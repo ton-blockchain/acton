@@ -9,7 +9,7 @@ import {
   sortJettonWalletsByAmount,
 } from "../../explorer/api/jettonWallets"
 import type {JettonWallet} from "../../explorer/api/types"
-import {AddressChip} from "../../explorer/components/AddressChip"
+import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
 import {
   normalizeAddress,
@@ -197,7 +197,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           </span>
                         </td>
                         <td className={styles.walletAddressCell}>
-                          <AddressChip
+                          <ExplorerAddressChip
                             address={walletAddress}
                             fallback="Account"
                             copiedAddress={copiedAddress}
@@ -437,7 +437,7 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
 
   const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
   return (
-    <AddressChip
+    <ExplorerAddressChip
       address={walletAddress}
       copiedAddress={copiedAddress}
       nameFallback={wallet.record.name}

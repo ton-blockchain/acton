@@ -393,6 +393,65 @@ history persistence, validation messages, and navigation.
 - Use Input for a search field without a dropdown, and use a command palette
   for global application commands.
 
+## AddressChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { AddressChip } from "@acton/ui"
+```
+
+Use AddressChip for a compact technical address that may need copying,
+navigation, caller-resolved naming, or coordinated highlighting. The component
+owns shortening, copy feedback, focus behavior, and the compact chip visual.
+
+### Composition
+
+```tsx
+<AddressChip
+  address={address}
+  formatAddress={formatFriendlyAddress}
+  label={resolvedName ? <span>{resolvedName}</span> : undefined}
+  onAddressClick={openAccount}
+/>
+```
+
+- `address`: raw or already formatted string; missing values render `fallback`.
+- `formatAddress`: optional caller-owned conversion to a friendly/network form.
+- `label`: optional resolved display content that replaces the shortened address.
+- `copyable`: hides the copy action when another surrounding action owns the row.
+- `copyPlacement`: places the copy action on the left or right without changing
+  click semantics.
+- `shorten`: controls compact middle truncation; full values wrap safely.
+- `highlighted`: coordinates the chip with another hovered address or trace node.
+- `variant="plain"`: uses the standard text color, removes address hover styling,
+  and keeps the copy action visible.
+- `copied`: optional external copied state; the component also owns local feedback.
+- `onCopyAddress`: optional application copy handler. Native clipboard copying is
+  used when omitted.
+
+### States To Review Visually
+
+- Missing address and custom fallback
+- Shortened and full address
+- Caller-resolved label
+- Clickable and read-only
+- Copy action on the left and right
+- Highlighted address
+- Keyboard focus and copied feedback
+
+### Agent Guidance
+
+- Keep TON parsing, network selection, and address-book lookup outside AddressChip.
+- Pass a formatter callback instead of adding `@ton/core` to `@acton/ui`.
+- Pass resolved names through `label`; do not add address-book state to the component.
+- Let AddressChip own shortening and copy feedback.
+- Use ContractChip when known contract metadata should show a letter, name, and
+  address together.
+- Do not wrap AddressChip in another copy control or clickable element.
+
 ## ContractChip
 
 Status: ready

@@ -4,7 +4,7 @@ import {addressKey} from "../api/compilerAbi"
 import type {V3Message, V3TransactionListItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {AddressChip} from "./AddressChip"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {formatNano, formatTimeAgo, hashToHex} from "./utils"
 import type {MessageNamesByAddress} from "../hooks/useMessageNamesByAddress"
 
@@ -214,7 +214,7 @@ const EndpointCell: FC<{
 
   if (!onAddressClick) {
     return (
-      <AddressChip
+      <ExplorerAddressChip
         address={endpoint.address}
         fallback={endpoint.fallback}
         copyPlacement={copyPlacement}
@@ -223,7 +223,7 @@ const EndpointCell: FC<{
   }
 
   return (
-    <AddressChip
+    <ExplorerAddressChip
       address={endpoint.address}
       fallback={endpoint.fallback}
       copyPlacement={copyPlacement}

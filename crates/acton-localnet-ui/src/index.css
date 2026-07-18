@@ -3,7 +3,6 @@
   --litenode-text-faint: #8c8c92;
   --litenode-accent-bg: rgba(0, 136, 204, 0.1);
   --litenode-link-chip-bg: #eef6ff;
-  --litenode-link-chip-bg-active: #dff0ff;
   --litenode-overlay: rgba(250, 250, 250, 0.68);
   --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   --litenode-workspace-to: #71717a;
@@ -17,7 +16,6 @@
   --litenode-text-faint: #a1a1aa;
   --litenode-accent-bg: rgba(56, 189, 248, 0.12);
   --litenode-link-chip-bg: rgba(56, 189, 248, 0.12);
-  --litenode-link-chip-bg-active: rgba(56, 189, 248, 0.18);
   --litenode-overlay: rgba(9, 9, 11, 0.72);
   --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   --litenode-workspace-to: #71717a;

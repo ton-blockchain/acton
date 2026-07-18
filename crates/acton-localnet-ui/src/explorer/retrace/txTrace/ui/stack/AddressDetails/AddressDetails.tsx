@@ -6,7 +6,7 @@ import type {Address} from "@ton/core"
 import {ContractChip} from "@acton/ui"
 import type {ContractData} from "@acton/shared-ui"
 
-import {AddressChip} from "../../../../../components/AddressChip"
+import {ExplorerAddressChip} from "../../../../../components/ExplorerAddressChip"
 import type {ExplorerNavigationClickEvent} from "../../../../../hooks/useOpenExplorerPath"
 
 import styles from "./AddressDetails.module.css"
@@ -28,7 +28,7 @@ const AddressValueRow: React.FC<{
   <div className={styles.addressRow}>
     <div className={styles.addressLabel}>{label}</div>
     <div className={styles.addressChipLine}>
-      <AddressChip
+      <ExplorerAddressChip
         address={value}
         copyPlacement="right"
         displayFormat={displayFormat}

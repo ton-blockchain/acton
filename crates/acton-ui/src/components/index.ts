@@ -1,3 +1,4 @@
+export * from "./AddressChip"
 export * from "./Button"
 export * from "./Breadcrumbs"
 export * from "./Checkbox"

@@ -3,7 +3,7 @@ import {Link} from "react-router-dom"
 import type {FC, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
-import {AddressLabel} from "./AddressLabel"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import styles from "./ExplorerBreadcrumbs.module.css"
 import {formatAddress} from "./utils"
 
@@ -30,7 +30,7 @@ function createBreadcrumbLink(path: string): BreadcrumbLink {
 
 function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
   if (item.isAddress) {
-    return <AddressLabel address={item.label} />
+    return <ExplorerAddressChip address={item.label} copyable={false} variant="plain" />
   }
   if (item.isHash) {
     return formatAddress(item.label)

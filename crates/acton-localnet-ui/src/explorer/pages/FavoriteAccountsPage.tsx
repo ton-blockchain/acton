@@ -7,7 +7,7 @@ import {Star, Trash2} from "lucide-react"
 import type {TonClient} from "../api/client"
 import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/jettonWallets"
 import type {JettonWallet} from "../api/types"
-import {AddressChip} from "../components/AddressChip"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
 import {normalizeAddress, toRawAddress} from "../components/utils"
@@ -194,7 +194,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           />
                         }
                       >
-                        <AddressChip
+                        <ExplorerAddressChip
                           address={favorite.address}
                           fallback="Account"
                           copyable={false}

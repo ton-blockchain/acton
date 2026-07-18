@@ -3,7 +3,7 @@ import type {FC, ReactNode} from "react"
 import type {V3AccountState} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {AddressChip} from "./AddressChip"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {formatNano} from "./utils"
 
 import styles from "./DeveloperAccountList.module.css"
@@ -112,7 +112,7 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
                 aria-label={canOpenAccount ? `Open account ${account.address}` : undefined}
               >
                 <td className={styles.accountCell}>
-                  <AccountCell account={account} onAddressClick={onAddressClick} />
+                  <ExplorerAddressChip address={account.address} onAddressClick={onAddressClick} />
                 </td>
                 <td className={styles.statusCell}>
                   <span className={`${styles.statusBadge} ${styles[status.className]}`}>
@@ -132,17 +132,6 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
       </table>
     </div>
   )
-}
-
-const AccountCell: FC<{
-  readonly account: DeveloperAccountListItem
-  readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
-}> = ({account, onAddressClick}) => {
-  if (!onAddressClick) {
-    return <AddressChip address={account.address} />
-  }
-
-  return <AddressChip address={account.address} onAddressClick={onAddressClick} />
 }
 
 type AccountStatusClass = "statusActive" | "statusFrozen" | "statusUninit" | "statusNonexist"

@@ -16,7 +16,7 @@ import type {FC} from "react"
 import type {TonClient} from "../../explorer/api/client"
 import type {NftItem} from "../../explorer/api/types"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
-import {AddressChip} from "../../explorer/components/AddressChip"
+import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {NFT_PLACEHOLDER_IMAGE} from "../constants"
 import {contentString} from "../dashboardUtils"
 
@@ -174,7 +174,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                         </span>
                       </DataTableCell>
                       <DataTableCell>
-                        <AddressChip address={item.address} resolveName={false} />
+                        <ExplorerAddressChip address={item.address} resolveName={false} />
                       </DataTableCell>
                     </DataTableRow>
                   )

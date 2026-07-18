@@ -66,7 +66,7 @@ import {
 } from "../hooks/useMessageNamesByAddress"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
-import {AddressChip} from "./AddressChip"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -876,7 +876,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         <td>
                           <div className={styles.addressWrapper}>
                             {info.address ? (
-                              <AddressChip
+                              <ExplorerAddressChip
                                 address={info.address}
                                 fallback={info.displayAddressFallback}
                                 highlighted={isAddressHovered}
@@ -1046,10 +1046,16 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         }
                       >
                         <td>
-                          <AddressChip address={holder.owner} onAddressClick={onAddressClick} />
+                          <ExplorerAddressChip
+                            address={holder.owner}
+                            onAddressClick={onAddressClick}
+                          />
                         </td>
                         <td>
-                          <AddressChip address={holder.address} onAddressClick={onAddressClick} />
+                          <ExplorerAddressChip
+                            address={holder.address}
+                            onAddressClick={onAddressClick}
+                          />
                         </td>
                         <td className={styles.valueContainer}>
                           <div className={styles.valuePositive}>
@@ -1347,7 +1353,7 @@ export function ActionHistoryRows({
                   <span className={styles.addressRelation}>{info.relationLabel}</span>
                 )}
                 {info.address ? (
-                  <AddressChip
+                  <ExplorerAddressChip
                     address={info.address}
                     fallback={info.displayAddressFallback}
                     highlighted={isAddressHovered}

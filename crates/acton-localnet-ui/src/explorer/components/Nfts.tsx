@@ -5,7 +5,7 @@ import type {FC} from "react"
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {AddressLabel} from "./AddressLabel"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {
   NFT_IMAGE_SOURCE_KEYS,
   getImageSources,
@@ -110,7 +110,7 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
                 <div className={styles.nftMetaLine}>
                   <span>#{item.index}</span>
                   <span className={styles.nftAddress}>
-                    <AddressLabel address={item.address} />
+                    <ExplorerAddressChip address={item.address} copyable={false} variant="plain" />
                   </span>
                 </div>
               </div>

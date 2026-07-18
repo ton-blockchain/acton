@@ -11,7 +11,7 @@ import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
-import {AddressChip} from "../components/AddressChip"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -489,7 +489,7 @@ const BlockTransactionsTable: FC<{
               >
                 <td>{index + 1}</td>
                 <td>
-                  <AddressChip
+                  <ExplorerAddressChip
                     address={transaction.account}
                     fallback="Account"
                     onAddressClick={onOpenAccount}

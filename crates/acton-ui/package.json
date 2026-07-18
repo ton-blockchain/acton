@@ -10,6 +10,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./components/address-chip": "./src/components/AddressChip/index.ts",
     "./components/breadcrumbs": "./src/components/Breadcrumbs/index.ts",
     "./components/button": "./src/components/Button/index.ts",
     "./components/checkbox": "./src/components/Checkbox/index.ts",

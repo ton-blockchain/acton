@@ -229,38 +229,6 @@
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
-.addressCopyButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  color: var(--acton-color-text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  cursor: pointer;
-  transition:
-    background-color var(--acton-duration-fast),
-    color var(--acton-duration-fast);
-}
-
-.addressCopyButton:hover {
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface-raised);
-}
-
-.addressCopyButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.addressCopyButtonCopied {
-  color: var(--acton-color-text);
-}
-
 .jettonDescription {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
@@ -322,21 +290,6 @@
 .accountDetailAddressValue .accountDetailValue {
   flex: 0 1 auto;
   max-width: calc(100% - 28px);
-}
-
-.accountDetailLink {
-  color: var(--acton-color-text);
-  cursor: pointer;
-  border-radius: 6px;
-}
-
-.accountDetailLink:hover {
-  color: var(--acton-color-accent);
-}
-
-.accountDetailLink:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nftPanel {
@@ -591,21 +544,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.metadataLink {
-  color: var(--acton-color-accent);
-  cursor: pointer;
-}
-
-.metadataLink:hover {
-  text-decoration: underline;
-}
-
-.metadataLink:focus-visible {
-  outline: none;
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataDescription {

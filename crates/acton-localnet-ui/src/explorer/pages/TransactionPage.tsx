@@ -34,7 +34,7 @@ import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
-import {AddressChip} from "../components/AddressChip"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
   formatAddress as formatDisplayAddress,
@@ -319,7 +319,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     address: string,
     options: {readonly shorten: boolean},
   ): JSX.Element => (
-    <AddressChip
+    <ExplorerAddressChip
       address={address}
       onAddressClick={handleContractClick}
       resolveName={false}

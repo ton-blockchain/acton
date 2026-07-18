@@ -16,7 +16,7 @@ import type {FC} from "react"
 import type {TonClient} from "../../explorer/api/client"
 import type {JettonMaster} from "../../explorer/api/types"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
-import {AddressChip} from "../../explorer/components/AddressChip"
+import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {formatTokenSupply} from "../dashboardUtils"
 
@@ -173,7 +173,7 @@ export const TokensPage: FC<TokensPageProps> = ({client}) => {
                         </span>
                       </DataTableCell>
                       <DataTableCell>
-                        <AddressChip address={token.address} resolveName={false} />
+                        <ExplorerAddressChip address={token.address} resolveName={false} />
                       </DataTableCell>
                     </DataTableRow>
                   )
