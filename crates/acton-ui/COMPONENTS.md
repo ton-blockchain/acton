@@ -1108,6 +1108,10 @@ renders the scrollable `pre/code` area and owns copy button state.
   plain text.
 - `empty`: renders a quiet empty state instead of `pre/code`; copy is hidden.
 - `emptyContent`: text or React content explaining why raw data is unavailable.
+- `loading`: disables copy and renders a skeleton instead of ordinary content. A
+  collapsible block hides its content and shows progress in the header action
+  slot instead.
+- `loadingLabel`: accessible name for the loading status.
 - `children`: optional highlighted code fragments rendered inside the built-in
   `pre/code`; `value` remains the copy source.
 - `customContent`: a complete pre-rendered code viewer that replaces the
@@ -1121,6 +1125,7 @@ renders the scrollable `pre/code` area and owns copy button state.
 - Wrapped payload
 - No-wrap preformatted output
 - Collapsible title open and closed states
+- Loading skeleton and collapsible header progress
 - Empty data text and custom React content
 - Copy hover/focus and copied state
 
@@ -1132,6 +1137,8 @@ renders the scrollable `pre/code` area and owns copy button state.
   one-off disclosure header.
 - Use `empty` for missing VM logs, executor logs, state init, raw bodies, or
   other expected payloads. Do not display missing-data explanations as raw text.
+- Use `loading` while raw data is being fetched. Do not render loading text as
+  raw or empty content.
 - Keep decoding, formatting, and syntax highlighting setup outside RawDataBlock.
 - Do not use RawDataBlock for parsed key-value data, tables, or prose content.
 

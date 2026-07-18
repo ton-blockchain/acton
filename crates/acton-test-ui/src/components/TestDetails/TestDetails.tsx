@@ -20,10 +20,12 @@ import {
   DataTable,
   DataTableBody,
   DataTableCell,
+  DataTableEmpty,
   DataTableGroupRow,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
+  DataTableSkeletonRows,
   DataTableTable,
   RawDataBlock,
 } from "@acton/ui"
@@ -127,7 +129,7 @@ const isExternalMessageNotAcceptedError = (error: string): boolean => {
 }
 
 const MISSING_VM_LOG_HINT = [
-  "No VM logs were collected for this trace.",
+  "No VM logs were collected for this trace",
   "Re-run with --verbose flag",
 ].join("\n")
 const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
@@ -733,24 +735,42 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             </div>
           )}
           <div className={styles.logSection}>
-            <div className={styles.logSectionTitle}>Error</div>
-            <RawDataBlock value={failedMessage.error} />
+            <RawDataBlock
+              collapsible
+              copyLabel="Error"
+              defaultExpanded={false}
+              title="Error"
+              value={failedMessage.error}
+            />
           </div>
           {failedMessage.vm_exit_code !== undefined && (
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>VM Exit Code</div>
-              <RawDataBlock value={failedMessage.vm_exit_code.toString()} />
+              <RawDataBlock
+                collapsible
+                copyLabel="VM exit code"
+                defaultExpanded={false}
+                title="VM Exit Code"
+                value={failedMessage.vm_exit_code.toString()}
+              />
             </div>
           )}
           {hasExecutorLog && (
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>Executor Log</div>
-              <RawDataBlock value={failedMessage.executor_logs ?? ""} />
+              <RawDataBlock
+                collapsible
+                copyLabel="Executor log"
+                defaultExpanded={false}
+                title="Executor Log"
+                value={failedMessage.executor_logs ?? ""}
+              />
             </div>
           )}
           <div className={styles.logSection}>
-            <div className={styles.logSectionTitle}>VM Log</div>
             <RawDataBlock
+              collapsible
+              copyLabel="VM log"
+              defaultExpanded={false}
+              title="VM Log"
               value={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT}
             />
           </div>
@@ -760,56 +780,43 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }
 
   const renderTestExecutionLogs = () => {
-    const hasStdout = hasNonEmptyLog(executionLogs?.stdout)
-    const hasStderr = hasNonEmptyLog(executionLogs?.stderr)
-    const hasVmLog = hasNonEmptyLog(executionLogs?.vm_log)
-    const hasAnyLogs = hasStdout || hasStderr || hasVmLog
-
-    if (!hasAnyLogs && !isLoadingExecutionLogs) {
-      return
-    }
-
-    if (isLoadingExecutionLogs) {
-      return (
-        <RawDataBlock
-          empty
-          emptyContent="Loading test logs..."
-          showCopy={false}
-          title="Test Logs"
-          value=""
-        />
-      )
-    }
+    const sections = [
+      {
+        copyLabel: "Test stdout",
+        emptyContent: "No test output was produced",
+        title: "Test Output",
+        value: executionLogs?.stdout ?? "",
+      },
+      {
+        copyLabel: "Test stderr",
+        emptyContent: "No test error output was produced",
+        title: "Test Error Output",
+        value: executionLogs?.stderr ?? "",
+      },
+      {
+        copyLabel: "Test VM log",
+        emptyContent: "No test VM log was collected",
+        title: "Test VM Log",
+        value: executionLogs?.vm_log ?? "",
+      },
+    ]
 
     return (
       <div className={styles.infoLogsSection}>
-        {hasStdout && (
+        {sections.map(section => (
           <RawDataBlock
+            key={section.title}
             collapsible
-            copyLabel="Test stdout"
+            copyLabel={section.copyLabel}
             defaultExpanded={false}
-            title="Test Output"
-            value={executionLogs?.stdout ?? ""}
+            empty={!isLoadingExecutionLogs && !hasNonEmptyLog(section.value)}
+            emptyContent={section.emptyContent}
+            loading={isLoadingExecutionLogs}
+            loadingLabel={`Loading ${section.title}`}
+            title={section.title}
+            value={section.value}
           />
-        )}
-        {hasStderr && (
-          <RawDataBlock
-            collapsible
-            copyLabel="Test stderr"
-            defaultExpanded={false}
-            title="Test Error Output"
-            value={executionLogs?.stderr ?? ""}
-          />
-        )}
-        {hasVmLog && (
-          <RawDataBlock
-            collapsible
-            copyLabel="Test VM log"
-            defaultExpanded={false}
-            title="Test VM Log"
-            value={executionLogs?.vm_log ?? ""}
-          />
-        )}
+        ))}
       </div>
     )
   }
@@ -1025,45 +1032,55 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             </div>
           )}
 
-          {traceFeeSummaries.length > 0 && (
-            <div className={styles.traceFeesSection}>
-              <div className={styles.traceFeesTitle}>Fee Summary</div>
-              <DataTable minWidth="62rem">
-                <DataTableTable aria-label="Trace fee summary">
-                  <DataTableHead>
-                    <DataTableRow>
-                      <DataTableHeaderCell columnWidth="16rem">Trace</DataTableHeaderCell>
-                      <DataTableHeaderCell align="center" columnWidth="8rem">
-                        Tx Count
-                      </DataTableHeaderCell>
-                      <DataTableHeaderCell columnWidth="8rem">Gas Used</DataTableHeaderCell>
-                      <DataTableHeaderCell columnWidth="12rem">Gas Fee</DataTableHeaderCell>
-                      <DataTableHeaderCell columnWidth="13rem">Forward Fee</DataTableHeaderCell>
-                      <DataTableHeaderCell columnWidth="13rem">Total Fee</DataTableHeaderCell>
-                    </DataTableRow>
-                  </DataTableHead>
-                  <DataTableBody>
-                    {treasuryDeployTraceFeeSummaries.length > 0 && (
-                      <DataTableGroupRow
-                        colSpan={6}
-                        expanded={shouldShowTreasuryDeployTraces}
-                        onToggle={handleToggleTreasuryDeployTraces}
-                      >
-                        {treasuryDeployTraceLabel}
-                      </DataTableGroupRow>
-                    )}
-                    {shouldShowTreasuryDeployTraces &&
-                      treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+          <div className={styles.traceFeesSection}>
+            <div className={styles.traceFeesTitle}>Fee Summary</div>
+            <DataTable aria-busy={isTraceLoading} minWidth="62rem">
+              <DataTableTable aria-label="Trace fee summary">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth="16rem">Trace</DataTableHeaderCell>
+                    <DataTableHeaderCell align="center" columnWidth="8rem">
+                      Tx Count
+                    </DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="8rem">Gas Used</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="12rem">Gas Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Forward Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Total Fee</DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
+                  {isTraceLoading ? (
+                    <DataTableSkeletonRows
+                      alignments={["left", "center", "left", "left", "left", "left"]}
+                      columns={6}
+                      rowKeyPrefix="trace-fee-summary"
+                    />
+                  ) : traceFeeSummaries.length === 0 ? (
+                    <DataTableEmpty colSpan={6}>No transactions were recorded</DataTableEmpty>
+                  ) : (
+                    <>
+                      {treasuryDeployTraceFeeSummaries.length > 0 && (
+                        <DataTableGroupRow
+                          colSpan={6}
+                          expanded={shouldShowTreasuryDeployTraces}
+                          onToggle={handleToggleTreasuryDeployTraces}
+                        >
+                          {treasuryDeployTraceLabel}
+                        </DataTableGroupRow>
+                      )}
+                      {shouldShowTreasuryDeployTraces &&
+                        treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+                          renderTraceFeeSummaryRow(traceFeeSummary),
+                        )}
+                      {regularTraceFeeSummaries.map(traceFeeSummary =>
                         renderTraceFeeSummaryRow(traceFeeSummary),
                       )}
-                    {regularTraceFeeSummaries.map(traceFeeSummary =>
-                      renderTraceFeeSummaryRow(traceFeeSummary),
-                    )}
-                  </DataTableBody>
-                </DataTableTable>
-              </DataTable>
-            </div>
-          )}
+                    </>
+                  )}
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
+          </div>
 
           {renderTestExecutionLogs()}
         </div>
@@ -1117,8 +1134,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 </div>
                 {hasExecutorLog && (
                   <div className={styles.logSection}>
-                    <div className={styles.logSectionTitle}>Executor Log</div>
                     <RawDataBlock
+                      collapsible
+                      copyLabel="Executor log"
+                      defaultExpanded={false}
+                      title="Executor Log"
                       value={tx.executor_logs}
                       data-visual-dynamic="executor-log"
                       data-visual-placeholder="<executor log>"
@@ -1126,8 +1146,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                   </div>
                 )}
                 <div className={styles.logSection}>
-                  <div className={styles.logSectionTitle}>VM Log</div>
                   <RawDataBlock
+                    collapsible
+                    copyLabel="VM log"
+                    defaultExpanded={false}
+                    title="VM Log"
                     value={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
                     data-visual-dynamic="vm-log"
                     data-visual-placeholder="<vm log>"
@@ -1146,8 +1169,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         return (
           <div className={styles.txLogs}>
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>VM Log</div>
               <RawDataBlock
+                collapsible
+                copyLabel="VM log"
+                defaultExpanded={false}
+                title="VM Log"
                 value={MISSING_VM_LOG_HINT}
                 data-visual-dynamic="vm-log"
                 data-visual-placeholder="<vm log>"

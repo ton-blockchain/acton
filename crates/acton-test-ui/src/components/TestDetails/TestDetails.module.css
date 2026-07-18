@@ -790,12 +790,3 @@
 .logSection {
   margin-top: var(--acton-space-2);
 }
-
-.logSectionTitle {
-  font-size: var(--acton-font-size-xs);
-  font-weight: var(--acton-font-weight-emphasis);
-  color: var(--acton-color-text-subtle);
-  text-transform: uppercase;
-  margin-bottom: var(--acton-space-1);
-  letter-spacing: 0.05em;
-}

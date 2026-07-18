@@ -7,8 +7,8 @@ import type {ThemeMode} from "@acton/ui"
 import type {TestReport} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
-import {CoverageView} from "./components/Coverage/CoverageView"
-import {GasProfileView} from "./components/GasProfile/GasProfileView"
+import {Coverage} from "./components/Coverage/Coverage"
+import {GasProfile} from "./components/GasProfile/GasProfile"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
 import {useRunnerConnection} from "./hooks/useRunnerConnection"
@@ -391,10 +391,10 @@ export const App: React.FC = () => {
         <div className={styles.mainPanel}>
           {activeView === "profile" && gasProfileAvailable ? (
             <div className={styles.profileView}>
-              <GasProfileView projectRoot={projectRoot} />
+              <GasProfile projectRoot={projectRoot} />
             </div>
           ) : activeView === "coverage" && coverageAvailable ? (
-            <CoverageView projectRoot={projectRoot} />
+            <Coverage projectRoot={projectRoot} />
           ) : selectedTest ? (
             <TestDetails
               test={selectedTest}

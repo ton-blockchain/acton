@@ -4,13 +4,13 @@ import {FiSearch} from "react-icons/fi"
 
 import {highlightCodeToTokens, type HighlightedCodeToken} from "@acton/ui"
 
+import {useCoverageReport} from "../../hooks/useCoverageReport"
 import {useFileContent} from "../../hooks/useFileContent"
 import {parseLcov, type CoverageFile} from "../../utils/lcov"
 
 import styles from "./Coverage.module.css"
 
 interface CoverageProps {
-  readonly lcov: string
   readonly projectRoot?: string
 }
 
@@ -94,8 +94,9 @@ const tokenStyle = (token: HighlightedCodeToken): React.CSSProperties | undefine
   return Object.keys(style).length > 0 ? style : undefined
 }
 
-export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
-  const coverage = useMemo(() => parseLcov(lcov), [lcov])
+export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
+  const {lcov, error, loading} = useCoverageReport()
+  const coverage = useMemo(() => parseLcov(lcov ?? ""), [lcov])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
     return coverage.files[0]?.filePath
@@ -202,8 +203,12 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
     return sourceContent.split("\n")
   }, [sourceContent])
 
+  if (loading) return <div className={styles.emptyState}>Loading coverage report...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load coverage: {error}</div>
+  if (lcov === undefined) return <div className={styles.emptyState}>Coverage is not available</div>
+
   if (coverage.files.length === 0) {
-    return <div className={styles.emptyState}>No coverage records found in the LCOV report.</div>
+    return <div className={styles.emptyState}>No coverage records found in the LCOV report</div>
   }
 
   return (
@@ -296,14 +301,14 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
             })}
 
             {filteredFiles.length === 0 && (
-              <div className={styles.emptyList}>No files matched the current filter.</div>
+              <div className={styles.emptyList}>No files matched the current filter</div>
             )}
           </div>
         </aside>
 
         <section className={styles.viewer} aria-label="Coverage source">
           {selectedFile === undefined ? (
-            <div className={styles.emptyState}>Select a file to inspect its coverage.</div>
+            <div className={styles.emptyState}>Select a file to inspect its coverage</div>
           ) : (
             <>
               <div className={styles.viewerHeader}>

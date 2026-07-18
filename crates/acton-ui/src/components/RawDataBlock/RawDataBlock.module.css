@@ -121,11 +121,17 @@ div.headerTitle {
   overflow: visible;
 }
 
+.loadingContent {
+  min-height: 4.5rem;
+  max-height: none;
+  padding: var(--acton-space-4);
+  overflow: hidden;
+}
+
 .empty {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  min-height: 4.5rem;
   padding: var(--acton-space-4);
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
@@ -223,4 +229,31 @@ div.headerTitle {
   flex: 0 0 auto;
   opacity: 1;
   pointer-events: auto;
+}
+
+.loadingIndicator {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  color: var(--acton-color-text-muted);
+}
+
+.loadingIndicator svg {
+  animation: actonRawDataBlockSpin 800ms linear infinite;
+}
+
+@keyframes actonRawDataBlockSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingIndicator svg {
+    animation: none;
+  }
 }

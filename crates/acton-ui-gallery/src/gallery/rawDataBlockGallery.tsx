@@ -200,6 +200,7 @@ export const rawDataBlockGallery = {
     'Use variant="embedded" inside ContentTabs so there is only one visible panel frame.',
     "Use wrap={false} for disassembly, logs, and aligned preformatted output.",
     "Use title with collapsible when a raw payload needs a compact reveal header.",
+    "Use loading instead of rendering loading text as raw or empty content.",
     "Use empty with emptyContent when a raw payload was expected but no data exists.",
     "Pass copyLabel so the copy button has a useful accessible label.",
     "Compose HighlightedCode through customContent when the raw value is source code.",
@@ -235,6 +236,25 @@ export const rawDataBlockGallery = {
       title: "Empty Data",
       description: "A missing raw payload gets a quiet empty state instead of fake raw text.",
       content: <EmptySamples />,
+    },
+    {
+      id: "raw-data-block-loading",
+      title: "Loading",
+      description:
+        "Standalone content uses a skeleton; a collapsible header uses its action slot for progress.",
+      content: (
+        <div className={styles.sampleRow}>
+          <RawDataBlock loading value="" />
+          <RawDataBlock
+            collapsible
+            defaultExpanded={false}
+            loading
+            loadingLabel="Loading raw message body"
+            title="Raw message body"
+            value=""
+          />
+        </div>
+      ),
     },
   ],
 } satisfies ComponentGallery
