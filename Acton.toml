@@ -11,10 +11,10 @@ fail-on-diff = false
 [test.mutation]
 
 [lint]
-exclude = ["tests/**", "**/templates/**", "crates/acton-test-ui/e2e/**"]
+exclude = ["tests/**", "**/templates/**", "crates/acton-test-ui/e2e/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
 
 [fmt]
-ignore = ["crates/tolk-compiler/**"]
+ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
 
 [localnet]
 port = 3010

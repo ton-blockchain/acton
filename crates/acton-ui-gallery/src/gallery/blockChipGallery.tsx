@@ -31,20 +31,25 @@ export const blockChipGallery = {
         <div className={styles.grid}>
           <article className={styles.sample}>
             <span className={styles.sampleTitle}>Read-only</span>
-            <BlockChip workchain={-1} shard="8000000000000000" seqno={80323933} />
+            <BlockChip workchain={-1} shard="8000000000000000" seqno={80_323_933} />
           </article>
           <article className={styles.sample}>
             <span className={styles.sampleTitle}>Linked</span>
             <BlockChip
               workchain={-1}
               shard="8000000000000000"
-              seqno={80323933}
+              seqno={80_323_933}
               href="#block-chip"
             />
           </article>
           <article className={styles.sample}>
             <span className={styles.sampleTitle}>Highlighted</span>
-            <BlockChip workchain={-1} shard="8000000000000000" seqno={80323933} highlighted />
+            <BlockChip
+              workchain={-1}
+              shard="8000000000000000"
+              seqno={80_323_933}
+              highlighted
+            />
           </article>
         </div>
       ),
