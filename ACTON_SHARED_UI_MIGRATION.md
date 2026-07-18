@@ -51,7 +51,7 @@ Code remains local when it owns routing, network state, address-book lookup, app
 
 ## Phase 1: Replace Existing Duplicates
 
-This duplicate-cleanup phase is complete except for the localnet `InlineLoader`.
+This duplicate-cleanup phase is complete.
 
 | Current component | Target | Notes |
 | --- | --- | --- |
@@ -62,7 +62,7 @@ This duplicate-cleanup phase is complete except for the localnet `InlineLoader`.
 | Explorer `Breadcrumbs` | `@acton/ui/Breadcrumbs` | Migrated through application-owned navigation adapters and prepared labels. |
 | Explorer `InlineActionButton` | `InlineButton` or `InlineActions` | Migrated according to whether actions are standalone or grouped. |
 | `TraceViewModeToggle` | `PillTabs` adapter | Migrated; trace-mode state and labels remain in localnet. |
-| `InlineLoader` | `Skeleton` or a new `LoadingState` | Add `LoadingState` only if `Skeleton` cannot express the actual shared use cases. |
+| Localnet `InlineLoader` | `@acton/ui/InlineLoader` | Migrated as an accessible indeterminate state for layouts that cannot be represented by `Skeleton`. |
 
 Migration should preserve controlled and uncontrolled behavior, copy feedback, collapsed state, wrapping, and keyboard interaction rather than matching only the visual result.
 
@@ -272,9 +272,8 @@ Large components such as `ContractSourcePanel` and `TransactionDetails` may rely
 
 ## Remaining Work
 
-The original low-risk duplicate cleanup is complete for buttons, tables, raw-data blocks, copy actions, breadcrumbs, inline actions, and trace view-mode tabs. The remaining slices are:
+The original low-risk duplicate cleanup is complete for buttons, tables, raw-data blocks, copy actions, breadcrumbs, inline actions, loading states, and trace view-mode tabs. The remaining slices are:
 
-1. Replace the localnet `InlineLoader` when an existing loading primitive can preserve its current full-state presentation.
-2. Continue reducing the legacy Retrace token surface without replacing application-specific visualization tokens with misleading global semantics.
-3. Add `Card`, `TextArea`, `FileInput`, and `Badge`/`StatusBadge` only alongside concrete consumers and gallery examples.
-4. Complete light/dark Playwright verification and bundle review for the migrated applications.
+1. Continue reducing the legacy Retrace token surface without replacing application-specific visualization tokens with misleading global semantics.
+2. Add `Card`, `TextArea`, `FileInput`, and `Badge`/`StatusBadge` only alongside concrete consumers and gallery examples.
+3. Complete light/dark Playwright verification and bundle review for the migrated applications.

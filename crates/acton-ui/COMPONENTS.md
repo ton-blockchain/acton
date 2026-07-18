@@ -1517,6 +1517,56 @@ behavior, and basic placeholder shapes.
   when the loading state needs to be announced.
 - Do not use Skeleton for empty states, error states, or hidden final content.
 
+## InlineLoader
+
+Status: ready
+
+Import:
+
+```tsx
+import { InlineLoader } from "@acton/ui"
+```
+
+Use InlineLoader for an indeterminate operation when the destination layout is
+not yet available, such as a lazily loaded editor or a transaction trace. The
+component owns the accessible status, spinner, optional detail, animated dots,
+and reduced-motion behavior; the caller owns when it is mounted and how much
+space surrounds it.
+
+### Composition
+
+```tsx
+<InlineLoader message="Loading editor" />
+
+<InlineLoader
+  message="Tracing transaction"
+  subtext="This may take a few moments"
+/>
+```
+
+- `message`: operation label; defaults to `Loading`.
+- `subtext`: optional expectation-setting detail with animated trailing dots.
+- Standard `div` props, `className`, and `ref` are forwarded.
+- The component is announced as a polite status by default.
+
+### States To Review Visually
+
+- Default loading message
+- Message with subtext and animated dots
+- Light and dark themes
+- Reduced-motion mode
+- Constrained centered container
+
+### Agent Guidance
+
+- Mount InlineLoader only while the operation is in progress; it does not need
+  a separate `loading` boolean.
+- Use Skeleton when the final layout is known and preserving it will reduce
+  visual movement.
+- Keep page, panel, and editor sizing in the caller rather than adding layout
+  variants to InlineLoader.
+- Use a progress component instead when completion can be measured.
+
 ## Checkbox
 
 Status: ready

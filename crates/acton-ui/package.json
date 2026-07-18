@@ -25,6 +25,7 @@
     "./components/input": "./src/components/Input/index.ts",
     "./components/inline-actions": "./src/components/InlineActions/index.ts",
     "./components/inline-button": "./src/components/InlineButton/index.ts",
+    "./components/inline-loader": "./src/components/InlineLoader/index.ts",
     "./components/markdown-text": "./src/components/MarkdownText/index.ts",
     "./components/mode-viewer": "./src/components/ModeViewer/index.ts",
     "./components/pill-tabs": "./src/components/PillTabs/index.ts",

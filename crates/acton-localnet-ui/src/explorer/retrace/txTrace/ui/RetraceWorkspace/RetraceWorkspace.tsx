@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 
 import type {ContractData} from "@acton/transaction-ui"
-import {CopyInlineAction} from "@acton/ui"
+import {CopyInlineAction, InlineLoader} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -57,7 +57,6 @@ import {
   setStoredTraceViewMode,
   type TraceViewMode,
 } from "../../lib/traceViewModel"
-import InlineLoader from "../InlineLoader"
 import StatusBadge from "../StatusBadge"
 import TraceSidePanel from "../TraceSidePanel"
 import TraceStepsChainView from "../TraceStepsChainView"
@@ -1277,7 +1276,7 @@ function SourceFilesEditor({
           <Suspense
             fallback={
               <div className={styles.editorLoader}>
-                <InlineLoader message="Loading editor" loading={true} />
+                <InlineLoader message="Loading editor" />
               </div>
             }
           >
@@ -1508,7 +1507,7 @@ function RetraceWorkspaceFc({
               <Suspense
                 fallback={
                   <div className={styles.editorLoader}>
-                    <InlineLoader message="Loading editor" loading={true} />
+                    <InlineLoader message="Loading editor" />
                   </div>
                 }
               >

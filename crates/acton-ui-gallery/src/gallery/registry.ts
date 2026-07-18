@@ -14,6 +14,7 @@ import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inputGallery} from "./inputGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
+import {inlineLoaderGallery} from "./inlineLoaderGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
 import {modeViewerGallery} from "./modeViewerGallery"
 import {opcodeChipGallery} from "./opcodeChipGallery"
@@ -40,6 +41,7 @@ export const galleries = [
   breadcrumbsGallery,
   inlineButtonGallery,
   inlineActionsGallery,
+  inlineLoaderGallery,
   codeViewerGallery,
   contractChipGallery,
   disclosureToggleGallery,
