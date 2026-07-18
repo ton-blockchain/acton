@@ -12,7 +12,7 @@
   flex: 0 0 auto;
   color: var(--tonscan-text-secondary);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -48,7 +48,7 @@
   background: transparent;
   font: inherit;
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;

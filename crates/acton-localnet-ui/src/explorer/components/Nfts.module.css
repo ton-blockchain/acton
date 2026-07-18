@@ -35,7 +35,7 @@
   background: transparent;
   color: var(--tonscan-text-primary);
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.4;
 }
 
@@ -103,7 +103,7 @@
 .nftMetaLine {
   min-width: 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 500;
   line-height: 1.25;
 }
@@ -118,7 +118,7 @@
 
 .nftName {
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 650;
   line-height: 1.25;
 }
@@ -137,7 +137,7 @@
   padding: 32px 16px;
   text-align: center;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 @media (max-width: 720px) {

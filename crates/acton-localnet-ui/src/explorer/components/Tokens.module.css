@@ -8,10 +8,10 @@
 }
 
 .walletItem {
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--acton-space-4) var(--acton-space-6);
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--acton-space-4);
   cursor: pointer;
   transition: background-color var(--transition-duration-fast);
   border-bottom: 1px solid var(--tonscan-border);
@@ -26,10 +26,10 @@
 }
 
 .walletItemSkeleton {
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--acton-space-4) var(--acton-space-6);
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--acton-space-4);
   border-bottom: 1px solid var(--tonscan-border);
 }
 
@@ -61,7 +61,7 @@
 .jettonBalanceRow {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   font-size: 0.875rem;
 }
 
@@ -92,10 +92,10 @@
 }
 
 .empty {
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   text-align: center;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .skeleton {

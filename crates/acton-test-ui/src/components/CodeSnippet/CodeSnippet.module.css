@@ -1,15 +1,15 @@
 .container {
-  margin-top: var(--spacing-md);
+  margin-top: var(--acton-space-4);
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  background-color: var(--bg-color);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background-color: var(--acton-color-surface);
 }
 
 .header {
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: var(--acton-space-1) var(--acton-space-2);
   background-color: var(--bg-secondary-color);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
   display: flex;
   align-items: center;
 }
@@ -17,14 +17,14 @@
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   flex: 1;
   min-width: 0;
 }
 
 .filePath {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
+  font-size: var(--acton-font-size-xs);
+  color: var(--acton-color-text-subtle);
   font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
@@ -38,9 +38,9 @@
 }
 
 .lineNumbers {
-  padding: var(--spacing-sm) 0;
+  padding: var(--acton-space-2) 0;
   background-color: var(--bg-secondary-color);
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--acton-color-border);
   text-align: right;
   min-width: 40px;
   user-select: none;
@@ -48,16 +48,16 @@
 }
 
 .lineNumber {
-  padding: 0 var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
+  padding: 0 var(--acton-space-2);
+  font-size: var(--acton-font-size-xs);
+  color: var(--acton-color-text-subtle);
   font-family: var(--font-mono);
   line-height: 1.5rem;
 }
 
 .activeLineNumber {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-bold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-bold);
 }
 
 .shikiWrapper {
@@ -67,10 +67,10 @@
 
 .shikiWrapper :global(pre) {
   margin: 0 !important;
-  padding: var(--spacing-sm) 0 !important;
+  padding: var(--acton-space-2) 0 !important;
   background-color: transparent !important;
   font-family: var(--font-mono) !important;
-  font-size: var(--font-size-xs) !important;
+  font-size: var(--acton-font-size-xs) !important;
 }
 
 .shikiWrapper :global(code) {
@@ -78,7 +78,7 @@
 }
 
 .shikiWrapper :global(.line) {
-  padding: 0 var(--spacing-md);
+  padding: 0 var(--acton-space-4);
   min-height: 1.5rem;
   line-height: 1.5rem;
 }
@@ -95,9 +95,9 @@
 
 .loading,
 .error {
-  padding: var(--spacing-md);
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
+  padding: var(--acton-space-4);
+  font-size: var(--acton-font-size-sm);
+  color: var(--acton-color-text-subtle);
   font-style: italic;
 }
 

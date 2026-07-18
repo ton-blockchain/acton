@@ -1,6 +1,6 @@
 .stackViewer {
   margin: 0;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -9,13 +9,13 @@
 }
 
 .stackTitle {
-  margin: 0 0 var(--spacing-xs) 0;
-  font-size: var(--font-size-sm);
+  margin: 0 0 var(--acton-space-1) 0;
+  font-size: var(--acton-font-size-sm);
   color: var(--color-text-secondary);
 }
 
 .stackContainer {
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background-color: var(--color-background-primary);
   flex: 1;
   overflow-y: auto;
@@ -24,7 +24,7 @@
 }
 
 .emptyStack {
-  padding: var(--spacing-md);
+  padding: var(--acton-space-4);
   text-align: center;
   color: var(--color-text-placeholder);
 }
@@ -38,8 +38,8 @@
 .stackElement {
   display: flex;
   border-bottom: 1px solid var(--stack-item-border);
-  padding: var(--spacing-xs);
-  font-size: var(--font-size-sm);
+  padding: var(--acton-space-1);
+  font-size: var(--acton-font-size-sm);
 }
 
 .stackElement:last-child {
@@ -54,16 +54,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--border-radius-sm);
-  margin-right: var(--spacing-xs);
-  font-size: var(--font-size-xs);
+  border-radius: var(--acton-radius-control-xs);
+  margin-right: var(--acton-space-1);
+  font-size: var(--acton-font-size-xs);
 }
 
 .stackItem {
   position: relative;
   flex: 1;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
+  padding: var(--acton-space-1) var(--acton-space-2);
+  border-radius: var(--acton-radius-control-xs);
   cursor: pointer;
   transition:
     opacity var(--transition-duration-fast) ease,
@@ -80,16 +80,16 @@
 }
 
 .stackItemLabel {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   margin-bottom: 2px;
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   color: var(--stack-item-label-text);
 }
 
 .stackItemValue {
   font-family: var(--font-family-mono);
   word-break: break-all;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .stackAddressContent {
@@ -129,15 +129,15 @@
   flex: 0 0 20px;
   align-self: center;
   border-radius: 50%;
-  background-color: var(--text-secondary, var(--color-text-secondary));
-  color: var(--bg-color, var(--color-background-primary));
+  background-color: var(--acton-color-text-muted, var(--color-text-secondary));
+  color: var(--acton-color-surface, var(--color-background-primary));
   font-size: 11px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
 }
 
 .stackItemDetails {
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   color: var(--stack-item-details-text);
   margin-top: 2px;
 }
@@ -145,8 +145,8 @@
 .stackItemCopyButton {
   position: absolute;
   top: 0.15rem;
-  right: var(--spacing-xs);
-  margin-left: var(--spacing-sm);
+  right: var(--acton-space-1);
+  margin-left: var(--acton-space-2);
   opacity: 0;
   transition:
     opacity var(--transition-duration-fast) ease,
@@ -260,9 +260,9 @@
 }
 
 .tupleElement {
-  margin-left: var(--spacing-md);
-  margin-bottom: var(--spacing-xs);
-  padding-left: var(--spacing-xs);
+  margin-left: var(--acton-space-4);
+  margin-bottom: var(--acton-space-1);
+  padding-left: var(--acton-space-1);
   border-left: 2px solid var(--stack-item-border);
 }
 
@@ -282,24 +282,24 @@
 }
 
 .ellipsis {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   margin: 0 2px;
 }
 
 .stackItemFullview {
-  margin-top: var(--spacing-xs);
-  padding: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
+  padding: var(--acton-space-1);
   background-color: var(--stack-item-expanded-bg);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   text-align: right;
 }
 
 .closeBtn {
   background-color: var(--color-neutral-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
-  padding: 2px var(--spacing-xs);
-  font-size: var(--font-size-xs);
+  border-radius: var(--acton-radius-control-xs);
+  padding: 2px var(--acton-space-1);
+  font-size: var(--acton-font-size-xs);
   cursor: pointer;
   color: var(--color-text-primary);
 }
@@ -316,8 +316,8 @@
   .stackIndex {
     min-width: 20px;
     height: 20px;
-    font-size: calc(var(--font-size-xs) - 1px);
-    margin-right: var(--spacing-sm);
+    font-size: calc(var(--acton-font-size-xs) - 1px);
+    margin-right: var(--acton-space-2);
   }
 
   .stackItem {
@@ -327,10 +327,10 @@
   .stackItemLabel,
   .stackItemDetails,
   .closeBtn {
-    font-size: var(--font-size-xs);
+    font-size: var(--acton-font-size-xs);
   }
 
   .stackItemValue {
-    font-size: var(--font-size-sm);
+    font-size: var(--acton-font-size-sm);
   }
 }

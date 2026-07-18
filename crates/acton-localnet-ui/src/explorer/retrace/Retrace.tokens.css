@@ -48,7 +48,7 @@
 
   --color-text-primary: var(--tonscan-text-primary, #09090b);
   --color-text-secondary: var(--tonscan-text-secondary, #71717a);
-  --color-text-tertiary: var(--text-muted, #a1a1aa);
+  --color-text-tertiary: var(--acton-color-text-subtle, #a1a1aa);
   --color-text-secondary-hex: #636366;
   --color-text-placeholder: #a0a0a5;
   --color-text-disabled: #bcbbc0;
@@ -254,7 +254,7 @@
 
   font-family: var(--font-family-sans), sans-serif;
   line-height: 1.5;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   color: var(--color-text-primary);
   background-color: var(--color-background-primary);
 
@@ -314,7 +314,7 @@ html.dark-theme .retraceRoot {
 
   --color-text-primary: var(--tonscan-text-primary, #fafafa);
   --color-text-secondary: var(--tonscan-text-secondary, #a1a1aa);
-  --color-text-tertiary: var(--text-muted, #71717a);
+  --color-text-tertiary: var(--acton-color-text-subtle, #71717a);
   --color-text-secondary-hex: #aeaeb2;
   --color-text-placeholder: #8e8e93;
   --color-text-disabled: #505054;

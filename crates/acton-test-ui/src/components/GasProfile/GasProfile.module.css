@@ -3,8 +3,8 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0 var(--spacing-md) var(--spacing-md);
-  background-color: var(--bg-color);
+  padding: 0 var(--acton-space-4) var(--acton-space-4);
+  background-color: var(--acton-color-surface);
 }
 
 .workspace {
@@ -17,7 +17,7 @@
   min-height: 0;
   border: 0;
   border-radius: 0;
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-surface);
   box-shadow: none;
 }
 
@@ -26,7 +26,7 @@
   gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) 0;
+  padding: var(--acton-space-2) var(--acton-space-4) var(--acton-space-2) 0;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
@@ -37,30 +37,30 @@
   overflow: hidden;
   border: none;
   border-radius: 4px;
-  background-color: var(--bg-color);
-  color: var(--text-secondary);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 500;
-  padding: 4px var(--spacing-sm);
+  padding: 4px var(--acton-space-2);
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: color 0.2s ease;
 }
 
 .contractButton:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .contractButton:focus {
-  outline: 1px solid var(--border-color);
+  outline: 1px solid var(--acton-color-border);
 }
 
 .contractButtonSelected,
 .contractButtonSelected:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-color);
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface);
   font-weight: 600;
 }
 
@@ -101,7 +101,7 @@
 }
 
 .flameChart :global(.gas-profile-frame-separator) {
-  stroke: var(--bg-color);
+  stroke: var(--acton-color-surface);
   stroke-width: 1px;
   pointer-events: none;
   vector-effect: non-scaling-stroke;
@@ -111,17 +111,17 @@
   color: #ffffff;
   font-family: var(--font-family);
   font-size: 12px;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 22px;
 }
 
 :global(.d3-flame-graph-tip) {
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  border: 1px solid var(--acton-color-border);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
   box-shadow: var(--shadow-tooltip);
   font-family: var(--font-family);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
 }
 
 .connectorLayer {
@@ -135,7 +135,7 @@
 }
 
 .connectorLayer line {
-  stroke: var(--border-color);
+  stroke: var(--acton-color-border);
   stroke-width: 1px;
   vector-effect: non-scaling-stroke;
 }
@@ -147,26 +147,26 @@
   flex: 0 1 auto;
   flex-direction: column;
   width: fit-content;
-  max-width: calc(100% - var(--spacing-md));
+  max-width: calc(100% - var(--acton-space-4));
   min-height: 0;
   overflow: visible;
-  margin-top: var(--spacing-md);
-  margin-left: var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
-  padding: 12px var(--spacing-md) var(--spacing-xs);
+  margin-top: var(--acton-space-4);
+  margin-left: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 0 0 var(--acton-radius-control-sm) var(--acton-radius-control-sm);
+  padding: 12px var(--acton-space-4) var(--acton-space-1);
 }
 
 .detailsHeader {
   min-width: 0;
-  margin-top: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
 }
 
 .detailsTitle {
   overflow: hidden;
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -174,8 +174,8 @@
 .detailsLocation {
   margin-top: 2px;
   overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -184,17 +184,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0;
-  margin-top: var(--spacing-sm);
+  margin-top: var(--acton-space-2);
 }
 
 .metric {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   min-width: 0;
-  margin-right: var(--spacing-md);
-  padding-right: var(--spacing-md);
-  border-right: 1px solid var(--border-color);
+  margin-right: var(--acton-space-4);
+  padding-right: var(--acton-space-4);
+  border-right: 1px solid var(--acton-color-border);
 }
 
 .metric:last-child {
@@ -204,38 +204,38 @@
 }
 
 .metric span {
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.2;
 }
 
 .metric strong {
   overflow: hidden;
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .instructionStats {
-  margin-top: var(--spacing-sm);
-  padding-top: var(--spacing-xs);
-  border-top: 1px solid var(--border-color);
+  margin-top: var(--acton-space-2);
+  padding-top: var(--acton-space-1);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .instructionStatsHeader {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--acton-space-4);
 }
 
 .actionsToggleButton {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -246,20 +246,20 @@
 }
 
 .actionsToggleButton:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .actionsToggleText {
-  margin-left: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  margin-left: var(--acton-space-1);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .instructionFilters {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .instructionFilterGroup {
@@ -268,28 +268,28 @@
   gap: var(--spacing-xss);
   width: fit-content;
   padding: var(--spacing-xss);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background-color: var(--bg-secondary-color);
 }
 
 .instructionStackToggle {
   align-items: center;
   min-height: 28px;
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   white-space: nowrap;
 }
 
 .instructionFilterButton {
   border: none;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 20px;
-  padding: 0 var(--spacing-sm);
+  padding: 0 var(--acton-space-2);
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
@@ -297,23 +297,23 @@
 }
 
 .instructionFilterButton:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .instructionFilterButtonActive,
 .instructionFilterButtonActive:hover {
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .instructionStatsTable {
   width: 100%;
-  margin-top: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
   margin-bottom: 0;
   border-collapse: collapse;
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
@@ -326,13 +326,13 @@
 }
 
 .instructionStatsTable td:not(:first-child) {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .instructionStatsTable th {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   font-size: 0.6875rem;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .instructionStatsTable th:first-child,
@@ -342,21 +342,21 @@
 
 .instructionStatsTable th + th,
 .instructionStatsTable td + td {
-  padding-left: var(--spacing-md);
+  padding-left: var(--acton-space-4);
 }
 
 .instructionStatsTable tfoot td {
-  padding-top: var(--spacing-xs);
-  border-top: 1px solid var(--border-color);
+  padding-top: var(--acton-space-1);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .instructionStatsSummaryRow td {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .instructionStatsSummaryRow td:first-child {
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .instructionName {
@@ -364,15 +364,15 @@
   min-width: 0;
   max-width: 32ch;
   overflow: hidden;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .instructionStatsEmpty {
-  margin-top: var(--spacing-xs);
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
+  margin-top: var(--acton-space-1);
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
 }
 
 .stackPath {
@@ -385,28 +385,28 @@
 .stackPart {
   max-width: 100%;
   overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .stackPart + .stackPart::before {
   content: "/";
-  padding: 0 var(--spacing-xs);
-  color: var(--text-muted);
+  padding: 0 var(--acton-space-1);
+  color: var(--acton-color-text-subtle);
 }
 
 .viewerState,
 .emptyState {
-  padding: var(--spacing-lg);
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  padding: var(--acton-space-6);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
 }
 
 @media (max-width: 720px) {
   .gasProfile {
-    padding: 0 var(--spacing-sm) var(--spacing-sm);
+    padding: 0 var(--acton-space-2) var(--acton-space-2);
   }
 
   .contractSelector {

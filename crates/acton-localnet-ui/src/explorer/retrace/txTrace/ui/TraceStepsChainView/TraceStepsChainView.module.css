@@ -201,6 +201,6 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
-  padding: var(--spacing-md);
+  padding: var(--acton-space-4);
   background-color: var(--color-background-primary);
 }

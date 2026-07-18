@@ -35,7 +35,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   transition:
@@ -98,11 +98,11 @@
 }
 
 .highlightedCode {
-  --acton-highlighted-code-font-size: var(--font-size-sm);
+  --acton-highlighted-code-font-size: var(--acton-font-size-sm);
   --acton-highlighted-code-line-height: 1.5;
   --acton-highlighted-code-max-height: 600px;
   --acton-highlighted-code-min-height: 96px;
-  --acton-highlighted-code-padding: var(--spacing-md);
+  --acton-highlighted-code-padding: var(--acton-space-4);
 }
 
 .abiPanel {
@@ -137,8 +137,8 @@
 
 .abiStackLabel {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
@@ -146,7 +146,7 @@
   margin: 0;
   color: var(--tonscan-text-primary);
   font-size: 18px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.25;
 }
 
@@ -155,7 +155,7 @@
 .abiDeclarationDescription {
   margin: 6px 0 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
 }
 
@@ -170,7 +170,7 @@
   min-width: 0;
   margin-top: 6px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.35;
 }
 
@@ -180,7 +180,7 @@
 
 .abiFacts strong {
   color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiSection {
@@ -204,15 +204,15 @@
   margin: 0;
   color: var(--tonscan-text-primary);
   font-size: 13px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .abiCount {
   color: var(--tonscan-text-secondary);
   font-family: var(--font-family);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
 }
 
@@ -278,7 +278,7 @@
   color: var(--tonscan-text-secondary);
   font-family: var(--font-family);
   font-size: 10px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
 }
 
@@ -296,8 +296,8 @@
   color: var(--tonscan-text-primary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   transition:
     background-color var(--transition-duration-fast),
     border-color var(--transition-duration-fast),
@@ -331,7 +331,7 @@
 .abiMuted,
 .abiEmptyInline {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 
@@ -355,13 +355,13 @@
   align-items: baseline;
   gap: 8px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.25;
 }
 
 .abiArgLabel strong {
   color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiArgLabel code {
@@ -370,7 +370,7 @@
   color: var(--tonscan-text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -410,7 +410,7 @@
 
 .abiError {
   color: var(--tonscan-error);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 
@@ -475,13 +475,13 @@
 
 .abiResultStats span {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.35;
 }
 
 .abiResultStats strong {
   color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiDecodedResult span {
@@ -489,7 +489,7 @@
   overflow-wrap: anywhere;
   color: var(--tonscan-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -504,7 +504,7 @@
 }
 
 .abiDecodedResult .abiTolkCode .highlightedCode {
-  --acton-highlighted-code-font-size: var(--font-size-xs);
+  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
 }
 
 .abiDetails {
@@ -522,7 +522,7 @@
   width: fit-content;
   color: var(--tonscan-text-secondary);
   cursor: pointer;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
   list-style: none;
   -webkit-appearance: none;
@@ -622,8 +622,8 @@
   min-height: 26px;
   margin-bottom: 6px;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiMessageRow,
@@ -672,8 +672,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -711,15 +711,15 @@
   background: var(--tonscan-row-hover);
   color: var(--tonscan-text-primary);
   font-family: var(--font-family);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .abiErrorName {
   color: color-mix(in srgb, var(--tonscan-accent) 72%, var(--tonscan-text-primary));
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.45;
 }
 
@@ -749,8 +749,8 @@
   overflow: hidden;
   color: var(--tonscan-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -787,7 +787,7 @@
   margin-top: -2px;
   font-family: var(--font-family);
   font-size: 9px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
 }
 

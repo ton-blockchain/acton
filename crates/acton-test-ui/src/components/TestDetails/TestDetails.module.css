@@ -2,15 +2,15 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-surface);
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
 .header {
-  padding: calc(var(--spacing-xs) + 2px) var(--spacing-md) var(--spacing-xs);
-  border-bottom: 1px solid var(--border-color);
+  padding: calc(var(--acton-space-1) + 2px) var(--acton-space-4) var(--acton-space-1);
+  border-bottom: 1px solid var(--acton-color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -32,14 +32,14 @@
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  background-color: var(--bg-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-xs);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   opacity: 1;
   transition:
     background-color 0.1s,
@@ -48,13 +48,13 @@
 }
 
 .expandButton:hover {
-  background-color: var(--hover-bg);
-  color: var(--text-primary);
+  background-color: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .expandButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 70%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-text-subtle) 70%, transparent);
 }
 
 .expandButton svg {
@@ -70,12 +70,12 @@
 }
 
 .suiteName {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
 }
 
 .testName {
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .ideSelectorContainer {
@@ -83,7 +83,7 @@
   display: flex;
   align-items: center;
   background-color: var(--bg-secondary-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--acton-color-border);
   border-radius: 6px;
   padding: 2px;
 }
@@ -92,14 +92,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  color: var(--text-muted);
+  padding: var(--acton-space-1) var(--acton-space-2);
+  color: var(--acton-color-text-subtle);
   transition: all 0.2s;
   font-size: 1rem;
 }
 
 .ideQuickLink:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .sourceLocationLink {
@@ -118,30 +118,30 @@
   padding: 4px;
   border: none;
   background: none;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   cursor: pointer;
   transition:
     background-color 0.2s,
     color 0.2s,
     border-color 0.2s;
   font-size: 0.8rem;
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--acton-color-border);
 }
 
 .ideTrigger:hover,
 .ideTrigger.active {
-  color: var(--text-primary);
-  background-color: var(--hover-bg);
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface-hover);
 }
 
 .ideDropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: var(--spacing-xs);
-  background-color: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  margin-top: var(--acton-space-1);
+  background-color: var(--acton-color-surface);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 180px;
@@ -154,12 +154,12 @@
 .ideItem {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
-  color: var(--text-primary);
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-xs);
+  color: var(--acton-color-text);
   text-decoration: none;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   transition:
     background-color 0.2s,
     color 0.2s;
@@ -171,17 +171,17 @@
 }
 
 .ideItem:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--acton-color-surface-hover);
 }
 
 .selectedIde {
-  background-color: var(--hover-bg);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-semibold);
+  background-color: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .selectedIde .ideIcon {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .ideIcon {
@@ -230,32 +230,32 @@
 
 .traceTab {
   flex: 0 0 auto;
-  padding: 4px var(--spacing-sm);
+  padding: 4px var(--acton-space-2);
   border: none;
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-surface);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   border-radius: 4px;
   transition: color 0.2s ease;
 }
 
 .traceTab:hover {
-  color: var(--text-primary);
-  border-color: var(--text-muted);
+  color: var(--acton-color-text);
+  border-color: var(--acton-color-text-subtle);
 }
 
 .traceTab:focus {
-  outline: 1px solid var(--border-color);
+  outline: 1px solid var(--acton-color-border);
 }
 
 .treasuryDeployTraceToggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   background-color: var(--bg-secondary-color);
 }
 
@@ -266,13 +266,13 @@
 }
 
 .treasuryDeployTraceTab {
-  color: var(--text-muted);
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 72%, var(--bg-color));
+  color: var(--acton-color-text-subtle);
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 72%, var(--acton-color-surface));
 }
 
 .skippedTraceTab,
 .skippedTraceTab:hover {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   background-color: var(--bg-secondary-color);
   cursor: default;
   opacity: 0.75;
@@ -283,8 +283,8 @@
 }
 
 .activeTraceTab {
-  color: var(--text-primary);
-  background-color: var(--bg-color);
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface);
   font-weight: 600;
 }
 
@@ -296,9 +296,9 @@
   margin-left: auto;
   padding: 4px 8px;
   border: none;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background: none;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.75rem;
@@ -317,12 +317,12 @@
 }
 
 .valueFlowToggle:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .tabsContainer {
-  padding: var(--spacing-mds) var(--spacing-md) var(--spacing-sm);
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--acton-space-3) var(--acton-space-4) var(--acton-space-2);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .tabsList {
@@ -330,9 +330,9 @@
   height: 36px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background-color: var(--bg-secondary-color);
-  padding: var(--spacing-xs);
+  padding: var(--acton-space-1);
 }
 
 .tabTrigger {
@@ -340,10 +340,10 @@
   align-items: center;
   justify-content: center;
   white-space: nowrap;
-  border-radius: var(--border-radius-sm);
-  padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  border-radius: var(--acton-radius-control-xs);
+  padding: var(--acton-space-1) var(--acton-space-4);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   transition:
     background-color 0.2s,
     color 0.2s,
@@ -351,16 +351,16 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .tabTrigger:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .activeTabTrigger {
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.1),
     0 1px 2px -1px rgba(0, 0, 0, 0.1);
@@ -383,7 +383,7 @@
 
 .valueFlowSection {
   flex: 0 0 auto;
-  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  padding: var(--acton-space-4) var(--acton-space-4) var(--acton-space-2);
 }
 
 .profileTab {
@@ -392,42 +392,42 @@
 }
 
 .txLogs {
-  margin-bottom: var(--spacing-lg);
-  padding: 0 var(--spacing-md);
+  margin-bottom: var(--acton-space-6);
+  padding: 0 var(--acton-space-4);
 }
 
 .txLogs:first-child {
-  padding-top: var(--spacing-md);
+  padding-top: var(--acton-space-4);
 }
 
 .txHeader {
-  font-weight: var(--font-weight-semibold);
-  margin-bottom: var(--spacing-sm);
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  margin-bottom: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   display: flex;
   align-items: center;
 }
 
 .txDest {
-  background-color: var(--hover-bg);
-  padding: 2px var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  font-weight: var(--font-weight-normal);
+  background-color: var(--acton-color-surface-hover);
+  padding: 2px var(--acton-space-2);
+  border-radius: var(--acton-radius-control-xs);
+  font-weight: var(--acton-font-weight-normal);
   font-family: var(--font-mono);
 }
 
 .infoTab {
-  padding: var(--spacing-lg);
+  padding: var(--acton-space-6);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xl);
+  gap: var(--acton-space-8);
 }
 
 .infoGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--spacing-lg);
+  gap: var(--acton-space-6);
 }
 
 .infoItem {
@@ -443,26 +443,26 @@
 
 .infoLabel {
   font-size: var(--font-size-xss);
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   text-transform: uppercase;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   letter-spacing: 0.05em;
 }
 
 .infoValue {
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-utility);
   word-break: break-all;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .statusDescription {
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.45;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -470,27 +470,27 @@
 .traceNotice {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
   background-color: var(--bg-secondary-color);
 }
 
 .traceNoticeError {
-  border-color: color-mix(in srgb, var(--color-failed) 45%, var(--border-color));
+  border-color: color-mix(in srgb, var(--color-failed) 45%, var(--acton-color-border));
 }
 
 .traceNoticeTitle {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  color: var(--acton-color-text);
 }
 
 .traceNoticeMessage {
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   overflow-wrap: anywhere;
 }
 
@@ -498,27 +498,27 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
+  font-size: var(--acton-font-size-xs);
+  color: var(--acton-color-text-subtle);
 }
 
 .traceFeesSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .infoLogsSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .traceFeesTitle {
-  margin-bottom: var(--spacing-xs);
-  color: var(--text-primary);
+  margin-bottom: var(--acton-space-1);
+  color: var(--acton-color-text);
   font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .traceLinkButton {
@@ -568,11 +568,11 @@
 }
 
 .traceMessageName {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
 }
 
 .traceMessageSeparator {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
 }
 
 .traceFeeList {
@@ -584,18 +584,18 @@
 .traceFeeListItem {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
 }
 
 .traceFeeLabel {
   font-size: var(--font-size-xss);
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .emptyCellValue {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
 }
 
 .gridIdeSelector {
@@ -603,7 +603,7 @@
   display: inline-flex;
   align-items: center;
   background-color: var(--bg-secondary-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--acton-color-border);
   border-radius: 4px;
   padding: 1px;
 }
@@ -613,13 +613,13 @@
   align-items: center;
   justify-content: center;
   padding: 2px 4px;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   transition: all 0.2s;
   font-size: 0.85rem;
 }
 
 .gridIdeQuickLink:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .gridIdeTrigger {
@@ -629,27 +629,27 @@
   padding: 2px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.7rem;
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--acton-color-border);
 }
 
 .gridIdeTrigger:hover,
 .gridIdeTrigger.active {
-  color: var(--text-primary);
-  background-color: var(--hover-bg);
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface-hover);
 }
 
 .gridIdeDropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: var(--spacing-xs);
-  background-color: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  margin-top: var(--acton-space-1);
+  background-color: var(--acton-color-surface);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 180px;
@@ -675,85 +675,85 @@
 .errorSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .errorTitle {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  color: var(--acton-color-text-muted);
 }
 
 .errorMessageBlock {
   background-color: var(--bg-secondary-color);
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .failedTransactionsSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
-  background-color: var(--bg-color);
+  gap: var(--acton-space-2);
+  margin-top: var(--acton-space-4);
+  background-color: var(--acton-color-surface);
 }
 
 .structuredError {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) - 3px);
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-4) var(--acton-space-4) calc(var(--acton-space-4) - 3px);
   background-color: var(--bg-secondary-color);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
-  margin-top: var(--spacing-md);
+  border-radius: var(--acton-radius-control-sm);
+  border: 1px solid var(--acton-color-border);
+  margin-top: var(--acton-space-4);
 }
 
 .structuredErrorTitle {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .anyAddress {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   font-style: italic;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .errorHeader {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
 }
 
 .errorRoute {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
+  gap: var(--acton-space-2);
+  font-size: var(--acton-font-size-sm);
 }
 
 .routeLabel {
-  color: var(--text-muted);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-subtle);
+  font-weight: var(--acton-font-weight-utility);
   min-width: 48px;
 }
 
 .routeValue {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-family: var(--font-mono);
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-surface);
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--acton-color-border);
 }
 
 .errorParams {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--spacing-sm);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--border-color);
+  gap: var(--acton-space-2);
+  padding-top: var(--acton-space-2);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .errorParam {
@@ -764,34 +764,34 @@
 
 .paramKey {
   font-size: var(--font-size-xss);
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   text-transform: uppercase;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .paramValue {
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
+  font-size: var(--acton-font-size-sm);
+  color: var(--acton-color-text);
   font-family: var(--font-mono);
 }
 
 .empty {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   font-style: italic;
   text-align: center;
   margin-top: 40px;
-  padding: 0 var(--spacing-md);
+  padding: 0 var(--acton-space-4);
 }
 
 .logSection {
-  margin-top: var(--spacing-sm);
+  margin-top: var(--acton-space-2);
 }
 
 .logSectionTitle {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
+  color: var(--acton-color-text-subtle);
   text-transform: uppercase;
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: var(--acton-space-1);
   letter-spacing: 0.05em;
 }

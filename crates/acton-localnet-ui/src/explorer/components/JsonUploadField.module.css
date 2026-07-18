@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 7px;
   color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 650;
   letter-spacing: 0;
 }
@@ -20,7 +20,7 @@
   padding: 10px;
   font: inherit;
   font-family: var(--font-family-mono, monospace);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 400;
   line-height: 1.45;
 }
@@ -38,7 +38,7 @@
   background: var(--litenode-surface-subtle);
   padding: 5px;
   color: var(--litenode-text);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 400;
 }
 

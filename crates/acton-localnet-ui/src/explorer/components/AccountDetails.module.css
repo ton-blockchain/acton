@@ -20,11 +20,11 @@
   width: 100%;
   border-collapse: collapse;
   caption-side: bottom;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .table thead {
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .table tbody tr:last-child {
@@ -32,24 +32,24 @@
 }
 
 .table tr {
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
   transition: background-color var(--transition-duration-fast);
 }
 
 .table tr:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--acton-color-surface-hover);
 }
 
 .table th {
   height: 3rem;
-  padding: 0 var(--spacing-md);
+  padding: 0 var(--acton-space-4);
   text-align: left;
   vertical-align: middle;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .table td {
-  padding: var(--spacing-md);
+  padding: var(--acton-space-4);
   vertical-align: middle;
 }
 
@@ -72,7 +72,7 @@
 
 .addressRelation {
   color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -110,8 +110,8 @@
   min-height: 34px;
   padding: 0 10px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
   border: none;
   border-radius: 8px;
@@ -224,7 +224,7 @@
   align-items: center;
   justify-content: center;
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 750;
   line-height: 1;
   white-space: nowrap;
@@ -246,7 +246,7 @@
   min-height: 34px;
   padding: 8px;
   color: var(--tonscan-text-tertiary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
 
@@ -267,7 +267,7 @@
   color: var(--tonscan-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 700;
   transition:
     background-color var(--transition-duration-fast),
@@ -349,7 +349,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 750;
   line-height: 1.2;
 }
@@ -360,7 +360,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tonscan-text-tertiary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 650;
   line-height: 1.2;
 }
@@ -368,7 +368,7 @@
 .tableHeader {
   color: var(--tonscan-text-secondary) !important;
   text-transform: uppercase;
-  font-size: var(--font-size-xs) !important;
+  font-size: var(--acton-font-size-xs) !important;
   letter-spacing: 0.05em;
 }
 
@@ -440,8 +440,8 @@
   justify-content: center;
   min-height: 56px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .tableState {
@@ -450,8 +450,8 @@
   justify-content: center;
   min-height: 64px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .tableStateError {
@@ -514,21 +514,21 @@
 .contractSkeleton {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-4);
 }
 
 .contractSkeletonTabs {
   width: 260px;
   max-width: 100%;
   height: 34px;
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 .contractSkeletonBlock {
   width: 100%;
   height: 260px;
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 @keyframes skeleton-shimmer {
@@ -620,7 +620,7 @@
 
 .addressFallback {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
 
@@ -636,7 +636,7 @@
   max-width: 12rem;
   overflow: hidden;
   color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -659,22 +659,22 @@ th.valueContainer {
 
 .valuePositive {
   color: var(--tonscan-success);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueNegative {
   color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueEmpty {
   color: var(--tonscan-text-secondary);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueNeutral {
   color: var(--tonscan-text-secondary);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .statusSuccess {
@@ -694,7 +694,7 @@ th.valueContainer {
 }
 
 .historyValue {
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.35;
 }
 
@@ -724,7 +724,7 @@ th.valueContainer {
 
 .tokenValue {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
 }
 
 .pagination {
@@ -755,8 +755,8 @@ th.valueContainer {
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   transition:
     background-color var(--transition-duration-fast),
     border-color var(--transition-duration-fast),
@@ -783,8 +783,8 @@ th.valueContainer {
   color: var(--tonscan-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   transition:
     background-color var(--transition-duration-fast),
     border-color var(--transition-duration-fast),

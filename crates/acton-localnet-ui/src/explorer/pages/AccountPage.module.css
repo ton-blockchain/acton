@@ -11,13 +11,13 @@
 
 .loading {
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   color: var(--tonscan-text-secondary);
 }
 
 .empty {
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   color: var(--tonscan-text-secondary);
   background-color: var(--tonscan-card-bg);
   border-radius: 16px;
@@ -47,8 +47,8 @@
 .accountIssueEyebrow {
   margin-bottom: 6px;
   color: var(--tonscan-error);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 16px;
 }
 
@@ -56,7 +56,7 @@
   margin: 0;
   color: var(--tonscan-text-primary);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 28px;
 }
 
@@ -64,7 +64,7 @@
   max-width: 72ch;
   margin: 8px 0 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -78,15 +78,15 @@
   color: var(--tonscan-text-primary);
   background: var(--tonscan-bg-secondary);
   border-radius: 10px;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
 .accountIssueHintLabel {
   flex: 0 0 auto;
   color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .accountIssueHintText {
@@ -178,8 +178,8 @@
   display: block;
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,16 +189,16 @@
 .jettonSymbol {
   margin-top: 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
 }
 
 .jettonSupply {
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -215,8 +215,8 @@
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -263,7 +263,7 @@
 
 .jettonDescription {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
   max-width: 68ch;
   overflow-wrap: anywhere;
@@ -296,16 +296,16 @@
 
 .accountDetailLabel {
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 20px;
 }
 
 .accountDetailValue {
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -388,7 +388,7 @@
   min-width: 0;
   color: var(--tonscan-text-primary);
   font-size: 1rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 22px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -405,8 +405,8 @@
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -422,8 +422,8 @@
 .nftPanelDescription {
   max-width: 56ch;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   display: -webkit-box;
   overflow: hidden;
@@ -481,7 +481,7 @@
   margin: 0;
   color: var(--tonscan-text-primary);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 24px;
 }
 
@@ -504,7 +504,7 @@
   margin-bottom: 14px;
   color: var(--tonscan-text-primary);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 24px;
 }
 
@@ -575,8 +575,8 @@
 .metadataLabel {
   flex: 0 0 144px;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 20px;
 }
 
@@ -585,8 +585,8 @@
   flex: 1 1 auto;
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -611,7 +611,7 @@
 .metadataDescription {
   margin: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -651,7 +651,7 @@
 }
 
 .metadataJson {
-  --acton-highlighted-code-font-size: var(--font-size-xs);
+  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
   --acton-highlighted-code-line-height: 18px;
   --acton-highlighted-code-padding: 16px 44px 16px 16px;
 }
@@ -763,12 +763,12 @@
 
   .metadataLabel {
     flex-basis: auto;
-    font-size: var(--font-size-sm);
+    font-size: var(--acton-font-size-sm);
   }
 
   .metadataValue,
   .metadataDescription {
-    font-size: var(--font-size-sm);
+    font-size: var(--acton-font-size-sm);
   }
 
   .metadataJsonFrame {
@@ -777,7 +777,7 @@
 
   .metadataJson {
     padding: 16px 40px 16px 16px;
-    font-size: var(--font-size-xs);
+    font-size: var(--acton-font-size-xs);
   }
 
   .metadataJsonCopyButton {

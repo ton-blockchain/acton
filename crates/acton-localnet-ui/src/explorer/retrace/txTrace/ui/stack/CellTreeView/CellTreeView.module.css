@@ -2,8 +2,8 @@
   padding: 4px;
   border-radius: 4px;
   border-left: 1px solid var(--color-divider);
-  margin-top: var(--spacing-xs);
-  margin-bottom: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
+  margin-bottom: var(--acton-space-1);
   display: block;
   width: 100%;
 }
@@ -49,13 +49,13 @@
 }
 
 .cellInfo {
-  padding: var(--spacing-sm) var(--spacing-xl) var(--spacing-sm) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  margin-bottom: var(--spacing-xs);
-  font-size: var(--font-size-xs);
+  padding: var(--acton-space-2) var(--acton-space-8) var(--acton-space-2) var(--acton-space-2);
+  border-radius: var(--acton-radius-control-xs);
+  margin-bottom: var(--acton-space-1);
+  font-size: var(--acton-font-size-xs);
   display: block;
   position: relative;
-  margin-left: var(--spacing-sm);
+  margin-left: var(--acton-space-2);
   transition: background-color var(--transition-duration-fast) ease;
 }
 
@@ -65,7 +65,7 @@
 }
 
 .cellTextContent strong {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   color: var(--color-text-secondary);
 }
 
@@ -74,7 +74,7 @@
 }
 
 .cellRefs {
-  padding-left: var(--spacing-md);
+  padding-left: var(--acton-space-4);
   display: flex;
   flex-direction: column;
 }
@@ -87,8 +87,8 @@
 
 .copyButton {
   position: absolute;
-  top: var(--spacing-sm);
-  right: var(--spacing-sm);
+  top: var(--acton-space-2);
+  right: var(--acton-space-2);
   padding: 2px;
   border: none;
   background-color: transparent;

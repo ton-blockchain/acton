@@ -79,27 +79,27 @@
 .sidebarSlotPinning .floatingSidebar {
   height: calc(100vh - 16px);
   margin: 8px 0;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
 }
 
 .expandButton {
   position: absolute;
-  left: var(--spacing-md);
-  top: var(--spacing-md);
+  left: var(--acton-space-4);
+  top: var(--acton-space-4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  background-color: var(--bg-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-xs);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   z-index: 100;
   transition:
     background-color 0.1s,
@@ -107,13 +107,13 @@
 }
 
 .expandButton:hover {
-  color: var(--text-primary);
-  background-color: var(--hover-bg);
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface-hover);
 }
 
 .expandButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 70%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-text-subtle) 70%, transparent);
 }
 
 .expandButton svg {
@@ -146,37 +146,37 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-surface);
 }
 
 .viewTabs {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid var(--border-color);
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-bottom: 1px solid var(--acton-color-border);
   background-color: var(--bg-secondary-color);
 }
 
 .viewTab {
   border: none;
   background: none;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-sm);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-xs);
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .viewTab:hover {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .viewTabActive {
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
   box-shadow: var(--shadow);
 }
 
@@ -208,8 +208,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xl);
-  background-color: color-mix(in srgb, var(--bg-color) 72%, transparent);
+  padding: var(--acton-space-8);
+  background-color: color-mix(in srgb, var(--acton-color-surface) 72%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -218,10 +218,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--spacing-2xl);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  background-color: var(--bg-color);
+  padding: var(--acton-space-12);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background-color: var(--acton-color-surface);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
   text-align: center;
 }
@@ -230,24 +230,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--spacing-lg);
-  color: var(--text-secondary);
+  margin-bottom: var(--acton-space-6);
+  color: var(--acton-color-text-muted);
   font-size: 64px;
   line-height: 1;
 }
 
 .connectionTitle {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .connectionMessage {
   max-width: 37ch;
-  margin: var(--spacing-md) 0 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
+  margin: var(--acton-space-4) 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-lg);
   line-height: 1.55;
 }

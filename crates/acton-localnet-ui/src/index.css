@@ -1,9 +1,9 @@
 :root {
-  --background: var(--bg-color);
-  --foreground: var(--text-primary);
+  --background: var(--acton-color-surface);
+  --foreground: var(--acton-color-text);
   --muted: var(--bg-secondary-color);
-  --muted-foreground: var(--text-secondary);
-  --border: var(--border-color);
+  --muted-foreground: var(--acton-color-text-muted);
+  --border: var(--acton-color-border);
 
   --litenode-bg: #f7f7f8;
   --litenode-surface: #ffffff;

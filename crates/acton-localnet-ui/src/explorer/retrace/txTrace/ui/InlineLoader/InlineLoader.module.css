@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-md);
-  margin-top: var(--spacing-lg);
+  gap: var(--acton-space-4);
+  margin-top: var(--acton-space-6);
   transition:
     opacity 0.3s ease-in-out,
     visibility 0.3s ease-in-out;
@@ -24,15 +24,15 @@
 }
 
 .loadingText {
-  font-size: var(--font-size-base);
+  font-size: var(--acton-font-size-lg);
   color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .loadingSubtext {
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   color: var(--color-text-secondary);
-  margin-top: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
   display: flex;
   align-items: center;
 }
@@ -59,7 +59,7 @@
 .spinner {
   width: 24px;
   height: 24px;
-  border-radius: var(--border-radius-full);
+  border-radius: var(--acton-radius-round);
   border: 2px solid transparent;
   border-top-color: var(--color-primary);
   border-right-color: var(--color-primary);
@@ -72,7 +72,7 @@
   position: absolute;
   width: 32px;
   height: 32px;
-  border-radius: var(--border-radius-full);
+  border-radius: var(--acton-radius-round);
   background: radial-gradient(
     circle,
     rgb(var(--color-primary-rgb), 0.2) 0%,

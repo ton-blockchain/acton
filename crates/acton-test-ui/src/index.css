@@ -8,8 +8,8 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
   font-family: var(--font-family), serif;
   line-height: 1.6;
 }

@@ -38,7 +38,7 @@
   margin-bottom: 8px;
   color: var(--tonscan-text-secondary);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -46,7 +46,7 @@
 .stackSetupButton {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
 }
 
 @media (width <= 768px) {

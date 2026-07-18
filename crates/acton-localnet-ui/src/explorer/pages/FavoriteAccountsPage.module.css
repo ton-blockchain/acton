@@ -139,7 +139,7 @@
 
 .savedAtCell {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   white-space: nowrap;
 }
 
@@ -161,7 +161,7 @@
 
 .emptyText {
   color: var(--litenode-text);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 650;
 }
 
@@ -173,7 +173,7 @@
   padding: 0 12px;
   color: var(--tonscan-link);
   border-radius: 8px;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 650;
   text-decoration: none;
 }

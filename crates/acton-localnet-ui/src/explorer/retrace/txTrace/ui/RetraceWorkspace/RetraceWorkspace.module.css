@@ -68,7 +68,7 @@
   background: var(--tonscan-row-hover);
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
@@ -107,7 +107,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   min-width: 0;
   margin-left: 18px;
   margin-bottom: 6px;
@@ -345,7 +345,7 @@
   flex: 0 0 auto;
   color: var(--tonscan-text-primary);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
 }
 
@@ -355,7 +355,7 @@
   color: var(--color-primary);
   font-family: var(--font-family-mono);
   font-size: 14.5px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -365,7 +365,7 @@
   flex: 0 0 auto;
   color: var(--table-gas-value-color);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -374,7 +374,7 @@
   flex: 0 0 auto;
   color: var(--tonscan-text-secondary);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -385,7 +385,7 @@
   overflow: hidden;
   color: var(--tonscan-text-secondary);
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -511,7 +511,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: 12px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -656,7 +656,7 @@
 .sourceVariableName {
   flex: 0 0 auto;
   color: var(--source-debug-variable-name-color);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .sourceVariableType {
@@ -674,10 +674,10 @@
   height: 17px;
   margin-right: 5px;
   border-radius: 50%;
-  background: var(--text-secondary, var(--color-text-secondary));
-  color: var(--bg-color, var(--color-background-primary));
+  background: var(--acton-color-text-muted, var(--color-text-secondary));
+  color: var(--acton-color-surface, var(--color-background-primary));
   font-size: 12px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 16px;
 }
 
@@ -775,7 +775,7 @@
 .sourceCallFrameName {
   flex: 0 1 auto;
   color: var(--source-debug-call-frame-name-color);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .sourceCallFrameLocation {

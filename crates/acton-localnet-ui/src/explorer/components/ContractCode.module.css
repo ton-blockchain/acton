@@ -2,9 +2,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: var(--spacing-md);
+  padding: var(--acton-space-4);
   background-color: var(--tonscan-card-bg);
-  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  border-radius: 0 0 var(--acton-radius-control-sm) var(--acton-radius-control-sm);
 }
 
 .tabs {
@@ -97,7 +97,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   transition:
@@ -157,7 +157,7 @@
   color: var(--tonscan-text-primary);
   white-space: pre;
   word-break: normal;
-  padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md);
+  padding: var(--acton-space-4) 54px var(--acton-space-4) var(--acton-space-4);
   margin: 0;
   overflow-x: auto;
   max-height: 600px;
@@ -175,9 +175,9 @@
   max-height: 600px;
   min-height: 96px;
   overflow: auto;
-  padding: var(--spacing-md);
+  padding: var(--acton-space-4);
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
 }
 
@@ -186,16 +186,16 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .panelEmpty {
   background-color: var(--tonscan-bg);
   border: 1px solid var(--tonscan-border);
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 .sourceShell > .panelEmpty {

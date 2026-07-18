@@ -28,7 +28,7 @@
 .subtitle {
   margin: 6px 0 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 
@@ -47,7 +47,7 @@
   flex-direction: column;
   gap: 7px;
   color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 650;
   letter-spacing: 0;
 }
@@ -76,7 +76,7 @@
   padding: 0 12px;
   background: var(--litenode-text-strong);
   color: var(--litenode-surface);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .primaryButton:disabled {
@@ -254,8 +254,8 @@
 
 .primaryCell small {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .formButtonRow td {
@@ -333,7 +333,7 @@
   gap: 7px;
   margin: -2px 0 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.45;
 }
@@ -362,10 +362,10 @@
   align-items: center;
   justify-content: center;
   min-height: 180px;
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   text-align: center;
 }
 
@@ -405,8 +405,8 @@
   border-radius: 8px;
   background: var(--tonscan-card-bg);
   color: var(--tonscan-link);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
   text-decoration: none;
 }
@@ -422,7 +422,7 @@
 
 .links span {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   text-transform: capitalize;
 }
 

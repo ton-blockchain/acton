@@ -5,7 +5,7 @@
   padding: 24px 32px 40px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--acton-space-6);
   box-sizing: border-box;
 }
 
@@ -26,7 +26,7 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--acton-space-6);
   flex: 1;
   min-height: 0;
 }
@@ -224,7 +224,7 @@
   --trace-step: 24px;
   --trace-connector-offset: 12px;
   --trace-line-thickness: 1px;
-  --trace-line-color: var(--text-muted);
+  --trace-line-color: var(--acton-color-text-subtle);
 }
 
 .traceNode {
@@ -408,18 +408,18 @@
 .backButton {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   background: var(--tonscan-bg);
   border: 1px solid var(--tonscan-border);
   color: var(--tonscan-text-primary);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--border-radius-md);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-sm);
   cursor: pointer;
   transition: all var(--transition-duration-fast);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   text-decoration: none;
   width: fit-content;
-  margin-top: var(--spacing-md);
+  margin-top: var(--acton-space-4);
 }
 
 .backButton:hover {
@@ -526,10 +526,10 @@
   padding-block: 0;
   background: transparent;
   border-radius: 0;
-  border-bottom: 1px solid var(--tonscan-border, var(--border-color));
-  color: var(--tonscan-text-secondary, var(--text-secondary));
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  border-bottom: 1px solid var(--tonscan-border, var(--acton-color-border));
+  color: var(--tonscan-text-secondary, var(--acton-color-text-muted));
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -560,13 +560,13 @@
   justify-content: flex-end;
   margin: 0 20px;
   padding: 8px 0;
-  border-top: 1px solid var(--tonscan-border, var(--border-color));
+  border-top: 1px solid var(--tonscan-border, var(--acton-color-border));
 }
 
 .skeletonFlowAccount {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   min-width: 0;
 }
 
@@ -575,7 +575,7 @@
   height: 22px;
   border-radius: 50%;
   flex: 0 0 auto;
-  background: var(--tonscan-text-secondary, var(--text-secondary));
+  background: var(--tonscan-text-secondary, var(--acton-color-text-muted));
   opacity: 0.72;
   animation: none;
 }
@@ -583,7 +583,7 @@
 .skeletonFlowAccountText {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   min-width: 0;
   flex: 1;
 }
@@ -638,10 +638,10 @@
 .skeletonEventHeader {
   min-height: 48px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--tonscan-border, var(--border-color));
-  color: var(--tonscan-text-secondary, var(--text-secondary));
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  border-bottom: 1px solid var(--tonscan-border, var(--acton-color-border));
+  color: var(--tonscan-text-secondary, var(--acton-color-text-muted));
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -724,9 +724,9 @@
 }
 
 .skeletonDetailCard {
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  background: var(--bg-color);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
   overflow: hidden;
 }
 
@@ -734,7 +734,7 @@
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
   min-height: 38px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .skeletonDetailRow:last-child {
@@ -749,12 +749,12 @@
 
 .skeletonDetailLabel {
   width: 76px;
-  margin-left: var(--spacing-mds);
+  margin-left: var(--acton-space-3);
 }
 
 .skeletonDetailValue {
   width: min(520px, 72%);
-  margin-left: var(--spacing-mds);
+  margin-left: var(--acton-space-3);
 }
 
 .skeletonTree {
@@ -791,9 +791,9 @@
   left: 50%;
   width: min(360px, 50vw);
   height: 52px;
-  border-top: 1px solid var(--text-muted);
-  border-left: 1px solid var(--text-muted);
-  border-right: 1px solid var(--text-muted);
+  border-top: 1px solid var(--acton-color-text-subtle);
+  border-left: 1px solid var(--acton-color-text-subtle);
+  border-right: 1px solid var(--acton-color-text-subtle);
   opacity: 0.45;
   transform: translateX(-50%);
 }
@@ -882,7 +882,7 @@
 
   .skeletonFlowMetric {
     width: 48%;
-    margin-left: calc(22px + var(--spacing-sm));
+    margin-left: calc(22px + var(--acton-space-2));
     justify-content: flex-start;
   }
 

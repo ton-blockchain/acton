@@ -94,14 +94,14 @@
 
 .errorTitle {
   color: var(--tonscan-error);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .errorMessage {
   max-width: 760px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 

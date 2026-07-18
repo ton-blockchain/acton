@@ -1,11 +1,11 @@
 .statusBase {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-weight: var(--font-weight-medium);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-size-sm);
+  gap: var(--acton-space-1);
+  font-weight: var(--acton-font-weight-utility);
+  padding: var(--acton-space-1) var(--acton-space-2);
+  border-radius: var(--acton-radius-control-sm);
+  font-size: var(--acton-font-size-sm);
   border: 1px solid;
 }
 
@@ -40,17 +40,17 @@
 .tooltipContent {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--acton-space-4);
 }
 
 .tooltipLabel {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .tooltipDescription {
-  margin-top: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
 }
 
 .tooltipPhase {
-  margin-top: var(--spacing-xs);
+  margin-top: var(--acton-space-1);
 }

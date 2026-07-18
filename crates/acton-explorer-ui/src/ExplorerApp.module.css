@@ -120,8 +120,8 @@
   border-radius: 9px;
   background: transparent;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -141,8 +141,8 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -202,8 +202,8 @@
 .networkTriggerLabel {
   overflow: hidden;
   color: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -347,8 +347,8 @@
 .networkOptionLabel {
   overflow: hidden;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -358,8 +358,8 @@
 .networkOptionMeta {
   overflow: hidden;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -457,8 +457,8 @@
 
 .networkFormTitle {
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
 }
 
@@ -471,14 +471,14 @@
 
 .networkFieldLabel {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
   letter-spacing: 0;
 }
 
 .networkInput {
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
 }
 
 .networkCheckbox {
@@ -499,8 +499,8 @@
   padding: 0 10px;
   border-radius: 7px;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
   cursor: pointer;
   transition:

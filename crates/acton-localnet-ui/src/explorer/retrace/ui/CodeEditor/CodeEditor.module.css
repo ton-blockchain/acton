@@ -46,7 +46,7 @@
 :global(.monaco-editor .precise-highlight) {
   background-color: rgb(255 0 0 / 10%) !important;
   box-shadow: inset 0 0 0 2px rgb(255 0 0 / 20%) !important;
-  border-radius: var(--border-radius-sm) !important;
+  border-radius: var(--acton-radius-control-xs) !important;
   font-weight: bold !important;
 }
 
@@ -122,7 +122,7 @@
 
 .editorWrapperWithBorderRadius {
   composes: editorWrapper;
-  border-radius: var(--border-radius-lg);
+  border-radius: var(--acton-radius-panel);
 }
 
 .editorWrapperWithoutBorderRadius {
@@ -132,13 +132,13 @@
 
 .editorHint {
   position: absolute;
-  bottom: var(--spacing-md);
-  right: var(--spacing-md);
+  bottom: var(--acton-space-4);
+  right: var(--acton-space-4);
   background-color: var(--color-hint-background);
   color: var(--color-hint-text);
   padding: 8px 12px;
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-size-xs);
+  border-radius: var(--acton-radius-control-sm);
+  font-size: var(--acton-font-size-xs);
   display: flex;
   align-items: center;
   z-index: 100;
@@ -155,23 +155,23 @@
 kbd {
   background-color: var(--color-hint-kbd-background);
   border: none;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   color: var(--color-hint-text);
   display: inline-block;
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   padding: 3px 6px;
-  margin: 0 var(--spacing-xs);
+  margin: 0 var(--acton-space-1);
   font-family: var(--font-family-mono), serif;
 }
 
 .clickIcon {
   font-size: 1.1em;
-  margin: 0 var(--spacing-xs);
+  margin: 0 var(--acton-space-1);
   vertical-align: middle;
 }
 
 .hintDivider {
-  margin: 0 var(--spacing-sm);
+  margin: 0 var(--acton-space-2);
   color: var(--color-hint-divider-text);
 }
 

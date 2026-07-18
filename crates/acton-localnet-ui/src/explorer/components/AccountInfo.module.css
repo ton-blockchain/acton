@@ -52,8 +52,8 @@
 .label {
   flex: 0 0 144px;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 20px;
 }
 
@@ -65,16 +65,16 @@
   min-width: 0;
   min-height: 20px;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
 }
 
 .primaryValue {
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -97,7 +97,7 @@
 
 .contractTypeSeparator {
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -112,15 +112,15 @@
 
 .contractDescriptionTitle {
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .contractDescriptionText,
 .contractDescriptionLink {
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
 }
 
 .contractDescriptionLink {
@@ -173,7 +173,7 @@
   min-width: 0;
   color: color-mix(in srgb, var(--tonscan-text-secondary) 72%, transparent);
   font-size: 11px;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 13px;
   text-transform: lowercase;
 }
@@ -182,8 +182,8 @@
   display: block;
   min-width: 0;
   color: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
   overflow-wrap: anywhere;
 }
@@ -202,8 +202,8 @@
   min-width: 0;
   max-width: 100%;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -226,8 +226,8 @@
 .customName {
   min-width: 0;
   color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow-wrap: anywhere;
 }
@@ -243,7 +243,7 @@
 .editInput {
   background: var(--litenode-surface-subtle);
   border-radius: 10px;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
 }
 
 .renameSaveButton,
@@ -252,8 +252,8 @@
   padding: 0 12px;
   border-radius: 10px;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
   transition:
     background-color var(--transition-duration-fast),
@@ -447,8 +447,8 @@
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
 }
 
 .moreLink:hover {
@@ -501,7 +501,7 @@
   padding-top: 0;
   border-top: 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
 }
 
@@ -512,8 +512,8 @@
   min-height: 18px;
   padding: 0;
   border-radius: 0;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -551,7 +551,7 @@
   flex: 0 1 auto;
   min-width: 0;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
@@ -564,7 +564,7 @@
   align-items: center;
   gap: 6px;
   color: var(--tonscan-link);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
   border-radius: 6px;
   text-decoration: none;
@@ -635,8 +635,8 @@
   gap: 8px;
   margin-bottom: 10px;
   color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .qrPopoverBody {
