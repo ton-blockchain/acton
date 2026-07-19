@@ -1,9 +1,6 @@
 name: Deploy actonscan
 
 on:
-  pull_request:
-    branches:
-      - master
   push:
     branches:
       - master
@@ -81,11 +78,9 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTONSCAN_TOKEN }}
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
-          ACTONSCAN_CNAME="${ACTONSCAN_URL#*://}"
-          ACTONSCAN_CNAME="${ACTONSCAN_CNAME%%/*}"
           cargo xtask deploy-explorer \
             --branch pages \
-            --cname "${ACTONSCAN_CNAME}" \
+            --cname "${ACTONSCAN_URL}" \
             --message "Deploy actonscan from ${DEPLOY_COMMIT}"
 
       - name: Save Bun cache

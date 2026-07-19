@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use url::Url;
 
 const DEFAULT_REPOSITORY: &str = "https://github.com/i582/actonscan";
 const DEFAULT_BRANCH: &str = "pages";
@@ -22,7 +23,7 @@ pub(crate) struct DeployExplorerArgs {
     #[arg(long, value_name = "PATH", default_value = DEFAULT_CHECKOUT_DIR)]
     checkout: PathBuf,
 
-    #[arg(long, value_name = "DOMAIN")]
+    #[arg(long, value_name = "DOMAIN_OR_URL")]
     cname: Option<String>,
 
     #[arg(long, value_name = "MESSAGE", default_value = "Deploy actonscan")]
@@ -33,6 +34,7 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     let workspace_root = workspace_root()?;
     let checkout_dir = resolve_path(&workspace_root, &args.checkout);
     let dist_dir = workspace_root.join(EXPLORER_PACKAGE_DIR).join("dist");
+    let cname = normalize_cname(args.cname.as_deref())?;
 
     println!("Building `{EXPLORER_PACKAGE}`");
     run_inherited(
@@ -46,7 +48,7 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     ensure_dist_ready(&dist_dir)?;
     ensure_checkout(&checkout_dir, &args.repository)?;
     prepare_branch(&checkout_dir, &args.branch)?;
-    sync_dist(&dist_dir, &checkout_dir, args.cname.as_deref())?;
+    sync_dist(&dist_dir, &checkout_dir, cname.as_deref())?;
     commit_and_push(&checkout_dir, &args.branch, &args.message)?;
 
     println!(
@@ -54,6 +56,22 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
         args.repository, args.branch
     );
     Ok(())
+}
+
+fn normalize_cname(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+
+    if !value.contains("://") {
+        return Ok(Some(value.to_owned()));
+    }
+
+    let url = Url::parse(value).with_context(|| format!("invalid CNAME URL `{value}`"))?;
+    let host = url
+        .host_str()
+        .with_context(|| format!("CNAME URL `{value}` does not contain a host"))?;
+    Ok(Some(host.to_owned()))
 }
 
 fn workspace_root() -> Result<PathBuf> {
@@ -293,4 +311,36 @@ fn run_inherited(command: &mut Command) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_cname;
+
+    #[test]
+    fn cname_keeps_bare_domain() {
+        assert_eq!(
+            normalize_cname(Some(" actonscan.com ")).unwrap(),
+            Some("actonscan.com".to_owned())
+        );
+    }
+
+    #[test]
+    fn cname_extracts_host_from_url() {
+        assert_eq!(
+            normalize_cname(Some("https://actonscan.com/explorer")).unwrap(),
+            Some("actonscan.com".to_owned())
+        );
+    }
+
+    #[test]
+    fn cname_ignores_empty_value() {
+        assert_eq!(normalize_cname(Some("  ")).unwrap(), None);
+    }
+
+    #[test]
+    fn cname_rejects_url_without_host() {
+        let error = normalize_cname(Some("file:///explorer")).unwrap_err();
+        assert!(error.to_string().contains("does not contain a host"));
+    }
 }
