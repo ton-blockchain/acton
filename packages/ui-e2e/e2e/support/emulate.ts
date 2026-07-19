@@ -21,25 +21,96 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
     })
 
     test("opens the builder and switches to raw BOC input", async ({page}) => {
-      const builderTab = page.getByRole("button", {name: "Builder", exact: true})
-      const rawTab = page.getByRole("button", {name: "Raw BOC", exact: true})
+      const builderTab = page.getByRole("tab", {name: "Builder", exact: true})
+      const rawTab = page.getByRole("tab", {name: "Raw", exact: true})
       const emulateButton = page.getByRole("button", {name: "Emulate", exact: true})
 
-      await expect(builderTab).toHaveAttribute("aria-pressed", "true")
-      await expect(page.getByRole("textbox", {name: "Target contract", exact: true})).toBeVisible()
+      await expect(builderTab).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByRole("textbox", {name: "From", exact: true})).toBeVisible()
+      await expect(page.getByRole("textbox", {name: "To", exact: true})).toBeVisible()
+      await expect(
+        page.getByText("Enter a valid contract address in To to configure the message", {
+          exact: true,
+        }),
+      ).toBeVisible()
+      await expect(page.getByText("ABI not loaded", {exact: true})).toBeHidden()
       await expect(emulateButton).toBeDisabled()
 
       await rawTab.click()
-      await expect(rawTab).toHaveAttribute("aria-pressed", "true")
-      await expect(page.getByRole("textbox", {name: "Message BOC", exact: true})).toBeVisible()
+      await expect(rawTab).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByRole("textbox", {name: "Message BOC", exact: true})).toHaveAttribute(
+        "placeholder",
+        "Hex or base64 message BoC",
+      )
       await expect(emulateButton).toBeDisabled()
 
       await page.getByRole("textbox", {name: "Message BOC", exact: true}).fill(EXTERNAL_MESSAGE_BOC)
       await expect(emulateButton).toBeEnabled()
 
-      await page.getByRole("button", {name: "Reset", exact: true}).click()
-      await expect(builderTab).toHaveAttribute("aria-pressed", "true")
+      const resetButton = page.getByRole("button", {name: "Reset transaction fields", exact: true})
+      await expect(resetButton).toHaveAttribute(
+        "title",
+        "Reset all transaction fields to their default values",
+      )
+      await resetButton.click()
+      await expect(rawTab).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByRole("textbox", {name: "Message BOC", exact: true})).toHaveValue("")
       await expect(emulateButton).toBeDisabled()
+    })
+
+    test("restores and persists transaction options in the URL", async ({page}) => {
+      const params = new URLSearchParams({
+        source: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+        address: "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+        value: "2",
+        bounce: "false",
+        mcSeqno: "7",
+        ignoreChksig: "true",
+        timeMode: "increase",
+        increaseTime: "15",
+        timestamp: "1234567890",
+      })
+      await page.goto(`${route}?${params}`)
+
+      await expect(page.getByRole("textbox", {name: "From", exact: true})).toHaveValue(
+        params.get("source") ?? "",
+      )
+      await expect(page.getByRole("textbox", {name: "To", exact: true})).toHaveValue(
+        params.get("address") ?? "",
+      )
+      await expect(page.getByRole("textbox", {name: "Value", exact: true})).toHaveValue("2")
+
+      await page.locator('summary[aria-label="Advanced options"]').click()
+      const bounce = page.getByRole("checkbox", {name: "Bounce", exact: true})
+      const ignoreChksig = page.getByRole("checkbox", {name: "Ignore CHKSIG", exact: true})
+      const block = page.getByRole("textbox", {name: "Masterchain block", exact: true})
+      await expect(bounce).not.toBeChecked()
+      await expect(ignoreChksig).toBeChecked()
+      await expect(block).toHaveValue("7")
+
+      await page.locator('summary[aria-label="Override timestamp"]').click()
+      await expect(page.getByRole("radio", {name: "Increase time", exact: true})).toBeChecked()
+      const seconds = page.getByRole("textbox", {name: "Seconds to add", exact: true})
+      await expect(seconds).toHaveValue("15")
+
+      await bounce.check()
+      await ignoreChksig.uncheck()
+      await block.fill("8")
+      await seconds.fill("30")
+
+      await expect
+        .poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toMatchObject({
+          source: params.get("source"),
+          address: params.get("address"),
+          value: "2",
+          mcSeqno: "8",
+          timeMode: "increase",
+          increaseTime: "30",
+          timestamp: "1234567890",
+        })
+      await expect.poll(() => new URL(page.url()).searchParams.has("bounce")).toBe(false)
+      await expect.poll(() => new URL(page.url()).searchParams.has("ignoreChksig")).toBe(false)
     })
 
     test("reports malformed raw BOC input", async ({page}) => {
@@ -66,20 +137,22 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       })
 
       await selectRawMessage(page, EXTERNAL_MESSAGE_BOC)
-      await page.getByRole("button", {name: "Emulate", exact: true}).click()
+      const emulateButton = page.getByRole("button", {name: "Emulate", exact: true})
+      await emulateButton.click()
 
-      await expect(page.getByText("Emulating message", {exact: true})).toBeVisible()
+      await expect(emulateButton).toHaveAttribute("aria-busy", "true")
+      await expect(emulateButton).toBeDisabled()
       releaseRequests()
 
-      await expect(page.getByText("Emulating message", {exact: true})).toBeHidden()
       await expect(page.getByRole("alert").last()).toBeVisible()
-      await expect(page.getByRole("button", {name: "Emulate", exact: true})).toBeEnabled()
+      await expect(emulateButton).not.toHaveAttribute("aria-busy", "true")
+      await expect(emulateButton).toBeEnabled()
     })
   })
 }
 
 async function selectRawMessage(page: Page, boc: string): Promise<void> {
-  await page.getByRole("button", {name: "Raw BOC", exact: true}).click()
+  await page.getByRole("tab", {name: "Raw", exact: true}).click()
   await page.getByRole("textbox", {name: "Message BOC", exact: true}).fill(boc)
 }
 

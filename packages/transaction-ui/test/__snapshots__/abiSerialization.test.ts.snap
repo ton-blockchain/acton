@@ -77,6 +77,88 @@ exports[`ABI value serialization round-trips nested collections with struct valu
 }
 `;
 
+exports[`ABI value serialization round-trips arrays, lists, shaped tuples, and union variants 1`] = `
+[
+  {
+    "boc": "b5ee9c7241010801005000024d0380000005e00000000000000000000000000000000000000000000000000000000000000000040104010980000000c0020109800000014003000900000001c00101c005010140060101c0070000fb8c4442",
+    "decoded": {
+      "$": "CollectionFields",
+      "array": [
+        "1",
+        "2",
+        "3",
+      ],
+      "list": [
+        true,
+        false,
+        true,
+      ],
+      "tuple": [
+        "11",
+        true,
+        "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+      ],
+    },
+    "name": "collections",
+    "stable": true,
+  },
+  {
+    "boc": "b5ee9c7241010101000300000140f6d24034",
+    "decoded": null,
+    "name": "null union",
+    "stable": true,
+  },
+  {
+    "boc": "b5ee9c7241010101003100005d80000003e00000000000000000000000000000000000000000000000000000000000000000022540be4010000002a83569693d",
+    "decoded": {
+      "$": "ScalarFields",
+      "count": "7",
+      "enabled": true,
+      "maybeAddress": null,
+      "maybeCount": "42",
+      "recipient": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+      "tonAmount": "1250000000",
+    },
+    "name": "struct union",
+    "stable": true,
+  },
+]
+`;
+
+exports[`ABI value serialization round-trips Cell and fixed-width bits 1`] = `
+[
+  {
+    "boc": "b5ee9c72410102010006000100010002ab128a4458",
+    "decoded": "b5ee9c72410101010003000002ab4e791e7a",
+    "name": "Cell",
+    "stable": true,
+  },
+  {
+    "boc": "b5ee9c72410101010003000002ab4e791e7a",
+    "decoded": "b5ee9c72410101010003000002ab4e791e7a",
+    "name": "bits8",
+    "stable": true,
+  },
+  {
+    "boc": "b5ee9c72410102010006000100010002ab128a4458",
+    "decoded": {
+      "ref": "b5ee9c72410101010003000002ab4e791e7a",
+    },
+    "name": "Cell<bits8>",
+    "stable": true,
+  },
+]
+`;
+
+exports[`ABI value serialization round-trips maps with address keys and Cell values 1`] = `
+{
+  "boc": "b5ee9c7241010301002d000101c0010145a170000000000000000000000000000000000000000000000000000000000000000002020002ab006d2d49",
+  "decoded": {
+    "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c": "b5ee9c72410101010003000002ab4e791e7a",
+  },
+}
+`;
+
 exports[`ABI value serialization formats TON runtime values as JSON-safe form values 1`] = `
 {
   "address": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
@@ -87,6 +169,16 @@ exports[`ABI value serialization formats TON runtime values as JSON-safe form va
   },
   "integer": "42",
   "slice": "b5ee9c72410101010003000002ab4e791e7a",
+}
+`;
+
+exports[`ABI value serialization creates a serializable zero-filled default for fixed-width bits 1`] = `
+{
+  "boc": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
+  "decoded": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
+  "sample": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
+  "sampleBits": 512,
+  "sampleRefs": 0,
 }
 `;
 
@@ -110,12 +202,33 @@ exports[`ABI value serialization validates address kinds without rewriting the i
 }
 `;
 
-exports[`ABI value serialization creates a serializable zero-filled default for fixed-width bits 1`] = `
+exports[`ABI value serialization parses JSON and converts GRAM values at their precision boundaries 1`] = `
 {
-  "boc": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
-  "decoded": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
-  "sample": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
-  "sampleBits": 512,
-  "sampleRefs": 0,
+  "emptyJson": {
+    "empty": true,
+  },
+  "formatted": "1.25",
+  "fractional": "1000000001",
+  "invalidJsonFallback": {
+    "invalid": true,
+  },
+  "json": {
+    "value": "7",
+  },
+  "leadingFraction": "500000000",
+  "malformedNano": "",
+  "negative": undefined,
+  "tooPrecise": undefined,
+  "zero": "0",
+}
+`;
+
+exports[`ABI value serialization creates stable defaults for scalar, collection, and TON-specific types 1`] = `
+{
+  "address": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+  "bits512": "b5ee9c724101010100420000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010f06c53",
+  "passthrough": "not-normalized",
+  "uint256": "0",
+  "unsupported": "",
 }
 `;

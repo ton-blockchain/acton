@@ -9,9 +9,14 @@ import {
   createAbiSymbols,
   decodeAbiValueFromBoc,
   encodeAbiValueToBoc,
+  formatAbiAddress,
   formatAbiCellBoc,
+  formatNanoAsGram,
   isTonAddress,
   parseAbiCellArg,
+  parseAbiJson,
+  parseAbiJsonStrict,
+  parseGramAsNano,
   sampleAbiValueForTy,
   stringifyAbiJson,
   type ContractABI,
@@ -60,6 +65,16 @@ const nestedAbi = {
         {name: "nestedBatches", ty_idx: 19},
       ],
     },
+    {
+      kind: "struct",
+      name: "CollectionFields",
+      ty_idx: 24,
+      fields: [
+        {name: "array", ty_idx: 21},
+        {name: "list", ty_idx: 22},
+        {name: "tuple", ty_idx: 23},
+      ],
+    },
   ],
   unique_types: [
     {kind: "void"},
@@ -83,6 +98,20 @@ const nestedAbi = {
     {kind: "mapKV", key_ty_idx: 9, value_ty_idx: 17},
     {kind: "arrayOf", inner_ty_idx: 18},
     {kind: "StructRef", struct_name: "ComplexCollections"},
+    {kind: "arrayOf", inner_ty_idx: 8},
+    {kind: "lispListOf", inner_ty_idx: 5},
+    {kind: "shapedTuple", items_ty_idx: [8, 5, 7]},
+    {kind: "StructRef", struct_name: "CollectionFields"},
+    {kind: "bitsN", n: 8},
+    {kind: "cellOf", inner_ty_idx: 25},
+    {kind: "nullLiteral"},
+    {
+      kind: "union",
+      variants: [
+        {variant_ty_idx: 27, prefix_num: 0, prefix_len: 1, is_prefix_implicit: true},
+        {variant_ty_idx: 14, prefix_num: 1, prefix_len: 1, is_prefix_implicit: true},
+      ],
+    },
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -130,6 +159,7 @@ const dictionaryAbi = {
     {kind: "intN", n: 32},
     {kind: "uintN", n: 32},
     {kind: "mapKV", key_ty_idx: 9, value_ty_idx: 6},
+    {kind: "mapKV", key_ty_idx: 7, value_ty_idx: 3},
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -185,6 +215,7 @@ const fixedBitsAbi = {
     {kind: "coins"},
     {kind: "address"},
     {kind: "bitsN", n: 512},
+    {kind: "uintN", n: 256},
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -221,6 +252,64 @@ describe("ABI value serialization", () => {
 
     expect({boc, decoded: abiValueToFormValue(decoded)}).toMatchSnapshot()
     expect(encodeAbiValueToBoc(nestedAbi, 20, decoded)).toBe(boc)
+  })
+
+  test("round-trips arrays, lists, shaped tuples, and union variants", () => {
+    const collectionValue = {
+      array: ["1", "2", "3"],
+      list: [true, false, true],
+      tuple: ["11", true, SAMPLE_ADDRESS],
+    }
+    const scenarios = [
+      {name: "collections", tyIdx: 24, value: collectionValue},
+      {name: "null union", tyIdx: 28, value: null},
+      {name: "struct union", tyIdx: 28, value: {$: "ScalarFields", ...nestedFormValue.summary}},
+    ]
+
+    expect(
+      scenarios.map(scenario => {
+        const boc = encodeAbiValueToBoc(nestedAbi, scenario.tyIdx, scenario.value)
+        const decoded = decodeAbiValueFromBoc(nestedAbi, scenario.tyIdx, boc)
+        return {
+          name: scenario.name,
+          boc,
+          decoded: abiValueToFormValue(decoded),
+          stable: encodeAbiValueToBoc(nestedAbi, scenario.tyIdx, decoded) === boc,
+        }
+      }),
+    ).toMatchSnapshot()
+  })
+
+  test("round-trips Cell and fixed-width bits", () => {
+    const byteCell = beginCell().storeUint(0xab, 8).endCell()
+    const byteBoc = formatAbiCellBoc(byteCell)
+    const scenarios = [
+      {name: "Cell", tyIdx: 3, value: byteBoc},
+      {name: "bits8", tyIdx: 25, value: byteBoc},
+      {name: "Cell<bits8>", tyIdx: 26, value: {ref: byteBoc}},
+    ]
+
+    expect(
+      scenarios.map(scenario => {
+        const boc = encodeAbiValueToBoc(nestedAbi, scenario.tyIdx, scenario.value)
+        const decoded = decodeAbiValueFromBoc(nestedAbi, scenario.tyIdx, boc)
+        return {
+          name: scenario.name,
+          boc,
+          decoded: abiValueToFormValue(decoded),
+          stable: encodeAbiValueToBoc(nestedAbi, scenario.tyIdx, decoded) === boc,
+        }
+      }),
+    ).toMatchSnapshot()
+  })
+
+  test("round-trips maps with address keys and Cell values", () => {
+    const byteBoc = formatAbiCellBoc(beginCell().storeUint(0xab, 8).endCell())
+    const value = {[SAMPLE_ADDRESS]: byteBoc}
+    const boc = encodeAbiValueToBoc(dictionaryAbi, 11, value)
+    const decoded = decodeAbiValueFromBoc(dictionaryAbi, 11, boc)
+
+    expect({boc, decoded: abiValueToFormValue(decoded)}).toMatchSnapshot()
   })
 
   test("formats TON runtime values as JSON-safe form values", () => {
@@ -285,5 +374,38 @@ describe("ABI value serialization", () => {
       noneAsInternal: isTonAddress(TON_ADDR_NONE, "internal"),
       invalidExternalWidth: isTonAddress("External<8:256>", "external"),
     }).toMatchSnapshot()
+  })
+
+  test("parses JSON and converts GRAM values at their precision boundaries", () => {
+    expect({
+      json: parseAbiJson('{"value":"7"}'),
+      emptyJson: parseAbiJson("", {empty: true}),
+      invalidJsonFallback: parseAbiJson("{", {invalid: true}),
+      zero: parseGramAsNano("0"),
+      fractional: parseGramAsNano("1.000000001"),
+      leadingFraction: parseGramAsNano(".5"),
+      tooPrecise: parseGramAsNano("0.0000000001"),
+      negative: parseGramAsNano("-1"),
+      formatted: formatNanoAsGram("1250000000"),
+      malformedNano: formatNanoAsGram("1.5"),
+    }).toMatchSnapshot()
+    expect(() => parseAbiJsonStrict("{")).toThrow()
+  })
+
+  test("creates stable defaults for scalar, collection, and TON-specific types", () => {
+    const symbols = createAbiSymbols(fixedBitsAbi)
+
+    expect({
+      uint256: sampleAbiValueForTy(symbols, 9),
+      bits512: sampleAbiValueForTy(symbols, 8),
+      address: formatAbiAddress(Address.parse(SAMPLE_ADDRESS)),
+      passthrough: formatAbiAddress("not-normalized"),
+      unsupported: formatAbiAddress(42),
+    }).toMatchSnapshot()
+  })
+
+  test("rejects empty and malformed Cell arguments", () => {
+    expect(() => parseAbiCellArg(" ")).toThrow("Cell argument is required")
+    expect(() => parseAbiCellArg("not-a-boc")).toThrow()
   })
 })
