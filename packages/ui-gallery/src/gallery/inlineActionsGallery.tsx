@@ -63,7 +63,11 @@ function HoverSample() {
           actions={
             <>
               <CopyAction label="Copy account" value="Pinned wallet account" />
-              <InlineAction label="Remove" icon={<Trash2 {...iconProps} aria-hidden="true" />} />
+              <InlineAction
+                label="Remove"
+                variant="danger"
+                icon={<Trash2 {...iconProps} aria-hidden="true" />}
+              />
             </>
           }
         >
@@ -96,7 +100,11 @@ function DenseRows() {
                 label="Open"
                 icon={<ExternalLink {...iconProps} aria-hidden="true" />}
               />
-              <InlineAction label="Remove" icon={<Trash2 {...iconProps} aria-hidden="true" />} />
+              <InlineAction
+                label="Remove"
+                variant="danger"
+                icon={<Trash2 {...iconProps} aria-hidden="true" />}
+              />
             </>
           }
         >

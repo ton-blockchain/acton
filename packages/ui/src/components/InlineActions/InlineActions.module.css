@@ -111,6 +111,14 @@
   color: var(--acton-color-accent-hover);
 }
 
+.actionVariantDanger {
+  color: var(--acton-color-danger-text);
+}
+
+.actionVariantDanger:hover:not(:disabled) {
+  color: var(--acton-color-danger-text-hover);
+}
+
 @media (hover: none), (pointer: coarse) {
   .visibilityHover .actions {
     opacity: 1;

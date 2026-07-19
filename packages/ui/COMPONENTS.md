@@ -236,6 +236,8 @@ row item.
   accessible label/title, and resets after 2000ms by default.
 - `CopyInlineAction` uses copy/check icons by default; pass `icon` and
   `copiedIcon` only when the surrounding domain needs different symbols.
+- `variant="danger"` gives destructive actions the shared danger color and
+  hover treatment.
 
 ### Visibility Rules
 
@@ -252,8 +254,7 @@ row item.
 - Use `InlineAction` for icon-only buttons and always provide a clear `label`.
 - Use `CopyInlineAction` instead of wiring copy state by hand when the action
   should change to a check mark after copying.
-- Keep `InlineAction` visually neutral; handle destructive intent through label,
-  placement, confirmation, or surrounding context.
+- Use `variant="danger"` for destructive actions such as removing a row.
 - Use `size="compact"` only when the surrounding value is itself compact; keep
   the default size for standalone inline actions.
 - Use `InlineButton` instead when the action needs a visible text label like

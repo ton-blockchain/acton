@@ -1,0 +1,566 @@
+.page {
+  width: 100%;
+  max-width: 1200px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 24px 32px 48px;
+  color: var(--acton-color-text);
+}
+
+.pageReady {
+  max-width: none;
+  gap: 0;
+  padding: 0;
+}
+
+.secondaryControls {
+  width: 100%;
+  max-width: 1200px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 24px 32px 48px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--acton-space-5);
+  padding: var(--acton-space-1) 0 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 32px;
+  font-weight: var(--acton-font-weight-medium);
+  letter-spacing: 0;
+  line-height: 40px;
+}
+
+.metaLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2);
+  margin-top: var(--acton-space-1-5);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.loadingPanel {
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-raised);
+  box-sizing: border-box;
+}
+
+.formPanel {
+  min-width: 0;
+}
+
+.formPanel input:not([type="checkbox"]),
+.formPanel textarea,
+.formPanel select {
+  background: var(--acton-color-surface-raised);
+}
+
+.field,
+.blockField {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-2);
+}
+
+.fieldLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.messageInput,
+.abiInput,
+.stateOverrideBoc,
+.textInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+}
+
+.messageInput {
+  min-height: 180px;
+  resize: vertical;
+  padding: var(--acton-space-3);
+  font-family: var(--acton-font-mono);
+  line-height: 1.45;
+}
+
+.abiInput {
+  min-height: 150px;
+  resize: vertical;
+  padding: var(--acton-space-3);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.stateOverrideBoc {
+  min-height: 96px;
+  resize: vertical;
+  padding: var(--acton-space-3);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.textInput {
+  min-height: 2.5rem;
+  padding: 0 var(--acton-space-3);
+}
+
+.unitInputControl {
+  position: relative;
+  display: block;
+}
+
+.unitInput {
+  padding-inline-end: 4.25rem;
+}
+
+.unitInputSuffix {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--acton-space-3);
+  display: flex;
+  align-items: center;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  pointer-events: none;
+}
+
+.addressInput {
+  height: 2.5rem;
+  min-height: 2.5rem;
+  padding-inline: var(--acton-space-3);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  font-size: var(--acton-font-size-sm);
+}
+
+.messageInput:focus,
+.abiInput:focus,
+.stateOverrideBoc:focus,
+.textInput:focus {
+  outline: none;
+  border-color: var(--acton-color-border-strong);
+  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
+}
+
+.messageInput:disabled,
+.abiInput:disabled,
+.stateOverrideBoc:disabled,
+.textInput:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.inputModeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-1-5);
+}
+
+.inputModePanel {
+  overflow: visible;
+}
+
+.builderGrid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.74fr) minmax(420px, 1.26fr);
+  align-items: start;
+}
+
+.builderPanel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-5);
+}
+
+.payloadPanel {
+  border-left: 1px solid var(--acton-color-border);
+}
+
+.builderOverrides {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--acton-color-border);
+  padding: 0 var(--acton-space-5) var(--acton-space-5);
+}
+
+.builderOverrides .stateOverride {
+  border-top: 0;
+}
+
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 1.35;
+}
+
+.panelMeta {
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.inlineInputAction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--acton-space-2);
+  align-items: center;
+}
+
+.segmentedControl,
+.sourceSwitch {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 2px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+  padding: 2px;
+}
+
+.segment,
+.sourceSwitchButton {
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  padding: 0 var(--acton-space-3);
+  cursor: pointer;
+}
+
+.segment:hover,
+.sourceSwitchButton:hover {
+  color: var(--acton-color-text);
+}
+
+.segmentActive,
+.sourceSwitchButtonActive {
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+}
+
+.segment:disabled,
+.sourceSwitchButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.internalGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.45fr);
+  gap: var(--acton-space-4);
+}
+
+.messageOptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.rawModeGrid {
+  display: grid;
+}
+
+.rawModeGrid {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-5);
+}
+
+.stateOverride {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  border-top: 1px solid var(--acton-color-border);
+  padding-top: var(--acton-space-4);
+}
+
+.stateOverrideHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+}
+
+.stateOverrideCheckbox {
+  min-height: 30px;
+  align-content: center;
+}
+
+.stateOverrideHeader > .stateOverrideCheckbox {
+  margin-inline-start: var(--acton-space-2);
+}
+
+.stateOverrideBody,
+.stateOverrideFields,
+.stateOverrideNested,
+.stateOverrideStorage {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.stateOverrideAccount {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+  padding: var(--acton-space-3);
+}
+
+.accountOverrideHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+}
+
+.accountOverrideTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.35;
+}
+
+.overrideFormatBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-2);
+}
+
+.overrideFormatRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.addOverrideButton {
+  align-self: flex-start;
+}
+
+.stateOverrideStorageHeader,
+.payloadInputHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+}
+
+.abiStatus {
+  box-sizing: border-box;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
+  padding: 0 var(--acton-space-3);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.inlineError {
+  border: 1px solid color-mix(in srgb, var(--acton-color-danger) 42%, var(--acton-color-border));
+  border-radius: var(--acton-radius-control-sm);
+  background: color-mix(in srgb, var(--acton-color-danger) 10%, var(--acton-color-surface));
+  color: var(--acton-color-danger-text);
+  padding: var(--acton-space-2) var(--acton-space-3);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+}
+
+.previewPanel {
+  min-width: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+  overflow: hidden;
+}
+
+.previewTitle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.previewError {
+  min-width: 0;
+  text-align: right;
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.formFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid var(--acton-color-border);
+  padding: var(--acton-space-4) var(--acton-space-5);
+}
+
+.optionCheckbox {
+  align-self: flex-start;
+  margin-inline-start: var(--acton-space-2);
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+  min-width: max-content;
+}
+
+.loadingPanel {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--acton-space-5);
+}
+
+.resultSection {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.pageReady .resultSection {
+  gap: 0;
+}
+
+.debugInlineButtonActive {
+  color: var(--acton-color-accent-hover);
+}
+
+@media (max-width: 900px) {
+  .page,
+  .secondaryControls {
+    padding: var(--acton-space-5) var(--acton-space-4) 1.75rem;
+  }
+
+  .pageReady {
+    padding: 0;
+  }
+
+  .pageReady .secondaryControls {
+    padding: 0 var(--acton-space-4) 1.75rem;
+  }
+
+  .builderGrid,
+  .internalGrid,
+  .payloadInputHeader,
+  .stateOverrideStorageHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .payloadPanel {
+    border-top: 1px solid var(--acton-color-border);
+    border-left: 0;
+  }
+
+  .builderOverrides {
+    grid-column: auto;
+  }
+
+  .payloadInputHeader,
+  .stateOverrideStorageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .title {
+    font-size: 26px;
+    line-height: 32px;
+  }
+
+  .sourceSwitch {
+    width: 100%;
+  }
+
+  .sourceSwitchButton {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .inlineInputAction {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

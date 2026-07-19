@@ -43,6 +43,7 @@ export type InlineActionsProps = Readonly<
 const actionVariantClassNames = {
   default: styles.actionVariantDefault,
   accent: styles.actionVariantAccent,
+  danger: styles.actionVariantDanger,
 } satisfies Record<ActonInlineActionVariant, string>
 
 const actionSizeClassNames = {

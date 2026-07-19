@@ -2,6 +2,7 @@ export const ACTON_INLINE_ACTION_VARIANTS = {
   variant: {
     default: "Neutral inline action",
     accent: "Highlighted inline action",
+    danger: "Destructive inline action",
   },
   size: {
     default: "Standard inline action",
