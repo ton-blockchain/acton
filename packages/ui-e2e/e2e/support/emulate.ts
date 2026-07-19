@@ -23,11 +23,11 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
     test("opens the builder and switches to raw BOC input", async ({page}) => {
       const builderTab = page.getByRole("tab", {name: "Builder", exact: true})
       const rawTab = page.getByRole("tab", {name: "Raw", exact: true})
-      const emulateButton = page.getByRole("button", {name: "Emulate", exact: true})
+      const emulateButton = getEmulateButton(page)
 
       await expect(builderTab).toHaveAttribute("aria-selected", "true")
-      await expect(page.getByRole("textbox", {name: "From", exact: true})).toBeVisible()
-      await expect(page.getByRole("textbox", {name: "To", exact: true})).toBeVisible()
+      await expect(page.getByRole("combobox", {name: "From", exact: true})).toBeVisible()
+      await expect(page.getByRole("combobox", {name: "To", exact: true})).toBeVisible()
       await expect(
         page.getByText("Enter a valid contract address in To to configure the message", {
           exact: true,
@@ -72,25 +72,35 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       })
       await page.goto(`${route}?${params}`)
 
-      await expect(page.getByRole("textbox", {name: "From", exact: true})).toHaveValue(
+      await expect(page.getByRole("combobox", {name: "From", exact: true})).toHaveValue(
         params.get("source") ?? "",
       )
-      await expect(page.getByRole("textbox", {name: "To", exact: true})).toHaveValue(
+      await expect(page.getByRole("combobox", {name: "To", exact: true})).toHaveValue(
         params.get("address") ?? "",
       )
       await expect(page.getByRole("textbox", {name: "Value", exact: true})).toHaveValue("2")
 
       await page.locator('summary[aria-label="Advanced options"]').click()
-      const bounce = page.getByRole("checkbox", {name: "Bounce", exact: true})
-      const ignoreChksig = page.getByRole("checkbox", {name: "Ignore CHKSIG", exact: true})
+      const bounce = page.getByRole("checkbox", {name: /^Bounce/})
+      const ignoreChksig = page.getByRole("checkbox", {name: /^Ignore CHKSIG/})
       const block = page.getByRole("textbox", {name: "Masterchain block", exact: true})
       await expect(bounce).not.toBeChecked()
       await expect(ignoreChksig).toBeChecked()
       await expect(block).toHaveValue("7")
 
       await page.locator('summary[aria-label="Override timestamp"]').click()
-      await expect(page.getByRole("radio", {name: "Increase time", exact: true})).toBeChecked()
+      const increaseMode = page.getByRole("radio", {name: "Increase time", exact: true})
+      const timestampMode = page.getByRole("radio", {name: "Set UNIX timestamp", exact: true})
+      await expect(increaseMode).toBeChecked()
       const seconds = page.getByRole("textbox", {name: "Seconds to add", exact: true})
+      await expect(seconds).toHaveValue("15")
+
+      await timestampMode.check()
+      const unixTimestamp = page.getByRole("textbox", {name: "UNIX timestamp", exact: true})
+      await expect(unixTimestamp).not.toHaveValue("")
+      const currentTimestamp = await unixTimestamp.inputValue()
+      expect(currentTimestamp).not.toBe("1234567890")
+      await increaseMode.check()
       await expect(seconds).toHaveValue("15")
 
       await bounce.check()
@@ -107,7 +117,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
           mcSeqno: "8",
           timeMode: "increase",
           increaseTime: "30",
-          timestamp: "1234567890",
+          timestamp: currentTimestamp,
         })
       await expect.poll(() => new URL(page.url()).searchParams.has("bounce")).toBe(false)
       await expect.poll(() => new URL(page.url()).searchParams.has("ignoreChksig")).toBe(false)
@@ -115,7 +125,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
 
     test("reports malformed raw BOC input", async ({page}) => {
       await selectRawMessage(page, "not a BOC")
-      await page.getByRole("button", {name: "Emulate", exact: true}).click()
+      await getEmulateButton(page).click()
 
       await expect(
         page
@@ -137,7 +147,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       })
 
       await selectRawMessage(page, EXTERNAL_MESSAGE_BOC)
-      const emulateButton = page.getByRole("button", {name: "Emulate", exact: true})
+      const emulateButton = getEmulateButton(page)
       await emulateButton.click()
 
       await expect(emulateButton).toHaveAttribute("aria-busy", "true")
@@ -162,4 +172,8 @@ function isTonApiRequest(url: URL): boolean {
     url.pathname.startsWith("/api/v2") ||
     url.pathname.startsWith("/api/v3")
   )
+}
+
+function getEmulateButton(page: Page) {
+  return page.getByRole("tabpanel").getByRole("button", {name: "Emulate", exact: true})
 }

@@ -1,0 +1,108 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI message builder lists internal and external message options with serializable defaults 1`] = `
+{
+  "external": [
+    {
+      "bodyTyIdx": 12,
+      "id": "external:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "external",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  ],
+  "internal": [
+    {
+      "bodyTyIdx": 12,
+      "id": "internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  ],
+  "union": [
+    {
+      "bodyTyIdx": 15,
+      "id": "internal:0:0",
+      "label": "null",
+      "sample": null,
+      "summary": "null / null",
+      "transport": "internal",
+      "union": {
+        "hasValueField": true,
+        "label": "",
+      },
+      "valueTyIdx": 14,
+    },
+    {
+      "bodyTyIdx": 15,
+      "id": "internal:0:1",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment / Increment",
+      "transport": "internal",
+      "union": {
+        "hasValueField": false,
+        "label": "Increment",
+      },
+      "valueTyIdx": 12,
+    },
+  ],
+}
+`;
+
+exports[`ABI message builder builds an internal message with source, value, bounce, and ABI body 1`] = `
+{
+  "boc": "b5ee9c724101010100600000bb48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444512a05f200000000000000000000000000000000000080000003c074ab90b0",
+  "message": {
+    "body": {
+      "$": "Increment",
+      "value": "7",
+    },
+    "info": {
+      "bounce": false,
+      "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+      "source": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+      "type": "internal",
+      "value": "1250000000",
+    },
+  },
+}
+`;
+
+exports[`ABI message builder builds external and union messages 1`] = `
+{
+  "external": {
+    "body": {
+      "$": "Increment",
+      "value": "11",
+    },
+    "info": {
+      "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+      "type": "external-in",
+    },
+  },
+  "union": {
+    "body": {
+      "$": "Increment",
+      "value": "13",
+    },
+    "info": {
+      "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+      "type": "external-in",
+    },
+  },
+}
+`;
