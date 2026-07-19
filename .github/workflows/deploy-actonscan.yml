@@ -27,12 +27,15 @@ jobs:
     runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 30
 
+    env:
+      ACTONSCAN_URL: https://actonscan.com
+
     permissions:
       contents: read
 
     environment:
       name: actonscan
-      url: https://actonscan.com
+      url: ${{ env.ACTONSCAN_URL }}
 
     steps:
       - name: Check out Acton repository
@@ -78,8 +81,11 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTONSCAN_TOKEN }}
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
+          ACTONSCAN_CNAME="${ACTONSCAN_URL#*://}"
+          ACTONSCAN_CNAME="${ACTONSCAN_CNAME%%/*}"
           cargo xtask deploy-explorer \
-            --cname actonscan.com \
+            --branch pages \
+            --cname "${ACTONSCAN_CNAME}" \
             --message "Deploy actonscan from ${DEPLOY_COMMIT}"
 
       - name: Save Bun cache
