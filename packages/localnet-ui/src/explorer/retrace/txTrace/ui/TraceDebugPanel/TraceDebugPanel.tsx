@@ -53,10 +53,7 @@ export function TraceDebugPanel({
 export function TraceDebugPanelLoading() {
   return (
     <div className={styles.loadingState}>
-      <InlineLoader
-        message="Tracing transaction"
-        subtext="This may take a few moments"
-      />
+      <InlineLoader message="Tracing transaction" subtext="This may take a few moments" />
     </div>
   )
 }
@@ -75,5 +72,3 @@ export function TraceDebugPanelError({
     </div>
   )
 }
-
-

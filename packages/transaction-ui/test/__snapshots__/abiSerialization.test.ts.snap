@@ -1,0 +1,43 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI value serialization round-trips nested form values through Cell and BoC 1`] = `
+{
+  "boc": "b5ee9c7241010101003500006500000007c00000000000000000000000000000000000000000000000000000000000000000044a817c80200000054000000c7048b94bef",
+  "decoded": {
+    "$": "NestedStruct",
+    "counterAlias": "99",
+    "summary": {
+      "$": "ScalarFields",
+      "count": "7",
+      "enabled": true,
+      "maybeAddress": null,
+      "maybeCount": "42",
+      "recipient": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+      "tonAmount": "1250000000",
+    },
+  },
+}
+`;
+
+exports[`ABI value serialization round-trips dictionaries with numeric keys and coins values 1`] = `
+{
+  "boc": "b5ee9c7241010401001a000101c0010203cec00203000b650ee6b28020000bf20773594040d1f0d12b",
+  "decoded": {
+    "1": "1000000000",
+    "7": "250000000",
+  },
+}
+`;
+
+exports[`ABI value serialization formats TON runtime values as JSON-safe form values 1`] = `
+{
+  "address": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+  "builder": "b5ee9c72410101010003000002ab4e791e7a",
+  "cell": "b5ee9c72410101010003000002ab4e791e7a",
+  "dictionary": {
+    "7": "1024",
+  },
+  "integer": "42",
+  "slice": "b5ee9c72410101010003000002ab4e791e7a",
+}
+`;

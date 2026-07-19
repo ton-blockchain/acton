@@ -90,6 +90,13 @@
   box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
 
+.invalid .textInput,
+.invalid .textArea,
+.invalid .booleanInput,
+.invalid .group {
+  border-color: var(--acton-color-danger);
+}
+
 .textInput:disabled,
 .textArea:disabled {
   cursor: not-allowed;

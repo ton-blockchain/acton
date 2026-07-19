@@ -17,6 +17,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
+      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"],
+      "@acton/transaction-ui/abi": ["../transaction-ui/src/abi.ts"],
       "@acton/ui": ["../ui/src/index.ts"],
       "@acton/ui/styles/*": ["../ui/src/styles/*"]
     }

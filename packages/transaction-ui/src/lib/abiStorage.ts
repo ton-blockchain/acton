@@ -1,19 +1,21 @@
-import {beginCell} from "@ton/core"
+import {beginCell, type Cell} from "@ton/core"
 import {
   DynamicCtx,
   packToBuilderDynamic,
   renderTy,
-  SymTable,
   type ContractABI,
+  type SymTable,
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
 
 import {
+  createAbiSymbols,
   normalizeAbiDynamicArg,
   parseAbiCellArg,
+  parseAbiJsonStrict,
   sampleAbiValueForTy,
   stringifyAbiJson,
-} from "../../../api/abiDynamic"
+} from "./abiValue"
 
 export interface AbiStorageBuilderInfo {
   readonly tyIdx: number
@@ -29,7 +31,7 @@ export function getAbiStorageBuilderInfo(
     return undefined
   }
 
-  const symbols = createSymTable(abi)
+  const symbols = createAbiSymbols(abi)
   return {
     tyIdx,
     typeLabel: safeRenderTy(symbols, tyIdx),
@@ -43,12 +45,7 @@ export function buildAbiStorageDataBoc(abi: ContractABI, storageJson: string): s
     throw new Error("ABI does not describe contract storage.")
   }
 
-  const ctx = new DynamicCtx(abi)
-  const input = parseStorageJson(storageJson)
-  const normalizedInput = normalizeAbiDynamicArg(ctx, tyIdx, input)
-  const builder = beginCell()
-  packToBuilderDynamic(ctx, tyIdx, normalizedInput, builder)
-  return builder.endCell().toBoc().toString("hex")
+  return encodeAbiValueToBoc(abi, tyIdx, parseAbiJsonStrict(storageJson))
 }
 
 export function decodeAbiStorageDataBoc(abi: ContractABI, dataBoc: string): unknown {
@@ -57,26 +54,32 @@ export function decodeAbiStorageDataBoc(abi: ContractABI, dataBoc: string): unkn
     throw new Error("ABI does not describe contract storage.")
   }
 
-  const ctx = new DynamicCtx(abi)
-  return unpackFromSliceDynamic(ctx, tyIdx, parseAbiCellArg(dataBoc).beginParse())
+  return decodeAbiValueFromBoc(abi, tyIdx, dataBoc)
 }
 
 export function createAbiStorageSymbols(abi: ContractABI): SymTable {
-  return createSymTable(abi)
+  return createAbiSymbols(abi)
 }
 
-function createSymTable(abi: ContractABI): SymTable {
-  return new SymTable(
-    abi.declarations,
-    abi.unique_types,
-    abi.struct_instantiations,
-    abi.alias_instantiations,
-  )
+export function encodeAbiValueToCell(abi: ContractABI, tyIdx: number, formValue: unknown): Cell {
+  const ctx = new DynamicCtx(abi)
+  const normalizedInput = normalizeAbiDynamicArg(ctx, tyIdx, formValue)
+  const builder = beginCell()
+  packToBuilderDynamic(ctx, tyIdx, normalizedInput, builder)
+  return builder.endCell()
 }
 
-function parseStorageJson(value: string): unknown {
-  const trimmed = value.trim()
-  return trimmed ? JSON.parse(trimmed) : {}
+export function encodeAbiValueToBoc(abi: ContractABI, tyIdx: number, formValue: unknown): string {
+  return encodeAbiValueToCell(abi, tyIdx, formValue).toBoc().toString("hex")
+}
+
+export function decodeAbiValueFromCell(abi: ContractABI, tyIdx: number, cell: Cell): unknown {
+  const ctx = new DynamicCtx(abi)
+  return unpackFromSliceDynamic(ctx, tyIdx, cell.beginParse())
+}
+
+export function decodeAbiValueFromBoc(abi: ContractABI, tyIdx: number, dataBoc: string): unknown {
+  return decodeAbiValueFromCell(abi, tyIdx, parseAbiCellArg(dataBoc))
 }
 
 function safeRenderTy(symbols: SymTable, tyIdx: number): string {

@@ -1,11 +1,11 @@
-import {Buffer} from "node:buffer"
-
 import {
   Address,
   Builder,
   Cell,
   Dictionary,
   Slice,
+  fromNano,
+  toNano,
   type DictionaryKey,
   type DictionaryKeyTypes,
   type DictionaryValue,
@@ -14,12 +14,73 @@ import {
   packToBuilderDynamic,
   renderTy,
   type DynamicCtx,
-  type SymTable,
+  type ContractABI,
+  SymTable,
   type UnionVariant,
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
 
+export type {ContractABI, SymTable, Ty, UnionVariant} from "@ton/tolk-abi-to-typescript"
+
 export const SAMPLE_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+
+export function parseAbiJson(value: string, fallback: unknown = {}): unknown {
+  try {
+    return value.trim() ? JSON.parse(value) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export function parseAbiJsonStrict(value: string, fallback: unknown = {}): unknown {
+  return value.trim() ? JSON.parse(value) : fallback
+}
+
+export function abiValueToFormValue(value: unknown): unknown {
+  return parseAbiJson(stringifyAbiJson(value), null)
+}
+
+export function parseGramAsNano(value: string): string | undefined {
+  const normalized = value.trim()
+  if (!/^(?:\d+|\d*\.\d{0,9})$/.test(normalized) || normalized === ".") {
+    return undefined
+  }
+
+  try {
+    return toNano(normalized).toString()
+  } catch {
+    return undefined
+  }
+}
+
+export function formatNanoAsGram(value: string): string {
+  if (!/^[0-9]+$/.test(value)) return ""
+
+  try {
+    return fromNano(BigInt(value))
+  } catch {
+    return ""
+  }
+}
+
+export function formatAbiAddress(value: unknown): string {
+  if (Address.isAddress(value)) return value.toString()
+  return typeof value === "string" ? value : ""
+}
+
+export function formatAbiCellBoc(value: Cell | Builder | Slice): string {
+  const cell = value instanceof Cell ? value : value.asCell()
+  return cell.toBoc().toString("hex")
+}
+
+export function createAbiSymbols(abi: ContractABI): SymTable {
+  return new SymTable(
+    abi.declarations,
+    abi.unique_types,
+    abi.struct_instantiations,
+    abi.alias_instantiations,
+  )
+}
 
 export function normalizeSimpleAbiDynamicArg(
   ctx: DynamicCtx,
@@ -204,7 +265,7 @@ export function parseAbiCellArg(value: string): Cell {
   const trimmed = requireArgValue(value, "Cell argument")
   const hex = trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed
   if (/^(?:[0-9a-fA-F]{2})+$/.test(hex)) {
-    return Cell.fromBoc(Buffer.from(hex, "hex"))[0]
+    return Cell.fromHex(hex)
   }
   return Cell.fromBase64(trimmed)
 }
@@ -305,27 +366,31 @@ export function sampleAbiValueForTy(
 }
 
 export function stringifyAbiJson(value: unknown): string {
-  return JSON.stringify(
-    value,
-    (_key, item) => {
-      if (typeof item === "bigint") {
-        return item.toString()
-      }
-      if (Address.isAddress(item)) {
-        return item.toString()
-      }
-      if (item instanceof Cell) {
-        return item.toBoc().toString("hex")
-      }
-      if (item instanceof Builder || item instanceof Slice) {
-        return item.asCell().toBoc().toString("hex")
-      }
-      if (item instanceof Dictionary) {
-        return Object.fromEntries([...item].map(([key, value]) => [stringifyAbiMapKey(key), value]))
-      }
-      return item
-    },
-    2,
+  return (
+    JSON.stringify(
+      value,
+      (_key, item) => {
+        if (typeof item === "bigint") {
+          return item.toString()
+        }
+        if (Address.isAddress(item)) {
+          return formatAbiAddress(item)
+        }
+        if (item instanceof Cell) {
+          return formatAbiCellBoc(item)
+        }
+        if (item instanceof Builder || item instanceof Slice) {
+          return formatAbiCellBoc(item)
+        }
+        if (item instanceof Dictionary) {
+          return Object.fromEntries(
+            [...item].map(([key, value]) => [stringifyAbiMapKey(key), value]),
+          )
+        }
+        return item
+      },
+      2,
+    ) ?? "null"
   )
 }
 

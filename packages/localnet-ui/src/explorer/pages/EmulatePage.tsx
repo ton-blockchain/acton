@@ -11,10 +11,24 @@ import {
   Select,
   useToast,
 } from "@acton/ui"
-import type {
-  LoadedTransactionActions,
-  TransactionBlockRef,
-  TransactionInfo,
+import {
+  AbiValueEditor,
+  buildAbiMessageBoc,
+  buildAbiStorageDataBoc,
+  createAbiMessageSymbols,
+  createAbiStorageSymbols,
+  decodeAbiStorageDataBoc,
+  formatAbiMessageOptionSummary,
+  getAbiStorageBuilderInfo,
+  listAbiMessageBuilderOptions,
+  parseAbiCellArg,
+  parseAbiJson,
+  stringifyAbiJson,
+  type AbiMessageBuilderOption,
+  type AbiMessageTransport,
+  type LoadedTransactionActions,
+  type TransactionBlockRef,
+  type TransactionInfo,
 } from "@acton/transaction-ui"
 import {useNavigate, useSearchParams} from "react-router-dom"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
@@ -29,24 +43,8 @@ import {normalizeAddress} from "../components/utils"
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
-import {parseAbiCellArg, stringifyAbiJson} from "../api/abiDynamic"
-import {AbiValueEditor} from "../components/AbiValueEditor"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
-import {
-  buildAbiMessageBoc,
-  createAbiMessageSymbols,
-  formatAbiMessageOptionSummary,
-  listAbiMessageBuilderOptions,
-  type AbiMessageBuilderOption,
-  type AbiMessageTransport,
-} from "../retrace/txTrace/lib/abiMessageBuilder"
-import {
-  buildAbiStorageDataBoc,
-  createAbiStorageSymbols,
-  decodeAbiStorageDataBoc,
-  getAbiStorageBuilderInfo,
-} from "../retrace/txTrace/lib/abiStorageBuilder"
 import {
   emulateRawMessageBoc,
   parseRawMessageBoc,
@@ -478,7 +476,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       const firstOption = builderOptions[0]
       setSelectedMessageId(firstOption.id)
       setArgsJson(firstOption.sampleJson)
-      setArgsFormValue(parseJsonValue(firstOption.sampleJson, {}))
+      setArgsFormValue(parseAbiJson(firstOption.sampleJson, {}))
     }
   }, [builderOptions, selectedMessageId])
 
@@ -605,7 +603,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       setSelectedMessageId(messageId)
       if (option) {
         setArgsJson(option.sampleJson)
-        setArgsFormValue(parseJsonValue(option.sampleJson, {}))
+        setArgsFormValue(parseAbiJson(option.sampleJson, {}))
       }
     },
     [builderOptions],
@@ -615,7 +613,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     (mode: AbiValueInputMode) => {
       setArgsInputMode(mode)
       if (mode === "form") {
-        setArgsFormValue(parseJsonValue(argsJson, argsFormValue))
+        setArgsFormValue(parseAbiJson(argsJson, argsFormValue))
       } else {
         setArgsJson(stringifyAbiJson(argsFormValue))
       }
@@ -635,7 +633,7 @@ export function EmulatePage({client}: EmulatePageProps) {
           return {
             ...entry,
             storageInputMode: mode,
-            storageFormValue: parseJsonValue(entry.storageJson, entry.storageFormValue),
+            storageFormValue: parseAbiJson(entry.storageJson, entry.storageFormValue),
           }
         }
         return {
@@ -1708,7 +1706,7 @@ function createAccountStateOverrideDraft({
     storageSource: "abi",
     storageInputMode: "form",
     storageJson,
-    storageFormValue: parseJsonValue(storageJson, {}),
+    storageFormValue: parseAbiJson(storageJson, {}),
     dataBoc: "",
     frozenHash: "",
     lastTransactionLt: "",
@@ -1784,7 +1782,7 @@ function currentStorageOverrideDraft(
         storageSource: "abi",
         storageInputMode: "form",
         storageJson,
-        storageFormValue: parseJsonValue(storageJson, {}),
+        storageFormValue: parseAbiJson(storageJson, {}),
       }
     } catch {
       // Fall through to raw BOC when the loaded contract state does not match the active ABI.
@@ -1932,14 +1930,6 @@ function buildStorageOverridePreview({
     return {
       error: error instanceof Error ? error.message : "Failed to build storage data",
     }
-  }
-}
-
-function parseJsonValue(value: string, fallback: unknown): unknown {
-  try {
-    return value.trim() ? JSON.parse(value) : fallback
-  } catch {
-    return fallback
   }
 }
 

@@ -179,6 +179,7 @@
       "name": "@acton/ui-gallery",
       "version": "0.1.0",
       "dependencies": {
+        "@acton/transaction-ui": "workspace:*",
         "@acton/ui": "workspace:*",
         "lucide-react": "^0.474.0",
         "react": "^19.2.3",
@@ -191,6 +192,7 @@
         "@vitejs/plugin-react": "^6.0.2",
         "typescript": "^7.0.2",
         "vite": "^8.0.16",
+        "vite-plugin-node-polyfills": "^0.28.0",
       },
     },
   },

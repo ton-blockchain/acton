@@ -6,13 +6,15 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./abi": "./src/abi.ts"
   },
   "scripts": {
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

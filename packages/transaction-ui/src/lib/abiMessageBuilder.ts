@@ -3,17 +3,18 @@ import {
   DynamicCtx,
   packToBuilderDynamic,
   renderTy,
-  SymTable,
+  type SymTable,
   type ContractABI,
   type Ty,
   type UnionVariant,
 } from "@ton/tolk-abi-to-typescript"
 
 import {
+  createAbiSymbols,
   normalizeAbiDynamicArg,
   sampleAbiValueForTy,
   stringifyAbiJson,
-} from "../../../api/abiDynamic"
+} from "./abiValue"
 
 export type AbiMessageTransport = "external" | "internal"
 
@@ -55,12 +56,7 @@ export function listAbiMessageBuilderOptions(
 }
 
 export function createAbiMessageSymbols(abi: ContractABI): SymTable {
-  return new SymTable(
-    abi.declarations,
-    abi.unique_types,
-    abi.struct_instantiations,
-    abi.alias_instantiations,
-  )
+  return createAbiSymbols(abi)
 }
 
 export function buildAbiMessageBoc({

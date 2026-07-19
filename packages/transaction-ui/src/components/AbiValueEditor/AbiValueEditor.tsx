@@ -1,18 +1,23 @@
 import {useEffect, useMemo, useState} from "react"
 import {Checkbox, InlineAction, Select} from "@acton/ui"
-import {fromNano, toNano} from "@ton/core"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
-import {SAMPLE_ADDRESS, sampleAbiValueForTy} from "../api/abiDynamic"
+import {
+  formatNanoAsGram,
+  parseGramAsNano,
+  SAMPLE_ADDRESS,
+  sampleAbiValueForTy,
+} from "../../lib/abiValue"
 import styles from "./AbiValueEditor.module.css"
 
-interface AbiValueEditorProps {
+export interface AbiValueEditorProps {
   readonly symbols: SymTable
   readonly tyIdx: number
   readonly value: unknown
   readonly onChange: (value: unknown) => void
   readonly disabled?: boolean
+  readonly invalid?: boolean
   readonly label?: string
 }
 
@@ -22,10 +27,14 @@ export function AbiValueEditor({
   value,
   onChange,
   disabled = false,
+  invalid = false,
   label,
 }: AbiValueEditorProps) {
   return (
-    <div className={styles.editor}>
+    <div
+      className={`${styles.editor} ${invalid ? styles.invalid : ""}`}
+      aria-invalid={invalid || undefined}
+    >
       <AbiValueEditorNode
         symbols={symbols}
         tyIdx={tyIdx}
@@ -591,29 +600,6 @@ function isTonFieldName(label: string): boolean {
     .map(word => word.toLowerCase())
 
   return words.some(word => word === "ton" || word === "gram" || word === "grams")
-}
-
-function parseGramAsNano(value: string): string | undefined {
-  const normalized = value.trim()
-  if (!/^(?:\d+|\d*\.\d{0,9})$/.test(normalized) || normalized === ".") {
-    return undefined
-  }
-
-  try {
-    return toNano(normalized).toString()
-  } catch {
-    return undefined
-  }
-}
-
-function formatNanoAsGram(value: string): string {
-  if (!/^[0-9]+$/.test(value)) return ""
-
-  try {
-    return fromNano(BigInt(value))
-  } catch {
-    return ""
-  }
 }
 
 function recordValue(value: unknown): Record<string, unknown> {
