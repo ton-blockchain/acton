@@ -3,9 +3,11 @@ import {Search, X} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {KeyboardEvent, ReactNode} from "react"
 
+import {Input} from "../Input/Input"
 import styles from "./SearchInput.module.css"
 
-export type SearchInputSize = "sm" | "lg"
+export type SearchInputSize = "sm" | "md" | "lg"
+export type SearchInputVariant = "search" | "field"
 
 export interface SearchInputItem {
   readonly id: string
@@ -21,30 +23,38 @@ export interface SearchInputProps {
   readonly ariaLabel: string
   readonly autoFocus?: boolean
   readonly className?: string
+  readonly disabled?: boolean
+  readonly inputClassName?: string
   readonly invalid?: boolean
   readonly items: readonly SearchInputItem[]
   readonly onOpenChange?: (open: boolean) => void
+  readonly onFocus?: () => void
   readonly onSubmit?: (value: string) => boolean | void
   readonly onValueChange: (value: string) => void
   readonly open?: boolean
   readonly placeholder?: string
   readonly size?: SearchInputSize
   readonly value: string
+  readonly variant?: SearchInputVariant
 }
 
 export function SearchInput({
   ariaLabel,
   autoFocus = false,
   className,
+  disabled = false,
+  inputClassName,
   invalid = false,
   items,
   onOpenChange,
+  onFocus,
   onSubmit,
   onValueChange,
   open,
   placeholder,
   size = "lg",
   value,
+  variant = "search",
 }: SearchInputProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null)
@@ -54,10 +64,10 @@ export function SearchInput({
   const isOpen = open ?? uncontrolledOpen
 
   useEffect(() => {
-    if (autoFocus) {
+    if (autoFocus && !disabled) {
       inputRef.current?.focus()
     }
-  }, [autoFocus])
+  }, [autoFocus, disabled])
 
   const setOpen = useCallback(
     (nextOpen: boolean) => {
@@ -86,16 +96,24 @@ export function SearchInput({
     [submit],
   )
 
-  const rootClassName = [styles.root, size === "sm" ? styles.sizeSm : styles.sizeLg, className]
+  const sizeClassName =
+    size === "sm" ? styles.sizeSm : size === "md" ? styles.sizeMd : styles.sizeLg
+  const rootClassName = [
+    styles.root,
+    sizeClassName,
+    variant === "field" ? styles.fieldVariant : styles.searchVariant,
+    className,
+  ]
     .filter(Boolean)
     .join(" ")
+  const iconSize = size === "sm" ? 16 : size === "md" ? 18 : 20
 
   return (
     <Autocomplete.Root
       itemToStringValue={item => (typeof item.label === "string" ? item.label : "")}
       items={items}
       mode="none"
-      open={isOpen && items.length > 0}
+      open={!disabled && isOpen && items.length > 0}
       openOnInputClick
       value={value}
       onItemHighlighted={item => {
@@ -109,32 +127,44 @@ export function SearchInput({
         }
       }}
     >
-      <section
+      <div
         ref={setPortalContainer}
         className={rootClassName}
-        role="search"
+        role={variant === "search" ? "search" : undefined}
         aria-label={ariaLabel}
       >
-        <div ref={controlRef} className={`${styles.control} ${invalid ? styles.invalid : ""}`}>
+        <div
+          ref={controlRef}
+          className={`${styles.control} ${
+            variant === "search" && invalid ? styles.invalid : ""
+          } ${variant === "search" && disabled ? styles.disabled : ""}`}
+        >
           <span className={styles.searchIcon} aria-hidden="true">
-            <Search size={size === "sm" ? 16 : 20} />
+            <Search size={iconSize} />
           </span>
           <Autocomplete.Input
             ref={inputRef}
-            type="search"
-            className={styles.input}
+            type={variant === "search" ? "search" : "text"}
+            className={variant === "search" ? styles.input : inputClassName}
+            render={variant === "field" ? <Input size={size} invalid={invalid} /> : undefined}
             aria-invalid={invalid}
             aria-label={ariaLabel}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
+            disabled={disabled}
             placeholder={placeholder}
             spellCheck={false}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              if (!disabled) {
+                onFocus?.()
+                setOpen(true)
+              }
+            }}
             onKeyDown={handleKeyDown}
           />
         </div>
-      </section>
+      </div>
       {portalContainer && (
         <Autocomplete.Portal container={portalContainer}>
           <Autocomplete.Positioner

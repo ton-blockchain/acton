@@ -424,7 +424,13 @@ history persistence, validation messages, and navigation.
 />
 ```
 
-- `size`: `sm` for headers and dense toolbars, or `lg` for primary page search.
+- `size`: `sm` for headers and dense toolbars, `md` for form controls, or `lg`
+  for primary page search.
+- `variant`: `search` is the default search surface; `field` matches regular
+  form controls and omits the search icon for suggestion-backed inputs.
+- `inputClassName`: styles the native input surface without affecting the
+  autocomplete anchor or popup.
+- `disabled`: disables typing, focus-open behavior, and the suggestion list.
 - `items`: resolved rows with a stable `id`, label, optional description and
   icon, and an `onSelect` callback.
 - `onRemove`: optional history-row command. SearchInput supplies the remove
@@ -433,6 +439,8 @@ history persistence, validation messages, and navigation.
   control should stay open.
 - `open` and `onOpenChange`: optional controlled visibility for previews or
   coordinated layouts. Normal product usage can leave visibility uncontrolled.
+- `onFocus`: optional hook for suggestion wrappers that need to reset their
+  filtering state whenever the field receives focus.
 
 ### States To Review Visually
 

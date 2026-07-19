@@ -1,6 +1,8 @@
 import {
   AbiValueEditor,
   SAMPLE_ADDRESS,
+  SAMPLE_EXTERNAL_ADDRESS,
+  TON_ADDR_NONE,
   abiValueToFormValue,
   createAbiSymbols,
   decodeAbiValueFromBoc,
@@ -9,6 +11,7 @@ import {
   type ContractABI,
 } from "@acton/transaction-ui/abi"
 import {RawDataBlock} from "@acton/ui"
+import {Address} from "@ton/core"
 import {useMemo, useState} from "react"
 
 import styles from "./abiValueEditorGallery.module.css"
@@ -33,6 +36,7 @@ const typeIndex = {
   nestedCollections: 30,
   complexCollectionFields: 31,
   optionalTon: 32,
+  addressFields: 35,
 } as const
 
 const matrixAbi = {
@@ -109,6 +113,16 @@ const matrixAbi = {
         {name: "nestedBatches", ty_idx: typeIndex.nestedCollections},
       ],
     },
+    {
+      kind: "struct",
+      name: "AddressFields",
+      ty_idx: typeIndex.addressFields,
+      fields: [
+        {name: "internal", ty_idx: 7},
+        {name: "external", ty_idx: 33},
+        {name: "any", ty_idx: 34},
+      ],
+    },
   ],
   unique_types: [
     {kind: "void"},
@@ -155,6 +169,9 @@ const matrixAbi = {
     {kind: "arrayOf", inner_ty_idx: typeIndex.structsByBatch},
     {kind: "StructRef", struct_name: "ComplexCollectionFields"},
     {kind: "nullable", inner_ty_idx: 6},
+    {kind: "addressExt"},
+    {kind: "addressAny"},
+    {kind: "StructRef", struct_name: "AddressFields"},
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -168,6 +185,16 @@ const matrixAbi = {
 } satisfies ContractABI
 
 const matrixSymbols = createAbiSymbols(matrixAbi)
+const treasuryAddress = Address.parseRaw(`0:${"11".repeat(32)}`).toString()
+
+const addressSuggestions = [
+  {address: SAMPLE_ADDRESS, label: `Zero account · ${shortAddress(SAMPLE_ADDRESS)}`},
+  {address: treasuryAddress, label: `Treasury · ${shortAddress(treasuryAddress)}`},
+] as const
+
+function shortAddress(address: string): string {
+  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-6)}` : address
+}
 
 const scalarValue = {
   count: "7",
@@ -255,6 +282,7 @@ function EditorSample({
         disabled={disabled}
         invalid={invalid}
         label={label}
+        addressSuggestions={addressSuggestions}
       />
     </article>
   )
@@ -283,6 +311,15 @@ function ScalarSamples() {
         tyIdx={typeIndex.optionalTon}
         initialValue="1500000000"
         label="tonAmount"
+      />
+      <EditorSample
+        title="Internal · external · any address"
+        tyIdx={typeIndex.addressFields}
+        initialValue={{
+          internal: SAMPLE_ADDRESS,
+          external: SAMPLE_EXTERNAL_ADDRESS,
+          any: TON_ADDR_NONE,
+        }}
       />
     </div>
   )
@@ -385,6 +422,7 @@ function RoundTripSample() {
           value={value}
           onChange={setValue}
           invalid={Boolean(result.error)}
+          addressSuggestions={addressSuggestions}
         />
       </article>
       <div className={styles.roundTripOutput}>

@@ -130,6 +130,12 @@
   font-size: var(--acton-font-size-sm);
 }
 
+.addressInput {
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  font-size: var(--acton-font-size-sm);
+}
+
 .textArea {
   min-height: 82px;
   resize: vertical;

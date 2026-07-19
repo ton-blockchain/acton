@@ -3,6 +3,7 @@ import {
   Builder,
   Cell,
   Dictionary,
+  ExternalAddress,
   Slice,
   fromNano,
   toNano,
@@ -19,6 +20,8 @@ import {
   type UnionVariant,
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
+
+import {parseTonAddress, SAMPLE_EXTERNAL_ADDRESS} from "./tonAddress"
 
 export type {ContractABI, SymTable, Ty, UnionVariant} from "@ton/tolk-abi-to-typescript"
 
@@ -65,6 +68,7 @@ export function formatNanoAsGram(value: string): string {
 
 export function formatAbiAddress(value: unknown): string {
   if (Address.isAddress(value)) return value.toString()
+  if (ExternalAddress.isAddress(value)) return value.toString()
   return typeof value === "string" ? value : ""
 }
 
@@ -106,15 +110,17 @@ export function normalizeSimpleAbiDynamicArg(
     case "string": {
       return value
     }
-    case "address":
+    case "address": {
+      return parseTonAddress(requireArgValue(value, "Address argument"), "internal")
+    }
     case "addressExt": {
-      return Address.parse(requireArgValue(value, "Address argument"))
+      return parseTonAddress(requireArgValue(value, "External address argument"), "external")
     }
     case "addressOpt": {
       return value.trim() ? Address.parse(value.trim()) : null
     }
     case "addressAny": {
-      return value.trim() ? Address.parse(value.trim()) : "none"
+      return parseTonAddress(requireArgValue(value, "Address argument"), "any")
     }
     case "cell": {
       return parseAbiCellArg(value)
@@ -152,9 +158,11 @@ export function normalizeAbiDynamicArg(ctx: DynamicCtx, tyIdx: number, value: un
     case "EnumRef": {
       return typeof value === "string" ? BigInt(value) : value
     }
-    case "address":
+    case "address": {
+      return typeof value === "string" ? parseTonAddress(value, "internal") : value
+    }
     case "addressExt": {
-      return typeof value === "string" ? Address.parse(value) : value
+      return typeof value === "string" ? parseTonAddress(value, "external") : value
     }
     case "addressOpt": {
       if (value === null || value === undefined) return null
@@ -165,7 +173,7 @@ export function normalizeAbiDynamicArg(ctx: DynamicCtx, tyIdx: number, value: un
       return value
     }
     case "addressAny": {
-      return typeof value === "string" && value !== "none" ? Address.parse(value) : value
+      return typeof value === "string" ? parseTonAddress(value, "any") : value
     }
     case "cell": {
       return typeof value === "string" ? parseAbiCellArg(value) : value
@@ -294,9 +302,11 @@ export function sampleAbiValueForTy(
       return ""
     }
     case "address":
-    case "addressExt":
     case "addressAny": {
       return SAMPLE_ADDRESS
+    }
+    case "addressExt": {
+      return SAMPLE_EXTERNAL_ADDRESS
     }
     case "addressOpt": {
       return null
@@ -374,6 +384,9 @@ export function stringifyAbiJson(value: unknown): string {
           return item.toString()
         }
         if (Address.isAddress(item)) {
+          return formatAbiAddress(item)
+        }
+        if (ExternalAddress.isAddress(item)) {
           return formatAbiAddress(item)
         }
         if (item instanceof Cell) {

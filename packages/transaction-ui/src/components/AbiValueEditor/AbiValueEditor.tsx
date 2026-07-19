@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState, type ReactNode} from "react"
+import {createContext, useContext, useEffect, useMemo, useState, type ReactNode} from "react"
 import {Checkbox, InlineAction, Input, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
@@ -9,7 +9,11 @@ import {
   SAMPLE_ADDRESS,
   sampleAbiValueForTy,
 } from "../../lib/abiValue"
+import type {TonAddressKind} from "../../lib/tonAddress"
+import {TonAddressInput, type TonAddressSuggestion} from "../TonAddressInput/TonAddressInput"
 import styles from "./AbiValueEditor.module.css"
+
+const AddressSuggestionsContext = createContext<readonly TonAddressSuggestion[]>([])
 
 export interface AbiValueEditorProps {
   readonly symbols: SymTable
@@ -19,6 +23,7 @@ export interface AbiValueEditorProps {
   readonly disabled?: boolean
   readonly invalid?: boolean
   readonly label?: string
+  readonly addressSuggestions?: readonly TonAddressSuggestion[]
 }
 
 export function AbiValueEditor({
@@ -29,21 +34,24 @@ export function AbiValueEditor({
   disabled = false,
   invalid = false,
   label,
+  addressSuggestions = [],
 }: AbiValueEditorProps) {
   return (
-    <div
-      className={`${styles.editor} ${invalid ? styles.invalid : ""}`}
-      aria-invalid={invalid || undefined}
-    >
-      <AbiValueEditorNode
-        symbols={symbols}
-        tyIdx={tyIdx}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        label={label}
-      />
-    </div>
+    <AddressSuggestionsContext.Provider value={addressSuggestions}>
+      <div
+        className={`${styles.editor} ${invalid ? styles.invalid : ""}`}
+        aria-invalid={invalid || undefined}
+      >
+        <AbiValueEditorNode
+          symbols={symbols}
+          tyIdx={tyIdx}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          label={label}
+        />
+      </div>
+    </AddressSuggestionsContext.Provider>
   )
 }
 
@@ -110,6 +118,7 @@ function AbiValueEditorNode({
   label,
   hideHeader = false,
 }: AbiValueEditorNodeProps) {
+  const addressSuggestions = useContext(AddressSuggestionsContext)
   const ty = tryTyByIdx(symbols, tyIdx)
   const typeLabel = useMemo(() => safeRenderTy(symbols, tyIdx), [symbols, tyIdx])
   if (!ty) {
@@ -144,10 +153,7 @@ function AbiValueEditorNode({
     case "varintN":
     case "varuintN":
     case "EnumRef":
-    case "string":
-    case "address":
-    case "addressExt":
-    case "addressAny": {
+    case "string": {
       return (
         <label className={styles.field}>
           <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
@@ -159,6 +165,25 @@ function AbiValueEditorNode({
             disabled={disabled}
           />
         </label>
+      )
+    }
+    case "address":
+    case "addressExt":
+    case "addressAny": {
+      return (
+        <div className={styles.field}>
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
+          <TonAddressInput
+            ariaLabel={label ?? typeLabel}
+            className={styles.addressInput}
+            kind={tonAddressKindForAbiKind(ty.kind)}
+            value={formatScalarValue(value)}
+            onValueChange={onChange}
+            suggestions={addressSuggestions}
+            disabled={disabled}
+            required
+          />
+        </div>
       )
     }
     case "coins": {
@@ -189,7 +214,7 @@ function AbiValueEditorNode({
       )
     }
     case "addressOpt": {
-      const isNull = value === null || value === undefined || value === ""
+      const isNull = value === null || value === undefined
       return (
         <div className={styles.field}>
           <FieldHeader
@@ -209,12 +234,15 @@ function AbiValueEditorNode({
           {isNull ? (
             <NullValue />
           ) : (
-            <input
-              className={styles.textInput}
+            <TonAddressInput
+              ariaLabel={label ?? typeLabel}
+              className={styles.addressInput}
+              kind="internal"
               value={formatScalarValue(value)}
-              onChange={event => onChange(event.target.value)}
-              placeholder={inputPlaceholder(ty.kind, typeLabel)}
+              onValueChange={onChange}
+              suggestions={addressSuggestions}
               disabled={disabled}
+              required
             />
           )}
         </div>
@@ -369,15 +397,13 @@ function AbiValueEditorNode({
             {entries.length === 0 && <span className={styles.emptyValue}>Empty map</span>}
             {entries.map(([key, item]) => (
               <div className={`${styles.collectionItem} ${styles.mapItem}`} key={key}>
-                <label className={styles.field}>
-                  <FieldHeader label="Key" typeLabel={safeRenderTy(symbols, ty.key_ty_idx)} />
-                  <input
-                    className={styles.textInput}
-                    value={key}
-                    onChange={event => renameMapKey(value, key, event.target.value, onChange)}
-                    disabled={disabled}
-                  />
-                </label>
+                <AbiMapKeyInput
+                  symbols={symbols}
+                  tyIdx={ty.key_ty_idx}
+                  value={key}
+                  onChange={next => renameMapKey(value, key, next, onChange)}
+                  disabled={disabled}
+                />
                 <AbiValueEditorNode
                   symbols={symbols}
                   tyIdx={ty.value_ty_idx}
@@ -531,6 +557,50 @@ function AbiValueEditorNode({
   }
 }
 
+function AbiMapKeyInput({
+  symbols,
+  tyIdx,
+  value,
+  onChange,
+  disabled,
+}: {
+  readonly symbols: SymTable
+  readonly tyIdx: number
+  readonly value: string
+  readonly onChange: (value: string) => void
+  readonly disabled: boolean
+}) {
+  const addressSuggestions = useContext(AddressSuggestionsContext)
+  const typeLabel = safeRenderTy(symbols, tyIdx)
+  const addressKind = tonAddressKindForTy(symbols, tyIdx)
+
+  return (
+    <div className={styles.field}>
+      <FieldHeader label="Key" typeLabel={typeLabel} />
+      {addressKind ? (
+        <TonAddressInput
+          ariaLabel="Key"
+          className={styles.addressInput}
+          kind={addressKind}
+          value={value}
+          onValueChange={onChange}
+          suggestions={addressSuggestions}
+          disabled={disabled}
+          required
+        />
+      ) : (
+        <input
+          className={styles.textInput}
+          value={value}
+          onChange={event => onChange(event.target.value)}
+          disabled={disabled}
+          aria-label="Key"
+        />
+      )}
+    </div>
+  )
+}
+
 function CollectionHeader({
   label,
   typeLabel,
@@ -655,18 +725,38 @@ function tryTyByIdx(symbols: SymTable, tyIdx: number): ReturnType<SymTable["tyBy
 }
 
 function inputPlaceholder(kind: string, typeLabel: string): string {
-  if (
-    kind === "address" ||
-    kind === "addressOpt" ||
-    kind === "addressExt" ||
-    kind === "addressAny"
-  ) {
-    return "EQ..."
-  }
   if (kind === "string") {
     return "string"
   }
   return typeLabel
+}
+
+function tonAddressKindForAbiKind(kind: "address" | "addressExt" | "addressAny"): TonAddressKind {
+  if (kind === "addressExt") return "external"
+  if (kind === "addressAny") return "any"
+  return "internal"
+}
+
+function tonAddressKindForTy(
+  symbols: SymTable,
+  tyIdx: number,
+  visited = new Set<number>(),
+): TonAddressKind | undefined {
+  if (visited.has(tyIdx)) return undefined
+  visited.add(tyIdx)
+
+  const ty = tryTyByIdx(symbols, tyIdx)
+  if (!ty) return undefined
+  if (ty.kind === "address" || ty.kind === "addressOpt") return "internal"
+  if (ty.kind === "addressExt") return "external"
+  if (ty.kind === "addressAny") return "any"
+  if (ty.kind === "AliasRef") {
+    const targetTyIdx = safeAliasTargetTyIdx(symbols, tyIdx)
+    return targetTyIdx === undefined
+      ? undefined
+      : tonAddressKindForTy(symbols, targetTyIdx, visited)
+  }
+  return undefined
 }
 
 function formatScalarValue(value: unknown): string {

@@ -89,3 +89,23 @@ exports[`ABI value serialization formats TON runtime values as JSON-safe form va
   "slice": "b5ee9c72410101010003000002ab4e791e7a",
 }
 `;
+
+exports[`ABI value serialization round-trips external and addr_none address values 1`] = `
+{
+  "external": "External<8:0>",
+  "externalBoc": "b5ee9c7241010101000500000541001021550755",
+  "none": "none",
+  "noneBoc": "b5ee9c724101010100030000012094418655",
+}
+`;
+
+exports[`ABI value serialization validates address kinds without rewriting the input 1`] = `
+{
+  "external": true,
+  "externalAsInternal": false,
+  "internal": true,
+  "invalidExternalWidth": false,
+  "noneAsAny": true,
+  "noneAsInternal": false,
+}
+`;

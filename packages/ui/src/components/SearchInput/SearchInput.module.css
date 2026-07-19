@@ -19,23 +19,33 @@
     box-shadow var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
-.control:hover {
+.searchVariant .control:hover {
   border-color: var(--acton-color-border-strong);
 }
 
-.control:focus-within {
+.searchVariant .control:focus-within {
   border-color: var(--acton-color-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-accent) 22%, transparent);
 }
 
-.control.invalid,
-.control.invalid:hover,
-.control.invalid:focus-within {
+.searchVariant .control.invalid,
+.searchVariant .control.invalid:hover {
   border-color: var(--acton-color-danger-text);
+  box-shadow: none;
 }
 
-.control.invalid:focus-within {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acton-color-danger-text) 22%, transparent);
+.searchVariant .control.invalid:focus-within {
+  border-color: var(--acton-color-danger-text);
+  outline: 2px solid color-mix(in srgb, var(--acton-color-danger-text) 22%, transparent);
+  outline-offset: 0;
+  box-shadow: none;
+}
+
+.searchVariant .control.disabled,
+.searchVariant .control.disabled:hover {
+  border-color: var(--acton-color-border-control);
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .sizeLg .control {
@@ -49,6 +59,26 @@
   gap: 0.5625rem;
   padding: 0 var(--acton-space-3);
   background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+}
+
+.sizeMd .control {
+  height: 2.5rem;
+  gap: var(--acton-space-3);
+  padding: 0 0.875rem;
+}
+
+.fieldVariant .control {
+  height: auto;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transition: none;
+}
+
+.fieldVariant .searchIcon {
+  display: none;
 }
 
 .searchIcon {
@@ -93,6 +123,10 @@
 
 .sizeSm .input {
   font-size: var(--acton-font-size-sm);
+}
+
+.sizeMd .input {
+  font-size: var(--acton-font-size-md);
 }
 
 .input::placeholder {

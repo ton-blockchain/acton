@@ -12,6 +12,7 @@ import {
 } from "@acton/ui"
 import {
   AbiValueEditor,
+  TonAddressInput,
   buildAbiMessageBoc,
   buildAbiStorageDataBoc,
   createAbiMessageSymbols,
@@ -28,6 +29,7 @@ import {
   type LoadedTransactionActions,
   type TransactionBlockRef,
   type TransactionInfo,
+  type TonAddressSuggestion,
 } from "@acton/transaction-ui"
 import {useNavigate, useSearchParams} from "react-router-dom"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
@@ -36,9 +38,10 @@ import {Address, Cell, fromNano, loadShardAccount, toNano, type ShardAccount} fr
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {useAddressBook} from "../hooks/useAddressBook"
+import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-import {normalizeAddress} from "../components/utils"
+import {formatAddress, normalizeAddress} from "../components/utils"
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
@@ -151,7 +154,8 @@ interface AccountStateOverrideDraft {
 export function EmulatePage({client}: EmulatePageProps) {
   const {network} = useNetworkInfo()
   const addressFormat = useAddressFormat()
-  const {fetchName} = useAddressBook()
+  const {fetchName, getCachedName, prefetchNames} = useAddressBook()
+  const {favorites} = useFavoriteAccounts()
   const metadataRegistry = useMetadataRegistry()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -192,6 +196,20 @@ export function EmulatePage({client}: EmulatePageProps) {
   const nextStateOverrideId = useRef(1)
   const lastSearchFields = useRef(readEmulateSearchFields(searchParams))
   const isApplyingSearchFields = useRef(false)
+
+  useEffect(() => {
+    void prefetchNames(favorites.map(favorite => favorite.address))
+  }, [favorites, prefetchNames])
+
+  const favoriteAddressSuggestions: readonly TonAddressSuggestion[] = favorites.map(favorite => {
+    const name = getCachedName(favorite.address)
+    const fullAddress = formatAddress(favorite.address, false, addressFormat)
+    const displayAddress = name ? formatAddress(favorite.address, true, addressFormat) : fullAddress
+    return {
+      address: fullAddress,
+      label: name ? `${name} · ${displayAddress}` : displayAddress,
+    }
+  })
 
   const isLoading = state.type === "loading"
   const emulation = state.type === "ready" ? state.result : undefined
@@ -820,27 +838,25 @@ export function EmulatePage({client}: EmulatePageProps) {
                   </Button>
                 </div>
 
-                <Input
+                <TonAddressInput
                   fieldClassName={styles.field}
                   className={styles.addressInput}
                   label="Account address"
                   value={entry.address}
-                  onChange={event =>
+                  onValueChange={nextAddress =>
                     updateStateOverrideEntry(entry.id, current => ({
                       ...current,
-                      address: event.target.value,
-                      abi:
-                        current.loadedAddress === event.target.value.trim()
-                          ? current.abi
-                          : undefined,
+                      address: nextAddress,
+                      abi: current.loadedAddress === nextAddress.trim() ? current.abi : undefined,
                       loadedAddress:
-                        current.loadedAddress === event.target.value.trim()
+                        current.loadedAddress === nextAddress.trim()
                           ? current.loadedAddress
                           : undefined,
                       loadState: {type: "idle"},
                     }))
                   }
-                  placeholder={targetAddress.trim() ? "Target contract" : "EQ..."}
+                  placeholder={targetAddress.trim() ? "Target contract" : "EQ… or 0:…"}
+                  suggestions={favoriteAddressSuggestions}
                   disabled={isLoading}
                 />
 
@@ -1066,6 +1082,7 @@ export function EmulatePage({client}: EmulatePageProps) {
                                       tyIdx={storageInfo.tyIdx}
                                       value={entry.storageFormValue}
                                       onChange={value => handleStorageFormChange(entry.id, value)}
+                                      addressSuggestions={favoriteAddressSuggestions}
                                       disabled={isLoading}
                                     />
                                   ) : (
@@ -1252,13 +1269,13 @@ export function EmulatePage({client}: EmulatePageProps) {
                 <h2 className={styles.panelTitle}>Transaction</h2>
               </div>
 
-              <Input
+              <TonAddressInput
                 fieldClassName={styles.field}
                 className={styles.addressInput}
                 label="Target contract"
                 value={targetAddress}
-                onChange={event => setTargetAddress(event.target.value)}
-                placeholder="EQ..."
+                onValueChange={setTargetAddress}
+                suggestions={favoriteAddressSuggestions}
                 disabled={isLoading}
               />
 
@@ -1290,13 +1307,13 @@ export function EmulatePage({client}: EmulatePageProps) {
               {messageTransport === "internal" && (
                 <div className={styles.messageOptions}>
                   <div className={styles.internalGrid}>
-                    <Input
+                    <TonAddressInput
                       fieldClassName={styles.field}
                       className={styles.addressInput}
                       label="Source account"
                       value={sourceAddress}
-                      onChange={event => setSourceAddress(event.target.value)}
-                      placeholder="EQ..."
+                      onValueChange={setSourceAddress}
+                      suggestions={favoriteAddressSuggestions}
                       disabled={isLoading}
                     />
                     <Input
@@ -1465,6 +1482,7 @@ export function EmulatePage({client}: EmulatePageProps) {
                       tyIdx={selectedBuilderOption.valueTyIdx}
                       value={argsFormValue}
                       onChange={handleArgsFormChange}
+                      addressSuggestions={favoriteAddressSuggestions}
                       disabled={isLoading}
                     />
                   ) : (
