@@ -5,6 +5,7 @@ export interface ExplorerRoutes {
   readonly blocksPath: string
   readonly abiPath: string
   readonly cellPath: string
+  readonly emulatePath: string
   readonly sourcesPath: string
   readonly favoritesPath: string
   readonly abiDetailsPath: (slug: string) => string
@@ -23,6 +24,7 @@ export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
     blocksPath: path("/blocks"),
     abiPath: path("/abi"),
     cellPath: path("/cell"),
+    emulatePath: path("/emulate"),
     sourcesPath: path("/sources"),
     favoritesPath: path("/favorites"),
     abiDetailsPath: slug => path(`/abi/${encodeURIComponent(slug)}`),

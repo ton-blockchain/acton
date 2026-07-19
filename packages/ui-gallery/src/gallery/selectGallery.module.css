@@ -1,0 +1,14 @@
+.grid,
+.sizeGrid {
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  align-items: start;
+}
+
+.sizeGrid {
+  max-width: 32rem;
+}

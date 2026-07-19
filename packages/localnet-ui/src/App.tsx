@@ -11,6 +11,7 @@ import {AccountPage} from "./explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
 import {CellInspectorPage} from "./explorer/pages/CellInspectorPage"
+import {EmulatePage} from "./explorer/pages/EmulatePage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
 import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
@@ -376,6 +377,14 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <CellInspectorPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/emulate"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <EmulatePage client={client} />
                 </DashboardPage>
               }
             />

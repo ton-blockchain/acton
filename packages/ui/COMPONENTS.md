@@ -329,6 +329,66 @@ and forwards native attributes and refs.
   actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
+## Select
+
+Status: ready
+
+Import:
+
+```tsx
+import { Select } from "@acton/ui"
+```
+
+Use Select for choosing one value from a concise, known option set. It renders
+a native `select`, forwards native attributes and refs, and preserves native
+keyboard, focus, option, and form behavior.
+
+### Composition
+
+```tsx
+<Select
+  label="Network"
+  description="Network used to resolve the account state."
+  defaultValue="mainnet"
+>
+  <option value="mainnet">Mainnet</option>
+  <option value="testnet">Testnet</option>
+</Select>
+```
+
+- `size`: `sm`, `md`, or `lg`; `md` is the default.
+- `label`: optional accessible field label. Omit it when the caller already
+  renders a linked label.
+- `description`: optional neutral helper text linked with
+  `aria-describedby`.
+- `invalid`: applies validation styling and `aria-invalid` without owning an
+  error message.
+- `fieldClassName`: layout hook for the optional label/description wrapper;
+  `className` always targets the native select.
+- Native select attributes, `option` and `optgroup` children, and refs are
+  forwarded unchanged, apart from `size`, which controls Acton control density.
+
+### States To Review Visually
+
+- Empty placeholder option and selected value
+- Hover and keyboard focus
+- Disabled
+- Invalid
+- Required label
+- Small, medium, and large
+
+### Agent Guidance
+
+- Use native `option` and `optgroup` elements as children.
+- Prefer the built-in label and description when no surrounding form field
+  owns them.
+- Use `invalid` or `aria-invalid` to expose validation state, then report the
+  actual validation or request failure through Toast.
+- Keep option labels short enough to scan in a native dropdown.
+- Do not add a second chevron or override native interaction behavior.
+- Use a dedicated searchable picker instead when options require search, rich
+  content, or asynchronous loading.
+
 ## SearchInput
 
 Status: ready

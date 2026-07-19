@@ -19,6 +19,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Play,
   Search as SearchIcon,
   Settings2,
   Star,
@@ -55,6 +56,7 @@ interface SidebarItem {
 const mainItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
+  {label: "Emulate", icon: Play, path: "/explorer/emulate"},
   {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
@@ -113,6 +115,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
       location.pathname === "/explorer/sources" ||
       location.pathname.startsWith("/explorer/abi") ||
       location.pathname === "/explorer/cell" ||
+      location.pathname === "/explorer/emulate" ||
       location.pathname === "/explorer/favorites"
     ) {
       return
@@ -214,6 +217,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                           location.pathname !== "/explorer/sources" &&
                           !location.pathname.startsWith("/explorer/abi") &&
                           location.pathname !== "/explorer/cell" &&
+                          location.pathname !== "/explorer/emulate" &&
                           location.pathname !== "/explorer/favorites"
                         : item.path === "/explorer/blocks"
                           ? location.pathname === "/explorer/blocks" ||

@@ -42,7 +42,7 @@ function absoluteApiBaseUrl(baseUrl: string): string {
   return new URL(fullBase).toString().replace(/\/$/, "")
 }
 
-function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkConfig {
+export function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkConfig {
   if (network.api) {
     return {
       testnet: network.testOnly,
@@ -264,7 +264,7 @@ export function findExitCode(vmLogs: string, mappingInfo: AssemblyMapping) {
   return exitCode
 }
 
-function extractCodeAndTrace(
+export function extractCodeAndTrace(
   codeCell: Cell | undefined,
   vmLogs: string,
 ): {

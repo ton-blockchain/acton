@@ -29,6 +29,7 @@ import type {
 } from "../../localnet-ui/src/explorer/hooks/useNetworkInfo"
 import {BlockDetailsPage, BlocksPage} from "../../localnet-ui/src/explorer/pages/BlocksPage"
 import {CellInspectorPage} from "../../localnet-ui/src/explorer/pages/CellInspectorPage"
+import {EmulatePage} from "../../localnet-ui/src/explorer/pages/EmulatePage"
 import {AccountPage} from "../../localnet-ui/src/explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "../../localnet-ui/src/explorer/pages/AbiCatalogPage"
 import {SourceCatalogPage} from "../../localnet-ui/src/explorer/pages/SourceCatalogPage"
@@ -967,6 +968,9 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/blocks">
                             Blocks
                           </Link>
+                          <Link className={styles.navLink} to="/emulate">
+                            Emulate
+                          </Link>
                           <Link className={styles.navLink} to="/abi">
                             ABI
                           </Link>
@@ -1022,6 +1026,7 @@ export const ExplorerApp: FC = () => {
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
+                      <Route path="/emulate" element={<EmulatePage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
                         path="/block/:workchain/:shard/:seqno"

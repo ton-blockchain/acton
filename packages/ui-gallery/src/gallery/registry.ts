@@ -28,6 +28,7 @@ import {parsedValueViewGallery} from "./parsedValueViewGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {searchInputGallery} from "./searchInputGallery"
+import {selectGallery} from "./selectGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {toastGallery} from "./toastGallery"
@@ -41,6 +42,7 @@ export const galleries = [
   blockChipGallery,
   buttonGallery,
   inputGallery,
+  selectGallery,
   searchInputGallery,
   breadcrumbsGallery,
   inlineButtonGallery,

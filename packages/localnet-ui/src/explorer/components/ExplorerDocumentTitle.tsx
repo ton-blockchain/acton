@@ -32,6 +32,7 @@ export function useExplorerPageTitle(): string | undefined {
   if (relativePath === "/blocks") return "Blocks"
   if (relativePath === "/abi") return "ABI"
   if (relativePath === "/cell") return "Cell Inspector"
+  if (relativePath === "/emulate") return "Emulate Transaction"
   if (relativePath === "/sources") return "Verified Sources"
   if (relativePath === "/favorites") return "Favorite Accounts"
 

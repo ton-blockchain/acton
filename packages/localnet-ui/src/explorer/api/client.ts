@@ -311,6 +311,24 @@ export class TonClient {
     return this.request(url, "Failed to fetch account states")
   }
 
+  async getShardAccountCell(address: string, seqno?: number): Promise<string> {
+    const url = this.buildUrl(this.v2BaseUrl, "/getShardAccountCell")
+    url.searchParams.append("address", address)
+    if (seqno !== undefined) {
+      url.searchParams.append("seqno", seqno.toString())
+    }
+
+    const response = await this.request<{readonly bytes?: string}>(
+      url,
+      "Failed to fetch shard account",
+    )
+    const boc = response.bytes
+    if (!boc) {
+      throw new Error("Shard account response does not contain a BoC")
+    }
+    return boc
+  }
+
   async getAccountTransactions(
     address: string,
     limit = 20,
