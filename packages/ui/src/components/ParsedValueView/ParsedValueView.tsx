@@ -212,7 +212,6 @@ export function ParsedValueView({
           <div className={styles.parsedNested}>
             {value.items.map((item, index) => (
               <ParsedValueRow
-                // react-doctor-disable-next-line react-doctor/no-array-index-as-key -- the index is the semantic identity of an array item
                 key={`array-item-${index}`}
                 label={`[${index}]`}
                 value={item}

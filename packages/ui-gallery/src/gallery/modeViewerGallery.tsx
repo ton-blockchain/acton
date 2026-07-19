@@ -100,7 +100,6 @@ function WrapperSamples() {
   )
 }
 
-// react-doctor-disable-next-line react-doctor/no-multi-comp -- private examples belong to this gallery descriptor
 function BaseComponentSample() {
   return (
     <article className={styles.sample}>
@@ -115,7 +114,6 @@ function BaseComponentSample() {
   )
 }
 
-// react-doctor-disable-next-line react-doctor/no-multi-comp -- private examples belong to this gallery descriptor
 function AllFlagsSamples() {
   return (
     <div className={styles.flagGroups}>

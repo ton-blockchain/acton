@@ -10,7 +10,6 @@ export type UseCopyValueOptions = Readonly<{
 export function useCopyValue({onCopy, onCopyError, resetDelay = 2000, value}: UseCopyValueOptions) {
   const [isCopied, setIsCopied] = useState(false)
 
-  // react-doctor-disable-next-line react-doctor/no-reset-all-state-on-prop-change -- avoids showing copied state for a new value
   useEffect(() => {
     setIsCopied(false)
   }, [value])
