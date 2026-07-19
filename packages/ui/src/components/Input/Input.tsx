@@ -12,6 +12,7 @@ export type InputProps = Readonly<
     readonly mono?: boolean
     readonly invalid?: boolean
     readonly leadingIcon?: ReactNode
+    readonly suffix?: ReactNode
     readonly shortcut?: string
     readonly label?: ReactNode
     readonly description?: ReactNode
@@ -45,14 +46,17 @@ export function Input({
   shortcut,
   size = "md",
   spellCheck = false,
+  suffix,
   ...props
 }: InputProps) {
   const generatedId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const hasField = label !== undefined || description !== undefined
-  const inputId = id ?? (hasField ? generatedId : undefined)
+  const inputId = id ?? (hasField || suffix !== undefined ? generatedId : undefined)
   const descriptionId = description === undefined ? undefined : `${inputId}-description`
-  const describedBy = [ariaDescribedBy, descriptionId].filter(Boolean).join(" ") || undefined
+  const suffixId = suffix === undefined ? undefined : `${inputId}-suffix`
+  const describedBy =
+    [ariaDescribedBy, descriptionId, suffixId].filter(Boolean).join(" ") || undefined
   const isInvalid =
     invalid ||
     ariaInvalid === true ||
@@ -112,13 +116,16 @@ export function Input({
         sizeClassNames[size],
         leadingIcon !== undefined && styles.withLeadingIcon,
         shortcut !== undefined && styles.withShortcut,
+        suffix !== undefined && styles.withSuffix,
+        shortcut !== undefined && suffix !== undefined && styles.withShortcutAndSuffix,
         mono && styles.mono,
         isInvalid && styles.invalid,
         className,
       )}
     />
   )
-  const hasDecoration = leadingIcon !== undefined || shortcut !== undefined
+  const hasTrailingDecoration = suffix !== undefined || shortcut !== undefined
+  const hasDecoration = leadingIcon !== undefined || hasTrailingDecoration
   const control = hasDecoration ? (
     <div className={styles.control}>
       {leadingIcon === undefined ? undefined : (
@@ -127,12 +134,21 @@ export function Input({
         </span>
       )}
       {input}
-      {shortcut === undefined ? undefined : (
-        <span className={styles.shortcut} aria-hidden="true">
-          <kbd>{shortcutModifier}</kbd>
-          <kbd>{shortcut}</kbd>
+      {hasTrailingDecoration ? (
+        <span className={styles.trailingDecoration}>
+          {suffix === undefined ? undefined : (
+            <span id={suffixId} className={styles.suffix}>
+              {suffix}
+            </span>
+          )}
+          {shortcut === undefined ? undefined : (
+            <span className={styles.shortcut} aria-hidden="true">
+              <kbd>{shortcutModifier}</kbd>
+              <kbd>{shortcut}</kbd>
+            </span>
+          )}
         </span>
-      )}
+      ) : undefined}
     </div>
   ) : (
     input

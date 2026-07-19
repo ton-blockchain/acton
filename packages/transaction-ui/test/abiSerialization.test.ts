@@ -45,6 +45,16 @@ const nestedAbi = {
         {name: "counterAlias", ty_idx: 15},
       ],
     },
+    {
+      kind: "struct",
+      name: "ComplexCollections",
+      ty_idx: 20,
+      fields: [
+        {name: "records", ty_idx: 17},
+        {name: "recordsByBatch", ty_idx: 18},
+        {name: "nestedBatches", ty_idx: 19},
+      ],
+    },
   ],
   unique_types: [
     {kind: "void"},
@@ -64,6 +74,10 @@ const nestedAbi = {
     {kind: "StructRef", struct_name: "ScalarFields"},
     {kind: "AliasRef", alias_name: "CounterAlias"},
     {kind: "StructRef", struct_name: "NestedStruct"},
+    {kind: "arrayOf", inner_ty_idx: 14},
+    {kind: "mapKV", key_ty_idx: 9, value_ty_idx: 17},
+    {kind: "arrayOf", inner_ty_idx: 18},
+    {kind: "StructRef", struct_name: "ComplexCollections"},
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -86,6 +100,12 @@ const nestedFormValue = {
     maybeCount: "42",
   },
   counterAlias: "99",
+}
+
+const complexCollectionFormValue = {
+  records: [nestedFormValue.summary],
+  recordsByBatch: {"1": [nestedFormValue.summary]},
+  nestedBatches: [{"7": [nestedFormValue.summary]}],
 }
 
 const dictionaryAbi = {
@@ -133,6 +153,14 @@ describe("ABI value serialization", () => {
     const decoded = decodeAbiValueFromBoc(dictionaryAbi, 10, boc)
 
     expect({boc, decoded: abiValueToFormValue(decoded)}).toMatchSnapshot()
+  })
+
+  test("round-trips nested collections with struct values", () => {
+    const boc = encodeAbiValueToBoc(nestedAbi, 20, complexCollectionFormValue)
+    const decoded = decodeAbiValueFromBoc(nestedAbi, 20, boc)
+
+    expect({boc, decoded: abiValueToFormValue(decoded)}).toMatchSnapshot()
+    expect(encodeAbiValueToBoc(nestedAbi, 20, decoded)).toBe(boc)
   })
 
   test("formats TON runtime values as JSON-safe form values", () => {

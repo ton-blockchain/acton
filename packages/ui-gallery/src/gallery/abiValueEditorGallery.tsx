@@ -28,6 +28,11 @@ const typeIndex = {
   collectionFields: 25,
   cellFields: 26,
   mapFields: 27,
+  arrayOfStructs: 28,
+  structsByBatch: 29,
+  nestedCollections: 30,
+  complexCollectionFields: 31,
+  optionalTon: 32,
 } as const
 
 const matrixAbi = {
@@ -46,6 +51,7 @@ const matrixAbi = {
         {name: "tonAmount", ty_idx: 6},
         {name: "maybeAddress", ty_idx: 12},
         {name: "maybeCount", ty_idx: typeIndex.optionalInt},
+        {name: "maybeTon", ty_idx: typeIndex.optionalTon},
       ],
     },
     {
@@ -93,6 +99,16 @@ const matrixAbi = {
         {name: "byOwner", ty_idx: 21},
       ],
     },
+    {
+      kind: "struct",
+      name: "ComplexCollectionFields",
+      ty_idx: typeIndex.complexCollectionFields,
+      fields: [
+        {name: "records", ty_idx: typeIndex.arrayOfStructs},
+        {name: "recordsByBatch", ty_idx: typeIndex.structsByBatch},
+        {name: "nestedBatches", ty_idx: typeIndex.nestedCollections},
+      ],
+    },
   ],
   unique_types: [
     {kind: "void"},
@@ -134,6 +150,11 @@ const matrixAbi = {
     {kind: "StructRef", struct_name: "CollectionFields"},
     {kind: "StructRef", struct_name: "CellFields"},
     {kind: "StructRef", struct_name: "MapFields"},
+    {kind: "arrayOf", inner_ty_idx: typeIndex.scalarFields},
+    {kind: "mapKV", key_ty_idx: 9, value_ty_idx: typeIndex.arrayOfStructs},
+    {kind: "arrayOf", inner_ty_idx: typeIndex.structsByBatch},
+    {kind: "StructRef", struct_name: "ComplexCollectionFields"},
+    {kind: "nullable", inner_ty_idx: 6},
   ],
   struct_instantiations: [],
   alias_instantiations: [],
@@ -155,6 +176,7 @@ const scalarValue = {
   tonAmount: "1250000000",
   maybeAddress: null,
   maybeCount: "42",
+  maybeTon: "2500000000",
 }
 
 const nestedValue = {
@@ -173,6 +195,28 @@ const mapValue = {
   byOwner: {[SAMPLE_ADDRESS]: EMPTY_CELL_BOC},
 }
 
+const alternateScalarValue = {
+  ...scalarValue,
+  count: "12",
+  enabled: false,
+  tonAmount: "750000000",
+  maybeAddress: SAMPLE_ADDRESS,
+  maybeCount: null,
+}
+
+const complexCollectionValue = {
+  records: [scalarValue, alternateScalarValue],
+  recordsByBatch: {
+    "1": [scalarValue],
+    "7": [alternateScalarValue],
+  },
+  nestedBatches: [
+    {
+      "42": [alternateScalarValue, scalarValue],
+    },
+  ],
+}
+
 const cellValue = {
   cell: EMPTY_CELL_BOC,
   slice: EMPTY_CELL_BOC,
@@ -186,12 +230,14 @@ function EditorSample({
   initialValue,
   disabled,
   invalid,
+  label,
 }: {
   readonly title: string
   readonly tyIdx: number
   readonly initialValue: unknown
   readonly disabled?: boolean
   readonly invalid?: boolean
+  readonly label?: string
 }) {
   const [value, setValue] = useState(initialValue)
 
@@ -208,6 +254,7 @@ function EditorSample({
         onChange={setValue}
         disabled={disabled}
         invalid={invalid}
+        label={label}
       />
     </article>
   )
@@ -230,6 +277,12 @@ function ScalarSamples() {
         title="Optional integer · loaded"
         tyIdx={typeIndex.optionalInt}
         initialValue="64"
+      />
+      <EditorSample
+        title="Optional TON · loaded"
+        tyIdx={typeIndex.optionalTon}
+        initialValue="1500000000"
+        label="tonAmount"
       />
     </div>
   )
@@ -260,6 +313,16 @@ function CollectionSamples() {
         tyIdx={typeIndex.collectionFields}
         initialValue={collectionValue}
       />
+      <EditorSample
+        title="Map · uint and address keys"
+        tyIdx={typeIndex.mapFields}
+        initialValue={mapValue}
+      />
+      <EditorSample
+        title="Nested collections · complex values"
+        tyIdx={typeIndex.complexCollectionFields}
+        initialValue={complexCollectionValue}
+      />
       <EditorSample title="Empty array" tyIdx={typeIndex.array} initialValue={[]} />
       <EditorSample title="Loaded array" tyIdx={typeIndex.array} initialValue={["3", "5", "8"]} />
     </div>
@@ -269,11 +332,6 @@ function CollectionSamples() {
 function TonSamples() {
   return (
     <div className={styles.matrix}>
-      <EditorSample
-        title="Maps · uint and address keys"
-        tyIdx={typeIndex.mapFields}
-        initialValue={mapValue}
-      />
       <EditorSample
         title="Cell · Slice · Builder · bitsN"
         tyIdx={typeIndex.cellFields}
@@ -396,13 +454,14 @@ export const abiValueEditorGallery = {
     {
       id: "abi-collections",
       title: "Collections",
-      description: "Array, list, shaped tuple, empty, and populated collection states.",
+      description:
+        "Array, list, shaped tuple, map with multiple key/value shapes, empty, and populated states.",
       content: <CollectionSamples />,
     },
     {
       id: "abi-ton-values",
       title: "TON Values",
-      description: "Maps with multiple key/value shapes plus Cell, Slice, Builder, and bitsN BoCs.",
+      description: "Cell, Slice, Builder, and bitsN BoCs.",
       content: <TonSamples />,
     },
     {

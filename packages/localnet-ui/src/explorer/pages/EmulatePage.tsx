@@ -5,7 +5,6 @@ import {
   Checkbox,
   ContentTabs,
   InlineButton,
-  InlineLoader,
   Input,
   RawDataBlock,
   Select,
@@ -916,27 +915,21 @@ export function EmulatePage({client}: EmulatePageProps) {
                   </label>
                 ) : (
                   <div className={styles.stateOverrideFields}>
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Balance</span>
-                      <span className={styles.unitInputControl}>
-                        <input
-                          className={`${styles.textInput} ${styles.unitInput}`}
-                          value={entry.balance}
-                          onChange={event =>
-                            updateStateOverrideEntry(entry.id, current => ({
-                              ...current,
-                              balance: event.target.value,
-                            }))
-                          }
-                          inputMode="decimal"
-                          placeholder="0.5"
-                          disabled={isLoading}
-                        />
-                        <span className={styles.unitInputSuffix} aria-hidden="true">
-                          GRAM
-                        </span>
-                      </span>
-                    </label>
+                    <Input
+                      fieldClassName={styles.field}
+                      label="Balance"
+                      suffix="GRAM"
+                      value={entry.balance}
+                      onChange={event =>
+                        updateStateOverrideEntry(entry.id, current => ({
+                          ...current,
+                          balance: event.target.value,
+                        }))
+                      }
+                      inputMode="decimal"
+                      placeholder="0.5"
+                      disabled={isLoading}
+                    />
 
                     <Select
                       fieldClassName={styles.field}
@@ -1309,6 +1302,7 @@ export function EmulatePage({client}: EmulatePageProps) {
                     <Input
                       fieldClassName={styles.field}
                       label="Value"
+                      suffix="GRAM"
                       value={messageValue}
                       onChange={event => setMessageValue(event.target.value)}
                       inputMode="decimal"
@@ -1639,12 +1633,6 @@ export function EmulatePage({client}: EmulatePageProps) {
       <ExplorerBreadcrumbs items={[{label: "Emulate"}]} />
       {simulationHeader}
       {simulationForm}
-
-      {state.type === "loading" && (
-        <div className={styles.loadingPanel}>
-          <InlineLoader message="Emulating message" />
-        </div>
-      )}
     </div>
   )
 }

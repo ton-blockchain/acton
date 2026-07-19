@@ -29,6 +29,54 @@ exports[`ABI value serialization round-trips dictionaries with numeric keys and 
 }
 `;
 
+exports[`ABI value serialization round-trips nested collections with struct values 1`] = `
+{
+  "boc": "b5ee9c7241010501005100030501c070040102010da00000000101c00401016003010da00000000701c004005d00000003e00000000000000000000000000000000000000000000000000000000000000000022540be4010000002a8731a6238",
+  "decoded": {
+    "$": "ComplexCollections",
+    "nestedBatches": [
+      {
+        "7": [
+          {
+            "$": "ScalarFields",
+            "count": "7",
+            "enabled": true,
+            "maybeAddress": null,
+            "maybeCount": "42",
+            "recipient": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+            "tonAmount": "1250000000",
+          },
+        ],
+      },
+    ],
+    "records": [
+      {
+        "$": "ScalarFields",
+        "count": "7",
+        "enabled": true,
+        "maybeAddress": null,
+        "maybeCount": "42",
+        "recipient": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+        "tonAmount": "1250000000",
+      },
+    ],
+    "recordsByBatch": {
+      "1": [
+        {
+          "$": "ScalarFields",
+          "count": "7",
+          "enabled": true,
+          "maybeAddress": null,
+          "maybeCount": "42",
+          "recipient": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+          "tonAmount": "1250000000",
+        },
+      ],
+    },
+  },
+}
+`;
+
 exports[`ABI value serialization formats TON runtime values as JSON-safe form values 1`] = `
 {
   "address": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",

@@ -295,6 +295,8 @@ and forwards native attributes and refs.
   error message.
 - `leadingIcon`: optional decorative icon for standard search, token, or
   credential fields. The icon is hidden from assistive technology.
+- `suffix`: optional short unit or decoration such as `"GRAM"`, `"ms"`, or
+  `"%"`. It is linked to the input through `aria-describedby`.
 - `shortcut`: optional global modifier shortcut key, such as `"K"`. Input
   renders the platform modifier and focuses and selects itself when the
   shortcut is pressed.

@@ -1,5 +1,5 @@
-import {useEffect, useMemo, useState} from "react"
-import {Checkbox, InlineAction, Select} from "@acton/ui"
+import {useEffect, useMemo, useState, type ReactNode} from "react"
+import {Checkbox, InlineAction, Input, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
@@ -49,11 +49,15 @@ export function AbiValueEditor({
 
 function TonCoinsInput({
   label,
+  typeLabel,
+  hideHeader = false,
   value,
   onChange,
   disabled,
 }: {
   readonly label: string
+  readonly typeLabel: string
+  readonly hideHeader?: boolean
   readonly value: unknown
   readonly onChange: (value: unknown) => void
   readonly disabled: boolean
@@ -69,35 +73,32 @@ function TonCoinsInput({
   }, [nanoValue])
 
   return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>{label}</span>
-      <span className={styles.unitInputControl}>
-        <input
-          className={`${styles.textInput} ${styles.unitInput}`}
-          value={draft}
-          onChange={event => {
-            const next = event.target.value
-            setDraft(next)
-            const nextNano = parseGramAsNano(next)
-            if (nextNano !== undefined) {
-              onChange(nextNano)
-            }
-          }}
-          onBlur={() => setDraft(formatNanoAsGram(formatScalarValue(value)))}
-          inputMode="decimal"
-          placeholder="0.1"
-          disabled={disabled}
-        />
-        <span className={styles.unitInputSuffix} aria-hidden="true">
-          GRAM
-        </span>
-      </span>
-    </label>
+    <div className={styles.field}>
+      <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
+      <Input
+        className={styles.tonInput}
+        suffix="GRAM"
+        value={draft}
+        onChange={event => {
+          const next = event.target.value
+          setDraft(next)
+          const nextNano = parseGramAsNano(next)
+          if (nextNano !== undefined) {
+            onChange(nextNano)
+          }
+        }}
+        onBlur={() => setDraft(formatNanoAsGram(formatScalarValue(value)))}
+        inputMode="decimal"
+        placeholder="0.1"
+        disabled={disabled}
+        aria-label={label}
+      />
+    </div>
   )
 }
 
 interface AbiValueEditorNodeProps extends AbiValueEditorProps {
-  readonly nested?: boolean
+  readonly hideHeader?: boolean
 }
 
 function AbiValueEditorNode({
@@ -107,14 +108,14 @@ function AbiValueEditorNode({
   onChange,
   disabled = false,
   label,
-  nested = false,
+  hideHeader = false,
 }: AbiValueEditorNodeProps) {
   const ty = tryTyByIdx(symbols, tyIdx)
   const typeLabel = useMemo(() => safeRenderTy(symbols, tyIdx), [symbols, tyIdx])
   if (!ty) {
     return (
       <div className={styles.field}>
-        {label && <span className={styles.fieldLabel}>{label}</span>}
+        <FieldHeader label={label} typeLabel={`ty#${tyIdx}`} hidden={hideHeader} />
         <span className={styles.emptyValue}>Unknown type #{tyIdx}</span>
       </div>
     )
@@ -124,17 +125,16 @@ function AbiValueEditorNode({
     case "bool": {
       return (
         <div className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
           <div className={styles.booleanInput}>
             <Checkbox
               checked={value === true}
               onChange={event => onChange(event.target.checked)}
               disabled={disabled}
-              label="true"
+              label={value === true ? "true" : "false"}
               className={styles.checkboxControl}
             />
           </div>
-          {!label && <span className={styles.typeLabel}>{typeLabel}</span>}
         </div>
       )
     }
@@ -150,7 +150,7 @@ function AbiValueEditorNode({
     case "addressAny": {
       return (
         <label className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
           <input
             className={styles.textInput}
             value={formatScalarValue(value)}
@@ -158,18 +158,26 @@ function AbiValueEditorNode({
             placeholder={inputPlaceholder(ty.kind, typeLabel)}
             disabled={disabled}
           />
-          {!label && <span className={styles.typeLabel}>{typeLabel}</span>}
         </label>
       )
     }
     case "coins": {
       if (label && isTonFieldName(label)) {
-        return <TonCoinsInput label={label} value={value} onChange={onChange} disabled={disabled} />
+        return (
+          <TonCoinsInput
+            label={label}
+            typeLabel={typeLabel}
+            hideHeader={hideHeader}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        )
       }
 
       return (
         <label className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
           <input
             className={styles.textInput}
             value={formatScalarValue(value)}
@@ -177,25 +185,30 @@ function AbiValueEditorNode({
             placeholder={inputPlaceholder(ty.kind, typeLabel)}
             disabled={disabled}
           />
-          {!label && <span className={styles.typeLabel}>{typeLabel}</span>}
         </label>
       )
     }
     case "addressOpt": {
       const isNull = value === null || value === undefined || value === ""
       return (
-        <div className={nested ? styles.nested : styles.group}>
-          <div className={styles.rowHeader}>
-            <span className={styles.groupTitle}>{label ?? typeLabel}</span>
-            <Checkbox
-              checked={isNull}
-              onChange={event => onChange(event.target.checked ? null : SAMPLE_ADDRESS)}
-              disabled={disabled}
-              label="Set as null"
-              className={styles.nullCheckbox}
-            />
-          </div>
-          {!isNull && (
+        <div className={styles.field}>
+          <FieldHeader
+            label={label}
+            typeLabel={typeLabel}
+            hidden={hideHeader}
+            action={
+              <Checkbox
+                checked={isNull}
+                onChange={event => onChange(event.target.checked ? null : SAMPLE_ADDRESS)}
+                disabled={disabled}
+                label="Null"
+                className={styles.nullCheckbox}
+              />
+            }
+          />
+          {isNull ? (
+            <NullValue />
+          ) : (
             <input
               className={styles.textInput}
               value={formatScalarValue(value)}
@@ -214,7 +227,7 @@ function AbiValueEditorNode({
     case "bitsN": {
       return (
         <label className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
           <textarea
             className={styles.textArea}
             value={typeof value === "string" ? value : ""}
@@ -223,37 +236,54 @@ function AbiValueEditorNode({
             spellCheck={false}
             disabled={disabled}
           />
-          {!label && <span className={styles.typeLabel}>{typeLabel}</span>}
         </label>
       )
     }
     case "nullable": {
       const isNull = value === null || value === undefined
+      const innerTy = tryTyByIdx(symbols, ty.inner_ty_idx)
       return (
-        <div className={nested ? styles.nested : styles.group}>
-          <div className={styles.rowHeader}>
-            <span className={styles.groupTitle}>{label ?? typeLabel}</span>
-            <Checkbox
-              checked={isNull}
-              onChange={event =>
-                onChange(
-                  event.target.checked ? null : sampleAbiValueForTy(symbols, ty.inner_ty_idx),
-                )
-              }
-              disabled={disabled}
-              label="Set as null"
-              className={styles.nullCheckbox}
-            />
-          </div>
-          {!isNull && (
-            <AbiValueEditorNode
-              symbols={symbols}
-              tyIdx={ty.inner_ty_idx}
+        <div className={styles.field}>
+          <FieldHeader
+            label={label}
+            typeLabel={typeLabel}
+            hidden={hideHeader}
+            action={
+              <Checkbox
+                checked={isNull}
+                onChange={event =>
+                  onChange(
+                    event.target.checked ? null : sampleAbiValueForTy(symbols, ty.inner_ty_idx),
+                  )
+                }
+                disabled={disabled}
+                label="Null"
+                className={styles.nullCheckbox}
+              />
+            }
+          />
+          {isNull ? (
+            <NullValue />
+          ) : innerTy?.kind === "coins" && label && isTonFieldName(label) ? (
+            <TonCoinsInput
+              label={label}
+              typeLabel={safeRenderTy(symbols, ty.inner_ty_idx)}
+              hideHeader
               value={value}
               onChange={onChange}
               disabled={disabled}
-              nested
             />
+          ) : (
+            <div className={styles.optionalValue}>
+              <AbiValueEditorNode
+                symbols={symbols}
+                tyIdx={ty.inner_ty_idx}
+                value={value}
+                onChange={onChange}
+                disabled={disabled}
+                hideHeader
+              />
+            </div>
           )}
         </div>
       )
@@ -262,9 +292,11 @@ function AbiValueEditorNode({
     case "lispListOf": {
       const items = Array.isArray(value) ? value : []
       return (
-        <div className={styles.group}>
+        <div className={hideHeader ? styles.flattenedGroup : styles.group}>
           <CollectionHeader
-            label={label ?? typeLabel}
+            label={label ?? (ty.kind === "arrayOf" ? "Array" : "List")}
+            typeLabel={typeLabel}
+            hidden={hideHeader}
             disabled={disabled}
             onAdd={() => onChange([...items, sampleAbiValueForTy(symbols, ty.inner_ty_idx)])}
           />
@@ -281,7 +313,6 @@ function AbiValueEditorNode({
                   }
                   disabled={disabled}
                   label={`#${index}`}
-                  nested
                 />
                 <RemoveButton
                   disabled={disabled}
@@ -298,7 +329,7 @@ function AbiValueEditorNode({
       const items = Array.isArray(value) ? value : []
       return (
         <div className={styles.group}>
-          <span className={styles.groupTitle}>{label ?? typeLabel}</span>
+          <FieldHeader label={label ?? "Tuple"} typeLabel={typeLabel} hidden={hideHeader} group />
           {ty.items_ty_idx.map((itemTyIdx, index) => (
             <AbiValueEditorNode
               key={`${itemTyIdx}:${index}`}
@@ -312,7 +343,6 @@ function AbiValueEditorNode({
               }}
               disabled={disabled}
               label={`#${index}`}
-              nested
             />
           ))}
         </div>
@@ -323,7 +353,9 @@ function AbiValueEditorNode({
       return (
         <div className={styles.group}>
           <CollectionHeader
-            label={label ?? typeLabel}
+            label={label ?? "Map"}
+            typeLabel={typeLabel}
+            hidden={hideHeader}
             disabled={disabled}
             onAdd={() => {
               const key = nextMapKey(entries)
@@ -338,7 +370,7 @@ function AbiValueEditorNode({
             {entries.map(([key, item]) => (
               <div className={`${styles.collectionItem} ${styles.mapItem}`} key={key}>
                 <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Key</span>
+                  <FieldHeader label="Key" typeLabel={safeRenderTy(symbols, ty.key_ty_idx)} />
                   <input
                     className={styles.textInput}
                     value={key}
@@ -353,7 +385,6 @@ function AbiValueEditorNode({
                   onChange={next => onChange({...recordValue(value), [key]: next})}
                   disabled={disabled}
                   label="Value"
-                  nested
                 />
                 <RemoveButton
                   disabled={disabled}
@@ -379,15 +410,20 @@ function AbiValueEditorNode({
           onChange={next => onChange({ref: next})}
           disabled={disabled}
           label={label}
-          nested={nested}
+          hideHeader={hideHeader}
         />
       )
     }
     case "StructRef": {
       const fields = safeStructFields(symbols, tyIdx)
       return (
-        <div className={styles.group}>
-          <span className={styles.groupTitle}>{label ?? ty.struct_name}</span>
+        <div className={hideHeader ? styles.flattenedGroup : styles.group}>
+          <FieldHeader
+            label={label ?? ty.struct_name}
+            typeLabel={label ? typeLabel : "struct"}
+            hidden={hideHeader}
+            group
+          />
           {fields.length === 0 && <span className={styles.emptyValue}>No fields</span>}
           {fields.map(field => (
             <AbiValueEditorNode
@@ -400,7 +436,6 @@ function AbiValueEditorNode({
               onChange={next => onChange({...recordValue(value), [field.name]: next})}
               disabled={disabled}
               label={field.name}
-              nested
             />
           ))}
         </div>
@@ -419,7 +454,7 @@ function AbiValueEditorNode({
           onChange={onChange}
           disabled={disabled}
           label={label ?? ty.alias_name}
-          nested={nested}
+          hideHeader={hideHeader}
         />
       )
     }
@@ -432,11 +467,13 @@ function AbiValueEditorNode({
         return <span className={styles.emptyValue}>Empty union</span>
       }
       const selectedValue = unionValueForEditor(value, selected, symbols)
+      const selectedHasOwnStructure = isStructWithOwnLabel(symbols, selected.variant_ty_idx)
       return (
         <div className={styles.group}>
+          <FieldHeader label={label ?? "Union"} typeLabel={typeLabel} hidden={hideHeader} group />
           <Select
-            fieldClassName={styles.field}
-            label={label ?? typeLabel}
+            fieldClassName={`${styles.field} ${styles.variantField}`}
+            label="Variant"
             value={selected.labelStr}
             onChange={event => {
               const next =
@@ -462,7 +499,8 @@ function AbiValueEditorNode({
               value={selectedValue}
               onChange={next => onChange(unionValueFromEditor(selected, next))}
               disabled={disabled}
-              nested
+              label={selectedHasOwnStructure ? undefined : "Value"}
+              hideHeader={selectedHasOwnStructure}
             />
           )}
         </div>
@@ -472,22 +510,21 @@ function AbiValueEditorNode({
     case "nullLiteral": {
       return (
         <div className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
-          <span className={styles.emptyValue}>null</span>
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
+          <NullValue />
         </div>
       )
     }
     default: {
       return (
         <label className={styles.field}>
-          {label && <span className={styles.fieldLabel}>{label}</span>}
+          <FieldHeader label={label} typeLabel={typeLabel} hidden={hideHeader} />
           <textarea
             className={styles.textArea}
             value={typeof value === "string" ? value : JSON.stringify(value ?? null, null, 2)}
             onChange={event => onChange(event.target.value)}
             disabled={disabled}
           />
-          <span className={styles.typeLabel}>{typeLabel}</span>
         </label>
       )
     }
@@ -496,25 +533,70 @@ function AbiValueEditorNode({
 
 function CollectionHeader({
   label,
+  typeLabel,
+  hideType,
+  hidden,
   disabled,
   onAdd,
 }: {
   readonly label: string
+  readonly typeLabel: string
+  readonly hideType?: boolean
+  readonly hidden?: boolean
   readonly disabled: boolean
   readonly onAdd: () => void
 }) {
   return (
-    <div className={styles.collectionHeader}>
-      <span className={styles.groupTitle}>{label}</span>
-      <InlineAction
-        className={styles.collectionAddAction}
-        icon={<Plus />}
-        label="Add item"
-        onClick={onAdd}
-        disabled={disabled}
-      />
+    <FieldHeader
+      label={label}
+      typeLabel={typeLabel}
+      hideType={hideType}
+      hidden={hidden}
+      group
+      action={
+        <InlineAction
+          className={styles.collectionAddAction}
+          icon={<Plus />}
+          label="Add item"
+          onClick={onAdd}
+          disabled={disabled}
+        />
+      }
+    />
+  )
+}
+
+function FieldHeader({
+  label,
+  typeLabel,
+  hideType = false,
+  hidden = false,
+  group = false,
+  action,
+}: {
+  readonly label?: string
+  readonly typeLabel: string
+  readonly hideType?: boolean
+  readonly hidden?: boolean
+  readonly group?: boolean
+  readonly action?: ReactNode
+}) {
+  if (hidden && !action) return null
+
+  const title = label ?? typeLabel
+  return (
+    <div className={`${styles.fieldHeader} ${group ? styles.groupHeader : ""}`}>
+      {!hidden && <span className={styles.fieldLabel}>{title}</span>}
+      {!hidden && !hideType && title !== typeLabel && (
+        <span className={styles.typeLabel}>{typeLabel}</span>
+      )}
+      {action && <div className={styles.fieldAction}>{action}</div>}
     </div>
   )
+}
+
+function NullValue() {
+  return <span className={styles.nullValue}>null</span>
 }
 
 function RemoveButton({

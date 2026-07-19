@@ -55,13 +55,6 @@
   line-height: 1.35;
 }
 
-.loadingPanel {
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-panel);
-  background: var(--acton-color-surface-raised);
-  box-sizing: border-box;
-}
-
 .formPanel {
   min-width: 0;
 }
@@ -131,27 +124,6 @@
 .textInput {
   min-height: 2.5rem;
   padding: 0 var(--acton-space-3);
-}
-
-.unitInputControl {
-  position: relative;
-  display: block;
-}
-
-.unitInput {
-  padding-inline-end: 4.25rem;
-}
-
-.unitInputSuffix {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: var(--acton-space-3);
-  display: flex;
-  align-items: center;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  font-weight: var(--acton-font-weight-semibold);
-  pointer-events: none;
 }
 
 .addressInput {
@@ -473,14 +445,6 @@
   justify-content: flex-end;
   gap: var(--acton-space-2);
   min-width: max-content;
-}
-
-.loadingPanel {
-  min-height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--acton-space-5);
 }
 
 .resultSection {
