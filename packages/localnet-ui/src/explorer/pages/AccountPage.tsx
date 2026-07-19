@@ -69,6 +69,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const metadataRegistry = useMetadataRegistry()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
+  const [accountDomain, setAccountDomain] = useState<string | undefined>()
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
   const [actions, setActions] = useState<V3Action[]>([])
   const [actionMetadata, setActionMetadata] = useState<V3Metadata>({})
@@ -147,6 +148,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         activeAccountKeyRef.current = undefined
         setAccountState(undefined)
         setAccountStateV3(undefined)
+        setAccountDomain(undefined)
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -189,6 +191,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         setActionsLoading(supportsAccountActions)
         setAccountState(undefined)
         setAccountStateV3(undefined)
+        setAccountDomain(undefined)
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -225,15 +228,18 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
             client.getAccountStates([formattedAddress], false).catch(() => {}),
           ])
           const currentTokenInfo = getAccountTokenInfo(stateV3)
+          const currentDomain = getAccountDomain(stateV3)
           if (!isActive) return
           setAccountState(state)
           setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
+          setAccountDomain(currentDomain)
           setAccountTokenInfo(currentTokenInfo)
         } catch (error) {
           if (!isActive) return
           setAccountError(error instanceof Error ? error.message : "An error occurred")
           setAccountState(undefined)
           setAccountStateV3(undefined)
+          setAccountDomain(undefined)
           setTransactions([])
           setActions([])
           setActionMetadata({})
@@ -881,6 +887,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
               ) : (
                 <AccountInfo
                   address={formattedAddress}
+                  domain={accountDomain}
                   state={accountState}
                   extendedContractAbi={extendedContractAbi}
                   contractInterfaces={
@@ -1336,6 +1343,13 @@ function getAccountTokenInfo(
   if (!stateV3) return []
   const currentAccount = stateV3.accounts[0]
   return currentAccount ? (stateV3.metadata[currentAccount.address]?.token_info ?? []) : []
+}
+
+function getAccountDomain(stateV3: AccountStatesResponse | void): string | undefined {
+  if (!stateV3) return undefined
+  const currentAccount = stateV3.accounts[0]
+  const domain = currentAccount ? stateV3.address_book[currentAccount.address]?.domain : undefined
+  return domain?.trim() || undefined
 }
 
 function tokenInfoString(info: AccountStateTokenInfo | undefined, key: string): string | undefined {

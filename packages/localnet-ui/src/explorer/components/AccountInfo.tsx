@@ -25,6 +25,7 @@ const TOKEN_PREVIEW_LIMIT = 5
 
 interface AccountInfoProps {
   readonly address: string
+  readonly domain?: string
   readonly state?: AddressInformation
   readonly extendedContractAbi?: ExtendedContractABI
   readonly contractInterfaces?: readonly string[]
@@ -51,6 +52,7 @@ interface CollectiblePreview {
 
 export const AccountInfo: FC<AccountInfoProps> = ({
   address,
+  domain,
   state,
   extendedContractAbi,
   contractInterfaces,
@@ -152,8 +154,10 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     editInputRef.current?.select()
   }, [isEditing])
 
+  const displayName = customName || domain
+
   const handleStartEdit = () => {
-    setEditValue(customName || "")
+    setEditValue(displayName || "")
     setIsEditing(true)
   }
 
@@ -197,7 +201,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const addressRowText = hasContextCard ? shortAddress : displayAddress
   const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
-  const isNameUnchanged = editValue.trim() === (customName || "")
+  const isNameUnchanged = editValue.trim() === (displayName || "")
   const stateLoading = accountLoading
   const firstWallet = jettonWallets[0]
   const canOpenTokens = Boolean(onMoreAssetsClick)
@@ -288,11 +292,11 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   </div>
                 </div>
               </div>
-            ) : customName ? (
+            ) : displayName ? (
               <div className={styles.infoRow}>
                 <div className={styles.label}>Name</div>
                 <div className={styles.rowValue}>
-                  <span className={styles.customName}>{customName}</span>
+                  <span className={styles.customName}>{displayName}</span>
                   <button
                     type="button"
                     className={styles.iconButton}
@@ -323,7 +327,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   >
                     <Star size={16} className={favorite ? styles.favoriteIconActive : undefined} />
                   </button>
-                  {!customName && !isEditing && (
+                  {!displayName && !isEditing && (
                     <button
                       type="button"
                       className={styles.iconButton}
