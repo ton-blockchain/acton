@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build && XDG_CONFIG_HOME=../../target/wrangler-config WRANGLER_LOG_PATH=../../target/wrangler-logs wrangler pages functions build functions --outdir dist --build-output-directory dist --compatibility-date 2026-06-18 && mv dist/index.js dist/_worker.js",
     "dev": "vite --port 3007",
+    "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",

@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
+    "doctor": "CI=1 react-doctor",
     "e2e": "playwright test --config playwright.config.ts",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",

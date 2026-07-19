@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",

@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite --port 3006",
+    "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "generate:block-tlb": "bun scripts/generate-block-tlb.ts",
