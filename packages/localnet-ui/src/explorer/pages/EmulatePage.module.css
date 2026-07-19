@@ -162,10 +162,17 @@
   overflow: visible;
 }
 
+.emulateAction {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: var(--acton-space-3);
+  inset-inline-end: var(--acton-space-5);
+}
+
 .builderGrid {
   display: grid;
   grid-template-columns: minmax(280px, 0.74fr) minmax(420px, 1.26fr);
-  align-items: start;
+  align-items: stretch;
 }
 
 .builderPanel {
@@ -180,11 +187,30 @@
   border-left: 1px solid var(--acton-color-border);
 }
 
+.messagePlaceholder {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: var(--acton-space-6);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.messagePlaceholder > span {
+  max-width: 24rem;
+}
+
 .panelTitleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--acton-space-3);
+}
+
+.transactionTitleRow {
+  margin-inline-end: calc(-1 * var(--acton-space-2));
 }
 
 .panelTitle {
@@ -202,15 +228,7 @@
   line-height: 1.35;
 }
 
-.inlineInputAction {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--acton-space-2);
-  align-items: center;
-}
-
-.segmentedControl,
-.sourceSwitch {
+.segmentedControl {
   width: fit-content;
   max-width: 100%;
   display: inline-flex;
@@ -223,8 +241,7 @@
   padding: 2px;
 }
 
-.segment,
-.sourceSwitchButton {
+.segment {
   min-height: 34px;
   border: 0;
   border-radius: var(--acton-radius-control-sm);
@@ -233,36 +250,23 @@
   font: inherit;
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-medium);
+  line-height: 1;
   padding: 0 var(--acton-space-3);
   cursor: pointer;
 }
 
-.segment:hover,
-.sourceSwitchButton:hover {
+.segment:hover {
   color: var(--acton-color-text);
 }
 
-.segmentActive,
-.sourceSwitchButtonActive {
+.segmentActive {
   background: var(--acton-color-surface-raised);
   color: var(--acton-color-text);
 }
 
-.segment:disabled,
-.sourceSwitchButton:disabled {
+.segment:disabled {
   cursor: not-allowed;
   opacity: 0.6;
-}
-
-.rawModeGrid {
-  display: grid;
-}
-
-.rawModeGrid {
-  grid-template-columns: 1fr;
-  align-items: stretch;
-  gap: var(--acton-space-4);
-  padding: var(--acton-space-5);
 }
 
 .stateOverride {
@@ -342,13 +346,14 @@
   box-sizing: border-box;
   min-height: 40px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--acton-space-3);
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
   background: var(--acton-color-surface);
-  padding: 0 var(--acton-space-3);
+  padding: var(--acton-space-2) var(--acton-space-3);
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
 }
@@ -374,17 +379,9 @@
   white-space: nowrap;
 }
 
-.formFooter {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  border-top: 1px solid var(--acton-color-border);
-  padding: var(--acton-space-4) var(--acton-space-5);
-}
-
 .optionCheckbox {
   align-self: flex-start;
-  margin-inline-start: var(--acton-space-2);
+  margin-inline-start: var(--acton-space-1);
 }
 
 .advancedOptions {
@@ -404,11 +401,17 @@
 
 .builderPanel > .emulationOptions {
   margin-inline: calc(-1 * var(--acton-space-5));
+  margin-bottom: calc(-1 * var(--acton-space-5) - 1px);
 }
 
 .emulationOptions > .timeOverride,
 .emulationOptions > .stateOverrideOptions {
   border-top: 0;
+}
+
+.emulationOptions > .stateOverrideOptions {
+  border-bottom: 0;
+  background: transparent;
 }
 
 .advancedOptionsSummary {
@@ -588,14 +591,6 @@
   font-size: var(--acton-font-size-xs);
 }
 
-.actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--acton-space-2);
-  min-width: max-content;
-}
-
 .resultSection {
   min-width: 0;
   display: flex;
@@ -641,34 +636,11 @@
     align-items: flex-start;
     flex-direction: column;
   }
-
-  .actions {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 560px) {
   .title {
     font-size: 26px;
     line-height: 32px;
-  }
-
-  .sourceSwitch {
-    width: 100%;
-  }
-
-  .sourceSwitchButton {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .inlineInputAction {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
   }
 }

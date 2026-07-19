@@ -1,5 +1,6 @@
 import {
   Address,
+  beginCell,
   Builder,
   Cell,
   Dictionary,
@@ -314,9 +315,11 @@ export function sampleAbiValueForTy(
     case "cell":
     case "slice":
     case "builder":
-    case "bitsN":
     case "remaining": {
       return "b5ee9c72010101010002000000"
+    }
+    case "bitsN": {
+      return beginCell().storeUint(0n, ty.n).endCell().toBoc().toString("hex")
     }
     case "nullable": {
       return null

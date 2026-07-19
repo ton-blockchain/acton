@@ -83,7 +83,6 @@ import styles from "./EmulatePage.module.css"
 
 type EmulateInputMode = "builder" | "raw"
 type AbiSourceMode = "auto" | "manual"
-type AbiValueInputMode = "form" | "json"
 type AccountStateOverrideKind = "keep" | "active" | "uninit" | "frozen"
 type StorageOverrideSource = "abi" | "raw"
 type TimeOverrideMode = "increase" | "timestamp"
@@ -215,7 +214,6 @@ export function EmulatePage({client}: EmulatePageProps) {
   const [loadedAbi, setLoadedAbi] = useState<ContractABI | undefined>()
   const [abiLoadState, setAbiLoadState] = useState<AbiLoadState>({type: "idle"})
   const [selectedMessageId, setSelectedMessageId] = useState("")
-  const [argsInputMode, setArgsInputMode] = useState<AbiValueInputMode>("form")
   const [argsJson, setArgsJson] = useState("{}")
   const [argsFormValue, setArgsFormValue] = useState<unknown>({})
   const [rawMessage, setRawMessage] = useState("")
@@ -318,6 +316,7 @@ export function EmulatePage({client}: EmulatePageProps) {
   )
   const valueFlow = enrichment?.valueFlow ?? []
   const manualAbi = useMemo(() => parseManualAbi(manualAbiJson), [manualAbiJson])
+  const hasValidTargetAddress = isValidAddress(targetAddress.trim())
   const activeAbi = abiSourceMode === "manual" ? manualAbi.abi : loadedAbi
   const abiParseError = abiSourceMode === "manual" ? manualAbi.error : undefined
   const messageSymbols = useMemo(
@@ -656,6 +655,7 @@ export function EmulatePage({client}: EmulatePageProps) {
   useEffect(() => {
     const address = targetAddress.trim()
     if (!address) {
+      setAbiSourceMode("auto")
       setLoadedAbi(undefined)
       setAbiLoadState({type: "idle"})
       return
@@ -664,11 +664,13 @@ export function EmulatePage({client}: EmulatePageProps) {
     try {
       Address.parse(address)
     } catch {
+      setAbiSourceMode("auto")
       setLoadedAbi(undefined)
       setAbiLoadState({type: "idle"})
       return
     }
 
+    setAbiSourceMode("auto")
     const requestId = latestAbiLoadRequest.current + 1
     latestAbiLoadRequest.current = requestId
     setAbiLoadState({type: "loading"})
@@ -738,38 +740,6 @@ export function EmulatePage({client}: EmulatePageProps) {
     [emulation],
   )
 
-  const handleLoadAbi = useCallback(async () => {
-    const address = targetAddress.trim()
-    if (!address) {
-      const message = "Target contract address is required."
-      setAbiLoadState({type: "error", message})
-      showToast({title: "Failed to load ABI", description: message, variant: "error"})
-      return
-    }
-
-    try {
-      setAbiLoadState({type: "loading"})
-      const resolved = await resolveCompilerAbis({
-        client,
-        metadataRegistry,
-        addresses: [address],
-      })
-      const abi = resolved?.abiByAddress.get(addressKey(address))
-      if (!abi) {
-        throw new Error("No ABI found for target contract.")
-      }
-
-      setLoadedAbi(abi)
-      setAbiSourceMode("auto")
-      setAbiLoadState({type: "ready", label: abi.contract_name})
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load ABI"
-      setLoadedAbi(undefined)
-      setAbiLoadState({type: "error", message})
-      showToast({title: "Failed to load ABI", description: message, variant: "error"})
-    }
-  }, [client, metadataRegistry, showToast, targetAddress])
-
   const handleMessageOptionChange = useCallback(
     (messageId: string) => {
       const option = builderOptions.find(option => option.id === messageId)
@@ -780,18 +750,6 @@ export function EmulatePage({client}: EmulatePageProps) {
       }
     },
     [builderOptions],
-  )
-
-  const handleArgsInputModeChange = useCallback(
-    (mode: AbiValueInputMode) => {
-      setArgsInputMode(mode)
-      if (mode === "form") {
-        setArgsFormValue(parseAbiJson(argsJson, argsFormValue))
-      } else {
-        setArgsJson(stringifyAbiJson(argsFormValue))
-      }
-    },
-    [argsFormValue, argsJson],
   )
 
   const handleArgsFormChange = useCallback((value: unknown) => {
@@ -900,6 +858,9 @@ export function EmulatePage({client}: EmulatePageProps) {
       setExpandedDebugHash(undefined)
       setActiveTab("value-flow")
       setState({type: "ready", result, enrichment, mcSeqno})
+      globalThis.requestAnimationFrame(() => {
+        globalThis.scrollTo({top: 0, behavior: "smooth"})
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to emulate message"
       setState({type: "error", message})
@@ -912,7 +873,6 @@ export function EmulatePage({client}: EmulatePageProps) {
   }
 
   const handleReset = () => {
-    setInputMode("builder")
     setTargetAddress("")
     setSourceAddress("")
     setMessageValue(DEFAULT_MESSAGE_VALUE)
@@ -923,7 +883,6 @@ export function EmulatePage({client}: EmulatePageProps) {
     setLoadedAbi(undefined)
     setAbiLoadState({type: "idle"})
     setSelectedMessageId("")
-    setArgsInputMode("form")
     setArgsJson("{}")
     setArgsFormValue({})
     setRawMessage("")
@@ -1256,6 +1215,26 @@ export function EmulatePage({client}: EmulatePageProps) {
         </span>
       </summary>
       <div className={styles.advancedOptionsContent}>
+        {messageTransport === "internal" && (
+          <Checkbox
+            checked={bounce}
+            onChange={event => setBounce(event.target.checked)}
+            disabled={isLoading}
+            label="Bounce"
+            description="Bounce failed messages back to From"
+            className={styles.optionCheckbox}
+          />
+        )}
+
+        <Checkbox
+          checked={ignoreChksig}
+          onChange={event => setIgnoreChksig(event.target.checked)}
+          disabled={isLoading}
+          label="Ignore CHKSIG"
+          description="Skip signature checks during emulation"
+          className={styles.optionCheckbox}
+        />
+
         <Input
           fieldClassName={styles.blockField}
           label="Masterchain block"
@@ -1268,15 +1247,6 @@ export function EmulatePage({client}: EmulatePageProps) {
           inputMode="numeric"
           placeholder="latest"
           disabled={isLoading}
-        />
-
-        <Checkbox
-          checked={ignoreChksig}
-          onChange={event => setIgnoreChksig(event.target.checked)}
-          disabled={isLoading}
-          label="Ignore CHKSIG"
-          description="Skip signature checks during emulation"
-          className={styles.optionCheckbox}
         />
       </div>
     </details>
@@ -1308,7 +1278,7 @@ export function EmulatePage({client}: EmulatePageProps) {
             label: (
               <span className={styles.inputModeLabel}>
                 <FileJson size={15} aria-hidden="true" />
-                Raw BOC
+                Raw
               </span>
             ),
             value: "raw",
@@ -1318,11 +1288,30 @@ export function EmulatePage({client}: EmulatePageProps) {
         onValueChange={setInputMode}
         panelClassName={styles.inputModePanel}
       >
+        <Button
+          className={styles.emulateAction}
+          type="submit"
+          variant="primary"
+          size="sm"
+          leadingIcon={<Play size={16} />}
+          loading={isLoading}
+          disabled={!canEmulate}
+        >
+          Emulate
+        </Button>
+
         {inputMode === "builder" ? (
           <div className={styles.builderGrid}>
             <section className={styles.builderPanel}>
-              <div className={styles.panelTitleRow}>
+              <div className={`${styles.panelTitleRow} ${styles.transactionTitleRow}`}>
                 <h2 className={styles.panelTitle}>Transaction</h2>
+                <InlineAction
+                  icon={<RotateCcw size={14} />}
+                  label="Reset transaction fields"
+                  title="Reset all transaction fields to their default values"
+                  onClick={handleReset}
+                  disabled={isLoading}
+                />
               </div>
 
               <div className={styles.segmentedControl} aria-label="Incoming message type">
@@ -1373,25 +1362,16 @@ export function EmulatePage({client}: EmulatePageProps) {
               />
 
               {messageTransport === "internal" && (
-                <>
-                  <Input
-                    fieldClassName={styles.field}
-                    label="Value"
-                    suffix="GRAM"
-                    value={messageValue}
-                    onChange={event => setMessageValue(event.target.value)}
-                    inputMode="decimal"
-                    placeholder="0.05"
-                    disabled={isLoading}
-                  />
-                  <Checkbox
-                    checked={bounce}
-                    onChange={event => setBounce(event.target.checked)}
-                    disabled={isLoading}
-                    label="Bounce"
-                    className={styles.optionCheckbox}
-                  />
-                </>
+                <Input
+                  fieldClassName={styles.field}
+                  label="Value"
+                  suffix="GRAM"
+                  value={messageValue}
+                  onChange={event => setMessageValue(event.target.value)}
+                  inputMode="decimal"
+                  placeholder="0.05"
+                  disabled={isLoading}
+                />
               )}
 
               {emulationOptions}
@@ -1399,35 +1379,27 @@ export function EmulatePage({client}: EmulatePageProps) {
 
             <section className={`${styles.builderPanel} ${styles.payloadPanel}`}>
               <div className={styles.panelTitleRow}>
-                <h2 className={styles.panelTitle}>Payload</h2>
-                <div className={styles.sourceSwitch} aria-label="ABI source">
-                  <button
-                    type="button"
-                    className={`${styles.sourceSwitchButton} ${
-                      abiSourceMode === "auto" ? styles.sourceSwitchButtonActive : ""
-                    }`}
-                    onClick={() => setAbiSourceMode("auto")}
-                    aria-pressed={abiSourceMode === "auto"}
-                  >
-                    Auto
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.sourceSwitchButton} ${
-                      abiSourceMode === "manual" ? styles.sourceSwitchButtonActive : ""
-                    }`}
-                    onClick={() => setAbiSourceMode("manual")}
-                    aria-pressed={abiSourceMode === "manual"}
-                  >
-                    JSON
-                  </button>
-                </div>
+                <h2 className={styles.panelTitle}>Message</h2>
               </div>
 
-              {abiSourceMode === "manual" ? (
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>ABI JSON</span>
+              {!hasValidTargetAddress && (
+                <div className={styles.messagePlaceholder}>
+                  <span>Enter a valid contract address in To to configure the message</span>
+                </div>
+              )}
+
+              {hasValidTargetAddress && abiSourceMode === "manual" && (
+                <div className={styles.field}>
+                  <div className={styles.payloadInputHeader}>
+                    <label className={styles.fieldLabel} htmlFor="emulate-manual-abi-json">
+                      ABI JSON
+                    </label>
+                    <InlineButton type="button" onClick={() => setAbiSourceMode("auto")}>
+                      Cancel
+                    </InlineButton>
+                  </div>
                   <textarea
+                    id="emulate-manual-abi-json"
                     className={styles.abiInput}
                     value={manualAbiJson}
                     onChange={event => setManualAbiJson(event.target.value)}
@@ -1436,154 +1408,107 @@ export function EmulatePage({client}: EmulatePageProps) {
                     disabled={isLoading}
                     rows={7}
                   />
-                </label>
-              ) : (
-                <div className={styles.abiStatus}>
-                  <span>
-                    {abiLoadState.type === "ready"
-                      ? abiLoadState.label
-                      : abiLoadState.type === "error"
+                </div>
+              )}
+
+              {hasValidTargetAddress &&
+                abiSourceMode === "auto" &&
+                abiLoadState.type !== "ready" && (
+                  <div className={styles.abiStatus}>
+                    <span>
+                      {abiLoadState.type === "error"
                         ? abiLoadState.message
                         : abiLoadState.type === "loading"
                           ? "Loading ABI"
                           : "ABI not loaded"}
-                  </span>
-                  {abiLoadState.type === "error" && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={isLoading || !targetAddress.trim()}
-                      onClick={() => void handleLoadAbi()}
-                    >
-                      Retry
-                    </Button>
-                  )}
-                </div>
-              )}
+                    </span>
+                    {abiLoadState.type !== "loading" && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={isLoading}
+                        onClick={() => setAbiSourceMode("manual")}
+                      >
+                        Enter ABI manually
+                      </Button>
+                    )}
+                  </div>
+                )}
 
-              {abiParseError && (
+              {hasValidTargetAddress && abiParseError && (
                 <div className={styles.inlineError} role="alert">
                   {abiParseError}
                 </div>
               )}
 
-              <Select
-                fieldClassName={styles.field}
-                label="Message"
-                value={selectedMessageId}
-                onChange={event => handleMessageOptionChange(event.target.value)}
-                disabled={isLoading || builderOptions.length === 0}
-              >
-                {builderOptions.length === 0 ? (
-                  <option value="">No {messageTransport} ABI messages</option>
-                ) : (
-                  builderOptions.map(option => (
-                    <option key={option.id} value={option.id}>
-                      {formatAbiMessageOptionSummary(option)}
-                    </option>
-                  ))
-                )}
-              </Select>
-
-              {selectedBuilderOption && (
-                <>
-                  <div className={styles.payloadInputHeader}>
-                    <span className={styles.fieldLabel}>Arguments</span>
-                    <div className={styles.sourceSwitch} aria-label="Arguments input mode">
-                      <button
-                        type="button"
-                        className={`${styles.sourceSwitchButton} ${
-                          argsInputMode === "form" ? styles.sourceSwitchButtonActive : ""
-                        }`}
-                        onClick={() => handleArgsInputModeChange("form")}
-                        aria-pressed={argsInputMode === "form"}
-                        disabled={isLoading || !messageSymbols}
-                      >
-                        Form
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.sourceSwitchButton} ${
-                          argsInputMode === "json" ? styles.sourceSwitchButtonActive : ""
-                        }`}
-                        onClick={() => handleArgsInputModeChange("json")}
-                        aria-pressed={argsInputMode === "json"}
-                        disabled={isLoading}
-                      >
-                        JSON
-                      </button>
-                    </div>
-                  </div>
-
-                  {argsInputMode === "form" && messageSymbols ? (
-                    <AbiValueEditor
-                      symbols={messageSymbols}
-                      tyIdx={selectedBuilderOption.valueTyIdx}
-                      value={argsFormValue}
-                      onChange={handleArgsFormChange}
-                      addressSuggestions={favoriteAddressSuggestions}
-                      disabled={isLoading}
-                    />
+              {hasValidTargetAddress && activeAbi && (
+                <Select
+                  fieldClassName={styles.field}
+                  aria-label="Message"
+                  value={selectedMessageId}
+                  onChange={event => handleMessageOptionChange(event.target.value)}
+                  disabled={isLoading || builderOptions.length === 0}
+                >
+                  {builderOptions.length === 0 ? (
+                    <option value="">No {messageTransport} ABI messages</option>
                   ) : (
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Arguments JSON</span>
-                      <textarea
-                        className={styles.messageInput}
-                        value={argsJson}
-                        onChange={event => setArgsJson(event.target.value)}
-                        placeholder="{}"
-                        spellCheck={false}
-                        disabled={isLoading}
-                        rows={8}
-                      />
-                    </label>
+                    builderOptions.map(option => (
+                      <option key={option.id} value={option.id}>
+                        {formatAbiMessageOptionSummary(option)}
+                      </option>
+                    ))
                   )}
-                </>
+                </Select>
+              )}
+
+              {hasValidTargetAddress && selectedBuilderOption && messageSymbols && (
+                <AbiValueEditor
+                  symbols={messageSymbols}
+                  tyIdx={selectedBuilderOption.valueTyIdx}
+                  value={argsFormValue}
+                  onChange={handleArgsFormChange}
+                  addressSuggestions={favoriteAddressSuggestions}
+                  disabled={isLoading}
+                />
               )}
             </section>
           </div>
         ) : (
-          <div className={styles.rawModeGrid}>
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Message BOC</span>
+          <div className={styles.builderGrid}>
+            <section className={styles.builderPanel}>
+              <div className={`${styles.panelTitleRow} ${styles.transactionTitleRow}`}>
+                <h2 className={styles.panelTitle}>Transaction</h2>
+                <InlineAction
+                  icon={<RotateCcw size={14} />}
+                  label="Reset transaction fields"
+                  title="Reset all transaction fields to their default values"
+                  onClick={handleReset}
+                  disabled={isLoading}
+                />
+              </div>
+
+              {emulationOptions}
+            </section>
+
+            <section className={`${styles.builderPanel} ${styles.payloadPanel}`}>
+              <div className={styles.panelTitleRow}>
+                <h2 className={styles.panelTitle}>Message</h2>
+              </div>
+
               <textarea
                 className={styles.messageInput}
+                aria-label="Message BOC"
                 value={rawMessage}
                 onChange={event => setRawMessage(event.target.value)}
-                placeholder="Hex message BoC"
+                placeholder="Hex or base64 message BoC"
                 spellCheck={false}
                 disabled={isLoading}
                 rows={8}
               />
-            </label>
-
-            {emulationOptions}
+            </section>
           </div>
         )}
-
-        <div className={styles.formFooter}>
-          <div className={styles.actions}>
-            <Button
-              type="button"
-              variant="ghost"
-              leadingIcon={<RotateCcw size={16} />}
-              onClick={handleReset}
-              disabled={isLoading}
-            >
-              Reset
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              leadingIcon={<Play size={16} />}
-              loading={isLoading}
-              disabled={!canEmulate}
-            >
-              Emulate
-            </Button>
-          </div>
-        </div>
       </ContentTabs>
     </form>
   )

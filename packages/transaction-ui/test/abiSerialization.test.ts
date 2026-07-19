@@ -6,11 +6,13 @@ import {
   SAMPLE_EXTERNAL_ADDRESS,
   TON_ADDR_NONE,
   abiValueToFormValue,
+  createAbiSymbols,
   decodeAbiValueFromBoc,
   encodeAbiValueToBoc,
   formatAbiCellBoc,
   isTonAddress,
   parseAbiCellArg,
+  sampleAbiValueForTy,
   stringifyAbiJson,
   type ContractABI,
 } from "../src/abi"
@@ -168,6 +170,33 @@ const addressAbi = {
   thrown_errors: [],
 } satisfies ContractABI
 
+const fixedBitsAbi = {
+  contract_name: "FixedBitsRoundTrip",
+  compiler_name: "tolk",
+  compiler_version: "test",
+  declarations: [],
+  unique_types: [
+    {kind: "void"},
+    {kind: "int"},
+    {kind: "slice"},
+    {kind: "cell"},
+    {kind: "builder"},
+    {kind: "bool"},
+    {kind: "coins"},
+    {kind: "address"},
+    {kind: "bitsN", n: 512},
+  ],
+  struct_instantiations: [],
+  alias_instantiations: [],
+  storage: {storage_ty_idx: 8},
+  incoming_messages: [],
+  incoming_external: [],
+  outgoing_messages: [],
+  emitted_events: [],
+  get_methods: [],
+  thrown_errors: [],
+} satisfies ContractABI
+
 describe("ABI value serialization", () => {
   test("round-trips nested form values through Cell and BoC", () => {
     const boc = encodeAbiValueToBoc(nestedAbi, 16, nestedFormValue)
@@ -219,6 +248,20 @@ describe("ABI value serialization", () => {
 
     expect(parseAbiCellArg(hex).equals(parseAbiCellArg(base64))).toBe(true)
     expect(parseAbiCellArg(`0x${hex}`).equals(cell)).toBe(true)
+  })
+
+  test("creates a serializable zero-filled default for fixed-width bits", () => {
+    const sample = sampleAbiValueForTy(createAbiSymbols(fixedBitsAbi), 8)
+    const sampleSlice = parseAbiCellArg(String(sample)).beginParse()
+    const boc = encodeAbiValueToBoc(fixedBitsAbi, 8, sample)
+
+    expect({
+      sample,
+      sampleBits: sampleSlice.remainingBits,
+      sampleRefs: sampleSlice.remainingRefs,
+      boc,
+      decoded: abiValueToFormValue(decodeAbiValueFromBoc(fixedBitsAbi, 8, boc)),
+    }).toMatchSnapshot()
   })
 
   test("round-trips external and addr_none address values", () => {
