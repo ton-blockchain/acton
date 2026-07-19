@@ -367,7 +367,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     } as CSSProperties
   }, [isWideTraceTree, treeFlowMetrics])
 
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address-book lookup without restarting it
   fetchNameRef.current = fetchName
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address format without restarting it
   addressFormatRef.current = addressFormat
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
