@@ -1,5 +1,5 @@
-import {Input} from "@acton/ui"
-import {KeyRound, Search} from "lucide-react"
+import {InlineAction, Input} from "@acton/ui"
+import {KeyRound, RefreshCw, Search} from "lucide-react"
 import {useState} from "react"
 
 import styles from "./inputGallery.module.css"
@@ -37,6 +37,13 @@ function FieldSamples() {
         description="HTTPS Toncenter V3 endpoint used by the explorer."
         placeholder="https://example.com/api/v3"
         required
+      />
+      <Input
+        label="Address"
+        labelAction={
+          <InlineAction label="Reload address" icon={<RefreshCw />} onClick={() => undefined} />
+        }
+        defaultValue="EQD36XRy1lSfSB8zmISQKBsa5bmeixAWwD6vUUhOXXur8c8Y"
       />
     </div>
   )

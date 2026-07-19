@@ -2,14 +2,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--acton-space-3);
+  gap: var(--acton-space-2);
 }
 
 .field {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--acton-space-2);
+  gap: var(--acton-space-1);
 }
 
 .fieldHeader {
@@ -50,8 +50,8 @@
 }
 
 .groupHeader {
-  min-height: 1.75rem;
-  padding-bottom: var(--acton-space-1-5);
+  min-height: 1.5rem;
+  padding-bottom: 0;
 }
 
 .groupHeader .fieldLabel {
@@ -180,13 +180,13 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--acton-space-3);
+  gap: var(--acton-space-1);
 }
 
 .group::before {
   content: "";
   position: absolute;
-  inset-block-start: calc(1.75rem + var(--acton-space-1-5));
+  inset-block-start: calc(1.5rem + var(--acton-space-1));
   inset-block-end: 0;
   inset-inline-start: 0;
   width: 1px;
@@ -194,7 +194,7 @@
 }
 
 .group .group::before {
-  inset-block-start: calc(1.5rem + var(--acton-space-1-5));
+  inset-block-start: calc(1.5rem + var(--acton-space-1));
 }
 
 .group > :not(.groupHeader) {
@@ -205,7 +205,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--acton-space-3);
+  gap: var(--acton-space-2);
 }
 
 .variantField > label {
@@ -233,11 +233,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: var(--acton-space-2);
 }
 
 .collectionItem {
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--acton-space-2);
@@ -251,7 +254,7 @@
 }
 
 .mapItem {
-  grid-template-columns: minmax(120px, 0.35fr) minmax(0, 0.65fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 @media (max-width: 720px) {

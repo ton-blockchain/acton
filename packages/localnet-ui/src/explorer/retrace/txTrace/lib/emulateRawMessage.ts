@@ -18,7 +18,7 @@ import {extractCodeAndTrace, getRetraceNetworkConfig} from "./traceTx"
 
 export type RawMessageEmulationOptions = Pick<
   EmulateRawMessageOptions,
-  "accountStateOverrides" | "ignoreChksig" | "maxTransactions" | "mcSeqno"
+  "accountStateOverrides" | "ignoreChksig" | "maxTransactions" | "mcSeqno" | "now"
 >
 
 export interface RawMessageEmulationResult {

@@ -15,6 +15,7 @@ export type InputProps = Readonly<
     readonly suffix?: ReactNode
     readonly shortcut?: string
     readonly label?: ReactNode
+    readonly labelAction?: ReactNode
     readonly description?: ReactNode
     readonly fieldClassName?: string
   }
@@ -39,6 +40,7 @@ export function Input({
   id,
   invalid = false,
   label,
+  labelAction,
   leadingIcon,
   mono = false,
   ref,
@@ -51,7 +53,7 @@ export function Input({
 }: InputProps) {
   const generatedId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
-  const hasField = label !== undefined || description !== undefined
+  const hasField = label !== undefined || labelAction !== undefined || description !== undefined
   const inputId = id ?? (hasField || suffix !== undefined ? generatedId : undefined)
   const descriptionId = description === undefined ? undefined : `${inputId}-description`
   const suffixId = suffix === undefined ? undefined : `${inputId}-suffix`
@@ -160,15 +162,22 @@ export function Input({
 
   return (
     <div className={cx(styles.field, fieldClassName)}>
-      {label === undefined ? undefined : (
-        <label className={styles.label} htmlFor={inputId}>
-          {label}
-          {required ? (
-            <span className={styles.required} aria-hidden="true">
-              *
-            </span>
-          ) : undefined}
-        </label>
+      {label === undefined && labelAction === undefined ? undefined : (
+        <div className={styles.labelRow}>
+          {label === undefined ? undefined : (
+            <label className={styles.label} htmlFor={inputId}>
+              {label}
+              {required ? (
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
+              ) : undefined}
+            </label>
+          )}
+          {labelAction === undefined ? undefined : (
+            <div className={styles.labelAction}>{labelAction}</div>
+          )}
+        </div>
       )}
       {control}
       {description === undefined ? undefined : (

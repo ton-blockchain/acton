@@ -59,7 +59,7 @@
   min-width: 0;
 }
 
-.formPanel input:not([type="checkbox"]),
+.formPanel input:not([type="checkbox"], [type="radio"]),
 .formPanel textarea,
 .formPanel select {
   background: var(--acton-color-surface-raised);
@@ -180,16 +180,6 @@
   border-left: 1px solid var(--acton-color-border);
 }
 
-.builderOverrides {
-  grid-column: 1 / -1;
-  border-top: 1px solid var(--acton-color-border);
-  padding: 0 var(--acton-space-5) var(--acton-space-5);
-}
-
-.builderOverrides .stateOverride {
-  border-top: 0;
-}
-
 .panelTitleRow {
   display: flex;
   align-items: center;
@@ -264,18 +254,6 @@
   opacity: 0.6;
 }
 
-.internalGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.45fr);
-  gap: var(--acton-space-4);
-}
-
-.messageOptions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--acton-space-3);
-}
-
 .rawModeGrid {
   display: grid;
 }
@@ -288,17 +266,9 @@
 }
 
 .stateOverride {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--acton-space-3);
-  border-top: 1px solid var(--acton-color-border);
-  padding-top: var(--acton-space-4);
-}
-
-.stateOverrideHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--acton-space-3);
 }
 
@@ -307,11 +277,6 @@
   align-content: center;
 }
 
-.stateOverrideHeader > .stateOverrideCheckbox {
-  margin-inline-start: var(--acton-space-2);
-}
-
-.stateOverrideBody,
 .stateOverrideFields,
 .stateOverrideNested,
 .stateOverrideStorage {
@@ -321,15 +286,18 @@
   gap: var(--acton-space-3);
 }
 
+.stateOverrideBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-6);
+}
+
 .stateOverrideAccount {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--acton-space-3);
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-control);
-  background: var(--acton-color-surface);
-  padding: var(--acton-space-3);
 }
 
 .accountOverrideHeader {
@@ -347,19 +315,14 @@
   line-height: 1.35;
 }
 
-.overrideFormatBlock {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--acton-space-2);
+.accountReloadAction {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
-.overrideFormatRow {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--acton-space-3);
+.accountReloadAction svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .addOverrideButton {
@@ -400,21 +363,6 @@
   line-height: 1.4;
 }
 
-.previewPanel {
-  min-width: 0;
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-panel);
-  background: var(--acton-color-surface);
-  overflow: hidden;
-}
-
-.previewTitle {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--acton-space-3);
-}
-
 .previewError {
   min-width: 0;
   text-align: right;
@@ -437,6 +385,207 @@
 .optionCheckbox {
   align-self: flex-start;
   margin-inline-start: var(--acton-space-2);
+}
+
+.advancedOptions {
+  min-width: 0;
+  border-block: 1px solid var(--acton-color-border);
+  border-inline: 0;
+  border-radius: 0;
+  background: var(--acton-color-surface);
+  overflow: hidden;
+}
+
+.emulationOptions {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.builderPanel > .emulationOptions {
+  margin-inline: calc(-1 * var(--acton-space-5));
+}
+
+.emulationOptions > .timeOverride,
+.emulationOptions > .stateOverrideOptions {
+  border-top: 0;
+}
+
+.advancedOptionsSummary {
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  padding: 0 var(--acton-space-3);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  cursor: pointer;
+  list-style: none;
+}
+
+.advancedOptionsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedOptionsSummary:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: -2px;
+}
+
+.advancedOptionsTitle,
+.advancedOptionsToggle {
+  display: inline-flex;
+  align-items: center;
+}
+
+.advancedOptionsTitle {
+  gap: var(--acton-space-2);
+}
+
+.advancedOptionsToggle {
+  flex: 0 0 auto;
+}
+
+.advancedOptionsMinus {
+  display: none;
+}
+
+.advancedOptions[open] .advancedOptionsPlus {
+  display: none;
+}
+
+.advancedOptions[open] .advancedOptionsMinus {
+  display: block;
+}
+
+.advancedOptionsContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-4);
+  border-top: 1px solid var(--acton-color-border);
+  padding: var(--acton-space-4) var(--acton-space-3);
+}
+
+.timeOverride {
+  min-width: 0;
+  border-block: 1px solid var(--acton-color-border);
+  border-inline: 0;
+  background: var(--acton-color-surface);
+  overflow: hidden;
+}
+
+.timeOverrideSummary {
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  padding: 0 var(--acton-space-3);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  cursor: pointer;
+  list-style: none;
+}
+
+.timeOverrideSummary::-webkit-details-marker {
+  display: none;
+}
+
+.timeOverrideSummary:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: -2px;
+}
+
+.timeOverrideMinus {
+  display: none;
+}
+
+.timeOverride[open] .timeOverridePlus {
+  display: none;
+}
+
+.timeOverride[open] .timeOverrideMinus {
+  display: block;
+}
+
+.timeOverrideContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  border-top: 1px solid var(--acton-color-border);
+  padding: var(--acton-space-4) var(--acton-space-3);
+}
+
+.timeOverrideModes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-4);
+}
+
+.timeOverrideMode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  cursor: pointer;
+}
+
+.timeOverrideRadio {
+  width: 1.125rem;
+  height: 1.125rem;
+  box-sizing: border-box;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  border: 2px solid var(--acton-color-border-strong);
+  border-radius: 50%;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.timeOverrideRadio::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--acton-color-accent);
+  content: "";
+  transform: scale(0);
+}
+
+.timeOverrideRadio:checked {
+  border-color: var(--acton-color-accent);
+}
+
+.timeOverrideRadio:checked::before {
+  transform: scale(1);
+}
+
+.timeOverrideRadio:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.timeOverrideRadio:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.timeOverridePreview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
 }
 
 .actions {
@@ -477,7 +626,6 @@
   }
 
   .builderGrid,
-  .internalGrid,
   .payloadInputHeader,
   .stateOverrideStorageHeader {
     grid-template-columns: 1fr;
@@ -486,10 +634,6 @@
   .payloadPanel {
     border-top: 1px solid var(--acton-color-border);
     border-left: 0;
-  }
-
-  .builderOverrides {
-    grid-column: auto;
   }
 
   .payloadInputHeader,

@@ -11,7 +11,6 @@ import {
   type ContractABI,
 } from "@acton/transaction-ui/abi"
 import {RawDataBlock} from "@acton/ui"
-import {Address} from "@ton/core"
 import {useMemo, useState} from "react"
 
 import styles from "./abiValueEditorGallery.module.css"
@@ -185,7 +184,7 @@ const matrixAbi = {
 } satisfies ContractABI
 
 const matrixSymbols = createAbiSymbols(matrixAbi)
-const treasuryAddress = Address.parseRaw(`0:${"11".repeat(32)}`).toString()
+const treasuryAddress = "EQAREREREREREREREREREREREREREREREREREREREREREeYT"
 
 const addressSuggestions = [
   {address: SAMPLE_ADDRESS, label: `Zero account · ${shortAddress(SAMPLE_ADDRESS)}`},

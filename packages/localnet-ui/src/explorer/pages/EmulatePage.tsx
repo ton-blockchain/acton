@@ -1,12 +1,25 @@
 import {type FormEvent, useCallback, useEffect, useMemo, useRef, useState} from "react"
-import {Bug, FileJson, Play, Plus, RefreshCw, RotateCcw, Trash2, WandSparkles} from "lucide-react"
+import {
+  Bug,
+  Clock3,
+  Database,
+  FileJson,
+  Minus,
+  Play,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
+  WandSparkles,
+} from "lucide-react"
 import {
   Button,
   Checkbox,
   ContentTabs,
+  InlineAction,
   InlineButton,
   Input,
-  RawDataBlock,
   Select,
   useToast,
 } from "@acton/ui"
@@ -71,25 +84,45 @@ import styles from "./EmulatePage.module.css"
 type EmulateInputMode = "builder" | "raw"
 type AbiSourceMode = "auto" | "manual"
 type AbiValueInputMode = "form" | "json"
-type AccountOverrideMode = "fields" | "shardAccount"
 type AccountStateOverrideKind = "keep" | "active" | "uninit" | "frozen"
 type StorageOverrideSource = "abi" | "raw"
+type TimeOverrideMode = "increase" | "timestamp"
 const EMULATE_ADDRESS_QUERY_PARAM = "address"
 const EMULATE_SOURCE_QUERY_PARAM = "source"
 const EMULATE_VALUE_QUERY_PARAM = "value"
+const EMULATE_BOUNCE_QUERY_PARAM = "bounce"
+const EMULATE_MC_SEQNO_QUERY_PARAM = "mcSeqno"
+const EMULATE_IGNORE_CHKSIG_QUERY_PARAM = "ignoreChksig"
+const EMULATE_TIME_MODE_QUERY_PARAM = "timeMode"
+const EMULATE_INCREASE_TIME_QUERY_PARAM = "increaseTime"
+const EMULATE_TIMESTAMP_QUERY_PARAM = "timestamp"
 const DEFAULT_MESSAGE_VALUE = "0.5"
+const MAX_UINT32 = 0xff_ff_ff_ff
 
 interface EmulateSearchFields {
   readonly targetAddress: string
   readonly sourceAddress: string
   readonly messageValue: string
+  readonly bounce: boolean
+  readonly mcSeqnoInput: string
+  readonly ignoreChksig: boolean
+  readonly timeOverrideMode: TimeOverrideMode
+  readonly increaseTimeInput: string
+  readonly unixTimestampInput: string
 }
 
 function readEmulateSearchFields(searchParams: URLSearchParams): EmulateSearchFields {
+  const timeMode = searchParams.get(EMULATE_TIME_MODE_QUERY_PARAM)
   return {
     targetAddress: searchParams.get(EMULATE_ADDRESS_QUERY_PARAM) ?? "",
     sourceAddress: searchParams.get(EMULATE_SOURCE_QUERY_PARAM) ?? "",
     messageValue: searchParams.get(EMULATE_VALUE_QUERY_PARAM) ?? DEFAULT_MESSAGE_VALUE,
+    bounce: searchParams.get(EMULATE_BOUNCE_QUERY_PARAM) !== "false",
+    mcSeqnoInput: searchParams.get(EMULATE_MC_SEQNO_QUERY_PARAM) ?? "",
+    ignoreChksig: searchParams.get(EMULATE_IGNORE_CHKSIG_QUERY_PARAM) === "true",
+    timeOverrideMode: timeMode === "increase" ? "increase" : "timestamp",
+    increaseTimeInput: searchParams.get(EMULATE_INCREASE_TIME_QUERY_PARAM) ?? "",
+    unixTimestampInput: searchParams.get(EMULATE_TIMESTAMP_QUERY_PARAM) ?? "",
   }
 }
 
@@ -100,7 +133,13 @@ function areEmulateSearchFieldsEqual(
   return (
     left.targetAddress === right.targetAddress &&
     left.sourceAddress === right.sourceAddress &&
-    left.messageValue === right.messageValue
+    left.messageValue === right.messageValue &&
+    left.bounce === right.bounce &&
+    left.mcSeqnoInput === right.mcSeqnoInput &&
+    left.ignoreChksig === right.ignoreChksig &&
+    left.timeOverrideMode === right.timeOverrideMode &&
+    left.increaseTimeInput === right.increaseTimeInput &&
+    left.unixTimestampInput === right.unixTimestampInput
   )
 }
 type AccountOverrideLoadState =
@@ -135,14 +174,12 @@ interface AccountStateOverrideDraft {
   readonly abi?: ContractABI
   readonly loadedAddress?: string
   readonly loadState: AccountOverrideLoadState
-  readonly mode: AccountOverrideMode
-  readonly shardAccountBoc: string
   readonly balance: string
   readonly stateKind: AccountStateOverrideKind
+  readonly currentStateKind?: Exclude<AccountStateOverrideKind, "keep">
   readonly codeBoc: string
   readonly storageEnabled: boolean
   readonly storageSource: StorageOverrideSource
-  readonly storageInputMode: AbiValueInputMode
   readonly storageJson: string
   readonly storageFormValue: unknown
   readonly dataBoc: string
@@ -172,7 +209,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     () => readEmulateSearchFields(searchParams).messageValue,
   )
   const [messageTransport, setMessageTransport] = useState<AbiMessageTransport>("internal")
-  const [bounce, setBounce] = useState(true)
+  const [bounce, setBounce] = useState(() => readEmulateSearchFields(searchParams).bounce)
   const [abiSourceMode, setAbiSourceMode] = useState<AbiSourceMode>("auto")
   const [manualAbiJson, setManualAbiJson] = useState("")
   const [loadedAbi, setLoadedAbi] = useState<ContractABI | undefined>()
@@ -182,24 +219,79 @@ export function EmulatePage({client}: EmulatePageProps) {
   const [argsJson, setArgsJson] = useState("{}")
   const [argsFormValue, setArgsFormValue] = useState<unknown>({})
   const [rawMessage, setRawMessage] = useState("")
-  const [mcSeqnoInput, setMcSeqnoInput] = useState("")
-  const [ignoreChksig, setIgnoreChksig] = useState(false)
-  const [stateOverrideEnabled, setStateOverrideEnabled] = useState(false)
+  const [mcSeqnoInput, setMcSeqnoInput] = useState(
+    () => readEmulateSearchFields(searchParams).mcSeqnoInput,
+  )
+  const [ignoreChksig, setIgnoreChksig] = useState(
+    () => readEmulateSearchFields(searchParams).ignoreChksig,
+  )
+  const [timeOverrideOpen, setTimeOverrideOpen] = useState(false)
+  const [timeOverrideMode, setTimeOverrideMode] = useState<TimeOverrideMode>(
+    () => readEmulateSearchFields(searchParams).timeOverrideMode,
+  )
+  const [increaseTimeInput, setIncreaseTimeInput] = useState(
+    () => readEmulateSearchFields(searchParams).increaseTimeInput,
+  )
+  const [unixTimestampInput, setUnixTimestampInput] = useState(
+    () => readEmulateSearchFields(searchParams).unixTimestampInput,
+  )
+  const [baseBlockUnixTime, setBaseBlockUnixTime] = useState<number | undefined>()
   const [stateOverrideEntries, setStateOverrideEntries] = useState<
     readonly AccountStateOverrideDraft[]
   >([])
+  const stateOverrideEnabled = stateOverrideEntries.length > 0
   const [state, setState] = useState<EmulateState>({type: "idle"})
   const [activeTab, setActiveTab] = useState<TransactionTraceTabType>("value-flow")
   const [selectedHash, setSelectedHash] = useState<string | undefined>()
   const [expandedDebugHash, setExpandedDebugHash] = useState<string | undefined>()
   const latestAbiLoadRequest = useRef(0)
   const nextStateOverrideId = useRef(1)
+  const baseBlockUnixTimeQuery = useRef<string | undefined>(undefined)
   const lastSearchFields = useRef(readEmulateSearchFields(searchParams))
   const isApplyingSearchFields = useRef(false)
 
   useEffect(() => {
     void prefetchNames(favorites.map(favorite => favorite.address))
   }, [favorites, prefetchNames])
+
+  useEffect(() => {
+    if (!timeOverrideOpen) {
+      return
+    }
+
+    let mcSeqno: number | undefined
+    try {
+      mcSeqno = parseMcSeqno(mcSeqnoInput)
+    } catch {
+      baseBlockUnixTimeQuery.current = undefined
+      setBaseBlockUnixTime(undefined)
+      return
+    }
+
+    const queryKey = `${network}:${mcSeqno === undefined ? "latest" : mcSeqno}`
+    if (baseBlockUnixTimeQuery.current === queryKey && baseBlockUnixTime !== undefined) {
+      return
+    }
+
+    let cancelled = false
+    void loadEmulationBlockUnixTime(client, mcSeqno)
+      .then(unixTime => {
+        if (!cancelled) {
+          baseBlockUnixTimeQuery.current = queryKey
+          setBaseBlockUnixTime(unixTime)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          baseBlockUnixTimeQuery.current = undefined
+          setBaseBlockUnixTime(undefined)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [baseBlockUnixTime, client, mcSeqnoInput, network, timeOverrideOpen])
 
   const favoriteAddressSuggestions: readonly TonAddressSuggestion[] = favorites.map(favorite => {
     const name = getCachedName(favorite.address)
@@ -283,20 +375,43 @@ export function EmulatePage({client}: EmulatePageProps) {
   const stateOverrideStoragePreviews = useMemo(
     () =>
       new Map(
-        stateOverrideEntries.map(entry => [
-          entry.id,
-          buildStorageOverridePreview({
-            enabled: stateOverrideEnabled && entry.mode === "fields" && entry.storageEnabled,
-            source: entry.storageSource,
-            abi: stateOverrideAbiContexts.get(entry.id)?.abi,
-            storageJson: entry.storageJson,
-            rawDataBoc: entry.dataBoc,
-          }),
-        ]),
+        stateOverrideEntries.map(entry => {
+          const context = stateOverrideAbiContexts.get(entry.id)
+          const source: StorageOverrideSource =
+            entry.storageSource === "abi" && context?.storageInfo && context.storageSymbols
+              ? "abi"
+              : "raw"
+          return [
+            entry.id,
+            buildStorageOverridePreview({
+              enabled: stateOverrideEnabled && entry.storageEnabled,
+              source,
+              abi: context?.abi,
+              storageJson: entry.storageJson,
+              rawDataBoc: entry.dataBoc,
+            }),
+          ]
+        }),
       ),
     [stateOverrideAbiContexts, stateOverrideEnabled, stateOverrideEntries],
   )
   const stateOverrideAccountCount = stateOverrideEntries.length
+  const timeOverrideInput = timeOverrideMode === "increase" ? increaseTimeInput : unixTimestampInput
+  const parsedTimeOverrideInput = parseOptionalUint32(timeOverrideInput)
+  const previewUnixTime =
+    parsedTimeOverrideInput === undefined
+      ? undefined
+      : timeOverrideMode === "timestamp"
+        ? parsedTimeOverrideInput
+        : baseBlockUnixTime === undefined
+          ? undefined
+          : baseBlockUnixTime + parsedTimeOverrideInput
+  const timeOverrideInvalid =
+    timeOverrideInput.trim().length > 0 &&
+    (parsedTimeOverrideInput === undefined ||
+      (timeOverrideMode === "increase" &&
+        previewUnixTime !== undefined &&
+        previewUnixTime > MAX_UINT32))
   const canApplyStateOverride =
     !stateOverrideEnabled ||
     (stateOverrideEntries.length > 0 &&
@@ -305,19 +420,20 @@ export function EmulatePage({client}: EmulatePageProps) {
         return (
           Boolean(entry.address.trim()) &&
           entry.loadState.type !== "loading" &&
-          (entry.mode === "fields" || Boolean(entry.shardAccountBoc.trim())) &&
           preview?.error === undefined
         )
       }))
   const canEmulate =
     canApplyStateOverride &&
+    !timeOverrideInvalid &&
     (inputMode === "builder"
       ? Boolean(builderPreview.boc) && builderPreview.error === undefined
       : Boolean(rawMessage.trim()))
 
   useEffect(() => {
     const fieldsFromUrl = readEmulateSearchFields(searchParams)
-    if (areEmulateSearchFieldsEqual(fieldsFromUrl, lastSearchFields.current)) {
+    const previousFields = lastSearchFields.current
+    if (areEmulateSearchFieldsEqual(fieldsFromUrl, previousFields)) {
       return
     }
 
@@ -326,6 +442,16 @@ export function EmulatePage({client}: EmulatePageProps) {
     setTargetAddress(fieldsFromUrl.targetAddress)
     setSourceAddress(fieldsFromUrl.sourceAddress)
     setMessageValue(fieldsFromUrl.messageValue)
+    setBounce(fieldsFromUrl.bounce)
+    if (fieldsFromUrl.mcSeqnoInput !== previousFields.mcSeqnoInput) {
+      baseBlockUnixTimeQuery.current = undefined
+      setBaseBlockUnixTime(undefined)
+    }
+    setMcSeqnoInput(fieldsFromUrl.mcSeqnoInput)
+    setIgnoreChksig(fieldsFromUrl.ignoreChksig)
+    setTimeOverrideMode(fieldsFromUrl.timeOverrideMode)
+    setIncreaseTimeInput(fieldsFromUrl.increaseTimeInput)
+    setUnixTimestampInput(fieldsFromUrl.unixTimestampInput)
   }, [searchParams])
 
   useEffect(() => {
@@ -338,6 +464,12 @@ export function EmulatePage({client}: EmulatePageProps) {
       targetAddress: targetAddress.trim(),
       sourceAddress: sourceAddress.trim(),
       messageValue: messageValue.trim() || DEFAULT_MESSAGE_VALUE,
+      bounce,
+      mcSeqnoInput: mcSeqnoInput.trim(),
+      ignoreChksig,
+      timeOverrideMode,
+      increaseTimeInput: increaseTimeInput.trim(),
+      unixTimestampInput: unixTimestampInput.trim(),
     }
     if (areEmulateSearchFieldsEqual(readEmulateSearchFields(searchParams), nextFields)) {
       return
@@ -359,9 +491,51 @@ export function EmulatePage({client}: EmulatePageProps) {
     } else {
       nextParams.set(EMULATE_VALUE_QUERY_PARAM, nextFields.messageValue)
     }
+    if (nextFields.bounce) {
+      nextParams.delete(EMULATE_BOUNCE_QUERY_PARAM)
+    } else {
+      nextParams.set(EMULATE_BOUNCE_QUERY_PARAM, "false")
+    }
+    if (nextFields.mcSeqnoInput) {
+      nextParams.set(EMULATE_MC_SEQNO_QUERY_PARAM, nextFields.mcSeqnoInput)
+    } else {
+      nextParams.delete(EMULATE_MC_SEQNO_QUERY_PARAM)
+    }
+    if (nextFields.ignoreChksig) {
+      nextParams.set(EMULATE_IGNORE_CHKSIG_QUERY_PARAM, "true")
+    } else {
+      nextParams.delete(EMULATE_IGNORE_CHKSIG_QUERY_PARAM)
+    }
+    if (nextFields.timeOverrideMode === "increase") {
+      nextParams.set(EMULATE_TIME_MODE_QUERY_PARAM, "increase")
+    } else {
+      nextParams.delete(EMULATE_TIME_MODE_QUERY_PARAM)
+    }
+    if (nextFields.increaseTimeInput) {
+      nextParams.set(EMULATE_INCREASE_TIME_QUERY_PARAM, nextFields.increaseTimeInput)
+    } else {
+      nextParams.delete(EMULATE_INCREASE_TIME_QUERY_PARAM)
+    }
+    if (nextFields.unixTimestampInput) {
+      nextParams.set(EMULATE_TIMESTAMP_QUERY_PARAM, nextFields.unixTimestampInput)
+    } else {
+      nextParams.delete(EMULATE_TIMESTAMP_QUERY_PARAM)
+    }
     lastSearchFields.current = nextFields
     setSearchParams(nextParams, {replace: true})
-  }, [messageValue, searchParams, setSearchParams, sourceAddress, targetAddress])
+  }, [
+    bounce,
+    ignoreChksig,
+    increaseTimeInput,
+    mcSeqnoInput,
+    messageValue,
+    searchParams,
+    setSearchParams,
+    sourceAddress,
+    targetAddress,
+    timeOverrideMode,
+    unixTimestampInput,
+  ])
 
   const createStateOverrideDraft = useCallback(
     (address = "") =>
@@ -379,18 +553,6 @@ export function EmulatePage({client}: EmulatePageProps) {
       )
     },
     [],
-  )
-
-  const handleStateOverrideEnabledChange = useCallback(
-    (checked: boolean) => {
-      setStateOverrideEnabled(checked)
-      if (checked) {
-        setStateOverrideEntries(entries =>
-          entries.length > 0 ? entries : [createStateOverrideDraft(targetAddress.trim())],
-        )
-      }
-    },
-    [createStateOverrideDraft, targetAddress],
   )
 
   const handleAddStateOverrideEntry = useCallback(() => {
@@ -435,13 +597,7 @@ export function EmulatePage({client}: EmulatePageProps) {
         setStateOverrideEntries(entries =>
           entries.map(entry =>
             entry.id === entryId && entry.address.trim() === address
-              ? hydrateAccountStateOverrideDraft(
-                  entry,
-                  address,
-                  shardAccount,
-                  shardAccountCell,
-                  accountAbi,
-                )
+              ? hydrateAccountStateOverrideDraft(entry, address, shardAccount, accountAbi)
               : entry,
           ),
         )
@@ -643,26 +799,6 @@ export function EmulatePage({client}: EmulatePageProps) {
     setArgsJson(stringifyAbiJson(value))
   }, [])
 
-  const handleStorageInputModeChange = useCallback(
-    (entryId: string, mode: AbiValueInputMode) => {
-      updateStateOverrideEntry(entryId, entry => {
-        if (mode === "form") {
-          return {
-            ...entry,
-            storageInputMode: mode,
-            storageFormValue: parseAbiJson(entry.storageJson, entry.storageFormValue),
-          }
-        }
-        return {
-          ...entry,
-          storageInputMode: mode,
-          storageJson: stringifyAbiJson(entry.storageFormValue),
-        }
-      })
-    },
-    [updateStateOverrideEntry],
-  )
-
   const handleStorageFormChange = useCallback(
     (entryId: string, value: unknown) => {
       updateStateOverrideEntry(entryId, entry => ({
@@ -737,10 +873,17 @@ export function EmulatePage({client}: EmulatePageProps) {
       })
 
       setState({type: "loading"})
+      const now = await resolveEmulationUnixTime({
+        client,
+        mcSeqno,
+        mode: timeOverrideMode,
+        value: timeOverrideInput,
+      })
       const result = await emulateRawMessageBoc(activeRawMessage, network, {
         accountStateOverrides,
         ignoreChksig,
         mcSeqno,
+        now,
       })
       const enrichment = await enrichTraceTransactions({
         client,
@@ -786,7 +929,11 @@ export function EmulatePage({client}: EmulatePageProps) {
     setRawMessage("")
     setMcSeqnoInput("")
     setIgnoreChksig(false)
-    setStateOverrideEnabled(false)
+    setTimeOverrideOpen(false)
+    setTimeOverrideMode("timestamp")
+    setIncreaseTimeInput("")
+    setUnixTimestampInput("")
+    setBaseBlockUnixTime(undefined)
     setStateOverrideEntries([])
     setSelectedHash(undefined)
     setExpandedDebugHash(undefined)
@@ -796,23 +943,6 @@ export function EmulatePage({client}: EmulatePageProps) {
 
   const stateOverrideControls = (
     <div className={styles.stateOverride}>
-      <div className={styles.stateOverrideHeader}>
-        <Checkbox
-          checked={stateOverrideEnabled}
-          onChange={event => handleStateOverrideEnabledChange(event.target.checked)}
-          disabled={isLoading}
-          label="Override state"
-          className={styles.stateOverrideCheckbox}
-        />
-        {stateOverrideEnabled && (
-          <span className={styles.panelMeta}>
-            {stateOverrideAccountCount === 1
-              ? "1 account"
-              : `${stateOverrideAccountCount} accounts`}
-          </span>
-        )}
-      </div>
-
       {stateOverrideEnabled && (
         <div className={styles.stateOverrideBody}>
           {stateOverrideEntries.map((entry, index) => {
@@ -820,28 +950,38 @@ export function EmulatePage({client}: EmulatePageProps) {
             const storageContext = stateOverrideAbiContexts.get(entry.id)
             const storageInfo = storageContext?.storageInfo
             const storageSymbols = storageContext?.storageSymbols
+            const usesStorageAbi =
+              entry.storageSource === "abi" &&
+              storageInfo !== undefined &&
+              storageSymbols !== undefined
             const canLoadCurrent = isValidAddress(entry.address.trim())
 
             return (
               <section className={styles.stateOverrideAccount} key={entry.id}>
                 <div className={styles.accountOverrideHeader}>
                   <div className={styles.accountOverrideTitle}>Account {index + 1}</div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    leadingIcon={<Trash2 size={14} />}
+                  <InlineAction
+                    label={`Remove account ${index + 1}`}
+                    icon={<Trash2 />}
+                    variant="danger"
                     onClick={() => handleRemoveStateOverrideEntry(entry.id)}
                     disabled={isLoading}
-                  >
-                    Remove
-                  </Button>
+                  />
                 </div>
 
                 <TonAddressInput
-                  fieldClassName={styles.field}
                   className={styles.addressInput}
-                  label="Account address"
+                  label="Address"
+                  labelAction={
+                    <InlineAction
+                      className={styles.accountReloadAction}
+                      label="Load current account state"
+                      icon={<RefreshCw />}
+                      onClick={() => void preloadStateOverrideEntry(entry.id, entry.address)}
+                      disabled={isLoading || !canLoadCurrent || entry.loadState.type === "loading"}
+                      aria-busy={entry.loadState.type === "loading"}
+                    />
+                  }
                   value={entry.address}
                   onValueChange={nextAddress =>
                     updateStateOverrideEntry(entry.id, current => ({
@@ -852,6 +992,10 @@ export function EmulatePage({client}: EmulatePageProps) {
                         current.loadedAddress === nextAddress.trim()
                           ? current.loadedAddress
                           : undefined,
+                      currentStateKind:
+                        current.loadedAddress === nextAddress.trim()
+                          ? current.currentStateKind
+                          : undefined,
                       loadState: {type: "idle"},
                     }))
                   }
@@ -860,377 +1004,289 @@ export function EmulatePage({client}: EmulatePageProps) {
                   disabled={isLoading}
                 />
 
-                <div className={styles.overrideFormatBlock}>
-                  <span className={styles.fieldLabel}>Override format</span>
-                  <div className={styles.overrideFormatRow}>
-                    <div className={styles.segmentedControl} aria-label="State override mode">
-                      <button
-                        type="button"
-                        className={`${styles.segment} ${
-                          entry.mode === "fields" ? styles.segmentActive : ""
-                        }`}
-                        onClick={() =>
-                          updateStateOverrideEntry(entry.id, current => ({
-                            ...current,
-                            mode: "fields",
-                          }))
-                        }
-                        aria-pressed={entry.mode === "fields"}
-                        disabled={isLoading}
-                      >
-                        Fields
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.segment} ${
-                          entry.mode === "shardAccount" ? styles.segmentActive : ""
-                        }`}
-                        onClick={() =>
-                          updateStateOverrideEntry(entry.id, current => ({
-                            ...current,
-                            mode: "shardAccount",
-                          }))
-                        }
-                        aria-pressed={entry.mode === "shardAccount"}
-                        disabled={isLoading}
-                      >
-                        ShardAccount
-                      </button>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      leadingIcon={<RefreshCw size={14} />}
-                      loading={entry.loadState.type === "loading"}
-                      onClick={() => void preloadStateOverrideEntry(entry.id, entry.address)}
-                      disabled={isLoading || !canLoadCurrent}
-                    >
-                      Load current
-                    </Button>
-                  </div>
-                </div>
+                <div className={styles.stateOverrideFields}>
+                  <Input
+                    fieldClassName={styles.field}
+                    label="Balance"
+                    suffix="GRAM"
+                    value={entry.balance}
+                    onChange={event =>
+                      updateStateOverrideEntry(entry.id, current => ({
+                        ...current,
+                        balance: event.target.value,
+                      }))
+                    }
+                    inputMode="decimal"
+                    placeholder="0.5"
+                    disabled={isLoading}
+                  />
 
-                {entry.mode === "shardAccount" ? (
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>ShardAccount BOC</span>
-                    <textarea
-                      className={styles.stateOverrideBoc}
-                      value={entry.shardAccountBoc}
-                      onChange={event =>
-                        updateStateOverrideEntry(entry.id, current => ({
-                          ...current,
-                          shardAccountBoc: event.target.value,
-                        }))
-                      }
-                      placeholder="Hex ShardAccount BoC"
-                      spellCheck={false}
-                      disabled={isLoading}
-                      rows={5}
-                    />
-                  </label>
-                ) : (
-                  <div className={styles.stateOverrideFields}>
-                    <Input
-                      fieldClassName={styles.field}
-                      label="Balance"
-                      suffix="GRAM"
-                      value={entry.balance}
-                      onChange={event =>
-                        updateStateOverrideEntry(entry.id, current => ({
-                          ...current,
-                          balance: event.target.value,
-                        }))
-                      }
-                      inputMode="decimal"
-                      placeholder="0.5"
-                      disabled={isLoading}
-                    />
+                  <Select
+                    fieldClassName={styles.field}
+                    label="Account state"
+                    value={entry.stateKind}
+                    onChange={event =>
+                      updateStateOverrideEntry(entry.id, current => ({
+                        ...current,
+                        stateKind: event.target.value as AccountStateOverrideKind,
+                      }))
+                    }
+                    disabled={isLoading}
+                  >
+                    <option value="keep">
+                      Keep current
+                      {entry.currentStateKind ? ` (${entry.currentStateKind})` : ""}
+                    </option>
+                    <option value="active">Active</option>
+                    <option value="uninit">Uninit</option>
+                    <option value="frozen">Frozen</option>
+                  </Select>
 
-                    <Select
-                      fieldClassName={styles.field}
-                      label="Account state"
-                      value={entry.stateKind}
-                      onChange={event =>
-                        updateStateOverrideEntry(entry.id, current => ({
-                          ...current,
-                          stateKind: event.target.value as AccountStateOverrideKind,
-                        }))
-                      }
-                      disabled={isLoading}
-                    >
-                      <option value="keep">Keep current</option>
-                      <option value="active">Active</option>
-                      <option value="uninit">Uninit</option>
-                      <option value="frozen">Frozen</option>
-                    </Select>
-
-                    {(entry.stateKind === "keep" || entry.stateKind === "active") && (
-                      <div className={styles.stateOverrideNested}>
-                        <label className={styles.field}>
-                          <span className={styles.fieldLabel}>Code BOC</span>
-                          <textarea
-                            className={styles.stateOverrideBoc}
-                            value={entry.codeBoc}
-                            onChange={event =>
-                              updateStateOverrideEntry(entry.id, current => ({
-                                ...current,
-                                codeBoc: event.target.value,
-                              }))
-                            }
-                            placeholder="current code BOC"
-                            spellCheck={false}
-                            disabled={isLoading}
-                            rows={3}
-                          />
-                        </label>
-
-                        <div className={styles.stateOverrideStorageHeader}>
-                          <Checkbox
-                            checked={entry.storageEnabled}
-                            onChange={event =>
-                              updateStateOverrideEntry(entry.id, current => ({
-                                ...current,
-                                storageEnabled: event.target.checked,
-                              }))
-                            }
-                            disabled={isLoading}
-                            label="Override storage data"
-                            className={styles.stateOverrideCheckbox}
-                          />
-                        </div>
-
-                        {entry.storageEnabled && (
-                          <div className={styles.stateOverrideStorage}>
-                            <div className={styles.sourceSwitch} aria-label="Storage data source">
-                              <button
-                                type="button"
-                                className={`${styles.sourceSwitchButton} ${
-                                  entry.storageSource === "abi"
-                                    ? styles.sourceSwitchButtonActive
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  updateStateOverrideEntry(entry.id, current => ({
-                                    ...current,
-                                    storageSource: "abi",
-                                  }))
-                                }
-                                aria-pressed={entry.storageSource === "abi"}
-                                disabled={isLoading}
-                              >
-                                ABI
-                              </button>
-                              <button
-                                type="button"
-                                className={`${styles.sourceSwitchButton} ${
-                                  entry.storageSource === "raw"
-                                    ? styles.sourceSwitchButtonActive
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  updateStateOverrideEntry(entry.id, current => ({
-                                    ...current,
-                                    storageSource: "raw",
-                                  }))
-                                }
-                                aria-pressed={entry.storageSource === "raw"}
-                                disabled={isLoading}
-                              >
-                                Raw
-                              </button>
-                            </div>
-
-                            {entry.storageSource === "abi" ? (
-                              <>
-                                <div
-                                  className={styles.sourceSwitch}
-                                  aria-label="Storage input mode"
-                                >
-                                  <button
-                                    type="button"
-                                    className={`${styles.sourceSwitchButton} ${
-                                      entry.storageInputMode === "form"
-                                        ? styles.sourceSwitchButtonActive
-                                        : ""
-                                    }`}
-                                    onClick={() => handleStorageInputModeChange(entry.id, "form")}
-                                    aria-pressed={entry.storageInputMode === "form"}
-                                    disabled={isLoading || !storageInfo || !storageSymbols}
-                                  >
-                                    Form
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`${styles.sourceSwitchButton} ${
-                                      entry.storageInputMode === "json"
-                                        ? styles.sourceSwitchButtonActive
-                                        : ""
-                                    }`}
-                                    onClick={() => handleStorageInputModeChange(entry.id, "json")}
-                                    aria-pressed={entry.storageInputMode === "json"}
-                                    disabled={isLoading || !storageInfo}
-                                  >
-                                    JSON
-                                  </button>
-                                </div>
-
-                                {storageInfo && storageSymbols ? (
-                                  entry.storageInputMode === "form" ? (
-                                    <AbiValueEditor
-                                      symbols={storageSymbols}
-                                      tyIdx={storageInfo.tyIdx}
-                                      value={entry.storageFormValue}
-                                      onChange={value => handleStorageFormChange(entry.id, value)}
-                                      addressSuggestions={favoriteAddressSuggestions}
-                                      disabled={isLoading}
-                                    />
-                                  ) : (
-                                    <label className={styles.field}>
-                                      <span className={styles.fieldLabel}>Storage JSON</span>
-                                      <textarea
-                                        className={styles.messageInput}
-                                        value={entry.storageJson}
-                                        onChange={event =>
-                                          updateStateOverrideEntry(entry.id, current => ({
-                                            ...current,
-                                            storageJson: event.target.value,
-                                          }))
-                                        }
-                                        placeholder="{}"
-                                        spellCheck={false}
-                                        disabled={isLoading}
-                                        rows={8}
-                                      />
-                                    </label>
-                                  )
-                                ) : (
-                                  <div className={styles.abiStatus}>Storage ABI not loaded</div>
-                                )}
-                              </>
-                            ) : (
-                              <label className={styles.field}>
-                                <span className={styles.fieldLabel}>Data BOC</span>
-                                <textarea
-                                  className={styles.stateOverrideBoc}
-                                  value={entry.dataBoc}
-                                  onChange={event =>
-                                    updateStateOverrideEntry(entry.id, current => ({
-                                      ...current,
-                                      dataBoc: event.target.value,
-                                    }))
-                                  }
-                                  placeholder="Hex data cell BoC"
-                                  spellCheck={false}
-                                  disabled={isLoading}
-                                  rows={5}
-                                />
-                              </label>
-                            )}
-
-                            {entry.storageSource === "abi" ? (
-                              <div className={styles.previewPanel}>
-                                <RawDataBlock
-                                  variant="embedded"
-                                  title={
-                                    <span className={styles.previewTitle}>
-                                      <span>Entered data as a cell</span>
-                                      {storagePreview.error && (
-                                        <span className={styles.previewError}>
-                                          {storagePreview.error}
-                                        </span>
-                                      )}
-                                    </span>
-                                  }
-                                  titleLabel="Entered data as a cell"
-                                  collapsible
-                                  defaultExpanded={false}
-                                  value={storagePreview.dataBoc ?? ""}
-                                  copyLabel="storage data BOC"
-                                  empty={!storagePreview.dataBoc}
-                                  emptyContent="No storage data built"
-                                  maxHeight={140}
-                                />
-                              </div>
-                            ) : (
-                              storagePreview.error && (
-                                <span className={styles.previewError}>{storagePreview.error}</span>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {entry.stateKind === "frozen" && (
-                      <label className={styles.field}>
-                        <span className={styles.fieldLabel}>Frozen state hash</span>
-                        <input
-                          className={styles.textInput}
-                          value={entry.frozenHash}
+                  {(entry.stateKind === "keep" || entry.stateKind === "active") && (
+                    <div className={styles.stateOverrideNested}>
+                      <div className={styles.stateOverrideStorageHeader}>
+                        <Checkbox
+                          checked={entry.storageEnabled}
                           onChange={event =>
                             updateStateOverrideEntry(entry.id, current => ({
                               ...current,
-                              frozenHash: event.target.value,
+                              storageEnabled: event.target.checked,
                             }))
                           }
-                          placeholder="current state hash"
                           disabled={isLoading}
+                          label="Override storage data"
+                          className={styles.stateOverrideCheckbox}
                         />
-                      </label>
-                    )}
+                      </div>
 
+                      {entry.storageEnabled && (
+                        <div className={styles.stateOverrideStorage}>
+                          {usesStorageAbi ? (
+                            <AbiValueEditor
+                              symbols={storageSymbols}
+                              tyIdx={storageInfo.tyIdx}
+                              value={entry.storageFormValue}
+                              onChange={value => handleStorageFormChange(entry.id, value)}
+                              addressSuggestions={favoriteAddressSuggestions}
+                              disabled={isLoading}
+                            />
+                          ) : (
+                            <label className={styles.field}>
+                              <span className={styles.fieldLabel}>Data BOC</span>
+                              <textarea
+                                className={styles.stateOverrideBoc}
+                                value={entry.dataBoc}
+                                onChange={event =>
+                                  updateStateOverrideEntry(entry.id, current => ({
+                                    ...current,
+                                    dataBoc: event.target.value,
+                                  }))
+                                }
+                                placeholder="Hex data cell BoC"
+                                spellCheck={false}
+                                disabled={isLoading}
+                                rows={5}
+                              />
+                            </label>
+                          )}
+
+                          {!usesStorageAbi && storagePreview.error && (
+                            <span className={styles.previewError}>{storagePreview.error}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {entry.stateKind === "frozen" && (
                     <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Last transaction LT</span>
+                      <span className={styles.fieldLabel}>Frozen state hash</span>
                       <input
                         className={styles.textInput}
-                        value={entry.lastTransactionLt}
+                        value={entry.frozenHash}
                         onChange={event =>
                           updateStateOverrideEntry(entry.id, current => ({
                             ...current,
-                            lastTransactionLt: event.target.value,
+                            frozenHash: event.target.value,
                           }))
                         }
-                        inputMode="numeric"
-                        placeholder="0"
+                        placeholder="current state hash"
                         disabled={isLoading}
                       />
                     </label>
-
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Last transaction hash</span>
-                      <input
-                        className={styles.textInput}
-                        value={entry.lastTransactionHash}
-                        onChange={event =>
-                          updateStateOverrideEntry(entry.id, current => ({
-                            ...current,
-                            lastTransactionHash: event.target.value,
-                          }))
-                        }
-                        placeholder="current transaction hash"
-                        disabled={isLoading}
-                      />
-                    </label>
-                  </div>
-                )}
+                  )}
+                </div>
               </section>
             )
           })}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leadingIcon={<Plus size={14} />}
-            onClick={handleAddStateOverrideEntry}
-            disabled={isLoading}
-            className={styles.addOverrideButton}
-          >
-            Add account
-          </Button>
         </div>
       )}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leadingIcon={<Plus size={14} />}
+        onClick={handleAddStateOverrideEntry}
+        disabled={isLoading}
+        className={styles.addOverrideButton}
+      >
+        Add account
+      </Button>
+    </div>
+  )
+
+  const stateOverrideOptions = (
+    <details className={`${styles.advancedOptions} ${styles.stateOverrideOptions}`}>
+      <summary className={styles.advancedOptionsSummary} aria-label="State overrides">
+        <span className={styles.advancedOptionsTitle}>
+          <Database size={17} aria-hidden="true" />
+          State overrides
+          {stateOverrideAccountCount > 0 && (
+            <span className={styles.panelMeta}>
+              {stateOverrideAccountCount === 1
+                ? "1 account"
+                : `${stateOverrideAccountCount} accounts`}
+            </span>
+          )}
+        </span>
+        <span className={styles.advancedOptionsToggle} aria-hidden="true">
+          <Plus className={styles.advancedOptionsPlus} size={18} />
+          <Minus className={styles.advancedOptionsMinus} size={18} />
+        </span>
+      </summary>
+      <div className={styles.advancedOptionsContent}>{stateOverrideControls}</div>
+    </details>
+  )
+
+  const timestampOverrideOptions = (
+    <details
+      className={styles.timeOverride}
+      open={timeOverrideOpen}
+      onToggle={event => setTimeOverrideOpen(event.currentTarget.open)}
+    >
+      <summary
+        className={styles.timeOverrideSummary}
+        aria-label="Override timestamp"
+        onClick={() => {
+          if (!timeOverrideOpen && timeOverrideMode === "timestamp" && !unixTimestampInput.trim()) {
+            setUnixTimestampInput(String(baseBlockUnixTime ?? Math.floor(Date.now() / 1000)))
+          }
+        }}
+      >
+        <span className={styles.advancedOptionsTitle}>
+          <Clock3 size={17} aria-hidden="true" />
+          Override timestamp
+        </span>
+        <span className={styles.advancedOptionsToggle} aria-hidden="true">
+          <Plus className={styles.timeOverridePlus} size={18} />
+          <Minus className={styles.timeOverrideMinus} size={18} />
+        </span>
+      </summary>
+      <div className={styles.timeOverrideContent}>
+        <div className={styles.timeOverrideModes} role="radiogroup" aria-label="Timestamp mode">
+          <label className={styles.timeOverrideMode}>
+            <input
+              className={styles.timeOverrideRadio}
+              type="radio"
+              name="time-override-mode"
+              value="increase"
+              checked={timeOverrideMode === "increase"}
+              onChange={() => setTimeOverrideMode("increase")}
+              disabled={isLoading}
+            />
+            Increase time
+          </label>
+          <label className={styles.timeOverrideMode}>
+            <input
+              className={styles.timeOverrideRadio}
+              type="radio"
+              name="time-override-mode"
+              value="timestamp"
+              checked={timeOverrideMode === "timestamp"}
+              onChange={() => {
+                setTimeOverrideMode("timestamp")
+                setUnixTimestampInput(String(baseBlockUnixTime ?? Math.floor(Date.now() / 1000)))
+              }}
+              disabled={isLoading}
+            />
+            Set UNIX timestamp
+          </label>
+        </div>
+
+        <Input
+          aria-label={timeOverrideMode === "increase" ? "Seconds to add" : "UNIX timestamp"}
+          value={timeOverrideInput}
+          onChange={event => {
+            if (timeOverrideMode === "increase") {
+              setIncreaseTimeInput(event.target.value)
+            } else {
+              setUnixTimestampInput(event.target.value)
+            }
+          }}
+          inputMode="numeric"
+          placeholder={timeOverrideMode === "increase" ? "Seconds" : "UNIX timestamp"}
+          invalid={timeOverrideInvalid}
+          disabled={isLoading}
+        />
+
+        {baseBlockUnixTime !== undefined &&
+          previewUnixTime !== undefined &&
+          previewUnixTime <= MAX_UINT32 && (
+            <div className={styles.timeOverridePreview}>
+              <span>{formatEmulationUnixTime(baseBlockUnixTime)}</span>
+              <span aria-hidden="true">→</span>
+              <span>{formatEmulationUnixTime(previewUnixTime)}</span>
+            </div>
+          )}
+      </div>
+    </details>
+  )
+
+  const advancedEmulationOptions = (
+    <details className={styles.advancedOptions}>
+      <summary className={styles.advancedOptionsSummary} aria-label="Advanced options">
+        <span className={styles.advancedOptionsTitle}>
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          Advanced options
+        </span>
+        <span className={styles.advancedOptionsToggle} aria-hidden="true">
+          <Plus className={styles.advancedOptionsPlus} size={18} />
+          <Minus className={styles.advancedOptionsMinus} size={18} />
+        </span>
+      </summary>
+      <div className={styles.advancedOptionsContent}>
+        <Input
+          fieldClassName={styles.blockField}
+          label="Masterchain block"
+          value={mcSeqnoInput}
+          onChange={event => {
+            baseBlockUnixTimeQuery.current = undefined
+            setBaseBlockUnixTime(undefined)
+            setMcSeqnoInput(event.target.value)
+          }}
+          inputMode="numeric"
+          placeholder="latest"
+          disabled={isLoading}
+        />
+
+        <Checkbox
+          checked={ignoreChksig}
+          onChange={event => setIgnoreChksig(event.target.checked)}
+          disabled={isLoading}
+          label="Ignore CHKSIG"
+          description="Skip signature checks during emulation"
+          className={styles.optionCheckbox}
+        />
+      </div>
+    </details>
+  )
+
+  const emulationOptions = (
+    <div className={styles.emulationOptions}>
+      {advancedEmulationOptions}
+      {timestampOverrideOptions}
+      {stateOverrideOptions}
     </div>
   )
 
@@ -1269,16 +1325,6 @@ export function EmulatePage({client}: EmulatePageProps) {
                 <h2 className={styles.panelTitle}>Transaction</h2>
               </div>
 
-              <TonAddressInput
-                fieldClassName={styles.field}
-                className={styles.addressInput}
-                label="Target contract"
-                value={targetAddress}
-                onValueChange={setTargetAddress}
-                suggestions={favoriteAddressSuggestions}
-                disabled={isLoading}
-              />
-
               <div className={styles.segmentedControl} aria-label="Incoming message type">
                 <button
                   type="button"
@@ -1305,28 +1351,39 @@ export function EmulatePage({client}: EmulatePageProps) {
               </div>
 
               {messageTransport === "internal" && (
-                <div className={styles.messageOptions}>
-                  <div className={styles.internalGrid}>
-                    <TonAddressInput
-                      fieldClassName={styles.field}
-                      className={styles.addressInput}
-                      label="Source account"
-                      value={sourceAddress}
-                      onValueChange={setSourceAddress}
-                      suggestions={favoriteAddressSuggestions}
-                      disabled={isLoading}
-                    />
-                    <Input
-                      fieldClassName={styles.field}
-                      label="Value"
-                      suffix="GRAM"
-                      value={messageValue}
-                      onChange={event => setMessageValue(event.target.value)}
-                      inputMode="decimal"
-                      placeholder="0.05"
-                      disabled={isLoading}
-                    />
-                  </div>
+                <TonAddressInput
+                  fieldClassName={styles.field}
+                  className={styles.addressInput}
+                  label="From"
+                  value={sourceAddress}
+                  onValueChange={setSourceAddress}
+                  suggestions={favoriteAddressSuggestions}
+                  disabled={isLoading}
+                />
+              )}
+
+              <TonAddressInput
+                fieldClassName={styles.field}
+                className={styles.addressInput}
+                label="To"
+                value={targetAddress}
+                onValueChange={setTargetAddress}
+                suggestions={favoriteAddressSuggestions}
+                disabled={isLoading}
+              />
+
+              {messageTransport === "internal" && (
+                <>
+                  <Input
+                    fieldClassName={styles.field}
+                    label="Value"
+                    suffix="GRAM"
+                    value={messageValue}
+                    onChange={event => setMessageValue(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="0.05"
+                    disabled={isLoading}
+                  />
                   <Checkbox
                     checked={bounce}
                     onChange={event => setBounce(event.target.checked)}
@@ -1334,27 +1391,10 @@ export function EmulatePage({client}: EmulatePageProps) {
                     label="Bounce"
                     className={styles.optionCheckbox}
                   />
-                </div>
+                </>
               )}
 
-              <Input
-                fieldClassName={styles.blockField}
-                label="Masterchain block"
-                value={mcSeqnoInput}
-                onChange={event => setMcSeqnoInput(event.target.value)}
-                inputMode="numeric"
-                placeholder="latest"
-                disabled={isLoading}
-              />
-
-              <Checkbox
-                checked={ignoreChksig}
-                onChange={event => setIgnoreChksig(event.target.checked)}
-                disabled={isLoading}
-                label="Ignore CHKSIG"
-                description="Skip signature checks during emulation"
-                className={styles.optionCheckbox}
-              />
+              {emulationOptions}
             </section>
 
             <section className={`${styles.builderPanel} ${styles.payloadPanel}`}>
@@ -1499,35 +1539,8 @@ export function EmulatePage({client}: EmulatePageProps) {
                       />
                     </label>
                   )}
-
-                  <div className={styles.previewPanel}>
-                    <RawDataBlock
-                      variant="embedded"
-                      title={
-                        <span className={styles.previewTitle}>
-                          <span>Entered message as a cell</span>
-                          {builderPreview.error && (
-                            <span className={styles.previewError} title={builderPreview.error}>
-                              {builderPreview.error}
-                            </span>
-                          )}
-                        </span>
-                      }
-                      titleLabel="Entered message as a cell"
-                      collapsible
-                      defaultExpanded={false}
-                      value={builderPreview.boc}
-                      copyLabel="message BOC"
-                      empty={!builderPreview.boc}
-                      emptyContent="No message built"
-                      maxHeight={160}
-                    />
-                  </div>
                 </>
               )}
-            </section>
-            <section className={styles.builderOverrides} aria-label="State overrides">
-              {stateOverrideControls}
             </section>
           </div>
         ) : (
@@ -1545,26 +1558,7 @@ export function EmulatePage({client}: EmulatePageProps) {
               />
             </label>
 
-            <Input
-              fieldClassName={styles.blockField}
-              label="Masterchain block"
-              value={mcSeqnoInput}
-              onChange={event => setMcSeqnoInput(event.target.value)}
-              inputMode="numeric"
-              placeholder="latest"
-              disabled={isLoading}
-            />
-
-            <Checkbox
-              checked={ignoreChksig}
-              onChange={event => setIgnoreChksig(event.target.checked)}
-              disabled={isLoading}
-              label="Ignore CHKSIG"
-              description="Skip signature checks during emulation"
-              className={styles.optionCheckbox}
-            />
-
-            {stateOverrideControls}
+            {emulationOptions}
           </div>
         )}
 
@@ -1670,6 +1664,79 @@ function parseMcSeqno(value: string): number | undefined {
   return seqno
 }
 
+function parseOptionalUint32(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined
+  }
+  const parsed = Number(trimmed)
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_UINT32 ? parsed : undefined
+}
+
+async function resolveEmulationUnixTime({
+  client,
+  mcSeqno,
+  mode,
+  value,
+}: {
+  readonly client: TonClient
+  readonly mcSeqno: number | undefined
+  readonly mode: TimeOverrideMode
+  readonly value: string
+}): Promise<number | undefined> {
+  if (!value.trim()) {
+    return undefined
+  }
+
+  const parsed = parseOptionalUint32(value)
+  if (parsed === undefined) {
+    throw new Error(
+      mode === "increase"
+        ? "Time increase must be a valid uint32 number of seconds"
+        : "UNIX timestamp must be a valid uint32",
+    )
+  }
+  if (mode === "timestamp") {
+    return parsed
+  }
+
+  const blockUnixTime = await loadEmulationBlockUnixTime(client, mcSeqno)
+  const result = blockUnixTime + parsed
+  if (result > MAX_UINT32) {
+    throw new Error("Resulting UNIX timestamp must be a valid uint32")
+  }
+  return result
+}
+
+async function loadEmulationBlockUnixTime(
+  client: TonClient,
+  mcSeqno: number | undefined,
+): Promise<number> {
+  const response = await client.getBlocks({
+    workchain: -1,
+    seqno: mcSeqno,
+    limit: 1,
+    sort: "desc",
+  })
+  const block = response.blocks[0]
+  const unixTime = block ? Number(block.gen_utime) : Number.NaN
+  if (!Number.isSafeInteger(unixTime) || unixTime < 0 || unixTime > MAX_UINT32) {
+    throw new Error("Failed to resolve selected masterchain block time")
+  }
+  return unixTime
+}
+
+function formatEmulationUnixTime(value: number): string {
+  return new Date(value * 1000).toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
 function parseManualAbi(value: string): {readonly abi?: ContractABI; readonly error?: string} {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -1703,14 +1770,12 @@ function createAccountStateOverrideDraft({
     address,
     abi: undefined,
     loadState: {type: "idle"},
-    mode: "fields",
-    shardAccountBoc: "",
     balance: "",
     stateKind: "keep",
+    currentStateKind: undefined,
     codeBoc: "",
     storageEnabled: false,
     storageSource: "abi",
-    storageInputMode: "form",
     storageJson,
     storageFormValue: parseAbiJson(storageJson, {}),
     dataBoc: "",
@@ -1724,7 +1789,6 @@ function hydrateAccountStateOverrideDraft(
   entry: AccountStateOverrideDraft,
   address: string,
   shardAccount: ShardAccount,
-  shardAccountCell: Cell,
   abi: ContractABI | undefined,
 ): AccountStateOverrideDraft {
   const account = shardAccount.account
@@ -1738,6 +1802,7 @@ function hydrateAccountStateOverrideDraft(
       ? accountState.state.data.toBoc().toString("hex")
       : ""
   const storage = currentStorageOverrideDraft(entry, abi, dataBoc)
+  const currentStateKind = accountState?.type ?? "uninit"
 
   return {
     ...entry,
@@ -1745,14 +1810,12 @@ function hydrateAccountStateOverrideDraft(
     abi,
     loadedAddress: address,
     loadState: {type: "ready"},
-    mode: "fields",
-    shardAccountBoc: shardAccountCell.toBoc().toString("hex"),
     balance: fromNano(account?.storage.balance.coins ?? 0n),
-    stateKind: accountState?.type ?? "uninit",
+    stateKind: entry.stateKind,
+    currentStateKind,
     codeBoc,
     storageEnabled: storage.storageEnabled,
     storageSource: storage.storageSource,
-    storageInputMode: storage.storageInputMode,
     storageJson: storage.storageJson,
     storageFormValue: storage.storageFormValue,
     dataBoc,
@@ -1768,13 +1831,12 @@ function currentStorageOverrideDraft(
   dataBoc: string,
 ): Pick<
   AccountStateOverrideDraft,
-  "storageEnabled" | "storageSource" | "storageInputMode" | "storageJson" | "storageFormValue"
+  "storageEnabled" | "storageSource" | "storageJson" | "storageFormValue"
 > {
   if (!dataBoc) {
     return {
       storageEnabled: false,
       storageSource: entry.storageSource,
-      storageInputMode: entry.storageInputMode,
       storageJson: entry.storageJson,
       storageFormValue: entry.storageFormValue,
     }
@@ -1784,9 +1846,8 @@ function currentStorageOverrideDraft(
     try {
       const storageJson = stringifyAbiJson(decodeAbiStorageDataBoc(abi, dataBoc))
       return {
-        storageEnabled: true,
+        storageEnabled: entry.storageEnabled,
         storageSource: "abi",
-        storageInputMode: "form",
         storageJson,
         storageFormValue: parseAbiJson(storageJson, {}),
       }
@@ -1796,9 +1857,8 @@ function currentStorageOverrideDraft(
   }
 
   return {
-    storageEnabled: true,
+    storageEnabled: entry.storageEnabled,
     storageSource: "raw",
-    storageInputMode: entry.storageInputMode,
     storageJson: entry.storageJson,
     storageFormValue: entry.storageFormValue,
   }
@@ -1842,18 +1902,6 @@ function buildAccountStateOverrides({
       throw new Error(`Duplicate override account: ${normalizedAddress}`)
     }
     seenAddresses.add(normalizedAddressKey)
-
-    if (entry.mode === "shardAccount") {
-      const normalizedShardAccountBoc = entry.shardAccountBoc.trim()
-      if (!normalizedShardAccountBoc) {
-        throw new Error("ShardAccount BOC is required")
-      }
-
-      overrides[normalizedAddress] = {
-        shardAccountBoc: normalizedShardAccountBoc,
-      }
-      continue
-    }
 
     const preview = storagePreviews.get(entry.id)
     if (preview?.error) {

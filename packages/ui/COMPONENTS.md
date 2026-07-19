@@ -289,6 +289,9 @@ and forwards native attributes and refs.
 - `size`: `sm`, `md`, or `lg`; `md` is the default.
 - `label`: optional accessible field label. Omit it when the caller already
   renders a linked label.
+- `labelAction`: optional action rendered at the right edge of the label row.
+  Use it for a compact secondary action such as reload or paste; interactive
+  content stays outside the native label.
 - `description`: optional neutral helper text linked with
   `aria-describedby`.
 - `invalid`: applies validation styling and `aria-invalid` without owning an
