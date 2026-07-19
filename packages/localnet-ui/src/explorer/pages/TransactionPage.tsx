@@ -298,7 +298,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     Map<string, ContractVerifiedSource>
   >(new Map())
   const [error, setError] = useState<string | undefined>()
-  const {fetchName} = useAddressBook()
+  const {fetchName, updateDomains} = useAddressBook()
   const {network} = useNetworkInfo()
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
@@ -530,6 +530,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           includeActions: supportsTraceActions,
         })
         if (!isActive) return
+        updateDomains(data.address_book)
 
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
@@ -662,7 +663,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return () => {
       isActive = false
     }
-  }, [client, metadataRegistry, traceLookupHash, supportsTraceActions])
+  }, [client, metadataRegistry, supportsTraceActions, traceLookupHash, updateDomains])
 
   useEffect(() => {
     const requestedHash = traceLookupHash.toLowerCase()

@@ -61,7 +61,7 @@ interface BlockDetailsState {
 export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
-  const {prefetchNames} = useAddressBook()
+  const {prefetchNames, updateDomains} = useAddressBook()
   const [state, setState] = useState<BlocksPageState>({
     transactions: [],
     masterchainBlocks: [],
@@ -93,6 +93,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
           return
         }
 
+        updateDomains(transactions.address_book)
         setState({
           transactions: transactions.transactions,
           masterchainBlocks: masterchainBlocks.blocks,
@@ -128,7 +129,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client])
+  }, [client, updateDomains])
 
   return (
     <div className={styles.container}>
@@ -190,7 +191,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
-  const {prefetchNames} = useAddressBook()
+  const {prefetchNames, updateDomains} = useAddressBook()
   const workchain = Number(params.workchain)
   const shard = params.shard ?? ""
   const seqno = Number(params.seqno)
@@ -258,6 +259,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
           return
         }
 
+        updateDomains(transactionsResponse.address_book)
         setState({
           block,
           latestBlock: latestResponse.blocks[0],
@@ -282,7 +284,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [client, shard, seqno, workchain])
+  }, [client, shard, seqno, updateDomains, workchain])
 
   const title = workchain === -1 ? "Masterchain block" : "Workchain block"
   const hasValidRoute = Number.isInteger(workchain) && Number.isInteger(seqno) && Boolean(shard)

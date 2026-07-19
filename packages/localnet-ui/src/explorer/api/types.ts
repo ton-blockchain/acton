@@ -43,7 +43,7 @@ export interface AccountStateTokenInfo {
   readonly [key: string]: unknown
 }
 
-export interface AccountStatesAddressBookRow {
+export interface V3AddressBookRow {
   readonly user_friendly: string
   readonly domain?: string | null
   readonly interfaces: readonly string[] | null
@@ -68,7 +68,7 @@ export interface V3AccountState {
 
 export interface AccountStatesResponse {
   readonly accounts: readonly V3AccountState[]
-  readonly address_book: Record<string, AccountStatesAddressBookRow>
+  readonly address_book: Record<string, V3AddressBookRow>
   readonly metadata: Record<
     string,
     {
@@ -79,14 +79,14 @@ export interface AccountStatesResponse {
 }
 
 export interface V3TracesResponse {
-  readonly address_book: Record<string, unknown>
+  readonly address_book: Record<string, V3AddressBookRow>
   readonly metadata: V3Metadata
   readonly traces: readonly V3Trace[]
 }
 
 export interface V3ActionsResponse {
   readonly actions: readonly V3Action[]
-  readonly address_book: Record<string, unknown>
+  readonly address_book: Record<string, V3AddressBookRow>
   readonly metadata: V3Metadata
 }
 
@@ -976,7 +976,7 @@ export type V3Action =
   | V3ActionBase<"cocoon_client_withdraw", V3ActionDetailsCocoonClientWithdraw>
 
 export interface V3TransactionsResponse {
-  readonly address_book: Record<string, unknown>
+  readonly address_book: Record<string, V3AddressBookRow>
   readonly transactions: readonly V3TransactionListItem[]
 }
 

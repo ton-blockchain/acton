@@ -15,6 +15,10 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 type AddressName = string | undefined
 
+interface AddressBookDomainRow {
+  readonly domain?: string | null
+}
+
 interface TonAssetsAccount {
   readonly address: string
   readonly name: string
@@ -31,6 +35,9 @@ interface AddressBookContextValue {
   readonly prefetchNames: (addresses: readonly string[]) => Promise<void>
   readonly searchTonAssetsNames: (query: string, limit?: number) => readonly TonAssetsNameMatch[]
   readonly updateName: (address: string, name: AddressName) => void
+  readonly updateDomains: (
+    addressBook: Readonly<Record<string, AddressBookDomainRow>>,
+  ) => void
   readonly setAddressName: (address: string, name: string) => Promise<void>
   readonly version: number
 }
@@ -64,6 +71,7 @@ export const AddressBookProvider: FC<{
 }> = ({children}) => {
   const metadataRegistry = useMetadataRegistry()
   const cacheRef = useRef(new Map<string, AddressName>())
+  const domainsRef = useRef(new Map<string, string>())
   const tonAssetsRef = useRef(new Map<string, string>())
   const tonAssetsAccountsRef = useRef<readonly TonAssetsNameMatch[]>([])
   const pendingRef = useRef(new Map<string, Promise<AddressName>>())
@@ -75,9 +83,11 @@ export const AddressBookProvider: FC<{
     if (!address) return
     const key = normalizeKey(address)
     if (cacheRef.current.has(key)) {
-      return cacheRef.current.get(key) ?? tonAssetsRef.current.get(key)
+      return (
+        cacheRef.current.get(key) ?? domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
+      )
     }
-    return tonAssetsRef.current.get(key)
+    return domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
   }, [])
 
   const updateNames = useCallback((entries: readonly (readonly [string, AddressName])[]) => {
@@ -92,6 +102,29 @@ export const AddressBookProvider: FC<{
   const updateName = useCallback(
     (address: string, name: AddressName) => updateNames([[address, name]]),
     [updateNames],
+  )
+
+  const updateDomains = useCallback(
+    (addressBook: Readonly<Record<string, AddressBookDomainRow>>) => {
+      let changed = false
+      for (const [address, row] of Object.entries(addressBook)) {
+        if (!address) continue
+        const key = normalizeKey(address)
+        const domain = row.domain?.trim() || undefined
+        if (domain) {
+          if (domainsRef.current.get(key) !== domain) {
+            domainsRef.current.set(key, domain)
+            changed = true
+          }
+        } else if (domainsRef.current.delete(key)) {
+          changed = true
+        }
+      }
+      if (changed) {
+        setVersion(prev => prev + 1)
+      }
+    },
+    [],
   )
 
   useEffect(() => {
@@ -163,17 +196,18 @@ export const AddressBookProvider: FC<{
         for (const request of requests) {
           request.resolve(
             namesByAddress[request.address] ??
+              domainsRef.current.get(normalizeKey(request.address)) ??
               tonAssetsRef.current.get(normalizeKey(request.address)),
           )
         }
       })
       .catch(error => {
         console.warn("Failed to fetch address names:", error)
-        const missingName: AddressName = undefined
         const entries = requests.map(request => [request.address, undefined] as const)
         updateNames(entries)
         for (const request of requests) {
-          request.resolve(missingName ?? tonAssetsRef.current.get(normalizeKey(request.address)))
+          const key = normalizeKey(request.address)
+          request.resolve(domainsRef.current.get(key) ?? tonAssetsRef.current.get(key))
         }
       })
   }, [metadataRegistry, updateNames])
@@ -191,7 +225,9 @@ export const AddressBookProvider: FC<{
       if (!address) return
       const key = normalizeKey(address)
       if (cacheRef.current.has(key)) {
-        return cacheRef.current.get(key) ?? tonAssetsRef.current.get(key)
+        return (
+          cacheRef.current.get(key) ?? domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
+        )
       }
       const pending = pendingRef.current.get(key)
       if (pending) return pending
@@ -252,6 +288,7 @@ export const AddressBookProvider: FC<{
       prefetchNames,
       searchTonAssetsNames,
       updateName,
+      updateDomains,
       setAddressName,
       version,
     }),
@@ -261,6 +298,7 @@ export const AddressBookProvider: FC<{
       prefetchNames,
       searchTonAssetsNames,
       setAddressName,
+      updateDomains,
       updateName,
       version,
     ],

@@ -34,6 +34,7 @@ import {
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
 import {normalizeAddress, toRawAddress} from "../components/utils"
+import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
@@ -67,6 +68,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const openPath = useOpenExplorerPath()
   const {addressFormat, network} = useNetworkInfo()
   const metadataRegistry = useMetadataRegistry()
+  const {updateDomains} = useAddressBook()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
@@ -230,6 +232,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
           const currentTokenInfo = getAccountTokenInfo(stateV3)
           const currentDomain = getAccountDomain(stateV3)
           if (!isActive) return
+          if (stateV3) updateDomains(stateV3.address_book)
           setAccountState(state)
           setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
           setAccountDomain(currentDomain)
@@ -268,6 +271,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         try {
           const txs = await client.getAccountTransactions(formattedAddress, initialTransactionLimit)
           if (!isActive) return
+          updateDomains(txs.address_book)
           setTransactions([...txs.transactions])
           transactionHashesRef.current = transactionHashSet(txs.transactions)
           setTransactionsHasMore(txs.transactions.length === initialTransactionLimit)
@@ -302,6 +306,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         try {
           const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE)
           if (!isActive) return
+          updateDomains(response.address_book)
           setActions([...response.actions])
           setActionMetadata(response.metadata)
           setActionsOffset(response.actions.length)
@@ -329,7 +334,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [accountRequestKey, client, initialTransactionLimit, supportsAccountActions])
+  }, [accountRequestKey, client, initialTransactionLimit, supportsAccountActions, updateDomains])
 
   const loadMoreTransactions = async () => {
     if (
@@ -349,6 +354,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         transactionPageSize,
         transactions.length,
       )
+      updateDomains(txs.address_book)
       transactionHashesRef.current = transactionHashSet([...transactions, ...txs.transactions])
       setTransactions(current => appendUniqueTransactions(current, txs.transactions))
       setTransactionsHasMore(txs.transactions.length === transactionPageSize)
@@ -376,6 +382,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     setActionsError(undefined)
     try {
       const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE, offset)
+      updateDomains(response.address_book)
       setActions(current => [...current, ...response.actions])
       setActionMetadata(current => ({...current, ...response.metadata}))
       setActionsOffset(current => current + response.actions.length)
