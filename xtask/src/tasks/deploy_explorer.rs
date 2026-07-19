@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use clap::Args;
+use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,6 +12,8 @@ const DEFAULT_BRANCH: &str = "pages";
 const DEFAULT_CHECKOUT_DIR: &str = "target/actonscan-pages";
 const EXPLORER_PACKAGE: &str = "@acton/explorer-ui";
 const EXPLORER_PACKAGE_DIR: &str = "packages/explorer-ui";
+const EXPLORER_TONCENTER_API_KEY_ENV: &str = "EXPLORER_TONCENTER_API_KEY";
+const VITE_EXPLORER_TONCENTER_API_KEY_ENV: &str = "VITE_EXPLORER_TONCENTER_API_KEY";
 
 #[derive(Args)]
 pub(crate) struct DeployExplorerArgs {
@@ -37,13 +40,18 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     let cname = normalize_cname(args.cname.as_deref())?;
 
     println!("Building `{EXPLORER_PACKAGE}`");
-    run_inherited(
-        Command::new("bun")
-            .arg("--filter")
-            .arg(EXPLORER_PACKAGE)
-            .arg("build")
-            .current_dir(&workspace_root),
-    )?;
+    let mut build_command = Command::new("bun");
+    build_command
+        .arg("--filter")
+        .arg(EXPLORER_PACKAGE)
+        .arg("build")
+        .current_dir(&workspace_root);
+    if let Some(api_key) =
+        env::var_os(EXPLORER_TONCENTER_API_KEY_ENV).filter(|value| !value.is_empty())
+    {
+        build_command.env(VITE_EXPLORER_TONCENTER_API_KEY_ENV, api_key);
+    }
+    run_inherited(&mut build_command)?;
 
     ensure_dist_ready(&dist_dir)?;
     ensure_checkout(&checkout_dir, &args.repository)?;
