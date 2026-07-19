@@ -75,6 +75,7 @@ jobs:
 
       - name: Deploy actonscan
         env:
+          GH_TOKEN: ${{ secrets.ACTONSCAN_TOKEN }}
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
           cargo xtask deploy-explorer \
