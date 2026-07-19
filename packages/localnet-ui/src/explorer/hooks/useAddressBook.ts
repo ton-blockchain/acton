@@ -35,9 +35,7 @@ interface AddressBookContextValue {
   readonly prefetchNames: (addresses: readonly string[]) => Promise<void>
   readonly searchTonAssetsNames: (query: string, limit?: number) => readonly TonAssetsNameMatch[]
   readonly updateName: (address: string, name: AddressName) => void
-  readonly updateDomains: (
-    addressBook: Readonly<Record<string, AddressBookDomainRow>>,
-  ) => void
+  readonly updateDomains: (addressBook: Readonly<Record<string, AddressBookDomainRow>>) => void
   readonly setAddressName: (address: string, name: string) => Promise<void>
   readonly version: number
 }
