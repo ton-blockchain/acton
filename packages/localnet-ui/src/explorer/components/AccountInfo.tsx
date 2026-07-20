@@ -243,6 +243,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       className={styles.qrSvg}
     />
   )
+  const qrContent = (
+    <div className={styles.qrContent}>
+      {qrCode}
+      {tonscanUrl && (
+        <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
+          tonscan.org
+        </a>
+      )}
+    </div>
+  )
   const addressFormats = (
     <div className={styles.addressFormats}>
       <div className={styles.addressFormatRow}>
@@ -662,7 +672,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
         <Popover
           key={rawAddress}
           ariaLabel="Address QR code"
-          content={qrCode}
+          content={qrContent}
           interaction="click"
           placement="bottom"
           triggerAsChild
@@ -678,12 +688,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
         </Popover>
 
         <div className={styles.qrPanel} aria-label="Address QR code">
-          {qrCode}
-          {tonscanUrl && (
-            <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
-              tonscan.org
-            </a>
-          )}
+          {qrContent}
         </div>
       </div>
     </div>

@@ -599,7 +599,6 @@
 
 .qrPanel {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   width: 132px;
@@ -609,6 +608,12 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.qrContent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .cardCompactQr .qrPanel {

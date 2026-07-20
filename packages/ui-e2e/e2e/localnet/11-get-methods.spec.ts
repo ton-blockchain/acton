@@ -128,10 +128,19 @@ test.describe("Account get methods", () => {
     await expect(page.getByText("0:302…fffed", {exact: true})).toHaveCount(0)
 
     const qrPanel = page.locator('[aria-label="Address QR code"]').filter({
-      has: page.getByRole("link", {name: "tonscan.org"}),
+      has: page.locator("a", {hasText: "tonscan.org"}),
     })
     await expect(qrPanel).toHaveCount(1)
-    await expect(qrPanel.getByRole("link", {name: "tonscan.org"})).toHaveAttribute(
+    await expect(qrPanel.locator("a", {hasText: "tonscan.org"})).toHaveAttribute(
+      "href",
+      /https:\/\/tonscan\.org\/address\//,
+    )
+    await expect(qrPanel).toBeHidden()
+
+    await page.getByRole("button", {name: "Show QR code"}).click()
+    const qrPopover = page.getByRole("dialog", {name: "Address QR code"})
+    await expect(qrPopover.getByRole("link", {name: "tonscan.org"})).toBeVisible()
+    await expect(qrPopover.getByRole("link", {name: "tonscan.org"})).toHaveAttribute(
       "href",
       /https:\/\/tonscan\.org\/address\//,
     )
