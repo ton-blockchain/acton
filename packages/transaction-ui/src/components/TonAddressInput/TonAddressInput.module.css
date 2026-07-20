@@ -1,0 +1,34 @@
+.field {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+.labelRow {
+  display: flex;
+  min-width: 0;
+  height: 1.25em;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.25;
+}
+
+.label {
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.labelAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.required {
+  margin-inline-start: var(--acton-space-1);
+  color: var(--acton-color-danger-text);
+}

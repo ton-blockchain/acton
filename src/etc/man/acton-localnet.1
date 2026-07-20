@@ -39,7 +39,8 @@ Wallet names to auto\-fund and deploy on startup.
 .sp
 \fB\-\-db\-path\fR \fIpath\fR
 .RS 4
-Path to a SQLite database for persistent node state.
+Path to a SQLite database for persistent node state. Defaults to
+\fB[localnet].db\-path\fR when configured.
 .RE
 .sp
 \fB\-\-rate\-limit\fR \fIrps\fR
@@ -79,7 +80,8 @@ Require a token for all Localnet HTTP API, control, emulate, and streaming
 endpoints. The server prints the token on startup.
 .RE
 .sp
-\fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
+\fB\-\-load\-state\fR cannot be used when a database path comes from either
+\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR\&.
 .SS "acton localnet airdrop"
 Send GRAM from the local faucet to an address.
 .SS "Synopsis"
@@ -252,6 +254,7 @@ You can store defaults in \fBActon.toml\fR:
 .nf
 [localnet]
 port = 5411
+db\-path = ".acton/localnet.sqlite"
 fork\-net = "testnet"
 fork\-block\-number = 55000000
 accounts = ["deployer", "user"]
@@ -262,7 +265,10 @@ no\-mining = false
 .fi
 .RE
 .sp
-CLI flags override config values for the current invocation.
+CLI flags override config values for the current invocation. In particular,
+\fB\-\-db\-path\fR overrides \fB[localnet].db\-path\fR\&. A relative path in \fBActon.toml\fR
+resolves from the project root, while a relative \fB\-\-db\-path\fR resolves from the
+current working directory.
 .SH "TONCENTER API KEYS"
 When localnet forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
 authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
@@ -487,12 +493,13 @@ expose the localnet server publicly.
 .SH "PERSISTENCE"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR enables persistent SQLite\-backed node state across runs
+\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR enables persistent SQLite\-backed node
+state across runs
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-load\-state\fR initializes state from a JSON snapshot and cannot be combined
-with \fB\-\-db\-path\fR
+with a database path from either CLI or \fBActon.toml\fR
 .RE
 .sp
 .RS 4
@@ -500,7 +507,8 @@ with \fB\-\-db\-path\fR
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'when \fB\-\-db\-path\fR is not used, node state is ephemeral unless loaded or dumped
+\h'-04'\(bu\h'+03'when no database path is configured, node state is ephemeral unless loaded
+or dumped
 .RE
 .SH "EXIT STATUS"
 .sp

@@ -493,6 +493,8 @@ pub struct LocalnetSettings {
     /// Localnet port used by `acton localnet` commands
     #[schemars(default = "default_localnet_port", range(max = 65535))]
     pub port: Option<u16>,
+    /// Path to an `SQLite` database used by `acton localnet start` for persistent node state
+    pub db_path: Option<String>,
     /// Network to fork from used by `acton localnet start`
     #[schemars(with = "Option<Network>")]
     pub fork_net: Option<String>,
@@ -2213,6 +2215,7 @@ version = "0.1.0"
 
 [localnet]
 port = 3015
+db-path = "state/localnet.sqlite"
 fork-net = "testnet"
 fork-block-number = 1234567
 accounts = ["deployer", "user"]
@@ -2226,6 +2229,7 @@ mine-empty-blocks = true
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
         let localnet = config.localnet.as_ref().unwrap();
         assert_eq!(localnet.port, Some(3015));
+        assert_eq!(localnet.db_path.as_deref(), Some("state/localnet.sqlite"));
         assert_eq!(localnet.fork_net.as_deref(), Some("testnet"));
         assert_eq!(localnet.fork_block_number, Some(1234567));
         assert_eq!(

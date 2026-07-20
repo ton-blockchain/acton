@@ -1,0 +1,108 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-5);
+  padding: var(--acton-space-4);
+  background: var(--acton-color-surface);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.card + .card {
+  padding-top: var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.storageScroll {
+  overflow-x: auto;
+  padding-block: 2px var(--acton-space-1);
+  scrollbar-width: none;
+}
+
+.storageScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.loadingState,
+.emptyState,
+.statusNote {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.errorState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 280px;
+  padding: var(--acton-space-7) var(--acton-space-5);
+  box-sizing: border-box;
+}
+
+.errorContent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--acton-space-3);
+  max-width: 560px;
+}
+
+.errorIcon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--acton-color-danger-text);
+}
+
+.errorTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.errorMessage {
+  margin-top: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  background: var(--acton-color-surface);
+}
+
+.statusNote {
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-md);
+  background: var(--acton-color-surface-subtle);
+}
+
+.emptyState {
+  padding: var(--acton-space-7) var(--acton-space-5);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    padding: var(--acton-space-3);
+  }
+
+  .errorState {
+    min-height: 220px;
+  }
+}

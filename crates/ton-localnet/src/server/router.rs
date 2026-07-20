@@ -57,7 +57,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../acton-localnet-ui/dist");
+static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/localnet-ui/dist");
 
 pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
     let mut api_v2_router = Router::new()
@@ -592,7 +592,7 @@ fn load_ui_file(path: &str) -> Option<Vec<u8>> {
     }
     let dist_path = PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../acton-localnet-ui/dist"
+        "/../../packages/localnet-ui/dist"
     ));
     let file_path = dist_path.join(path);
     if !file_path.is_file() {

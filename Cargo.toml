@@ -17,12 +17,6 @@ dist = true
 members = ["crates/*", "xtask"]
 
 exclude = [
-  "crates/acton-ui",
-  "crates/acton-ui-gallery",
-  "crates/acton-test-ui",
-  "crates/acton-shared-ui",
-  "crates/acton-localnet-ui",
-  "crates/acton-explorer-ui",
   "crates/ton-language-server-core",
   "crates/ton-language-server-native",
   "crates/ton-language-server-wasm",

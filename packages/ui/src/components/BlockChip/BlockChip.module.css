@@ -1,0 +1,37 @@
+.blockCluster {
+  max-width: 100%;
+}
+
+.blockChip {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-start: -6px;
+  padding: 2px 6px;
+  overflow: hidden;
+  border-radius: 7px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1.35;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.blockChip:hover,
+.blockCluster:hover .blockChip {
+  background: color-mix(in srgb, var(--acton-color-accent) 12%, transparent);
+}
+
+.highlighted {
+  background: color-mix(in srgb, var(--acton-color-accent) 18%, transparent);
+}
+
+.blockChip:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}

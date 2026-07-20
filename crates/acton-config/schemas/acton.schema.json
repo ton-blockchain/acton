@@ -478,6 +478,10 @@
           "format": "uint64",
           "minimum": 1.0
         },
+        "db-path": {
+          "description": "Path to an `SQLite` database used by `acton localnet start` for persistent node state",
+          "type": "string"
+        },
         "fork-block-number": {
           "description": "Block sequence number used by `acton localnet start` when forking from historical state",
           "type": "integer",

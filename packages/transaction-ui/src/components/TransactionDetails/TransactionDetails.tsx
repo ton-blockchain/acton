@@ -1,0 +1,983 @@
+import * as React from "react"
+import {useEffect, useRef, useState} from "react"
+import {
+  buildStorageDiff,
+  ContractChip,
+  CopyInlineButton,
+  DisclosureToggle,
+  ExitCodeChip,
+  InfoPopover,
+  OpcodeChip,
+  ParsedBodySection,
+  type ParsedCodeCell,
+  ParsedValueDiffView,
+  ParsedValueView,
+  RawDataBlock,
+  SendModeViewer,
+} from "@acton/ui"
+
+import type {BackendContractInfo, SourceLocation} from "../../model/backend"
+import type {
+  ContractData,
+  LoadedTransactionActions,
+  TransactionBlockRef,
+  TransactionInfo,
+} from "../../model/transaction"
+import {
+  CodeCellDetails,
+  type ResolveVerifiedSourceByCodeHash,
+} from "../CodeCellDetails/CodeCellDetails"
+import {
+  ContractSourcePanel,
+  type ContractVerifiedSource,
+} from "../ContractSourcePanel/ContractSourcePanel"
+import * as fmt from "../../lib/format"
+import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "../../lib/messageBody"
+import {
+  computeSendMode,
+  getTransactionActionPhase,
+  getTransactionComputePhase,
+  getTransactionOpcode,
+  getTransactionSourceLabel,
+  getTransactionTriggerLabel,
+  resolveTransactionOpcodeName,
+} from "../../lib/transaction"
+
+import {
+  formatCellBocHex,
+  formatMessageBocHex,
+  formatOutListBocHex,
+  formatShardAccountDataBocHex,
+  formatStateInitBocHex,
+} from "../../lib/rawBoc"
+
+import {ActionsSummary} from "./ActionsSummary"
+import styles from "./TransactionDetails.module.css"
+
+export interface TransactionDetailsProps {
+  readonly tx: TransactionInfo
+  readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
+  readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
+  readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
+  readonly allContracts: readonly BackendContractInfo[]
+  readonly onContractClick?: (address: string) => void
+  readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
+  readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
+  readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
+  readonly onBlockClick?: (
+    blockRef: TransactionBlockRef,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void
+}
+
+interface RawCopyAction {
+  readonly value: string | undefined
+  readonly label: string
+  readonly caption: string
+}
+
+function renderSectionCopyActions(
+  actions: readonly RawCopyAction[],
+): React.JSX.Element | undefined {
+  const availableActions = actions.filter(
+    (action): action is RawCopyAction & {readonly value: string} => action.value !== undefined,
+  )
+  if (availableActions.length === 0) {
+    return undefined
+  }
+
+  return (
+    <div className={styles.sectionCopyActions}>
+      {availableActions.map(action => (
+        <CopyInlineButton
+          key={action.label}
+          className={styles.sectionCopyButton}
+          value={action.value}
+          label={`Copy ${action.label}`}
+          copiedLabel={`Copied ${action.label}`}
+        >
+          {action.caption}
+        </CopyInlineButton>
+      ))}
+    </div>
+  )
+}
+
+export function TransactionDetails({
+  tx,
+  contracts,
+  compilerAbisByCodeHash,
+  verifiedSourcesByCodeHash,
+  resolveVerifiedSourceByCodeHash,
+  allContracts,
+  onContractClick,
+  renderSourceLocation,
+  loadActions,
+  renderMessageRouteAction,
+  getBlockPath,
+  onBlockClick,
+}: TransactionDetailsProps): React.JSX.Element {
+  const stateInitAbiInfoId = React.useId()
+  const [showActions, setShowActions] = useState(false)
+  const [showStateInit, setShowStateInit] = useState(false)
+  const [showStateInitCode, setShowStateInitCode] = useState(false)
+  const [expandedStorageLt, setExpandedStorageLt] = useState<string | undefined>()
+  const [loadedActions, setLoadedActions] = useState<LoadedTransactionActions | undefined>()
+  const [isLoadingActions, setIsLoadingActions] = useState(false)
+  const [loadActionsError, setLoadActionsError] = useState<string | undefined>()
+  const [isLoadingStorage, setIsLoadingStorage] = useState(false)
+  const [loadStorageError, setLoadStorageError] = useState<string | undefined>()
+  const currentTxIdRef = useRef(tx.id)
+  const renderCodeCellDetails = React.useCallback(
+    (cell: ParsedCodeCell) => (
+      <CodeCellDetails
+        cell={cell}
+        verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+        resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+      />
+    ),
+    [resolveVerifiedSourceByCodeHash, verifiedSourcesByCodeHash],
+  )
+
+  useEffect(() => {
+    currentTxIdRef.current = tx.id
+    setShowActions(false)
+    setShowStateInitCode(false)
+    setLoadedActions(undefined)
+    setIsLoadingActions(false)
+    setLoadActionsError(undefined)
+    setIsLoadingStorage(false)
+    setLoadStorageError(undefined)
+  }, [tx.id])
+
+  const description = tx.transaction.description
+  if (description.type !== "generic" && description.type !== "tick-tock") {
+    return (
+      <div className={styles.transactionDetailsContainer}>
+        <div className={styles.detailRow}>
+          <div className={styles.detailValue}>
+            Non-generic transaction not supported (Type: {description.type})
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const isTickTock = description.type === "tick-tock"
+  const tickTockDescription = description.type === "tick-tock" ? description : undefined
+  const computePhase = getTransactionComputePhase(tx.transaction)
+  const actionPhase = getTransactionActionPhase(tx.transaction)
+  const triggerLabel = getTransactionTriggerLabel(tx.transaction)
+  const messageRouteAction = renderMessageRouteAction?.(tx)
+  const blockRef = tx.blockRef
+  const blockSeqno = blockRef?.seqno
+  const blockPath = blockRef ? getBlockPath?.(blockRef) : undefined
+  const blockTitle = blockRef
+    ? `workchain: ${blockRef.workchain}, shard: ${blockRef.shard}, seqno: ${blockRef.seqno}`
+    : undefined
+
+  if (!computePhase) {
+    return (
+      <div className={styles.transactionDetailsContainer}>
+        <div className={styles.detailRow}>
+          <div className={styles.detailValue}>
+            Transaction compute phase unavailable (Type: {description.type})
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const formatBoolean = (v: boolean): React.JSX.Element => (
+    <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
+  )
+  const formatStatusChange = (value: "unchanged" | "frozen" | "deleted"): string => {
+    switch (value) {
+      case "unchanged": {
+        return "Unchanged"
+      }
+      case "frozen": {
+        return "Frozen"
+      }
+      case "deleted": {
+        return "Deleted"
+      }
+    }
+  }
+
+  const inMessage = tx.transaction.inMessage ?? undefined
+  const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
+  const targetAbi = tx.contractAbi ?? targetContract?.abi
+  const targetContractWithAbi =
+    targetContract && targetAbi && targetContract.abi !== targetAbi
+      ? {...targetContract, abi: targetAbi}
+      : targetContract
+  const sourceLabel = getTransactionSourceLabel(tx.transaction)
+  const hasMessageBody =
+    // biome-ignore lint/suspicious/noDoubleEquals: ok
+    inMessage != undefined &&
+    (() => {
+      const body = inMessage.body.asSlice()
+      return body.remainingBits > 0 || body.remainingRefs > 0
+    })()
+  const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
+  const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
+  const stateInitCode = inMessage?.init?.code ?? undefined
+  const stateInitData = inMessage?.init?.data ?? undefined
+  const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
+  const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const stateInitDataBocHex = stateInitData ? formatCellBocHex(stateInitData) : undefined
+  const stateInitCodeBocBase64 = stateInitCode?.toBoc().toString("base64")
+  const stateInitCodeHash = stateInitCode?.hash().toString("hex")
+  const stateInitAbi = stateInitCodeHash
+    ? compilerAbisByCodeHash?.get(stateInitCodeHash)
+    : undefined
+  const stateInitAbiName = stateInitAbi?.contract_name?.trim()
+  const stateInitAbiDescription = stateInitAbi?.description?.trim()
+  const stateInitVerifiedSource = stateInitCodeHash
+    ? verifiedSourcesByCodeHash?.get(stateInitCodeHash)
+    : undefined
+  const messageCopyActions = renderSectionCopyActions([
+    {value: messageBocHex, label: "raw message", caption: "Copy raw message"},
+    {value: messageBodyBocHex, label: "raw data", caption: "Copy raw body"},
+    {value: stateInitBocHex, label: "raw state init", caption: "Copy raw state init"},
+  ])
+  const additionalMessageBodyAbis = [
+    ...allContracts.map(contract => contract.abi),
+    ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
+  ].filter((abi): abi is NonNullable<ContractData["abi"]> => abi !== undefined)
+  const parsedBody =
+    tx.parsedBody ??
+    (inMessage
+      ? decodeMessageBody(inMessage, contracts, tx.address?.toString(), additionalMessageBodyAbis)
+      : undefined)
+  const parsedStateInitData = decodeStateInitData(
+    stateInitData,
+    targetContractWithAbi,
+    tx.contractName,
+    allContracts,
+  )
+  const sendMode = computeSendMode(tx)
+
+  const opcode = getTransactionOpcode(tx.transaction)
+  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
+  const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
+  const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
+
+  const sentTotal = [...tx.transaction.outMessages.values()].reduce(
+    (accumulator: bigint, message) =>
+      accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
+    0n,
+  )
+  const actionFee = actionPhase?.totalActionFees ?? undefined
+  const endBalance = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
+  const tickTockStorageFeesDue = tickTockDescription?.storagePhase.storageFeesDue
+  const hasAccountStatusChange = tx.transaction.oldStatus !== tx.transaction.endStatus
+  const storageDiff = buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter)
+  const showStorageDiff = expandedStorageLt === tx.lt
+  const storageBocHex = storageDiff ? formatShardAccountDataBocHex(tx.shardAccountAfter) : undefined
+  const storageCopyActions = renderSectionCopyActions([
+    {value: storageBocHex, label: "raw storage", caption: "Copy raw storage"},
+  ])
+  const storageChangeLabel =
+    storageDiff === undefined
+      ? undefined
+      : storageDiff.status === "unchanged"
+        ? "Intact"
+        : "Changed"
+  const hasStorageAbi = targetAbi !== undefined
+  const storageUnavailableLabel = hasStorageAbi
+    ? "Storage data not loaded"
+    : "Storage data unavailable"
+  const canLoadStorage = storageDiff === undefined && loadActions !== undefined && hasStorageAbi
+
+  const hasResolvedActions = resolvedOutActions.length > 0
+  const resolvedActionsCell = loadedActions?.actions ?? tx.actions
+  const actionsBocHex = hasResolvedActions
+    ? resolvedActionsCell
+      ? formatCellBocHex(resolvedActionsCell)
+      : formatOutListBocHex(resolvedOutActions)
+    : undefined
+  const actionPhaseCopyActions = renderSectionCopyActions([
+    {value: actionsBocHex, label: "raw actions", caption: "Copy raw actions"},
+  ])
+  const canLoadActions =
+    !hasResolvedActions &&
+    actionPhase !== null &&
+    actionPhase !== undefined &&
+    actionPhase.totalActions > 0 &&
+    loadActions !== undefined
+  const canToggleActions = hasResolvedActions || canLoadActions
+  const handleActionsToggle = async () => {
+    if (hasResolvedActions) {
+      setShowActions(!showActions)
+      return
+    }
+
+    if (!canLoadActions || isLoadingActions) {
+      return
+    }
+
+    const requestedTxId = tx.id
+    setIsLoadingActions(true)
+    setLoadActionsError(undefined)
+    try {
+      const nextActions = await loadActions(tx)
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      if (nextActions.outActions.length === 0) {
+        setLoadActionsError("No actions returned by retrace")
+        return
+      }
+
+      setLoadedActions(nextActions)
+      setShowActions(true)
+    } catch (error) {
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setLoadActionsError(error instanceof Error ? error.message : "Failed to load actions")
+    } finally {
+      if (currentTxIdRef.current === requestedTxId) {
+        setIsLoadingActions(false)
+      }
+    }
+  }
+
+  const handleStorageLoad = async () => {
+    if (!canLoadStorage || isLoadingStorage || !loadActions) {
+      return
+    }
+
+    const requestedTxId = tx.id
+    setIsLoadingStorage(true)
+    setLoadStorageError(undefined)
+    try {
+      await loadActions(tx)
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setExpandedStorageLt(tx.lt)
+    } catch (error) {
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setLoadStorageError(error instanceof Error ? error.message : "Failed to load storage")
+    } finally {
+      if (currentTxIdRef.current === requestedTxId) {
+        setIsLoadingStorage(false)
+      }
+    }
+  }
+
+  return (
+    <div className={styles.transactionDetailsContainer}>
+      <div className={styles.detailRow}>
+        <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message Route"}</div>
+        <div className={styles.heightDetailValue}>
+          <div className={styles.messageRouteValue}>
+            {isTickTock ? (
+              <span className={styles.triggerRoute}>
+                <span className={styles.triggerKind}>{triggerLabel ?? "Tick-Tock"}</span>
+                <span aria-hidden="true">→</span>
+                <ContractChip
+                  address={tx.address?.toString()}
+                  contracts={contracts}
+                  onContractClick={onContractClick}
+                />
+              </span>
+            ) : (
+              <span className={styles.triggerRoute}>
+                {sourceLabel ? (
+                  <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
+                ) : (
+                  <ContractChip
+                    address={tx.transaction.inMessage?.info.src?.toString()}
+                    contracts={contracts}
+                    onContractClick={onContractClick}
+                  />
+                )}
+                {" → "}
+                <ContractChip
+                  address={tx.transaction.inMessage?.info.dest?.toString()}
+                  contracts={contracts}
+                  onContractClick={onContractClick}
+                />
+              </span>
+            )}
+            {messageRouteAction && (
+              <span className={styles.messageRouteAction}>{messageRouteAction}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isTickTock && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Tick-Tock</div>
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Kind</div>
+                <div className={styles.multiColumnItemValue}>{triggerLabel ?? "Tick-Tock"}</div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Aborted</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(tickTockDescription?.aborted ?? false)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Destroyed</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(tickTockDescription?.destroyed ?? false)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isTickTock && inMessage && inMessage.info.type === "internal" && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>In Message</div>
+
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Value</div>
+                <div className={`${styles.multiColumnItemValue}`}>
+                  {fmt.formatCurrency(inMessage.info.value.coins)}
+                </div>
+              </div>
+              {sendMode !== undefined && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Send Mode</div>
+                  <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                    <SendModeViewer mode={sendMode} />
+                  </div>
+                </div>
+              )}
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Bounced</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(inMessage.info.bounced)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Bounce</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(inMessage.info.bounce)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created At</div>
+                <div
+                  className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
+                  data-visual-dynamic="timestamp"
+                  data-visual-placeholder="<timestamp>"
+                >
+                  {formatDetailedTimestamp(inMessage.info.createdAt, false)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created Lt</div>
+                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                  {inMessage.info.createdLt.toString()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isTickTock && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Message Data</div>
+          <div
+            className={`${styles.labeledSectionContent} ${
+              messageCopyActions ? styles.copyableSectionContent : ""
+            }`}
+          >
+            {messageCopyActions}
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Opcode</div>
+                <div className={styles.multiColumnItemValue}>
+                  <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
+                </div>
+              </div>
+            </div>
+            {parsedBody && hasMessageBody && (
+              <ParsedBodySection
+                key={tx.lt}
+                parsedBody={parsedBody}
+                contracts={contracts}
+                onContractClick={onContractClick}
+                renderCodeCellDetails={renderCodeCellDetails}
+              />
+            )}
+            {(stateInitCode || stateInitData) && (
+              <div className={styles.parsedBodySection}>
+                <div className={styles.parsedBodyTitle}>
+                  State Init
+                  <DisclosureToggle
+                    expanded={showStateInit}
+                    contextLabel="state init"
+                    onClick={() => {
+                      setShowStateInit(expanded => !expanded)
+                    }}
+                  />
+                </div>
+                {showStateInit && (
+                  <div className={styles.stateInitSection}>
+                    {stateInitAbiName && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>ABI</div>
+                        <div
+                          className={`${styles.multiColumnItemValue} ${styles.stateInitAbiValue}`}
+                        >
+                          <span className={styles.stateInitAbiName}>{stateInitAbiName}</span>
+                          {stateInitAbiDescription && (
+                            <InfoPopover id={stateInitAbiInfoId} ariaLabel="Show ABI information">
+                              <span className={styles.stateInitAbiInfoTitle}>
+                                {stateInitAbiName}
+                              </span>
+                              <span className={styles.stateInitAbiInfoText}>
+                                {stateInitAbiDescription}
+                              </span>
+                            </InfoPopover>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {stateInitData && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.stateInitFieldTitle}>
+                          <span className={styles.multiColumnItemTitle}>Data</span>
+                          {parsedStateInitData && stateInitDataBocHex && (
+                            <CopyInlineButton
+                              className={styles.fieldCopyButton}
+                              value={stateInitDataBocHex}
+                              label="Copy state data BoC"
+                              copiedLabel="Copied state data BoC"
+                            >
+                              Copy BoC
+                            </CopyInlineButton>
+                          )}
+                        </div>
+                        {parsedStateInitData ? (
+                          <div className={styles.parsedBodyTree}>
+                            <div className={styles.parsedBodyContent}>
+                              <ParsedValueView
+                                value={parsedStateInitData.value}
+                                contracts={contracts}
+                                onContractClick={onContractClick}
+                                fallbackTypeName={parsedStateInitData.name}
+                                renderCodeCellDetails={renderCodeCellDetails}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <RawDataBlock value={stateInitDataBocHex!} copyLabel="state data BOC" />
+                        )}
+                      </div>
+                    )}
+                    {stateInitCode && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.stateInitFieldTitle}>
+                          <span className={styles.multiColumnItemTitle}>Code</span>
+                          <DisclosureToggle
+                            expanded={showStateInitCode}
+                            contextLabel="state init code"
+                            onClick={() => {
+                              setShowStateInitCode(expanded => !expanded)
+                            }}
+                          />
+                          {stateInitCodeBocHex && (
+                            <CopyInlineButton
+                              className={styles.fieldCopyButton}
+                              value={stateInitCodeBocHex}
+                              label="Copy state code BoC"
+                              copiedLabel="Copied state code BoC"
+                            >
+                              Copy BoC
+                            </CopyInlineButton>
+                          )}
+                        </div>
+                        {showStateInitCode && (
+                          <ContractSourcePanel
+                            codeBoc={stateInitCodeBocBase64!}
+                            verifiedSource={stateInitVerifiedSource}
+                            compact
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className={styles.labeledSectionRow}>
+        <div className={styles.labeledSectionTitle}>Storage</div>
+        <div
+          className={`${styles.labeledSectionContent} ${
+            storageCopyActions ? styles.copyableSectionContent : ""
+          }`}
+        >
+          {storageCopyActions}
+          <div className={styles.storageSummaryRow}>
+            <div className={styles.storageSummaryMain}>
+              {storageChangeLabel && (
+                <span className={styles.storageChangeBadge}>{storageChangeLabel}</span>
+              )}
+              {!storageDiff && (
+                <span className={styles.storageUnavailable}>{storageUnavailableLabel}</span>
+              )}
+              {hasAccountStatusChange && (
+                <span className={styles.storageAccountStatus}>
+                  {formatAccountStatus(tx.transaction.oldStatus)} →{" "}
+                  {formatAccountStatus(tx.transaction.endStatus)}
+                </span>
+              )}
+            </div>
+            {!storageDiff && canLoadStorage && (
+              <DisclosureToggle
+                expanded={false}
+                contextLabel="storage state change"
+                showLabel="Load"
+                loadingLabel="Loading"
+                loading={isLoadingStorage}
+                onClick={() => void handleStorageLoad()}
+              />
+            )}
+            {storageDiff && (
+              <DisclosureToggle
+                expanded={showStorageDiff}
+                contextLabel="storage state change"
+                onClick={() => {
+                  setExpandedStorageLt(showStorageDiff ? undefined : tx.lt)
+                }}
+              />
+            )}
+          </div>
+
+          {showStorageDiff && storageDiff && (
+            <div className={styles.storageDiffDetails} data-testid="storage-diff-details">
+              <ParsedValueDiffView
+                diff={storageDiff}
+                contracts={contracts}
+                onContractClick={onContractClick}
+                renderCodeCellDetails={renderCodeCellDetails}
+              />
+            </div>
+          )}
+          {loadStorageError && <div className={styles.actionsLoadError}>{loadStorageError}</div>}
+        </div>
+      </div>
+
+      <div className={styles.labeledSectionRow}>
+        <div className={styles.labeledSectionTitle}>Fees & Sent</div>
+        <div className={styles.labeledSectionContent}>
+          <div className={styles.multiColumnRow}>
+            <div className={styles.multiColumnItem}>
+              <div className={styles.multiColumnItemTitle}>Amount Sent (Total)</div>
+              <div className={`${styles.multiColumnItemValue}`}>
+                {fmt.formatCurrency(sentTotal)}
+              </div>
+            </div>
+            <div className={styles.multiColumnItem}>
+              <div className={styles.multiColumnItemTitle}>End Balance</div>
+              <div className={`${styles.multiColumnItemValue}`}>
+                {endBalance === undefined ? "—" : fmt.formatCurrency(endBalance)}
+              </div>
+            </div>
+            <div className={styles.multiColumnItem}>
+              <div className={styles.multiColumnItemTitle}>Total Fee</div>
+              <div className={`${styles.multiColumnItemValue}`}>
+                {fmt.formatCurrency(tx.transaction.totalFees.coins)}
+              </div>
+            </div>
+            {actionPhase && (
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Action Fee</div>
+                <div className={`${styles.multiColumnItemValue}`}>
+                  {actionFee === undefined ? "—" : fmt.formatCurrency(actionFee)}
+                </div>
+              </div>
+            )}
+            {tx.transaction.inMessage?.info.type === "internal" && (
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Forward Fee</div>
+                <div className={`${styles.multiColumnItemValue}`}>
+                  {fmt.formatCurrency(tx.transaction.inMessage.info.forwardFee)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {tickTockDescription && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Storage Phase</div>
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Storage Fee</div>
+                <div className={styles.multiColumnItemValue}>
+                  {fmt.formatCurrency(tickTockDescription.storagePhase.storageFeesCollected)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Storage Due</div>
+                <div className={styles.multiColumnItemValue}>
+                  {typeof tickTockStorageFeesDue === "bigint"
+                    ? fmt.formatCurrency(tickTockStorageFeesDue)
+                    : "—"}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Status Change</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatStatusChange(tickTockDescription.storagePhase.statusChange)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={styles.labeledSectionRow}>
+        <div className={styles.labeledSectionTitle}>Compute Phase</div>
+        <div className={styles.labeledSectionContent}>
+          {computePhase.type === "skipped" ? (
+            <div className={styles.multiColumnItemValue}>Skipped ({computePhase.reason})</div>
+          ) : (
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Success</div>
+                <div className={styles.multiColumnItemValue}>
+                  {formatBoolean(computePhase.success)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Exit Code</div>
+                <div className={styles.multiColumnItemValue}>
+                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetAbi} />
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>VM Steps</div>
+                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                  {computePhase.vmSteps}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Gas Used</div>
+                <div className={styles.multiColumnItemValue}>{computePhase.gasUsed.toString()}</div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Gas Fee</div>
+                <div className={styles.multiColumnItemValue}>
+                  {fmt.formatCurrency(computePhase.gasFees)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.labeledSectionRow}>
+        <div className={styles.labeledSectionTitle}>Action Phase</div>
+        <div
+          className={`${styles.labeledSectionContent} ${
+            actionPhaseCopyActions ? styles.copyableSectionContent : ""
+          }`}
+        >
+          {actionPhaseCopyActions}
+          {actionPhase ? (
+            <div className={`${styles.multiColumnRow} ${styles.actionPhaseSummaryRow}`}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Success</div>
+                <div
+                  className={`${styles.multiColumnItemValue} ${actionPhase.success ? styles.booleanTrue : styles.booleanFalse}`}
+                >
+                  {formatBoolean(actionPhase.success)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Exit Code</div>
+                <div className={styles.multiColumnItemValue}>
+                  <ExitCodeChip exitCode={actionPhase.resultCode} abi={targetAbi} phase="action" />
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Total Actions</div>
+                <div
+                  className={`${styles.multiColumnItemValue} ${styles.numberValue} ${styles.actionsCountValue}`}
+                >
+                  {fmt.formatNumber(actionPhase.totalActions)}
+                  {canToggleActions && (
+                    <DisclosureToggle
+                      expanded={showActions}
+                      contextLabel="actions"
+                      loading={isLoadingActions}
+                      onClick={() => void handleActionsToggle()}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.multiColumnItemValue}>No action phase</div>
+          )}
+          {loadActionsError && <div className={styles.actionsLoadError}>{loadActionsError}</div>}
+        </div>
+      </div>
+
+      {showActions && hasResolvedActions && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>Actions Details</div>
+          <div className={styles.labeledSectionContent}>
+            <ActionsSummary
+              actions={resolvedOutActions}
+              executorActions={resolvedExecutorActions}
+              contracts={contracts}
+              contractAddress={tx.address?.toString() ?? ""}
+              additionalMessageBodyAbis={additionalMessageBodyAbis}
+              onContractClick={onContractClick}
+              renderSourceLocation={renderSourceLocation}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className={styles.detailRow}>
+        <div className={styles.detailLabel}>Time</div>
+        <div className={`${styles.detailValue} ${styles.timeInlineValue}`}>
+          <span
+            className={styles.timestampValue}
+            data-visual-dynamic="timestamp"
+            data-visual-placeholder="<timestamp>"
+          >
+            {formatDetailedTimestamp(tx.transaction.now)}
+          </span>
+          <span className={styles.timeInlineItem}>
+            <span className={styles.timeInlineLabel}>LT:</span>
+            <span className={`${styles.timeInlineText} ${styles.numberValue}`}>{tx.lt}</span>
+          </span>
+          <span className={styles.timeInlineItem}>
+            <span className={styles.timeInlineLabel}>Block:</span>
+            <span className={`${styles.timeInlineText} ${styles.numberValue}`}>
+              {blockSeqno === undefined ? (
+                "—"
+              ) : blockRef && blockPath ? (
+                <a
+                  className={styles.blockLink}
+                  href={blockPath}
+                  title={blockTitle}
+                  onClick={event => {
+                    if (!onBlockClick) {
+                      return
+                    }
+                    event.preventDefault()
+                    onBlockClick(blockRef, event)
+                  }}
+                >
+                  {blockSeqno}
+                </a>
+              ) : blockRef && onBlockClick ? (
+                <button
+                  type="button"
+                  className={styles.blockLink}
+                  title={blockTitle}
+                  onClick={event => onBlockClick(blockRef, event)}
+                >
+                  {blockSeqno}
+                </button>
+              ) : (
+                <span title={blockTitle}>{blockSeqno}</span>
+              )}
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function formatAccountStatus(status: string): string {
+  switch (status) {
+    case "non-existing": {
+      return "Non-existing"
+    }
+    case "uninitialized": {
+      return "Uninitialized"
+    }
+    case "active": {
+      return "Active"
+    }
+    case "frozen": {
+      return "Frozen"
+    }
+    default: {
+      return status
+    }
+  }
+}
+
+function formatDetailedTimestamp(
+  timestampInput: number | string | undefined,
+  showShort = true,
+): React.JSX.Element | string {
+  if (timestampInput === undefined) return "—"
+
+  const date =
+    typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
+
+  const pad = (number: number): string => number.toString().padStart(2, "0")
+  const monthAbbrs = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ]
+
+  const day = date.getDate()
+  const monthIndex = date.getMonth()
+  const monthNumber = monthIndex + 1
+  const year = date.getFullYear()
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const seconds = date.getSeconds()
+
+  const fullPart = `${pad(day)}.${pad(monthNumber)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
+
+  return (
+    <>
+      {fullPart}
+      {showShort && <span className={styles.timestampDetailSecondary}> — {shortPart}</span>}
+    </>
+  )
+}

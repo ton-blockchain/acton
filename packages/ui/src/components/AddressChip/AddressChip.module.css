@@ -1,0 +1,116 @@
+.addressCluster {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.addressClusterFull {
+  align-items: center;
+}
+
+.addressText,
+.addressButton {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressText > span,
+.addressButton > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressFull,
+.addressFull > span {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.addressFull {
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.addressText {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 7px;
+}
+
+.addressButton {
+  display: inline-block;
+  width: auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: var(--acton-font-weight-utility);
+  line-height: inherit;
+  text-align: left;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.addressButton:not(.addressPlain):hover,
+.addressCluster:hover .addressText:not(.addressPlain) {
+  background: color-mix(in srgb, var(--acton-color-accent) 12%, transparent);
+}
+
+.addressPlain {
+  padding: 0;
+  padding-inline-end: var(--acton-space-1);
+  color: var(--acton-color-text);
+  font-weight: inherit;
+}
+
+.addressHighlighted {
+  background: color-mix(in srgb, var(--acton-color-accent) 18%, transparent);
+}
+
+.addressButton:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.copyButton {
+  flex: 0 0 auto;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.addressCluster:hover .copyButton,
+.addressCluster:focus-within .copyButton,
+.copyButtonCopied {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.addressClusterPlain .copyButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .copyButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

@@ -32,6 +32,17 @@ const VERIFIER_SOURCE_URL: &str = "https://verifier.acton.monster/api/v1/verific
 const VERIFIER_ABI_URL: &str = "https://verifier.acton.monster/api/v1/abi";
 const VERIFIER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
+const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
+fn build_verifier_http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder()
+        .timeout(VERIFIER_REQUEST_TIMEOUT)
+        .user_agent(user_agent())
+        .build()
+}
+
 pub async fn faucet(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<FaucetRequest>,
@@ -511,12 +522,7 @@ async fn fetch_verified_source(payload: GetVerifiedSourceRequest) -> anyhow::Res
         }
     }
 
-    let response = reqwest::Client::builder()
-        .timeout(VERIFIER_REQUEST_TIMEOUT)
-        .build()?
-        .get(url)
-        .send()
-        .await?;
+    let response = build_verifier_http_client()?.get(url).send().await?;
     let status = response.status();
     let body = response.text().await?;
     let value = serde_json::from_str::<Value>(&body).unwrap_or(Value::String(body));
@@ -551,12 +557,7 @@ async fn fetch_verified_compiler_abis(source: &Value) -> anyhow::Result<Vec<(Has
     let mut url = reqwest::Url::parse(VERIFIER_ABI_URL)?;
     url.query_pairs_mut().append_pair("code_hash", code_hash);
 
-    let response = reqwest::Client::builder()
-        .timeout(VERIFIER_REQUEST_TIMEOUT)
-        .build()?
-        .get(url)
-        .send()
-        .await?;
+    let response = build_verifier_http_client()?.get(url).send().await?;
     let status = response.status();
     let body = response.text().await?;
     let value = serde_json::from_str::<Value>(&body).unwrap_or(Value::String(body));

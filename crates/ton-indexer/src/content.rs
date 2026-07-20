@@ -6,6 +6,10 @@ use tycho_types::cell::Cell;
 use tycho_types::dict::Dict;
 use tycho_types::prelude::HashBytes;
 
+const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
 pub(crate) fn parse_token_content(content_cell: Cell, keys: &[&str]) -> Value {
     let Ok(mut parser) = content_cell.as_slice() else {
         return json!({});
@@ -39,6 +43,7 @@ pub(crate) fn resolve_offchain_token_content(mut content: Value, keys: &[&str]) 
 
     let Ok(client) = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(3))
+        .user_agent(user_agent())
         .build()
     else {
         return content;

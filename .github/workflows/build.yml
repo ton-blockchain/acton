@@ -108,15 +108,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-playwright-
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
           CC: clang-16
           CXX: clang++-16
         # language=Bash
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
@@ -343,12 +344,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
