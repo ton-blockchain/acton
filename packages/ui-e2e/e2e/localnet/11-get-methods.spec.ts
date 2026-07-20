@@ -124,8 +124,7 @@ test.describe("Account get methods", () => {
 
     const statusRow = page.getByText("Status", {exact: true}).locator("..")
     await expect(statusRow).toContainText("Active")
-    await expect(statusRow.locator("xpath=preceding-sibling::*[1]")).toContainText("Address")
-    await expect(statusRow.locator("xpath=following-sibling::*[1]")).toContainText("Balance")
+    await expect(statusRow.locator("xpath=preceding-sibling::*[1]")).toContainText("Contract type")
     await expect(page.getByText("0:302…fffed", {exact: true})).toHaveCount(0)
 
     const qrPanel = page.locator('[aria-label="Address QR code"]').filter({

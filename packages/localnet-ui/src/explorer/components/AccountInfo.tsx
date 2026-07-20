@@ -400,19 +400,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
             </div>
 
             <div className={styles.infoRow}>
-              <div className={styles.label}>Status</div>
-              <div className={styles.rowValue}>
-                {stateLoading ? (
-                  <div className={`${styles.skeleton} ${styles.statusSkeleton}`} />
-                ) : (
-                  <span className={`${styles.status} ${styles[statusInfo.className]}`}>
-                    {statusInfo.label}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.infoRow}>
               <div className={styles.label}>Balance</div>
               <div className={styles.rowValue}>
                 {stateLoading ? (
@@ -652,6 +639,19 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                         )}
                       </span>
                     ))}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.infoRow}>
+              <div className={styles.label}>Status</div>
+              <div className={styles.rowValue}>
+                {stateLoading ? (
+                  <div className={`${styles.skeleton} ${styles.statusSkeleton}`} />
+                ) : (
+                  <span className={`${styles.status} ${styles[statusInfo.className]}`}>
+                    {statusInfo.label}
                   </span>
                 )}
               </div>
