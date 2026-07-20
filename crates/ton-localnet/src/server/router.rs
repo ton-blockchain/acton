@@ -43,6 +43,7 @@ use include_dir::{Dir, include_dir};
 use serde_json::{Value, json};
 #[cfg(debug_assertions)]
 use std::fs;
+use std::num::NonZeroU32;
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,6 +59,11 @@ use tower_http::trace::TraceLayer;
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/localnet-ui/dist");
+
+fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
+    let nanoseconds = 1_000_000_000u64.div_ceil(u64::from(requests_per_second.get()));
+    Duration::from_nanos(nanoseconds)
+}
 
 pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
     let mut api_v2_router = Router::new()
@@ -234,9 +240,11 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
             record_api_call(request, next, api_calls_for_admin.clone())
         }));
 
-    if let Some(limit) = rate_limit_rps {
+    if let Some(limit) = rate_limit_rps.and_then(NonZeroU32::new) {
+        let period = rate_limit_period(limit);
+        let limit = limit.get();
         let mut governor_config = GovernorConfigBuilder::default();
-        governor_config.per_second(1).burst_size(limit);
+        governor_config.period(period).burst_size(limit);
         let mut governor_config = governor_config.key_extractor(GlobalKeyExtractor);
         let governor_config = Arc::new(
             governor_config

@@ -201,7 +201,8 @@ impl Node {
         let config_hash = Hash256::from(config_cell.repr_hash());
 
         let persistence = db_path.map(NodePersistence::open).transpose()?;
-        let (mut latest, history, indexes, head_seqno) = if let Some(persistence) = &persistence {
+        let (mut latest, mut history, indexes, head_seqno) = if let Some(persistence) = &persistence
+        {
             let persisted = persistence.load()?;
             (
                 persisted.latest,
@@ -217,6 +218,11 @@ impl Node {
                 Seqno::default(),
             )
         };
+        for block in &mut history.masterchain_blocks {
+            if block.config_boc_hash == Hash256::default() {
+                block.config_boc_hash = config_hash;
+            }
+        }
 
         let mut cas = if let Some(persistence) = &persistence {
             CellStore::with_conn(persistence.connection())
@@ -4893,6 +4899,18 @@ mod tests {
         assert_eq!(wallet.owner_address, owner_address);
         assert_eq!(wallet.jetton_address, jetton_address);
         assert_eq!(wallet.last_transaction_lt, 42);
+
+        let meta = node
+            .latest
+            .accounts
+            .get_mut(&wallet_address)
+            .expect("wallet account metadata must exist");
+        meta.status = AccountStatus::Nonexist;
+        meta.code_hash = None;
+        meta.data_hash = None;
+        node.detect_assets(&wallet_address)
+            .expect("removed account must no longer be detected as a jetton wallet");
+        assert!(!node.history.jetton_wallets.contains_key(&wallet_address));
     }
 
     #[test]

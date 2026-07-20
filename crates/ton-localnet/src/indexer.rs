@@ -362,15 +362,22 @@ impl Node {
     pub(crate) fn detect_assets(&mut self, addr: &Addr) -> anyhow::Result<()> {
         let meta = self.latest.accounts.get(addr).cloned();
         let info = self.detect_assets_for_account(addr, meta.as_ref())?;
+        let should_clear_stale = meta.is_some();
 
         if let Some(master) = info.jetton_master {
             self.history.jetton_masters.insert(*addr, master);
+        } else if should_clear_stale {
+            self.history.jetton_masters.shift_remove(addr);
         }
         if let Some(wallet) = info.jetton_wallet {
             self.history.jetton_wallets.insert(*addr, wallet);
+        } else if should_clear_stale {
+            self.history.jetton_wallets.shift_remove(addr);
         }
         if let Some(item) = info.nft_item {
             self.history.nft_items.insert(*addr, item);
+        } else if should_clear_stale {
+            self.history.nft_items.shift_remove(addr);
         }
         Ok(())
     }

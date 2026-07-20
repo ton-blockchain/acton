@@ -666,7 +666,7 @@ pub struct TonlibErrorResponse {
     pub ok: bool,
     pub error: String,
     pub code: i32,
-    #[serde(rename = "@extra")]
+    #[serde(default, rename = "@extra", skip_serializing_if = "String::is_empty")]
     pub extra: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jsonrpc: Option<String>,
@@ -677,6 +677,28 @@ pub struct TonlibErrorResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tonlib_error_response_accepts_missing_optional_extra() {
+        let without_extra: TonlibErrorResponse = serde_json::from_value(serde_json::json!({
+            "ok": false,
+            "error": "API key does not exist",
+            "code": 401
+        }))
+        .expect("TonCenter errors may omit @extra");
+
+        assert!(without_extra.extra.is_empty());
+
+        let with_extra: TonlibErrorResponse = serde_json::from_value(serde_json::json!({
+            "ok": false,
+            "error": "request failed",
+            "code": 500,
+            "@extra": "request-1"
+        }))
+        .expect("TonCenter errors may include @extra");
+
+        assert_eq!(with_extra.extra, "request-1");
+    }
 
     #[test]
     fn json_rpc_response_deserializes_generic_result() {
