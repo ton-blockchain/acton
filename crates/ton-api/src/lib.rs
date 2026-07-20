@@ -1,7 +1,6 @@
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
-use reqwest::header::USER_AGENT;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
