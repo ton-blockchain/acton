@@ -1,11 +1,11 @@
-import "../../lib/build"
-import "../../lib/emulation/network"
-import "../../lib/emulation/scripts"
-import "../../lib/io"
 import "../types/jetton_v1_master.types"
 import "../types/jetton_v1_wallet.types"
 import "../wrappers/JettonV1Master.gen"
 import "../wrappers/JettonV1Wallet.gen"
+import "../../lib/build"
+import "../../lib/io"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 
 const RECIPIENT = "0:1111111111111111111111111111111111111111111111111111111111111111"
 
@@ -39,55 +39,65 @@ fun main() {
         forwardTonAmount: 0,
         forwardPayload: inlineEmptyForwardPayload(),
     }.toCell();
-    waitForTransaction(master.sendJettonV1Mint(
-        owner.address,
-        100,
-        owner.address,
-        ton("0.2"),
-        mintBody,
-        { value: ton("0.5"), bounce: false },
-    ));
+    waitForTransaction(
+        master.sendJettonV1Mint(
+            owner.address,
+            100,
+            owner.address,
+            ton("0.2"),
+            mintBody,
+            { value: ton("0.5"), bounce: false },
+        ),
+    );
 
     val sourceWallet = JettonV1Wallet.fromAddress(master.getWalletAddress(owner.address));
     val recipientWalletAddress = master.getWalletAddress(recipient);
-    waitForTransaction(sourceWallet.sendJettonTransfer(
-        owner.address,
-        101,
-        100,
-        recipient,
-        owner.address,
-        null,
-        ton("0.01"),
-        inlineEmptyForwardPayload(),
-        { value: ton("0.3"), bounce: false },
-    ));
-    waitForTransaction(sourceWallet.sendJettonBurn(
-        owner.address,
-        102,
-        50,
-        owner.address,
-        null,
-        { value: ton("0.2"), bounce: false },
-    ));
-    waitForTransaction(sourceWallet.sendJettonTransfer(
-        owner.address,
-        103,
-        10000,
-        recipient,
-        owner.address,
-        null,
-        ton("0.01"),
-        inlineEmptyForwardPayload(),
-        { value: ton("0.3"), bounce: false },
-    ));
-    waitForTransaction(sourceWallet.sendJettonBurn(
-        owner.address,
-        104,
-        10000,
-        owner.address,
-        null,
-        { value: ton("0.2"), bounce: false },
-    ));
+    waitForTransaction(
+        sourceWallet.sendJettonTransfer(
+            owner.address,
+            101,
+            100,
+            recipient,
+            owner.address,
+            null,
+            ton("0.01"),
+            inlineEmptyForwardPayload(),
+            { value: ton("0.3"), bounce: false },
+        ),
+    );
+    waitForTransaction(
+        sourceWallet.sendJettonBurn(
+            owner.address,
+            102,
+            50,
+            owner.address,
+            null,
+            { value: ton("0.2"), bounce: false },
+        ),
+    );
+    waitForTransaction(
+        sourceWallet.sendJettonTransfer(
+            owner.address,
+            103,
+            10000,
+            recipient,
+            owner.address,
+            null,
+            ton("0.01"),
+            inlineEmptyForwardPayload(),
+            { value: ton("0.3"), bounce: false },
+        ),
+    );
+    waitForTransaction(
+        sourceWallet.sendJettonBurn(
+            owner.address,
+            104,
+            10000,
+            owner.address,
+            null,
+            { value: ton("0.2"), bounce: false },
+        ),
+    );
 
     println("OWNER={}", owner.address);
     println("RECIPIENT={}", recipient);

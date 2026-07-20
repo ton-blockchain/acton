@@ -1,9 +1,9 @@
-import "../../lib/build"
-import "../../lib/emulation/network"
-import "../../lib/emulation/scripts"
-import "../../lib/io"
 import "../types/wallet_vesting.types"
 import "../wrappers/WalletVesting.gen"
+import "../../lib/build"
+import "../../lib/io"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 
 const WHITELISTED = "0:3333333333333333333333333333333333333333333333333333333333333333"
 const OWNER = "0:4444444444444444444444444444444444444444444444444444444444444444"
@@ -43,12 +43,14 @@ fun main() {
     });
     waitForTransaction(vesting.deploy(deployer.address, { value: ton("11"), bounce: false }));
     waitForTransaction(vestingSecond.deploy(deployer.address, { value: ton("11"), bounce: false }));
-    waitForTransaction(vesting.sendWalletVestingAddWhitelist(
-        deployer.address,
-        400,
-        beginCell().storeAddress(whitelisted).endCell().beginParse(),
-        { value: ton("0.2"), bounce: false },
-    ));
+    waitForTransaction(
+        vesting.sendWalletVestingAddWhitelist(
+            deployer.address,
+            400,
+            beginCell().storeAddress(whitelisted).endCell().beginParse(),
+            { value: ton("0.2"), bounce: false },
+        ),
+    );
 
     println("OWNER={}", owner);
     println("SENDER={}", deployer.address);

@@ -1,13 +1,13 @@
-import "../../lib/build"
-import "../../lib/emulation/network"
-import "../../lib/emulation/scripts"
-import "../../lib/io"
 import "../types/getgems_nft_fixprice_sale_v3.types"
 import "../types/nft_v1_collection.types"
 import "../types/nft_v1_item.types"
 import "../wrappers/GetgemsNftFixpriceSaleV3.gen"
 import "../wrappers/NftV1Collection.gen"
 import "../wrappers/NftV1Item.gen"
+import "../../lib/build"
+import "../../lib/io"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 
 fun inlineEmptyForwardPayload(): RemainingBitsAndRefs {
     return beginCell().storeUint(0, 1).endCell().beginParse();
@@ -36,17 +36,16 @@ fun main() {
         }.toCell(),
     });
     waitForTransaction(collection.deploy(owner.address, { value: ton("1"), bounce: false }));
-    waitForTransaction(collection.sendNftV1DeployItem(
-        owner.address,
-        200,
-        0,
-        ton("0.2"),
-        {
-            ownerAddress: owner.address,
-            content: createEmptyCell(),
-        },
-        { value: ton("0.4"), bounce: false },
-    ));
+    waitForTransaction(
+        collection.sendNftV1DeployItem(
+            owner.address,
+            200,
+            0,
+            ton("0.2"),
+            { ownerAddress: owner.address, content: createEmptyCell() },
+            { value: ton("0.4"), bounce: false },
+        ),
+    );
 
     val item = NftV1Item.fromAddress(collection.getNftAddressByIndex(0));
     val sale = GetgemsNftFixpriceSaleV3.fromStorage({
@@ -65,16 +64,18 @@ fun main() {
         canDeployByExternal: false,
     });
     waitForTransaction(sale.deploy(owner.address, { value: ton("1"), bounce: false }));
-    waitForTransaction(item.sendNftV1Transfer(
-        owner.address,
-        202,
-        sale.address,
-        owner.address,
-        null,
-        ton("0.05"),
-        inlineEmptyForwardPayload(),
-        { value: ton("0.3"), bounce: false },
-    ));
+    waitForTransaction(
+        item.sendNftV1Transfer(
+            owner.address,
+            202,
+            sale.address,
+            owner.address,
+            null,
+            ton("0.05"),
+            inlineEmptyForwardPayload(),
+            { value: ton("0.3"), bounce: false },
+        ),
+    );
 
     println("OWNER={}", owner.address);
     println("NFT_COLLECTION={}", collection.address);

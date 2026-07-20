@@ -1,11 +1,11 @@
-import "../../lib/build"
-import "../../lib/emulation/network"
-import "../../lib/emulation/scripts"
-import "../../lib/io"
 import "../types/nft_v1_collection.types"
 import "../types/nft_v1_item.types"
 import "../wrappers/NftV1Collection.gen"
 import "../wrappers/NftV1Item.gen"
+import "../../lib/build"
+import "../../lib/io"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
 
 const RECIPIENT = "0:1111111111111111111111111111111111111111111111111111111111111111"
 
@@ -37,51 +37,53 @@ fun main() {
         }.toCell(),
     });
     waitForTransaction(collection.deploy(owner.address, { value: ton("1"), bounce: false }));
-    waitForTransaction(collection.sendNftV1DeployItem(
-        owner.address,
-        199,
-        1,
-        ton("0.2"),
-        {
-            ownerAddress: owner.address,
-            content: createEmptyCell(),
-        },
-        { value: ton("0.4"), bounce: false },
-    ));
-    waitForTransaction(collection.sendNftV1DeployItem(
-        owner.address,
-        200,
-        0,
-        ton("0.2"),
-        {
-            ownerAddress: owner.address,
-            content: createEmptyCell(),
-        },
-        { value: ton("0.4"), bounce: false },
-    ));
+    waitForTransaction(
+        collection.sendNftV1DeployItem(
+            owner.address,
+            199,
+            1,
+            ton("0.2"),
+            { ownerAddress: owner.address, content: createEmptyCell() },
+            { value: ton("0.4"), bounce: false },
+        ),
+    );
+    waitForTransaction(
+        collection.sendNftV1DeployItem(
+            owner.address,
+            200,
+            0,
+            ton("0.2"),
+            { ownerAddress: owner.address, content: createEmptyCell() },
+            { value: ton("0.4"), bounce: false },
+        ),
+    );
 
     val item = NftV1Item.fromAddress(collection.getNftAddressByIndex(0));
     val itemSecond = NftV1Item.fromAddress(collection.getNftAddressByIndex(1));
-    waitForTransaction(item.sendNftV1Transfer(
-        owner.address,
-        201,
-        recipient,
-        owner.address,
-        null,
-        ton("0.01"),
-        inlineEmptyForwardPayload(),
-        { value: ton("0.2"), bounce: false },
-    ));
-    waitForTransaction(item.sendNftV1Transfer(
-        owner.address,
-        203,
-        owner.address,
-        owner.address,
-        null,
-        ton("0.01"),
-        inlineEmptyForwardPayload(),
-        { value: ton("0.2"), bounce: false },
-    ));
+    waitForTransaction(
+        item.sendNftV1Transfer(
+            owner.address,
+            201,
+            recipient,
+            owner.address,
+            null,
+            ton("0.01"),
+            inlineEmptyForwardPayload(),
+            { value: ton("0.2"), bounce: false },
+        ),
+    );
+    waitForTransaction(
+        item.sendNftV1Transfer(
+            owner.address,
+            203,
+            owner.address,
+            owner.address,
+            null,
+            ton("0.01"),
+            inlineEmptyForwardPayload(),
+            { value: ton("0.2"), bounce: false },
+        ),
+    );
 
     println("OWNER={}", owner.address);
     println("RECIPIENT={}", recipient);
