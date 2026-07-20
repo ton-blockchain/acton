@@ -15,7 +15,7 @@ use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::JsonRpcRequest;
 use ton_api::toncenter::v2::responses::JsonRpcResponse;
 
-const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(15);
+const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(45);
 const STOP_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub(crate) struct LocalnetBuilder<'a> {

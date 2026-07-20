@@ -653,7 +653,7 @@ pub struct AccountStateFull {
     pub code_boc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_hash: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub contract_methods: Vec<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_boc: Option<String>,
@@ -1009,5 +1009,21 @@ mod tests {
         .expect("pendingTraces returns null instead of an empty OpenAPI array");
 
         assert!(response.traces.is_empty());
+    }
+
+    #[test]
+    fn account_state_accepts_null_contract_methods() {
+        let state: AccountStateFull = serde_json::from_value(serde_json::json!({
+            "address": "0:B68DE1A8AC80058762D7C2C0E31DF44AF864A8F54CDC85D204321DB803B4FB00",
+            "account_state_hash": "X5b9nGGVrdlr+FYN0HoaNZfLHEBNOBlT91T3Zmmc0b0=",
+            "balance": "6049945",
+            "extra_currencies": {},
+            "status": "active",
+            "contract_methods": null,
+            "interfaces": ["jetton_wallet_v2"]
+        }))
+        .expect("accountStates returns null for unknown contract methods");
+
+        assert!(state.contract_methods.is_empty());
     }
 }

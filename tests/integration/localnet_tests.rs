@@ -5433,11 +5433,11 @@ fn localnet_supports_v3_address_information_endpoint() {
     );
     assert_eq!(
         v3_missing_default_payload["status"].as_str(),
-        Some("uninitialized")
+        Some("uninit")
     );
     assert_eq!(
         v3_missing_use_v2_false_payload["status"].as_str(),
-        Some("uninitialized")
+        Some("uninit")
     );
     assert_eq!(
         v3_missing_default_payload["status"].as_str(),
@@ -5585,9 +5585,10 @@ fn localnet_supports_v3_core_lookup_endpoints() {
             "wallet_interfaces": address_book
                 .get(&wallet_address)
                 .and_then(|row| row.interfaces.clone()),
-            "missing_interfaces_are_null": address_book
+            "missing_interfaces_are_empty": address_book
                 .get(missing_address)
-                .is_some_and(|row| row.interfaces.is_none()),
+                .and_then(|row| row.interfaces.as_ref())
+                .is_some_and(Vec::is_empty),
         },
         "metadata": {
             "is_empty_for_plain_wallets": metadata.is_empty(),
@@ -6518,9 +6519,9 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
             "short_transactions": {
                 "type": short_block_payload["@type"].as_str(),
                 "count": short_block_transactions.len(),
-                "all_modes_are_seven": short_block_transactions
+                "all_modes_are_135": short_block_transactions
                     .iter()
-                    .all(|transaction| transaction["mode"] == 7),
+                    .all(|transaction| transaction["mode"] == 135),
                 "match_extended": short_block_transactions.iter().zip(block_transactions).all(
                     |(short, full)| {
                         short["account"] == full["account"]

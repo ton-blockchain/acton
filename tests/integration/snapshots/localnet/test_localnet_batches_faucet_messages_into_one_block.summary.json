@@ -10,7 +10,7 @@
     },
     "req_count": 40,
     "short_transactions": {
-      "all_modes_are_seven": true,
+      "all_modes_are_135": true,
       "count": 2,
       "match_extended": true,
       "type": "blocks.transactions"

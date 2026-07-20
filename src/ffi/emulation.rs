@@ -59,7 +59,7 @@ use tycho_types::models::{
     ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
     StorageUsedShort, Transaction, TxInfo,
 };
-use tycho_types::num::{Tokens, Uint15};
+use tycho_types::num::{Tokens, Uint15, VarUint24, VarUint56};
 
 const ZERO_RANDOM_SEED_HEX: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -4373,7 +4373,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
     let state_update_old = parse_hash_bytes(&summary.account_state_before.hash)?;
     let state_update_new = parse_hash_bytes(&summary.account_state_after.hash)?;
 
-    let tx_info = build_tx_info_from_v3(Some(&summary.description))?;
+    let tx_info = build_tx_info_from_v3(Some(&summary.description));
     let tx = Transaction {
         account,
         lt,
@@ -4565,9 +4565,9 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
-fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<TxInfo> {
+fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
     let Some(desc) = desc else {
-        return Ok(TxInfo::Ordinary(OrdinaryTxInfo {
+        return TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: false,
             storage_phase: None,
             credit_phase: None,
@@ -4578,7 +4578,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<
             aborted: true,
             bounce_phase: None,
             destroyed: false,
-        }));
+        });
     };
 
     let compute_phase = match desc.compute_ph.as_ref() {
@@ -4594,19 +4594,19 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<
                 .gas_used
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_limit: cp
                 .gas_limit
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_credit: cp
                 .gas_credit
                 .as_deref()
                 .and_then(|s| s.parse::<u32>().ok())
-                .map(tycho_types::num::VarUint24::new),
+                .map(VarUint24::new),
             mode: cp.mode.unwrap_or(0),
             exit_code: cp.exit_code.unwrap_or(0),
             exit_arg: cp.exit_arg,
@@ -4643,64 +4643,54 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<
         status_change: parse_account_status_change(sp.status_change.as_deref()),
     });
 
-    let action_phase = desc
-        .action
-        .as_ref()
-        .map(|ap| {
-            Ok::<_, anyhow::Error>(ActionPhase {
-                success: ap.success.unwrap_or(false),
-                valid: ap.valid.unwrap_or(false),
-                no_funds: ap.no_funds.unwrap_or(false),
-                status_change: parse_account_status_change(ap.status_change.as_deref()),
-                total_fwd_fees: ap
-                    .total_fwd_fees
+    let action_phase = desc.action.as_ref().map(|ap| ActionPhase {
+        success: ap.success.unwrap_or(false),
+        valid: ap.valid.unwrap_or(false),
+        no_funds: ap.no_funds.unwrap_or(false),
+        status_change: parse_account_status_change(ap.status_change.as_deref()),
+        total_fwd_fees: ap
+            .total_fwd_fees
+            .as_deref()
+            .and_then(|s| s.parse::<u128>().ok())
+            .map(Tokens::new),
+        total_action_fees: ap
+            .total_action_fees
+            .as_deref()
+            .and_then(|s| s.parse::<u128>().ok())
+            .map(Tokens::new),
+        result_code: ap.result_code.unwrap_or(0),
+        result_arg: ap.result_arg,
+        total_actions: ap.tot_actions.unwrap_or_default() as u16,
+        special_actions: ap.spec_actions.unwrap_or_default() as u16,
+        skipped_actions: ap.skipped_actions.unwrap_or_default() as u16,
+        messages_created: ap.msgs_created.unwrap_or_default() as u16,
+        action_list_hash: ap
+            .action_list_hash
+            .as_deref()
+            .map(parse_hash_bytes)
+            .transpose()
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        total_message_size: ap
+            .tot_msg_size
+            .as_ref()
+            .map(|s| StorageUsedShort {
+                cells: s
+                    .cells
                     .as_deref()
-                    .and_then(|s| s.parse::<u128>().ok())
-                    .map(Tokens::new),
-                total_action_fees: ap
-                    .total_action_fees
-                    .as_deref()
-                    .and_then(|s| s.parse::<u128>().ok())
-                    .map(Tokens::new),
-                result_code: ap.result_code.unwrap_or(0),
-                result_arg: ap.result_arg,
-                total_actions: u16::try_from(ap.tot_actions.unwrap_or_default())
-                    .context("TonCenter action count does not fit TVM ActionPhase")?,
-                special_actions: u16::try_from(ap.spec_actions.unwrap_or_default())
-                    .context("TonCenter special action count does not fit TVM ActionPhase")?,
-                skipped_actions: u16::try_from(ap.skipped_actions.unwrap_or_default())
-                    .context("TonCenter skipped action count does not fit TVM ActionPhase")?,
-                messages_created: u16::try_from(ap.msgs_created.unwrap_or_default())
-                    .context("TonCenter message count does not fit TVM ActionPhase")?,
-                action_list_hash: ap
-                    .action_list_hash
-                    .as_deref()
-                    .map(parse_hash_bytes)
-                    .transpose()
-                    .ok()
-                    .flatten()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
-                total_message_size: ap
-                    .tot_msg_size
-                    .as_ref()
-                    .map(|s| StorageUsedShort {
-                        cells: s
-                            .cells
-                            .as_deref()
-                            .and_then(|v| v.parse::<u64>().ok())
-                            .map(tycho_types::num::VarUint56::new)
-                            .unwrap_or_default(),
-                        bits: s
-                            .bits
-                            .as_deref()
-                            .and_then(|v| v.parse::<u64>().ok())
-                            .map(tycho_types::num::VarUint56::new)
-                            .unwrap_or_default(),
-                    })
+                bits: s
+                    .bits
+                    .as_deref()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
             })
-        })
-        .transpose()?;
+            .unwrap_or_default(),
+    });
 
     let credit_phase = desc
         .credit_ph
@@ -4717,7 +4707,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<
             },
         });
 
-    Ok(TxInfo::Ordinary(OrdinaryTxInfo {
+    TxInfo::Ordinary(OrdinaryTxInfo {
         credit_first: desc.credit_first.unwrap_or(false),
         storage_phase,
         credit_phase,
@@ -4726,7 +4716,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<
         aborted: desc.aborted.unwrap_or(false),
         bounce_phase: None,
         destroyed: desc.destroyed.unwrap_or(false),
-    }))
+    })
 }
 
 fn parse_compute_phase_skip_reason(s: Option<&str>) -> ComputePhaseSkipReason {

@@ -1,6 +1,6 @@
 {
   "address_book": {
-    "missing_interfaces_are_null": true,
+    "missing_interfaces_are_empty": true,
     "preserves_missing_key": true,
     "preserves_wallet_key": true,
     "wallet_interfaces": [
