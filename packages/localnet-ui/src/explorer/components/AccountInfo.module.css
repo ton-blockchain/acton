@@ -539,20 +539,6 @@
   background: var(--acton-color-surface-group);
 }
 
-.statusBar {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 16px;
-  min-height: 18px;
-  margin-top: auto;
-  padding-top: 0;
-  border-top: 0;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  line-height: 18px;
-}
-
 .status {
   display: inline-flex;
   align-items: center;
@@ -594,21 +580,9 @@
   color: var(--acton-color-text-muted);
 }
 
-.statusAddress {
-  display: block;
-  flex: 0 1 auto;
-  min-width: 0;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  line-height: 18px;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .externalLink {
   display: inline-flex;
+  position: relative;
   align-items: center;
   gap: 6px;
   color: var(--acton-color-accent);
@@ -625,6 +599,7 @@
 
 .qrPanel {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   width: 132px;
@@ -809,9 +784,5 @@
   .renameSaveButton,
   .renameCancelButton {
     width: 100%;
-  }
-
-  .statusBar {
-    align-items: flex-start;
   }
 }

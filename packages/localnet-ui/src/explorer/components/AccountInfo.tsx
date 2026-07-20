@@ -201,7 +201,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const statusInfo = getStatusInfo(state)
   const shortAddress = formatAddress(displayAddress, true, addressFormat)
   const addressRowText = hasContextCard ? shortAddress : displayAddress
-  const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
   const isNameUnchanged = editValue.trim() === (displayName || "")
   const stateLoading = accountLoading
@@ -397,6 +396,19 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                     {copied ? <Check size={16} className={styles.saveIcon} /> : <Copy size={16} />}
                   </button>
                 </span>
+              </div>
+            </div>
+
+            <div className={styles.infoRow}>
+              <div className={styles.label}>Status</div>
+              <div className={styles.rowValue}>
+                {stateLoading ? (
+                  <div className={`${styles.skeleton} ${styles.statusSkeleton}`} />
+                ) : (
+                  <span className={`${styles.status} ${styles[statusInfo.className]}`}>
+                    {statusInfo.label}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -645,29 +657,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               </div>
             </div>
           </div>
-
-          <div className={styles.statusBar}>
-            {stateLoading ? (
-              <div className={`${styles.skeleton} ${styles.statusSkeleton}`} />
-            ) : (
-              <span className={`${styles.status} ${styles[statusInfo.className]}`}>
-                {statusInfo.label}
-              </span>
-            )}
-            <span className={styles.statusAddress}>{statusAddress}</span>
-            {tonscanUrl && (
-              <>
-                <a
-                  className={styles.externalLink}
-                  href={tonscanUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  tonscan.org
-                </a>
-              </>
-            )}
-          </div>
         </div>
 
         <Popover
@@ -690,6 +679,11 @@ export const AccountInfo: FC<AccountInfoProps> = ({
 
         <div className={styles.qrPanel} aria-label="Address QR code">
           {qrCode}
+          {tonscanUrl && (
+            <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
+              tonscan.org
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -854,15 +848,4 @@ function formatTokenAmount(value: string, decimals: number): string {
 
 function formatCollectibleCount(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? "NFT" : "NFTs"}`
-}
-
-function formatRawAddress(address: string): string {
-  const [workchain, hash] = toRawAddress(address).trim().split(":")
-  if (!workchain || !hash) {
-    return address
-  }
-  if (hash.length <= 11) {
-    return `${workchain}:${hash}`
-  }
-  return `${workchain}:${hash.slice(0, 3)}…${hash.slice(-5)}`
 }

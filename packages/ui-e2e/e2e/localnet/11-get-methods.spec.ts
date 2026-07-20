@@ -100,6 +100,44 @@ const mockGetMethodError = async (page: Page) => {
 }
 
 test.describe("Account get methods", () => {
+  test("shows status in the account details and the explorer link under the QR code", async ({
+    page,
+  }) => {
+    await page.route(
+      url => url.pathname === "/acton_nodeInfo",
+      async route =>
+        route.fulfill({
+          json: {
+            current_unix_time: 1_784_192_438,
+            time_offset_seconds: 0,
+            next_block_timestamp: null,
+            uptime_seconds: 42,
+            last_block_seqno: 2,
+            state_source: "snapshot",
+            fork_network: "mainnet",
+            fork_block_number: 1,
+            network_conditions: {response_delay_ms: 0},
+          },
+        }),
+    )
+    await openGetMethods(page)
+
+    const statusRow = page.getByText("Status", {exact: true}).locator("..")
+    await expect(statusRow).toContainText("Active")
+    await expect(statusRow.locator("xpath=preceding-sibling::*[1]")).toContainText("Address")
+    await expect(statusRow.locator("xpath=following-sibling::*[1]")).toContainText("Balance")
+    await expect(page.getByText("0:302…fffed", {exact: true})).toHaveCount(0)
+
+    const qrPanel = page.locator('[aria-label="Address QR code"]').filter({
+      has: page.getByRole("link", {name: "tonscan.org"}),
+    })
+    await expect(qrPanel).toHaveCount(1)
+    await expect(qrPanel.getByRole("link", {name: "tonscan.org"})).toHaveAttribute(
+      "href",
+      /https:\/\/tonscan\.org\/address\//,
+    )
+  })
+
   test("shows network-aware address formats on hover", async ({page}) => {
     await openGetMethods(page)
 
