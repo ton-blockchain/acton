@@ -1,13 +1,16 @@
 use crate::api::toncenter_v3;
-use crate::localnet::{Localnet, LocalnetTransaction, convert_to_tx_struct};
-use crate::storage::{JettonWalletMeta, TraceNode};
+use crate::localnet::{
+    Localnet, LocalnetJettonWalletsQuery, LocalnetNftItemsOrder, LocalnetNftItemsQuery,
+    LocalnetTransaction, convert_to_tx_struct,
+};
+use crate::storage;
+use crate::storage::TraceNode;
 use crate::types::{Addr, Hash256};
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
 use std::collections::{BTreeSet, HashMap};
+use ton_api::toncenter::streaming::v2 as streaming;
+use ton_api::toncenter::v3;
 use ton_indexer::categorize_wallet;
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, Copy, Debug)]
@@ -15,87 +18,12 @@ pub struct StreamingCommitEvent {
     pub tx_hash: Hash256,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StreamingFinality {
-    Pending,
-    Confirmed,
-    #[default]
-    Finalized,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StreamingEventType {
-    Transactions,
-    Actions,
-    Trace,
-    AccountStateChange,
-    JettonsChange,
-    TraceInvalidated,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct StreamingSubscribeRequest {
-    pub id: Option<String>,
-    #[serde(default)]
-    pub addresses: Vec<String>,
-    #[serde(default)]
-    pub trace_external_hash_norms: Vec<String>,
-    #[serde(default)]
-    pub types: Vec<StreamingEventType>,
-    pub min_finality: Option<StreamingFinality>,
-    #[serde(default)]
-    pub action_types: Vec<String>,
-    #[serde(default)]
-    pub supported_action_types: Vec<String>,
-    pub include_address_book: Option<bool>,
-    pub include_metadata: Option<bool>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct StreamingUnsubscribeRequest {
-    pub id: Option<String>,
-    #[serde(default)]
-    pub addresses: Vec<String>,
-    #[serde(default)]
-    pub trace_external_hash_norms: Vec<String>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum StreamingOperation {
-    Ping,
-    Subscribe,
-    Unsubscribe,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct StreamingEnvelope {
-    pub id: Option<String>,
-    pub operation: StreamingOperation,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct StreamingStatusResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    pub status: &'static str,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct StreamingErrorResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    pub error: String,
-}
-
 #[derive(Clone, Debug)]
 pub struct StreamingSubscription {
     pub addresses: BTreeSet<Addr>,
     pub trace_external_hash_norms: BTreeSet<String>,
-    pub event_types: BTreeSet<StreamingEventType>,
-    pub min_finality: StreamingFinality,
+    pub event_types: BTreeSet<streaming::EventType>,
+    pub min_finality: streaming::Finality,
     pub action_types: BTreeSet<String>,
     pub supported_action_types: BTreeSet<String>,
     pub include_address_book: bool,
@@ -108,7 +36,7 @@ impl Default for StreamingSubscription {
             addresses: BTreeSet::new(),
             trace_external_hash_norms: BTreeSet::new(),
             event_types: BTreeSet::new(),
-            min_finality: StreamingFinality::Finalized,
+            min_finality: streaming::Finality::Finalized,
             action_types: BTreeSet::new(),
             supported_action_types: BTreeSet::from(["latest".to_string()]),
             include_address_book: false,
@@ -118,12 +46,12 @@ impl Default for StreamingSubscription {
 }
 
 impl StreamingSubscription {
-    pub fn from_subscribe_request(req: &StreamingSubscribeRequest) -> anyhow::Result<Self> {
+    pub fn from_subscribe_request(req: &streaming::Subscription) -> anyhow::Result<Self> {
         validate_event_types(&req.types)?;
 
         let addresses = normalize_addresses(&req.addresses)?;
         let trace_external_hash_norms =
-            normalize_trace_external_hash_norms(&req.trace_external_hash_norms)?;
+            validate_trace_external_hash_norms(&req.trace_external_hash_norms)?;
         validate_subscription_shape(&req.types, &addresses, &trace_external_hash_norms)?;
 
         let supported_action_types = if req.supported_action_types.is_empty() {
@@ -144,9 +72,9 @@ impl StreamingSubscription {
         })
     }
 
-    pub fn unsubscribe(&mut self, req: &StreamingUnsubscribeRequest) -> anyhow::Result<()> {
+    pub fn unsubscribe(&mut self, req: &streaming::UnsubscribeRequest) -> anyhow::Result<()> {
         let addresses = normalize_addresses(&req.addresses)?;
-        let traces = normalize_trace_external_hash_norms(&req.trace_external_hash_norms)?;
+        let traces = validate_trace_external_hash_norms(&req.trace_external_hash_norms)?;
 
         for address in addresses {
             self.addresses.remove(&address);
@@ -157,17 +85,17 @@ impl StreamingSubscription {
         Ok(())
     }
 
-    fn has_type(&self, event_type: StreamingEventType) -> bool {
+    fn has_type(&self, event_type: streaming::EventType) -> bool {
         self.event_types.contains(&event_type)
     }
 
-    fn accepts_finality(&self, finality: StreamingFinality) -> bool {
+    fn accepts_finality(&self, finality: streaming::Finality) -> bool {
         finality >= self.min_finality
     }
 
     fn interested_in_any_address(
         &self,
-        event_type: StreamingEventType,
+        event_type: streaming::EventType,
         addresses: &[Addr],
     ) -> bool {
         self.has_type(event_type)
@@ -177,14 +105,14 @@ impl StreamingSubscription {
     }
 
     fn interested_in_trace(&self, trace_external_hash_norm: &str) -> bool {
-        self.has_type(StreamingEventType::Trace)
+        self.has_type(streaming::EventType::Trace)
             && self
                 .trace_external_hash_norms
                 .contains(trace_external_hash_norm)
     }
 }
 
-pub fn validate_unsubscribe_request(req: &StreamingUnsubscribeRequest) -> anyhow::Result<()> {
+pub fn validate_unsubscribe_request(req: &streaming::UnsubscribeRequest) -> anyhow::Result<()> {
     if req.addresses.is_empty() && req.trace_external_hash_norms.is_empty() {
         anyhow::bail!("addresses or trace_external_hash_norms are required");
     }
@@ -195,9 +123,9 @@ pub async fn notifications_for_commit(
     node: &Localnet,
     subscription: &StreamingSubscription,
     commit: StreamingCommitEvent,
-) -> anyhow::Result<Vec<Value>> {
+) -> anyhow::Result<Vec<streaming::Notification>> {
     let trace = node.get_traces(commit.tx_hash).await?;
-    let trace_external_hash_norm = trace_external_hash_norm(&trace);
+    let trace_external_hash_norm = trace.effective_external_hash_norm().to_base64();
     let transactions = collect_trace_transactions(&trace)?;
     let event_addresses = collect_transaction_addresses(&transactions);
     let current_account = transactions
@@ -208,9 +136,9 @@ pub async fn notifications_for_commit(
     let mut notifications = Vec::new();
 
     for finality in [
-        StreamingFinality::Pending,
-        StreamingFinality::Confirmed,
-        StreamingFinality::Finalized,
+        streaming::Finality::Pending,
+        streaming::Finality::Confirmed,
+        streaming::Finality::Finalized,
     ] {
         if !subscription.accepts_finality(finality) {
             continue;
@@ -253,7 +181,10 @@ pub async fn notifications_for_commit(
         }
     }
 
-    for finality in [StreamingFinality::Confirmed, StreamingFinality::Finalized] {
+    for finality in [
+        streaming::Finality::Confirmed,
+        streaming::Finality::Finalized,
+    ] {
         if !subscription.accepts_finality(finality) {
             continue;
         }
@@ -276,25 +207,22 @@ pub async fn notifications_for_commit(
     Ok(notifications)
 }
 
-fn validate_event_types(types: &[StreamingEventType]) -> anyhow::Result<()> {
+fn validate_event_types(types: &[streaming::EventType]) -> anyhow::Result<()> {
     if types.is_empty() {
         anyhow::bail!("types are required for subscription");
-    }
-    if types.contains(&StreamingEventType::TraceInvalidated) {
-        anyhow::bail!("invalid event type: trace_invalidated");
     }
     Ok(())
 }
 
 fn validate_subscription_shape(
-    types: &[StreamingEventType],
+    types: &[streaming::EventType],
     addresses: &BTreeSet<Addr>,
     trace_external_hash_norms: &BTreeSet<String>,
 ) -> anyhow::Result<()> {
-    let has_trace_type = types.contains(&StreamingEventType::Trace);
+    let has_trace_type = types.contains(&streaming::EventType::Trace);
     let has_address_types = types
         .iter()
-        .any(|event_type| *event_type != StreamingEventType::Trace);
+        .any(|event_type| *event_type != streaming::EventType::Trace);
 
     if !trace_external_hash_norms.is_empty() && !has_trace_type {
         anyhow::bail!("trace_external_hash_norms requires type \"trace\"");
@@ -312,13 +240,13 @@ fn normalize_addresses(addresses: &[String]) -> anyhow::Result<BTreeSet<Addr>> {
     addresses
         .iter()
         .map(|address| {
-            Localnet::parse_addr(address)
+            Addr::parse(address)
                 .with_context(|| format!("invalid address in subscription: {address}"))
         })
         .collect()
 }
 
-fn normalize_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTreeSet<String>> {
+fn validate_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTreeSet<String>> {
     let mut normalized = BTreeSet::new();
     for trace in traces {
         let trace = trace.trim();
@@ -328,13 +256,6 @@ fn normalize_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTre
         normalized.insert(trace.to_string());
     }
     Ok(normalized)
-}
-
-fn trace_external_hash_norm(trace: &TraceNode) -> String {
-    trace
-        .external_hash
-        .unwrap_or(trace.transaction.meta.tx_hash)
-        .to_base64()
 }
 
 fn collect_trace_transactions(trace: &TraceNode) -> anyhow::Result<Vec<LocalnetTransaction>> {
@@ -390,9 +311,9 @@ async fn transactions_notification(
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     transactions: &[LocalnetTransaction],
-    finality: StreamingFinality,
-) -> anyhow::Result<Option<Value>> {
-    if !subscription.has_type(StreamingEventType::Transactions) {
+    finality: streaming::Finality,
+) -> anyhow::Result<Option<streaming::Notification>> {
+    if !subscription.has_type(streaming::EventType::Transactions) {
         return Ok(None);
     }
 
@@ -405,24 +326,20 @@ async fn transactions_notification(
         return Ok(None);
     }
 
-    let mapped = toncenter_v3::map_transactions_response(&filtered);
-    let mut notification = json!({
-        "type": StreamingEventType::Transactions,
-        "finality": finality,
-        "trace_external_hash_norm": trace_external_hash_norm,
-        "transactions": mapped
-            .get("transactions")
-            .cloned()
-            .unwrap_or_else(|| json!([])),
-    });
-    attach_extra_data(
+    let response = toncenter_v3::map_transactions_response(&filtered);
+    let (address_book, metadata) = build_extra_data(
         node,
         subscription,
-        &mut notification,
-        collect_transaction_addresses(&filtered),
+        &collect_transaction_addresses(&filtered),
     )
     .await?;
-    Ok(Some(notification))
+    Ok(Some(streaming::Notification::Transactions {
+        finality,
+        trace_external_hash_norm: trace_external_hash_norm.to_owned(),
+        transactions: response.transactions,
+        address_book,
+        metadata,
+    }))
 }
 
 async fn actions_notification(
@@ -430,30 +347,24 @@ async fn actions_notification(
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     event_addresses: &BTreeSet<Addr>,
-    finality: StreamingFinality,
-) -> anyhow::Result<Option<Value>> {
+    finality: streaming::Finality,
+) -> anyhow::Result<Option<streaming::Notification>> {
     if !subscription.interested_in_any_address(
-        StreamingEventType::Actions,
+        streaming::EventType::Actions,
         &event_addresses.iter().copied().collect::<Vec<_>>(),
     ) || !subscription.action_types.is_empty()
     {
         return Ok(None);
     }
 
-    let mut notification = json!({
-        "type": StreamingEventType::Actions,
-        "finality": finality,
-        "trace_external_hash_norm": trace_external_hash_norm,
-        "actions": [],
-    });
-    attach_extra_data(
-        node,
-        subscription,
-        &mut notification,
-        event_addresses.clone(),
-    )
-    .await?;
-    Ok(Some(notification))
+    let (address_book, metadata) = build_extra_data(node, subscription, event_addresses).await?;
+    Ok(Some(streaming::Notification::Actions {
+        finality,
+        trace_external_hash_norm: trace_external_hash_norm.to_owned(),
+        actions: Vec::new(),
+        address_book,
+        metadata,
+    }))
 }
 
 async fn trace_notification(
@@ -461,53 +372,48 @@ async fn trace_notification(
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     trace: &TraceNode,
-    finality: StreamingFinality,
-) -> anyhow::Result<Option<Value>> {
+    finality: streaming::Finality,
+) -> anyhow::Result<Option<streaming::Notification>> {
     if !subscription.interested_in_trace(trace_external_hash_norm) {
         return Ok(None);
     }
 
-    let mapped = toncenter_v3::map_traces(trace);
-    let Some(trace_entry) = mapped
-        .get("traces")
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-    else {
-        return Ok(None);
-    };
-
+    let mut mapped = toncenter_v3::map_traces(trace);
+    let trace_entry = mapped
+        .traces
+        .pop()
+        .context("typed trace mapper returned no traces")?;
     let transactions = collect_trace_transactions(trace)?;
-    let mut notification = json!({
-        "type": StreamingEventType::Trace,
-        "finality": finality,
-        "trace_external_hash_norm": trace_external_hash_norm,
-        "trace": trace_entry
-            .get("trace")
-            .cloned()
-            .unwrap_or_else(|| json!({})),
-        "transactions": trace_entry
-            .get("transactions")
-            .cloned()
-            .unwrap_or_else(|| json!({})),
-        "actions": [],
-    });
-    attach_extra_data(
+    let (address_book, metadata) = build_extra_data(
         node,
         subscription,
-        &mut notification,
-        collect_transaction_addresses(&transactions),
+        &collect_transaction_addresses(&transactions),
     )
     .await?;
-    Ok(Some(notification))
+
+    Ok(Some(streaming::Notification::Trace {
+        finality,
+        trace_external_hash_norm: trace_external_hash_norm.to_owned(),
+        trace: Box::new(
+            trace_entry
+                .trace
+                .context("typed trace mapper omitted trace tree")?,
+        ),
+        transactions: trace_entry.transactions,
+        actions: Some(trace_entry.actions),
+        address_book,
+        metadata,
+    }))
 }
 
 async fn account_state_notification(
     node: &Localnet,
     subscription: &StreamingSubscription,
     account: Addr,
-    finality: StreamingFinality,
-) -> anyhow::Result<Option<Value>> {
-    if !subscription.interested_in_any_address(StreamingEventType::AccountStateChange, &[account]) {
+    finality: streaming::Finality,
+) -> anyhow::Result<Option<streaming::Notification>> {
+    if !subscription.interested_in_any_address(streaming::EventType::AccountStateChange, &[account])
+    {
         return Ok(None);
     }
 
@@ -515,33 +421,34 @@ async fn account_state_notification(
         .get_address_information(account.to_string(), None)
         .await?;
     let state = map_account_state(&state);
-    Ok(Some(json!({
-        "type": StreamingEventType::AccountStateChange,
-        "finality": finality,
-        "account": account.to_string(),
-        "state": state,
-    })))
+
+    Ok(Some(streaming::Notification::AccountStateChange {
+        finality,
+        account: account.to_string(),
+        state,
+    }))
 }
 
 async fn jettons_notification(
     node: &Localnet,
     subscription: &StreamingSubscription,
     account: Addr,
-    finality: StreamingFinality,
-) -> anyhow::Result<Option<Value>> {
-    if !subscription.has_type(StreamingEventType::JettonsChange) {
+    finality: streaming::Finality,
+) -> anyhow::Result<Option<streaming::Notification>> {
+    if !subscription.has_type(streaming::EventType::JettonsChange) {
         return Ok(None);
     }
 
     let Some(wallet) = node
-        .get_jetton_wallets(
-            Some(account.to_string()),
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses: vec![account.to_string()],
+            owner_addresses: Vec::new(),
+            jetton_addresses: Vec::new(),
+            exclude_zero_balance: Some(false),
+            sort: None,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?
         .into_iter()
         .next()
@@ -555,71 +462,53 @@ async fn jettons_notification(
         return Ok(None);
     }
 
-    let mut notification = json!({
-        "type": StreamingEventType::JettonsChange,
-        "finality": finality,
-        "jetton": map_jetton_wallet(&wallet),
-    });
-    attach_extra_data(
+    let (address_book, metadata) = build_extra_data(
         node,
         subscription,
-        &mut notification,
-        BTreeSet::from([wallet.address, wallet.owner_address, wallet.jetton_address]),
+        &BTreeSet::from([wallet.address, wallet.owner_address, wallet.jetton_address]),
     )
     .await?;
-    Ok(Some(notification))
+
+    Ok(Some(streaming::Notification::JettonsChange {
+        finality,
+        jetton: toncenter_v3::map_jetton_wallet(&wallet),
+        address_book,
+        metadata,
+    }))
 }
 
-fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> Value {
-    let mapped =
-        toncenter_v3::map_account_states(std::slice::from_ref(state), &HashMap::new(), true);
-    mapped
-        .get("accounts")
-        .and_then(Value::as_array)
-        .and_then(|accounts| accounts.first())
-        .cloned()
-        .unwrap_or_else(|| json!({}))
-}
-
-fn map_jetton_wallet(wallet: &JettonWalletMeta) -> Value {
-    let wallets = vec![wallet.clone()];
-    toncenter_v3::map_jetton_wallets(&wallets)
-        .get("jetton_wallets")
-        .and_then(Value::as_array)
-        .and_then(|wallets| wallets.first())
-        .cloned()
-        .unwrap_or_else(|| json!({}))
-}
-
-async fn attach_extra_data(
-    node: &Localnet,
-    subscription: &StreamingSubscription,
-    notification: &mut Value,
-    addresses: BTreeSet<Addr>,
-) -> anyhow::Result<()> {
-    if !subscription.include_address_book && !subscription.include_metadata {
-        return Ok(());
+fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> v3::AccountState {
+    v3::AccountState {
+        hash: state.account_state_hash.to_base64(),
+        balance: Some(state.balance.to_string()),
+        account_status: Some(
+            match state.state {
+                storage::AccountStatus::Active => "active",
+                storage::AccountStatus::Uninit => "uninit",
+                storage::AccountStatus::Frozen => "frozen",
+                storage::AccountStatus::Nonexist => "nonexist",
+            }
+            .to_owned(),
+        ),
+        code_boc: None,
+        code_hash: state.code_hash.as_ref().map(Hash256::to_base64),
+        data_boc: None,
+        data_hash: state.data_hash.as_ref().map(Hash256::to_base64),
+        extra_currencies: Some(HashMap::new()),
+        frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
     }
-
-    let (address_book, metadata) = build_extra_data(node, subscription, &addresses).await?;
-    if let Some(root) = notification.as_object_mut() {
-        if let Some(address_book) = address_book {
-            root.insert("address_book".to_string(), address_book);
-        }
-        if let Some(metadata) = metadata {
-            root.insert("metadata".to_string(), metadata);
-        }
-    }
-    Ok(())
 }
 
 async fn build_extra_data(
     node: &Localnet,
     subscription: &StreamingSubscription,
     addresses: &BTreeSet<Addr>,
-) -> anyhow::Result<(Option<Value>, Option<Value>)> {
-    let mut address_book = Map::new();
-    let mut metadata = Map::new();
+) -> anyhow::Result<(Option<v3::AddressBook>, Option<v3::Metadata>)> {
+    if !subscription.include_address_book && !subscription.include_metadata {
+        return Ok((None, None));
+    }
+    let mut address_book = v3::AddressBook::new();
+    let mut metadata = v3::Metadata::new();
     let mut extra_jetton_masters = BTreeSet::new();
 
     for address in addresses {
@@ -629,21 +518,21 @@ async fn build_extra_data(
         if subscription.include_address_book {
             address_book.insert(
                 address.to_string(),
-                json!({
-                    "user_friendly": as_user_friendly(*address),
-                    "domain": Value::Null,
-                    "interfaces": info.interfaces.into_iter().collect::<Vec<_>>(),
-                }),
+                v3::AddressBookRow {
+                    user_friendly: Some(address.as_user_friendly()),
+                    domain: None,
+                    interfaces: Some(info.interfaces.into_iter().collect()),
+                },
             );
         }
 
         if subscription.include_metadata && !info.token_info.is_empty() {
             metadata.insert(
                 address.to_string(),
-                json!({
-                    "is_indexed": true,
-                    "token_info": info.token_info,
-                }),
+                v3::AddressMetadata {
+                    is_indexed: true,
+                    token_info: info.token_info,
+                },
             );
         }
     }
@@ -658,29 +547,25 @@ async fn build_extra_data(
             if !info.token_info.is_empty() {
                 metadata.insert(
                     key,
-                    json!({
-                        "is_indexed": true,
-                        "token_info": info.token_info,
-                    }),
+                    v3::AddressMetadata {
+                        is_indexed: true,
+                        token_info: info.token_info,
+                    },
                 );
             }
         }
     }
 
     Ok((
-        subscription
-            .include_address_book
-            .then_some(Value::Object(address_book)),
-        subscription
-            .include_metadata
-            .then_some(Value::Object(metadata)),
+        subscription.include_address_book.then_some(address_book),
+        subscription.include_metadata.then_some(metadata),
     ))
 }
 
 #[derive(Default)]
 struct AddressInfo {
     interfaces: BTreeSet<String>,
-    token_info: Vec<Value>,
+    token_info: Vec<v3::TokenInfo>,
     extra_jetton_masters: BTreeSet<Addr>,
 }
 
@@ -700,14 +585,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let wallets = node
-        .get_jetton_wallets(
-            Some(address_str.clone()),
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses: vec![address_str.clone()],
+            owner_addresses: Vec::new(),
+            jetton_addresses: Vec::new(),
+            exclude_zero_balance: Some(false),
+            sort: None,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(wallet) = wallets.first() {
         info.interfaces.insert("jetton_wallet".to_string());
@@ -717,7 +603,7 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let masters = node
-        .get_jetton_masters(Some(address_str.clone()), None, Some(1), Some(0))
+        .get_jetton_masters(vec![address_str.clone()], Vec::new(), Some(1), Some(0))
         .await?;
     if let Some(master) = masters.first() {
         info.interfaces.insert("jetton_master".to_string());
@@ -726,15 +612,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let items = node
-        .get_nft_items(
-            Some(address_str.clone()),
-            None,
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_nft_items(LocalnetNftItemsQuery {
+            addresses: vec![address_str.clone()],
+            owner_addresses: Vec::new(),
+            collection_addresses: Vec::new(),
+            indexes: Vec::new(),
+            order: LocalnetNftItemsOrder::Insertion,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(item) = items.first() {
         info.interfaces.insert("nft_item".to_string());
@@ -743,15 +629,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let collections = node
-        .get_nft_items(
-            None,
-            None,
-            Some(address_str),
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_nft_items(LocalnetNftItemsQuery {
+            addresses: Vec::new(),
+            owner_addresses: Vec::new(),
+            collection_addresses: vec![address_str],
+            indexes: Vec::new(),
+            order: LocalnetNftItemsOrder::CollectionIndex,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(item) = collections.first() {
         info.interfaces.insert("nft_collection".to_string());
@@ -760,18 +646,4 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     Ok(info)
-}
-
-fn as_user_friendly(address: Addr) -> String {
-    let workchain = i8::try_from(address.workchain).ok().unwrap_or_default();
-    let std_addr = StdAddr::new(workchain, HashBytes(address.addr));
-    DisplayBase64StdAddr {
-        addr: &std_addr,
-        flags: Base64StdAddrFlags {
-            testnet: false,
-            base64_url: true,
-            bounceable: false,
-        },
-    }
-    .to_string()
 }

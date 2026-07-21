@@ -41,8 +41,14 @@ pub(crate) enum LocalnetError {
     #[error("Protocol violation: {message}")]
     ProtocolViolation { message: String },
 
+    #[error("{message}")]
+    InvalidRequest { message: String },
+
     #[error("Timed out waiting for masterchain seqno {seqno}")]
     MasterchainWaitTimeout { seqno: u32 },
+
+    #[error("transaction was not found")]
+    TransactionNotFound,
 }
 
 impl LocalnetError {
@@ -52,13 +58,22 @@ impl LocalnetError {
         }
     }
 
+    pub(crate) fn invalid_request(message: impl Into<String>) -> Self {
+        Self::InvalidRequest {
+            message: message.into(),
+        }
+    }
+
     /// Maps typed localnet failures to the liteserver status codes used by TON.
     pub(crate) const fn lite_server_code(&self) -> LiteServerErrorCode {
         match self {
             Self::BlockNotFound { .. }
             | Self::BlockLookupNotFound { .. }
-            | Self::BlockDataNotFound { .. } => LiteServerErrorCode::NotReady,
-            Self::ProtocolViolation { .. } => LiteServerErrorCode::ProtoViolation,
+            | Self::BlockDataNotFound { .. }
+            | Self::TransactionNotFound => LiteServerErrorCode::NotReady,
+            Self::ProtocolViolation { .. } | Self::InvalidRequest { .. } => {
+                LiteServerErrorCode::ProtoViolation
+            }
             Self::MasterchainWaitTimeout { .. } => LiteServerErrorCode::Timeout,
         }
     }

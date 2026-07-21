@@ -37,9 +37,7 @@ use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
-use ton_api::{
-    Network, TonApiClient, V3MessageSummary, V3Trace, V3TransactionSummary, V3TxDescription,
-};
+use ton_api::{Network, TonApiClient, toncenter::v3};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
@@ -61,7 +59,7 @@ use tycho_types::models::{
     ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
     StorageUsedShort, Transaction, TxInfo,
 };
-use tycho_types::num::{Tokens, Uint15};
+use tycho_types::num::{Tokens, Uint15, VarUint24, VarUint56};
 
 const ZERO_RANDOM_SEED_HEX: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -884,7 +882,7 @@ fn tx_cell_to_send_result_tuple(
 
 pub(crate) struct V3TraceTransaction {
     pub(crate) hash: String,
-    pub(crate) summary: V3TransactionSummary,
+    pub(crate) summary: v3::Transaction,
     pub(crate) tx_cell: Cell,
     pub(crate) transaction: Transaction,
     pub(crate) parent_lt: Option<u64>,
@@ -907,7 +905,9 @@ pub(crate) enum V3TraceTransactions {
     Pending { tx_hash: String },
 }
 
-pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
+pub(crate) fn build_v3_trace_transactions(
+    trace: &v3::Trace,
+) -> anyhow::Result<V3TraceTransactions> {
     let mut transactions = Vec::with_capacity(trace.transactions_order.len());
     for tx_hash in &trace.transactions_order {
         let Some(summary) = trace.transactions.get(tx_hash) else {
@@ -972,8 +972,8 @@ pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3T
     Ok(V3TraceTransactions::Ready(transactions))
 }
 
-pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
-    message.hash.as_deref().filter(|hash| !hash.is_empty())
+pub(crate) fn v3_message_hash(message: &v3::Message) -> Option<&str> {
+    (!message.hash.is_empty()).then_some(message.hash.as_str())
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -4068,13 +4068,6 @@ mod tests {
     #[test]
     fn synthesize_tx_cell_from_v3_reproduces_on_chain_hash() {
         use expect_test::expect_file;
-        use ton_api::V3Trace;
-
-        #[derive(serde::Deserialize)]
-        struct TraceEnvelope {
-            traces: Vec<V3Trace>,
-        }
-
         let fixtures = [
             (
                 include_str!("testdata/v3_trace_fixture.json"),
@@ -4087,7 +4080,7 @@ mod tests {
         ];
 
         for (idx, (fixture, expected)) in fixtures.into_iter().enumerate() {
-            let envelope: TraceEnvelope = serde_json::from_str(fixture)
+            let envelope: v3::TracesResponse = serde_json::from_str(fixture)
                 .unwrap_or_else(|e| panic!("fixture {idx} must deserialize: {e:#}"));
             let trace = envelope
                 .traces
@@ -4096,7 +4089,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("fixture {idx} has no traces"));
 
             // Iterate in indexer-reported order so the snapshot is stable —
-            // `V3Trace.transactions` is a HashMap and has no natural ordering.
+            // `v3::Trace.transactions` is a HashMap and has no natural ordering.
             let mut actual = String::new();
             for tx_hash_b64 in &trace.transactions_order {
                 let summary = trace
@@ -4341,7 +4334,7 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 /// cell had a non-addr_none src, a non-zero `import_fee`, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
 pub(crate) fn synthesize_tx_cell_from_v3(
-    summary: &V3TransactionSummary,
+    summary: &v3::Transaction,
 ) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)
         .with_context(|| format!("Unsupported account address format: {}", summary.account))?;
@@ -4349,17 +4342,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         .lt
         .parse()
         .with_context(|| format!("Invalid lt '{}' in v3 tx summary", summary.lt))?;
-    let prev_trans_lt: u64 = summary
-        .prev_trans_lt
-        .as_deref()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let prev_trans_hash = summary
-        .prev_trans_hash
-        .as_deref()
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let prev_trans_lt: u64 = summary.prev_trans_lt.parse().ok().unwrap_or(0);
+    let prev_trans_hash = parse_hash_bytes(&summary.prev_trans_hash)?;
 
     let in_msg = summary
         .in_msg
@@ -4382,25 +4366,14 @@ pub(crate) fn synthesize_tx_cell_from_v3(
     let out_msg_count = Uint15::new(summary.out_msgs.len() as u16);
 
     let total_fees = CurrencyCollection {
-        tokens: parse_tokens_opt(summary.total_fees.as_deref()),
+        tokens: parse_tokens_opt(Some(&summary.total_fees)),
         other: ExtraCurrencyCollection::new(),
     };
 
-    let state_update_old = summary
-        .account_state_before
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
-    let state_update_new = summary
-        .account_state_after
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let state_update_old = parse_hash_bytes(&summary.account_state_before.hash)?;
+    let state_update_new = parse_hash_bytes(&summary.account_state_after.hash)?;
 
+    let tx_info = build_tx_info_from_v3(Some(&summary.description));
     let tx = Transaction {
         account,
         lt,
@@ -4408,8 +4381,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         prev_trans_lt,
         now: summary.now,
         out_msg_count,
-        orig_status: parse_account_status(summary.orig_status.as_deref()),
-        end_status: parse_account_status(summary.end_status.as_deref()),
+        orig_status: parse_account_status(&summary.orig_status),
+        end_status: parse_account_status(&summary.end_status),
         in_msg,
         out_msgs,
         total_fees,
@@ -4418,8 +4391,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
             new: state_update_new,
         })
         .context("Failed to build synthetic state_update")?,
-        info: Lazy::new(&build_tx_info_from_v3(summary.description.as_ref()))
-            .context("Failed to build synthetic tx info")?,
+        info: Lazy::new(&tx_info).context("Failed to build synthetic tx info")?,
     };
 
     let cell = to_cell(&tx);
@@ -4433,7 +4405,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
 /// every combination and pick the one whose `repr_hash` matches the summary's `hash`.
 /// Without this the synthesized tx's `repr_hash` can disagree with the on-chain hash on any
 /// transaction whose messages happened to be laid out differently than our fixed guess.
-fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
+fn build_message_cell_from_v3(m: &v3::Message) -> anyhow::Result<Cell> {
     let body_cell = match m
         .message_content
         .as_ref()
@@ -4454,7 +4426,7 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
     };
 
     let info = infer_msg_info_from_v3(m)?;
-    let expected_hash = m.hash.as_deref().and_then(|h| parse_hash_bytes(h).ok());
+    let expected_hash = parse_hash_bytes(&m.hash).ok();
 
     let try_layout = |init_as_ref: bool, body_as_ref: bool| -> anyhow::Result<Cell> {
         let ctx = Cell::empty_context();
@@ -4524,23 +4496,21 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
 ///
 /// Classify by the address pair: `source=None` → external-in, `destination=None` →
 /// external-out, both present → internal.
-fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
+fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
     let src_str = m.source.as_deref().filter(|s| !s.is_empty());
     let dst_str = m.destination.as_deref().filter(|s| !s.is_empty());
 
     match (src_str, dst_str) {
-        (None, Some(_)) => {
-            let dst = parse_int_addr(dst_str)?
-                .context("External-in message missing destination address")?;
+        (None, Some(dst_str)) => {
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::ExtIn(ExtInMsgInfo {
                 src: None,
                 dst,
                 import_fee: parse_tokens_opt(m.import_fee.as_deref()),
             }))
         }
-        (Some(_), None) => {
-            let src =
-                parse_int_addr(src_str)?.context("External-out message missing source address")?;
+        (Some(src_str), None) => {
+            let src = parse_int_addr(src_str)?;
             // External-out destinations are opaque ExtAddr; we leave dst = None.
             Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
                 src,
@@ -4557,11 +4527,9 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
                     .unwrap_or(0),
             }))
         }
-        (Some(_), Some(_)) => {
-            let src = parse_int_addr(src_str)?
-                .context("Internal message summary missing source address")?;
-            let dst = parse_int_addr(dst_str)?
-                .context("Internal message summary missing destination address")?;
+        (Some(src_str), Some(dst_str)) => {
+            let src = parse_int_addr(src_str)?;
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::Int(IntMsgInfo {
                 ihr_disabled: m.ihr_disabled.unwrap_or(true),
                 bounce: m.bounce.unwrap_or(false),
@@ -4597,7 +4565,7 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
-fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
+fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
     let Some(desc) = desc else {
         return TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: false,
@@ -4626,19 +4594,19 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
                 .gas_used
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_limit: cp
                 .gas_limit
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_credit: cp
                 .gas_credit
                 .as_deref()
                 .and_then(|s| s.parse::<u32>().ok())
-                .map(tycho_types::num::VarUint24::new),
+                .map(VarUint24::new),
             mode: cp.mode.unwrap_or(0),
             exit_code: cp.exit_code.unwrap_or(0),
             exit_arg: cp.exit_arg,
@@ -4692,10 +4660,10 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
             .map(Tokens::new),
         result_code: ap.result_code.unwrap_or(0),
         result_arg: ap.result_arg,
-        total_actions: ap.tot_actions.unwrap_or(0),
-        special_actions: ap.spec_actions.unwrap_or(0),
-        skipped_actions: ap.skipped_actions.unwrap_or(0),
-        messages_created: ap.msgs_created.unwrap_or(0),
+        total_actions: ap.tot_actions.unwrap_or_default() as u16,
+        special_actions: ap.spec_actions.unwrap_or_default() as u16,
+        skipped_actions: ap.skipped_actions.unwrap_or_default() as u16,
+        messages_created: ap.msgs_created.unwrap_or_default() as u16,
         action_list_hash: ap
             .action_list_hash
             .as_deref()
@@ -4712,13 +4680,13 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
                     .cells
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
                 bits: s
                     .bits
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
             })
             .unwrap_or_default(),
@@ -4793,13 +4761,8 @@ fn parse_hash_bytes(h: &str) -> anyhow::Result<HashBytes> {
     Ok(HashBytes(out))
 }
 
-fn parse_int_addr(s: Option<&str>) -> anyhow::Result<Option<IntAddr>> {
-    match s {
-        None | Some("") => Ok(None),
-        Some(a) => IntAddr::from_str(a)
-            .map(Some)
-            .map_err(|e| anyhow!("Failed to parse address '{a}': {e:?}")),
-    }
+fn parse_int_addr(address: &str) -> anyhow::Result<IntAddr> {
+    IntAddr::from_str(address).map_err(|e| anyhow!("Failed to parse address '{address}': {e:?}"))
 }
 
 fn parse_tokens_opt(s: Option<&str>) -> Tokens {
@@ -4808,11 +4771,11 @@ fn parse_tokens_opt(s: Option<&str>) -> Tokens {
         .unwrap_or_default()
 }
 
-fn parse_account_status(s: Option<&str>) -> AccountStatus {
+fn parse_account_status(s: &str) -> AccountStatus {
     match s {
-        Some("active") => AccountStatus::Active,
-        Some("frozen") => AccountStatus::Frozen,
-        Some("nonexist") => AccountStatus::NotExists,
+        "active" => AccountStatus::Active,
+        "frozen" => AccountStatus::Frozen,
+        "nonexist" => AccountStatus::NotExists,
         _ => AccountStatus::Uninit,
     }
 }

@@ -52,6 +52,8 @@ pub async fn localnet_start_cmd(
     load_state: Option<String>,
     dump_state: Option<String>,
     require_auth: bool,
+    liteapi: bool,
+    liteapi_port: Option<u16>,
 ) -> anyhow::Result<()> {
     if load_state.is_some() && db_path.is_some() {
         anyhow::bail!(
@@ -111,6 +113,8 @@ pub async fn localnet_start_cmd(
             response_delay_ms,
             startup_wallets,
             auth_token,
+            liteapi,
+            liteapi_port,
         },
     )
     .await;

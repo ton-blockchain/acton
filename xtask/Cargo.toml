@@ -26,6 +26,7 @@ owo-colors = { workspace = true }
 reqwest = { workspace = true }
 tycho-types = { workspace = true }
 urlencoding = { workspace = true }
+url = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
 indicatif = { workspace = true }

@@ -31,6 +31,7 @@ test-results/
 Thumbs.db
 
 .env
+.worktree/
 
 gen/
 *.mnemonic
@@ -40,7 +41,9 @@ toncenter-*.json
 libraries.toml
 AGENTS.md
 block.tlb
+!packages/localnet-ui/src/explorer/cell-inspector/block.tlb
 debug.entitlements
 .codegraph/
 .playwright-mcp/
 .mcp.json
+crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/

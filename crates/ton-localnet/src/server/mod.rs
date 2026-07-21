@@ -292,6 +292,8 @@ pub struct ServerArgs {
     pub response_delay_ms: Option<u64>,
     pub startup_wallets: Vec<StartupWallet>,
     pub auth_token: Option<String>,
+    pub liteapi: bool,
+    pub liteapi_port: Option<u16>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -330,6 +332,8 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         response_delay_ms,
         startup_wallets,
         auth_token,
+        liteapi,
+        liteapi_port,
     } = args;
     let auth_token = auth_token.map(Arc::<str>::from);
 
@@ -367,29 +371,40 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
             address: address.clone(),
             source,
         })?;
-    let liteapi_port = port
-        .checked_add(1)
-        .ok_or(ServerError::LiteApiPortOverflow { http_port: port })?;
-    let liteapi_endpoint = liteapi::spawn_liteapi_server(Arc::clone(&node), liteapi_port)
-        .await
-        .map_err(|source| ServerError::LiteApiBind {
-            address: format!("127.0.0.1:{liteapi_port}"),
-            source,
-        })?;
+    let liteapi_endpoint = if liteapi {
+        let liteapi_port = match liteapi_port {
+            Some(liteapi_port) => liteapi_port,
+            None => port
+                .checked_add(1)
+                .ok_or(ServerError::LiteApiPortOverflow { http_port: port })?,
+        };
+        Some(
+            liteapi::spawn_liteapi_server(Arc::clone(&node), liteapi_port)
+                .await
+                .map_err(|source| ServerError::LiteApiBind {
+                    address: format!("127.0.0.1:{liteapi_port}"),
+                    source,
+                })?,
+        )
+    } else {
+        None
+    };
     println!(
         "    {} Localnet server and UI on http://{address}",
         "Starting".green().bold(),
     );
-    println!(
-        "    {} Localnet LiteAPI on tcp://{}",
-        "Starting".green().bold(),
-        liteapi_endpoint.address,
-    );
-    println!(
-        "         {} LiteAPI public key: {}",
-        "Key".yellow().bold(),
-        liteapi_endpoint.public_key_base64
-    );
+    if let Some(liteapi_endpoint) = liteapi_endpoint {
+        println!(
+            "    {} Localnet LiteAPI on tcp://{}",
+            "Starting".green().bold(),
+            liteapi_endpoint.address,
+        );
+        println!(
+            "         {} LiteAPI public key: {}",
+            "Key".yellow().bold(),
+            liteapi_endpoint.public_key_base64
+        );
+    }
     if let Some(token) = auth_token.as_deref() {
         println!(
             "        {} Localnet API token: {}",

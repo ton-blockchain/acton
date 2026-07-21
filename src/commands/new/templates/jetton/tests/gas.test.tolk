@@ -546,7 +546,7 @@ get fun `test gas: wallet storage fee should be measurable`() {
         return;
     }
 
-    val (cells, bits, _) = state!.toCell().calculateSizeStrict(4096);
+    val (cells, bits, _) = state.toCell().calculateSizeStrict(4096);
     val storageFee = calculateStorageFee(BASECHAIN, MIN_STORAGE_DURATION, bits, cells);
 
     expect(storageFee).toBeGreater(0);

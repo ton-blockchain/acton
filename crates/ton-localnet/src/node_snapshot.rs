@@ -208,9 +208,20 @@ impl Node {
         }
     }
 
-    pub(crate) fn apply_snapshot(&mut self, snapshot: NodeStateSnapshot) -> anyhow::Result<()> {
+    pub(crate) fn apply_snapshot(&mut self, mut snapshot: NodeStateSnapshot) -> anyhow::Result<()> {
         if snapshot.version != NODE_STATE_SNAPSHOT_VERSION {
             anyhow::bail!("Unsupported snapshot version: {}", snapshot.version);
+        }
+
+        for block in &mut snapshot.history_masterchain_blocks {
+            if block.config_boc_hash == Hash256::default() {
+                block.config_boc_hash = snapshot.globals.config_boc_hash;
+            }
+        }
+        for (_, wallet) in &mut snapshot.history_jetton_wallets {
+            if wallet.jetton_wallet_code_hash == Hash256::default() {
+                wallet.jetton_wallet_code_hash = wallet.code_hash;
+            }
         }
 
         if let Some(persistence) = &self.persistence {
@@ -276,6 +287,7 @@ impl Node {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
                 balance: GIVER_BALANCE,
+                extra_currencies: Vec::new(),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,

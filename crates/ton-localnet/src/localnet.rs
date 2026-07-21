@@ -1,13 +1,15 @@
 use crate::LocalnetError;
 use crate::executor::TvmEmulatorAdapter;
+use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
 use crate::node_snapshot::{NodeStateSnapshot, read_snapshot_from_path, write_snapshot_to_path};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
 use crate::streaming::StreamingCommitEvent;
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use anyhow::Context;
 use crc::{CRC_16_XMODEM, Crc};
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
@@ -19,12 +21,12 @@ use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::PrevBlockId;
-use tvm_ffi::json_stack::json_to_legacy_item;
+use tvm_ffi::json_stack::{TvmStackEntry, json_to_legacy_stack, std_stack_into_tuple};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo, StdAddr, StdAddrFormat};
+use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
 use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
@@ -92,6 +94,7 @@ pub struct LocalnetAccountState {
     pub address: Addr,
     pub account_state_hash: Hash256,
     pub balance: u128,
+    pub extra_currencies: Vec<ExtraCurrency>,
     pub code: Option<BocBytes>,
     pub code_hash: Option<Hash256>,
     pub data: Option<BocBytes>,
@@ -107,16 +110,89 @@ pub struct LocalnetAccountState {
 pub struct LocalnetAddressInfo {
     pub address: Addr,
     pub code_hash: Option<Hash256>,
+    pub dns: Option<storage::DnsRecordMeta>,
     pub jetton_wallet: Option<storage::JettonWalletMeta>,
     pub jetton_master: Option<storage::JettonMasterMeta>,
     pub nft_item: Option<storage::NftItemMeta>,
-    pub nft_collection_item: Option<storage::NftItemMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+}
+
+impl LocalnetAddressInfo {
+    #[must_use]
+    pub fn jetton_wallet_code_hash(&self) -> Option<Hash256> {
+        self.jetton_master
+            .as_ref()
+            .map(|master| master.jetton_wallet_code_hash)
+            .or_else(|| {
+                self.jetton_wallet
+                    .as_ref()
+                    .map(|wallet| wallet.jetton_wallet_code_hash)
+            })
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct LocalnetAccountStateWithInfo {
     pub state: LocalnetAccountState,
     pub info: LocalnetAddressInfo,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetJettonWalletsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub jetton_addresses: Vec<String>,
+    pub exclude_zero_balance: Option<bool>,
+    pub sort: Option<LocalnetSortOrder>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetNftItemsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub collection_addresses: Vec<String>,
+    pub indexes: Vec<String>,
+    pub order: LocalnetNftItemsOrder,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetNftItemsOrder {
+    Insertion,
+    OwnerCollectionIndex,
+    CollectionIndex,
+    LastTransactionLtDesc,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetSortOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedJettonWalletsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    jetton_addresses: HashSet<Addr>,
+    exclude_zero_balance: bool,
+    sort: Option<LocalnetSortOrder>,
+    limit: usize,
+    offset: usize,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedNftItemsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    collection_addresses: HashSet<Addr>,
+    indexes: HashSet<BigInt>,
+    order: LocalnetNftItemsOrder,
+    limit: usize,
+    offset: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +209,7 @@ impl LocalnetAccountState {
             address,
             account_state_hash: Hash256([0; 32]),
             balance: 0,
+            extra_currencies: Vec::new(),
             code: None,
             code_hash: None,
             data: None,
@@ -143,6 +220,11 @@ impl LocalnetAccountState {
             sync_utime,
             frozen_hash: None,
         }
+    }
+
+    #[must_use]
+    pub(crate) fn is_missing(&self) -> bool {
+        self.account_state_hash == Hash256([0; 32])
     }
 }
 
@@ -159,7 +241,7 @@ pub struct LocalnetTransaction {
     pub mc_block_seqno: u32,
     pub utime: u32,
     pub data: BocBytes,
-    pub success: bool,
+    pub aborted: bool,
     pub exit_code: i32,
     pub transaction_id: LocalnetTransactionId,
     pub in_msg: LocalnetMessage,
@@ -167,6 +249,42 @@ pub struct LocalnetTransaction {
     pub total_fees: u128,
     pub storage_fees: u128,
     pub other_fees: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetTransactionsPage {
+    pub transactions: Vec<LocalnetTransaction>,
+    pub previous_transaction_id: LocalnetTransactionId,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetAccountBalance {
+    pub account: Addr,
+    pub balance: u128,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LocalnetEstimatedFee {
+    pub in_fwd_fee: u64,
+    pub storage_fee: u64,
+    pub gas_fee: u64,
+    pub fwd_fee: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetEstimateFeeResult {
+    pub source_fees: LocalnetEstimatedFee,
+    pub destination_fees: Vec<LocalnetEstimatedFee>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LocalnetContractData {
+    pub dns: Option<storage::DnsRecordMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+    pub nft_sale: Option<storage::NftSaleMeta>,
+    pub multisig: Option<storage::MultisigMeta>,
+    pub multisig_order: Option<storage::MultisigOrderMeta>,
+    pub vesting: Option<storage::VestingMeta>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -186,6 +304,8 @@ pub struct LocalnetMessage {
     pub fwd_fee: u128,
     pub ihr_fee: u128,
     pub created_lt: u64,
+    #[serde(default)]
+    pub extra_currencies: Vec<ExtraCurrency>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -226,6 +346,12 @@ pub struct LocalnetMiningMode {
     pub skip_empty_blocks: bool,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum TransactionLookupKind {
+    Source,
+    Result,
+}
+
 impl Default for LocalnetMiningMode {
     fn default() -> Self {
         Self {
@@ -243,16 +369,31 @@ pub struct LocalnetRecoveryPointResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
+    pub global_id: i32,
+    pub version: i32,
+    pub after_merge: bool,
+    pub after_split: bool,
+    pub before_split: bool,
+    pub want_merge: bool,
+    pub want_split: bool,
+    pub validator_list_hash_short: i32,
+    pub catchain_seqno: i32,
+    pub min_ref_mc_seqno: i32,
+    pub is_key_block: bool,
+    pub prev_key_block_seqno: i32,
     pub gen_utime: u32,
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub prev_seqno: Option<Seqno>,
+    pub prev_blocks: Vec<LocalnetBlockId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockTransactions {
     pub id: LocalnetBlockId,
     pub transactions: Vec<LocalnetTransaction>,
+    pub requested_count: usize,
+    pub incomplete: bool,
     pub msg_hash: Option<Hash256>,
     #[serde(default)]
     pub msg_hash_norm: Option<Hash256>,
@@ -303,6 +444,7 @@ pub(crate) enum Request {
     },
     GetAddressInfos {
         addresses: Vec<Addr>,
+        seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAddressInfo>>>,
     },
     GetCellBoc {
@@ -331,7 +473,7 @@ pub(crate) enum Request {
         lt: Option<u64>,
         hash: Option<Hash256>,
         to_lt: Option<u64>,
-        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetTransactionsPage>>,
     },
     GetAllTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
@@ -355,22 +497,11 @@ pub(crate) enum Request {
     GetPendingTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
     },
-    TryLocateTx {
+    LocateTransaction {
         source: Addr,
         destination: Addr,
         created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateResultTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateSourceTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
+        kind: TransactionLookupKind,
         resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
     },
     RunGetMethod {
@@ -446,6 +577,12 @@ pub(crate) enum Request {
         amount: u128,
         resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
+    JettonFaucet {
+        recipient: Addr,
+        jetton_master: Addr,
+        amount: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
+    },
     GetTraces {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
@@ -460,31 +597,34 @@ pub(crate) enum Request {
         mc_block_seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<storage::EmulateTraceResult>>,
     },
+    EstimateFees {
+        boc: BocBytes,
+        ignore_chksig: bool,
+        resp: oneshot::Sender<anyhow::Result<LocalnetEstimateFeeResult>>,
+    },
+    GetTopAccountBalances {
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAccountBalance>>>,
+    },
     GetJettonMasters {
-        address: Option<Addr>,
-        admin_address: Option<Addr>,
+        addresses: HashSet<Addr>,
+        admin_addresses: HashSet<Addr>,
         limit: usize,
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonMasterMeta>>>,
     },
     GetJettonWallets {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        jetton_address: Option<Addr>,
-        exclude_zero_balance: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedJettonWalletsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
     GetNftItems {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        collection_address: Option<Addr>,
-        index: Option<String>,
-        sort_by_last_transaction_lt: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedNftItemsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
+    },
+    DetectContractData {
+        address: Addr,
+        resp: oneshot::Sender<anyhow::Result<LocalnetContractData>>,
     },
     SetAddressName {
         address: Addr,
@@ -609,9 +749,9 @@ impl RecoveryPoints {
         force: bool,
     ) -> anyhow::Result<LocalnetRecoveryPointResult> {
         let name = normalize_recovery_point_name(name)?;
-        self.remove_existing_name(&name, force)?;
+        let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = node.build_snapshot()?;
-        self.push_snapshot(snapshot, name)
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 
     fn import(
@@ -621,22 +761,28 @@ impl RecoveryPoints {
         force: bool,
     ) -> anyhow::Result<LocalnetRecoveryPointResult> {
         let name = normalize_recovery_point_name(name)?;
-        self.remove_existing_name(&name, force)?;
+        let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = read_snapshot_from_path(path)?;
-        self.push_snapshot(snapshot, name)
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 
-    fn push_snapshot(
+    fn store_snapshot(
         &mut self,
         snapshot: NodeStateSnapshot,
         name: String,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        replacement_index: Option<usize>,
+    ) -> LocalnetRecoveryPointResult {
         let block_seqno = snapshot.globals.head_seqno;
-        self.points.push(RecoveryPoint {
+        let point = RecoveryPoint {
             name: name.clone(),
             snapshot,
-        });
-        Ok(LocalnetRecoveryPointResult { name, block_seqno })
+        };
+        if let Some(index) = replacement_index {
+            self.points[index] = point;
+        } else {
+            self.points.push(point);
+        }
+        LocalnetRecoveryPointResult { name, block_seqno }
     }
 
     fn list(&self) -> Vec<LocalnetRecoveryPointResult> {
@@ -672,15 +818,12 @@ impl RecoveryPoints {
         self.points.clear();
     }
 
-    fn remove_existing_name(&mut self, name: &str, force: bool) -> anyhow::Result<()> {
-        let Some(index) = self.points.iter().position(|point| point.name == name) else {
-            return Ok(());
-        };
-        if !force {
+    fn replacement_index(&self, name: &str, force: bool) -> anyhow::Result<Option<usize>> {
+        let index = self.points.iter().position(|point| point.name == name);
+        if index.is_some() && !force {
             anyhow::bail!("Recovery point name {name} already exists");
         }
-        self.points.remove(index);
-        Ok(())
+        Ok(index)
     }
 
     fn find_index(&self, name: &str) -> anyhow::Result<usize> {
@@ -785,6 +928,13 @@ impl Localnet {
         boc_str: String,
     ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        self.enqueue_internal_boc(boc).await
+    }
+
+    async fn enqueue_internal_boc(
+        &self,
+        boc: BocBytes,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
@@ -795,7 +945,7 @@ impl Localnet {
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetAccountState> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressInformation {
@@ -826,10 +976,15 @@ impl Localnet {
     pub async fn get_address_infos(
         &self,
         addresses: Vec<Addr>,
+        seqno: Option<u32>,
     ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetAddressInfos { addresses, resp })
+            .send(Request::GetAddressInfos {
+                addresses,
+                seqno,
+                resp,
+            })
             .await?;
         rx.await?
     }
@@ -845,7 +1000,7 @@ impl Localnet {
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<BocBytes> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetShardAccountCell {
@@ -862,7 +1017,7 @@ impl Localnet {
         address_str: String,
         shard_account: String,
     ) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let shard_account =
             BocBytes::from_base64(&shard_account).context("Invalid shard_account base64")?;
         let (resp, rx) = oneshot::channel();
@@ -882,7 +1037,7 @@ impl Localnet {
         change: LocalnetAccountStateChange,
         mine: bool,
     ) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::ChangeAccountState {
@@ -903,9 +1058,9 @@ impl Localnet {
         hash_str: Option<String>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let hash = if let Some(h) = hash_str {
-            Some(Hash256::from_base64(&h)?)
+            Some(h.parse()?)
         } else {
             None
         };
@@ -915,10 +1070,8 @@ impl Localnet {
 
     /// Returns transactions for a parsed account address.
     ///
-    /// This is the typed localnet API used by `LiteAPI` adapters. The older
-    /// toncenter-compatible endpoint accepts string/base64 query values and
-    /// converts them before calling this method, so both transports share the
-    /// same actor request and pagination/filtering semantics.
+    /// This typed API is shared by `LiteAPI` and `TonCenter` adapters so both
+    /// transports use the same actor request and pagination semantics.
     pub async fn get_transactions_by_address(
         &self,
         address: Addr,
@@ -927,6 +1080,20 @@ impl Localnet {
         hash: Option<Hash256>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
+        Ok(self
+            .get_transactions_page_by_address(address, limit, lt, hash, to_lt)
+            .await?
+            .transactions)
+    }
+
+    pub async fn get_transactions_page_by_address(
+        &self,
+        address: Addr,
+        limit: usize,
+        lt: Option<u64>,
+        hash: Option<Hash256>,
+        to_lt: Option<u64>,
+    ) -> anyhow::Result<LocalnetTransactionsPage> {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetTransactions {
@@ -999,60 +1166,20 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn try_locate_tx(
+    pub(crate) async fn locate_transaction(
         &self,
-        source_str: String,
-        destination_str: String,
+        source: Addr,
+        destination: Addr,
         created_lt: u64,
+        kind: TransactionLookupKind,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::TryLocateTx {
+            .send(Request::LocateTransaction {
                 source,
                 destination,
                 created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_result_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateResultTx {
-                source,
-                destination,
-                created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_source_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateSourceTx {
-                source,
-                destination,
-                created_lt,
+                kind,
                 resp,
             })
             .await?;
@@ -1066,20 +1193,36 @@ impl Localnet {
         stack_json: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-        let address = Self::parse_addr(&address_str)?;
+        let stack = json_to_legacy_stack(stack_json)?;
+        self.run_get_method_with_stack(address_str, method, stack, seqno)
+            .await
+    }
+
+    pub async fn run_get_method_std(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Vec<TvmStackEntry>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        self.run_get_method_with_stack(address_str, method, std_stack_into_tuple(stack)?, seqno)
+            .await
+    }
+
+    async fn run_get_method_with_stack(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Tuple,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        let address = Addr::parse(&address_str)?;
         let method_id = if let Ok(id) = method.parse::<i32>() {
             id
         } else {
             let crc = CRC16.checksum(method.as_bytes());
             (i32::from(crc) & 0xffff) | 0x10000
         };
-
-        let stack = Tuple(
-            stack_json
-                .into_iter()
-                .map(json_to_legacy_item)
-                .collect::<anyhow::Result<Vec<_>>>()?,
-        );
 
         self.run_get_method_by_id(address, method_id, stack, seqno)
             .await
@@ -1238,14 +1381,11 @@ impl Localnet {
     pub async fn lookup_block(
         &self,
         workchain: i32,
-        shard: String,
+        shard: i64,
         seqno: Option<u32>,
         lt: Option<u64>,
         unixtime: Option<u32>,
     ) -> anyhow::Result<LocalnetBlockId> {
-        let shard = shard.parse::<i64>().map_err(|error| {
-            LocalnetError::protocol_violation(format!("invalid shard number: {error}"))
-        })?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::LookupBlock {
@@ -1265,12 +1405,34 @@ impl Localnet {
         address_str: String,
         amount: u128,
     ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::Faucet {
                 address,
                 amount,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn jetton_faucet(
+        &self,
+        address_str: String,
+        jetton_master_str: String,
+        amount_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let recipient = Addr::parse(&address_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid recipient address"))?;
+        let jetton_master = Addr::parse(&jetton_master_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid jetton master address"))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::JettonFaucet {
+                recipient,
+                jetton_master,
+                amount: amount_str,
                 resp,
             })
             .await?;
@@ -1313,21 +1475,53 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn estimate_fees(
+        &self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::EstimateFees {
+                boc,
+                ignore_chksig,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_top_account_balances(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<LocalnetAccountBalance>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetTopAccountBalances {
+                limit,
+                offset,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_jetton_masters(
         &self,
-        address: Option<String>,
-        admin_address: Option<String>,
+        addresses: Vec<String>,
+        admin_addresses: Vec<String>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let admin_address = admin_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let addresses = Self::parse_addresses(addresses)?;
+        let admin_addresses = Self::parse_addresses(admin_addresses)?;
 
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetJettonMasters {
-                address,
-                admin_address,
+                addresses,
+                admin_addresses,
                 limit: limit.unwrap_or(10),
                 offset: offset.unwrap_or(0),
                 resp,
@@ -1338,67 +1532,67 @@ impl Localnet {
 
     pub async fn get_jetton_wallets(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        jetton_address: Option<String>,
-        exclude_zero_balance: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetJettonWalletsQuery,
     ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let jetton_address = jetton_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let query = ParsedJettonWalletsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            jetton_addresses: Self::parse_addresses(query.jetton_addresses)?,
+            exclude_zero_balance: query.exclude_zero_balance.unwrap_or(false),
+            sort: query.sort,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetJettonWallets {
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance: exclude_zero_balance.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
+            .send(Request::GetJettonWallets { query, resp })
             .await?;
         rx.await?
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn get_nft_items(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        collection_address: Option<String>,
-        index: Option<String>,
-        sort_by_last_transaction_lt: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetNftItemsQuery,
     ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let collection_address = collection_address
-            .map(|s| Self::parse_addr(&s))
-            .transpose()?;
+        let query = ParsedNftItemsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            collection_addresses: Self::parse_addresses(query.collection_addresses)?,
+            indexes: query
+                .indexes
+                .into_iter()
+                .filter(|index| !index.is_empty())
+                .map(|index| {
+                    index
+                        .parse()
+                        .with_context(|| format!("Invalid NFT index `{index}`"))
+                })
+                .collect::<anyhow::Result<_>>()?,
+            order: query.order,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetNftItems { query, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn detect_contract_data(
+        &self,
+        address: String,
+    ) -> anyhow::Result<LocalnetContractData> {
+        let address = Addr::parse(&address)?;
+        let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetNftItems {
-                address,
-                owner_address,
-                collection_address,
-                index,
-                sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
+            .send(Request::DetectContractData { address, resp })
             .await?;
         rx.await?
     }
 
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::SetAddressName {
@@ -1416,7 +1610,7 @@ impl Localnet {
     ) -> anyhow::Result<Vec<(String, Option<String>)>> {
         let addresses = address_strs
             .iter()
-            .map(|address| Self::parse_addr(address))
+            .map(|address| Addr::parse(address))
             .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -1502,7 +1696,7 @@ impl Localnet {
         address_str: Option<String>,
         code_hash_str: Option<String>,
     ) -> anyhow::Result<Option<Value>> {
-        let address = address_str.as_deref().map(Self::parse_addr).transpose()?;
+        let address = address_str.as_deref().map(Addr::parse).transpose()?;
         let code_hash = code_hash_str
             .as_deref()
             .map(|code_hash| {
@@ -1661,14 +1855,11 @@ impl Localnet {
         rx.await?
     }
 
-    pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
-        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
-            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
-        })?;
-        Ok(Addr {
-            workchain: i32::from(int_addr.workchain),
-            addr: int_addr.address.0,
-        })
+    fn parse_addresses(values: Vec<String>) -> anyhow::Result<HashSet<Addr>> {
+        values
+            .into_iter()
+            .map(|value| Addr::parse(&value))
+            .collect()
     }
 }
 
@@ -1834,8 +2025,12 @@ fn process_loop_request(
             let res = handle_get_account_states(node, addresses, seqno);
             let _ = resp.send(res);
         }
-        Request::GetAddressInfos { addresses, resp } => {
-            let res = handle_get_address_infos(node, addresses);
+        Request::GetAddressInfos {
+            addresses,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_infos(node, addresses, seqno);
             let _ = resp.send(res);
         }
         Request::GetCellBoc { hash, resp } => {
@@ -1908,31 +2103,14 @@ fn process_loop_request(
             let res = handle_get_pending_transactions(node);
             let _ = resp.send(res);
         }
-        Request::TryLocateTx {
+        Request::LocateTransaction {
             source,
             destination,
             created_lt,
+            kind,
             resp,
         } => {
-            let res = handle_try_locate_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateResultTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_result_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateSourceTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_source_tx(node, source, destination, created_lt);
+            let res = handle_locate_transaction(node, source, destination, created_lt, kind);
             let _ = resp.send(res);
         }
         Request::RunGetMethod {
@@ -2018,6 +2196,16 @@ fn process_loop_request(
                 .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
             let _ = resp.send(res);
         }
+        Request::JettonFaucet {
+            recipient,
+            jetton_master,
+            amount,
+            resp,
+        } => {
+            let res = jetton_faucet::mint(node, &jetton_master, &recipient, &amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
+            let _ = resp.send(res);
+        }
         Request::GetTraces { tx_hash, resp } => {
             let res = node.get_traces(&tx_hash);
             let _ = resp.send(res);
@@ -2035,56 +2223,42 @@ fn process_loop_request(
             let res = node.emulate_trace_by_external_message(boc, ignore_chksig, mc_block_seqno);
             let _ = resp.send(res);
         }
+        Request::EstimateFees {
+            boc,
+            ignore_chksig,
+            resp,
+        } => {
+            let res = node.estimate_fees_by_external_message(boc, ignore_chksig);
+            let _ = resp.send(res);
+        }
+        Request::GetTopAccountBalances {
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = Ok(node.top_account_balances(limit, offset));
+            let _ = resp.send(res);
+        }
         Request::GetJettonMasters {
-            address,
-            admin_address,
+            addresses,
+            admin_addresses,
             limit,
             offset,
             resp,
         } => {
-            let res = handle_get_jetton_masters(node, address, admin_address, limit, offset);
+            let res = handle_get_jetton_masters(node, addresses, admin_addresses, limit, offset);
             let _ = resp.send(res);
         }
-        Request::GetJettonWallets {
-            address,
-            owner_address,
-            jetton_address,
-            exclude_zero_balance,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = handle_get_jetton_wallets(
-                node,
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance,
-                limit,
-                offset,
-            );
+        Request::GetJettonWallets { query, resp } => {
+            let res = handle_get_jetton_wallets(node, query);
             let _ = resp.send(res);
         }
-        Request::GetNftItems {
-            address,
-            owner_address,
-            collection_address,
-            index,
-            sort_by_last_transaction_lt,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = handle_get_nft_items(
-                node,
-                address,
-                owner_address,
-                collection_address,
-                index,
-                sort_by_last_transaction_lt,
-                limit,
-                offset,
-            );
+        Request::GetNftItems { query, resp } => {
+            let res = handle_get_nft_items(node, query);
+            let _ = resp.send(res);
+        }
+        Request::DetectContractData { address, resp } => {
+            let res = node.detect_contract_data(&address);
             let _ = resp.send(res);
         }
         Request::SetAddressName {
@@ -2245,7 +2419,7 @@ fn registered_verified_source_for_query(
     let Some(address) = address else {
         return Ok(None);
     };
-    let code_hash = handle_get_address_context(node, address)?.code_hash;
+    let code_hash = handle_get_address_context(node, address, None)?.code_hash;
     Ok(code_hash.and_then(|code_hash| node.history.get_verified_source(&code_hash)))
 }
 
@@ -2282,8 +2456,14 @@ fn handle_get_address_info(
 ) -> anyhow::Result<LocalnetAccountState> {
     let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-    let block_id = block_id_for_query_seqno(node, seqno)?;
-    let sync_utime = u64::from(node.now_unix()?);
+    let (block_id, sync_utime) = if seqno == 0 {
+        (LocalnetBlockId::first(), u64::from(node.now_unix()?))
+    } else {
+        let block = node
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        (block.block_id(), u64::from(block.gen_utime))
+    };
 
     let Some(meta) = meta else {
         return Ok(LocalnetAccountState::empty(address, block_id, sync_utime));
@@ -2297,6 +2477,7 @@ fn handle_get_address_info(
         address,
         account_state_hash: meta.account_hash,
         balance: meta.balance,
+        extra_currencies: meta.extra_currencies,
         code,
         code_hash: meta.code_hash,
         data,
@@ -2318,7 +2499,7 @@ fn handle_get_account_states(
         .into_iter()
         .map(|address| {
             let state = handle_get_address_info(node, address, seqno)?;
-            let info = handle_get_address_context(node, address)?;
+            let info = handle_get_address_context(node, address, seqno)?;
             Ok(LocalnetAccountStateWithInfo { state, info })
         })
         .collect()
@@ -2327,47 +2508,23 @@ fn handle_get_account_states(
 fn handle_get_address_infos(
     node: &mut Node,
     addresses: Vec<Addr>,
+    seqno: Option<u32>,
 ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
     addresses
         .into_iter()
-        .map(|address| handle_get_address_context(node, address))
+        .map(|address| handle_get_address_context(node, address, seqno))
         .collect()
 }
 
 fn handle_get_address_context(
     node: &mut Node,
     address: Addr,
+    seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetAddressInfo> {
-    node.ensure_detected_assets_for_address(&address)?;
-
-    let code_hash = node
-        .get_address_information(&address)
-        .and_then(|meta| meta.code_hash);
-    let jetton_wallet = node
-        .iter_jetton_wallets()
-        .find(|wallet| wallet.address == address)
-        .cloned();
-    let jetton_master = node
-        .iter_jetton_masters()
-        .find(|master| master.address == address)
-        .cloned();
-    let nft_item = node
-        .iter_nft_items()
-        .find(|item| item.address == address)
-        .cloned();
-    let nft_collection_item = node
-        .iter_nft_items()
-        .find(|item| item.collection_address == Some(address))
-        .cloned();
-
-    Ok(LocalnetAddressInfo {
-        address,
-        code_hash,
-        jetton_wallet,
-        jetton_master,
-        nft_item,
-        nft_collection_item,
-    })
+    let seqno = account_query_seqno(node, seqno);
+    let _ = block_id_for_query_seqno(node, seqno)?;
+    let meta = node.get_address_information_at_block(&address, seqno);
+    node.detect_assets_for_account(&address, meta.as_ref())
 }
 
 const fn account_query_seqno(node: &Node, seqno: Option<Seqno>) -> Seqno {
@@ -2389,25 +2546,25 @@ fn block_id_for_query_seqno(node: &Node, seqno: Seqno) -> anyhow::Result<Localne
 
 fn handle_get_jetton_masters(
     node: &mut Node,
-    address: Option<Addr>,
-    admin_address: Option<Addr>,
+    addresses: HashSet<Addr>,
+    admin_addresses: HashSet<Addr>,
     limit: usize,
     offset: usize,
 ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
     Ok(node
         .iter_jetton_masters()
         .filter(|master| {
-            if let Some(addr) = address
-                && master.address != addr
-            {
+            if !addresses.is_empty() && !addresses.contains(&master.address) {
                 return false;
             }
-            if let Some(addr) = admin_address
-                && master.admin_address != Some(addr)
+            if !admin_addresses.is_empty()
+                && !master
+                    .admin_address
+                    .is_some_and(|address| admin_addresses.contains(&address))
             {
                 return false;
             }
@@ -2421,100 +2578,214 @@ fn handle_get_jetton_masters(
 
 fn handle_get_jetton_wallets(
     node: &mut Node,
-    address: Option<Addr>,
-    owner_address: Option<Addr>,
-    jetton_address: Option<Addr>,
-    exclude_zero_balance: bool,
-    limit: usize,
-    offset: usize,
+    query: ParsedJettonWalletsQuery,
 ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &query.addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
-    Ok(node
+    let mut wallets = node
         .iter_jetton_wallets()
+        .enumerate()
         .filter(|wallet| {
-            if let Some(addr) = address
-                && wallet.address != addr
+            let wallet = wallet.1;
+            if !query.addresses.is_empty() && !query.addresses.contains(&wallet.address) {
+                return false;
+            }
+            if !query.owner_addresses.is_empty()
+                && !query.owner_addresses.contains(&wallet.owner_address)
             {
                 return false;
             }
-            if let Some(addr) = owner_address
-                && wallet.owner_address != addr
+            if !query.jetton_addresses.is_empty()
+                && !query.jetton_addresses.contains(&wallet.jetton_address)
             {
                 return false;
             }
-            if let Some(addr) = jetton_address
-                && wallet.jetton_address != addr
-            {
-                return false;
-            }
-            if exclude_zero_balance && wallet.balance == 0 {
+            if query.exclude_zero_balance && wallet.balance == 0 {
                 return false;
             }
             true
         })
-        .skip(offset)
-        .take(limit)
-        .cloned()
+        .map(|(id, wallet)| (id, wallet.clone()))
+        .collect::<Vec<_>>();
+    match query.sort {
+        Some(LocalnetSortOrder::Asc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                left.balance.cmp(&right.balance)
+            });
+        }
+        Some(LocalnetSortOrder::Desc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                right.balance.cmp(&left.balance)
+            });
+        }
+        None => {
+            sort_jetton_wallets(&mut wallets, &query, |(left_id, _), (right_id, _)| {
+                left_id.cmp(right_id)
+            });
+        }
+    }
+    Ok(wallets
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .map(|(_, wallet)| wallet)
         .collect())
 }
 
-#[allow(clippy::too_many_arguments)]
+fn sort_jetton_wallets(
+    wallets: &mut [(usize, storage::JettonWalletMeta)],
+    query: &ParsedJettonWalletsQuery,
+    compare_sort_column: impl Fn(
+        &(usize, storage::JettonWalletMeta),
+        &(usize, storage::JettonWalletMeta),
+    ) -> std::cmp::Ordering,
+) {
+    if query.jetton_addresses.len() == 1 {
+        wallets.sort_by(|left, right| {
+            left.1
+                .jetton_address
+                .cmp(&right.1.jetton_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.owner_addresses.is_empty() {
+        wallets.sort_by(|left, right| {
+            left.1
+                .owner_address
+                .cmp(&right.1.owner_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.addresses.is_empty() {
+        wallets.sort_by_key(|(_, wallet)| wallet.address);
+    } else {
+        wallets.sort_by(compare_sort_column);
+    }
+}
+
 fn handle_get_nft_items(
     node: &mut Node,
-    address: Option<Addr>,
-    owner_address: Option<Addr>,
-    collection_address: Option<Addr>,
-    index: Option<String>,
-    sort_by_last_transaction_lt: bool,
-    limit: usize,
-    offset: usize,
+    query: ParsedNftItemsQuery,
 ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &query.addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
-    let items = node.iter_nft_items().filter(|item| {
-        if let Some(addr) = address
-            && item.address != addr
-        {
-            return false;
+    let matches_query = |item: &storage::NftItemMeta| -> anyhow::Result<bool> {
+        if !query.addresses.is_empty() && !query.addresses.contains(&item.address) {
+            return Ok(false);
         }
-        if let Some(addr) = owner_address
-            && item.owner_address != Some(addr)
+        if !query.owner_addresses.is_empty()
+            && !item
+                .owner_address
+                .is_some_and(|address| query.owner_addresses.contains(&address))
         {
-            return false;
+            return Ok(false);
         }
-        if let Some(addr) = collection_address
-            && item.collection_address != Some(addr)
+        if !query.collection_addresses.is_empty()
+            && !item
+                .collection_address
+                .is_some_and(|address| query.collection_addresses.contains(&address))
         {
-            return false;
+            return Ok(false);
         }
-        if let Some(expected_index) = &index
-            && &item.index != expected_index
-        {
-            return false;
+        if !query.indexes.is_empty() {
+            let index = parse_stored_nft_index(item)?;
+            if !query.indexes.contains(&index) {
+                return Ok(false);
+            }
         }
-        true
-    });
+        Ok(true)
+    };
 
-    if sort_by_last_transaction_lt {
-        let mut items = items.cloned().collect::<Vec<_>>();
-        items.sort_by(|a, b| {
-            b.last_transaction_lt
-                .cmp(&a.last_transaction_lt)
-                .then_with(|| a.address.cmp(&b.address))
-        });
-        let start = offset.min(items.len());
-        let end = start.saturating_add(limit).min(items.len());
-        items.truncate(end);
-        items.drain(..start);
-        return Ok(items);
+    if query.limit == 0 {
+        return Ok(Vec::new());
+    }
+    if query.order == LocalnetNftItemsOrder::Insertion {
+        let mut result = Vec::new();
+        let mut skipped = 0;
+        for item in node.iter_nft_items() {
+            if !matches_query(item)? {
+                continue;
+            }
+            if skipped < query.offset {
+                skipped += 1;
+                continue;
+            }
+            result.push(item.clone());
+            if result.len() == query.limit {
+                break;
+            }
+        }
+        return Ok(result);
     }
 
-    Ok(items.skip(offset).take(limit).cloned().collect())
+    let mut items = Vec::new();
+    for item in node.iter_nft_items() {
+        if matches_query(item)? {
+            items.push(item.clone());
+        }
+    }
+    match query.order {
+        LocalnetNftItemsOrder::Insertion => unreachable!(),
+        LocalnetNftItemsOrder::LastTransactionLtDesc => {
+            items.sort_by(|left, right| {
+                right
+                    .last_transaction_lt
+                    .cmp(&left.last_transaction_lt)
+                    .then_with(|| left.address.cmp(&right.address))
+            });
+        }
+        LocalnetNftItemsOrder::OwnerCollectionIndex | LocalnetNftItemsOrder::CollectionIndex => {
+            let mut indexed_items = items
+                .into_iter()
+                .map(|item| {
+                    let index = parse_stored_nft_index(&item)?;
+                    Ok((item, index))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if query.order == LocalnetNftItemsOrder::OwnerCollectionIndex {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left.owner_address
+                        .is_none()
+                        .cmp(&right.owner_address.is_none())
+                        .then_with(|| left.owner_address.cmp(&right.owner_address))
+                        .then_with(|| {
+                            left.collection_address
+                                .is_none()
+                                .cmp(&right.collection_address.is_none())
+                        })
+                        .then_with(|| left.collection_address.cmp(&right.collection_address))
+                        .then_with(|| left_index.cmp(right_index))
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            } else {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left_index
+                        .cmp(right_index)
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            }
+            return Ok(indexed_items
+                .into_iter()
+                .skip(query.offset)
+                .take(query.limit)
+                .map(|(item, _)| item)
+                .collect());
+        }
+    }
+
+    Ok(items
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .collect())
+}
+
+fn parse_stored_nft_index(item: &storage::NftItemMeta) -> anyhow::Result<BigInt> {
+    item.index
+        .parse()
+        .with_context(|| format!("Invalid stored NFT index `{}`", item.index))
 }
 
 fn handle_get_transactions(
@@ -2524,11 +2795,29 @@ fn handle_get_transactions(
     lt: Option<u64>,
     hash: Option<Hash256>,
     to_lt: Option<u64>,
-) -> anyhow::Result<Vec<LocalnetTransaction>> {
-    let mut raw_txs = node.get_transactions(&address, limit, lt, hash);
+) -> anyhow::Result<LocalnetTransactionsPage> {
+    let mut raw_txs = node.get_transactions(&address, limit.saturating_add(1), lt, hash);
+
+    if let (Some(lt), Some(hash)) = (lt, hash)
+        && lt != 0
+        && !raw_txs
+            .first()
+            .is_some_and(|tx| tx.meta.lt == lt && tx.meta.tx_hash == hash)
+    {
+        anyhow::bail!("LITE_SERVER_UNKNOWN: transaction hash mismatch");
+    }
+
+    let previous_transaction_id =
+        raw_txs
+            .get(limit)
+            .map_or_else(LocalnetTransactionId::default, |tx| LocalnetTransactionId {
+                lt: tx.meta.lt,
+                hash: tx.meta.tx_hash,
+            });
+    raw_txs.truncate(limit);
 
     if let Some(min_lt) = to_lt {
-        raw_txs.retain(|tx| tx.meta.lt >= min_lt);
+        raw_txs.retain(|tx| tx.meta.lt > min_lt);
     }
 
     let full_txs = raw_txs
@@ -2538,7 +2827,10 @@ fn handle_get_transactions(
             convert_to_tx_struct(tx, tx_boc)
         })
         .collect();
-    Ok(full_txs)
+    Ok(LocalnetTransactionsPage {
+        transactions: full_txs,
+        previous_transaction_id,
+    })
 }
 
 fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransaction>> {
@@ -2548,7 +2840,11 @@ fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransa
         .values()
         .cloned()
         .collect::<Vec<_>>();
-    metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+    metas.sort_by(|a, b| {
+        b.lt.cmp(&a.lt)
+            .then_with(|| a.account.cmp(&b.account))
+            .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+    });
 
     let mut result = Vec::with_capacity(metas.len());
     for meta in metas {
@@ -2572,9 +2868,17 @@ fn handle_get_all_transactions_page(
         .cloned()
         .collect::<Vec<_>>();
     if descending {
-        metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+        metas.sort_by(|a, b| {
+            b.lt.cmp(&a.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
     } else {
-        metas.sort_by(|a, b| a.lt.cmp(&b.lt).then_with(|| a.tx_hash.cmp(&b.tx_hash)));
+        metas.sort_by(|a, b| {
+            a.lt.cmp(&b.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
     }
 
     let mut result = Vec::with_capacity(limit.min(metas.len().saturating_sub(offset)));
@@ -2734,76 +3038,41 @@ fn handle_get_pending_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTr
     Ok(result)
 }
 
-fn handle_try_locate_tx(
+fn handle_locate_transaction(
     node: &Node,
     source: Addr,
     destination: Addr,
     created_lt: u64,
+    kind: TransactionLookupKind,
 ) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
+    let expected_account = match kind {
+        TransactionLookupKind::Source => source,
+        TransactionLookupKind::Result => destination,
+    };
     let tx_hash = node
         .history
-        .msg_to_tx
-        .get(&msg_hash)
-        .copied()
-        .context("Destination transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located destination transaction is missing")?;
-
-    if tx.meta.account != destination {
-        anyhow::bail!("Located transaction does not belong to destination account")
-    }
-
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn handle_try_locate_result_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    handle_try_locate_tx(node, source, destination, created_lt)
-}
-
-fn handle_try_locate_source_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
-    let tx_hash = node
-        .history
-        .tx_by_hash
-        .iter()
-        .find_map(|(hash, tx)| {
-            (tx.account == source && tx.out_msg_hashes.contains(&msg_hash)).then_some(*hash)
-        })
-        .context("Source transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located source transaction is missing")?;
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn find_message_hash(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<Hash256> {
-    node.history
         .msg_by_hash
         .iter()
-        .find_map(|(hash, msg)| {
-            (msg.src == Some(source)
+        .filter(|(_, msg)| {
+            msg.src == Some(source)
                 && msg.dst == Some(destination)
-                && msg.created_lt == Some(created_lt))
-            .then_some(*hash)
+                && msg.created_lt == Some(created_lt)
         })
-        .context("Message not found by source, destination and created_lt")
+        .filter_map(|(msg_hash, _)| {
+            let tx_hash = match kind {
+                TransactionLookupKind::Source => node.indexes.tx_by_out_msg.get(msg_hash),
+                TransactionLookupKind::Result => node.history.msg_to_tx.get(msg_hash),
+            }?;
+            let tx = node.history.tx_by_hash.get(tx_hash)?;
+            (tx.account == expected_account).then_some((tx.lt, *tx_hash))
+        })
+        .max()
+        .map(|(_, tx_hash)| tx_hash)
+        .ok_or(LocalnetError::TransactionNotFound)?;
+    let tx = node
+        .get_transaction_by_hash(&tx_hash)
+        .context("Located transaction is missing")?;
+    convert_to_tx_struct(&tx, tx.tx_boc.clone())
 }
 
 fn handle_run_get_method(
@@ -2919,6 +3188,7 @@ pub(crate) fn convert_to_tx_struct(
             fwd_fee: 0,
             ihr_fee: 0,
             created_lt: 0,
+            extra_currencies: Vec::new(),
         }
     };
 
@@ -2934,7 +3204,7 @@ pub(crate) fn convert_to_tx_struct(
         mc_block_seqno: tx.meta.block_seqno,
         utime: tx.meta.now,
         data: tx_boc,
-        success: tx.meta.success,
+        aborted: tx.meta.aborted,
         exit_code: tx.meta.compute_exit_code.unwrap_or(0),
         transaction_id: LocalnetTransactionId {
             lt: tx.meta.lt,
@@ -3000,14 +3270,18 @@ pub(crate) fn convert_to_message_struct(
     let body_hash = Hash256::from(body_cell.repr_hash());
     let body_bytes = Boc::encode(body_cell);
 
-    let (fwd_fee, ihr_fee, bounce, bounced) = match &msg.info {
-        MsgInfo::Int(info) => (
-            info.fwd_fee.into(),
-            info.ihr_fee.into(),
-            info.bounce,
-            info.bounced,
-        ),
-        _ => (0, 0, false, false),
+    let (fwd_fee, ihr_fee, bounce, bounced, extra_currencies) = match &msg.info {
+        MsgInfo::Int(info) => {
+            let extra_currencies = ExtraCurrency::from_collection(&info.value.other)?;
+            (
+                info.fwd_fee.into(),
+                info.ihr_fee.into(),
+                info.bounce,
+                info.bounced,
+                extra_currencies,
+            )
+        }
+        _ => (0, 0, false, false, Vec::new()),
     };
 
     // Extract opcode, skipping the bounce prefix for bounced internal messages.
@@ -3046,6 +3320,7 @@ pub(crate) fn convert_to_message_struct(
         fwd_fee,
         ihr_fee,
         created_lt: meta.created_lt.unwrap_or(0),
+        extra_currencies,
     })
 }
 
@@ -3053,14 +3328,14 @@ fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LocalnetBl
     let Some(header) = node.get_block_header(seqno) else {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
-
-    Ok(LocalnetBlockHeader {
-        id: header.block_id(),
-        gen_utime: header.gen_utime,
-        start_lt: header.start_lt,
-        end_lt: header.end_lt,
-        prev_seqno: header.prev_seqno,
-    })
+    let block_boc = node.get_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| node.get_block_header(prev_seqno))
+        .map(|prev| prev.block_id())
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
 }
 
 fn handle_get_masterchain_block_header(
@@ -3070,13 +3345,45 @@ fn handle_get_masterchain_block_header(
     let Some(header) = node.get_masterchain_block_header(seqno) else {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
+    let block_boc = node.get_masterchain_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| node.get_masterchain_block_header(prev_seqno))
+        .map(|prev| prev.block_id())
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
+}
 
+fn parse_block_header(
+    id: LocalnetBlockId,
+    prev_blocks: Vec<LocalnetBlockId>,
+    block_boc: &BocBytes,
+) -> anyhow::Result<LocalnetBlockHeader> {
+    let cell = Boc::decode(block_boc).context("Failed to decode block BOC")?;
+    let block = cell.parse::<Block>().context("Failed to parse block")?;
+    let info = block.load_info().context("Failed to load block info")?;
+
+    let prev_seqno = prev_blocks.first().map(|block| block.seqno);
     Ok(LocalnetBlockHeader {
-        id: header.block_id(),
-        gen_utime: header.gen_utime,
-        start_lt: header.start_lt,
-        end_lt: header.end_lt,
-        prev_seqno: header.prev_seqno,
+        id,
+        global_id: block.global_id,
+        version: info.version as i32,
+        after_merge: info.after_merge,
+        after_split: info.after_split,
+        before_split: info.before_split,
+        want_merge: info.want_merge,
+        want_split: info.want_split,
+        validator_list_hash_short: info.gen_validator_list_hash_short as i32,
+        catchain_seqno: info.gen_catchain_seqno as i32,
+        min_ref_mc_seqno: info.min_ref_mc_seqno as i32,
+        is_key_block: info.key_block,
+        prev_key_block_seqno: info.prev_key_block_seqno as i32,
+        gen_utime: info.gen_utime,
+        start_lt: info.start_lt,
+        end_lt: info.end_lt,
+        prev_seqno,
+        prev_blocks,
     })
 }
 
@@ -3103,6 +3410,8 @@ fn handle_get_block_transactions(
 
     Ok(LocalnetBlockTransactions {
         id: block_id,
+        requested_count: result.len(),
+        incomplete: false,
         transactions: result,
         msg_hash: None,
         msg_hash_norm: None,
@@ -3206,7 +3515,15 @@ fn handle_get_config_param(
 fn handle_get_config_all(node: &Node, seqno: Option<u32>) -> anyhow::Result<BocBytes> {
     ensure_seqno_exists(node, seqno)?;
 
-    node.get_cell(&node.globals.config_boc_hash)
+    let config_boc_hash = match seqno {
+        Some(seqno) if seqno > 0 => {
+            node.get_masterchain_block_header(seqno)
+                .ok_or(LocalnetError::BlockNotFound { seqno })?
+                .config_boc_hash
+        }
+        _ => node.globals.config_boc_hash,
+    };
+    node.get_cell(&config_boc_hash)
         .context("Blockchain config cell not found")
 }
 
@@ -3302,7 +3619,8 @@ mod tests {
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use tycho_types::boc::BocRepr;
     use tycho_types::cell::{CellSliceParts, HashBytes};
-    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage};
+    use tycho_types::models::config::BlockchainConfigParams;
+    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
 
     const REGULAR_OPCODE: u32 = 0x178d_4519;
     const BOUNCE_PREFIX: u32 = 0xffff_ffff;
@@ -3363,6 +3681,61 @@ mod tests {
         assert_eq!(node.globals.head_seqno, 2);
     }
 
+    #[test]
+    fn config_queries_use_the_config_committed_with_each_block() {
+        const TEST_PARAM: u32 = 999;
+
+        let mut node = make_test_node();
+        node.mine_block().expect("first block must be mined");
+        let first_config =
+            handle_get_config_all(&node, Some(1)).expect("first block config must be available");
+
+        let mut builder = CellBuilder::new();
+        builder
+            .store_u32(0xfeed_cafe)
+            .expect("test config marker must fit");
+        let test_param = builder.build().expect("test config param must build");
+        let mut second_config_params = BlockchainConfigParams::from_raw(
+            Boc::decode(&first_config).expect("default config must decode"),
+        );
+        second_config_params
+            .set_raw(TEST_PARAM, test_param.clone())
+            .expect("test config param must be inserted");
+        let second_config_cell = second_config_params
+            .as_dict()
+            .root()
+            .as_ref()
+            .expect("config dictionary must remain non-empty")
+            .clone();
+        let second_config_hash = Hash256::from(second_config_cell.repr_hash());
+        let second_config = BocBytes::from(Boc::encode(second_config_cell));
+        node.cas.put(second_config.clone(), second_config_hash);
+        node.globals.config_boc_hash = second_config_hash;
+
+        node.mine_block().expect("second block must be mined");
+
+        assert_eq!(
+            handle_get_config_all(&node, Some(1)).expect("historical config must remain available"),
+            first_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, Some(2)).expect("second block config must be available"),
+            second_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, None).expect("latest config must be available"),
+            second_config
+        );
+        assert!(handle_get_config_param(&node, TEST_PARAM, Some(1)).is_err());
+        assert_eq!(
+            handle_get_config_param(&node, TEST_PARAM, Some(2))
+                .expect("new config param must be available at the second block"),
+            BocBytes::from(Boc::encode(test_param))
+        );
+        node.get_masterchain_state_cell(1)
+            .expect("historical masterchain state must use the historical config");
+    }
+
     struct NoopExecutor;
 
     impl TvmExecutor for NoopExecutor {
@@ -3382,6 +3755,243 @@ mod tests {
         let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
         Node::new(Box::new(NoopExecutor), config_boc, StateSource::Local)
             .expect("must create test node")
+    }
+
+    #[test]
+    fn jetton_master_pages_preserve_detection_order() {
+        let mut node = make_test_node();
+        let admin_a = test_addr(10);
+        let admin_b = test_addr(11);
+        for master in [
+            test_jetton_master(3, admin_a),
+            test_jetton_master(1, admin_b),
+            test_jetton_master(2, admin_a),
+        ] {
+            node.history.jetton_masters.insert(master.address, master);
+        }
+
+        let default = handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::new(), 2, 1)
+            .expect("default jetton master page must succeed");
+        let by_admin =
+            handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::from([admin_a]), 1, 1)
+                .expect("admin jetton master page must succeed");
+
+        assert_eq!(jetton_master_addresses(&default), [1, 2]);
+        assert_eq!(jetton_master_addresses(&by_admin), [2]);
+    }
+
+    fn test_jetton_master(id: u8, admin_address: Addr) -> storage::JettonMasterMeta {
+        storage::JettonMasterMeta {
+            address: test_addr(id),
+            admin_address: Some(admin_address),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_content: Value::Null,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt: u64::from(id),
+            mintable: true,
+            total_supply: 0,
+        }
+    }
+
+    fn jetton_master_addresses(masters: &[storage::JettonMasterMeta]) -> Vec<u8> {
+        masters
+            .iter()
+            .map(|master| master.address.addr[0])
+            .collect()
+    }
+
+    #[test]
+    fn jetton_wallet_queries_follow_upstream_sort_precedence() {
+        let mut node = make_test_node();
+        let owner_a = test_addr(10);
+        let owner_b = test_addr(11);
+        let master_a = test_addr(20);
+        let master_b = test_addr(21);
+        for wallet in [
+            test_jetton_wallet(1, owner_b, master_a, 300, 10),
+            test_jetton_wallet(2, owner_a, master_a, 100, 30),
+            test_jetton_wallet(3, owner_a, master_b, 200, 20),
+            test_jetton_wallet(4, owner_b, master_b, 0, 40),
+        ] {
+            node.history.jetton_wallets.insert(wallet.address, wallet);
+        }
+
+        let default = handle_get_jetton_wallets(&mut node, test_jetton_wallet_query(None))
+            .expect("default query must succeed");
+        assert_eq!(wallet_addresses(&default), vec![1, 2, 3, 4]);
+
+        let ascending = handle_get_jetton_wallets(
+            &mut node,
+            test_jetton_wallet_query(Some(LocalnetSortOrder::Asc)),
+        )
+        .expect("ascending query must succeed");
+        assert_eq!(wallet_balances(&ascending), vec![0, 100, 200, 300]);
+
+        let mut descending_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        descending_query.offset = 1;
+        descending_query.limit = 2;
+        let descending = handle_get_jetton_wallets(&mut node, descending_query)
+            .expect("descending page must succeed");
+        assert_eq!(wallet_balances(&descending), vec![200, 100]);
+
+        let mut address_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        address_query.addresses = HashSet::from([test_addr(3), test_addr(1)]);
+        let by_address = handle_get_jetton_wallets(&mut node, address_query)
+            .expect("address query must succeed");
+        assert_eq!(wallet_addresses(&by_address), vec![1, 3]);
+
+        let mut owner_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        owner_query.owner_addresses.insert(owner_a);
+        let by_owner =
+            handle_get_jetton_wallets(&mut node, owner_query).expect("owner query must succeed");
+        assert_eq!(wallet_balances(&by_owner), vec![200, 100]);
+
+        let mut combined_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        combined_query.owner_addresses.insert(owner_a);
+        combined_query.jetton_addresses.insert(master_a);
+        let combined = handle_get_jetton_wallets(&mut node, combined_query)
+            .expect("combined owner and jetton query must succeed");
+        assert_eq!(wallet_addresses(&combined), vec![2]);
+
+        let mut nonzero_query = test_jetton_wallet_query(None);
+        nonzero_query.exclude_zero_balance = true;
+        let nonzero = handle_get_jetton_wallets(&mut node, nonzero_query)
+            .expect("nonzero query must succeed");
+        assert_eq!(wallet_addresses(&nonzero), vec![1, 2, 3]);
+    }
+
+    fn test_jetton_wallet_query(sort: Option<LocalnetSortOrder>) -> ParsedJettonWalletsQuery {
+        ParsedJettonWalletsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            jetton_addresses: HashSet::new(),
+            exclude_zero_balance: false,
+            sort,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_jetton_wallet(
+        id: u8,
+        owner_address: Addr,
+        jetton_address: Addr,
+        balance: u128,
+        last_transaction_lt: Lt,
+    ) -> storage::JettonWalletMeta {
+        storage::JettonWalletMeta {
+            address: test_addr(id),
+            balance,
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_address,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt,
+            mintless_is_claimed: None,
+            owner_address,
+        }
+    }
+
+    fn wallet_addresses(wallets: &[storage::JettonWalletMeta]) -> Vec<u8> {
+        wallets
+            .iter()
+            .map(|wallet| wallet.address.addr[0])
+            .collect()
+    }
+
+    fn wallet_balances(wallets: &[storage::JettonWalletMeta]) -> Vec<u128> {
+        wallets.iter().map(|wallet| wallet.balance).collect()
+    }
+
+    #[test]
+    fn nft_item_queries_follow_upstream_order_precedence() {
+        let mut node = make_test_node();
+        let owner = test_addr(10);
+        let collection_a = test_addr(20);
+        let collection_b = test_addr(21);
+        for item in [
+            test_nft_item(1, owner, Some(collection_b), "10", 10),
+            test_nft_item(2, owner, Some(collection_b), "2", 40),
+            test_nft_item(3, owner, Some(collection_a), "7", 20),
+            test_nft_item(4, owner, None, "1", 30),
+        ] {
+            node.history.nft_items.insert(item.address, item);
+        }
+
+        let default = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::Insertion),
+        )
+        .expect("default NFT query must succeed");
+        assert_eq!(nft_item_addresses(&default), vec![1, 2, 3, 4]);
+
+        let mut collection_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        collection_query.collection_addresses.insert(collection_b);
+        let by_collection = handle_get_nft_items(&mut node, collection_query)
+            .expect("collection NFT query must succeed");
+        assert_eq!(nft_item_indexes(&by_collection), vec!["2", "10"]);
+
+        let mut owner_query = test_nft_items_query(LocalnetNftItemsOrder::OwnerCollectionIndex);
+        owner_query.owner_addresses.insert(owner);
+        let by_owner =
+            handle_get_nft_items(&mut node, owner_query).expect("owner NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_owner), vec![3, 2, 1, 4]);
+
+        let by_lt = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::LastTransactionLtDesc),
+        )
+        .expect("LT-sorted NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_lt), vec![2, 4, 3, 1]);
+
+        let mut page_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        page_query.collection_addresses.insert(collection_b);
+        page_query.limit = 1;
+        page_query.offset = 1;
+        let page =
+            handle_get_nft_items(&mut node, page_query).expect("paginated NFT query must succeed");
+        assert_eq!(nft_item_indexes(&page), vec!["10"]);
+    }
+
+    fn test_nft_items_query(order: LocalnetNftItemsOrder) -> ParsedNftItemsQuery {
+        ParsedNftItemsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            collection_addresses: HashSet::new(),
+            indexes: HashSet::new(),
+            order,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_nft_item(
+        id: u8,
+        owner_address: Addr,
+        collection_address: Option<Addr>,
+        index: &str,
+        last_transaction_lt: Lt,
+    ) -> storage::NftItemMeta {
+        storage::NftItemMeta {
+            address: test_addr(id),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            collection_address,
+            owner_address: Some(owner_address),
+            content: Value::Null,
+            index: index.to_owned(),
+            init: true,
+            last_transaction_lt,
+        }
+    }
+
+    fn nft_item_addresses(items: &[storage::NftItemMeta]) -> Vec<u8> {
+        items.iter().map(|item| item.address.addr[0]).collect()
+    }
+
+    fn nft_item_indexes(items: &[storage::NftItemMeta]) -> Vec<&str> {
+        items.iter().map(|item| item.index.as_str()).collect()
     }
 
     fn internal_message_boc(bounced: bool, body_words: &[u32]) -> BocBytes {
@@ -3416,6 +4026,7 @@ mod tests {
     fn message_meta(hash: Hash256) -> MsgMeta {
         MsgMeta {
             msg_hash: hash,
+            hash_norm: None,
             msg_boc_hash: hash,
             src: Some(test_addr(0x11)),
             dst: Some(test_addr(0x22)),

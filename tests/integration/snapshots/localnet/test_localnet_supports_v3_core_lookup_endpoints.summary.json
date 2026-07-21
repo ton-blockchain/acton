@@ -1,0 +1,69 @@
+{
+  "address_book": {
+    "missing_interfaces_are_empty": true,
+    "preserves_missing_key": true,
+    "preserves_wallet_key": true,
+    "wallet_interfaces": [
+      "wallet_v4r2"
+    ]
+  },
+  "bad_requests": {
+    "address_book_empty": {
+      "error": "at least 1 address required",
+      "status": 400
+    },
+    "invalid_sort": {
+      "error": "Invalid `sort`: invalid. Supported values: asc, desc",
+      "status": 400
+    },
+    "messages_invalid_direction": {
+      "error": "Invalid `direction`: sideways. Supported values: in, out",
+      "status": 400
+    },
+    "metadata_empty": {
+      "error": "at least 1 address required",
+      "status": 400
+    },
+    "negative_seqno": {
+      "error": "`seqno` must not be negative",
+      "status": 400
+    },
+    "wallet_states_empty": {
+      "error": "address of account is required",
+      "status": 400
+    }
+  },
+  "masterchain_info": {
+    "first_workchain": -1,
+    "last_workchain": -1,
+    "seqno_ordered": true
+  },
+  "messages": {
+    "address_book_present": true,
+    "contains_expected": true,
+    "count": 1,
+    "links_both_transactions": false
+  },
+  "metadata": {
+    "is_empty_for_plain_wallets": true
+  },
+  "transactions_by_masterchain_block": {
+    "address_book_present": true,
+    "all_match_mc_seqno": true,
+    "contains_expected": true
+  },
+  "wallet_information": {
+    "has_seqno": true,
+    "has_wallet_id": true,
+    "missing_status": "uninit",
+    "missing_wallet_fields_omitted": true,
+    "status": "active",
+    "wallet_type": "wallet v4 r2"
+  },
+  "wallet_states": {
+    "address_book_matches_returned_states": true,
+    "contains_funded_non_wallet": true,
+    "contains_wallet": true,
+    "omits_missing_account": true
+  }
+}

@@ -19,7 +19,8 @@ extend-exclude = [
   "src/commands/new/templates/*/package-lock.json",
   "crates/acton-abi-catalog/data/data-abis.json",
   "*.csv",
-  "crates/ton-liteapi/src/tl/schemas/**"
+  "crates/ton-liteapi/src/tl/schemas/**",
+  "packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts"
 ]
 
 [default]
@@ -34,5 +35,6 @@ extend-ignore-re = [
   "Inferrable",
   "readed",
   "authentificate",
-  "authentification"
+  "authentification",
+  "ba"
 ]

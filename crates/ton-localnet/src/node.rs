@@ -7,9 +7,10 @@ use crate::block::{
         MasterchainBlockBuildContext,
     },
 };
-use crate::executor::{ExecContext, TvmExecutor};
+use crate::executor::{ExecContext, ExecResult, FeeEstimationExecution, TvmExecutor};
 use crate::localnet::{
-    LocalnetAccountStateChange, LocalnetBlockId, compute_normalized_ext_in_hash,
+    LocalnetAccountBalance, LocalnetAccountStateChange, LocalnetBlockId, LocalnetEstimateFeeResult,
+    LocalnetEstimatedFee, compute_normalized_ext_in_hash,
 };
 use crate::node_persistence::NodePersistence;
 use crate::remote::{
@@ -23,25 +24,31 @@ use crate::storage::{
     PendingCommit, ReverseLtKey, TraceNode, TransactionInfo, TxMeta,
 };
 use crate::streaming::StreamingCommitEvent;
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 use tokio::sync::broadcast;
+use ton_emulator::Emulator;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
+use tycho_types::dict::Dict;
+use tycho_types::models::config::BlockchainConfigParams;
 use tycho_types::models::transaction::{
     ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
     Transaction,
 };
 use tycho_types::models::{
     Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
-    Message, MsgInfo, OptionalAccount, OwnedMessage, ShardAccount, StdAddr, StoragePhase, TxInfo,
+    Message, MsgInfo, OptionalAccount, OutAction, OutActionsRevIter, OwnedMessage, RelaxedMsgInfo,
+    ShardAccount, StdAddr, StoragePhase, TxInfo,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -141,6 +148,10 @@ fn action_result_code_from_tx_info(tx_info: Option<&TxInfo>) -> Option<i32> {
     info.action_phase.as_ref().map(|phase| phase.result_code)
 }
 
+const fn transaction_aborted_from_tx_info(tx_info: Option<&TxInfo>) -> bool {
+    matches!(tx_info, Some(TxInfo::Ordinary(info)) if info.aborted)
+}
+
 fn gas_used_from_tx_info(tx_info: Option<&TxInfo>) -> u64 {
     let Some(TxInfo::Ordinary(info)) = tx_info else {
         return 0;
@@ -190,7 +201,8 @@ impl Node {
         let config_hash = Hash256::from(config_cell.repr_hash());
 
         let persistence = db_path.map(NodePersistence::open).transpose()?;
-        let (mut latest, history, indexes, head_seqno) = if let Some(persistence) = &persistence {
+        let (mut latest, mut history, indexes, head_seqno) = if let Some(persistence) = &persistence
+        {
             let persisted = persistence.load()?;
             (
                 persisted.latest,
@@ -206,6 +218,11 @@ impl Node {
                 Seqno::default(),
             )
         };
+        for block in &mut history.masterchain_blocks {
+            if block.config_boc_hash == Hash256::default() {
+                block.config_boc_hash = config_hash;
+            }
+        }
 
         let mut cas = if let Some(persistence) = &persistence {
             CellStore::with_conn(persistence.connection())
@@ -221,6 +238,7 @@ impl Node {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
                 balance: GIVER_BALANCE,
+                extra_currencies: Vec::new(),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,
@@ -271,6 +289,41 @@ impl Node {
             boc,
             MessageKind::Internal,
             "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    /// Executes an internal message against the latest account state without storing the
+    /// transaction, changing the account, or adding either message to the localnet queue.
+    pub(crate) fn preflight_internal_boc(&mut self, boc: &BocBytes) -> anyhow::Result<ExecResult> {
+        let msg_hash = boc.hash()?;
+        let (msg_meta, kind) = parse_msg_meta_with_kind(boc, msg_hash)?;
+        if kind != MessageKind::Internal {
+            anyhow::bail!("Jetton mint preflight accepts only internal messages");
+        }
+        let dst = msg_meta
+            .dst
+            .ok_or_else(|| anyhow::anyhow!("Internal message has no destination"))?;
+        let shard_account_boc = self.get_shard_account_for_emulation(&dst, None)?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig: false,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+
+        self.executor.execute(
+            &shard_account_boc,
+            boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
         )
     }
 
@@ -538,6 +591,7 @@ impl Node {
             start_lt,
             end_lt,
             shard_block: block_meta.block_id(),
+            config_boc_hash: self.globals.config_boc_hash,
             state_root_hash: masterchain_block.state_root_hash,
             block_hash: masterchain_block_hash,
             file_hash: masterchain_file_hash,
@@ -690,6 +744,7 @@ impl Node {
 
         let mut balance = 0;
         let mut status = AccountStatus::Nonexist;
+        let mut extra_currencies = Vec::new();
         let mut code_hash = None;
         let mut data_hash = None;
         let mut frozen_hash = None;
@@ -705,9 +760,7 @@ impl Node {
             .parse::<ShardAccount>()
             .context("Failed to parse new ShardAccount")?;
         let account_state_cell = new_shard_account.account.inner().clone();
-        let account_state_hash = Hash256::from(account_state_cell.repr_hash());
-        self.cas
-            .put(Boc::encode(account_state_cell).into(), account_state_hash);
+        let account_state_hash = self.cas.put_cell(account_state_cell);
 
         if let Some(acc) = new_shard_account
             .account
@@ -716,6 +769,7 @@ impl Node {
             .0
         {
             balance = acc.balance.tokens.into();
+            extra_currencies = ExtraCurrency::from_collection(&acc.balance.other)?;
             status = match acc.state {
                 AccountState::Uninit => AccountStatus::Uninit,
                 AccountState::Active(state) => {
@@ -753,6 +807,7 @@ impl Node {
 
         let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
         let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
             transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
@@ -762,7 +817,7 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
             total_fees,
@@ -778,6 +833,7 @@ impl Node {
             account_hash: new_account_hash,
             status,
             balance,
+            extra_currencies,
             last_trans_lt: Some(lt),
             last_trans_hash: Some(tx_hash),
             code_hash,
@@ -912,7 +968,7 @@ impl Node {
             return Ok(self.global_libs_boc.clone());
         }
 
-        let mut libs = tycho_types::dict::Dict::<HashBytes, LibDescr>::new();
+        let mut libs = Dict::<HashBytes, LibDescr>::new();
         for (hash, entry) in &self.global_libraries {
             if entry.publishers.is_empty() {
                 continue;
@@ -930,7 +986,7 @@ impl Node {
                 );
             }
 
-            let mut publishers = tycho_types::dict::Dict::<HashBytes, ()>::new();
+            let mut publishers = Dict::<HashBytes, ()>::new();
             for publisher in &entry.publishers {
                 publishers
                     .add(HashBytes(publisher.addr), ())
@@ -1562,6 +1618,10 @@ impl Node {
             .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
             .cloned()
             .collect::<Vec<_>>();
+        let config_cell = self
+            .cas
+            .get_cell(&block.config_boc_hash)
+            .context("Historical config missing")?;
 
         let state = create_masterchain_state_cell(&MasterchainBlockBuildContext {
             seqno,
@@ -1571,7 +1631,7 @@ impl Node {
             prev_block: prev_block.as_ref(),
             prev_state: None,
             shard_block: &shard_block,
-            config_cell: &self.config_cell,
+            config_cell: &config_cell,
             prev_blocks: &prev_blocks,
         })?;
 
@@ -1793,12 +1853,12 @@ impl Node {
         }
 
         // 2. Build trace tree starting from root_hash (traverse DOWN)
-        let external_hash = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
+        let external_hashes = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
             tx.in_msg_hash.and_then(|h| {
                 self.history
                     .msg_by_hash
                     .get(&h)
-                    .and_then(|msg| if msg.src.is_none() { Some(h) } else { None })
+                    .and_then(|msg| (msg.src.is_none()).then_some((h, msg.hash_norm)))
             })
         });
 
@@ -1807,7 +1867,10 @@ impl Node {
         let mut trace = self
             .build_trace_node(&root_hash, &mut visited_down, &mut account_state_cache)
             .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
-        trace.external_hash = external_hash;
+        if let Some((external_hash, external_hash_norm)) = external_hashes {
+            trace.external_hash = Some(external_hash);
+            trace.external_hash_norm = external_hash_norm;
+        }
         Ok(trace)
     }
 
@@ -1865,6 +1928,7 @@ impl Node {
             transaction: tx_info,
             children,
             external_hash: None,
+            external_hash_norm: None,
         })
     }
 
@@ -2086,7 +2150,7 @@ impl Node {
             account: *addr,
             lt,
             now: gen_utime,
-            success: true,
+            aborted: true,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -2254,6 +2318,7 @@ impl Node {
     ) -> anyhow::Result<storage::EmulateTraceResult> {
         let msg_hash = boc.hash()?;
         let msg_meta = parse_msg_meta(&boc, msg_hash)?;
+        let external_hash_norm = msg_meta.hash_norm;
         let dst = msg_meta
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
@@ -2302,6 +2367,7 @@ impl Node {
         let tx_info = exec_result.tx.info.load().ok();
         let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
         let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
             transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
@@ -2311,7 +2377,7 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
             total_fees,
@@ -2345,10 +2411,130 @@ impl Node {
                 },
                 children: Vec::new(),
                 external_hash: Some(msg_hash),
+                external_hash_norm,
             },
             code_cells,
             data_cells,
         })
+    }
+
+    pub fn estimate_fees_by_external_message(
+        &mut self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let message_cell = Boc::decode(&boc).context("Failed to decode external message BOC")?;
+        let message = message_cell
+            .parse::<Message<'_>>()
+            .context("Failed to parse external message")?;
+        let destination = match &message.info {
+            MsgInfo::ExtIn(info) => Addr::from(&info.dst),
+            _ => anyhow::bail!("estimateFee accepts only external-in messages"),
+        };
+        let is_masterchain = destination.workchain == -1;
+
+        let mut config_slice = self.config_cell.as_slice_allow_exotic();
+        let config =
+            Dict::<u32, Cell>::load_from_root_ext(&mut config_slice, Cell::empty_context())
+                .context("Failed to parse blockchain config dictionary")?;
+        let config_root = config
+            .root()
+            .clone()
+            .context("Blockchain config is empty")?;
+        let config_params = BlockchainConfigParams::from_raw(config_root);
+        let (in_fwd_fee, _) =
+            Emulator::compute_message_fwd_fee(Arc::new(config.clone()), &message, is_masterchain)?;
+
+        let shard_account_boc = self.get_shard_account_for_emulation(&destination, None)?;
+        let shard_account_cell =
+            Boc::decode(&shard_account_boc).context("Failed to decode source ShardAccount BOC")?;
+        let shard_account = shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse source ShardAccount")?;
+        let account = shard_account
+            .load_account()
+            .context("Failed to load source account")?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let storage_fee =
+            estimate_storage_fee(&config_params, account.as_ref(), &destination, gen_utime)?;
+
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+        let execution = self.executor.execute_for_fee_estimation(
+            &shard_account_boc,
+            &boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
+        )?;
+        let (gas_fee, fwd_fee) = match execution {
+            FeeEstimationExecution::ExternalNotAccepted => (0, 0),
+            FeeEstimationExecution::Executed(result) => {
+                let tx_info = result
+                    .tx
+                    .info
+                    .load()
+                    .context("Failed to load transaction info")?;
+                let TxInfo::Ordinary(tx_info) = tx_info else {
+                    anyhow::bail!("estimateFee requires an ordinary transaction");
+                };
+                let (gas_fee, success) = match &tx_info.compute_phase {
+                    ComputePhase::Executed(phase) => (u128::from(phase.gas_fees), phase.success),
+                    ComputePhase::Skipped(_) => (0, false),
+                };
+                let fwd_fee = if success {
+                    estimate_action_forward_fees(
+                        Arc::new(config),
+                        result.actions.as_ref(),
+                        is_masterchain,
+                    )?
+                } else {
+                    0
+                };
+                (gas_fee, fwd_fee)
+            }
+        };
+
+        Ok(LocalnetEstimateFeeResult {
+            source_fees: LocalnetEstimatedFee {
+                in_fwd_fee: u64::try_from(u128::from(in_fwd_fee))
+                    .context("input forwarding fee does not fit u64")?,
+                storage_fee,
+                gas_fee: u64::try_from(gas_fee).context("gas fee does not fit u64")?,
+                fwd_fee: u64::try_from(fwd_fee).context("forwarding fee does not fit u64")?,
+            },
+            destination_fees: Vec::new(),
+        })
+    }
+
+    #[must_use]
+    pub fn top_account_balances(&self, limit: usize, offset: usize) -> Vec<LocalnetAccountBalance> {
+        let mut accounts = self
+            .latest
+            .accounts
+            .iter()
+            .map(|(account, meta)| LocalnetAccountBalance {
+                account: *account,
+                balance: meta.balance,
+            })
+            .collect::<Vec<_>>();
+        accounts.sort_unstable_by(|left, right| {
+            right
+                .balance
+                .cmp(&left.balance)
+                .then_with(|| left.account.cmp(&right.account))
+        });
+        accounts.into_iter().skip(offset).take(limit).collect()
     }
 
     fn get_shard_account_for_emulation(
@@ -2434,7 +2620,7 @@ impl Node {
         balance: u128,
     ) -> anyhow::Result<BocBytes> {
         let account = Account {
-            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            address: IntAddr::Std(StdAddr::from(addr)),
             storage_stat: Default::default(),
             last_trans_lt: 0,
             balance: CurrencyCollection::new(balance),
@@ -2467,7 +2653,7 @@ impl Node {
             AccountState::Frozen(_) => anyhow::bail!("Account is already frozen"),
         };
 
-        account.address = IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr)));
+        account.address = IntAddr::Std(StdAddr::from(addr));
         account.state = AccountState::Frozen(state_hash);
         Ok(account)
     }
@@ -2554,6 +2740,108 @@ impl Node {
     }
 }
 
+fn estimate_storage_fee(
+    config: &BlockchainConfigParams,
+    account: Option<&Account>,
+    address: &Addr,
+    now: u32,
+) -> anyhow::Result<u64> {
+    let Some(account) = account else {
+        return Ok(0);
+    };
+    let last_paid = account.storage_stat.last_paid;
+    let is_masterchain = address.workchain == -1;
+    let is_special = is_masterchain
+        && config
+            .get_fundamental_addresses()
+            .context("Failed to load fundamental addresses")?
+            .contains_key(HashBytes(address.addr))
+            .context("Failed to check fundamental address")?;
+
+    let mut all_prices = config
+        .get_storage_prices()
+        .context("Failed to load storage prices")?
+        .iter()
+        .map(|entry| entry.map(|(_, prices)| prices))
+        .collect::<Result<Vec<_>, _>>()?;
+    all_prices.sort_unstable_by_key(|prices| prices.utime_since);
+    if now <= last_paid
+        || last_paid == 0
+        || is_special
+        || all_prices.is_empty()
+        || now <= all_prices[0].utime_since
+    {
+        return Ok(0);
+    }
+
+    let mut index = all_prices.len();
+    while index > 0 && all_prices[index - 1].utime_since > last_paid {
+        index -= 1;
+    }
+    index = index.saturating_sub(1);
+
+    let cells = u64::from(account.storage_stat.used.cells);
+    let bits = u64::from(account.storage_stat.used.bits);
+    let mut upto = last_paid.max(all_prices[0].utime_since);
+    let mut total = BigUint::default();
+    for (position, prices) in all_prices.iter().enumerate().skip(index) {
+        if upto >= now {
+            break;
+        }
+        let valid_until = all_prices
+            .get(position + 1)
+            .map_or(now, |next| now.min(next.utime_since));
+        if upto < valid_until {
+            let (cell_price, bit_price) = if is_masterchain {
+                (prices.mc_cell_price_ps, prices.mc_bit_price_ps)
+            } else {
+                (prices.cell_price_ps, prices.bit_price_ps)
+            };
+            let rate = BigUint::from(cells) * cell_price + BigUint::from(bits) * bit_price;
+            total += rate * (valid_until - upto);
+        }
+        upto = valid_until;
+    }
+
+    let rounded = (total + BigUint::from(u16::MAX)) >> 16_usize;
+    u64::try_from(rounded).context("storage fee does not fit u64")
+}
+
+fn estimate_action_forward_fees(
+    config: Arc<Dict<u32, Cell>>,
+    actions: Option<&BocBytes>,
+    source_is_masterchain: bool,
+) -> anyhow::Result<u128> {
+    let Some(actions) = actions else {
+        return Ok(0);
+    };
+    let actions = Boc::decode(actions).context("Failed to decode output actions BOC")?;
+    let actions = actions
+        .as_slice()
+        .context("Failed to read output actions cell")?;
+    let mut total = 0_u128;
+    for action in OutActionsRevIter::new(actions) {
+        let OutAction::SendMsg { out_msg, .. } = action.context("Failed to parse output action")?
+        else {
+            continue;
+        };
+        let message = out_msg.load().context("Failed to load output message")?;
+        let destination_is_masterchain = match &message.info {
+            RelaxedMsgInfo::Int(info) => info.dst.is_masterchain(),
+            RelaxedMsgInfo::ExtOut(_) => false,
+        };
+        let (fee, _) = Emulator::compute_message_fwd_fee(
+            Arc::clone(&config),
+            &message,
+            source_is_masterchain || destination_is_masterchain,
+        )?;
+        total = total
+            .checked_add(u128::from(fee))
+            .context("forwarding fee overflow")?;
+    }
+    Ok(total)
+}
+
 fn store_account_state_cell_from_shard_account_boc(
     cas: &mut CellStore,
     shard_account_boc: &BocBytes,
@@ -2561,9 +2849,7 @@ fn store_account_state_cell_from_shard_account_boc(
     let cell = Boc::decode(shard_account_boc).ok()?;
     let shard_account = cell.parse::<ShardAccount>().ok()?;
     let account_cell = shard_account.account.inner().clone();
-    let hash = Hash256::from(account_cell.repr_hash());
-    cas.put(Boc::encode(account_cell).into(), hash);
-    Some(hash)
+    Some(cas.put_cell(account_cell))
 }
 
 fn account_state_snapshot_from_boc(boc: &BocBytes) -> Option<AccountStateSnapshot> {
@@ -2714,6 +3000,9 @@ fn parse_msg_meta_with_kind_from_cell(
 ) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let msg = cell.parse::<Message<'_>>()?;
 
+    let hash_norm = matches!(&msg.info, MsgInfo::ExtIn(_))
+        .then(|| compute_normalized_ext_in_hash(&msg))
+        .transpose()?;
     let (kind, src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
             MessageKind::Internal,
@@ -2747,6 +3036,7 @@ fn parse_msg_meta_with_kind_from_cell(
     Ok((
         MsgMeta {
             msg_hash: hash,
+            hash_norm,
             msg_boc_hash: hash,
             src,
             dst,
@@ -2875,6 +3165,7 @@ mod tests {
                 tx_boc: BocRepr::encode(tx)?.into(),
                 new_account_boc,
                 out_msg_cells: Vec::new(),
+                actions: None,
             })
         }
     }
@@ -3098,6 +3389,7 @@ mod tests {
         let account = test_addr(0x42);
         let tx_hash = Hash256([0x10; 32]);
         let in_msg_hash = Hash256([0x11; 32]);
+        let in_msg_hash_norm = Hash256([0x21; 32]);
         let out_msg_hash = Hash256([0x12; 32]);
         let block_hash = Hash256([0x13; 32]);
         let dummy_boc = BocBytes::from(Boc::encode(Cell::default()));
@@ -3107,6 +3399,7 @@ mod tests {
             in_msg_hash,
             MsgMeta {
                 msg_hash: in_msg_hash,
+                hash_norm: Some(in_msg_hash_norm),
                 msg_boc_hash: in_msg_hash,
                 src: None,
                 dst: Some(account),
@@ -3120,6 +3413,7 @@ mod tests {
             out_msg_hash,
             MsgMeta {
                 msg_hash: out_msg_hash,
+                hash_norm: None,
                 msg_boc_hash: out_msg_hash,
                 src: Some(account),
                 dst: Some(test_addr(0x43)),
@@ -3135,7 +3429,7 @@ mod tests {
             account,
             lt: 1,
             now: 3,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -3186,7 +3480,12 @@ mod tests {
         assert_eq!(txs[0].tx_hash, tx_meta.tx_hash);
         assert_eq!(txs[0].in_msg_hash, tx_meta.in_msg_hash);
         assert_eq!(txs[0].out_msg_hashes, tx_meta.out_msg_hashes);
-        assert!(reopened.get_message_info(&in_msg_hash).is_some());
+        assert_eq!(
+            reopened
+                .get_message_info(&in_msg_hash)
+                .map(|message| message.meta.hash_norm),
+            Some(Some(in_msg_hash_norm))
+        );
         assert!(reopened.get_message_info(&out_msg_hash).is_some());
         assert_eq!(reopened.history.msg_to_tx.get(&in_msg_hash), Some(&tx_hash));
         assert_eq!(
@@ -3216,6 +3515,7 @@ mod tests {
             account_hash: Hash256([0x41; 32]),
             status: AccountStatus::Active,
             balance: 7,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(10),
             last_trans_hash: Some(Hash256([0x42; 32])),
             code_hash: None,
@@ -3250,7 +3550,7 @@ mod tests {
                 account,
                 lt: 10,
                 now: 3,
-                success: true,
+                aborted: false,
                 compute_exit_code: Some(0),
                 action_result_code: Some(0),
                 total_fees: 0,
@@ -3341,6 +3641,7 @@ mod tests {
             account_hash,
             status,
             balance: cached_balance,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(0),
             last_trans_hash: None,
             code_hash: None,
@@ -3798,6 +4099,7 @@ mod tests {
         let parent_account = test_addr(0x61);
         let child_account = test_addr(0x62);
         let external_msg_hash = Hash256([0x63; 32]);
+        let external_msg_hash_norm = Hash256([0x68; 32]);
         let internal_msg_hash = Hash256([0x64; 32]);
         let parent_tx_hash = Hash256([0x65; 32]);
         let child_tx_hash = Hash256([0x66; 32]);
@@ -3816,6 +4118,7 @@ mod tests {
             external_msg_hash,
             MsgMeta {
                 msg_hash: external_msg_hash,
+                hash_norm: Some(external_msg_hash_norm),
                 msg_boc_hash: external_msg_hash,
                 src: None,
                 dst: Some(parent_account),
@@ -3829,6 +4132,7 @@ mod tests {
             internal_msg_hash,
             MsgMeta {
                 msg_hash: internal_msg_hash,
+                hash_norm: None,
                 msg_boc_hash: internal_msg_hash,
                 src: Some(parent_account),
                 dst: Some(child_account),
@@ -3844,7 +4148,7 @@ mod tests {
             account: parent_account,
             lt: 1,
             now: 2,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -3859,7 +4163,7 @@ mod tests {
             account: child_account,
             lt: 2,
             now: 2,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -3901,6 +4205,8 @@ mod tests {
             .expect("child transaction trace must resolve to root");
         assert_eq!(trace.transaction.meta.tx_hash, parent_tx_hash);
         assert_eq!(trace.external_hash, Some(external_msg_hash));
+        assert_eq!(trace.external_hash_norm, Some(external_msg_hash_norm));
+        assert_eq!(trace.effective_external_hash_norm(), external_msg_hash_norm);
         assert_eq!(trace.children.len(), 1);
         assert_eq!(trace.children[0].transaction.meta.tx_hash, child_tx_hash);
     }
@@ -4279,6 +4585,7 @@ mod tests {
                 account_hash,
                 status: AccountStatus::Active,
                 balance: 1,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(23),
                 last_trans_hash: None,
                 code_hash: None,
@@ -4606,6 +4913,7 @@ mod tests {
                 account_hash,
                 status: AccountStatus::Active,
                 balance: 974_433,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(42),
                 last_trans_hash: None,
                 code_hash: Some(code_hash),
@@ -4614,7 +4922,7 @@ mod tests {
             },
         );
 
-        node.detect_jetton_wallets(&wallet_address)
+        node.detect_assets(&wallet_address)
             .expect("library-backed jetton wallet must be detected");
 
         let wallet = node
@@ -4626,6 +4934,18 @@ mod tests {
         assert_eq!(wallet.owner_address, owner_address);
         assert_eq!(wallet.jetton_address, jetton_address);
         assert_eq!(wallet.last_transaction_lt, 42);
+
+        let meta = node
+            .latest
+            .accounts
+            .get_mut(&wallet_address)
+            .expect("wallet account metadata must exist");
+        meta.status = AccountStatus::Nonexist;
+        meta.code_hash = None;
+        meta.data_hash = None;
+        node.detect_assets(&wallet_address)
+            .expect("removed account must no longer be detected as a jetton wallet");
+        assert!(!node.history.jetton_wallets.contains_key(&wallet_address));
     }
 
     #[test]
@@ -4962,6 +5282,7 @@ mod tests {
                 account_hash: high_account_hash,
                 status: AccountStatus::Active,
                 balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(100),
                 last_trans_hash: None,
                 code_hash: None,
@@ -4975,6 +5296,7 @@ mod tests {
                 account_hash: low_account_hash,
                 status: AccountStatus::Active,
                 balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(5),
                 last_trans_hash: None,
                 code_hash: None,

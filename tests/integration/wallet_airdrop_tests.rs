@@ -446,6 +446,84 @@ fn test_wallet_airdrop_rejects_difficulty_above_256() {
 }
 
 #[test]
+fn test_wallet_airdrop_honors_challenge_nonce_limit() {
+    let project = ProjectBuilder::new("wallet-airdrop-challenge-nonce-limit").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/faucet/challenge",
+        status: 200,
+        body: r#"{"version":1,"challenge":"mock-challenge","difficulty":1,"max_solve_ttl_seconds":300,"max_nonce_attempts":0}"#,
+    }]);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    output.assert_stderr_contains("PoW solve exceeded nonce limit of 0");
+}
+
+#[test]
+fn test_wallet_airdrop_honors_challenge_solve_ttl() {
+    let project = ProjectBuilder::new("wallet-airdrop-challenge-solve-ttl").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/faucet/challenge",
+        status: 200,
+        body: r#"{"version":1,"challenge":"mock-challenge","difficulty":1,"max_solve_ttl_seconds":0,"max_nonce_attempts":1000000000}"#,
+    }]);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    output.assert_stderr_contains("PoW solve exceeded time limit of 0s");
+}
+
+#[test]
 fn test_wallet_airdrop_rejects_unsupported_challenge_version() {
     let project = ProjectBuilder::new("wallet-airdrop-unsupported-challenge-version").build();
 
@@ -1246,6 +1324,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "0",
                     "code_boc": Value::Null,
                     "status": "uninit",
@@ -1258,6 +1337,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1352,6 +1432,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1364,6 +1445,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1376,6 +1458,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "3400000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2590,6 +2673,7 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2500000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2687,6 +2771,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "1500000000",
                     "code_boc": Value::Null,
                     "status": "active",

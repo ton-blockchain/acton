@@ -1,0 +1,13 @@
+.positive {
+  color: var(--acton-color-success);
+}
+
+.assetValue {
+  white-space: nowrap;
+}
+
+.totalCell {
+  padding-top: var(--acton-space-3);
+  padding-bottom: var(--acton-space-3);
+  white-space: nowrap;
+}

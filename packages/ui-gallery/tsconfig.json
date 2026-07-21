@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"],
+      "@acton/transaction-ui/abi": ["../transaction-ui/src/abi.ts"],
+      "@acton/ui": ["../ui/src/index.ts"],
+      "@acton/ui/styles/*": ["../ui/src/styles/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

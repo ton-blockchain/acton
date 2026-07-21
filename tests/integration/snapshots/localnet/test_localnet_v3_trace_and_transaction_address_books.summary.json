@@ -1,0 +1,10 @@
+{
+  "trace": {
+    "contains_account": true,
+    "user_friendly": true
+  },
+  "transactions_by_message": {
+    "contains_account": true,
+    "user_friendly": true
+  }
+}

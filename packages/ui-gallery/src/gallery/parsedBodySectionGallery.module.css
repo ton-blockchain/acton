@@ -1,0 +1,30 @@
+.stateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--acton-space-4);
+  align-items: start;
+}
+
+.stateSample,
+.wideSample {
+  min-width: 0;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.stateSample {
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.stateLabel {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-2xs);
+}
+
+.wideSample {
+  overflow: hidden;
+}

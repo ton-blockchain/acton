@@ -4250,6 +4250,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_html_form"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f0346d7a342ab90f405cfc08f25d15075f944f42fcabbc5eac923829fa6d228"
+dependencies = [
+ "form_urlencoded",
+ "indexmap 2.12.0",
+ "itoa",
+ "serde_core",
+ "zmij",
+]
+
+[[package]]
 name = "serde_json"
 version = "1.0.145"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5314,6 +5327,7 @@ dependencies = [
  "serde_json",
  "ton-networks",
  "toncenter-keys",
+ "tungstenite",
  "tvm-ffi",
  "tycho-types",
  "urlencoding",
@@ -5423,16 +5437,20 @@ dependencies = [
  "hex",
  "include_dir",
  "indexmap 2.12.0",
+ "num-bigint",
  "reqwest",
  "rusqlite",
  "rustc-hash 2.1.1",
  "serde",
+ "serde_html_form",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tolk-compiler",
+ "ton",
  "ton-api",
+ "ton-emulator",
  "ton-executor",
  "ton-indexer",
  "ton-liteapi",
@@ -5827,6 +5845,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
+ "native-tls",
  "rand 0.9.3",
  "sha1",
  "thiserror 2.0.18",
@@ -6817,6 +6836,7 @@ dependencies = [
  "tempfile",
  "toml_edit 0.24.0+spec-1.1.0",
  "tycho-types",
+ "url",
  "urlencoding",
 ]
 
@@ -6928,6 +6948,12 @@ dependencies = [
  "quote",
  "syn 2.0.114",
 ]
+
+[[package]]
+name = "zmij"
+version = "1.0.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zstd"

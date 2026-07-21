@@ -32,6 +32,7 @@
     "e028-throw-requires-errors-enum",
     "e029-create-message-body-to-cell",
     "e030-throw-requires-documented-error-value",
+    "e031-unnecessary-not-null-assertion",
     "s001-name-case-checker",
     "s002-explicit-return-type",
     "s003-field-init-can-be-folded",

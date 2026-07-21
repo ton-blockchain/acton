@@ -6,6 +6,10 @@ use tycho_types::cell::Cell;
 use tycho_types::dict::Dict;
 use tycho_types::prelude::HashBytes;
 
+const fn user_agent() -> &'static str {
+    concat!("acton/", env!("CARGO_PKG_VERSION"))
+}
+
 pub(crate) fn parse_token_content(content_cell: Cell, keys: &[&str]) -> Value {
     let Ok(mut parser) = content_cell.as_slice() else {
         return json!({});
@@ -37,19 +41,23 @@ pub(crate) fn resolve_offchain_token_content(mut content: Value, keys: &[&str]) 
         return content;
     };
 
-    let Ok(client) = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .build()
-    else {
-        return content;
-    };
-    let Ok(response) = client.get(uri).send() else {
-        return content;
-    };
-    if !response.status().is_success() {
-        return content;
-    }
-    let Ok(remote_content) = response.json::<Value>() else {
+    // Localnet calls this synchronous resolver from its current-thread Tokio node loop.
+    // A reqwest blocking client owns an internal runtime that cannot be dropped from an async
+    // context, so keep its complete lifecycle on a plain OS thread. Off-chain metadata lookups
+    // are rare and bounded by a short timeout, making a thread per lookup an acceptable tradeoff.
+    let Ok(Some(remote_content)) = std::thread::spawn(move || {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(3))
+            .user_agent(user_agent())
+            .build()
+            .ok()?;
+        let response = client.get(uri).send().ok()?;
+        if !response.status().is_success() {
+            return None;
+        }
+        response.json::<Value>().ok()
+    })
+    .join() else {
         return content;
     };
 

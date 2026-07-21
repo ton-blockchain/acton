@@ -1,0 +1,259 @@
+.rawDataBlock {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.variantStandalone {
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+}
+
+.variantEmbedded {
+  overflow: visible;
+  border: 0;
+  border-radius: inherit;
+}
+
+.header {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 2.625rem;
+  gap: var(--acton-space-3);
+  padding: 0 var(--acton-space-3) 1px var(--acton-space-4);
+  border-bottom: 0;
+  background: var(--acton-color-surface-raised);
+}
+
+.rawDataBlock[data-expanded="true"] .header::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--acton-color-border);
+  content: "";
+  pointer-events: none;
+}
+
+.headerToggle,
+.headerTitle {
+  min-width: 0;
+}
+
+.headerToggle {
+  appearance: none;
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--acton-space-2);
+  padding: 0;
+  margin-top: 1px;
+  border: 0;
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-align: left;
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.headerToggle:hover {
+  color: var(--acton-color-text);
+}
+
+.headerToggle:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.headerIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerIcon svg {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 2;
+}
+
+.headerTitle {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+div.headerTitle {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+}
+
+.content {
+  box-sizing: border-box;
+  max-height: var(--acton-raw-data-max-height, 37.5rem);
+  min-width: 0;
+  overflow: auto;
+  border-radius: inherit;
+}
+
+.emptyContent {
+  max-height: none;
+  overflow: visible;
+}
+
+.loadingContent {
+  min-height: 4.5rem;
+  max-height: none;
+  padding: var(--acton-space-4);
+  overflow: hidden;
+}
+
+.empty {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: var(--acton-space-4);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.pre {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: var(--acton-space-4) calc(var(--acton-space-6) + 2.25rem) var(--acton-space-4)
+    var(--acton-space-4);
+  background: transparent;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-compact);
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+  word-break: normal;
+}
+
+.rawDataBlock[data-has-title="true"] .pre {
+  padding-right: var(--acton-space-4);
+}
+
+.preWrap {
+  width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.copyButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    color var(--acton-duration-fast) var(--acton-ease-standard),
+    opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.copyButton:hover {
+  color: var(--acton-color-text);
+}
+
+.copyButton:focus-visible {
+  opacity: 1;
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+  pointer-events: auto;
+}
+
+.rawDataBlock:hover .copyButton,
+.rawDataBlock:focus-within .copyButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.copyButton svg {
+  flex: 0 0 auto;
+}
+
+@media (pointer: coarse) {
+  .copyButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.floatingCopyButton {
+  position: absolute;
+  top: var(--acton-space-2);
+  right: var(--acton-space-2);
+  z-index: 1;
+}
+
+.headerCopyButton {
+  position: static;
+  flex: 0 0 auto;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.loadingIndicator {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  color: var(--acton-color-text-muted);
+}
+
+.loadingIndicator svg {
+  animation: actonRawDataBlockSpin 800ms linear infinite;
+}
+
+@keyframes actonRawDataBlockSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingIndicator svg {
+    animation: none;
+  }
+}

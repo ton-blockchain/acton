@@ -1,5 +1,5 @@
 use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 use rusqlite::{Connection, params};
@@ -59,6 +59,11 @@ impl CellStore {
             self.boc_by_hash.insert(hash, boc);
         }
         hash
+    }
+
+    pub fn put_cell(&mut self, cell: Cell) -> Hash256 {
+        let hash = Hash256::from(cell.repr_hash());
+        self.put(Boc::encode(cell).into(), hash)
     }
 
     #[must_use]
@@ -207,6 +212,8 @@ pub struct AccountMeta {
     pub status: AccountStatus,
     #[serde(default)]
     pub balance: u128,
+    #[serde(default)]
+    pub extra_currencies: Vec<ExtraCurrency>,
     pub last_trans_lt: Option<Lt>,
     pub last_trans_hash: Option<Hash256>,
     pub code_hash: Option<Hash256>,
@@ -244,7 +251,11 @@ pub struct JettonWalletMeta {
     pub code_hash: Hash256,
     pub data_hash: Hash256,
     pub jetton_address: Addr,
+    #[serde(default)]
+    pub jetton_wallet_code_hash: Hash256,
     pub last_transaction_lt: Lt,
+    #[serde(default)]
+    pub mintless_is_claimed: Option<bool>,
     pub owner_address: Addr,
 }
 
@@ -259,6 +270,89 @@ pub struct NftItemMeta {
     pub index: String,
     pub init: bool,
     pub last_transaction_lt: Lt,
+}
+
+#[derive(Clone, Debug)]
+pub struct DnsRecordMeta {
+    pub nft_item_address: Addr,
+    pub nft_item_owner: Option<Addr>,
+    pub domain: String,
+    pub next_resolver: Option<Addr>,
+    pub wallet: Option<Addr>,
+    pub site_adnl: Option<Hash256>,
+    pub storage_bag_id: Option<Hash256>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NftCollectionMeta {
+    pub address: Addr,
+    pub owner_address: Option<Addr>,
+    pub first_transaction_lt: Lt,
+    pub last_transaction_lt: Lt,
+    pub next_item_index: String,
+    pub collection_content: Value,
+    pub data_hash: Hash256,
+    pub code_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct NftSaleMeta {
+    pub kind: String,
+    pub address: Addr,
+    pub nft_address: Addr,
+    pub nft_owner_address: Option<Addr>,
+    pub marketplace_address: Option<Addr>,
+    pub created_at: Option<i64>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub details: Value,
+    pub related_addresses: Vec<Addr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultisigOrderMeta {
+    pub address: Addr,
+    pub multisig_address: Addr,
+    pub first_transaction_lt: Lt,
+    pub order_seqno: String,
+    pub threshold: i32,
+    pub sent_for_execution: bool,
+    pub approvals_mask: String,
+    pub approvals_num: i32,
+    pub expiration_date: u64,
+    pub order_boc: BocBytes,
+    pub signers: Vec<Addr>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultisigMeta {
+    pub address: Addr,
+    pub first_transaction_lt: Lt,
+    pub next_order_seqno: String,
+    pub threshold: i32,
+    pub signers: Vec<Addr>,
+    pub proposers: Vec<Addr>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct VestingMeta {
+    pub address: Addr,
+    pub first_transaction_lt: Lt,
+    pub start_time: i64,
+    pub total_duration: i64,
+    pub unlock_period: i64,
+    pub cliff_duration: i64,
+    pub sender_address: Addr,
+    pub owner_address: Addr,
+    pub total_amount: String,
+    pub whitelist: Vec<Addr>,
 }
 
 pub struct LatestState {
@@ -313,6 +407,8 @@ pub struct MasterchainBlockMeta {
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub shard_block: LocalnetBlockId,
+    #[serde(default)]
+    pub config_boc_hash: Hash256,
     pub state_root_hash: Hash256,
     pub block_hash: Hash256,
     pub file_hash: Hash256,
@@ -331,13 +427,13 @@ impl MasterchainBlockMeta {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct TxMeta {
     pub tx_hash: Hash256,
     pub account: Addr,
     pub lt: Lt,
     pub now: u32,
-    pub success: bool,
+    pub aborted: bool,
     pub compute_exit_code: Option<i32>,
     pub action_result_code: Option<i32>,
     #[serde(default)]
@@ -351,9 +447,63 @@ pub struct TxMeta {
     pub block_seqno: Seqno,
 }
 
+#[derive(Deserialize)]
+struct TxMetaWire {
+    tx_hash: Hash256,
+    account: Addr,
+    lt: Lt,
+    now: u32,
+    #[serde(default)]
+    aborted: Option<bool>,
+    #[serde(default)]
+    success: Option<bool>,
+    compute_exit_code: Option<i32>,
+    action_result_code: Option<i32>,
+    #[serde(default)]
+    total_fees: u128,
+    #[serde(default)]
+    storage_fees: u128,
+    #[serde(default)]
+    other_fees: u128,
+    in_msg_hash: Option<Hash256>,
+    out_msg_hashes: Vec<Hash256>,
+    block_seqno: Seqno,
+}
+
+impl<'de> Deserialize<'de> for TxMeta {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = TxMetaWire::deserialize(deserializer)?;
+        let aborted = wire
+            .aborted
+            .or_else(|| wire.success.map(|success| !success))
+            .ok_or_else(|| serde::de::Error::missing_field("aborted"))?;
+
+        Ok(Self {
+            tx_hash: wire.tx_hash,
+            account: wire.account,
+            lt: wire.lt,
+            now: wire.now,
+            aborted,
+            compute_exit_code: wire.compute_exit_code,
+            action_result_code: wire.action_result_code,
+            total_fees: wire.total_fees,
+            storage_fees: wire.storage_fees,
+            other_fees: wire.other_fees,
+            in_msg_hash: wire.in_msg_hash,
+            out_msg_hashes: wire.out_msg_hashes,
+            block_seqno: wire.block_seqno,
+        })
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MsgMeta {
     pub msg_hash: Hash256,
+    #[serde(default)]
+    pub hash_norm: Option<Hash256>,
     pub msg_boc_hash: Hash256,
     pub src: Option<Addr>,
     pub dst: Option<Addr>,
@@ -384,6 +534,7 @@ pub struct TraceNode {
     pub transaction: TransactionInfo,
     pub children: Vec<TraceNode>,
     pub external_hash: Option<Hash256>,
+    pub external_hash_norm: Option<Hash256>,
 }
 
 #[derive(Clone, Debug)]
@@ -420,6 +571,13 @@ fn cell_hash(cell: &Cell) -> Hash256 {
 }
 
 impl TraceNode {
+    #[must_use]
+    pub fn effective_external_hash_norm(&self) -> Hash256 {
+        self.external_hash_norm
+            .or(self.external_hash)
+            .unwrap_or(self.transaction.meta.tx_hash)
+    }
+
     #[must_use]
     pub fn max_lt(&self) -> u64 {
         let mut max = self.transaction.meta.lt;
@@ -742,4 +900,110 @@ pub struct PendingCommit {
     pub out_msg_hashes: Vec<Hash256>,
     pub msg_to_tx: Vec<(Hash256, Hash256)>,
     pub deferred_msg_hashes: Vec<Hash256>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn addr(byte: u8) -> Addr {
+        Addr {
+            workchain: 0,
+            addr: [byte; 32],
+        }
+    }
+
+    #[test]
+    fn tx_meta_deserializes_legacy_success_field() {
+        let tx = TxMeta {
+            tx_hash: Hash256([1; 32]),
+            account: addr(2),
+            lt: 3,
+            now: 4,
+            aborted: false,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 5,
+            storage_fees: 2,
+            other_fees: 3,
+            in_msg_hash: Some(Hash256([6; 32])),
+            out_msg_hashes: vec![Hash256([7; 32])],
+            block_seqno: 8,
+        };
+        let mut value = serde_json::to_value(&tx).expect("transaction metadata must serialize");
+        let object = value
+            .as_object_mut()
+            .expect("transaction metadata must serialize as an object");
+        object.remove("aborted");
+        object.insert("success".to_owned(), Value::Bool(true));
+
+        let restored: TxMeta = serde_json::from_value(value.clone())
+            .expect("legacy transaction metadata must deserialize");
+
+        assert!(!restored.aborted);
+        assert_eq!(restored.tx_hash, tx.tx_hash);
+        assert_eq!(restored.total_fees, tx.total_fees);
+
+        value
+            .as_object_mut()
+            .expect("transaction metadata must remain an object")
+            .insert("success".to_owned(), Value::Bool(false));
+        let restored_failure: TxMeta = serde_json::from_value(value)
+            .expect("legacy failed transaction metadata must deserialize");
+        assert!(restored_failure.aborted);
+    }
+
+    #[test]
+    fn added_persisted_fields_default_when_reading_legacy_metadata() {
+        let masterchain_block = MasterchainBlockMeta {
+            seqno: 1,
+            prev_seqno: None,
+            gen_utime: 2,
+            start_lt: 3,
+            end_lt: 4,
+            shard_block: LocalnetBlockId {
+                workchain: 0,
+                shard: i64::MIN,
+                seqno: 1,
+                root_hash: Hash256([5; 32]),
+                file_hash: Hash256([6; 32]),
+            },
+            config_boc_hash: Hash256([7; 32]),
+            state_root_hash: Hash256([8; 32]),
+            block_hash: Hash256([9; 32]),
+            file_hash: Hash256([10; 32]),
+        };
+        let mut block_value =
+            serde_json::to_value(masterchain_block).expect("block metadata must serialize");
+        block_value
+            .as_object_mut()
+            .expect("block metadata must serialize as an object")
+            .remove("config_boc_hash");
+        let restored_block: MasterchainBlockMeta = serde_json::from_value(block_value)
+            .expect("legacy masterchain metadata must deserialize");
+        assert_eq!(restored_block.config_boc_hash, Hash256::default());
+
+        let wallet = JettonWalletMeta {
+            address: addr(11),
+            balance: 12,
+            code_hash: Hash256([13; 32]),
+            data_hash: Hash256([14; 32]),
+            jetton_address: addr(15),
+            jetton_wallet_code_hash: Hash256([16; 32]),
+            last_transaction_lt: 17,
+            mintless_is_claimed: Some(true),
+            owner_address: addr(18),
+        };
+        let mut wallet_value =
+            serde_json::to_value(wallet).expect("wallet metadata must serialize");
+        let wallet_object = wallet_value
+            .as_object_mut()
+            .expect("wallet metadata must serialize as an object");
+        wallet_object.remove("jetton_wallet_code_hash");
+        wallet_object.remove("mintless_is_claimed");
+        let restored_wallet: JettonWalletMeta = serde_json::from_value(wallet_value)
+            .expect("legacy jetton wallet metadata must deserialize");
+        assert_eq!(restored_wallet.jetton_wallet_code_hash, Hash256::default());
+        assert_eq!(restored_wallet.mintless_is_claimed, None);
+    }
 }

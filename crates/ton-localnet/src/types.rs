@@ -1,3 +1,4 @@
+use crate::error::LocalnetError;
 use base64::Engine;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -5,8 +6,33 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
-use tycho_types::models::{IntAddr, StdAddr};
+use tycho_types::models::{
+    Base64StdAddrFlags, DisplayBase64StdAddr, ExtraCurrencyCollection, IntAddr, StdAddr,
+    StdAddrFormat,
+};
+use tycho_types::num::VarUint248;
 use tycho_types::prelude::HashBytes;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtraCurrency {
+    pub id: u32,
+    pub amount: VarUint248,
+}
+
+impl ExtraCurrency {
+    pub fn from_collection(
+        collection: &ExtraCurrencyCollection,
+    ) -> Result<Vec<Self>, tycho_types::error::Error> {
+        collection
+            .as_dict()
+            .iter()
+            .map(|entry| {
+                let (id, amount) = entry?;
+                Ok(Self { id, amount })
+            })
+            .collect()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, Default)]
 pub struct BocBytes(pub Vec<u8>);
@@ -25,6 +51,19 @@ impl BocBytes {
     pub fn hash(&self) -> anyhow::Result<Hash256> {
         let cell = Boc::decode(self)?;
         Ok(Hash256::from(cell.repr_hash()))
+    }
+}
+
+impl FromStr for BocBytes {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let hex = s.strip_prefix("0x").unwrap_or(s);
+        if hex.len().is_multiple_of(2) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Ok(Self(hex::decode(hex)?));
+        }
+
+        Ok(Self(base64::engine::general_purpose::STANDARD.decode(s)?))
     }
 }
 
@@ -75,7 +114,7 @@ impl<'de> Deserialize<'de> for BocBytes {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        BocBytes::from_base64(&value).map_err(serde::de::Error::custom)
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -98,6 +137,11 @@ impl FromSql for BocBytes {
 pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {
+    #[must_use]
+    pub fn is_zero(&self) -> bool {
+        self.0 == [0; 32]
+    }
+
     #[must_use]
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
@@ -129,6 +173,34 @@ impl Hash256 {
     }
 }
 
+impl FromStr for Hash256 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 64 {
+            return Self::from_hex(s);
+        }
+        if s.len() == 44
+            && let Ok(hash) = Self::from_base64(s)
+        {
+            return Ok(hash);
+        }
+
+        for engine in [
+            &base64::engine::general_purpose::URL_SAFE,
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        ] {
+            if let Ok(bytes) = engine.decode(s)
+                && let Ok(bytes) = <[u8; 32]>::try_from(bytes)
+            {
+                return Ok(Self(bytes));
+            }
+        }
+
+        anyhow::bail!("Invalid hash format")
+    }
+}
+
 impl From<HashBytes> for Hash256 {
     fn from(value: HashBytes) -> Self {
         Self(value.0)
@@ -156,7 +228,7 @@ impl<'de> Deserialize<'de> for Hash256 {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        Hash256::from_hex(&value).map_err(serde::de::Error::custom)
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -166,23 +238,71 @@ pub struct Addr {
     pub addr: [u8; 32],
 }
 
+impl Addr {
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        let (address, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
+            LocalnetError::invalid_request(
+                "Invalid address, only standard internal address is allowed",
+            )
+        })?;
+        Ok(Self {
+            workchain: i32::from(address.workchain),
+            addr: address.address.0,
+        })
+    }
+
+    #[must_use]
+    pub fn as_user_friendly(self) -> String {
+        self.format_user_friendly(Base64StdAddrFlags {
+            testnet: false,
+            base64_url: true,
+            bounceable: true,
+        })
+    }
+
+    pub fn as_user_friendly_with_flags_from(self, source: &str) -> anyhow::Result<String> {
+        let (_, mut flags) = StdAddr::from_str_ext(source, StdAddrFormat::any()).map_err(|_| {
+            LocalnetError::invalid_request(
+                "Invalid address, only standard internal address is allowed",
+            )
+        })?;
+        if source.contains(':') {
+            flags.testnet = false;
+            flags.bounceable = true;
+        }
+        flags.base64_url = true;
+        Ok(self.format_user_friendly(flags))
+    }
+
+    fn format_user_friendly(self, flags: Base64StdAddrFlags) -> String {
+        DisplayBase64StdAddr {
+            addr: &StdAddr::from(self),
+            flags,
+        }
+        .to_string()
+    }
+}
+
+impl From<Addr> for StdAddr {
+    fn from(value: Addr) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&Addr> for StdAddr {
+    fn from(value: &Addr) -> Self {
+        StdAddr::new(
+            i8::try_from(value.workchain).unwrap_or_default(),
+            HashBytes(value.addr),
+        )
+    }
+}
+
 impl FromStr for Addr {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let Some((workchain, addr_hex)) = s.split_once(':') else {
-            anyhow::bail!("Invalid address format: expected '<workchain>:<64-hex-bytes>'");
-        };
-
-        let workchain = workchain.parse::<i32>()?;
-        let bytes = hex::decode(addr_hex)?;
-        if bytes.len() != 32 {
-            anyhow::bail!("Invalid address length");
-        }
-
-        let mut addr = [0u8; 32];
-        addr.copy_from_slice(&bytes);
-        Ok(Self { workchain, addr })
+        Self::parse(s)
     }
 }
 
@@ -224,10 +344,7 @@ impl From<Addr> for IntAddr {
 
 impl From<&Addr> for IntAddr {
     fn from(value: &Addr) -> Self {
-        Self::Std(StdAddr::new(
-            value.workchain.try_into().unwrap_or_default(),
-            HashBytes(value.addr),
-        ))
+        Self::Std(StdAddr::from(value))
     }
 }
 
@@ -256,6 +373,9 @@ pub type Lt = u64;
 #[cfg(test)]
 mod tests {
     use super::{Addr, BocBytes, Hash256};
+    use base64::Engine as _;
+    use tycho_types::models::StdAddr;
+    use tycho_types::prelude::HashBytes;
 
     #[test]
     fn hash256_serializes_as_hex_string() {
@@ -272,6 +392,21 @@ mod tests {
         let json = "\"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\"";
         let parsed: Hash256 = serde_json::from_str(json).expect("deserialize hash");
         assert_eq!(parsed, Hash256([0xCD; 32]));
+    }
+
+    #[test]
+    fn hash256_parses_all_upstream_wire_encodings() {
+        let expected = Hash256([0xFB; 32]);
+        let encodings = [
+            expected.to_hex(),
+            expected.to_base64(),
+            base64::engine::general_purpose::URL_SAFE.encode(expected.0),
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(expected.0),
+        ];
+
+        for encoding in encodings {
+            assert_eq!(encoding.parse::<Hash256>().unwrap(), expected);
+        }
     }
 
     #[test]
@@ -292,6 +427,18 @@ mod tests {
     #[test]
     fn boc_bytes_deserializes_from_base64_string() {
         let parsed: BocBytes = serde_json::from_str("\"AAECAw==\"").expect("deserialize boc bytes");
+        assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
+    }
+
+    #[test]
+    fn boc_bytes_deserializes_from_hex_string() {
+        let parsed: BocBytes = serde_json::from_str("\"00010203\"").expect("deserialize boc bytes");
+        assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
+    }
+
+    #[test]
+    fn boc_bytes_parses_prefixed_hex_string() {
+        let parsed = "0x00010203".parse::<BocBytes>().expect("parse boc bytes");
         assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
     }
 
@@ -334,5 +481,59 @@ mod tests {
         let json = r#"{ "workchain": 0, "addr": [1, 2, 3] }"#;
         let parsed: Result<Addr, _> = serde_json::from_str(json);
         assert!(parsed.is_err(), "object JSON must be rejected");
+    }
+
+    #[test]
+    fn addr_converts_to_std_addr_without_truncating_workchain() {
+        let address = Addr {
+            workchain: -1,
+            addr: [0xEF; 32],
+        };
+        let std_addr = StdAddr::from(address);
+
+        assert_eq!(std_addr.workchain, -1);
+        assert_eq!(std_addr.address.0, [0xEF; 32]);
+        assert_eq!(
+            StdAddr::from(Addr {
+                workchain: i32::MAX,
+                addr: [0; 32],
+            }),
+            StdAddr::new(0, HashBytes([0; 32]))
+        );
+    }
+
+    #[test]
+    fn addr_formats_as_bounceable_mainnet_address() {
+        let address = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+
+        assert_eq!(
+            address.as_user_friendly(),
+            "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+        );
+    }
+
+    #[test]
+    fn addr_preserves_friendly_address_flags() {
+        let address = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+        let non_bounceable = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ";
+
+        assert_eq!(
+            address
+                .as_user_friendly_with_flags_from(non_bounceable)
+                .expect("friendly flags must parse"),
+            non_bounceable
+        );
+        assert_eq!(
+            address
+                .as_user_friendly_with_flags_from(&address.to_string())
+                .expect("raw address must parse"),
+            address.as_user_friendly()
+        );
     }
 }
