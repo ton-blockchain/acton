@@ -17,6 +17,7 @@ jobs:
 
     permissions:
       contents: read
+      packages: write
 
     steps:
       - name: Check out Acton repository
@@ -29,7 +30,28 @@ jobs:
         with:
           cache-binary: false
 
-      - name: Build verifier Docker image
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ghcr.io/ton-blockchain/verifier
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         env:
           DOCKER_BUILD_RECORD_UPLOAD: false
@@ -37,8 +59,8 @@ jobs:
           context: .
           file: apps/verifier/Dockerfile
           platforms: linux/amd64
-          load: true
-          push: false
-          tags: ton-verifier:ci
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=verifier
           cache-to: type=gha,mode=max,scope=verifier
