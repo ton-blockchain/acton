@@ -502,7 +502,7 @@ fn shows_serialization_sizes_for_supported_type_shapes() {
                 value: uint32?
             }
             ```
-            **Size:** 33 bits.
+            **Size:** 1..33 bits, 0 refs.
 
             ---
             ```tolk
@@ -596,7 +596,7 @@ fn shows_serialization_sizes_for_nested_unions_and_generics() {
                 maybeCell: Cell<int32>?
             }
             ```
-            **Size:** 133..398 bits, 1..2 refs.
+            **Size:** 398 bits, 1..2 refs.
 
             ---
             ```tolk
@@ -638,6 +638,332 @@ fn shows_serialization_sizes_for_nested_unions_and_generics() {
             **Size:** 32 bits.
 
             ---"#]],
+    );
+}
+
+#[test]
+fn matches_compiler_serialization_estimates() {
+    case_tolk_hover(
+        r#"
+            type <caret>MaybeUint32 = uint32?;
+            type <caret>InternalAddress = address;
+            type <caret>MaybeInternalAddress = address?;
+            type <caret>AnyAddress = any_address;
+            type <caret>MaybeAnyAddress = any_address?;
+            type <caret>Text = string;
+            type <caret>Dictionary = map<int32, bool>;
+            type <caret>Values = array<int32>;
+
+            enum <caret>Color {
+                Red
+                Green
+                Blue
+            }
+
+            enum <caret>Role: uint8 {
+                User
+                Admin
+            }
+
+            enum <caret>SignedValue {
+                Negative = -1
+                Zero = 0
+            }
+
+            struct Box<T> {
+                value: T
+            }
+
+            struct Outer<T> {
+                value: Box<T>
+            }
+
+            struct <caret>Node {
+                next: Cell<Node>?
+            }
+
+            struct <caret>MutualA {
+                next: Cell<MutualB>
+            }
+
+            struct MutualB {
+                back: MutualA
+            }
+
+            type <caret>NestedGeneric = Outer<uint32>;
+            type <caret>WithVoid = uint32 | void;
+            type <caret>SeveralWithVoid = uint32 | uint64 | void;
+
+            type <caret>CustomBits = slice;
+
+            fun CustomBits.packToBuilder(self, mutate b: builder) {
+                b.storeSlice(self);
+            }
+
+            fun CustomBits.unpackFromSlice(mutate s: slice): CustomBits {
+                return s;
+            }
+
+            type <caret>MaybeCustomBits = CustomBits?;
+            type <caret>Remainder = RemainingBitsAndRefs;
+            type <caret>Unit = void;
+
+            @overflow1023_policy("suppress")
+            struct <caret>Large {
+                f1: bits1000
+                f2: bits1000
+                f3: bits1000
+                f4: bits1000
+                f5: bits1000
+                f6: bits1000
+                f7: bits1000
+                f8: bits1000
+                f9: bits1000
+                f10: bits1000
+            }
+        "#,
+        expect![[r#"
+            ```tolk
+            type MaybeUint32 = uint32?
+            ```
+            **Size:** 1..33 bits, 0 refs.
+
+            ---
+            ```tolk
+            type InternalAddress = address
+            ```
+            **Size:** 267 bits.
+
+            ---
+            ```tolk
+            type MaybeInternalAddress = address?
+            ```
+            **Size:** 2..267 bits, 0 refs.
+
+            ---
+            ```tolk
+            type AnyAddress = any_address
+            ```
+            **Size:** 2..522 bits, 0 refs.
+
+            ---
+            ```tolk
+            type MaybeAnyAddress = any_address?
+            ```
+            **Size:** 1..523 bits, 0 refs.
+
+            ---
+            ```tolk
+            type Text = string
+            ```
+            **Size:** 0 bits, 1 refs.
+
+            ---
+            ```tolk
+            type Dictionary = map<int32, bool>
+            ```
+            **Size:** 1 bit, 0..1 refs.
+
+            ---
+            ```tolk
+            type Values = array<int32>
+            ```
+            **Size:** 9 bits, 0..1 refs.
+
+            ---
+            ```tolk
+            enum Color {
+                Red
+                Green
+                Blue
+            }
+            ```
+            **Size:** 2 bits.
+
+            ---
+            ```tolk
+            enum Role: uint8 {
+                User
+                Admin
+            }
+            ```
+            **Size:** 8 bits.
+
+            ---
+            ```tolk
+            enum SignedValue {
+                Negative = -1
+                Zero = 0
+            }
+            ```
+            **Size:** 1 bits.
+
+            ---
+            ```tolk
+            struct Node {
+                next: Cell<Node>?
+            }
+            ```
+            **Size:** 1 bit, 0..1 refs.
+
+            ---
+            ```tolk
+            struct MutualA {
+                next: Cell<MutualB>
+            }
+            ```
+            **Size:** 0 bits, 1 refs.
+
+            ---
+            ```tolk
+            type NestedGeneric = Outer<uint32>
+            ```
+            **Size:** 32 bits.
+
+            ---
+            ```tolk
+            type WithVoid =
+                | uint32
+                | void
+            ```
+            **Size:** 0..32 bits, 0 refs.
+
+            ---
+            ```tolk
+            type SeveralWithVoid =
+                | uint32
+                | uint64
+                | void
+            ```
+            **Size:** 0..65 bits, 0 refs.
+
+            ---
+            ```tolk
+            type CustomBits = slice
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type MaybeCustomBits = CustomBits?
+            ```
+            **Size:** 1..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Remainder = RemainingBitsAndRefs
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Unit = void
+            ```
+            **Size:** 0 bits.
+
+            ---
+            ```tolk
+            struct Large {
+                f1: bits1000
+                f2: bits1000
+                f3: bits1000
+                f4: bits1000
+                f5: bits1000
+                f6: bits1000
+                f7: bits1000
+                f8: bits1000
+                f9: bits1000
+                f10: bits1000
+            }
+            ```
+            **Size:** 10000 bits.
+
+            ---"#]],
+    );
+}
+
+#[test]
+fn hides_serialization_size_for_compiler_rejected_types() {
+    case_tolk_hover(
+        r"
+            type <caret>WideInt = int;
+            type <caret>ZeroSizedArray = array<void>;
+            type <caret>OversizedArray = array<bits1022>;
+            type <caret>InvalidTypedCell = Cell<int>;
+            type <caret>VoidOrNull = void | null;
+
+            struct <caret>Recursive {
+                next: Recursive?
+            }
+
+            struct <caret>DirectA {
+                next: DirectB
+            }
+
+            struct DirectB {
+                back: DirectA
+            }
+
+            struct (0x1) First {
+                value: uint32
+            }
+
+            struct (0b0001) Duplicate {
+                value: uint64
+            }
+
+            type <caret>DuplicatePrefixes = First | Duplicate;
+
+            struct Plain {
+                value: uint32
+            }
+
+            type <caret>MixedPrefixes = First | Plain;
+            type <caret>MisplacedVoid = void | uint32;
+        ",
+        expect![[r#"
+            ```tolk
+            type WideInt = int
+            ```
+            ```tolk
+            type ZeroSizedArray = array<void>
+            ```
+            ```tolk
+            type OversizedArray = array<bits1022>
+            ```
+            ```tolk
+            type InvalidTypedCell = Cell<int>
+            ```
+            ```tolk
+            type VoidOrNull =
+                | void
+                | null
+            ```
+            ```tolk
+            struct Recursive {
+                next: Recursive?
+            }
+            ```
+            ```tolk
+            struct DirectA {
+                next: DirectB
+            }
+            ```
+            ```tolk
+            type DuplicatePrefixes =
+                | First
+                | Duplicate
+            ```
+            ```tolk
+            type MixedPrefixes =
+                | First
+                | Plain
+            ```
+            ```tolk
+            type MisplacedVoid =
+                | void
+                | uint32
+            ```"#]],
     );
 }
 

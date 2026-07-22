@@ -454,9 +454,7 @@ fn parse_nanograms(value: &str) -> ConstantValue {
         (false, value.strip_prefix('+').unwrap_or(value))
     };
     let mut parts = value.split('.');
-    let Some(integer) = parts.next() else {
-        return ConstantValue::Unknown;
-    };
+    let integer = parts.next().unwrap_or_default();
     let fractional = parts.next().unwrap_or("");
     if parts.next().is_some()
         || integer.is_empty()
@@ -481,6 +479,6 @@ fn parse_nanograms(value: &str) -> ConstantValue {
         };
         parsed_fractional * 10_i64.pow(9 - fractional.len() as u32)
     };
-    let nanotons = BigInt::from(integer * 1_000_000_000 + fractional);
-    ConstantValue::Int(if negative { -nanotons } else { nanotons })
+    let nanograms = BigInt::from(integer * 1_000_000_000 + fractional);
+    ConstantValue::Int(if negative { -nanograms } else { nanograms })
 }

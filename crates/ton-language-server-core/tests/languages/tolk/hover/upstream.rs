@@ -351,10 +351,7 @@ fn basic_12_struct_documentation() {
                 value: int
                 other: bool
             }
-            ```
-            **Size:** 258 bits.
-            
-            ---"]],
+            ```"]],
     );
 }
 
@@ -374,10 +371,7 @@ fn basic_13_struct_with_pack_prefix_documentation() {
                 value: int
                 other: bool
             }
-            ```
-            **Size:** 270 bits.
-            
-            ---"]],
+            ```"]],
     );
 }
 
@@ -558,10 +552,7 @@ fn basic_21_type_alias_documentation() {
         expect![[r"
             ```tolk
             type Int = int
-            ```
-            **Size:** 257 bits.
-            
-            ---"]],
+            ```"]],
     );
 }
 
@@ -959,7 +950,10 @@ fn enums_01_enum_documentation() {
                 Blue = 200 + 100
                 Green
             }
-            ```"]],
+            ```
+            **Size:** 9 bits.
+
+            ---"]],
     );
 }
 
@@ -981,7 +975,10 @@ fn enums_02_enum_with_backed_type_documentation() {
                 Blue = 200 + 100
                 Green
             }
-            ```"]],
+            ```
+            **Size:** 8 bits.
+
+            ---"]],
     );
 }
 
@@ -1436,7 +1433,7 @@ fn size_of_05_size_of_optional_primitive_type() {
                 a: uint32?
             }
             ```
-            **Size:** 33 bits.
+            **Size:** 1..33 bits, 0 refs.
             
             ---"]],
     );
@@ -1599,7 +1596,7 @@ fn size_of_12_size_of_int32_uint64_and_bool() {
                 c: bool
             }
             ```
-            **Size:** 98 bits.
+            **Size:** 34..98 bits, 0 refs.
             
             ---"]],
     );
@@ -1620,7 +1617,7 @@ fn size_of_13_size_of_address() {
                 a: address
             }
             ```
-            **Size:** 2..267 bits, 0 refs.
+            **Size:** 267 bits.
             
             ---"]],
     );
@@ -1773,7 +1770,7 @@ fn size_of_20_size_of_maybe_int32() {
                 a: int32?
             }
             ```
-            **Size:** 33 bits.
+            **Size:** 1..33 bits, 0 refs.
             
             ---"]],
     );
@@ -1966,7 +1963,7 @@ fn size_of_27_size_of_with_remainingbitsandrefs() {
                 forwardPayload: ForwardPayloadRemainder
             }
             ```
-            **Size:** 109..9999 bits, 0..5 refs.
+            **Size:** 639..9999 bits, 0..5 refs.
             
             ---"]],
     );

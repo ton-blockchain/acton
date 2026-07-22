@@ -6,7 +6,7 @@ use tolk_analysis::{
     estimate_serialization_size, is_simple_literal,
 };
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
-use tolk_resolver::{FileDb, ProjectIndex, Resolved, Symbol, SymbolId, SymbolKind};
+use tolk_resolver::{Resolved, Symbol, SymbolId, SymbolKind};
 use tolk_syntax::{
     Annotation, Assert, AstNode, CatchClause, Contract, ContractField, EnumMember, FunctionLike,
     HasGenericParams, HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw,
@@ -214,14 +214,16 @@ impl TolkResolveSnapshot {
             _ => documentation_before(declaration.syntax(), source),
         };
 
-        let supports_serialized_size = matches!(symbol.kind, SymbolKind::Struct { .. })
-            || matches!(
-                symbol.kind,
-                SymbolKind::TypeAlias {
-                    is_builtin: false,
-                    ..
-                }
-            );
+        let supports_serialized_size = matches!(
+            symbol.kind,
+            SymbolKind::Struct { .. } | SymbolKind::Enum { .. }
+        ) || matches!(
+            symbol.kind,
+            SymbolKind::TypeAlias {
+                is_builtin: false,
+                ..
+            }
+        );
         if supports_serialized_size
             && let Some(size) = self
                 .type_db_cache
@@ -378,20 +380,16 @@ impl TolkResolveSnapshot {
 }
 
 impl SerializationSizeContext for TolkResolveSnapshot {
-    fn file_db(&self) -> &FileDb {
-        &self.file_db
-    }
-
-    fn project_index(&self) -> &ProjectIndex {
-        &self.project_index
-    }
-
     fn type_interner(&self) -> &TypeInterner {
         &self.type_interner
     }
 
     fn type_of_symbol(&self, symbol_id: SymbolId) -> Option<TyId> {
         self.type_db_cache.top_level_type(symbol_id)
+    }
+
+    fn method_receiver_type(&self, symbol_id: SymbolId) -> Option<TyId> {
+        self.type_db_cache.method_receiver_type(symbol_id)
     }
 }
 
