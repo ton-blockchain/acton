@@ -9,7 +9,7 @@ fun main() {
     val deployer = scripts.wallet("deployer");
 
     val contract = Empty.fromStorage({ owner: deployer.address });
-    val res = contract.deploy(deployer.address, { value: ton("0.05") });
+    val res = contract.deploy(deployer.address, { value: grams("0.05") });
     if (res.waitForFirstTransaction() == null) {
         return;
     }

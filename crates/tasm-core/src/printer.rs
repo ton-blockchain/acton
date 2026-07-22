@@ -1,7 +1,7 @@
 use crate::types::{ArgValue, Code, Instruction};
 use std::fs;
 use tolk_compiler::SourceMap;
-use ton_source_map::SourceLocation;
+use tolk_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 

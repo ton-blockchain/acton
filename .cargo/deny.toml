@@ -18,6 +18,13 @@ exceptions = []
 unused-allowed-license = "deny"
 unused-license-exception = "deny"
 
+[[licenses.clarify]]
+crate = "everscale-crypto@0.2.1"
+expression = "MIT"
+license-files = [
+  { path = "LICENSE", hash = 0xa8dcb217 },
+]
+
 [advisories]
 ignore = [
   "RUSTSEC-2024-0388", # derivative via ton_liteapi -> ton

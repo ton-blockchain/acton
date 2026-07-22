@@ -4,11 +4,25 @@
 #![allow(clippy::clone_on_copy)]
 
 use std::convert::Infallible;
+use std::sync::OnceLock;
 
-pub const TVM_SPEC_JSON: &str = include_str!("../spec/tvm-specification.json");
+const TVM_SPEC_JSON_ZST: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/tvm-specification.json.zst"));
+
+static TVM_SPEC_JSON: OnceLock<String> = OnceLock::new();
 
 pub fn load_tvm_specification() -> serde_json::Result<Specification> {
-    serde_json::from_str(TVM_SPEC_JSON)
+    serde_json::from_str(tvm_spec_json())
+}
+
+fn tvm_spec_json() -> &'static str {
+    TVM_SPEC_JSON
+        .get_or_init(|| {
+            let json =
+                zstd::stream::decode_all(TVM_SPEC_JSON_ZST).expect("bundled TVM spec must decode");
+            String::from_utf8(json).expect("bundled TVM spec must be UTF-8")
+        })
+        .as_str()
 }
 
 pub mod error {

@@ -62,6 +62,29 @@ impl std::fmt::Display for CoverageFormat {
     }
 }
 
+/// Gas profile output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[clap(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum GasProfileFormat {
+    /// Chrome `DevTools` `.cpuprofile` output
+    #[default]
+    Cpuprofile,
+    /// Folded stack output for flamegraph-style tooling
+    Collapsed,
+}
+
+impl std::fmt::Display for GasProfileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GasProfileFormat::Cpuprofile => write!(f, "cpuprofile"),
+            GasProfileFormat::Collapsed => write!(f, "collapsed"),
+        }
+    }
+}
+
 /// Mutation levels supported by mutation testing filters
 #[derive(
     clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash,
@@ -126,7 +149,7 @@ impl std::fmt::Display for MutationDiffMode {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
     pub show_bodies: bool,
@@ -134,6 +157,7 @@ pub struct TestConfig {
     pub debug: bool,
     pub debug_port: u16,
     pub backtrace: Option<BacktraceMode>,
+    pub no_capture: bool,
     pub coverage: bool,
     pub coverage_minimum_percent: Option<f64>,
     pub coverage_include_wrappers: bool,
@@ -148,9 +172,13 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub gas_profile: Option<String>,
+    pub gas_profile_format: GasProfileFormat,
+    pub gas_profile_include_tests: bool,
     pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub fork_block_number: Option<u64>,
+    pub fork_cache_enabled: bool,
     pub save_test_trace: Option<String>,
     pub mutate: bool,
     pub mutate_overrides: Option<String>,
@@ -170,4 +198,58 @@ pub struct TestConfig {
     pub fail_fast: bool,
     pub ui: bool,
     pub ui_port: u16,
+}
+
+impl Default for TestConfig {
+    fn default() -> Self {
+        Self {
+            report_formats: Vec::new(),
+            show_bodies: false,
+            verbosity: 0,
+            debug: false,
+            debug_port: 0,
+            backtrace: None,
+            no_capture: false,
+            coverage: false,
+            coverage_minimum_percent: None,
+            coverage_include_wrappers: false,
+            coverage_include_tests: false,
+            filter: None,
+            coverage_format: None,
+            coverage_file: None,
+            exclude_patterns: Vec::new(),
+            include_patterns: Vec::new(),
+            clear_cache: false,
+            junit_path: None,
+            junit_merge: false,
+            snapshot: None,
+            baseline_snapshot: None,
+            gas_profile: None,
+            gas_profile_format: GasProfileFormat::default(),
+            gas_profile_include_tests: false,
+            fail_on_diff: false,
+            fork_net: None,
+            fork_block_number: None,
+            fork_cache_enabled: true,
+            save_test_trace: None,
+            mutate: false,
+            mutate_overrides: None,
+            mutate_contract: None,
+            mutation_rules_file: None,
+            mutation_session_id: None,
+            mutation_workers: None,
+            mutation_levels: Vec::new(),
+            mutation_minimum_percent: None,
+            mutation_ids: Vec::new(),
+            mutation_diff: None,
+            mutation_diff_ref: None,
+            disable_rules: Vec::new(),
+            fuzz_runs: None,
+            fuzz_max_test_rejects: None,
+            fuzz_seed: None,
+            fail_fast: false,
+            ui: false,
+            ui_port: 0,
+        }
+    }
 }

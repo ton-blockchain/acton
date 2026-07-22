@@ -6,7 +6,7 @@ Commands:
   new              [PATH]              Create a new project from a template
   init                                 Add Acton support to current directory
 
-  test             [PATH]              Run tests from a file or directory
+  test             [PATH]              Run tests from files or directories
   build            [CONTRACT_NAME]     Build one contract or every contract
   check            [TARGET]            Check project Tolk sources for errors
   script           <PATH> [ARGS...]    Run a standalone Tolk script file
@@ -22,7 +22,7 @@ Commands:
   compile          <PATH>              Compile one Tolk source into TVM code
   wrapper          <CONTRACT_NAME>     Generate contract wrappers and test stubs
   disasm           [BOC_FILE]          Disassemble TVM code into TASM
-  doc              tvm <QUERY...>      Look up TVM reference documentation
+  doc              <COMMAND>           Look up reference documentation and contract ABIs
 
   up                                   Install or update Acton CLI releases
   help             [COMMAND]           Show top-level or command-specific help

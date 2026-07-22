@@ -1,0 +1,92 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.sample {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-4);
+  align-content: space-between;
+  min-height: 8rem;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.sampleText {
+  display: grid;
+  gap: var(--acton-space-2);
+}
+
+.sampleText h4 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.sampleText p {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.inlineCode {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowPanel {
+  display: grid;
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.3fr) minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-2);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.row:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.rowLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: var(--acton-space-1);
+  }
+}

@@ -40,6 +40,13 @@ Defaults to `[build].output-fift` when configured. If neither the flag nor the
 config value is set, Acton does not write `.fif` files.
 {{/option}}
 
+{{#option "`--output-sources` _dir_" }}
+Directory for source registration artifacts generated from `.tolk` contracts.
+
+Defaults to `[build].output-sources` when configured. If neither the flag nor
+the config value is set, Acton does not write source registration artifacts.
+{{/option}}
+
 {{#option "`--info`" }}
 Print compiled code and hash information for each successfully built contract.
 {{/option}}

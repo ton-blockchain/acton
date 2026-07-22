@@ -15,6 +15,7 @@ Options:
       --gen-dir <DIR>         Output directory for generated dependency files (default: gen/)
       --output-abi <DIR>      Directory to save contract ABI JSON files (default: build/abi/)
       --output-fift <DIR>     Directory to save compiled Fift files
+      --output-sources <DIR>  Directory to save source registration artifacts
       --info                  Show compiled contract info
   -h, --help                  Print help
 

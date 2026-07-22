@@ -1,0 +1,169 @@
+.button {
+  appearance: none;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--acton-radius-control);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    border-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard),
+    opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.button:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.button:disabled,
+.button[aria-busy="true"] {
+  cursor: not-allowed;
+}
+
+.button:disabled {
+  opacity: 0.52;
+}
+
+.content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.button svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  border: 0.125rem solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--acton-radius-round);
+  animation: acton-button-spin 700ms linear infinite;
+}
+
+.variantPrimary {
+  border-color: var(--acton-color-primary);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
+}
+
+.variantPrimary:hover:not(:disabled, [aria-busy="true"]) {
+  border-color: var(--acton-color-primary-hover);
+  background: var(--acton-color-primary-hover);
+}
+
+.variantSecondary {
+  border-color: transparent;
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.variantSecondary:hover:not(:disabled, [aria-busy="true"]) {
+  background: var(--acton-color-surface-active);
+}
+
+.variantOutline {
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.variantOutline:hover:not(:disabled, [aria-busy="true"]) {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+}
+
+.variantGhost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--acton-color-text);
+}
+
+.variantGhost:hover:not(:disabled, [aria-busy="true"]) {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.variantDanger {
+  border-color: var(--acton-color-danger);
+  background: var(--acton-color-danger);
+  color: var(--acton-color-danger-foreground);
+}
+
+.variantDanger:hover:not(:disabled, [aria-busy="true"]) {
+  border-color: var(--acton-color-danger-hover);
+  background: var(--acton-color-danger-hover);
+}
+
+.sizeSm {
+  height: 2rem;
+  padding: 0 var(--acton-space-3);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.sizeMd {
+  height: 2.5rem;
+  padding: 0 var(--acton-space-4);
+}
+
+.sizeLg {
+  height: 2.75rem;
+  padding: 0 var(--acton-space-5);
+  font-size: var(--acton-font-size-md);
+}
+
+.sizeIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+.sizeIcon .content {
+  gap: 0;
+}
+
+@keyframes acton-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    opacity: 0.62;
+  }
+}

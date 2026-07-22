@@ -885,6 +885,7 @@ get fun `test external send result helpers cover accepted trace`() {
     expect(result.transactions).toBeNotNull();
 
     result.giveName("external-helper-trace");
+    result.hideTraceFromUi();
 
     val txs = result.unwrap();
     expect(txs).toHaveLength(1);

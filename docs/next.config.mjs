@@ -39,9 +39,18 @@ function resolveAssetPrefix() {
   return undefined
 }
 
+function resolveEnvironment() {
+  if (isGitHubPagesBuild) {
+    return "production"
+  }
+
+  return "preview"
+}
+
 const baseUrl = resolveBaseUrl()
 const basePath = resolveBasePath()
 const assetPrefix = resolveAssetPrefix()
+const environment = resolveEnvironment()
 
 /** @type {import('next').NextConfig} */
 const config = {
@@ -49,6 +58,7 @@ const config = {
   output: "export",
   env: {
     NEXT_PUBLIC_BASE_URL: baseUrl,
+    NEXT_DOCS_ENVIRONMENT: environment,
   },
   serverExternalPackages: ["typescript", "twoslash"],
   images: {unoptimized: true},

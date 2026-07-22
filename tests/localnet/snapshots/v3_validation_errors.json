@@ -1,0 +1,56 @@
+[
+  {
+    "case": "pending actions without filter",
+    "code": 400,
+    "error": "account or ext_msg_hash should be specified",
+    "status": 400
+  },
+  {
+    "case": "pending traces without filter",
+    "code": 400,
+    "error": "account or ext_msg_hash should be specified",
+    "status": 400
+  },
+  {
+    "case": "traces without filter",
+    "code": 400,
+    "error": "Exactly one of `account`, `trace_id`, `tx_hash`, or `msg_hash` is required",
+    "status": 400
+  },
+  {
+    "case": "dns without filter",
+    "code": 400,
+    "error": "Exactly one of `wallet` or `domain` is required",
+    "status": 400
+  },
+  {
+    "case": "multisig orders without filter",
+    "code": 400,
+    "error": "At least one of `address` or `multisig_address` should be specified",
+    "status": 400
+  },
+  {
+    "case": "multisig wallets without filter",
+    "code": 400,
+    "error": "At least one of `address` or `wallet_address` should be specified",
+    "status": 400
+  },
+  {
+    "case": "unsupported stack type",
+    "code": 400,
+    "error": "Unsupported v3 stack entry type: unsupported",
+    "status": 400
+  },
+  {
+    "case": "cell without bytes",
+    "code": 400,
+    "error": "cell stack value must be a base64 string or an object with `bytes`",
+    "status": 400
+  },
+  {
+    "case": "tuple without elements",
+    "code": 400,
+    "error": "tuple stack value must be an array",
+    "status": 400
+  }
+]

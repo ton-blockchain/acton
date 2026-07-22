@@ -23,6 +23,9 @@ toncenter-keys = { workspace = true }
 log = { workspace = true }
 tvm-ffi = { workspace = true }
 
+[dev-dependencies]
+tungstenite = { workspace = true }
+
 [lints]
 workspace = true
 

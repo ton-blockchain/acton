@@ -43,6 +43,7 @@ mod throw_requires_documented_error_value_tests;
 mod throw_requires_errors_enum_tests;
 mod type_inference_regressions_tests;
 mod unauthorized_access_tests;
+mod unnecessary_not_null_assertion_tests;
 mod unused_expression_tests;
 mod unused_import_tests;
 mod unused_variable_tests;

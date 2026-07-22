@@ -1,0 +1,77 @@
+.skeleton {
+  position: relative;
+  display: block;
+  width: var(--acton-skeleton-width, 100%);
+  height: var(--acton-skeleton-height, var(--acton-skeleton-default-height));
+  overflow: hidden;
+  background: var(--acton-color-skeleton-base);
+  flex: 0 0 auto;
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--acton-color-skeleton-highlight),
+    transparent
+  );
+  content: "";
+  transform: translateX(-100%);
+  animation: actonSkeletonShimmer 1300ms ease-in-out infinite;
+}
+
+.skeleton[data-animated="false"]::after {
+  display: none;
+}
+
+.shapeLine {
+  --acton-skeleton-default-height: 0.6875rem;
+
+  border-radius: var(--acton-radius-round);
+}
+
+.shapeRect {
+  --acton-skeleton-default-height: 2.5rem;
+
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.shapeCircle {
+  --acton-skeleton-default-height: var(--acton-skeleton-width, 2rem);
+
+  width: var(--acton-skeleton-width, 2rem);
+  border-radius: var(--acton-radius-round);
+}
+
+.radiusSm {
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.radiusMd {
+  border-radius: var(--acton-radius-control);
+}
+
+.radiusRound {
+  border-radius: var(--acton-radius-round);
+}
+
+.skeletonText {
+  display: grid;
+  align-content: start;
+  gap: var(--acton-space-3);
+  min-width: 0;
+}
+
+@keyframes actonSkeletonShimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}

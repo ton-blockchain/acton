@@ -17,7 +17,7 @@
 "test-runner":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-test-ui/**"
+          - "packages/test-ui/**"
           - "src/commands/test/**"
 
 "IDE Support":
@@ -78,10 +78,15 @@
 "localnet":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-localnet-ui/**"
+          - "packages/localnet-ui/**"
           - "crates/ton-indexer/**"
           - "crates/ton-localnet/**"
           - "src/commands/localnet/**"
+
+"explorer":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/explorer-ui/**"
 
 "wallets":
   - changed-files:
@@ -112,3 +117,8 @@
   - changed-files:
       - any-glob-to-any-file:
           - "src/commands/hooks/**"
+
+"UI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/**"

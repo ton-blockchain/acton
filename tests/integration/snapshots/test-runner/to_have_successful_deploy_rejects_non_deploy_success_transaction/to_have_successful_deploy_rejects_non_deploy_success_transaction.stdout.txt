@@ -11,9 +11,9 @@
   ✗ cg to have successful deploy rejects non deploy success transaction [TIME]
     └─ Error: expect(actual).toHaveSuccessfulDeploy(expected)
         N/A -> sender A
-        └── empty 0.1 TON -> receiver B                                                 gas=253
+        └── empty 0.1 GRAM -> receiver B                                                gas=253
         
-        Cannot find transaction from sender A EQAXTu..1D6wLK to receiver B EQBS+c..jFM7dP
+        Cannot find transaction from sender A kQAXTu..1D67lA to receiver B kQBS-c..jFMwzF
         with:
           deploy=true
           success=true

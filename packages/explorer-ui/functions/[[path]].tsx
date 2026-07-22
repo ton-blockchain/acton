@@ -1,0 +1,660 @@
+import {ImageResponse} from "@cloudflare/pages-plugin-vercel-og/api"
+import abiCatalogData from "../../../crates/acton-abi-catalog/data/data-abis.json"
+import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
+import {PageOgImage, pageOgPreviewForKey, pageOgPreviewForPath} from "../src/og/PageOgImage"
+
+const OG_IMAGE_VERSION = "7"
+const OG_IMAGE_WIDTH = 1200
+const OG_IMAGE_HEIGHT = 630
+
+type AssetFetcher = {
+  fetch(request: Request): Promise<Response>
+}
+
+type Env = {
+  ASSETS: AssetFetcher
+  TONCENTER_API_V3_URL?: string
+  TONCENTER_API_KEY?: string
+  VITE_EXPLORER_TONCENTER_API_V3_URL?: string
+  VITE_EXPLORER_TONCENTER_API_KEY?: string
+}
+
+type PagesContext = {
+  request: Request
+  env: Env
+  next(): Promise<Response>
+}
+
+type RouteMetadata = {
+  title: string
+  description: string
+  image: string
+  url: string
+}
+
+type AbiCatalogBundle = {
+  readonly contracts: readonly AbiCatalogContract[]
+}
+
+type AbiCatalogContract = {
+  readonly displayName?: string
+  readonly hashes?: readonly string[]
+  readonly compilerAbi?: AbiCatalogCompilerAbi
+}
+
+type AbiCatalogCompilerAbi = {
+  readonly contract_name?: string
+  readonly description?: string
+  readonly author?: string
+  readonly version?: string
+  readonly get_methods?: readonly unknown[]
+  readonly incoming_messages?: readonly unknown[]
+  readonly incoming_external?: readonly unknown[]
+  readonly outgoing_messages?: readonly unknown[]
+  readonly emitted_events?: readonly unknown[]
+  readonly declarations?: readonly unknown[]
+  readonly thrown_errors?: readonly unknown[]
+}
+
+const ABI_CATALOG = abiCatalogData as AbiCatalogBundle
+
+export async function onRequest(context: PagesContext) {
+  const url = new URL(context.request.url)
+
+  if (url.pathname === "/og/account.png") {
+    return renderAccountOgPng(context)
+  }
+
+  if (url.pathname === "/og/abi.png") {
+    return renderAbiOgPng(context)
+  }
+
+  if (url.pathname === "/og/page.png") {
+    return renderPageOgPng(context)
+  }
+
+  const metadata = await getRouteMetadata(url, context.env)
+  const assetResponse = await context.next()
+  const response =
+    metadata && assetResponse.status === 404
+      ? await context.env.ASSETS.fetch(new Request(new URL("/index.html", url), context.request))
+      : assetResponse
+
+  if (!shouldInjectHtml(context.request, response)) {
+    return assetResponse
+  }
+
+  if (!metadata) {
+    return response
+  }
+
+  const html = await response.text()
+  return new Response(injectMetadata(html, metadata), {
+    headers: withHeader(response.headers, "content-type", "text/html; charset=utf-8"),
+    status: 200,
+    statusText: "OK",
+  })
+}
+
+async function renderAccountOgPng(context: PagesContext) {
+  const url = new URL(context.request.url)
+  const preview = await getAccountPreview(url.searchParams.get("address") || "", context.env, true)
+  const image = new ImageResponse(<AccountOgImage preview={preview} />, {
+    width: OG_IMAGE_WIDTH,
+    height: OG_IMAGE_HEIGHT,
+    headers: {
+      "cache-control": "public, max-age=14400",
+    },
+  })
+  const bytes = await image.arrayBuffer()
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=14400",
+    },
+  })
+}
+
+async function renderAbiOgPng(context: PagesContext) {
+  const url = new URL(context.request.url)
+  const preview = getAbiPreview(url.searchParams.get("slug") || "")
+  const image = new ImageResponse(<AccountOgImage preview={preview} />, {
+    width: OG_IMAGE_WIDTH,
+    height: OG_IMAGE_HEIGHT,
+    headers: {
+      "cache-control": "public, max-age=14400",
+    },
+  })
+  const bytes = await image.arrayBuffer()
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=14400",
+    },
+  })
+}
+
+async function renderPageOgPng(context: PagesContext) {
+  const url = new URL(context.request.url)
+  const preview = pageOgPreviewForKey(url.searchParams.get("page") || "home")
+  const image = new ImageResponse(<PageOgImage preview={preview} />, {
+    width: OG_IMAGE_WIDTH,
+    height: OG_IMAGE_HEIGHT,
+    headers: {
+      "cache-control": "public, max-age=86400",
+    },
+  })
+  const bytes = await image.arrayBuffer()
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=86400",
+    },
+  })
+}
+
+function shouldInjectHtml(request: Request, response: Response) {
+  if (request.method !== "GET") {
+    return false
+  }
+  return response.headers.get("content-type")?.includes("text/html") ?? false
+}
+
+async function getRouteMetadata(url: URL, env: Env): Promise<RouteMetadata | undefined> {
+  const pagePreview = pageOgPreviewForPath(url.pathname)
+  if (pagePreview) {
+    const image = absoluteUrl(
+      url,
+      `/og/page.png?page=${encodeURIComponent(pagePreview.key)}&v=${OG_IMAGE_VERSION}`,
+    )
+    return {
+      title: pagePreview.metadataTitle,
+      description: pagePreview.metadataDescription,
+      image,
+      url: url.href,
+    }
+  }
+
+  const abiSlug = abiSlugFromPath(url.pathname)
+  if (abiSlug) {
+    const preview = getAbiPreview(abiSlug)
+    const title = `${preview.title} ABI · actonscan`
+    const description = abiMetadataDescription(preview)
+    const image = absoluteUrl(
+      url,
+      `/og/abi.png?slug=${encodeURIComponent(abiSlug)}&v=${OG_IMAGE_VERSION}`,
+    )
+    return {title, description, image, url: url.href}
+  }
+
+  const address = addressFromPath(url.pathname)
+  if (!address) {
+    return undefined
+  }
+
+  const preview = await getAccountPreview(address, env)
+  const title = `${preview.title} · actonscan`
+  const description = `${preview.subtitle} ${preview.shortAddress} on actonscan.`
+  const image = absoluteUrl(
+    url,
+    `/og/account.png?address=${encodeURIComponent(address)}&v=${OG_IMAGE_VERSION}`,
+  )
+  return {title, description, image, url: url.href}
+}
+
+function abiSlugFromPath(pathname: string) {
+  const match = pathname.match(/^\/abi\/([^/?#]+)$/)
+  if (!match) {
+    return undefined
+  }
+
+  try {
+    return decodeURIComponent(match[1] || "").trim()
+  } catch {
+    return match[1]?.trim()
+  }
+}
+
+function addressFromPath(pathname: string) {
+  const match = pathname.match(/^\/address\/([^/?#]+)$/)
+  if (!match) {
+    return undefined
+  }
+
+  try {
+    return decodeURIComponent(match[1] || "").trim()
+  } catch {
+    return match[1]?.trim()
+  }
+}
+
+function injectMetadata(html: string, metadata: RouteMetadata) {
+  return html
+    .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(metadata.title)}</title>`)
+    .replace(
+      /<meta\s+name="description"\s+content="[^"]*"\s*\/>/,
+      `<meta name="description" content="${escapeHtml(metadata.description)}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:title"\s+content="[^"]*"\s*\/>/,
+      `<meta property="og:title" content="${escapeHtml(metadata.title)}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:url"\s+content="[^"]*"\s*\/>/,
+      `<meta property="og:url" content="${escapeHtml(metadata.url)}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:description"\s+content="[^"]*"\s*\/>/,
+      `<meta property="og:description" content="${escapeHtml(metadata.description)}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:image"\s+content="[^"]*"\s*\/>/,
+      `<meta property="og:image" content="${escapeHtml(metadata.image)}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/>/,
+      `<meta name="twitter:title" content="${escapeHtml(metadata.title)}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/>/,
+      `<meta name="twitter:description" content="${escapeHtml(metadata.description)}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/>/,
+      `<meta name="twitter:image" content="${escapeHtml(metadata.image)}" />`,
+    )
+}
+
+async function getAccountPreview(address: string, env: Env, includeImage = false) {
+  const fallback = fallbackAccountPreview(address)
+  if (!address) {
+    return fallback
+  }
+
+  try {
+    const accountStates = await fetchToncenterJson(
+      "/accountStates",
+      {address, include_boc: "false"},
+      env,
+    )
+    const jettonMasters = await fetchToncenterJson("/jetton/masters", {address}, env).catch(
+      () => undefined,
+    )
+    const preview = previewFromResponses(address, accountStates, jettonMasters)
+    if (!includeImage || !preview.image) {
+      return preview
+    }
+
+    return {
+      ...preview,
+      image: await inlineImage(preview.image),
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function fallbackAccountPreview(address: string): AccountOgPreview {
+  const shortAddress = address ? formatAddress(address) : "actonscan"
+  return {
+    title: shortAddress,
+    subtitle: "TON account",
+    shortAddress,
+    rawAddress: address || "Open-source TON explorer",
+    status: undefined,
+    type: undefined,
+    detail: undefined,
+    image: undefined,
+    avatarText: "A",
+  }
+}
+
+function getAbiPreview(slug: string): AccountOgPreview {
+  const entry = findAbiCatalogEntry(slug)
+  if (!entry) {
+    return fallbackAbiPreview(slug)
+  }
+
+  const {contract, index} = entry
+  const compilerAbi = contract.compilerAbi
+  const title = catalogDisplayName(contract, index)
+  const contractName = stringValue(compilerAbi?.contract_name) || title
+  const stats = abiStats(compilerAbi)
+  const description =
+    stringValue(compilerAbi?.description) ||
+    stats ||
+    [stringValue(compilerAbi?.author), stringValue(compilerAbi?.version)]
+      .filter(Boolean)
+      .join(" · ")
+
+  return {
+    title,
+    subtitle: contractName,
+    shortAddress: "ABI",
+    rawAddress: description || "Known ABI catalog entry",
+    status: undefined,
+    type: "ABI",
+    detail: description || "Known ABI catalog entry",
+    detailLines: 3,
+    image: undefined,
+    avatarText: "A",
+  }
+}
+
+function fallbackAbiPreview(slug: string): AccountOgPreview {
+  const title = slug ? slug.replace(/-/g, " ") : "ABI"
+  return {
+    title,
+    subtitle: "ABI",
+    shortAddress: "ABI",
+    rawAddress: "Known ABI catalog entry",
+    status: undefined,
+    type: "ABI",
+    detail: "Known ABI catalog entry",
+    detailLines: 3,
+    image: undefined,
+    avatarText: "A",
+  }
+}
+
+function abiMetadataDescription(preview: AccountOgPreview) {
+  const detail = preview.detail || preview.rawAddress
+  return `${detail}${/[.!?]$/.test(detail) ? "" : "."} View it on actonscan.`
+}
+
+function findAbiCatalogEntry(slug: string) {
+  const normalizedSlug = slug.trim().toLowerCase()
+  if (!normalizedSlug) {
+    return undefined
+  }
+
+  const baseSlugs = ABI_CATALOG.contracts.map((contract, index) =>
+    slugifyCatalogName(catalogDisplayName(contract, index)),
+  )
+  const duplicatedSlugs = new Set(
+    baseSlugs.filter((baseSlug, index) => baseSlugs.indexOf(baseSlug) !== index),
+  )
+
+  for (const [index, contract] of ABI_CATALOG.contracts.entries()) {
+    const baseSlug = baseSlugs[index]
+    const codeHashes = (contract.hashes ?? []).map(normalizeCodeHash).filter(Boolean)
+    const candidate = duplicatedSlugs.has(baseSlug)
+      ? `${baseSlug}-${codeHashes[0]?.slice(0, 8) ?? index + 1}`
+      : baseSlug
+    if (candidate === normalizedSlug) {
+      return {contract, index}
+    }
+  }
+
+  return undefined
+}
+
+function catalogDisplayName(contract: AbiCatalogContract, index: number): string {
+  return contract.displayName || contract.compilerAbi?.contract_name || `ABI ${index + 1}`
+}
+
+function slugifyCatalogName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return slug || "abi"
+}
+
+function normalizeCodeHash(codeHash: string): string {
+  const trimmed = codeHash.trim()
+  const hex = trimmed.replace(/^0x/i, "").toLowerCase()
+  if (/^[0-9a-f]{64}$/.test(hex)) {
+    return hex
+  }
+
+  return base64ToHex(trimmed) ?? hex
+}
+
+function base64ToHex(value: string): string | undefined {
+  try {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")
+    const binary = atob(padded)
+    if (binary.length !== 32) {
+      return undefined
+    }
+
+    return Array.from(binary, char => char.charCodeAt(0).toString(16).padStart(2, "0")).join("")
+  } catch {
+    return undefined
+  }
+}
+
+function abiStats(compilerAbi: AbiCatalogCompilerAbi | undefined) {
+  const getMethods = compilerAbi?.get_methods?.length ?? 0
+  const messages =
+    (compilerAbi?.incoming_messages?.length ?? 0) +
+    (compilerAbi?.incoming_external?.length ?? 0) +
+    (compilerAbi?.outgoing_messages?.length ?? 0) +
+    (compilerAbi?.emitted_events?.length ?? 0)
+  const declarations = compilerAbi?.declarations?.length ?? 0
+  const errors = compilerAbi?.thrown_errors?.length ?? 0
+  const parts = [
+    formatCount(getMethods, "get method"),
+    formatCount(messages, "message"),
+    formatCount(declarations, "declaration"),
+    formatCount(errors, "error"),
+  ].filter((part): part is string => Boolean(part))
+
+  return parts.join(" · ")
+}
+
+function formatCount(count: number, label: string) {
+  if (count === 0) {
+    return undefined
+  }
+
+  return `${count} ${label}${count === 1 ? "" : "s"}`
+}
+
+async function fetchToncenterJson(
+  pathname: string,
+  searchParams: Record<string, string>,
+  env: Env,
+) {
+  const baseUrl =
+    env.TONCENTER_API_V3_URL?.trim() ||
+    env.VITE_EXPLORER_TONCENTER_API_V3_URL?.trim() ||
+    "https://toncenter.com/api/v3"
+  const url = new URL(`${baseUrl.replace(/\/$/, "")}/${pathname.replace(/^\//, "")}`)
+  for (const [key, value] of Object.entries(searchParams)) {
+    url.searchParams.append(key, value)
+  }
+
+  const headers = new Headers()
+  const apiKey = env.TONCENTER_API_KEY?.trim() || env.VITE_EXPLORER_TONCENTER_API_KEY?.trim()
+  if (apiKey) {
+    headers.set("X-API-Key", apiKey)
+  }
+
+  const response = await fetch(url, {headers})
+  if (!response.ok) {
+    throw new Error(`Toncenter request failed: ${response.status}`)
+  }
+  return response.json()
+}
+
+function previewFromResponses(
+  address: string,
+  accountStates: Record<string, unknown>,
+  jettonMasters: Record<string, unknown> | undefined,
+): AccountOgPreview {
+  const fallback = fallbackAccountPreview(address)
+  const accounts = arrayValue(accountStates.accounts)
+  const account = recordValue(accounts?.[0])
+  const accountAddress = stringValue(account?.address) || address
+  const addressBookRecords = recordValue(accountStates.address_book)
+  const addressBook =
+    recordValue(addressBookRecords?.[accountAddress]) || recordValue(addressBookRecords?.[address])
+  const interfaces = arrayValue(account?.interfaces) || arrayValue(addressBook?.interfaces) || []
+  const jettonMasterRecords = arrayValue(jettonMasters?.jetton_masters)
+  const jettonMaster = recordValue(jettonMasterRecords?.[0])
+  const tokenInfo =
+    tokenInfoForAddress(recordValue(accountStates.metadata), accountAddress) ||
+    tokenInfoForAddress(recordValue(jettonMasters?.metadata), accountAddress)
+  const jettonContent = {
+    ...(isRecord(jettonMaster?.jetton_content) ? jettonMaster.jetton_content : {}),
+    ...(isRecord(tokenInfo?.extra) ? tokenInfo.extra : {}),
+  }
+
+  const name =
+    stringValue(jettonContent.name) ||
+    stringValue(tokenInfo?.name) ||
+    stringValue(addressBook?.domain) ||
+    fallback.title
+  const symbol = stringValue(jettonContent.symbol) || stringValue(tokenInfo?.symbol)
+  const image = tokenImage(jettonContent, tokenInfo)
+  const status = formatStatus(
+    stringValue(account?.status) ||
+      stringValue(account?.account_status) ||
+      stringValue(addressBook?.status),
+  )
+  const type = formatAccountType(interfaces, jettonMaster)
+  return {
+    title: name,
+    subtitle: type || "TON account",
+    shortAddress: fallback.shortAddress,
+    rawAddress: address,
+    status,
+    type,
+    detail: undefined,
+    image,
+    avatarText: avatarText(name, symbol),
+  }
+}
+
+function tokenInfoForAddress(metadata: Record<string, unknown> | undefined, address: string) {
+  const tokenInfoRecords = recordValue(metadata?.[address])?.token_info
+  const records = arrayValue(tokenInfoRecords)
+  return records?.find(info => recordValue(info)?.type === "jetton_masters") as
+    | Record<string, unknown>
+    | undefined
+}
+
+function formatAddress(address: string) {
+  if (address.length <= 18) {
+    return address
+  }
+  return `${address.slice(0, 8)}…${address.slice(-6)}`
+}
+
+function formatStatus(status: string | undefined) {
+  const value = status?.toLowerCase()
+  if (!value) {
+    return undefined
+  }
+  return value === "active" ? "Active" : value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function formatAccountType(values: unknown[], jettonMaster: Record<string, unknown> | undefined) {
+  const interfaces = values.filter((value): value is string => typeof value === "string")
+  if (interfaces.includes("dedust_pool")) {
+    return "DeDust Pool"
+  }
+  if (interfaces.includes("moon_pool")) {
+    return "Moon Pool"
+  }
+  if (jettonMaster || interfaces.includes("jetton_master")) {
+    return "Jetton Master"
+  }
+  if (interfaces.includes("jetton_wallet")) {
+    return "Jetton Wallet"
+  }
+  if (interfaces.includes("nft_item")) {
+    return "NFT Item"
+  }
+  if (interfaces.includes("nft_collection")) {
+    return "NFT Collection"
+  }
+  const wallet = interfaces.find(iface => /^wallet_v\d+r\d+$/i.test(iface))
+  if (wallet) {
+    return wallet.replace(/^wallet_/i, "wallet ")
+  }
+  return undefined
+}
+
+function avatarText(name: string, symbol: string | undefined) {
+  return (symbol || name || "A").trim().charAt(0).toUpperCase()
+}
+
+function tokenImage(
+  content: Record<string, unknown>,
+  tokenInfo: Record<string, unknown> | undefined,
+) {
+  const candidates = [
+    stringValue(tokenInfo?.image),
+    stringValue(content.image),
+    stringValue(content._image_big),
+    stringValue(content._image_medium),
+    stringValue(content._image_small),
+  ].filter((value): value is string => Boolean(value))
+  return candidates.find(isDataImage) || candidates[0]
+}
+
+async function inlineImage(url: string) {
+  if (isDataImage(url)) {
+    return url
+  }
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      return undefined
+    }
+
+    const contentType = response.headers.get("content-type") || "image/png"
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    let binary = ""
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte)
+    }
+    return `data:${contentType};base64,${btoa(binary)}`
+  } catch {
+    return undefined
+  }
+}
+
+function isDataImage(value: string) {
+  return value.startsWith("data:image/")
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined
+}
+
+function arrayValue(value: unknown): unknown[] | undefined {
+  return Array.isArray(value) ? value : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function absoluteUrl(url: URL, pathname: string) {
+  return `${url.protocol}//${url.host}${pathname}`
+}
+
+function withHeader(headers: Headers, name: string, value: string) {
+  const next = new Headers(headers)
+  next.set(name, value)
+  return next
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")
+}

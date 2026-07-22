@@ -11,7 +11,7 @@
   ✗ ce all successful compute skipped tx [TIME]
     └─ Error: expect(actual).toHaveAllSuccessfulTxs(expected)
         N/A -> sender A
-        └── 0x00000001 1 TON -> EQC2je..T7AHot B                                        compute phase skipped aborted
+        └── EvaaMasterClassicSupplyMaster 1 GRAM -> kQC2je..T7AMGn B                    compute phase skipped aborted
         
         Unexpected transaction
         with:

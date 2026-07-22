@@ -3,7 +3,8 @@ use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
-    SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache, to_cell,
+    SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache,
+    is_treasury_code_hash, to_cell,
 };
 use crate::contract_interface::{
     compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
@@ -12,10 +13,11 @@ use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
 use crate::retrace;
 use crate::tonconnect;
+use crate::wallets::wallet_message_expire_at;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
-use acton_debug::ChildDebugContextSpec;
 use acton_debug::replayer::StepMode;
+use acton_debug::{ChildDebugContextSpec, exit_codes};
 use anyhow::{Context as AnyhowContext, anyhow};
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -23,27 +25,26 @@ use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use path_absolutize::Absolutize;
+use rand::RngCore;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
-use ton_api::{
-    Network, TonApiClient, V3MessageSummary, V3Trace, V3TransactionSummary, V3TxDescription,
-};
+use ton_api::{Network, TonApiClient, toncenter::v3};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
-use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
-use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
+use ton_executor::{BaseExecutor, ExecutorVerbosity};
 use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
@@ -58,16 +59,10 @@ use tycho_types::models::{
     ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
     StorageUsedShort, Transaction, TxInfo,
 };
-use tycho_types::num::{Tokens, Uint15};
+use tycho_types::num::{Tokens, Uint15, VarUint24, VarUint56};
 
-// Keep in sync with `impl.treasuryCode()` in `lib/emulation/testing.tolk`.
-const TREASURY_CODE_BOC64: &str = "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe";
-
-static TREASURY_CODE_HASH: LazyLock<HashBytes> = LazyLock::new(|| {
-    let code =
-        Boc::decode_base64(TREASURY_CODE_BOC64).expect("testing.treasury code BoC must be valid");
-    code_lookup_hash(&code)
-});
+const ZERO_RANDOM_SEED_HEX: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Resolve the unix time to use for a get method invocation.
 ///
@@ -84,6 +79,33 @@ fn resolve_get_method_unixtime(world_state: &WorldState) -> anyhow::Result<i64> 
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
     Ok(duration_since_epoch.as_secs().try_into()?)
+}
+
+fn resolve_get_method_random_seed(world_state: &WorldState) -> String {
+    world_state
+        .get_random_seed()
+        .map_or_else(|| ZERO_RANDOM_SEED_HEX.to_owned(), hex::encode)
+}
+
+fn random_seed_from_bigint(seed: &BigInt) -> anyhow::Result<[u8; 32]> {
+    let (sign, bytes) = seed.to_bytes_be();
+    anyhow::ensure!(
+        sign != Sign::Minus,
+        "random seed must be a non-negative uint256"
+    );
+    anyhow::ensure!(
+        bytes.len() <= 32,
+        "random seed must fit into uint256, got {} bytes",
+        bytes.len()
+    );
+
+    let mut seed_bytes = [0u8; 32];
+    seed_bytes[32 - bytes.len()..].copy_from_slice(&bytes);
+    Ok(seed_bytes)
+}
+
+fn random_seed_to_bigint(seed: [u8; 32]) -> BigInt {
+    BigInt::from_bytes_be(Sign::Plus, &seed)
 }
 
 fn run_nested_executor_until_finished(
@@ -227,7 +249,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         }
 
         let code_boc64 = Boc::encode_base64(&cell);
-        let code_hash = *cell.repr_hash();
+        let code_hash = code_lookup_hash(&cell);
 
         let interface = if let Some(contract_config) = &contract_config {
             compile_optional_contract_interface(
@@ -260,14 +282,23 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         return Ok(());
     }
 
+    let allow_no_entrypoint = is_types_tolk_path(&path);
+    let cache_profile = if allow_no_entrypoint {
+        "1.4+allow-no-entrypoint"
+    } else {
+        "1.4"
+    };
+
     // File build cache is persistent cache that outlives reruns. If this contract was already
     // built we return cached cell for the contract. Since lookup in this cache is quite expensive
     // we also add cache entry to runtime build cache.
-    if let Some(cached_entry) =
-        ctx.build
-            .file_build_cache
-            .get(&path_display, ctx.build.need_debug_info, false, 2, "1.4")
-    {
+    if let Some(cached_entry) = ctx.build.file_build_cache.get(
+        &path_display,
+        ctx.build.need_debug_info,
+        false,
+        2,
+        cache_profile,
+    ) {
         let elapsed = start_time.elapsed();
         info!(
             "Build {path_display} from file cache ({}) in {elapsed:?}",
@@ -297,7 +328,9 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     let compile_start = Instant::now();
 
     let mappings = ctx.env.config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new(2)
+        .with_mappings(&mappings)
+        .with_allow_no_entrypoint(allow_no_entrypoint);
     let result = compiler.compile(&path, ctx.build.need_debug_info);
 
     let compile_time = compile_start.elapsed();
@@ -312,7 +345,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
                 ctx.build.need_debug_info,
                 false,
                 2,
-                "1.4",
+                cache_profile,
             ) {
                 warn!("Failed to build cached code BoC for {path_display}: {err}");
             }
@@ -349,6 +382,12 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
     Ok(())
 }
 
+fn is_types_tolk_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|file_name| file_name.to_str())
+        .is_some_and(|file_name| file_name.ends_with(".types.tolk"))
+}
+
 pub(crate) fn compilation_result_for_code(
     ctx: &Context,
     code: Option<&Cell>,
@@ -371,7 +410,7 @@ pub(crate) fn compilation_result_for_code(
     // match that cell against local project contracts so debug/backtrace and
     // formatter paths can still use their source maps or ABI.
     let target_hash = code_lookup_hash(&code);
-    if target_hash == *TREASURY_CODE_HASH {
+    if is_treasury_code_hash(&target_hash) {
         return None;
     }
 
@@ -480,40 +519,49 @@ fn send_message_impl(
         return Ok(());
     }
 
-    if ctx.can_broadcast_to_network()
-        && let Some(tonconnect) = ctx.env.find_tonconnect_by_address(src_std)
-    {
+    if ctx.can_broadcast_to_network() {
         let network = ctx.network();
-        let (wallet_ext_in, norm_hash) = send_tonconnect_message(&msg, tonconnect, &network)
-            .context("Failed to send message with TON Connect")?;
+        let tonconnect = ctx.env.find_tonconnect_by_address(src_std);
+        let wallet = ctx.env.find_wallet_by_address(src_std);
 
-        ctx.chain.world_state.invalidate_remote_cache();
+        if tonconnect.is_some() || wallet.is_some() {
+            let custom_networks = ctx.env.config.custom_networks();
+            if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
+                warn!("Failed to register compiler ABI in localnet: {err:#}");
+            }
 
-        let pseudo_tx =
-            build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
-        stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
-        return Ok(());
-    }
+            if let Some(tonconnect) = tonconnect {
+                let (wallet_ext_in, norm_hash) =
+                    send_tonconnect_message(&msg, tonconnect, &network)
+                        .context("Failed to send message with TON Connect")?;
 
-    if ctx.can_broadcast_to_network()
-        && let Some(wallet) = ctx.env.find_wallet_by_address(src_std)
-    {
-        let network = ctx.network();
-        let custom_networks = ctx.env.config.custom_networks();
-        if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
-            warn!("Failed to register compiler ABI in localnet: {err:#}");
+                ctx.chain.world_state.invalidate_remote_cache();
+
+                let pseudo_tx = build_pseudo_broadcast_tx(
+                    ctx.chain.world_state.get_now(),
+                    wallet_ext_in,
+                    norm_hash,
+                );
+                stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
+                return Ok(());
+            }
+
+            if let Some(wallet) = wallet {
+                let (wallet_ext_in, norm_hash) =
+                    send_wallet_message(&msg, wallet, &network, custom_networks)
+                        .context("Failed to send message to real network")?;
+
+                ctx.chain.world_state.invalidate_remote_cache();
+
+                let pseudo_tx = build_pseudo_broadcast_tx(
+                    ctx.chain.world_state.get_now(),
+                    wallet_ext_in,
+                    norm_hash,
+                );
+                stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
+                return Ok(());
+            }
         }
-
-        let (wallet_ext_in, norm_hash) =
-            send_wallet_message(&msg, wallet, &network, custom_networks)
-                .context("Failed to send message to real network")?;
-
-        ctx.chain.world_state.invalidate_remote_cache();
-
-        let pseudo_tx =
-            build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
-        stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
-        return Ok(());
     }
 
     let libs = ctx.chain.build_libs(&src);
@@ -834,7 +882,7 @@ fn tx_cell_to_send_result_tuple(
 
 pub(crate) struct V3TraceTransaction {
     pub(crate) hash: String,
-    pub(crate) summary: V3TransactionSummary,
+    pub(crate) summary: v3::Transaction,
     pub(crate) tx_cell: Cell,
     pub(crate) transaction: Transaction,
     pub(crate) parent_lt: Option<u64>,
@@ -857,7 +905,9 @@ pub(crate) enum V3TraceTransactions {
     Pending { tx_hash: String },
 }
 
-pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
+pub(crate) fn build_v3_trace_transactions(
+    trace: &v3::Trace,
+) -> anyhow::Result<V3TraceTransactions> {
     let mut transactions = Vec::with_capacity(trace.transactions_order.len());
     for tx_hash in &trace.transactions_order {
         let Some(summary) = trace.transactions.get(tx_hash) else {
@@ -922,12 +972,12 @@ pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3T
     Ok(V3TraceTransactions::Ready(transactions))
 }
 
-pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
-    message.hash.as_deref().filter(|hash| !hash.is_empty())
+pub(crate) fn v3_message_hash(message: &v3::Message) -> Option<&str> {
+    (!message.hash.is_empty()).then_some(message.hash.as_str())
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
-/// [TON docs message-lookup guide](https://docs.ton.org/ecosystem/ton-connect/message-lookup).
+/// [TON docs message-lookup guide](https://docs.ton.org/applications/ton-connect/how-to/message-lookup).
 ///
 /// Normalization rules applied to the cell:
 /// - `src` is replaced with `addr_none$00`;
@@ -1372,12 +1422,10 @@ fn send_wallet_message(
     network: &Network,
     custom_networks: HashMap<String, acton_config::config::CustomNetworkUrls>,
 ) -> anyhow::Result<(Cell, HashBytes)> {
-    let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
-    let expire_at = expired_at_time.duration_since(UNIX_EPOCH)?.as_secs() as u32;
-
     let client = TonApiClient::new(network.clone(), custom_networks)?;
 
     let (seqno, need_state_init) = wallet.seqno(&client)?;
+    let expire_at = wallet_message_expire_at(network)?;
     let message_ton = TonCell::from_boc(Boc::encode(message))?;
     let external =
         wallet
@@ -1743,6 +1791,22 @@ fn save_trace_name_impl(
     ctx.chain
         .emulations
         .save_trace_name(&ctx.env.running_id, root_lt, trace_name);
+    Ok(())
+}
+
+extension!(hide_trace_from_ui in (Context) with (txs: Vec<TupleItem>) using hide_trace_from_ui_impl);
+fn hide_trace_from_ui_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    txs: Vec<TupleItem>,
+) -> anyhow::Result<()> {
+    let Some(root_lt) = root_lt_from_send_results(&txs) else {
+        return Ok(());
+    };
+
+    ctx.chain
+        .emulations
+        .hide_trace_from_ui(&ctx.env.running_id, root_lt);
     Ok(())
 }
 
@@ -2289,7 +2353,7 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
         address: "0:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         unixtime,
         balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id: 0,
         debug_enabled: false,
@@ -2447,6 +2511,7 @@ fn run_get_method_impl(
     let addr_str = addr.to_string();
 
     let shard_account = ctx.chain.world_state.get_account(&addr);
+    let balance = get_address_balance(&shard_account);
     let state = shard_account
         .account
         .load()
@@ -2474,8 +2539,8 @@ fn run_get_method_impl(
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
         unixtime,
-        balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        balance,
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id,
         debug_enabled: true,
@@ -2501,9 +2566,14 @@ fn run_get_method_impl(
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize tuple")?;
 
+    let mut missing_libraries_ctx = MissingLibrariesContext::default();
+
     let result = if ctx.debug.is_enabled() {
-        let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
+        let mut step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
+        step_executor
+            .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
+            .context("Cannot register missing library callback")?;
         step_executor
             .prepare(method_id, &args_b64)
             .context("Cannot prepare get method")?;
@@ -2550,11 +2620,26 @@ fn run_get_method_impl(
 
         result
     } else {
-        let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
+        let mut executor = GetExecutor::new(&params).context("Cannot create get executor")?;
+        executor
+            .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
+            .context("Cannot register missing library callback")?;
         executor
             .run_get_method(&args_b64, &params, Some(&config_b64))
             .context("Cannot run get method")?
     };
+
+    let mut missing_libraries = match &result {
+        GetMethodResult::Success(result) => result
+            .missing_library
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>(),
+        GetMethodResult::Error(_) => HashSet::new(),
+    };
+    missing_libraries.extend(missing_libraries_ctx.into_set());
+    let mut missing_libraries = missing_libraries.into_iter().collect::<Vec<_>>();
+    missing_libraries.sort_unstable();
 
     match result {
         GetMethodResult::Success(result) => {
@@ -2602,6 +2687,7 @@ fn run_get_method_impl(
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
+                        missing_libraries,
                         source_map,
                         abi: abi.clone(),
                         caller_trace: None,
@@ -2670,6 +2756,15 @@ fn get_address_code(account: &ShardAccount) -> Option<Cell> {
     };
 
     state.code
+}
+
+fn get_address_balance(account: &ShardAccount) -> String {
+    account
+        .account
+        .load()
+        .ok()
+        .and_then(|account| account.0.map(|account| account.balance.tokens.to_string()))
+        .unwrap_or_else(|| "0".to_owned())
 }
 
 extension!(crc16 in (Context) with (data: String) using crc16_impl);
@@ -2998,8 +3093,20 @@ fn wait_for_transaction_impl(
             println!("Awaiting transaction... [Attempt {attempt}/{attempts}]");
         }
 
-        match poll_send_result_v2(&api_client, &dest_address, &target_hash) {
+        match poll_send_result_v2(
+            &api_client,
+            &dest_address,
+            &target_hash,
+            ctx.execution_started_at,
+        ) {
             Ok(Some(polled)) => {
+                if let Some(reason) = &polled.root_failure {
+                    let link = transaction_link(ctx, &dest_address, &polled);
+                    warn_root_transaction_failed("waitForFirstTransaction", reason, Some(&link));
+                    stack.push(TupleItem::Null);
+                    return Ok(());
+                }
+
                 // Short settle delay so descendant transactions are more likely to be visible.
                 std::thread::sleep(Duration::from_millis(WAIT_FOR_TRANSACTION_SETTLE_DELAY_MS));
 
@@ -3036,6 +3143,74 @@ struct PolledSendResult {
     lt: u64,
     utime: u32,
     send_result: TupleItem,
+    root_failure: Option<String>,
+}
+
+fn root_transaction_failure_reason(tx: &Transaction) -> Option<String> {
+    let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
+        return None;
+    };
+
+    match &info.compute_phase {
+        ComputePhase::Skipped(phase) => {
+            return Some(format!("Compute phase was skipped: {:?}", phase.reason));
+        }
+        ComputePhase::Executed(phase) if !phase.success => {
+            return Some(format!(
+                "Compute phase failed with {}",
+                format_compute_exit_code(phase.exit_code)
+            ));
+        }
+        ComputePhase::Executed(_) => {}
+    }
+
+    if let Some(action) = &info.action_phase
+        && (!action.success || action.result_code != 0)
+    {
+        let no_funds = if action.no_funds {
+            " (not enough funds)"
+        } else {
+            ""
+        };
+        return Some(format!(
+            "Action phase failed with {}{no_funds}",
+            format_action_result_code(action.result_code)
+        ));
+    }
+
+    if info.aborted {
+        return Some("Transaction was aborted".to_owned());
+    }
+
+    None
+}
+
+fn format_compute_exit_code(code: i32) -> String {
+    format_known_exit_code(code, exit_codes::ExitCodePhase::Compute, "exit code")
+}
+
+fn format_action_result_code(code: i32) -> String {
+    format_known_exit_code(code, exit_codes::ExitCodePhase::Action, "result code")
+}
+
+fn format_known_exit_code(code: i32, phase: exit_codes::ExitCodePhase, code_label: &str) -> String {
+    let Some(info) = exit_codes::find_for_phase(code, phase) else {
+        return format!("{code_label} {code}");
+    };
+
+    format!("{code_label} {code} ({})", info.description)
+}
+
+fn warn_root_transaction_failed(wait_name: &str, reason: &str, explorer_link: Option<&str>) {
+    warn!("{wait_name}: root transaction failed: {reason}");
+    eprintln!(
+        "Warning: the broadcast message was included in a block, but its root transaction failed."
+    );
+    eprintln!("Acton stopped waiting for {wait_name}(); the script receives null.");
+    eprintln!("Reason: {reason}");
+    if let Some(link) = explorer_link {
+        eprintln!("Open transaction in explorer: {link}");
+    }
 }
 
 /// One polling step using toncenter v2 — a direct translation of the TON docs
@@ -3049,6 +3224,7 @@ fn poll_send_result_v2(
     client: &TonApiClient,
     dest_address: &str,
     target_hash: &HashBytes,
+    execution_started_at: i64,
 ) -> anyhow::Result<Option<PolledSendResult>> {
     let txs = client.get_transactions(dest_address, Some(100), None, None)?;
     for tx in txs {
@@ -3057,6 +3233,11 @@ fn poll_send_result_v2(
         let parsed_tx: Transaction = tx_cell
             .parse::<Transaction>()
             .context("Failed to parse transaction from toncenter BoC")?;
+        // Transaction timestamps have one-second precision, so a transaction produced in the
+        // same second as the script started is current; only strictly older matches are stale.
+        if i64::from(parsed_tx.now) < execution_started_at {
+            continue;
+        }
         let Some(in_msg_cell) = parsed_tx.in_msg.as_ref() else {
             continue;
         };
@@ -3080,14 +3261,30 @@ fn poll_send_result_v2(
             lt: parsed_tx.lt,
             utime: parsed_tx.now,
             send_result,
+            root_failure: root_transaction_failure_reason(&parsed_tx),
         }));
     }
     Ok(None)
 }
 
 fn transaction_link(ctx: &mut Context, address_str: &str, polled: &PolledSendResult) -> String {
+    transaction_link_from_parts(
+        ctx,
+        address_str,
+        polled.tx_hash_hex.as_str(),
+        polled.lt,
+        polled.utime,
+    )
+}
+
+fn transaction_link_from_parts(
+    ctx: &mut Context,
+    address_str: &str,
+    tx_hash_hex: &str,
+    lt: u64,
+    utime: u32,
+) -> String {
     let network = ctx.network();
-    let tx_hash_hex = polled.tx_hash_hex.as_str();
     match &network {
         Network::Localnet => {
             if let Some(url) = localnet_transaction_link(ctx, tx_hash_hex) {
@@ -3112,14 +3309,10 @@ fn transaction_link(ctx: &mut Context, address_str: &str, polled: &PolledSendRes
     let explorer = ctx.env.explorer.unwrap_or(Explorer::Tonscan);
     match explorer {
         Explorer::Tonscan => format!("https://{network_prefix}tonscan.org/tx/{tx_hash_hex}"),
-        Explorer::Toncx => format!(
-            "https://{network_prefix}ton.cx/tx/{}:{tx_hash_hex}:{address_str}",
-            polled.lt
-        ),
-        Explorer::Dton => format!(
-            "https://{network_prefix}dton.io/tx/{tx_hash_hex}?time={}",
-            polled.utime
-        ),
+        Explorer::Toncx => {
+            format!("https://{network_prefix}ton.cx/tx/{lt}:{tx_hash_hex}:{address_str}")
+        }
+        Explorer::Dton => format!("https://{network_prefix}dton.io/tx/{tx_hash_hex}?time={utime}"),
         Explorer::Tonviewer => {
             format!("https://{network_prefix}tonviewer.com/transaction/{tx_hash_hex}")
         }
@@ -3149,8 +3342,6 @@ struct RegisterAbiPayload {
 
 #[derive(Serialize)]
 struct RegisterAbiEntry {
-    code_hash: String,
-    #[serde(rename = "compiler_abi")]
     abi: serde_json::Value,
 }
 
@@ -3171,9 +3362,16 @@ fn register_localnet_abis(
         if abi.contract_name.is_empty() {
             abi.contract_name.clone_from(&result.name);
         }
-        entries_by_hash
-            .entry(result.code_hash.to_string())
-            .or_insert(serde_json::to_value(&abi)?);
+        let display_name = abi.contract_name.clone();
+        let code_hash = result.code_hash.to_string();
+        entries_by_hash.entry(code_hash.clone()).or_insert_with(|| {
+            serde_json::json!({
+                "compiler_abi": abi,
+                "display_name": display_name,
+                "code_hashes": [code_hash],
+                "links": [],
+            })
+        });
     }
 
     if entries_by_hash.is_empty() {
@@ -3183,8 +3381,8 @@ fn register_localnet_abis(
     let url = localnet_acton_url(custom_networks, "acton_registerCompilerAbis")?;
     let payload = RegisterAbiPayload {
         entries: entries_by_hash
-            .into_iter()
-            .map(|(code_hash, abi)| RegisterAbiEntry { code_hash, abi })
+            .into_values()
+            .map(|abi| RegisterAbiEntry { abi })
             .collect(),
     };
 
@@ -3193,9 +3391,8 @@ fn register_localnet_abis(
         .timeout(Duration::from_secs(5))
         .user_agent(crate::build_info::user_agent())
         .build()?;
-    let response = client
-        .post(&url)
-        .json(&payload)
+    let request = client.post(&url).json(&payload);
+    let response = with_localnet_auth(request)
         .send()
         .with_context(|| format!("Failed to POST compiler ABI registry to {url}"))?;
     let status = response.status();
@@ -3219,6 +3416,15 @@ fn register_localnet_abis(
     );
 
     Ok(())
+}
+
+fn with_localnet_auth(
+    request: reqwest::blocking::RequestBuilder,
+) -> reqwest::blocking::RequestBuilder {
+    match crate::commands::localnet::resolve_localnet_auth_token(None) {
+        Some(token) => request.bearer_auth(token),
+        None => request,
+    }
 }
 
 fn localnet_acton_url(
@@ -3320,6 +3526,32 @@ fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     Ok(())
 }
 
+extension!(set_random_seed in (Context) with (seed: BigInt) using set_random_seed_impl);
+fn set_random_seed_impl(ctx: &mut Context, _: &mut Tuple, seed: BigInt) -> anyhow::Result<()> {
+    ctx.chain
+        .world_state
+        .set_random_seed(Some(random_seed_from_bigint(&seed)?));
+    Ok(())
+}
+
+extension!(set_chksig_ignore in (Context) with (ignore: bool) using set_chksig_ignore_impl);
+const fn set_chksig_ignore_impl(
+    ctx: &mut Context,
+    _: &mut Tuple,
+    ignore: bool,
+) -> anyhow::Result<()> {
+    ctx.chain.world_state.set_ignore_chksig(ignore);
+    Ok(())
+}
+
+extension!(generate_random_seed in (Context) using generate_random_seed_impl);
+fn generate_random_seed_impl(_: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    stack.push(TupleItem::Int(random_seed_to_bigint(seed)));
+    Ok(())
+}
+
 extension!(get_shard_account in (Context) with (addr: StdAddr) using get_shard_account_impl);
 fn get_shard_account_impl(
     ctx: &mut Context,
@@ -3353,14 +3585,13 @@ fn set_shard_account_impl(
     Ok(())
 }
 
-extension!(call_tolk_function in (Context) with (addr: StdAddr, arg: TupleItem, function: TupleItem) using call_tolk_function_impl);
-fn call_tolk_function_impl(
+pub(super) fn run_tolk_continuation(
     ctx: &mut Context,
-    stack: &mut Tuple,
     addr: StdAddr,
     args: TupleItem,
     function: TupleItem,
-) -> anyhow::Result<()> {
+    verbosity: ExecutorVerbosity,
+) -> anyhow::Result<GetMethodResultSuccess> {
     let TupleItem::Cont(cont) = function else {
         anyhow::bail!("Expected Cont, got {function:?}");
     };
@@ -3385,6 +3616,7 @@ fn call_tolk_function_impl(
     let world_state = &mut ctx.chain.world_state;
     let addr_str = addr.to_string();
     let shard_account = world_state.get_account(&addr);
+    let balance = get_address_balance(&shard_account);
     let account_state = shard_account
         .account
         .load()
@@ -3418,12 +3650,12 @@ fn call_tolk_function_impl(
     let params = RunGetMethodArgs {
         code,
         data,
-        verbosity: ctx.env.default_log_level,
+        verbosity,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
         unixtime,
-        balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        balance,
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id: 0,
         debug_enabled: true,
@@ -3437,32 +3669,43 @@ fn call_tolk_function_impl(
         .context("Cannot run continuation")?;
 
     match result {
-        GetMethodResult::Success(result) => {
-            // NOTE: Intentionally not saving this result into `emulations.get_methods`.
-            // `GetMethodResultSuccess.code` is `#[serde(skip)]` and is only populated by
-            // `run_get_method` (which has the contract code at hand). `run_continuation`
-            // cannot fill it, so stored continuation results would have an empty `code`
-            // and break downstream consumers that look it up (coverage + failed-get-method
-            // exception source-map resolution in `src/formatter.rs`). Continuation
-            // executions are out of scope for coverage anyway.
-            let cell =
-                Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
-            let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
-
-            if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
-                anyhow::bail!(
-                    "Continuation execution failed with exit code {}",
-                    result.vm_exit_code
-                );
-            }
-
-            stack.push(TupleItem::Tuple(tuple));
-            Ok(())
-        }
+        GetMethodResult::Success(result) => Ok(result),
         GetMethodResult::Error(err) => {
             anyhow::bail!("Continuation execution error: {}", err.error);
         }
     }
+}
+
+extension!(call_tolk_function in (Context) with (addr: StdAddr, arg: TupleItem, function: TupleItem) using call_tolk_function_impl);
+fn call_tolk_function_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: StdAddr,
+    args: TupleItem,
+    function: TupleItem,
+) -> anyhow::Result<()> {
+    let verbosity = ctx.env.default_log_level;
+    let result = run_tolk_continuation(ctx, addr, args, function, verbosity)?;
+
+    // NOTE: Intentionally not saving this result into `emulations.get_methods`.
+    // `GetMethodResultSuccess.code` is `#[serde(skip)]` and is only populated by
+    // `run_get_method` (which has the contract code at hand). `run_continuation`
+    // cannot fill it, so stored continuation results would have an empty `code`
+    // and break downstream consumers that look it up (coverage + failed-get-method
+    // exception source-map resolution in `src/formatter.rs`). Continuation
+    // executions are out of scope for coverage anyway.
+    let cell = Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
+    let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
+
+    if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
+        anyhow::bail!(
+            "Continuation execution failed with exit code {}",
+            result.vm_exit_code
+        );
+    }
+
+    stack.push(TupleItem::Tuple(tuple));
+    Ok(())
 }
 
 extension!(save_world_state_snapshot in (Context) with (path: String) using save_world_state_snapshot_impl);
@@ -3552,6 +3795,10 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         49 => wait_for_trace : 4,
         56 => send_external_message : 1,
         57 => parse_cell_from_base64 : 1,
+        58 => hide_trace_from_ui : 1,
+        59 => set_random_seed : 1,
+        60 => generate_random_seed : 0,
+        61 => set_chksig_ignore : 1,
         501 => call_tolk_function : 3,
     });
 }
@@ -3559,6 +3806,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::{TREASURY_CODE_BOC64, is_treasury_code};
     use anyhow::anyhow;
     use rustc_hash::FxHashSet;
     use std::sync::Arc;
@@ -3572,7 +3820,7 @@ mod tests {
     fn treasury_code_hash_is_recognized() {
         let code = Boc::decode_base64(TREASURY_CODE_BOC64).expect("treasury code must decode");
 
-        assert_eq!(code_lookup_hash(&code), *TREASURY_CODE_HASH);
+        assert!(is_treasury_code(&code));
     }
 
     #[test]
@@ -3581,7 +3829,7 @@ mod tests {
         builder.store_uint(0xcafe, 16).expect("bits must fit");
         let code = builder.build().expect("cell must build");
 
-        assert_ne!(code_lookup_hash(&code), *TREASURY_CODE_HASH);
+        assert!(!is_treasury_code(&code));
     }
 
     fn test_transaction(lt: u64) -> Transaction {
@@ -3831,13 +4079,6 @@ mod tests {
     #[test]
     fn synthesize_tx_cell_from_v3_reproduces_on_chain_hash() {
         use expect_test::expect_file;
-        use ton_api::V3Trace;
-
-        #[derive(serde::Deserialize)]
-        struct TraceEnvelope {
-            traces: Vec<V3Trace>,
-        }
-
         let fixtures = [
             (
                 include_str!("testdata/v3_trace_fixture.json"),
@@ -3850,7 +4091,7 @@ mod tests {
         ];
 
         for (idx, (fixture, expected)) in fixtures.into_iter().enumerate() {
-            let envelope: TraceEnvelope = serde_json::from_str(fixture)
+            let envelope: v3::TracesResponse = serde_json::from_str(fixture)
                 .unwrap_or_else(|e| panic!("fixture {idx} must deserialize: {e:#}"));
             let trace = envelope
                 .traces
@@ -3859,7 +4100,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("fixture {idx} has no traces"));
 
             // Iterate in indexer-reported order so the snapshot is stable —
-            // `V3Trace.transactions` is a HashMap and has no natural ordering.
+            // `v3::Trace.transactions` is a HashMap and has no natural ordering.
             let mut actual = String::new();
             for tx_hash_b64 in &trace.transactions_order {
                 let summary = trace
@@ -3967,6 +4208,18 @@ fn wait_for_trace_impl(
                      be fetched in full"
                 );
             }
+            Ok(TracePollOutcome::RootFailed {
+                reason,
+                tx_hash_hex,
+                address,
+                lt,
+                utime,
+            }) => {
+                let link = transaction_link_from_parts(ctx, &address, &tx_hash_hex, lt, utime);
+                warn_root_transaction_failed("waitForTrace", &reason, Some(&link));
+                stack.push(TupleItem::Null);
+                return Ok(());
+            }
             Err(err) => {
                 // Surface the failure on each attempt, and hold on to the last one so we can
                 // include it in the bail message if errors persist through timeout.
@@ -4004,6 +4257,13 @@ enum TracePollOutcome {
     Settled(Vec<TupleItem>),
     NotYet,
     Incomplete,
+    RootFailed {
+        reason: String,
+        tx_hash_hex: String,
+        address: String,
+        lt: u64,
+        utime: u32,
+    },
 }
 
 /// One polling step for a full trace.
@@ -4035,6 +4295,21 @@ fn poll_send_results_by_trace(
     };
     if has_unmatched_internal_out_messages(&transactions) {
         return Ok(TracePollOutcome::NotYet);
+    }
+    if let Some((root, reason)) = transactions.first().and_then(|root| {
+        root_transaction_failure_reason(&root.transaction).map(|reason| (root, reason))
+    }) {
+        let tx_hash_hex = parse_hash_bytes(&root.hash)
+            .map_or_else(|_| root.hash.clone(), |hash| hex::encode(hash.as_slice()));
+        let lt = root.summary.lt.parse().unwrap_or(root.transaction.lt);
+        let utime = root.summary.now;
+        return Ok(TracePollOutcome::RootFailed {
+            reason,
+            tx_hash_hex,
+            address: root.summary.account.clone(),
+            lt,
+            utime,
+        });
     }
     let results = transactions
         .iter()
@@ -4070,7 +4345,7 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 /// cell had a non-addr_none src, a non-zero `import_fee`, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
 pub(crate) fn synthesize_tx_cell_from_v3(
-    summary: &V3TransactionSummary,
+    summary: &v3::Transaction,
 ) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)
         .with_context(|| format!("Unsupported account address format: {}", summary.account))?;
@@ -4078,17 +4353,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         .lt
         .parse()
         .with_context(|| format!("Invalid lt '{}' in v3 tx summary", summary.lt))?;
-    let prev_trans_lt: u64 = summary
-        .prev_trans_lt
-        .as_deref()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let prev_trans_hash = summary
-        .prev_trans_hash
-        .as_deref()
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let prev_trans_lt: u64 = summary.prev_trans_lt.parse().ok().unwrap_or(0);
+    let prev_trans_hash = parse_hash_bytes(&summary.prev_trans_hash)?;
 
     let in_msg = summary
         .in_msg
@@ -4111,25 +4377,14 @@ pub(crate) fn synthesize_tx_cell_from_v3(
     let out_msg_count = Uint15::new(summary.out_msgs.len() as u16);
 
     let total_fees = CurrencyCollection {
-        tokens: parse_tokens_opt(summary.total_fees.as_deref()),
+        tokens: parse_tokens_opt(Some(&summary.total_fees)),
         other: ExtraCurrencyCollection::new(),
     };
 
-    let state_update_old = summary
-        .account_state_before
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
-    let state_update_new = summary
-        .account_state_after
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let state_update_old = parse_hash_bytes(&summary.account_state_before.hash)?;
+    let state_update_new = parse_hash_bytes(&summary.account_state_after.hash)?;
 
+    let tx_info = build_tx_info_from_v3(Some(&summary.description));
     let tx = Transaction {
         account,
         lt,
@@ -4137,8 +4392,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         prev_trans_lt,
         now: summary.now,
         out_msg_count,
-        orig_status: parse_account_status(summary.orig_status.as_deref()),
-        end_status: parse_account_status(summary.end_status.as_deref()),
+        orig_status: parse_account_status(&summary.orig_status),
+        end_status: parse_account_status(&summary.end_status),
         in_msg,
         out_msgs,
         total_fees,
@@ -4147,8 +4402,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
             new: state_update_new,
         })
         .context("Failed to build synthetic state_update")?,
-        info: Lazy::new(&build_tx_info_from_v3(summary.description.as_ref()))
-            .context("Failed to build synthetic tx info")?,
+        info: Lazy::new(&tx_info).context("Failed to build synthetic tx info")?,
     };
 
     let cell = to_cell(&tx);
@@ -4162,7 +4416,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
 /// every combination and pick the one whose `repr_hash` matches the summary's `hash`.
 /// Without this the synthesized tx's `repr_hash` can disagree with the on-chain hash on any
 /// transaction whose messages happened to be laid out differently than our fixed guess.
-fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
+fn build_message_cell_from_v3(m: &v3::Message) -> anyhow::Result<Cell> {
     let body_cell = match m
         .message_content
         .as_ref()
@@ -4183,7 +4437,7 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
     };
 
     let info = infer_msg_info_from_v3(m)?;
-    let expected_hash = m.hash.as_deref().and_then(|h| parse_hash_bytes(h).ok());
+    let expected_hash = parse_hash_bytes(&m.hash).ok();
 
     let try_layout = |init_as_ref: bool, body_as_ref: bool| -> anyhow::Result<Cell> {
         let ctx = Cell::empty_context();
@@ -4253,23 +4507,21 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
 ///
 /// Classify by the address pair: `source=None` → external-in, `destination=None` →
 /// external-out, both present → internal.
-fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
+fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
     let src_str = m.source.as_deref().filter(|s| !s.is_empty());
     let dst_str = m.destination.as_deref().filter(|s| !s.is_empty());
 
     match (src_str, dst_str) {
-        (None, Some(_)) => {
-            let dst = parse_int_addr(dst_str)?
-                .context("External-in message missing destination address")?;
+        (None, Some(dst_str)) => {
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::ExtIn(ExtInMsgInfo {
                 src: None,
                 dst,
                 import_fee: parse_tokens_opt(m.import_fee.as_deref()),
             }))
         }
-        (Some(_), None) => {
-            let src =
-                parse_int_addr(src_str)?.context("External-out message missing source address")?;
+        (Some(src_str), None) => {
+            let src = parse_int_addr(src_str)?;
             // External-out destinations are opaque ExtAddr; we leave dst = None.
             Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
                 src,
@@ -4286,11 +4538,9 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
                     .unwrap_or(0),
             }))
         }
-        (Some(_), Some(_)) => {
-            let src = parse_int_addr(src_str)?
-                .context("Internal message summary missing source address")?;
-            let dst = parse_int_addr(dst_str)?
-                .context("Internal message summary missing destination address")?;
+        (Some(src_str), Some(dst_str)) => {
+            let src = parse_int_addr(src_str)?;
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::Int(IntMsgInfo {
                 ihr_disabled: m.ihr_disabled.unwrap_or(true),
                 bounce: m.bounce.unwrap_or(false),
@@ -4326,7 +4576,7 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
-fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
+fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
     let Some(desc) = desc else {
         return TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: false,
@@ -4355,19 +4605,19 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
                 .gas_used
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_limit: cp
                 .gas_limit
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(tycho_types::num::VarUint56::new)
+                .map(VarUint56::new)
                 .unwrap_or_default(),
             gas_credit: cp
                 .gas_credit
                 .as_deref()
                 .and_then(|s| s.parse::<u32>().ok())
-                .map(tycho_types::num::VarUint24::new),
+                .map(VarUint24::new),
             mode: cp.mode.unwrap_or(0),
             exit_code: cp.exit_code.unwrap_or(0),
             exit_arg: cp.exit_arg,
@@ -4421,10 +4671,10 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
             .map(Tokens::new),
         result_code: ap.result_code.unwrap_or(0),
         result_arg: ap.result_arg,
-        total_actions: ap.tot_actions.unwrap_or(0),
-        special_actions: ap.spec_actions.unwrap_or(0),
-        skipped_actions: ap.skipped_actions.unwrap_or(0),
-        messages_created: ap.msgs_created.unwrap_or(0),
+        total_actions: ap.tot_actions.unwrap_or_default() as u16,
+        special_actions: ap.spec_actions.unwrap_or_default() as u16,
+        skipped_actions: ap.skipped_actions.unwrap_or_default() as u16,
+        messages_created: ap.msgs_created.unwrap_or_default() as u16,
         action_list_hash: ap
             .action_list_hash
             .as_deref()
@@ -4441,13 +4691,13 @@ fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
                     .cells
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
                 bits: s
                     .bits
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                    .map(VarUint56::new)
                     .unwrap_or_default(),
             })
             .unwrap_or_default(),
@@ -4522,13 +4772,8 @@ fn parse_hash_bytes(h: &str) -> anyhow::Result<HashBytes> {
     Ok(HashBytes(out))
 }
 
-fn parse_int_addr(s: Option<&str>) -> anyhow::Result<Option<IntAddr>> {
-    match s {
-        None | Some("") => Ok(None),
-        Some(a) => IntAddr::from_str(a)
-            .map(Some)
-            .map_err(|e| anyhow!("Failed to parse address '{a}': {e:?}")),
-    }
+fn parse_int_addr(address: &str) -> anyhow::Result<IntAddr> {
+    IntAddr::from_str(address).map_err(|e| anyhow!("Failed to parse address '{address}': {e:?}"))
 }
 
 fn parse_tokens_opt(s: Option<&str>) -> Tokens {
@@ -4537,11 +4782,11 @@ fn parse_tokens_opt(s: Option<&str>) -> Tokens {
         .unwrap_or_default()
 }
 
-fn parse_account_status(s: Option<&str>) -> AccountStatus {
+fn parse_account_status(s: &str) -> AccountStatus {
     match s {
-        Some("active") => AccountStatus::Active,
-        Some("frozen") => AccountStatus::Frozen,
-        Some("nonexist") => AccountStatus::NotExists,
+        "active" => AccountStatus::Active,
+        "frozen" => AccountStatus::Frozen,
+        "nonexist" => AccountStatus::NotExists,
         _ => AccountStatus::Uninit,
     }
 }

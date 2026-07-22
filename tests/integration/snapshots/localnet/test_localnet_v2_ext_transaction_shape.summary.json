@@ -1,0 +1,26 @@
+{
+  "get_transactions": {
+    "first_out_msg_type": "ext.message",
+    "has_top_level_exit_code": false,
+    "has_top_level_hash": false,
+    "has_top_level_success": false,
+    "in_msg_type": "ext.message",
+    "transaction_id_hash_present": true,
+    "type": "ext.transaction"
+  },
+  "try_locate_result_tx_hash_matches": true,
+  "try_locate_source_tx_hash_matches": true,
+  "try_locate_tx": {
+    "first_out_msg_type": null,
+    "has_top_level_exit_code": false,
+    "has_top_level_hash": false,
+    "has_top_level_success": false,
+    "in_msg_type": "ext.message",
+    "transaction_id_hash_present": true,
+    "type": "ext.transaction"
+  },
+  "try_locate_tx_rpc_hash_matches": true,
+  "v3_adjacent_in_finds_source": true,
+  "v3_adjacent_out_finds_result": true,
+  "v3_message_links_both_transactions": true
+}

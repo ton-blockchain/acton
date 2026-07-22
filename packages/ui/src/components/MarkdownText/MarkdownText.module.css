@@ -1,0 +1,209 @@
+.markdownText {
+  min-width: 0;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.toneDefault {
+  color: var(--acton-color-text);
+}
+
+.toneMuted {
+  color: var(--acton-color-text-muted);
+}
+
+.markdownText > * {
+  margin-block: 0;
+}
+
+.markdownText > * + * {
+  margin-top: var(--acton-space-3);
+}
+
+.markdownText h1,
+.markdownText h2,
+.markdownText h3,
+.markdownText h4,
+.markdownText h5,
+.markdownText h6 {
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.markdownText h1 {
+  font-size: 1.375rem;
+}
+
+.markdownText h2 {
+  font-size: 1.125rem;
+}
+
+.markdownText h3,
+.markdownText h4,
+.markdownText h5,
+.markdownText h6 {
+  font-size: var(--acton-font-size-md);
+}
+
+.markdownText p,
+.markdownText li,
+.markdownText blockquote {
+  color: inherit;
+}
+
+.markdownText ul,
+.markdownText ol {
+  padding-left: var(--acton-space-5);
+}
+
+.markdownText li + li {
+  margin-top: var(--acton-space-1);
+}
+
+.markdownText li > p {
+  margin-block: 0;
+}
+
+.markdownText li > p + p,
+.markdownText li > ul,
+.markdownText li > ol {
+  margin-top: var(--acton-space-2);
+}
+
+.markdownText blockquote {
+  padding-left: var(--acton-space-3);
+  border-left: 2px solid var(--acton-color-border-strong);
+}
+
+.markdownText input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--acton-color-border-strong);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: transparent;
+  vertical-align: middle;
+}
+
+.markdownText li:has(input[type="checkbox"]) {
+  list-style: none;
+}
+
+.markdownText li > p:has(> input[type="checkbox"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.markdownText input[type="checkbox"]:disabled {
+  opacity: 1;
+}
+
+.markdownText input[type="checkbox"]:checked {
+  border-color: var(--acton-color-primary);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
+}
+
+.markdownText input[type="checkbox"]:checked::after {
+  width: 0.25rem;
+  height: 0.5rem;
+  margin-top: -0.125rem;
+  border-right: 0.125rem solid currentColor;
+  border-bottom: 0.125rem solid currentColor;
+  content: "";
+  transform: rotate(45deg) scale(0.9);
+}
+
+.link {
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.inlineCode {
+  padding: 0.0625rem var(--acton-space-1-5);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-inline-code-surface);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: 0.92em;
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.pre {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  padding: var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.6;
+}
+
+.pre .inlineCode {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border-bottom: 1px solid var(--acton-color-border);
+  text-align: left;
+}
+
+.table th {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}

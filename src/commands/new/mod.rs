@@ -655,8 +655,7 @@ fn is_git_available() -> bool {
     std::process::Command::new("git")
         .arg("--version")
         .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|output| output.status.success())
 }
 
 fn initialize_git_repository() -> anyhow::Result<()> {

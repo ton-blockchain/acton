@@ -1,32 +1,58 @@
-use crate::executor::{ExecContext, TvmExecutor};
-use crate::localnet::compute_normalized_ext_in_hash;
-use crate::remote::{RemoteProvider, account_meta_from_shard_account, fetch_remote_shard_account};
-use crate::storage::{
-    self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta, NftItemMeta,
+use crate::LocalnetError;
+use crate::block::{
+    create_block_boc, create_masterchain_block_boc, create_masterchain_state_cell,
+    create_shard_state_cell, file_hash as block_file_hash,
+    types::{
+        BlockBuildContext, BlockTransaction, BuiltShardState, MASTERCHAIN_PREV_BLOCKS_LIMIT,
+        MasterchainBlockBuildContext,
+    },
 };
-use crate::storage::{
-    AccountDelta, AccountMeta, AccountStatePreview, AccountStatus, BlockMeta, CellStore, Globals,
-    History, Indexes, LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey,
-    TraceNode, TransactionInfo, TxMeta,
+use crate::executor::{ExecContext, ExecResult, FeeEstimationExecution, TvmExecutor};
+use crate::localnet::{
+    LocalnetAccountBalance, LocalnetAccountStateChange, LocalnetBlockId, LocalnetEstimateFeeResult,
+    LocalnetEstimatedFee, compute_normalized_ext_in_hash,
 };
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::node_persistence::NodePersistence;
+use crate::remote::{
+    RemoteProvider, account_meta_from_shard_account, fetch_remote_library,
+    fetch_remote_shard_account,
+};
+use crate::storage::{self, GlobalLibraryEntry, JettonMasterMeta, NftItemMeta};
+use crate::storage::{
+    AccountDelta, AccountMeta, AccountStateSnapshot, AccountStatus, BlockMeta, CellStore, Globals,
+    History, Indexes, LatestState, MasterchainBlockMeta, MessageInfo, MessagePool, MsgMeta,
+    PendingCommit, ReverseLtKey, TraceNode, TransactionInfo, TxMeta,
+};
+use crate::streaming::StreamingCommitEvent;
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
+use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
-use base64::Engine;
 use core::cmp;
-use rusqlite::params;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast;
+use ton_emulator::Emulator;
+use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
-use tycho_types::cell::{CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
+use tycho_types::dict::Dict;
+use tycho_types::models::config::BlockchainConfigParams;
+use tycho_types::models::transaction::{
+    ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
+    Transaction,
+};
 use tycho_types::models::{
-    AccountState, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
-    OwnedMessage, ShardAccount, StdAddr, StdAddrFormat,
+    Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
+    Message, MsgInfo, OptionalAccount, OutAction, OutActionsRevIter, OwnedMessage, RelaxedMsgInfo,
+    ShardAccount, StdAddr, StoragePhase, TxInfo,
 };
 use tycho_types::prelude::HashBytes;
+
+pub use crate::virtual_clock::NodeClockInfo;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StateSource {
@@ -37,16 +63,115 @@ pub enum StateSource {
 pub struct Node {
     pub cas: CellStore,
     pub latest: LatestState,
-    pub history: History,
+    pub(crate) history: History,
     pub indexes: Indexes,
     pub globals: Globals,
     pub pool: MessagePool,
     pub executor: Box<dyn TvmExecutor>,
     pub state_source: StateSource,
-    pub conn: Option<Arc<std::sync::Mutex<rusqlite::Connection>>>,
+    pub(crate) persistence: Option<NodePersistence>,
     pub global_libraries: HashMap<Hash256, GlobalLibraryEntry>,
-    pub vm_global_libs_boc: Option<BocBytes>,
-    pub vm_global_libs_dirty: bool,
+    pub global_libs_boc: Option<BocBytes>,
+    pub global_libs_dirty: bool,
+    pub streaming_events: Option<broadcast::Sender<StreamingCommitEvent>>,
+    pub(crate) clock: VirtualClock,
+    pub config_cell: Cell,
+    pub latest_masterchain_state: Option<Cell>,
+    pub(crate) latest_shard_state: Option<BuiltShardState>,
+    pub pending_freeze_current: VecDeque<Addr>,
+}
+
+const BASECHAIN_BLOCK_LIMITS: BlockLimits = BlockLimits {
+    bytes_hard_limit: 2_097_152,
+    gas_hard_limit: 20_000_000,
+    lt_delta_hard_limit: 10_000,
+};
+const CASCADE_TX_HARD_LIMIT: usize = BASECHAIN_BLOCK_LIMITS.lt_delta_hard_limit;
+
+#[derive(Clone, Copy)]
+struct BlockLimits {
+    bytes_hard_limit: usize,
+    gas_hard_limit: u64,
+    lt_delta_hard_limit: usize,
+}
+
+#[derive(Clone, Copy, Default)]
+struct BlockResourceUsage {
+    bytes: usize,
+    gas: u64,
+    lt_delta: usize,
+}
+
+impl BlockResourceUsage {
+    const fn hard_limit_reached(self, limits: BlockLimits) -> bool {
+        self.bytes >= limits.bytes_hard_limit
+            || self.gas >= limits.gas_hard_limit
+            || self.lt_delta >= limits.lt_delta_hard_limit
+    }
+
+    const fn add_transaction(&mut self, usage: TransactionResourceUsage) {
+        self.bytes = self.bytes.saturating_add(usage.bytes);
+        self.gas = self.gas.saturating_add(usage.gas);
+        self.lt_delta = self.lt_delta.saturating_add(1);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct TransactionResourceUsage {
+    bytes: usize,
+    gas: u64,
+}
+
+struct TransactionCommit {
+    tx_meta: TxMeta,
+    delta: AccountDelta,
+    out_msg_hashes: Vec<Hash256>,
+    msg_to_tx: Vec<(Hash256, Hash256)>,
+    block_tx: BlockTransaction,
+    resource_usage: TransactionResourceUsage,
+}
+
+const fn compute_exit_code_from_tx_info(tx_info: Option<&TxInfo>) -> Option<i32> {
+    let Some(TxInfo::Ordinary(info)) = tx_info else {
+        return None;
+    };
+    let ComputePhase::Executed(phase) = &info.compute_phase else {
+        return None;
+    };
+    Some(phase.exit_code)
+}
+
+fn action_result_code_from_tx_info(tx_info: Option<&TxInfo>) -> Option<i32> {
+    let Some(TxInfo::Ordinary(info)) = tx_info else {
+        return None;
+    };
+    info.action_phase.as_ref().map(|phase| phase.result_code)
+}
+
+const fn transaction_aborted_from_tx_info(tx_info: Option<&TxInfo>) -> bool {
+    matches!(tx_info, Some(TxInfo::Ordinary(info)) if info.aborted)
+}
+
+fn gas_used_from_tx_info(tx_info: Option<&TxInfo>) -> u64 {
+    let Some(TxInfo::Ordinary(info)) = tx_info else {
+        return 0;
+    };
+    let ComputePhase::Executed(phase) = &info.compute_phase else {
+        return 0;
+    };
+    u64::from(phase.gas_used)
+}
+
+fn transaction_fee_breakdown(tx: &Transaction, tx_info: Option<&TxInfo>) -> (u128, u128) {
+    let total: u128 = tx.total_fees.tokens.into();
+    let storage = if let Some(TxInfo::Ordinary(info)) = tx_info {
+        info.storage_phase
+            .as_ref()
+            .map_or(0, |phase| phase.storage_fees_collected.into())
+    } else {
+        0
+    };
+    (storage, total.saturating_sub(storage))
 }
 
 pub const GIVER_ADDR: Addr = Addr {
@@ -54,7 +179,7 @@ pub const GIVER_ADDR: Addr = Addr {
     addr: [0x55; 32],
 };
 
-pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
+pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B GRAM
 
 impl Node {
     pub fn new(
@@ -71,164 +196,50 @@ impl Node {
         state_source: StateSource,
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
-        let conn_obj = if let Some(path) = db_path {
-            let path = path.as_ref();
-            if let Some(parent) = path.parent()
-                && !parent.as_os_str().is_empty()
-            {
-                std::fs::create_dir_all(parent)?;
-            }
-            let conn = rusqlite::Connection::open(path)?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS cas (hash BLOB PRIMARY KEY, boc BLOB)",
-                [],
-            )?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS blocks (seqno INTEGER PRIMARY KEY, data BLOB)",
-                [],
-            )?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS transactions (hash BLOB PRIMARY KEY, data BLOB, account BLOB, lt INTEGER, seqno INTEGER)",
-                [],
-            )?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS messages (hash BLOB PRIMARY KEY, data BLOB)",
-                [],
-            )?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS accounts (address BLOB PRIMARY KEY, data BLOB)",
-                [],
-            )?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS compiler_abis (code_hash BLOB PRIMARY KEY, data BLOB)",
-                [],
-            )?;
-            Some(conn)
+        let initial_config_cell =
+            Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
+        let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
+
+        let persistence = db_path.map(NodePersistence::open).transpose()?;
+        let (mut latest, mut history, indexes, head_seqno) = if let Some(persistence) = &persistence
+        {
+            let persisted = persistence.load()?;
+            (
+                persisted.latest,
+                persisted.history,
+                persisted.indexes,
+                persisted.head_seqno,
+            )
         } else {
-            None
+            (
+                LatestState::new(),
+                History::new(),
+                Indexes::new(),
+                Seqno::default(),
+            )
         };
-
-        let config_hash = compute_boc_hash(&config_boc)?;
-
-        let mut history = History::new();
-        let mut latest = LatestState::new();
-        let mut indexes = Indexes::new();
-        let mut head_seqno = 0;
-
-        if let Some(conn) = &conn_obj {
-            // Load blocks
-            let mut stmt = conn.prepare("SELECT data FROM blocks ORDER BY seqno ASC")?;
-            let block_iter = stmt.query_map([], |row| {
-                let data: Vec<u8> = row.get(0)?;
-                serde_json::from_slice::<BlockMeta>(&data)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })?;
-            for block in block_iter {
-                let block = block?;
-                head_seqno = block.seqno;
-                history.blocks.push(block);
-            }
-
-            // Load transactions into indexes
-            let mut stmt =
-                conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
-            let tx_iter = stmt.query_map([], |row| {
-                let hash_bytes: Vec<u8> = row.get(0)?;
-                let data: Vec<u8> = row.get(1)?;
-                let account_bytes: Vec<u8> = row.get(2)?;
-                let lt: u64 = row.get(3)?;
-                let seqno: u32 = row.get(4)?;
-
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&hash_bytes);
-                let mut addr = [0u8; 32];
-                addr.copy_from_slice(&account_bytes);
-
-                let tx_meta = serde_json::from_slice::<TxMeta>(&data)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-
-                Ok((
-                    Hash256(hash),
-                    tx_meta,
-                    Addr { workchain: 0, addr },
-                    lt,
-                    seqno,
-                ))
-            })?;
-            for tx in tx_iter {
-                let (hash, tx_meta, addr, lt, seqno) = tx?;
-                history.tx_by_hash.insert(hash, tx_meta);
-
-                let key = ReverseLtKey(cmp::Reverse(lt), hash);
-                indexes
-                    .tx_by_account
-                    .entry(addr)
-                    .or_default()
-                    .insert(key, hash);
-                indexes.tx_by_block.insert(seqno, hash);
-            }
-
-            // Load accounts
-            let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
-            let acc_iter = stmt.query_map([], |row| {
-                let addr_bytes: Vec<u8> = row.get(0)?;
-                let data: Vec<u8> = row.get(1)?;
-                let mut addr = [0u8; 32];
-                addr.copy_from_slice(&addr_bytes);
-                let meta = serde_json::from_slice::<AccountMeta>(&data)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-                Ok((Addr { workchain: 0, addr }, meta))
-            })?;
-            for acc in acc_iter {
-                let (addr, meta) = acc?;
-                latest.accounts.insert(addr, meta);
-            }
-
-            // Load messages
-            let mut stmt = conn.prepare("SELECT hash, data FROM messages")?;
-            let msg_iter = stmt.query_map([], |row| {
-                let hash_bytes: Vec<u8> = row.get(0)?;
-                let data: Vec<u8> = row.get(1)?;
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&hash_bytes);
-                let meta = serde_json::from_slice::<MsgMeta>(&data)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-                Ok((Hash256(hash), meta))
-            })?;
-            for msg in msg_iter {
-                let (hash, meta) = msg?;
-                history.msg_by_hash.insert(hash, meta);
-            }
-
-            // Load compiler ABI registry
-            let mut stmt = conn.prepare("SELECT code_hash, data FROM compiler_abis")?;
-            let abi_iter = stmt.query_map([], |row| {
-                let hash_bytes: Vec<u8> = row.get(0)?;
-                let data: Vec<u8> = row.get(1)?;
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&hash_bytes);
-                let compiler_abi = serde_json::from_slice::<Value>(&data)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-                Ok((Hash256(hash), compiler_abi))
-            })?;
-            for abi in abi_iter {
-                let (hash, compiler_abi) = abi?;
-                history.compiler_abis.insert(hash, compiler_abi);
+        for block in &mut history.masterchain_blocks {
+            if block.config_boc_hash == Hash256::default() {
+                block.config_boc_hash = initial_config_hash;
             }
         }
+        let config_hash = history
+            .masterchain_blocks
+            .last()
+            .map_or(initial_config_hash, |block| block.config_boc_hash);
 
-        let conn = conn_obj.map(|c| Arc::new(std::sync::Mutex::new(c)));
-
-        let mut cas = if let Some(conn) = &conn {
-            CellStore::with_conn(conn.clone())
+        let mut cas = if let Some(persistence) = &persistence {
+            CellStore::with_conn(persistence.connection())
         } else {
             CellStore::new()
         };
-        cas.put(config_boc, config_hash);
-
-        if let Some(conn) = &conn {
-            history.conn = Some(conn.clone());
-        }
+        cas.put(config_boc, initial_config_hash);
+        let config_cell = if config_hash == initial_config_hash {
+            initial_config_cell
+        } else {
+            cas.get_cell(&config_hash)
+                .context("Persisted blockchain config missing")?
+        };
 
         latest
             .accounts
@@ -236,7 +247,8 @@ impl Node {
             .or_insert_with(|| AccountMeta {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
-                cached_balance: Some(GIVER_BALANCE),
+                balance: GIVER_BALANCE,
+                extra_currencies: Vec::new(),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,
@@ -248,6 +260,7 @@ impl Node {
         globals.head_seqno = head_seqno;
         // Approximation of global LT
         globals.global_lt = history.blocks.last().map_or(0, |b| b.end_lt);
+        let clock = VirtualClock::from_blocks(&history.blocks)?;
 
         let mut node = Self {
             cas,
@@ -258,19 +271,25 @@ impl Node {
             pool: MessagePool::new(),
             executor,
             state_source,
-            conn,
+            persistence,
             global_libraries: HashMap::new(),
-            vm_global_libs_boc: None,
-            vm_global_libs_dirty: true,
+            global_libs_boc: None,
+            global_libs_dirty: true,
+            streaming_events: None,
+            clock,
+            config_cell,
+            latest_masterchain_state: None,
+            latest_shard_state: None,
+            pending_freeze_current: VecDeque::new(),
         };
         node.rebuild_global_libraries_from_accounts()?;
+        if node.persistence.is_some() {
+            node.build_snapshot().context("Invalid SQLite state")?;
+        }
         Ok(node)
     }
 
-    pub fn send_boc(
-        &mut self,
-        boc: BocBytes,
-    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+    pub fn send_boc(&mut self, boc: BocBytes) -> anyhow::Result<Hash256> {
         self.send_boc_to_queue(
             boc,
             MessageKind::ExternalIn,
@@ -278,14 +297,46 @@ impl Node {
         )
     }
 
-    pub fn send_internal_boc(
-        &mut self,
-        boc: BocBytes,
-    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+    pub fn send_internal_boc(&mut self, boc: BocBytes) -> anyhow::Result<Hash256> {
         self.send_boc_to_queue(
             boc,
             MessageKind::Internal,
             "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    /// Executes an internal message against the latest account state without storing the
+    /// transaction, changing the account, or adding either message to the localnet queue.
+    pub(crate) fn preflight_internal_boc(&mut self, boc: &BocBytes) -> anyhow::Result<ExecResult> {
+        let msg_hash = boc.hash()?;
+        let (msg_meta, kind) = parse_msg_meta_with_kind(boc, msg_hash)?;
+        if kind != MessageKind::Internal {
+            anyhow::bail!("Jetton mint preflight accepts only internal messages");
+        }
+        let dst = msg_meta
+            .dst
+            .ok_or_else(|| anyhow::anyhow!("Internal message has no destination"))?;
+        let shard_account_boc = self.get_shard_account_for_emulation(&dst, None)?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig: false,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+
+        self.executor.execute(
+            &shard_account_boc,
+            boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
         )
     }
 
@@ -294,9 +345,9 @@ impl Node {
         boc: BocBytes,
         expected_kind: MessageKind,
         kind_error: &'static str,
-    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+    ) -> anyhow::Result<Hash256> {
         // 1. Validate
-        let hash = compute_boc_hash(&boc)?;
+        let hash = boc.hash()?;
         tracing::info!(
             "send_boc: msg_hash={}, current_queue={}",
             hash.to_hex(),
@@ -322,25 +373,318 @@ impl Node {
             MessageKind::ExternalOut => unreachable!("external-out messages are rejected above"),
         }
 
-        // 5. Mine one
-        let (block_meta, tx_meta) = self.mine_one()?;
-
-        Ok((
-            hash,
-            tx_meta.tx_hash,
-            block_meta.seqno,
-            tx_meta.out_msg_hashes,
-        ))
+        Ok(hash)
     }
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
-        // 1. Select message
-        let msg_hash = self
-            .pool
-            .pop_next(self.globals.queue_policy, &self.history.msg_by_hash)
-            .context("Queue empty")?;
+        let block_meta = self.mine_block()?;
+        let tx_hash = block_meta
+            .tx_hashes
+            .first()
+            .context("Block contains no transactions")?;
+        let tx_meta = self
+            .history
+            .tx_by_hash
+            .get(tx_hash)
+            .cloned()
+            .context("Transaction in mined block not found")?;
+        Ok((block_meta, tx_meta))
+    }
 
-        // 2. Load inbound message
+    pub fn mine_block_if_pending(&mut self) -> anyhow::Result<Option<BlockMeta>> {
+        if !self.has_pending_messages() {
+            return Ok(None);
+        }
+
+        self.mine_block().map(Some)
+    }
+
+    pub fn mine_block(&mut self) -> anyhow::Result<BlockMeta> {
+        self.mine_block_with_limits(BASECHAIN_BLOCK_LIMITS)
+    }
+
+    fn mine_block_with_limits(&mut self, block_limits: BlockLimits) -> anyhow::Result<BlockMeta> {
+        let seqno = self.globals.head_seqno + 1;
+        let prev_lt = self.globals.global_lt;
+        let gen_utime = self.next_block_gen_utime()?;
+        let initial_pending = self.pool.external.len() + self.pool.internal.len();
+
+        let mut tx_commits = Vec::new();
+        let mut block_usage = BlockResourceUsage::default();
+        let mut new_msgs = VecDeque::new();
+        let mut deferred_msg_hashes = Vec::new();
+
+        for _ in 0..initial_pending {
+            if block_usage.hard_limit_reached(block_limits) {
+                tracing::info!(
+                    "Basechain block hard limit reached in block {seqno}; leaving remaining queued messages for the next block"
+                );
+                break;
+            }
+
+            let Some(msg_hash) = self.pool.pop_next(self.globals.queue_policy) else {
+                break;
+            };
+            match self.execute_message_in_block(msg_hash, seqno, gen_utime) {
+                Ok(commit) => {
+                    self.collect_local_internal_messages(&commit.out_msg_hashes, &mut new_msgs);
+                    block_usage.add_transaction(commit.resource_usage);
+                    tx_commits.push(commit);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Block collation skipped message {}: {:?}",
+                        msg_hash.to_hex(),
+                        e
+                    );
+                }
+            }
+        }
+
+        let mut cascade_txs = 0usize;
+        while let Some(msg_hash) = new_msgs.pop_front() {
+            if block_usage.hard_limit_reached(block_limits) {
+                tracing::info!(
+                    "Basechain block hard limit reached in block {seqno}; deferring remaining cascade messages"
+                );
+                deferred_msg_hashes.push(msg_hash);
+                deferred_msg_hashes.extend(new_msgs);
+                break;
+            }
+
+            if cascade_txs >= CASCADE_TX_HARD_LIMIT {
+                tracing::error!(
+                    "Cascade transaction hard limit reached in block {seqno}; deferring remaining messages"
+                );
+                deferred_msg_hashes.push(msg_hash);
+                deferred_msg_hashes.extend(new_msgs);
+                break;
+            }
+            cascade_txs += 1;
+
+            match self.execute_message_in_block(msg_hash, seqno, gen_utime) {
+                Ok(commit) => {
+                    self.collect_local_internal_messages(&commit.out_msg_hashes, &mut new_msgs);
+                    block_usage.add_transaction(commit.resource_usage);
+                    tx_commits.push(commit);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Block collation skipped cascade message {}: {:?}",
+                        msg_hash.to_hex(),
+                        e
+                    );
+                }
+            }
+        }
+
+        while let Some(addr) = self.pending_freeze_current.pop_front() {
+            if block_usage.hard_limit_reached(block_limits) {
+                tracing::info!(
+                    "Basechain block hard limit reached in block {seqno}; deferring remaining account freezes"
+                );
+                self.pending_freeze_current.push_front(addr);
+                break;
+            }
+
+            match self.build_freeze_account_transaction(&addr, seqno, gen_utime) {
+                Ok(commit) => {
+                    block_usage.add_transaction(commit.resource_usage);
+                    tx_commits.push(commit);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Block collation skipped deferred account freeze {}: {:?}",
+                        addr,
+                        e
+                    );
+                }
+            }
+        }
+
+        self.commit_transaction_block(seqno, prev_lt, gen_utime, tx_commits, deferred_msg_hashes)
+    }
+
+    fn commit_transaction_block(
+        &mut self,
+        seqno: Seqno,
+        prev_lt: Lt,
+        gen_utime: u32,
+        tx_commits: Vec<TransactionCommit>,
+        deferred_msg_hashes: Vec<Hash256>,
+    ) -> anyhow::Result<BlockMeta> {
+        let tx_hashes = tx_commits
+            .iter()
+            .map(|commit| commit.tx_meta.tx_hash)
+            .collect::<Vec<_>>();
+        let start_lt = tx_commits
+            .first()
+            .map_or(prev_lt, |commit| commit.tx_meta.lt);
+        let end_lt = tx_commits
+            .last()
+            .map_or(prev_lt, |commit| commit.tx_meta.lt);
+        let block_transactions = tx_commits
+            .iter()
+            .map(|commit| commit.block_tx.clone())
+            .collect::<Vec<_>>();
+        let prev_masterchain_block = self.history.masterchain_blocks.last().cloned();
+        let prev_masterchain_blocks = self
+            .history
+            .masterchain_blocks
+            .iter()
+            .rev()
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .cloned()
+            .collect::<Vec<_>>();
+        let prev_masterchain_state = if let Some(block) = &prev_masterchain_block {
+            if let Some(state) = &self.latest_masterchain_state
+                && Hash256::from(state.repr_hash()) == block.state_root_hash
+            {
+                Some(state.clone())
+            } else {
+                Some(self.get_masterchain_state_cell(block.seqno)?)
+            }
+        } else {
+            None
+        };
+        let prev_shard_state = self.latest_shard_state.take();
+        let block = create_block_boc(BlockBuildContext {
+            seqno,
+            gen_utime,
+            start_lt,
+            end_lt,
+            prev_block: self.history.blocks.last(),
+            master_ref: prev_masterchain_block.as_ref(),
+            prev_state: prev_shard_state.as_ref(),
+            accounts_after: &self.latest.accounts,
+            transactions: &block_transactions,
+            cas: &self.cas,
+        })?;
+        let block_hash = block.block_hash;
+        let file_hash = block_file_hash(&block.block_boc);
+        let next_shard_state = block.state;
+        self.cas.put(block.block_boc, block_hash);
+
+        let block_meta = BlockMeta {
+            seqno,
+            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
+            gen_utime,
+            start_lt,
+            end_lt,
+            tx_hashes,
+            block_hash,
+            file_hash,
+        };
+        if Hash256::from(self.config_cell.repr_hash()) != self.globals.config_boc_hash {
+            self.config_cell = self
+                .cas
+                .get_cell(&self.globals.config_boc_hash)
+                .context("Config missing")?;
+        }
+        let masterchain_block = create_masterchain_block_boc(MasterchainBlockBuildContext {
+            seqno,
+            gen_utime,
+            start_lt,
+            end_lt,
+            prev_block: prev_masterchain_block.as_ref(),
+            prev_state: prev_masterchain_state,
+            shard_block: &block_meta,
+            config_cell: &self.config_cell,
+            prev_blocks: &prev_masterchain_blocks,
+        })?;
+        let masterchain_block_hash = masterchain_block.block_hash;
+        let masterchain_file_hash = block_file_hash(&masterchain_block.block_boc);
+        self.cas
+            .put(masterchain_block.block_boc, masterchain_block_hash);
+        let next_masterchain_state = masterchain_block.state_cell;
+        let masterchain_block_meta = MasterchainBlockMeta {
+            seqno,
+            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
+            gen_utime,
+            start_lt,
+            end_lt,
+            shard_block: block_meta.block_id(),
+            config_boc_hash: self.globals.config_boc_hash,
+            state_root_hash: masterchain_block.state_root_hash,
+            block_hash: masterchain_block_hash,
+            file_hash: masterchain_file_hash,
+        };
+
+        let pending = PendingCommit {
+            block_meta: block_meta.clone(),
+            masterchain_block_meta: Some(masterchain_block_meta),
+            tx_metas: tx_commits
+                .iter()
+                .map(|commit| commit.tx_meta.clone())
+                .collect(),
+            deltas: tx_commits
+                .iter()
+                .map(|commit| commit.delta.clone())
+                .collect(),
+            out_msg_hashes: tx_commits
+                .iter()
+                .flat_map(|commit| commit.out_msg_hashes.iter().copied())
+                .collect(),
+            msg_to_tx: tx_commits
+                .iter()
+                .flat_map(|commit| commit.msg_to_tx.iter().copied())
+                .collect(),
+            deferred_msg_hashes,
+        };
+
+        self.apply_commit(pending)?;
+        self.latest_shard_state = Some(next_shard_state);
+        self.latest_masterchain_state = Some(next_masterchain_state);
+        Ok(block_meta)
+    }
+
+    #[must_use]
+    pub fn prev_blocks_info_at(&self, seqno: Seqno) -> PrevBlocksInfo {
+        let zero_block = PrevBlockId::from(LocalnetBlockId::first());
+        let mut last_mc_blocks = self
+            .history
+            .blocks
+            .iter()
+            .rev()
+            .filter(|block| block.seqno <= seqno)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .map(|block| block.block_id().into())
+            .collect::<Vec<_>>();
+
+        if last_mc_blocks.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
+            last_mc_blocks.push(zero_block.clone());
+        }
+
+        // Localnet does not model key blocks, so use the latest known MC-like block.
+        let prev_key_block = last_mc_blocks[0].clone();
+        let mut last_mc_blocks_100 = self
+            .history
+            .blocks
+            .iter()
+            .rev()
+            .filter(|block| block.seqno <= seqno && block.seqno % 100 == 0)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .map(|block| block.block_id().into())
+            .collect::<Vec<_>>();
+
+        if last_mc_blocks_100.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
+            last_mc_blocks_100.push(zero_block);
+        }
+
+        PrevBlocksInfo::new(last_mc_blocks, prev_key_block, last_mc_blocks_100)
+    }
+
+    #[must_use]
+    pub fn prev_blocks_info_before_block(&self, seqno: Seqno) -> PrevBlocksInfo {
+        self.prev_blocks_info_at(seqno.saturating_sub(1))
+    }
+
+    fn execute_message_in_block(
+        &mut self,
+        msg_hash: Hash256,
+        seqno: Seqno,
+        gen_utime: u32,
+    ) -> anyhow::Result<TransactionCommit> {
         let msg_meta = self
             .history
             .msg_by_hash
@@ -356,12 +700,22 @@ impl Node {
 
         // 3. Load old account
         let shard_account_boc = self.get_shard_account(&dst)?;
+        let _ = store_account_state_cell_from_shard_account_boc(&mut self.cas, &shard_account_boc);
+        let old_account_cell =
+            Boc::decode(&shard_account_boc).context("Failed to decode old ShardAccount BOC")?;
+        let old_account_state_hash = Hash256::from(
+            old_account_cell
+                .parse::<ShardAccount>()
+                .context("Failed to parse old ShardAccount")?
+                .account
+                .inner()
+                .repr_hash(),
+        );
         let old_meta = self.latest.accounts.get(&dst).cloned();
 
         // 4. Allocate LT & time
         let lt = self.globals.global_lt + self.globals.lt_step;
         self.globals.global_lt = lt;
-        let gen_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32;
 
         // 5. Execute
         let config_boc = self
@@ -373,106 +727,102 @@ impl Node {
             gen_utime,
             rand_seed: None,
             ignore_chksig: false,
+            prev_blocks_info: self.prev_blocks_info_before_block(seqno),
         };
-        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let provider = match &self.state_source {
+            StateSource::Remote(provider) => Some(provider.clone()),
+            StateSource::Local => None,
+        };
+        self.register_message_state_init_libraries(&dst, provider.as_ref(), &msg_boc, lt)?;
+        let global_libs = self.build_vm_global_libs_boc()?;
 
         let exec_result = self.executor.execute(
             &shard_account_boc,
             &msg_boc,
             &ctx,
             &config_boc,
-            vm_global_libs.as_ref(),
+            global_libs.as_ref(),
         )?;
 
         // 6. Store outputs & 7. Derive hashes
-        let tx_hash = compute_boc_hash(&exec_result.tx_boc)?;
+        let tx_info = exec_result.tx.info.load().ok();
+        let resource_usage = TransactionResourceUsage {
+            bytes: exec_result.tx_boc.len(),
+            gas: gas_used_from_tx_info(tx_info.as_ref()),
+        };
+        let tx_hash = exec_result.tx_boc.hash()?;
         self.cas.put(exec_result.tx_boc.clone(), tx_hash);
+        let tx_cell =
+            Boc::decode(&exec_result.tx_boc).context("Failed to decode transaction BOC")?;
 
-        let mut balance_cache = None;
+        let mut balance = 0;
         let mut status = AccountStatus::Nonexist;
+        let mut extra_currencies = Vec::new();
         let mut code_hash = None;
         let mut data_hash = None;
         let mut frozen_hash = None;
 
-        let new_account_hash = if let Some(acc_boc) = &exec_result.new_account_boc {
-            let h = compute_boc_hash(acc_boc)?;
-            self.cas.put(acc_boc.clone(), h);
+        let new_account_boc = &exec_result.new_account_boc;
+        let new_account_cell =
+            Boc::decode(new_account_boc).context("Failed to decode new ShardAccount BOC")?;
 
-            // Parse for meta
-            if let Ok(cell) = Boc::decode(acc_boc)
-                && let Ok(sa) = cell.parse::<ShardAccount>()
-                && let Ok(opt_acc) = sa.account.load()
-                && let Some(acc) = opt_acc.0
-            {
-                balance_cache = Some(acc.balance.tokens.into());
-                status = match acc.state {
-                    AccountState::Uninit => AccountStatus::Uninit,
-                    AccountState::Active(state) => {
-                        if let Some(cell) = state.code {
-                            let ch = Hash256(*cell.repr_hash().as_array());
-                            let boc = Boc::encode(cell);
-                            self.cas.put(boc.into(), ch);
-                            code_hash = Some(ch);
-                        }
-                        if let Some(cell) = state.data {
-                            let dh = Hash256(*cell.repr_hash().as_array());
-                            let boc = Boc::encode(cell);
-                            self.cas.put(boc.into(), dh);
-                            data_hash = Some(dh);
-                        }
-                        AccountStatus::Active
+        let new_account_hash = Hash256::from(new_account_cell.repr_hash());
+        self.cas.put(new_account_boc.clone(), new_account_hash);
+
+        let new_shard_account = new_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse new ShardAccount")?;
+        let account_state_cell = new_shard_account.account.inner().clone();
+        let account_state_hash = self.cas.put_cell(account_state_cell);
+
+        if let Some(acc) = new_shard_account
+            .account
+            .load()
+            .context("Failed to load new account state")?
+            .0
+        {
+            balance = acc.balance.tokens.into();
+            extra_currencies = ExtraCurrency::from_collection(&acc.balance.other)?;
+            status = match acc.state {
+                AccountState::Uninit => AccountStatus::Uninit,
+                AccountState::Active(state) => {
+                    if let Some(cell) = state.code {
+                        let ch = Hash256::from(cell.repr_hash());
+                        let boc = Boc::encode(cell);
+                        self.cas.put(boc.into(), ch);
+                        code_hash = Some(ch);
                     }
-                    AccountState::Frozen(state) => {
-                        frozen_hash = Some(Hash256(state.0));
-                        AccountStatus::Frozen
+                    if let Some(cell) = state.data {
+                        let dh = Hash256::from(cell.repr_hash());
+                        let boc = Boc::encode(cell);
+                        self.cas.put(boc.into(), dh);
+                        data_hash = Some(dh);
                     }
-                };
-            }
-            Some(h)
-        } else {
-            None
-        };
+                    AccountStatus::Active
+                }
+                AccountState::Frozen(state) => {
+                    frozen_hash = Some(Hash256(state.0));
+                    AccountStatus::Frozen
+                }
+            };
+        }
 
         let mut out_msg_hashes = Vec::new();
-        for out_boc in &exec_result.out_msgs_boc {
-            let h = compute_boc_hash(out_boc)?;
-            self.cas.put(out_boc.clone(), h);
+        for out_cell in &exec_result.out_msg_cells {
+            let h = Hash256::from(out_cell.repr_hash());
+            let out_boc = BocBytes::from(Boc::encode(out_cell.clone()));
+            self.cas.put(out_boc, h);
             out_msg_hashes.push(h);
 
-            let out_meta = parse_msg_meta(out_boc, h)?;
+            let out_meta = parse_msg_meta_from_cell(out_cell, h)?;
             self.history.msg_by_hash.insert(h, out_meta);
         }
 
-        // 8. Build dev block
-        let seqno = self.globals.head_seqno + 1;
-        let block_boc = create_dev_block_boc(seqno, tx_hash)?;
-        let block_hash = compute_boc_hash(&block_boc)?;
-        self.cas.put(block_boc, block_hash);
-
-        let block_meta = BlockMeta {
-            seqno,
-            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
-            gen_utime,
-            start_lt: lt,
-            end_lt: lt,
-            tx_hash,
-            block_boc_hash: block_hash,
-        };
-
-        let compute_exit_code = exec_result.compute_exit_code();
-        let action_result_code = exec_result.action_result_code();
-
-        let info = exec_result.tx.info.load().ok();
+        let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
+        let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
-            if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
-                let storage: u128 = ord
-                    .storage_phase
-                    .map_or(0, |p| p.storage_fees_collected.into());
-                let total: u128 = exec_result.tx.total_fees.tokens.into();
-                (storage, total.saturating_sub(storage))
-            } else {
-                (0, exec_result.tx.total_fees.tokens.into())
-            };
+            transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
 
         let tx_meta = TxMeta {
@@ -480,22 +830,23 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
-            total_fees: Some(total_fees),
-            storage_fees: Some(storage_fees),
-            other_fees: Some(other_fees),
+            total_fees,
+            storage_fees,
+            other_fees,
             in_msg_hash: Some(msg_hash),
             out_msg_hashes: out_msg_hashes.clone(),
             block_seqno: seqno,
         };
 
         // 9. Prepare deltas
-        let new_meta = new_account_hash.map(|hash| AccountMeta {
-            account_hash: hash,
+        let new_meta = Some(AccountMeta {
+            account_hash: new_account_hash,
             status,
-            cached_balance: balance_cache,
+            balance,
+            extra_currencies,
             last_trans_lt: Some(lt),
             last_trans_hash: Some(tx_hash),
             code_hash,
@@ -506,391 +857,89 @@ impl Node {
         let delta = AccountDelta {
             addr: dst,
             old_hash: old_meta.as_ref().map(|m| m.account_hash),
-            new_hash: new_account_hash,
+            new_hash: Some(new_account_hash),
             old_meta,
             new_meta,
         };
 
-        // 10. Commit
-        let pending = PendingCommit {
-            block_meta: block_meta.clone(),
-            tx_meta: tx_meta.clone(),
-            delta,
-            out_msg_hashes,
-            msg_to_tx: vec![(msg_hash, tx_hash)],
-        };
-
-        self.apply_commit(pending)?;
+        if let Some(new_meta) = &delta.new_meta {
+            self.latest.accounts.insert(delta.addr, new_meta.clone());
+        } else {
+            self.latest.accounts.remove(&delta.addr);
+        }
         self.update_public_libraries_from_account_diff(
             &dst,
             Some(&shard_account_boc),
-            exec_result.new_account_boc.as_ref(),
+            Some(new_account_boc),
             lt,
         )?;
+        self.register_account_code_libraries(&dst, None, new_account_boc, lt)?;
 
         self.detect_assets(&dst)?;
 
-        Ok((block_meta, tx_meta))
-    }
-
-    fn detect_assets(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        self.detect_jetton_masters(addr)?;
-        self.detect_jetton_wallets(addr)?;
-        self.detect_nft_items(addr)?;
-        Ok(())
-    }
-
-    fn detect_jetton_wallets(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some((code_hash, data_hash, last_transaction_lt)) =
-            self.latest.accounts.get(addr).and_then(|meta| {
-                if meta.status != AccountStatus::Active {
-                    return None;
-                }
-                Some((
-                    meta.code_hash?,
-                    meta.data_hash?,
-                    meta.last_trans_lt.unwrap_or(0),
-                ))
-            })
-        else {
-            return Ok(());
-        };
-
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-        let libs = self
-            .build_vm_global_libs_boc()?
-            .map(|boc| base64::engine::general_purpose::STANDARD.encode(boc));
-
-        if let Some(wallet_data) = ton_indexer::jettons::get_jetton_wallet_data(
-            addr.to_string(),
-            code,
-            data,
-            libs.as_deref(),
-        ) {
-            let wallet_meta = storage::JettonWalletMeta {
-                address: *addr,
-                balance: wallet_data.balance.to_str_radix(10).parse().unwrap_or(0),
-                code_hash,
-                data_hash,
-                jetton_address: self
-                    .parse_addr_internal(&wallet_data.jetton_master_address)
-                    .unwrap_or(*addr),
-                last_transaction_lt,
-                owner_address: self
-                    .parse_addr_internal(&wallet_data.owner_address)
-                    .unwrap_or(*addr),
-            };
-
-            self.history.jetton_wallets.insert(*addr, wallet_meta);
-        }
-
-        Ok(())
-    }
-
-    fn detect_jetton_masters(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some((code_hash, data_hash, last_transaction_lt)) =
-            self.latest.accounts.get(addr).and_then(|meta| {
-                if meta.status != AccountStatus::Active {
-                    return None;
-                }
-                Some((
-                    meta.code_hash?,
-                    meta.data_hash?,
-                    meta.last_trans_lt.unwrap_or(0),
-                ))
-            })
-        else {
-            return Ok(());
-        };
-
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-        let libs = self
-            .build_vm_global_libs_boc()?
-            .map(|boc| base64::engine::general_purpose::STANDARD.encode(boc));
-
-        if let Some(jetton_data) =
-            ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data, libs.as_deref())
-        {
-            let wallet_code_hash = Hash256(*jetton_data.jetton_wallet_code.repr_hash().as_array());
-            let jetton_content = resolve_offchain_jetton_content(
-                ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
-            );
-
-            let master_meta = JettonMasterMeta {
-                address: *addr,
-                admin_address: self
-                    .parse_addr_internal(&jetton_data.admin_address)
-                    .unwrap_or(*addr),
-                code_hash,
-                data_hash,
-                jetton_content,
-                jetton_wallet_code_hash: wallet_code_hash,
-                last_transaction_lt,
-                mintable: jetton_data.mintable,
-                total_supply: jetton_data
-                    .total_supply
-                    .to_str_radix(10)
-                    .parse()
-                    .unwrap_or(0),
-            };
-
-            self.history.jetton_masters.insert(*addr, master_meta);
-        }
-
-        Ok(())
-    }
-
-    fn ensure_jetton_master_detected(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        if self.history.jetton_masters.contains_key(addr) {
-            return Ok(());
-        }
-
-        let _ = self.get_address_information(addr);
-        self.detect_jetton_masters(addr)
-    }
-
-    fn detect_nft_items(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some(meta) = self.latest.accounts.get(addr) else {
-            return Ok(());
-        };
-
-        if meta.status != AccountStatus::Active {
-            return Ok(());
-        }
-
-        let Some(code_hash) = meta.code_hash else {
-            return Ok(());
-        };
-        let Some(data_hash) = meta.data_hash else {
-            return Ok(());
-        };
-
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-
-        if let Some(nft_data) = ton_indexer::nfts::get_nft_item_data(addr.to_string(), code, data) {
-            let nft_meta = NftItemMeta {
-                address: *addr,
-                code_hash,
-                data_hash,
-                collection_address: nft_data
-                    .collection_address
-                    .as_deref()
-                    .and_then(|a| self.parse_addr_internal(a)),
-                owner_address: nft_data
-                    .owner_address
-                    .as_deref()
-                    .and_then(|a| self.parse_addr_internal(a)),
-                content: ton_indexer::nfts::parse_nft_content(nft_data.individual_content),
-                index: nft_data.index.to_str_radix(10),
-                init: nft_data.init,
-                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
-            };
-
-            self.history.nft_items.insert(*addr, nft_meta);
-        }
-
-        Ok(())
-    }
-
-    pub fn get_jetton_masters(
-        &mut self,
-        address: Option<Addr>,
-        admin_address: Option<Addr>,
-        limit: usize,
-        offset: usize,
-    ) -> anyhow::Result<Vec<JettonMasterMeta>> {
-        if let Some(addr) = address {
-            self.ensure_jetton_master_detected(&addr)?;
-        } else {
-            let jetton_addresses: HashSet<_> = self
-                .history
-                .jetton_wallets
-                .values()
-                .map(|wallet| wallet.jetton_address)
-                .collect();
-            for addr in jetton_addresses {
-                self.ensure_jetton_master_detected(&addr)?;
-            }
-        }
-
-        let mut masters: Vec<_> = self
-            .history
-            .jetton_masters
-            .values()
-            .filter(|m| {
-                if let Some(addr) = address
-                    && m.address != addr
-                {
-                    return false;
-                }
-                if let Some(addr) = admin_address
-                    && m.admin_address != addr
-                {
-                    return false;
-                }
-                true
-            })
-            .cloned()
-            .collect();
-
-        masters.sort_by_key(|m| m.address);
-
-        let start = offset.min(masters.len());
-        let end = (start + limit).min(masters.len());
-
-        Ok(masters[start..end].to_vec())
-    }
-
-    pub fn get_jetton_wallets(
-        &self,
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        jetton_address: Option<Addr>,
-        exclude_zero_balance: bool,
-        limit: usize,
-        offset: usize,
-    ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-        let mut wallets: Vec<_> = self
-            .history
-            .jetton_wallets
-            .values()
-            .filter(|w| {
-                if let Some(addr) = address
-                    && w.address != addr
-                {
-                    return false;
-                }
-                if let Some(addr) = owner_address
-                    && w.owner_address != addr
-                {
-                    return false;
-                }
-                if let Some(addr) = jetton_address
-                    && w.jetton_address != addr
-                {
-                    return false;
-                }
-                if exclude_zero_balance && w.balance == 0 {
-                    return false;
-                }
-                true
-            })
-            .cloned()
-            .collect();
-
-        wallets.sort_by_key(|w| w.address);
-
-        let start = offset.min(wallets.len());
-        let end = (start + limit).min(wallets.len());
-
-        Ok(wallets[start..end].to_vec())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn get_nft_items(
-        &self,
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        collection_address: Option<Addr>,
-        index: Option<String>,
-        sort_by_last_transaction_lt: bool,
-        limit: usize,
-        offset: usize,
-    ) -> anyhow::Result<Vec<NftItemMeta>> {
-        let mut items: Vec<_> = self
-            .history
-            .nft_items
-            .values()
-            .filter(|item| {
-                if let Some(addr) = address
-                    && item.address != addr
-                {
-                    return false;
-                }
-                if let Some(addr) = owner_address
-                    && item.owner_address != Some(addr)
-                {
-                    return false;
-                }
-                if let Some(addr) = collection_address
-                    && item.collection_address != Some(addr)
-                {
-                    return false;
-                }
-                if let Some(expected_index) = &index
-                    && &item.index != expected_index
-                {
-                    return false;
-                }
-                true
-            })
-            .cloned()
-            .collect();
-
-        if sort_by_last_transaction_lt {
-            items.sort_by(|a, b| {
-                b.last_transaction_lt
-                    .cmp(&a.last_transaction_lt)
-                    .then_with(|| a.address.cmp(&b.address))
-            });
-        } else {
-            items.sort_by_key(|item| item.address);
-        }
-
-        let start = offset.min(items.len());
-        let end = (start + limit).min(items.len());
-
-        Ok(items[start..end].to_vec())
-    }
-
-    fn parse_addr_internal(&self, s: &str) -> Option<Addr> {
-        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).ok()?;
-        Some(Addr {
-            workchain: i32::from(int_addr.workchain),
-            addr: int_addr.address.0,
+        Ok(TransactionCommit {
+            block_tx: BlockTransaction {
+                tx_meta: tx_meta.clone(),
+                old_meta: delta.old_meta.clone(),
+                tx_cell,
+                old_account_state_hash,
+                new_account_state_hash: account_state_hash,
+            },
+            tx_meta,
+            delta,
+            out_msg_hashes,
+            msg_to_tx: vec![(msg_hash, tx_hash)],
+            resource_usage,
         })
     }
 
+    fn collect_local_internal_messages(
+        &self,
+        out_msg_hashes: &[Hash256],
+        new_msgs: &mut VecDeque<Hash256>,
+    ) {
+        for hash in out_msg_hashes {
+            if self
+                .history
+                .msg_by_hash
+                .get(hash)
+                .is_some_and(|meta| meta.dst.is_some())
+            {
+                new_msgs.push_back(*hash);
+            }
+        }
+    }
+
+    pub fn iter_jetton_masters(&self) -> impl Iterator<Item = &JettonMasterMeta> {
+        self.history.jetton_masters.values()
+    }
+
+    pub fn iter_jetton_wallets(&self) -> impl Iterator<Item = &storage::JettonWalletMeta> {
+        self.history.jetton_wallets.values()
+    }
+
+    pub fn iter_nft_items(&self) -> impl Iterator<Item = &NftItemMeta> {
+        self.history.nft_items.values()
+    }
+
     #[must_use]
-    pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryLookup> {
+    pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<Option<GlobalLibraryEntry>> {
         hashes
             .iter()
-            .map(|hash| GlobalLibraryLookup {
-                hash: *hash,
-                entry: self.global_libraries.get(hash).cloned(),
-            })
+            .map(|hash| self.global_libraries.get(hash).cloned())
             .collect()
     }
 
     pub(crate) fn rebuild_global_libraries_from_accounts(&mut self) -> anyhow::Result<()> {
         self.global_libraries.clear();
 
-        let mut accounts: Vec<_> = self.latest.accounts.iter().collect();
-        accounts.sort_by_key(|(address, _)| **address);
+        let mut accounts: Vec<_> = self
+            .latest
+            .accounts
+            .iter()
+            .map(|(address, meta)| (*address, meta.clone()))
+            .collect();
+        accounts.sort_by_key(|(address, _)| *address);
         for (address, meta) in accounts {
             if meta.status != AccountStatus::Active {
                 continue;
@@ -914,23 +963,25 @@ impl Node {
                             first_seen_lt: lt,
                             last_seen_lt: lt,
                         });
-                entry.publishers.insert(*address);
+                entry.publishers.insert(address);
                 entry.first_seen_lt = entry.first_seen_lt.min(lt);
                 entry.last_seen_lt = entry.last_seen_lt.max(lt);
             }
+            let lt = meta.last_trans_lt.unwrap_or(0);
+            self.register_account_code_libraries(&address, None, &shard_account_boc, lt)?;
         }
 
-        self.vm_global_libs_dirty = true;
-        self.vm_global_libs_boc = None;
+        self.global_libs_dirty = true;
+        self.global_libs_boc = None;
         Ok(())
     }
 
     pub(crate) fn build_vm_global_libs_boc(&mut self) -> anyhow::Result<Option<BocBytes>> {
-        if !self.vm_global_libs_dirty {
-            return Ok(self.vm_global_libs_boc.clone());
+        if !self.global_libs_dirty {
+            return Ok(self.global_libs_boc.clone());
         }
 
-        let mut libs = tycho_types::dict::Dict::<HashBytes, LibDescr>::new();
+        let mut libs = Dict::<HashBytes, LibDescr>::new();
         for (hash, entry) in &self.global_libraries {
             if entry.publishers.is_empty() {
                 continue;
@@ -939,7 +990,7 @@ impl Node {
             let lib_cell = Boc::decode(&entry.lib_boc).with_context(|| {
                 format!("Failed to decode stored library BOC {}", hash.to_hex())
             })?;
-            let actual_hash = Hash256(*lib_cell.repr_hash().as_array());
+            let actual_hash = Hash256::from(lib_cell.repr_hash());
             if actual_hash != *hash {
                 anyhow::bail!(
                     "Stored global library hash mismatch for {}: got {}",
@@ -948,7 +999,7 @@ impl Node {
                 );
             }
 
-            let mut publishers = tycho_types::dict::Dict::<HashBytes, ()>::new();
+            let mut publishers = Dict::<HashBytes, ()>::new();
             for publisher in &entry.publishers {
                 publishers
                     .add(HashBytes(publisher.addr), ())
@@ -965,9 +1016,9 @@ impl Node {
             .context("Failed to add global library to VM dictionary")?;
         }
 
-        self.vm_global_libs_boc = libs.into_root().map(|cell| Boc::encode(cell).into());
-        self.vm_global_libs_dirty = false;
-        Ok(self.vm_global_libs_boc.clone())
+        self.global_libs_boc = libs.into_root().map(|cell| Boc::encode(cell).into());
+        self.global_libs_dirty = false;
+        Ok(self.global_libs_boc.clone())
     }
 
     fn update_public_libraries_from_account_diff(
@@ -1001,7 +1052,7 @@ impl Node {
                         && entry.publishers.remove(account)
                     {
                         entry.last_seen_lt = lt;
-                        self.vm_global_libs_dirty = true;
+                        self.global_libs_dirty = true;
                     }
                     if self
                         .global_libraries
@@ -1009,11 +1060,11 @@ impl Node {
                         .is_some_and(|entry| entry.publishers.is_empty())
                     {
                         self.global_libraries.remove(&hash);
-                        self.vm_global_libs_dirty = true;
+                        self.global_libs_dirty = true;
                     }
                 }
                 (_, Some(new_lib)) => {
-                    let new_hash = Hash256(*new_lib.repr_hash().as_array());
+                    let new_hash = Hash256::from(new_lib.repr_hash());
                     if new_hash != hash {
                         anyhow::bail!(
                             "Public library hash mismatch in account {}: dict key {} != library hash {}",
@@ -1035,7 +1086,7 @@ impl Node {
                                 last_seen_lt: lt,
                             });
                     let stored_cell = Boc::decode(&entry.lib_boc)?;
-                    let stored_hash = Hash256(*stored_cell.repr_hash().as_array());
+                    let stored_hash = Hash256::from(stored_cell.repr_hash());
                     if stored_hash != hash {
                         anyhow::bail!(
                             "Global library store is corrupted for {} (stored hash {})",
@@ -1046,7 +1097,7 @@ impl Node {
 
                     if entry.publishers.insert(*account) {
                         entry.last_seen_lt = lt;
-                        self.vm_global_libs_dirty = true;
+                        self.global_libs_dirty = true;
                     }
                 }
                 _ => {}
@@ -1056,9 +1107,193 @@ impl Node {
         Ok(())
     }
 
-    fn extract_public_libraries_from_shard_account(
+    fn register_account_code_libraries(
+        &mut self,
+        account: &Addr,
+        provider: Option<&RemoteProvider>,
         shard_account_boc: &BocBytes,
-    ) -> anyhow::Result<HashMap<Hash256, tycho_types::cell::Cell>> {
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let pending = Self::collect_code_library_refs_from_shard_account(shard_account_boc)?;
+        self.register_code_library_refs(account, provider, pending, lt)
+    }
+
+    fn register_message_state_init_libraries(
+        &mut self,
+        account: &Addr,
+        provider: Option<&RemoteProvider>,
+        msg_boc: &BocBytes,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let cell = Boc::decode(msg_boc).context("Failed to decode inbound message BOC")?;
+        let msg = cell
+            .parse::<Message<'_>>()
+            .context("Failed to parse inbound message")?;
+        let Some(init) = msg.init else {
+            return Ok(());
+        };
+        let Some(code) = init.code else {
+            return Ok(());
+        };
+
+        let pending = Self::collect_library_refs(&code)?;
+        self.register_code_library_refs(account, provider, pending, lt)
+    }
+
+    fn register_code_library_refs(
+        &mut self,
+        account: &Addr,
+        provider: Option<&RemoteProvider>,
+        mut pending: Vec<Hash256>,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let mut processed = HashSet::new();
+
+        while let Some(hash) = pending.pop() {
+            if !processed.insert(hash) {
+                continue;
+            }
+
+            let lib = match self.register_existing_global_library_publisher(account, hash, lt)? {
+                Some(lib) => lib,
+                None => match self.cas.get(&hash) {
+                    Some(lib_boc) => {
+                        let lib = Boc::decode(&lib_boc).with_context(|| {
+                            format!("Failed to decode cached remote library {}", hash.to_hex())
+                        })?;
+                        self.register_account_code_library(account, hash, &lib, lt)?;
+                        lib
+                    }
+                    None if let Some(provider) = provider => {
+                        match fetch_remote_library(&hash, provider) {
+                            Ok(lib) => {
+                                self.register_account_code_library(account, hash, &lib, lt)?;
+                                lib
+                            }
+                            Err(err) => {
+                                tracing::warn!(
+                                    "Failed to load remote library {} for account {}: {err:#}",
+                                    hash.to_hex(),
+                                    account
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    None => continue,
+                },
+            };
+            pending.extend(Self::collect_library_refs(&lib)?);
+        }
+
+        Ok(())
+    }
+
+    fn register_existing_global_library_publisher(
+        &mut self,
+        account: &Addr,
+        hash: Hash256,
+        lt: Lt,
+    ) -> anyhow::Result<Option<Cell>> {
+        let Some(entry) = self.global_libraries.get_mut(&hash) else {
+            return Ok(None);
+        };
+
+        let lib = Boc::decode(&entry.lib_boc)
+            .with_context(|| format!("Failed to decode global library {}", hash.to_hex()))?;
+
+        if entry.publishers.insert(*account) {
+            entry.last_seen_lt = lt;
+            self.global_libs_dirty = true;
+        }
+
+        Ok(Some(lib))
+    }
+
+    fn register_account_code_library(
+        &mut self,
+        account: &Addr,
+        hash: Hash256,
+        lib: &Cell,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let lib_boc: BocBytes = Boc::encode(lib.clone()).into();
+        self.cas.put(lib_boc.clone(), hash);
+        let entry = self
+            .global_libraries
+            .entry(hash)
+            .or_insert_with(|| GlobalLibraryEntry {
+                hash,
+                lib_boc,
+                publishers: std::iter::once(*account).collect(),
+                first_seen_lt: lt,
+                last_seen_lt: lt,
+            });
+        if entry.publishers.insert(*account) {
+            entry.last_seen_lt = lt;
+        }
+        entry.first_seen_lt = entry.first_seen_lt.min(lt);
+        entry.last_seen_lt = entry.last_seen_lt.max(lt);
+        self.global_libs_dirty = true;
+        self.global_libs_boc = None;
+        Ok(())
+    }
+
+    pub(crate) fn collect_code_library_refs_from_shard_account(
+        shard_account_boc: &BocBytes,
+    ) -> anyhow::Result<Vec<Hash256>> {
+        let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse shard account")?;
+        let opt_account = shard_account
+            .account
+            .load()
+            .context("Failed to load optional account from shard account")?;
+
+        let Some(account) = opt_account.0 else {
+            return Ok(Vec::new());
+        };
+        let AccountState::Active(state_init) = account.state else {
+            return Ok(Vec::new());
+        };
+        let Some(code) = state_init.code else {
+            return Ok(Vec::new());
+        };
+        Self::collect_library_refs(&code)
+    }
+
+    pub(crate) fn collect_library_refs(root: &Cell) -> anyhow::Result<Vec<Hash256>> {
+        let mut hashes = HashSet::new();
+        let mut visited = HashSet::new();
+        Self::collect_library_refs_inner(root, &mut hashes, &mut visited)?;
+        Ok(hashes.into_iter().collect())
+    }
+
+    fn collect_library_refs_inner(
+        cell: &Cell,
+        hashes: &mut HashSet<Hash256>,
+        visited: &mut HashSet<Hash256>,
+    ) -> anyhow::Result<()> {
+        if !visited.insert(Hash256::from(cell.repr_hash())) {
+            return Ok(());
+        }
+
+        if let Some(hash) = library_ref_hash(cell)? {
+            hashes.insert(hash);
+        }
+
+        for index in 0..cell.reference_count() {
+            if let Some(child) = cell.reference_cloned(index) {
+                Self::collect_library_refs_inner(&child, hashes, visited)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn extract_public_libraries_from_shard_account(
+        shard_account_boc: &BocBytes,
+    ) -> anyhow::Result<HashMap<Hash256, Cell>> {
         let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
         let shard_account = cell
             .parse::<ShardAccount>()
@@ -1079,8 +1314,8 @@ impl Node {
         for item in state_init.libraries.iter() {
             let (key_hash, simple_lib) =
                 item.context("Failed to read account library dictionary")?;
-            let key_hash = Hash256(key_hash.0);
-            let root_hash = Hash256(*simple_lib.root.repr_hash().as_array());
+            let key_hash = Hash256::from(key_hash);
+            let root_hash = Hash256::from(simple_lib.root.repr_hash());
             if root_hash != key_hash {
                 anyhow::bail!(
                     "Malformed account library entry: key {} != root hash {}",
@@ -1099,67 +1334,29 @@ impl Node {
 
     fn apply_commit(&mut self, pending: PendingCommit) -> anyhow::Result<()> {
         tracing::info!(
-            "Applying block commit: seqno={}, tx_hash={}",
+            "Applying block commit: seqno={}, tx_count={}",
             pending.block_meta.seqno,
-            pending.tx_meta.tx_hash.to_hex()
+            pending.tx_metas.len()
         );
 
-        // Persistent storage
-        if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
-
-            // Save block
-            let block_data = serde_json::to_vec(&pending.block_meta)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO blocks (seqno, data) VALUES (?1, ?2)",
-                params![pending.block_meta.seqno, block_data],
-            )?;
-
-            // Save transaction
-            let tx_data = serde_json::to_vec(&pending.tx_meta)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    pending.tx_meta.tx_hash.0.to_vec(),
-                    tx_data,
-                    pending.tx_meta.account.addr.to_vec(),
-                    pending.tx_meta.lt,
-                    pending.block_meta.seqno
-                ],
-            )?;
-
-            // Save account state
-            if let Some(new_meta) = &pending.delta.new_meta {
-                let account_data = serde_json::to_vec(new_meta)?;
-                conn.execute(
-                    "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                    params![pending.delta.addr.addr.to_vec(), account_data],
-                )?;
-            }
-
-            // Save messages
-            for h in &pending.out_msg_hashes {
-                if let Some(msg_meta) = self.history.msg_by_hash.get(h) {
-                    let msg_data = serde_json::to_vec(msg_meta)?;
-                    conn.execute(
-                        "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
-                        params![h.0.to_vec(), msg_data],
-                    )?;
-                }
-            }
+        if let Some(persistence) = &self.persistence {
+            persistence.persist_commit(&pending, &self.history, &self.latest)?;
         }
 
         // Apply delta
-        if let Some(new_meta) = &pending.delta.new_meta {
-            self.latest
-                .accounts
-                .insert(pending.delta.addr, new_meta.clone());
-        } else {
-            self.latest.accounts.remove(&pending.delta.addr);
+        for delta in &pending.deltas {
+            if let Some(new_meta) = &delta.new_meta {
+                self.latest.accounts.insert(delta.addr, new_meta.clone());
+            } else {
+                self.latest.accounts.remove(&delta.addr);
+            }
         }
 
         // History
         self.history.blocks.push(pending.block_meta.clone());
+        if let Some(masterchain_block_meta) = pending.masterchain_block_meta.clone() {
+            self.history.masterchain_blocks.push(masterchain_block_meta);
+        }
 
         let seqno = pending.block_meta.seqno;
         if self.history.deltas_by_seqno.len() < seqno as usize {
@@ -1169,30 +1366,54 @@ impl Node {
         }
         // seqno is 1-based, index is seqno-1
         if seqno > 0 {
-            self.history.deltas_by_seqno[seqno as usize - 1].push(pending.delta);
+            for delta in &pending.deltas {
+                self.indexes
+                    .account_deltas_by_addr
+                    .entry(delta.addr)
+                    .or_default()
+                    .insert(seqno, delta.clone());
+            }
+            self.history.deltas_by_seqno[seqno as usize - 1].extend(pending.deltas);
         }
 
-        self.history
-            .tx_by_hash
-            .insert(pending.tx_meta.tx_hash, pending.tx_meta.clone());
+        for tx_meta in &pending.tx_metas {
+            self.history
+                .tx_by_hash
+                .insert(tx_meta.tx_hash, tx_meta.clone());
+        }
 
         for (msg, tx) in pending.msg_to_tx {
             self.history.msg_to_tx.insert(msg, tx);
         }
 
         // Indexes
-        let key = ReverseLtKey(cmp::Reverse(pending.tx_meta.lt), pending.tx_meta.tx_hash);
-        self.indexes
-            .tx_by_account
-            .entry(pending.tx_meta.account)
-            .or_default()
-            .insert(key, pending.tx_meta.tx_hash);
-        self.indexes
-            .tx_by_block
-            .insert(seqno, pending.tx_meta.tx_hash);
+        for tx_meta in &pending.tx_metas {
+            let key = ReverseLtKey(cmp::Reverse(tx_meta.lt), tx_meta.tx_hash);
+            self.indexes
+                .tx_by_account
+                .entry(tx_meta.account)
+                .or_default()
+                .insert(key, tx_meta.tx_hash);
+            self.indexes
+                .tx_by_block
+                .entry(seqno)
+                .or_default()
+                .push(tx_meta.tx_hash);
+            for out_msg_hash in &tx_meta.out_msg_hashes {
+                self.indexes
+                    .tx_by_out_msg
+                    .insert(*out_msg_hash, tx_meta.tx_hash);
+            }
 
-        // Enqueue out msgs
-        for h in pending.out_msg_hashes {
+            if let Some(events) = &self.streaming_events {
+                let _ = events.send(StreamingCommitEvent {
+                    tx_hash: tx_meta.tx_hash,
+                });
+            }
+        }
+
+        // Enqueue out msgs deferred to future blocks.
+        for h in pending.deferred_msg_hashes {
             self.pool.push_internal(h);
         }
 
@@ -1230,24 +1451,28 @@ impl Node {
             return self.get_address_information(addr);
         }
 
-        // search backwards from seqno to find the state as it was after block 'seqno'
-        for s in (1..=seqno).rev() {
-            if s as usize > self.history.deltas_by_seqno.len() {
-                continue;
+        if let Some(deltas) = self.indexes.account_deltas_by_addr.get(addr) {
+            if let Some((_, delta)) = deltas.range(..=seqno).next_back() {
+                return delta.new_meta.clone();
             }
-            let deltas = &self.history.deltas_by_seqno[s as usize - 1];
-            for delta in deltas {
-                if delta.addr == *addr {
-                    return delta.new_meta.clone();
-                }
-            }
+            return deltas
+                .values()
+                .next()
+                .and_then(|delta| delta.old_meta.clone());
         }
-        None
+
+        self.get_address_information(addr)
     }
 
     #[must_use]
     pub fn get_cell(&self, hash: &Hash256) -> Option<BocBytes> {
         self.cas.get(hash)
+    }
+
+    #[must_use]
+    pub fn get_cell_or_empty(&self, hash: Option<Hash256>) -> BocBytes {
+        hash.and_then(|hash| self.get_cell(&hash))
+            .unwrap_or_else(|| Boc::encode(Cell::default()).into())
     }
 
     #[must_use]
@@ -1274,23 +1499,7 @@ impl Node {
             .range(start_key..)
             .take(limit)
             .filter_map(|(_, tx_hash)| self.history.tx_by_hash.get(tx_hash).cloned())
-            .map(|tx| {
-                let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
-                let out_msgs = tx
-                    .out_msg_hashes
-                    .iter()
-                    .filter_map(|h| self.get_message_info(h))
-                    .collect();
-                let tx_boc = self.get_cell(&tx.tx_hash).unwrap_or_default();
-                TransactionInfo {
-                    meta: tx,
-                    in_msg,
-                    out_msgs,
-                    tx_boc,
-                    account_state_before: None,
-                    account_state_after: None,
-                }
-            })
+            .map(|tx| self.transaction_info_from_meta(tx))
             .collect()
     }
 
@@ -1304,9 +1513,161 @@ impl Node {
     }
 
     #[must_use]
+    pub fn get_masterchain_block_header(&self, seqno: Seqno) -> Option<MasterchainBlockMeta> {
+        if seqno == 0 || seqno as usize > self.history.masterchain_blocks.len() {
+            None
+        } else {
+            Some(self.history.masterchain_blocks[seqno as usize - 1].clone())
+        }
+    }
+
+    /// Returns the serialized TON block `BoC` for a mined localnet block.
+    ///
+    /// Blocks are assembled during mining and stored in the content-addressed
+    /// store under their representation hash. LiteServer-compatible tooling
+    /// needs the original `BoC` bytes, not just the JSON block header metadata, so
+    /// this method exposes that stored artifact without rebuilding or mutating
+    /// block history.
+    pub fn get_block_data(&self, seqno: Seqno) -> anyhow::Result<BocBytes> {
+        let block = self
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        self.cas
+            .get(&block.block_hash)
+            .ok_or_else(|| LocalnetError::BlockDataNotFound { seqno }.into())
+    }
+
+    /// Rebuilds the full post-block shard state for a mined localnet block.
+    ///
+    /// Stored shard block BOCs may keep their `state_update` pruned so empty
+    /// blocks do not retain a full account dictionary forever. Proof builders
+    /// that need to read accounts should use this reconstructed state instead of
+    /// extracting `state_update.new` from the block body.
+    pub fn get_shard_state_cell(&self, seqno: Seqno) -> anyhow::Result<Cell> {
+        let block = self
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        let accounts = self.accounts_after_block(seqno);
+
+        create_shard_state_cell(
+            &self.cas,
+            &accounts,
+            block.seqno,
+            block.gen_utime,
+            block.end_lt,
+        )
+    }
+
+    fn accounts_after_block(&self, seqno: Seqno) -> HashMap<Addr, AccountMeta> {
+        let mut accounts = self.latest.accounts.clone();
+        if seqno >= self.globals.head_seqno {
+            return accounts;
+        }
+
+        for deltas in self
+            .history
+            .deltas_by_seqno
+            .iter()
+            .skip(seqno as usize)
+            .rev()
+        {
+            for delta in deltas.iter().rev() {
+                if let Some(old_meta) = &delta.old_meta {
+                    accounts.insert(delta.addr, old_meta.clone());
+                } else {
+                    accounts.remove(&delta.addr);
+                }
+            }
+        }
+
+        accounts
+    }
+
+    /// Returns the serialized TON masterchain block `BoC` for a mined localnet block.
+    ///
+    /// Masterchain blocks are mined together with basechain blocks and stored in
+    /// the same content-addressed store. They contain no localnet transactions;
+    /// their state anchors config and the basechain shard descriptor for the
+    /// matching sequence number.
+    pub fn get_masterchain_block_data(&self, seqno: Seqno) -> anyhow::Result<BocBytes> {
+        let block = self
+            .get_masterchain_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        self.cas
+            .get(&block.block_hash)
+            .ok_or_else(|| LocalnetError::BlockDataNotFound { seqno }.into())
+    }
+
+    /// Rebuilds the full post-block masterchain state for a mined localnet block.
+    ///
+    /// Stored masterchain block BOCs may keep their `state_update` pruned to avoid
+    /// serializing the large config subtree on every mined block. Proof builders
+    /// that need to read config or shard hashes should use this full in-memory
+    /// state instead of extracting `state_update.new` from the block body.
+    pub fn get_masterchain_state_cell(&self, seqno: Seqno) -> anyhow::Result<Cell> {
+        let block = self
+            .get_masterchain_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+
+        if seqno == self.globals.head_seqno
+            && let Some(state) = &self.latest_masterchain_state
+            && Hash256::from(state.repr_hash()) == block.state_root_hash
+        {
+            return Ok(state.clone());
+        }
+
+        let shard_block = self
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        let prev_block = block
+            .prev_seqno
+            .and_then(|prev_seqno| self.get_masterchain_block_header(prev_seqno));
+        let prev_blocks = self
+            .history
+            .masterchain_blocks
+            .iter()
+            .rev()
+            .filter(|prev| prev.seqno < seqno)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .cloned()
+            .collect::<Vec<_>>();
+        let config_cell = self
+            .cas
+            .get_cell(&block.config_boc_hash)
+            .context("Historical config missing")?;
+
+        let state = create_masterchain_state_cell(&MasterchainBlockBuildContext {
+            seqno,
+            gen_utime: block.gen_utime,
+            start_lt: block.start_lt,
+            end_lt: block.end_lt,
+            prev_block: prev_block.as_ref(),
+            prev_state: None,
+            shard_block: &shard_block,
+            config_cell: &config_cell,
+            prev_blocks: &prev_blocks,
+        })?;
+
+        anyhow::ensure!(
+            Hash256::from(state.repr_hash()) == block.state_root_hash,
+            "Rebuilt masterchain state root does not match block metadata for seqno {seqno}"
+        );
+        Ok(state)
+    }
+
+    #[must_use]
     pub fn find_block_by_lt(&self, lt: Lt) -> Option<BlockMeta> {
         self.history
             .blocks
+            .iter()
+            .find(|b| lt >= b.start_lt && lt <= b.end_lt)
+            .cloned()
+    }
+
+    #[must_use]
+    pub fn find_masterchain_block_by_lt(&self, lt: Lt) -> Option<MasterchainBlockMeta> {
+        self.history
+            .masterchain_blocks
             .iter()
             .find(|b| lt >= b.start_lt && lt <= b.end_lt)
             .cloned()
@@ -1323,10 +1684,25 @@ impl Node {
     }
 
     #[must_use]
+    pub fn find_masterchain_block_by_unixtime(&self, utime: u32) -> Option<MasterchainBlockMeta> {
+        self.history
+            .masterchain_blocks
+            .iter()
+            .rfind(|b| b.gen_utime <= utime)
+            .cloned()
+    }
+
+    #[must_use]
     pub fn get_block_transactions(&self, block_meta: &BlockMeta) -> Option<Vec<TxMeta>> {
-        let tx_hash = self.indexes.tx_by_block.get(&block_meta.seqno)?;
-        let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
-        Some(vec![tx])
+        let tx_hashes = self
+            .indexes
+            .tx_by_block
+            .get(&block_meta.seqno)
+            .map_or(block_meta.tx_hashes.as_slice(), Vec::as_slice);
+        tx_hashes
+            .iter()
+            .map(|tx_hash| self.history.tx_by_hash.get(tx_hash).cloned())
+            .collect()
     }
 
     #[must_use]
@@ -1339,20 +1715,112 @@ impl Node {
     #[must_use]
     pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
+        Some(self.transaction_info_from_meta(tx))
+    }
+
+    fn get_rich_transaction_by_hash(
+        &self,
+        hash: &Hash256,
+        account_state_cache: &mut HashMap<Hash256, Option<AccountStateSnapshot>>,
+    ) -> Option<TransactionInfo> {
+        let tx = self.history.tx_by_hash.get(hash).cloned()?;
+        Some(self.rich_transaction_info_from_meta(tx, account_state_cache))
+    }
+
+    /// Fast transaction view used by list-style endpoints. It intentionally skips
+    /// account state snapshots because finding them may scan the whole CAS.
+    fn transaction_info_from_meta(&self, tx: TxMeta) -> TransactionInfo {
         let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
         let out_msgs = tx
             .out_msg_hashes
             .iter()
             .filter_map(|h| self.get_message_info(h))
             .collect();
-        let tx_boc = self.get_cell(hash).unwrap_or_default();
-        Some(TransactionInfo {
+        let tx_boc = self.get_cell(&tx.tx_hash).unwrap_or_default();
+        TransactionInfo {
             meta: tx,
             in_msg,
             out_msgs,
             tx_boc,
             account_state_before: None,
             account_state_after: None,
+        }
+    }
+
+    /// Rich transaction view used by traces. Traces need full before/after account
+    /// states, so this path pays the extra parsing and CAS lookup cost explicitly.
+    fn rich_transaction_info_from_meta(
+        &self,
+        tx: TxMeta,
+        account_state_cache: &mut HashMap<Hash256, Option<AccountStateSnapshot>>,
+    ) -> TransactionInfo {
+        let mut info = self.transaction_info_from_meta(tx);
+        (info.account_state_before, info.account_state_after) = self
+            .transaction_account_state_snapshots(
+                &info.meta.tx_hash,
+                &info.tx_boc,
+                account_state_cache,
+            );
+        info
+    }
+
+    fn transaction_account_state_snapshots(
+        &self,
+        tx_hash: &Hash256,
+        tx_boc: &BocBytes,
+        account_state_cache: &mut HashMap<Hash256, Option<AccountStateSnapshot>>,
+    ) -> (Option<AccountStateSnapshot>, Option<AccountStateSnapshot>) {
+        let Some(state_update) = self
+            .cas
+            .get_cell(tx_hash)
+            .or_else(|| Boc::decode(tx_boc).ok())
+            .and_then(|cell| cell.parse::<Transaction>().ok())
+            .and_then(|tx| tx.state_update.load().ok())
+        else {
+            return (None, None);
+        };
+
+        (
+            self.find_account_state_snapshot_cached(
+                &Hash256::from(&state_update.old),
+                account_state_cache,
+            ),
+            self.find_account_state_snapshot_cached(
+                &Hash256::from(&state_update.new),
+                account_state_cache,
+            ),
+        )
+    }
+
+    fn find_account_state_snapshot_cached(
+        &self,
+        state_hash: &Hash256,
+        account_state_cache: &mut HashMap<Hash256, Option<AccountStateSnapshot>>,
+    ) -> Option<AccountStateSnapshot> {
+        if let Some(snapshot) = account_state_cache.get(state_hash) {
+            return snapshot.clone();
+        }
+
+        let snapshot = self.find_account_state_snapshot(state_hash);
+        account_state_cache.insert(*state_hash, snapshot.clone());
+        snapshot
+    }
+
+    fn find_account_state_snapshot(&self, state_hash: &Hash256) -> Option<AccountStateSnapshot> {
+        if let Some(cell) = self.cas.get_cell(state_hash) {
+            if let Some(snapshot) = account_state_snapshot_from_account_state_cell(&cell) {
+                return Some(snapshot);
+            }
+            if let Some(snapshot) = account_state_snapshot_from_cell(&cell)
+                && snapshot.hash == *state_hash
+            {
+                return Some(snapshot);
+            }
+        }
+
+        self.cas.find_map_cell(|cell| {
+            let snapshot = account_state_snapshot_from_cell(cell)?;
+            (snapshot.hash == *state_hash).then_some(snapshot)
         })
     }
 
@@ -1375,22 +1843,14 @@ impl Node {
                         break;
                     }
 
-                    // Find transaction that produced this message
-                    let mut found_parent = false;
-                    for (h, t) in &self.history.tx_by_hash {
-                        if t.out_msg_hashes.contains(in_msg_hash) {
-                            if visited_up.contains(h) {
-                                // Cycle detected
-                                break;
-                            }
-                            root_hash = *h;
-                            curr_tx_hash = *h;
-                            visited_up.insert(*h);
-                            found_parent = true;
+                    if let Some(parent_hash) = self.indexes.tx_by_out_msg.get(in_msg_hash) {
+                        if visited_up.contains(parent_hash) {
                             break;
                         }
-                    }
-                    if !found_parent {
+                        root_hash = *parent_hash;
+                        curr_tx_hash = *parent_hash;
+                        visited_up.insert(*parent_hash);
+                    } else {
                         // Source is not in our history (maybe external or pruned)
                         root_hash = curr_tx_hash;
                         break;
@@ -1406,35 +1866,41 @@ impl Node {
         }
 
         // 2. Build trace tree starting from root_hash (traverse DOWN)
-        let external_hash = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
+        let external_hashes = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
             tx.in_msg_hash.and_then(|h| {
                 self.history
                     .msg_by_hash
                     .get(&h)
-                    .and_then(|msg| if msg.src.is_none() { Some(h) } else { None })
+                    .and_then(|msg| (msg.src.is_none()).then_some((h, msg.hash_norm)))
             })
         });
 
+        let mut visited_down = HashSet::new();
+        let mut account_state_cache = HashMap::new();
         let mut trace = self
-            .build_trace_node(&root_hash)
+            .build_trace_node(&root_hash, &mut visited_down, &mut account_state_cache)
             .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
-        trace.external_hash = external_hash;
+        if let Some((external_hash, external_hash_norm)) = external_hashes {
+            trace.external_hash = Some(external_hash);
+            trace.external_hash_norm = external_hash_norm;
+        }
         Ok(trace)
     }
 
     pub fn get_traces_by_message_hash(&self, msg_hash: &Hash256) -> anyhow::Result<TraceNode> {
         let tx_hash = self
-            .find_trace_tx_hash_by_message_hash(msg_hash)
+            .history
+            .msg_to_tx
+            .get(msg_hash)
+            .or_else(|| self.indexes.tx_by_out_msg.get(msg_hash))
+            .copied()
+            .or_else(|| self.find_trace_tx_hash_by_normalized_message_hash(msg_hash))
             .ok_or_else(|| anyhow::anyhow!("Trace not found for message {}", msg_hash.to_hex()))?;
         self.get_traces(&tx_hash)
     }
 
-    fn find_trace_tx_hash_by_message_hash(&self, msg_hash: &Hash256) -> Option<Hash256> {
+    fn find_trace_tx_hash_by_normalized_message_hash(&self, msg_hash: &Hash256) -> Option<Hash256> {
         self.history.tx_by_hash.values().find_map(|tx| {
-            if tx.in_msg_hash == Some(*msg_hash) || tx.out_msg_hashes.contains(msg_hash) {
-                return Some(tx.tx_hash);
-            }
-
             let in_msg_hash = tx.in_msg_hash?;
             let msg_meta = self.history.msg_by_hash.get(&in_msg_hash)?;
             if msg_meta.src.is_some() {
@@ -1449,13 +1915,23 @@ impl Node {
         })
     }
 
-    fn build_trace_node(&self, tx_hash: &Hash256) -> Option<TraceNode> {
-        let tx_info = self.get_transaction_by_hash(tx_hash)?;
+    fn build_trace_node(
+        &self,
+        tx_hash: &Hash256,
+        visited: &mut HashSet<Hash256>,
+        account_state_cache: &mut HashMap<Hash256, Option<AccountStateSnapshot>>,
+    ) -> Option<TraceNode> {
+        if !visited.insert(*tx_hash) {
+            return None;
+        }
+
+        let tx_info = self.get_rich_transaction_by_hash(tx_hash, account_state_cache)?;
         let mut children = Vec::new();
 
         for out_msg in &tx_info.meta.out_msg_hashes {
             if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
-                && let Some(child_node) = self.build_trace_node(child_tx_hash)
+                && let Some(child_node) =
+                    self.build_trace_node(child_tx_hash, visited, account_state_cache)
             {
                 children.push(child_node);
             }
@@ -1465,13 +1941,20 @@ impl Node {
             transaction: tx_info,
             children,
             external_hash: None,
+            external_hash_norm: None,
         })
     }
 
     pub fn get_shard_account(&mut self, addr: &Addr) -> anyhow::Result<BocBytes> {
-        if let Some(meta) = self.latest.accounts.get(addr)
+        if let Some(meta) = self.latest.accounts.get(addr).cloned()
             && let Some(boc) = self.cas.get(&meta.account_hash)
         {
+            let provider = match &self.state_source {
+                StateSource::Remote(provider) => Some(provider.clone()),
+                StateSource::Local => None,
+            };
+            let lt = meta.last_trans_lt.unwrap_or(self.globals.global_lt);
+            self.register_account_code_libraries(addr, provider.as_ref(), &boc, lt)?;
             return Ok(boc);
         }
 
@@ -1500,38 +1983,321 @@ impl Node {
             .context("Failed to parse ShardAccount BOC")?;
         let meta =
             account_meta_from_shard_account(&shard_account, &shard_account_boc, &mut self.cas)?;
+        let _ = store_account_state_cell_from_shard_account_boc(&mut self.cas, &shard_account_boc);
         let lt = meta.last_trans_lt.unwrap_or(self.globals.global_lt);
 
         self.persist_account_meta(addr, &meta)?;
         self.latest.accounts.insert(*addr, meta);
+        self.latest_shard_state = None;
         self.update_public_libraries_from_account_diff(
             addr,
             old_boc.as_ref(),
             Some(&shard_account_boc),
             lt,
         )?;
+        let provider = match &self.state_source {
+            StateSource::Remote(provider) => Some(provider.clone()),
+            StateSource::Local => None,
+        };
+        self.register_account_code_libraries(addr, provider.as_ref(), &shard_account_boc, lt)?;
         self.detect_assets(addr)?;
 
         Ok(())
     }
 
-    fn clear_detected_assets(&mut self, addr: &Addr) {
-        self.history.jetton_masters.remove(addr);
-        self.history.jetton_wallets.remove(addr);
-        self.history.nft_items.remove(addr);
+    pub fn change_account_state(
+        &mut self,
+        addr: &Addr,
+        change: LocalnetAccountStateChange,
+        mine: bool,
+    ) -> anyhow::Result<()> {
+        if !mine {
+            return match change {
+                LocalnetAccountStateChange::FrozenFromCurrent => {
+                    self.pending_freeze_current.push_back(*addr);
+                    Ok(())
+                }
+                _ => anyhow::bail!("`mine: false` is only supported with frozen `source: current`"),
+            };
+        }
+
+        let shard_account_boc = match change {
+            LocalnetAccountStateChange::Nonexist => Self::empty_shard_account_boc()?,
+            LocalnetAccountStateChange::Uninit { balance } => {
+                Self::account_shard_account_boc(addr, AccountState::Uninit, balance)?
+            }
+            LocalnetAccountStateChange::FrozenFromCurrent => {
+                return self.freeze_account_from_current(addr);
+            }
+            LocalnetAccountStateChange::Frozen {
+                frozen_hash,
+                balance,
+            } => Self::account_shard_account_boc(
+                addr,
+                AccountState::Frozen(HashBytes(frozen_hash.0)),
+                balance,
+            )?,
+        };
+
+        self.set_shard_account(addr, shard_account_boc)
+    }
+
+    fn freeze_account_from_current(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let seqno = self.globals.head_seqno + 1;
+        let prev_lt = self.globals.global_lt;
+        let gen_utime = self.next_block_gen_utime()?;
+        let commit = self.build_freeze_account_transaction(addr, seqno, gen_utime)?;
+        self.commit_transaction_block(seqno, prev_lt, gen_utime, vec![commit], Vec::new())?;
+        Ok(())
+    }
+
+    fn build_freeze_account_transaction(
+        &mut self,
+        addr: &Addr,
+        seqno: Seqno,
+        gen_utime: u32,
+    ) -> anyhow::Result<TransactionCommit> {
+        let old_shard_account_boc = self.get_shard_account(addr)?;
+        let old_shard_account_cell = Boc::decode(&old_shard_account_boc)
+            .context("Failed to decode current ShardAccount BOC")?;
+        let old_shard_account = old_shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse current ShardAccount BOC")?;
+        let old_account_state_hash = Hash256::from(old_shard_account.account.inner().repr_hash());
+        let old_meta = self.latest.accounts.get(addr).cloned();
+
+        let frozen_account = Self::frozen_account_from_shard_account(addr, &old_shard_account)?;
+        let new_account_state_cell =
+            CellBuilder::build_from(OptionalAccount(Some(frozen_account.clone())))
+                .context("Failed to serialize frozen account state")?;
+        let new_account_state_hash = Hash256::from(new_account_state_cell.repr_hash());
+        self.cas.put(
+            Boc::encode(new_account_state_cell).into(),
+            new_account_state_hash,
+        );
+
+        let lt = self.globals.global_lt + self.globals.lt_step;
+        self.globals.global_lt = lt;
+
+        let in_msg_cell = self.build_admin_state_change_message(addr, lt, gen_utime)?;
+        let in_msg_boc = BocBytes::from(Boc::encode(in_msg_cell.clone()));
+        let in_msg_hash = in_msg_boc.hash()?;
+        self.cas.put(in_msg_boc, in_msg_hash);
+        let in_msg_meta = parse_msg_meta_from_cell(&in_msg_cell, in_msg_hash)
+            .context("Failed to parse synthetic freeze message")?;
+        self.history.msg_by_hash.insert(in_msg_hash, in_msg_meta);
+
+        let previous_tx = old_meta
+            .as_ref()
+            .and_then(|meta| Some((HashBytes(meta.last_trans_hash?.0), meta.last_trans_lt?)));
+        let tx = Transaction {
+            account: HashBytes(addr.addr),
+            lt,
+            prev_trans_hash: previous_tx.map_or(old_shard_account.last_trans_hash, |tx| tx.0),
+            prev_trans_lt: previous_tx
+                .as_ref()
+                .map_or(old_shard_account.last_trans_lt, |tx| tx.1),
+            now: gen_utime,
+            out_msg_count: tycho_types::num::Uint15::ZERO,
+            orig_status: old_meta
+                .as_ref()
+                .map_or(tycho_types::models::AccountStatus::NotExists, |meta| {
+                    tycho_account_status(meta.status.clone())
+                }),
+            end_status: tycho_types::models::AccountStatus::Frozen,
+            in_msg: Some(in_msg_cell),
+            out_msgs: Default::default(),
+            total_fees: CurrencyCollection::ZERO,
+            state_update: Lazy::new(&HashUpdate {
+                old: HashBytes(old_account_state_hash.0),
+                new: HashBytes(new_account_state_hash.0),
+            })
+            .context("Failed to build synthetic freeze transaction state update")?,
+            info: Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
+                credit_first: false,
+                storage_phase: Some(StoragePhase {
+                    storage_fees_collected: Default::default(),
+                    storage_fees_due: None,
+                    status_change: AccountStatusChange::Frozen,
+                }),
+                credit_phase: None,
+                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                    reason: ComputePhaseSkipReason::NoGas,
+                }),
+                action_phase: None,
+                aborted: true,
+                bounce_phase: None,
+                destroyed: false,
+            }))
+            .context("Failed to build synthetic freeze transaction info")?,
+        };
+        let tx_boc = BocBytes::from(BocRepr::encode(tx)?);
+        let resource_usage = TransactionResourceUsage {
+            bytes: tx_boc.len(),
+            gas: 0,
+        };
+        let tx_hash = tx_boc.hash()?;
+        self.cas.put(tx_boc.clone(), tx_hash);
+        let tx_cell = Boc::decode(&tx_boc).context("Failed to decode synthetic freeze tx BOC")?;
+
+        let new_shard_account_boc = Self::shard_account_boc(
+            OptionalAccount(Some(frozen_account)),
+            HashBytes(tx_hash.0),
+            lt,
+        )?;
+        let new_shard_account_cell = Boc::decode(&new_shard_account_boc)
+            .context("Failed to decode frozen ShardAccount BOC")?;
+        let new_shard_account = new_shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse frozen ShardAccount BOC")?;
+        let new_meta = account_meta_from_shard_account(
+            &new_shard_account,
+            &new_shard_account_boc,
+            &mut self.cas,
+        )?;
+        let _ =
+            store_account_state_cell_from_shard_account_boc(&mut self.cas, &new_shard_account_boc);
+
+        let tx_meta = TxMeta {
+            tx_hash,
+            account: *addr,
+            lt,
+            now: gen_utime,
+            aborted: true,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+            in_msg_hash: Some(in_msg_hash),
+            out_msg_hashes: Vec::new(),
+            block_seqno: seqno,
+        };
+
+        let delta = AccountDelta {
+            addr: *addr,
+            old_hash: old_meta.as_ref().map(|meta| meta.account_hash),
+            new_hash: Some(new_meta.account_hash),
+            old_meta,
+            new_meta: Some(new_meta.clone()),
+        };
+
+        self.clear_detected_assets(addr);
+        self.latest.accounts.insert(*addr, new_meta);
+        self.update_public_libraries_from_account_diff(
+            addr,
+            Some(&old_shard_account_boc),
+            Some(&new_shard_account_boc),
+            lt,
+        )?;
+        self.detect_assets(addr)?;
+
+        Ok(TransactionCommit {
+            block_tx: BlockTransaction {
+                tx_meta: tx_meta.clone(),
+                old_meta: delta.old_meta.clone(),
+                tx_cell,
+                old_account_state_hash,
+                new_account_state_hash,
+            },
+            tx_meta,
+            delta,
+            out_msg_hashes: Vec::new(),
+            msg_to_tx: vec![(in_msg_hash, tx_hash)],
+            resource_usage,
+        })
+    }
+
+    fn build_admin_state_change_message(
+        &self,
+        addr: &Addr,
+        created_lt: Lt,
+        created_at: u32,
+    ) -> anyhow::Result<Cell> {
+        let zero_addr = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+        let message_info = IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: zero_addr.into(),
+            dst: addr.into(),
+            ihr_fee: Default::default(),
+            value: CurrencyCollection::ZERO,
+            fwd_fee: Default::default(),
+            created_lt,
+            created_at,
+        };
+        let message = OwnedMessage {
+            info: MsgInfo::Int(message_info),
+            init: None,
+            body: Default::default(),
+            layout: None,
+        };
+        CellBuilder::build_from(&message).context("Failed to build synthetic freeze message")
     }
 
     fn persist_account_meta(&self, addr: &Addr, meta: &AccountMeta) -> anyhow::Result<()> {
-        let Some(conn) = &self.conn else {
-            return Ok(());
-        };
+        if let Some(persistence) = &self.persistence {
+            persistence.persist_account_meta(addr, meta)?;
+        }
+        Ok(())
+    }
 
-        let account_data = serde_json::to_vec(meta)?;
-        conn.lock().expect("Failed to lock DB connection").execute(
-            "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-            params![addr.addr.to_vec(), account_data],
-        )?;
+    #[must_use]
+    pub const fn history(&self) -> &History {
+        &self.history
+    }
 
+    pub fn set_address_name(&mut self, address: Addr, name: String) {
+        self.history.address_names.insert(address, name);
+    }
+
+    #[must_use]
+    pub fn get_address_name(&self, address: &Addr) -> Option<String> {
+        self.history.address_names.get(address).cloned()
+    }
+
+    pub fn set_compiler_abi(
+        &mut self,
+        code_hash: Hash256,
+        compiler_abi: Value,
+    ) -> anyhow::Result<()> {
+        let stale_keys = self
+            .history
+            .compiler_abi_stale_keys(code_hash, &compiler_abi);
+        if let Some(persistence) = &self.persistence {
+            persistence.set_compiler_abi(code_hash, &compiler_abi, &stale_keys)?;
+        }
+        self.history
+            .set_compiler_abi_with_stale_keys(code_hash, compiler_abi, &stale_keys);
+        Ok(())
+    }
+
+    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        let delete_key = self.history.compiler_abi_delete_key(code_hash);
+        if let Some(persistence) = &self.persistence {
+            persistence.delete_compiler_abi(delete_key)?;
+        }
+        self.history.delete_compiler_abi_by_key(&delete_key);
+        Ok(())
+    }
+
+    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
+        if let Some(persistence) = &self.persistence {
+            persistence.set_verified_source(code_hash, &source)?;
+        }
+        self.history.set_verified_source(code_hash, source);
+        Ok(())
+    }
+
+    pub fn delete_verified_source(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        if let Some(persistence) = &self.persistence {
+            persistence.delete_verified_source(*code_hash)?;
+        }
+        self.history.delete_verified_source(code_hash);
         Ok(())
     }
 
@@ -1563,8 +2329,9 @@ impl Node {
         ignore_chksig: bool,
         mc_block_seqno: Option<Seqno>,
     ) -> anyhow::Result<storage::EmulateTraceResult> {
-        let msg_hash = compute_boc_hash(&boc)?;
+        let msg_hash = boc.hash()?;
         let msg_meta = parse_msg_meta(&boc, msg_hash)?;
+        let external_hash_norm = msg_meta.hash_norm;
         let dst = msg_meta
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
@@ -1585,6 +2352,7 @@ impl Node {
             gen_utime,
             rand_seed: None,
             ignore_chksig,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
         };
 
         let exec_result = self.executor.execute(
@@ -1595,32 +2363,26 @@ impl Node {
             vm_global_libs.as_ref(),
         )?;
 
-        let tx_hash = compute_boc_hash(&exec_result.tx_boc)?;
+        let tx_hash = exec_result.tx_boc.hash()?;
         let mut out_msg_hashes = Vec::new();
         let mut out_msgs = Vec::new();
-        for out_boc in &exec_result.out_msgs_boc {
-            let out_hash = compute_boc_hash(out_boc)?;
+        for out_cell in &exec_result.out_msg_cells {
+            let out_hash = Hash256::from(out_cell.repr_hash());
             out_msg_hashes.push(out_hash);
-            let out_meta = parse_msg_meta(out_boc, out_hash)?;
+            let out_meta = parse_msg_meta_from_cell(out_cell, out_hash)?;
+            let out_boc = BocBytes::from(Boc::encode(out_cell.clone()));
             out_msgs.push(MessageInfo {
                 meta: out_meta,
-                boc: out_boc.clone(),
+                boc: out_boc,
             });
         }
 
-        let compute_exit_code = exec_result.compute_exit_code();
-        let action_result_code = exec_result.action_result_code();
-        let info = exec_result.tx.info.load().ok();
+        let tx_info = exec_result.tx.info.load().ok();
+        let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
+        let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
-            if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
-                let storage: u128 = ord
-                    .storage_phase
-                    .map_or(0, |p| p.storage_fees_collected.into());
-                let total: u128 = exec_result.tx.total_fees.tokens.into();
-                (storage, total.saturating_sub(storage))
-            } else {
-                (0, exec_result.tx.total_fees.tokens.into())
-            };
+            transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
 
         let tx_meta = TxMeta {
@@ -1628,19 +2390,19 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
-            total_fees: Some(total_fees),
-            storage_fees: Some(storage_fees),
-            other_fees: Some(other_fees),
+            total_fees,
+            storage_fees,
+            other_fees,
             in_msg_hash: Some(msg_hash),
             out_msg_hashes,
             block_seqno,
         };
 
         collect_code_data_cells(
-            exec_result.new_account_boc.as_ref(),
+            Some(&exec_result.new_account_boc),
             &mut code_cells,
             &mut data_cells,
         );
@@ -1655,18 +2417,137 @@ impl Node {
                     }),
                     out_msgs,
                     tx_boc: exec_result.tx_boc,
-                    account_state_before: account_state_preview_from_boc(&shard_account_boc),
-                    account_state_after: exec_result
-                        .new_account_boc
-                        .as_ref()
-                        .and_then(account_state_preview_from_boc),
+                    account_state_before: account_state_snapshot_from_boc(&shard_account_boc),
+                    account_state_after: account_state_snapshot_from_boc(
+                        &exec_result.new_account_boc,
+                    ),
                 },
                 children: Vec::new(),
                 external_hash: Some(msg_hash),
+                external_hash_norm,
             },
             code_cells,
             data_cells,
         })
+    }
+
+    pub fn estimate_fees_by_external_message(
+        &mut self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let message_cell = Boc::decode(&boc).context("Failed to decode external message BOC")?;
+        let message = message_cell
+            .parse::<Message<'_>>()
+            .context("Failed to parse external message")?;
+        let destination = match &message.info {
+            MsgInfo::ExtIn(info) => Addr::from(&info.dst),
+            _ => anyhow::bail!("estimateFee accepts only external-in messages"),
+        };
+        let is_masterchain = destination.workchain == -1;
+
+        let mut config_slice = self.config_cell.as_slice_allow_exotic();
+        let config =
+            Dict::<u32, Cell>::load_from_root_ext(&mut config_slice, Cell::empty_context())
+                .context("Failed to parse blockchain config dictionary")?;
+        let config_root = config
+            .root()
+            .clone()
+            .context("Blockchain config is empty")?;
+        let config_params = BlockchainConfigParams::from_raw(config_root);
+        let (in_fwd_fee, _) =
+            Emulator::compute_message_fwd_fee(Arc::new(config.clone()), &message, is_masterchain)?;
+
+        let shard_account_boc = self.get_shard_account_for_emulation(&destination, None)?;
+        let shard_account_cell =
+            Boc::decode(&shard_account_boc).context("Failed to decode source ShardAccount BOC")?;
+        let shard_account = shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse source ShardAccount")?;
+        let account = shard_account
+            .load_account()
+            .context("Failed to load source account")?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let storage_fee =
+            estimate_storage_fee(&config_params, account.as_ref(), &destination, gen_utime)?;
+
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+        let execution = self.executor.execute_for_fee_estimation(
+            &shard_account_boc,
+            &boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
+        )?;
+        let (gas_fee, fwd_fee) = match execution {
+            FeeEstimationExecution::ExternalNotAccepted => (0, 0),
+            FeeEstimationExecution::Executed(result) => {
+                let tx_info = result
+                    .tx
+                    .info
+                    .load()
+                    .context("Failed to load transaction info")?;
+                let TxInfo::Ordinary(tx_info) = tx_info else {
+                    anyhow::bail!("estimateFee requires an ordinary transaction");
+                };
+                let (gas_fee, success) = match &tx_info.compute_phase {
+                    ComputePhase::Executed(phase) => (u128::from(phase.gas_fees), phase.success),
+                    ComputePhase::Skipped(_) => (0, false),
+                };
+                let fwd_fee = if success {
+                    estimate_action_forward_fees(
+                        Arc::new(config),
+                        result.actions.as_ref(),
+                        is_masterchain,
+                    )?
+                } else {
+                    0
+                };
+                (gas_fee, fwd_fee)
+            }
+        };
+
+        Ok(LocalnetEstimateFeeResult {
+            source_fees: LocalnetEstimatedFee {
+                in_fwd_fee: u64::try_from(u128::from(in_fwd_fee))
+                    .context("input forwarding fee does not fit u64")?,
+                storage_fee,
+                gas_fee: u64::try_from(gas_fee).context("gas fee does not fit u64")?,
+                fwd_fee: u64::try_from(fwd_fee).context("forwarding fee does not fit u64")?,
+            },
+            destination_fees: Vec::new(),
+        })
+    }
+
+    #[must_use]
+    pub fn top_account_balances(&self, limit: usize, offset: usize) -> Vec<LocalnetAccountBalance> {
+        let mut accounts = self
+            .latest
+            .accounts
+            .iter()
+            .map(|(account, meta)| LocalnetAccountBalance {
+                account: *account,
+                balance: meta.balance,
+            })
+            .collect::<Vec<_>>();
+        accounts.sort_unstable_by(|left, right| {
+            right
+                .balance
+                .cmp(&left.balance)
+                .then_with(|| left.account.cmp(&right.account))
+        });
+        accounts.into_iter().skip(offset).take(limit).collect()
     }
 
     fn get_shard_account_for_emulation(
@@ -1682,14 +2563,14 @@ impl Node {
             if seqno == 0 {
                 return Ok((
                     self.globals.global_lt.saturating_add(self.globals.lt_step),
-                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32,
+                    self.now_unix()?,
                     self.globals.head_seqno,
                 ));
             }
 
             let block = self
                 .get_block_header(seqno)
-                .ok_or_else(|| anyhow::anyhow!("Block {seqno} not found"))?;
+                .ok_or(LocalnetError::BlockNotFound { seqno })?;
             return Ok((
                 block.end_lt.saturating_add(self.globals.lt_step),
                 block.gen_utime,
@@ -1699,19 +2580,105 @@ impl Node {
 
         Ok((
             self.globals.global_lt.saturating_add(self.globals.lt_step),
-            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32,
+            self.now_unix()?,
             self.globals.head_seqno,
         ))
     }
 
+    pub fn now_unix(&self) -> anyhow::Result<u32> {
+        self.clock.now_unix()
+    }
+
+    pub fn clock_info(&self) -> anyhow::Result<NodeClockInfo> {
+        self.clock.clock_info()
+    }
+
+    pub fn increase_time(&mut self, seconds: u64) -> anyhow::Result<NodeClockInfo> {
+        self.clock.increase_time(seconds)
+    }
+
+    pub fn set_time(&mut self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        self.clock
+            .set_time(timestamp, self.latest_block_timestamp())
+    }
+
+    pub fn set_next_block_timestamp(&mut self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        self.clock
+            .set_next_block_timestamp(timestamp, self.latest_block_timestamp())
+    }
+
+    fn next_block_gen_utime(&mut self) -> anyhow::Result<u32> {
+        self.clock
+            .next_block_gen_utime(self.latest_block_timestamp())
+    }
+
+    fn latest_block_timestamp(&self) -> u32 {
+        self.history
+            .blocks
+            .last()
+            .map_or(0, |block| block.gen_utime)
+    }
+
     fn empty_shard_account_boc() -> anyhow::Result<BocBytes> {
-        let sa = ShardAccount {
-            account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
-            last_trans_hash: HashBytes([0u8; 32]),
+        Self::shard_account_boc(OptionalAccount(None), HashBytes::ZERO, 0)
+    }
+
+    fn account_shard_account_boc(
+        addr: &Addr,
+        state: AccountState,
+        balance: u128,
+    ) -> anyhow::Result<BocBytes> {
+        let account = Account {
+            address: IntAddr::Std(StdAddr::from(addr)),
+            storage_stat: Default::default(),
             last_trans_lt: 0,
+            balance: CurrencyCollection::new(balance),
+            state,
+        };
+        Self::shard_account_boc(OptionalAccount(Some(account)), HashBytes::ZERO, 0)
+    }
+
+    fn frozen_account_from_shard_account(
+        addr: &Addr,
+        shard_account: &ShardAccount,
+    ) -> anyhow::Result<Account> {
+        let optional_account = shard_account
+            .account
+            .load()
+            .context("Failed to load current account state")?;
+        let mut account = optional_account
+            .0
+            .context("Cannot freeze non-existing account from current state")?;
+
+        let state_hash = match account.state.clone() {
+            AccountState::Active(state_init) => {
+                let state_cell = CellBuilder::build_from(state_init)
+                    .context("Failed to serialize current StateInit")?;
+                HashBytes(*state_cell.repr_hash().as_array())
+            }
+            AccountState::Uninit => {
+                anyhow::bail!("Cannot freeze uninitialized account from current state")
+            }
+            AccountState::Frozen(_) => anyhow::bail!("Account is already frozen"),
+        };
+
+        account.address = IntAddr::Std(StdAddr::from(addr));
+        account.state = AccountState::Frozen(state_hash);
+        Ok(account)
+    }
+
+    fn shard_account_boc(
+        optional_account: OptionalAccount,
+        last_trans_hash: HashBytes,
+        last_trans_lt: u64,
+    ) -> anyhow::Result<BocBytes> {
+        let sa = ShardAccount {
+            account: Lazy::new(&optional_account)?,
+            last_trans_hash,
+            last_trans_lt,
         };
         let mut builder = CellBuilder::new();
-        sa.store_into(&mut builder, tycho_types::cell::Cell::empty_context())?;
+        sa.store_into(&mut builder, Cell::empty_context())?;
         let cell = builder.build()?;
         Ok(Boc::encode(cell).into())
     }
@@ -1727,47 +2694,37 @@ impl Node {
         }
         let lt = meta.last_trans_lt.unwrap_or(0);
         self.latest.accounts.insert(*addr, meta);
+        self.latest_shard_state = None;
         self.update_public_libraries_from_account_diff(addr, None, Some(&boc), lt)?;
+        self.register_account_code_libraries(addr, Some(provider), &boc, lt)?;
         Ok(Some(boc))
     }
 
     #[must_use]
     pub fn has_pending_messages(&self) -> bool {
-        !self.pool.external.is_empty() || !self.pool.internal.is_empty()
+        !self.pool.external.is_empty()
+            || !self.pool.internal.is_empty()
+            || !self.pending_freeze_current.is_empty()
     }
 
-    pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Value> {
+    pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Hash256> {
         let mut giver_meta = self
             .latest
             .accounts
             .get(&GIVER_ADDR)
             .cloned()
             .context("Giver account not found")?;
-        let giver_balance = giver_meta.cached_balance.unwrap_or(0);
+        let giver_balance = giver_meta.balance;
         if giver_balance < amount {
             anyhow::bail!("Giver has insufficient balance");
         }
-
-        let src_addr = IntAddr::Std(StdAddr::new(
-            GIVER_ADDR
-                .workchain
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Invalid giver workchain {}", GIVER_ADDR.workchain))?,
-            HashBytes(GIVER_ADDR.addr),
-        ));
-        let dst_addr = IntAddr::Std(StdAddr::new(
-            addr.workchain
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Invalid destination workchain {}", addr.workchain))?,
-            HashBytes(addr.addr),
-        ));
 
         let message_info = IntMsgInfo {
             ihr_disabled: true,
             bounce: false,
             bounced: false,
-            src: src_addr,
-            dst: dst_addr,
+            src: GIVER_ADDR.into(),
+            dst: addr.into(),
             ihr_fee: Default::default(),
             value: CurrencyCollection::new(amount),
             fwd_fee: Default::default(),
@@ -1784,52 +2741,181 @@ impl Node {
 
         // Decrease giver balance before injecting the internal message. The local faucet
         // models a single destination transaction, so the source account is adjusted here.
-        giver_meta.cached_balance = Some(giver_balance - amount);
+        giver_meta.balance = giver_balance - amount;
         self.latest.accounts.insert(GIVER_ADDR, giver_meta);
+        self.latest_shard_state = None;
 
-        let (_, tx_hash, block_seqno, _) =
-            self.send_internal_boc(BocRepr::encode(message)?.into())?;
-
-        Ok(serde_json::json!({
-            "ok": true,
-            "result": {
-                "tx_hash": tx_hash.to_hex(),
-                "block_seqno": block_seqno
-            }
-        }))
+        self.send_internal_boc(BocRepr::encode(message)?.into())
     }
 }
 
-fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
-    let cell = Boc::decode(boc)?;
-    let hash = cell.repr_hash();
-    Ok(Hash256(*hash.as_array()))
+fn estimate_storage_fee(
+    config: &BlockchainConfigParams,
+    account: Option<&Account>,
+    address: &Addr,
+    now: u32,
+) -> anyhow::Result<u64> {
+    let Some(account) = account else {
+        return Ok(0);
+    };
+    let last_paid = account.storage_stat.last_paid;
+    let is_masterchain = address.workchain == -1;
+    let is_special = is_masterchain
+        && config
+            .get_fundamental_addresses()
+            .context("Failed to load fundamental addresses")?
+            .contains_key(HashBytes(address.addr))
+            .context("Failed to check fundamental address")?;
+
+    let mut all_prices = config
+        .get_storage_prices()
+        .context("Failed to load storage prices")?
+        .iter()
+        .map(|entry| entry.map(|(_, prices)| prices))
+        .collect::<Result<Vec<_>, _>>()?;
+    all_prices.sort_unstable_by_key(|prices| prices.utime_since);
+    if now <= last_paid
+        || last_paid == 0
+        || is_special
+        || all_prices.is_empty()
+        || now <= all_prices[0].utime_since
+    {
+        return Ok(0);
+    }
+
+    let mut index = all_prices.len();
+    while index > 0 && all_prices[index - 1].utime_since > last_paid {
+        index -= 1;
+    }
+    index = index.saturating_sub(1);
+
+    let cells = u64::from(account.storage_stat.used.cells);
+    let bits = u64::from(account.storage_stat.used.bits);
+    let mut upto = last_paid.max(all_prices[0].utime_since);
+    let mut total = BigUint::default();
+    for (position, prices) in all_prices.iter().enumerate().skip(index) {
+        if upto >= now {
+            break;
+        }
+        let valid_until = all_prices
+            .get(position + 1)
+            .map_or(now, |next| now.min(next.utime_since));
+        if upto < valid_until {
+            let (cell_price, bit_price) = if is_masterchain {
+                (prices.mc_cell_price_ps, prices.mc_bit_price_ps)
+            } else {
+                (prices.cell_price_ps, prices.bit_price_ps)
+            };
+            let rate = BigUint::from(cells) * cell_price + BigUint::from(bits) * bit_price;
+            total += rate * (valid_until - upto);
+        }
+        upto = valid_until;
+    }
+
+    let rounded = (total + BigUint::from(u16::MAX)) >> 16_usize;
+    u64::try_from(rounded).context("storage fee does not fit u64")
 }
 
-fn account_state_preview_from_boc(shard_account_boc: &BocBytes) -> Option<AccountStatePreview> {
-    let hash = compute_boc_hash(shard_account_boc).ok()?;
+fn estimate_action_forward_fees(
+    config: Arc<Dict<u32, Cell>>,
+    actions: Option<&BocBytes>,
+    source_is_masterchain: bool,
+) -> anyhow::Result<u128> {
+    let Some(actions) = actions else {
+        return Ok(0);
+    };
+    let actions = Boc::decode(actions).context("Failed to decode output actions BOC")?;
+    let actions = actions
+        .as_slice()
+        .context("Failed to read output actions cell")?;
+    let mut total = 0_u128;
+    for action in OutActionsRevIter::new(actions) {
+        let OutAction::SendMsg { out_msg, .. } = action.context("Failed to parse output action")?
+        else {
+            continue;
+        };
+        let message = out_msg.load().context("Failed to load output message")?;
+        let destination_is_masterchain = match &message.info {
+            RelaxedMsgInfo::Int(info) => info.dst.is_masterchain(),
+            RelaxedMsgInfo::ExtOut(_) => false,
+        };
+        let (fee, _) = Emulator::compute_message_fwd_fee(
+            Arc::clone(&config),
+            &message,
+            source_is_masterchain || destination_is_masterchain,
+        )?;
+        total = total
+            .checked_add(u128::from(fee))
+            .context("forwarding fee overflow")?;
+    }
+    Ok(total)
+}
+
+fn store_account_state_cell_from_shard_account_boc(
+    cas: &mut CellStore,
+    shard_account_boc: &BocBytes,
+) -> Option<Hash256> {
     let cell = Boc::decode(shard_account_boc).ok()?;
     let shard_account = cell.parse::<ShardAccount>().ok()?;
-    let optional_account = shard_account.account.load().ok()?;
+    let account_cell = shard_account.account.inner().clone();
+    Some(cas.put_cell(account_cell))
+}
+
+fn account_state_snapshot_from_boc(boc: &BocBytes) -> Option<AccountStateSnapshot> {
+    let cell = Boc::decode(boc).ok()?;
+    account_state_snapshot_from_cell(&cell)
+}
+
+fn account_state_snapshot_from_cell(cell: &Cell) -> Option<AccountStateSnapshot> {
+    if let Ok(shard_account) = cell.parse::<ShardAccount>() {
+        let hash = Hash256::from(shard_account.account.inner().repr_hash());
+        let optional_account = shard_account.account.load().ok()?;
+        return Some(account_state_snapshot_from_optional_account(
+            hash,
+            optional_account,
+        ));
+    }
+
+    let hash = Hash256::from(cell.repr_hash());
+    let optional_account = cell.parse::<OptionalAccount>().ok()?;
+    Some(account_state_snapshot_from_optional_account(
+        hash,
+        optional_account,
+    ))
+}
+
+fn account_state_snapshot_from_account_state_cell(cell: &Cell) -> Option<AccountStateSnapshot> {
+    let hash = Hash256::from(cell.repr_hash());
+    let optional_account = cell.parse::<OptionalAccount>().ok()?;
+    Some(account_state_snapshot_from_optional_account(
+        hash,
+        optional_account,
+    ))
+}
+
+fn account_state_snapshot_from_optional_account(
+    hash: Hash256,
+    optional_account: OptionalAccount,
+) -> AccountStateSnapshot {
     let Some(account) = optional_account.0 else {
-        return Some(AccountStatePreview {
+        return AccountStateSnapshot {
             hash,
             balance: 0,
             status: AccountStatus::Nonexist,
-            code_hash: None,
-            data_hash: None,
+            code: None,
+            data: None,
             frozen_hash: None,
-        });
+        };
     };
 
-    let mut code_hash = None;
-    let mut data_hash = None;
+    let mut code = None;
+    let mut data = None;
     let mut frozen_hash = None;
     let status = match account.state {
         AccountState::Uninit => AccountStatus::Uninit,
         AccountState::Active(state) => {
-            code_hash = state.code.map(|cell| Hash256(*cell.repr_hash().as_array()));
-            data_hash = state.data.map(|cell| Hash256(*cell.repr_hash().as_array()));
+            code = state.code;
+            data = state.data;
             AccountStatus::Active
         }
         AccountState::Frozen(state) => {
@@ -1838,14 +2924,23 @@ fn account_state_preview_from_boc(shard_account_boc: &BocBytes) -> Option<Accoun
         }
     };
 
-    Some(AccountStatePreview {
+    AccountStateSnapshot {
         hash,
         balance: account.balance.tokens.into(),
         status,
-        code_hash,
-        data_hash,
+        code,
+        data,
         frozen_hash,
-    })
+    }
+}
+
+const fn tycho_account_status(status: AccountStatus) -> tycho_types::models::AccountStatus {
+    match status {
+        AccountStatus::Active => tycho_types::models::AccountStatus::Active,
+        AccountStatus::Uninit => tycho_types::models::AccountStatus::Uninit,
+        AccountStatus::Frozen => tycho_types::models::AccountStatus::Frozen,
+        AccountStatus::Nonexist => tycho_types::models::AccountStatus::NotExists,
+    }
 }
 
 fn collect_code_data_cells(
@@ -1874,14 +2969,14 @@ fn collect_code_data_cells(
     };
 
     if let Some(code) = state.code {
-        let hash = Hash256(*code.repr_hash().as_array());
+        let hash = Hash256::from(code.repr_hash());
         code_cells
             .entry(hash)
             .or_insert_with(|| Boc::encode(code).into());
     }
 
     if let Some(data) = state.data {
-        let hash = Hash256(*data.repr_hash().as_array());
+        let hash = Hash256::from(data.repr_hash());
         data_cells
             .entry(hash)
             .or_insert_with(|| Boc::encode(data).into());
@@ -1901,13 +2996,27 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
 
 fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let cell = Boc::decode(boc)?;
+    parse_msg_meta_with_kind_from_cell(&cell, hash)
+}
+
+fn parse_msg_meta_from_cell(cell: &Cell, hash: Hash256) -> anyhow::Result<MsgMeta> {
+    Ok(parse_msg_meta_with_kind_from_cell(cell, hash)?.0)
+}
+
+fn parse_msg_meta_with_kind_from_cell(
+    cell: &Cell,
+    hash: Hash256,
+) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let msg = cell.parse::<Message<'_>>()?;
 
+    let hash_norm = matches!(&msg.info, MsgInfo::ExtIn(_))
+        .then(|| compute_normalized_ext_in_hash(&msg))
+        .transpose()?;
     let (kind, src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
             MessageKind::Internal,
-            Some(convert_addr(&info.src)),
-            Some(convert_addr(&info.dst)),
+            Some((&info.src).into()),
+            Some((&info.dst).into()),
             Some(info.value.tokens.into()),
             Some(info.bounce),
             Some(info.created_lt),
@@ -1916,7 +3025,7 @@ fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMet
         MsgInfo::ExtIn(info) => (
             MessageKind::ExternalIn,
             None,
-            Some(convert_addr(&info.dst)),
+            Some((&info.dst).into()),
             None,
             None,
             None,
@@ -1924,7 +3033,7 @@ fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMet
         ),
         MsgInfo::ExtOut(info) => (
             MessageKind::ExternalOut,
-            Some(convert_addr(&info.src)),
+            Some((&info.src).into()),
             None,
             None,
             None,
@@ -1936,6 +3045,7 @@ fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMet
     Ok((
         MsgMeta {
             msg_hash: hash,
+            hash_norm,
             msg_boc_hash: hash,
             src,
             dst,
@@ -1948,96 +3058,22 @@ fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMet
     ))
 }
 
-const fn convert_addr(addr: &IntAddr) -> Addr {
-    let mut bytes = [0u8; 32];
-    let (workchain, address) = match addr {
-        IntAddr::Std(std) => (std.workchain as i32, std.address.0),
-        IntAddr::Var(var) => (var.workchain, {
-            // skipped from TVM 11
-            [0u8; 32]
-        }),
-    };
-    bytes.copy_from_slice(&address);
-    Addr {
-        workchain,
-        addr: bytes,
+fn library_ref_hash(cell: &Cell) -> anyhow::Result<Option<Hash256>> {
+    const EXOTIC_LIBRARY_TAG: u8 = 2;
+    if !cell.is_exotic() {
+        return Ok(None);
     }
-}
 
-fn create_dev_block_boc(seqno: Seqno, tx_hash: Hash256) -> anyhow::Result<BocBytes> {
-    let mut builder = CellBuilder::new();
-    builder.store_u32(seqno)?;
-    builder.store_u256(&HashBytes(tx_hash.0))?;
-    let cell = builder.build()?;
-    Ok(Boc::encode(cell).into())
-}
-
-fn resolve_offchain_jetton_content(mut content: Value) -> Value {
-    let Some(uri) = content
-        .get("uri")
-        .and_then(Value::as_str)
-        .filter(|uri| uri.starts_with("https://") || uri.starts_with("http://"))
-        .map(ToOwned::to_owned)
-    else {
-        return content;
-    };
-
-    let Ok(client) = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .build()
-    else {
-        return content;
-    };
-    let Ok(response) = client.get(uri).send() else {
-        return content;
-    };
-    if !response.status().is_success() {
-        return content;
+    let slice = cell.as_slice_allow_exotic();
+    if slice.size_bits() != 8 + 256 {
+        return Ok(None);
     }
-    let Ok(remote_content) = response.json::<Value>() else {
-        return content;
-    };
 
-    merge_jetton_content(&mut content, &remote_content);
-    content
-}
-
-fn merge_jetton_content(content: &mut Value, remote_content: &Value) {
-    let Some(content) = content.as_object_mut() else {
-        return;
-    };
-    let Some(remote_content) = remote_content.as_object() else {
-        return;
-    };
-
-    for key in [
-        "name",
-        "description",
-        "image",
-        "image_data",
-        "symbol",
-        "decimals",
-        "amount_style",
-        "render_type",
-    ] {
-        if content
-            .get(key)
-            .and_then(Value::as_str)
-            .is_some_and(|value| !value.is_empty())
-        {
-            continue;
-        }
-
-        match remote_content.get(key) {
-            Some(Value::String(value)) if !value.is_empty() => {
-                content.insert(key.to_string(), Value::String(value.clone()));
-            }
-            Some(Value::Number(value)) => {
-                content.insert(key.to_string(), Value::String(value.to_string()));
-            }
-            _ => {}
-        }
+    let mut slice = cell.as_slice_allow_exotic();
+    if slice.load_u8()? != EXOTIC_LIBRARY_TAG {
+        return Ok(None);
     }
+    Ok(Some(Hash256(slice.load_u256()?.0)))
 }
 
 #[cfg(test)]
@@ -2045,15 +3081,20 @@ mod tests {
     use super::*;
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use crate::node::StateSource;
-    use base64::Engine;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
     use std::time::{SystemTime, UNIX_EPOCH};
     use ton_executor::DEFAULT_CONFIG;
     use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
     use tycho_types::dict::Dict;
+    use tycho_types::models::block::Block;
+    use tycho_types::models::transaction::{
+        ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
+        Transaction, TxInfo,
+    };
     use tycho_types::models::{
-        Account, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib, StateInit, StdAddr,
+        Account, BlockchainConfigParams, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib,
+        StateInit, StdAddr, StdAddrFormat,
     };
 
     struct NoopExecutor;
@@ -2071,9 +3112,77 @@ mod tests {
         }
     }
 
+    struct SingleTxExecutor;
+
+    impl TvmExecutor for SingleTxExecutor {
+        fn execute(
+            &self,
+            shard_account: &BocBytes,
+            in_msg: &BocBytes,
+            ctx: &ExecContext,
+            _config: &BocBytes,
+            _libs: Option<&BocBytes>,
+        ) -> anyhow::Result<ExecResult> {
+            let in_msg_cell = Boc::decode(in_msg)?;
+            let in_msg_owned = in_msg_cell.parse::<OwnedMessage>()?;
+            let dst = match &in_msg_owned.info {
+                MsgInfo::Int(info) => Addr::from(&info.dst),
+                MsgInfo::ExtIn(info) => Addr::from(&info.dst),
+                MsgInfo::ExtOut(_) => anyhow::bail!("test executor does not accept ext-out"),
+            };
+
+            let old_shard_account = Boc::decode(shard_account)?.parse::<ShardAccount>()?;
+            let old_account_hash = *old_shard_account.account.inner().repr_hash();
+            let new_account_boc =
+                make_active_shard_account_boc_with_state(dst, None, None, Dict::new(), 42_000);
+            let new_account_cell = Boc::decode(&new_account_boc)?;
+            let new_shard_account = new_account_cell.parse::<ShardAccount>()?;
+            let new_account_hash = *new_shard_account.account.inner().repr_hash();
+
+            let tx = Transaction {
+                account: HashBytes(dst.addr),
+                lt: ctx.lt,
+                prev_trans_hash: HashBytes::ZERO,
+                prev_trans_lt: 0,
+                now: ctx.gen_utime,
+                out_msg_count: tycho_types::num::Uint15::ZERO,
+                orig_status: tycho_types::models::AccountStatus::NotExists,
+                end_status: tycho_types::models::AccountStatus::Active,
+                in_msg: Some(in_msg_cell),
+                out_msgs: Dict::new(),
+                total_fees: CurrencyCollection::ZERO,
+                state_update: Lazy::new(&HashUpdate {
+                    old: old_account_hash,
+                    new: new_account_hash,
+                })?,
+                info: Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
+                    credit_first: false,
+                    storage_phase: None,
+                    credit_phase: None,
+                    compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                        reason: ComputePhaseSkipReason::NoState,
+                    }),
+                    action_phase: None,
+                    aborted: true,
+                    bounce_phase: None,
+                    destroyed: false,
+                }))?,
+            };
+
+            Ok(ExecResult {
+                tx: tx.clone(),
+                tx_boc: BocRepr::encode(tx)?.into(),
+                new_account_boc,
+                out_msg_cells: Vec::new(),
+                actions: None,
+            })
+        }
+    }
+
     #[derive(Clone)]
     struct RecordingExecutor {
         recorded_libs: Arc<Mutex<Vec<Option<BocBytes>>>>,
+        recorded_prev_blocks_info: Arc<Mutex<Vec<PrevBlocksInfo>>>,
     }
 
     impl TvmExecutor for RecordingExecutor {
@@ -2081,7 +3190,7 @@ mod tests {
             &self,
             _shard_account: &BocBytes,
             _in_msg: &BocBytes,
-            _ctx: &ExecContext,
+            ctx: &ExecContext,
             _config: &BocBytes,
             libs: Option<&BocBytes>,
         ) -> anyhow::Result<ExecResult> {
@@ -2089,15 +3198,30 @@ mod tests {
                 .lock()
                 .expect("recorded libs mutex poisoned")
                 .push(libs.cloned());
+            self.recorded_prev_blocks_info
+                .lock()
+                .expect("recorded prev blocks info mutex poisoned")
+                .push(ctx.prev_blocks_info.clone());
             anyhow::bail!("forced executor failure")
         }
     }
 
     fn make_test_node(executor: Box<dyn TvmExecutor>) -> Node {
-        let config_bytes = base64::engine::general_purpose::STANDARD
-            .decode(DEFAULT_CONFIG)
-            .expect("must decode default config");
-        Node::new(executor, config_bytes.into(), StateSource::Local).expect("must create test node")
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        Node::new(executor, config_boc, StateSource::Local).expect("must create test node")
+    }
+
+    fn block_meta(seqno: Seqno) -> BlockMeta {
+        BlockMeta {
+            seqno,
+            prev_seqno: (seqno > 1).then_some(seqno - 1),
+            gen_utime: seqno,
+            start_lt: u64::from(seqno),
+            end_lt: u64::from(seqno),
+            tx_hashes: Vec::new(),
+            block_hash: Hash256([seqno as u8; 32]),
+            file_hash: Hash256([seqno as u8; 32]),
+        }
     }
 
     #[test]
@@ -2112,12 +3236,10 @@ mod tests {
         ));
         let db_path = temp_root.join("build/data/localnet.db");
 
-        let config_bytes = base64::engine::general_purpose::STANDARD
-            .decode(DEFAULT_CONFIG)
-            .expect("must decode default config");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
         let node = Node::with_db_path(
             Box::new(NoopExecutor),
-            config_bytes.into(),
+            config_boc,
             StateSource::Local,
             Some(&db_path),
         )
@@ -2128,9 +3250,74 @@ mod tests {
             db_path.parent().is_some_and(std::path::Path::exists),
             "db parent directories must be created"
         );
-        assert!(node.conn.is_some(), "sqlite connection must be initialized");
+        assert!(
+            node.persistence.is_some(),
+            "sqlite persistence must be initialized"
+        );
 
         drop(node);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn db_reopen_restores_latest_block_config() {
+        const TEST_PARAM: u32 = 999;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-config-reopen-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let initial_config =
+            BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            initial_config.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let mut marker = CellBuilder::new();
+        marker
+            .store_u32(0xfeed_cafe)
+            .expect("test config marker must fit");
+        let mut params = BlockchainConfigParams::from_raw(node.config_cell.clone());
+        params
+            .set_raw(
+                TEST_PARAM,
+                marker.build().expect("test config marker must build"),
+            )
+            .expect("test config param must be inserted");
+        let config_cell = params
+            .as_dict()
+            .root()
+            .as_ref()
+            .expect("config dictionary must remain non-empty")
+            .clone();
+        let config_hash = Hash256::from(config_cell.repr_hash());
+        node.cas
+            .put(BocBytes::from(Boc::encode(config_cell)), config_hash);
+        node.globals.config_boc_hash = config_hash;
+        node.mine_block().expect("config block must be mined");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            initial_config,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(reopened.globals.config_boc_hash, config_hash);
+        assert_eq!(Hash256::from(reopened.config_cell.repr_hash()), config_hash);
+
+        drop(reopened);
         let _ = std::fs::remove_dir_all(temp_root);
     }
 
@@ -2146,12 +3333,10 @@ mod tests {
         ));
         let db_path = temp_root.join("localnet.db");
 
-        let config_bytes = base64::engine::general_purpose::STANDARD
-            .decode(DEFAULT_CONFIG)
-            .expect("must decode default config");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
         let mut node = Node::with_db_path(
             Box::new(NoopExecutor),
-            config_bytes.clone().into(),
+            config_boc.clone(),
             StateSource::Local,
             Some(&db_path),
         )
@@ -2166,14 +3351,13 @@ mod tests {
             ]
         });
 
-        node.history
-            .set_compiler_abi(code_hash, compiler_abi.clone())
+        node.set_compiler_abi(code_hash, compiler_abi.clone())
             .expect("must persist compiler ABI");
         drop(node);
 
         let reopened = Node::with_db_path(
             Box::new(NoopExecutor),
-            config_bytes.into(),
+            config_boc,
             StateSource::Local,
             Some(&db_path),
         )
@@ -2183,6 +3367,472 @@ mod tests {
             reopened.history.get_compiler_abi(&code_hash),
             Some(compiler_abi),
             "compiler ABI registry must survive node restart"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn verified_source_registry_persists_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-verified-source-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let code_hash = Hash256([0x24; 32]);
+        let source = json!({
+            "code_hash": code_hash.to_hex(),
+            "verified": true,
+            "bundles": [
+                {
+                    "source_bundle_hash": "source-bundle",
+                    "verified_at": 0,
+                    "storage_revision": "local",
+                    "entrypoint": "contracts/main.tolk",
+                    "compiler": {
+                        "language": "tolk",
+                        "version": "1.4.0",
+                        "params": {}
+                    },
+                    "files": []
+                }
+            ]
+        });
+
+        node.set_verified_source(code_hash, source.clone())
+            .expect("must persist verified source");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(
+            reopened.history.get_verified_source(&code_hash),
+            Some(source),
+            "verified source registry must survive node restart"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn db_reopen_restores_transactions_messages_and_account_history() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-history-reopen-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let account = test_addr(0x42);
+        let tx_hash = Hash256([0x10; 32]);
+        let in_msg_hash = Hash256([0x11; 32]);
+        let in_msg_hash_norm = Hash256([0x21; 32]);
+        let out_msg_hash = Hash256([0x12; 32]);
+        let block_hash = Hash256([0x13; 32]);
+        let dummy_cell = Cell::default();
+        let dummy_hash = Hash256::from(dummy_cell.repr_hash());
+        let dummy_boc = BocBytes::from(Boc::encode(dummy_cell));
+        let account_boc = make_uninit_shard_account_boc(account);
+        let account_meta = store_test_account_meta(&mut node, &account_boc, AccountStatus::Uninit);
+        node.cas.put(dummy_boc, dummy_hash);
+        node.history.msg_by_hash.insert(
+            in_msg_hash,
+            MsgMeta {
+                msg_hash: in_msg_hash,
+                hash_norm: Some(in_msg_hash_norm),
+                msg_boc_hash: dummy_hash,
+                src: None,
+                dst: Some(account),
+                value: None,
+                bounce: None,
+                created_lt: None,
+                created_at: None,
+            },
+        );
+        node.history.msg_by_hash.insert(
+            out_msg_hash,
+            MsgMeta {
+                msg_hash: out_msg_hash,
+                hash_norm: None,
+                msg_boc_hash: dummy_hash,
+                src: Some(account),
+                dst: Some(test_addr(0x43)),
+                value: Some(1),
+                bounce: Some(false),
+                created_lt: Some(2),
+                created_at: Some(3),
+            },
+        );
+
+        let tx_meta = TxMeta {
+            tx_hash,
+            account,
+            lt: 1,
+            now: 3,
+            aborted: false,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+            in_msg_hash: Some(in_msg_hash),
+            out_msg_hashes: vec![out_msg_hash],
+            block_seqno: 1,
+        };
+        let block_meta = BlockMeta {
+            seqno: 1,
+            prev_seqno: None,
+            gen_utime: 3,
+            start_lt: 1,
+            end_lt: 1,
+            tx_hashes: vec![tx_hash],
+            block_hash,
+            file_hash: block_hash,
+        };
+        node.apply_commit(PendingCommit {
+            block_meta,
+            masterchain_block_meta: None,
+            tx_metas: vec![tx_meta.clone()],
+            deltas: vec![AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(account_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(account_meta.clone()),
+            }],
+            out_msg_hashes: vec![out_msg_hash],
+            msg_to_tx: vec![(in_msg_hash, tx_hash)],
+            deferred_msg_hashes: Vec::new(),
+        })
+        .expect("commit must persist");
+        node.apply_commit(PendingCommit {
+            block_meta: BlockMeta {
+                seqno: 2,
+                prev_seqno: Some(1),
+                gen_utime: 4,
+                start_lt: 2,
+                end_lt: 2,
+                tx_hashes: Vec::new(),
+                block_hash: Hash256([0x14; 32]),
+                file_hash: Hash256([0x14; 32]),
+            },
+            masterchain_block_meta: None,
+            tx_metas: Vec::new(),
+            deltas: vec![AccountDelta {
+                addr: account,
+                old_hash: Some(account_meta.account_hash),
+                new_hash: None,
+                old_meta: Some(account_meta.clone()),
+                new_meta: None,
+            }],
+            out_msg_hashes: Vec::new(),
+            msg_to_tx: Vec::new(),
+            deferred_msg_hashes: Vec::new(),
+        })
+        .expect("account removal must persist");
+        drop(node);
+
+        let mut reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+        let reopened_block = reopened
+            .get_block_header(1)
+            .expect("persisted block must be loaded");
+
+        assert_eq!(reopened_block.tx_hashes, vec![tx_hash]);
+        let txs = reopened
+            .get_block_transactions(&reopened_block)
+            .expect("persisted block transactions must resolve");
+        assert_eq!(txs.len(), 1);
+        assert_eq!(txs[0].tx_hash, tx_meta.tx_hash);
+        assert_eq!(txs[0].in_msg_hash, tx_meta.in_msg_hash);
+        assert_eq!(txs[0].out_msg_hashes, tx_meta.out_msg_hashes);
+        assert_eq!(
+            reopened
+                .get_message_info(&in_msg_hash)
+                .map(|message| message.meta.hash_norm),
+            Some(Some(in_msg_hash_norm))
+        );
+        assert!(reopened.get_message_info(&out_msg_hash).is_some());
+        assert_eq!(reopened.history.msg_to_tx.get(&in_msg_hash), Some(&tx_hash));
+        assert_eq!(
+            reopened.indexes.tx_by_out_msg.get(&out_msg_hash),
+            Some(&tx_hash)
+        );
+        assert!(!reopened.latest.accounts.contains_key(&account));
+        assert_eq!(reopened.history.deltas_by_seqno.len(), 2);
+        assert_eq!(
+            reopened
+                .get_address_information_at_block(&account, 1)
+                .map(|meta| meta.account_hash),
+            Some(account_meta.account_hash)
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn db_reopen_preserves_account_workchain() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-address-reopen-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let masterchain_account = Addr {
+            workchain: -1,
+            addr: [0x45; 32],
+        };
+        node.set_shard_account(
+            &masterchain_account,
+            make_uninit_shard_account_boc(masterchain_account),
+        )
+        .expect("masterchain account must persist");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(reopened.latest.accounts.contains_key(&masterchain_account));
+        assert!(!reopened.latest.accounts.contains_key(&Addr {
+            workchain: 0,
+            addr: masterchain_account.addr,
+        }));
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn snapshot_load_rebuilds_historical_account_and_out_message_indexes() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-snapshot-indexes-test-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&temp_root).expect("must create temp dir");
+        let snapshot_path = temp_root.join("state.json");
+
+        let account = test_addr(0x44);
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_boc = make_uninit_shard_account_boc(account);
+        let account_hash = Hash256::from(
+            Boc::decode(&account_boc)
+                .expect("account BOC must decode")
+                .repr_hash(),
+        );
+        node.cas.put(account_boc, account_hash);
+        let account_meta = AccountMeta {
+            account_hash,
+            status: AccountStatus::Active,
+            balance: 7,
+            extra_currencies: Vec::new(),
+            last_trans_lt: Some(10),
+            last_trans_hash: Some(Hash256([0x42; 32])),
+            code_hash: None,
+            data_hash: None,
+            frozen_hash: None,
+        };
+        let tx_hash = Hash256([0x10; 32]);
+        let message_cell = Cell::default();
+        let out_msg_hash = Hash256::from(message_cell.repr_hash());
+        node.cas
+            .put(BocBytes::from(Boc::encode(message_cell)), out_msg_hash);
+        node.history.msg_by_hash.insert(
+            out_msg_hash,
+            MsgMeta {
+                msg_hash: out_msg_hash,
+                hash_norm: None,
+                msg_boc_hash: out_msg_hash,
+                src: Some(account),
+                dst: None,
+                value: None,
+                bounce: None,
+                created_lt: None,
+                created_at: None,
+            },
+        );
+        node.globals.head_seqno = 2;
+        node.history.blocks.push(BlockMeta {
+            seqno: 1,
+            prev_seqno: None,
+            gen_utime: 3,
+            start_lt: 10,
+            end_lt: 10,
+            tx_hashes: vec![tx_hash],
+            block_hash: Hash256([0x12; 32]),
+            file_hash: Hash256([0x12; 32]),
+        });
+        node.history.blocks.push(BlockMeta {
+            seqno: 2,
+            prev_seqno: Some(1),
+            gen_utime: 4,
+            start_lt: 10,
+            end_lt: 10,
+            tx_hashes: Vec::new(),
+            block_hash: Hash256([0x13; 32]),
+            file_hash: Hash256([0x13; 32]),
+        });
+        node.history.deltas_by_seqno = vec![
+            vec![AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(account_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(account_meta.clone()),
+            }],
+            Vec::new(),
+        ];
+        node.history.tx_by_hash.insert(
+            tx_hash,
+            TxMeta {
+                tx_hash,
+                account,
+                lt: 10,
+                now: 3,
+                aborted: false,
+                compute_exit_code: Some(0),
+                action_result_code: Some(0),
+                total_fees: 0,
+                storage_fees: 0,
+                other_fees: 0,
+                in_msg_hash: None,
+                out_msg_hashes: vec![out_msg_hash],
+                block_seqno: 1,
+            },
+        );
+        node.dump_state_to_path(&snapshot_path)
+            .expect("snapshot must dump");
+
+        let mut loaded = make_test_node(Box::new(NoopExecutor));
+        loaded
+            .load_state_from_path(&snapshot_path)
+            .expect("snapshot must load");
+
+        assert_eq!(
+            loaded
+                .get_address_information_at_block(&account, 1)
+                .map(|meta| meta.balance),
+            Some(account_meta.balance)
+        );
+        assert_eq!(
+            loaded.indexes.tx_by_out_msg.get(&out_msg_hash),
+            Some(&tx_hash)
+        );
+        assert_eq!(loaded.indexes.tx_by_block.get(&1), Some(&vec![tx_hash]));
+
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn invalid_snapshot_does_not_replace_memory_or_sqlite_state() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-atomic-snapshot-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+        let before = node.dump_state_to_json().expect("state must dump");
+        let mut invalid: Value = serde_json::from_slice(&before).expect("state must be valid JSON");
+        invalid["globals"]["config_boc_hash"] = Value::String("ff".repeat(32));
+        let invalid = serde_json::to_vec(&invalid).expect("invalid state must serialize");
+
+        let error = node
+            .load_state_from_json(&invalid)
+            .expect_err("state with missing config must be rejected");
+        assert!(error.to_string().contains("Config missing"));
+        assert_eq!(
+            node.dump_state_to_json()
+                .expect("live state must still dump"),
+            before,
+            "failed load must not mutate live state"
+        );
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+        assert_eq!(
+            reopened
+                .dump_state_to_json()
+                .expect("reopened state must dump"),
+            before,
+            "failed load must not replace SQLite state"
         );
 
         drop(reopened);
@@ -2220,7 +3870,7 @@ mod tests {
             "decimals": 9
         });
 
-        merge_jetton_content(&mut content, &remote_content);
+        ton_indexer::jettons::merge_jetton_content(&mut content, &remote_content);
 
         assert_eq!(content["uri"], "https://example.test/jetton.json");
         assert_eq!(content["name"], "Tether USD");
@@ -2235,7 +3885,7 @@ mod tests {
         boc: &BocBytes,
         status: AccountStatus,
     ) -> AccountMeta {
-        let account_hash = compute_boc_hash(boc).expect("must hash shard account");
+        let account_hash = boc.hash().expect("must hash shard account");
         node.cas.put(boc.clone(), account_hash);
         let cached_balance = if status == AccountStatus::Nonexist {
             0
@@ -2245,7 +3895,8 @@ mod tests {
         AccountMeta {
             account_hash,
             status,
-            cached_balance: Some(cached_balance),
+            balance: cached_balance,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(0),
             last_trans_hash: None,
             code_hash: None,
@@ -2357,14 +4008,468 @@ mod tests {
         Boc::encode(cell).into()
     }
 
-    fn single_library_lookup(node: &Node, hash: Hash256) -> GlobalLibraryLookup {
-        let mut entries = node.get_libraries(&[hash]);
-        assert_eq!(entries.len(), 1, "expected one lookup result");
-        entries.remove(0)
+    fn account_state_hash_from_shard_account_boc(boc: &BocBytes) -> Hash256 {
+        let cell = Boc::decode(boc).expect("shard account BOC must decode");
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .expect("shard account BOC must parse");
+        Hash256::from(shard_account.account.inner().repr_hash())
+    }
+
+    #[test]
+    fn account_state_snapshot_uses_account_state_hash_and_balance() {
+        let account = test_addr(0x21);
+        let code = make_lib_root(0xc0de);
+        let data = make_lib_root(0xda7a);
+        let boc = make_active_shard_account_boc_with_state(
+            account,
+            Some(code.clone()),
+            Some(data.clone()),
+            Dict::new(),
+            12_345_678,
+        );
+
+        let snapshot = account_state_snapshot_from_boc(&boc).expect("snapshot must parse");
+
+        assert_eq!(
+            snapshot.hash,
+            account_state_hash_from_shard_account_boc(&boc)
+        );
+        assert_eq!(snapshot.balance, 12_345_678);
+        assert_eq!(snapshot.status, AccountStatus::Active);
+        assert_eq!(snapshot.code_hash(), Some(Hash256::from(code.repr_hash())));
+        assert_eq!(snapshot.data_hash(), Some(Hash256::from(data.repr_hash())));
+        assert_eq!(snapshot.code.as_ref(), Some(&code));
+        assert_eq!(snapshot.data.as_ref(), Some(&data));
+    }
+
+    #[test]
+    fn account_state_snapshot_lookup_scans_shard_account_bocs_by_account_state_hash() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x22);
+        let boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 777_000);
+        let shard_hash = boc.hash().expect("shard account BOC must hash");
+        node.cas.put(boc.clone(), shard_hash);
+
+        let snapshot = node
+            .find_account_state_snapshot(&account_state_hash_from_shard_account_boc(&boc))
+            .expect("snapshot must be found by account state hash");
+
+        assert_eq!(snapshot.balance, 777_000);
+        assert_eq!(snapshot.status, AccountStatus::Active);
+    }
+
+    #[test]
+    fn account_state_snapshot_lookup_reads_stored_account_state_cell_directly() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x23);
+        let boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 888_000);
+        let state_hash = store_account_state_cell_from_shard_account_boc(&mut node.cas, &boc)
+            .expect("account state cell must be stored");
+
+        let snapshot = node
+            .find_account_state_snapshot(&state_hash)
+            .expect("snapshot must be found by stored account state hash");
+
+        assert_eq!(snapshot.hash, state_hash);
+        assert_eq!(snapshot.balance, 888_000);
+        assert_eq!(snapshot.status, AccountStatus::Active);
+    }
+
+    #[test]
+    fn mine_block_creates_empty_block_without_pending_messages() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let assert_pruned_masterchain_block = |node: &Node, seqno| {
+            let masterchain_block = node
+                .get_masterchain_block_header(seqno)
+                .expect("masterchain block must be stored");
+            let masterchain_block_boc = node
+                .get_masterchain_block_data(seqno)
+                .expect("masterchain block BOC must be stored");
+            let config_boc = node
+                .get_cell(&node.globals.config_boc_hash)
+                .expect("config BOC must be stored");
+            assert!(
+                masterchain_block_boc.len() < config_boc.len() / 4,
+                "masterchain block BOC should not serialize the full config subtree"
+            );
+            let masterchain_state = node
+                .get_masterchain_state_cell(seqno)
+                .expect("masterchain state must be rebuildable");
+            assert_eq!(
+                Hash256::from(masterchain_state.repr_hash()),
+                masterchain_block.state_root_hash
+            );
+            masterchain_block_boc.len()
+        };
+        let assert_pruned_shard_block = |node: &Node, seqno| {
+            let block_boc = node
+                .get_block_data(seqno)
+                .expect("shard block BOC must be stored");
+            let block_cell = Boc::decode(&block_boc).expect("shard block BOC must decode");
+            let block = block_cell.parse::<Block>().expect("shard block must parse");
+            let state_update = block
+                .load_state_update()
+                .expect("shard block state update must load");
+            let shard_state = node
+                .get_shard_state_cell(seqno)
+                .expect("shard state must be rebuildable");
+
+            assert_eq!(
+                Hash256::from(shard_state.repr_hash()),
+                Hash256::from(&state_update.new_hash)
+            );
+            block_boc.len()
+        };
+
+        let block = node.mine_block().expect("empty block must be mined");
+
+        assert_eq!(block.seqno, 1);
+        assert_eq!(block.prev_seqno, None);
+        assert!(block.tx_hashes.is_empty());
+        assert_eq!(block.start_lt, 0);
+        assert_eq!(block.end_lt, 0);
+        assert_eq!(node.globals.head_seqno, 1);
+        assert_pruned_masterchain_block(&node, 1);
+        assert_pruned_shard_block(&node, 1);
+        assert_eq!(
+            node.get_block_transactions(&block)
+                .expect("empty block transactions must resolve")
+                .len(),
+            0
+        );
+
+        let second_block = node.mine_block().expect("second empty block must be mined");
+
+        assert_eq!(second_block.seqno, 2);
+        assert_eq!(second_block.prev_seqno, Some(1));
+        assert!(second_block.tx_hashes.is_empty());
+        assert_eq!(node.globals.head_seqno, 2);
+        assert_pruned_masterchain_block(&node, 2);
+        assert_pruned_shard_block(&node, 2);
+
+        for expected_seqno in 3..=40 {
+            let block = node.mine_block().expect("empty block must be mined");
+            assert_eq!(block.seqno, expected_seqno);
+            assert!(block.tx_hashes.is_empty());
+        }
+
+        let size_after_limit = assert_pruned_masterchain_block(&node, 20);
+        let later_size = assert_pruned_masterchain_block(&node, 40);
+        assert!(
+            later_size <= size_after_limit + 2048,
+            "masterchain block BOC should stay bounded after old_mc_blocks reaches its limit"
+        );
+        let shard_size_after_limit = assert_pruned_shard_block(&node, 20);
+        let later_shard_size = assert_pruned_shard_block(&node, 40);
+        assert!(
+            later_shard_size <= shard_size_after_limit + 1024,
+            "shard block BOC should stay bounded across empty blocks"
+        );
+    }
+
+    #[test]
+    fn mine_block_stores_parseable_block_with_account_transactions() {
+        let account = test_addr(0x44);
+        let mut node = make_test_node(Box::new(SingleTxExecutor));
+        let message = OwnedMessage {
+            info: MsgInfo::Int(IntMsgInfo {
+                ihr_disabled: true,
+                bounce: false,
+                bounced: false,
+                src: GIVER_ADDR.into(),
+                dst: account.into(),
+                ihr_fee: Default::default(),
+                value: CurrencyCollection::new(1_000),
+                fwd_fee: Default::default(),
+                created_at: 0,
+                created_lt: 0,
+            }),
+            init: None,
+            body: Default::default(),
+            layout: None,
+        };
+        node.send_internal_boc(
+            BocRepr::encode(message)
+                .expect("message must serialize")
+                .into(),
+        )
+        .expect("message must be queued");
+
+        let block = node.mine_block().expect("block must be mined");
+        let block_boc = node
+            .cas
+            .get(&block.block_hash)
+            .expect("block BoC must be stored in CAS");
+        let block_cell = Boc::decode(&block_boc).expect("block BoC must decode");
+        let parsed = block_cell
+            .parse::<Block>()
+            .expect("block must parse as TON block");
+
+        assert_eq!(block.file_hash, crate::block::file_hash(&block_boc));
+        assert_ne!(block.file_hash, block.block_hash);
+        assert_eq!(parsed.load_info().expect("block info must load").seqno, 1);
+        assert!(
+            parsed
+                .load_value_flow()
+                .expect("value flow must load")
+                .validate()
+                .expect("value flow must validate")
+        );
+
+        let extra = parsed.load_extra().expect("block extra must load");
+        let account_blocks = extra
+            .account_blocks
+            .load()
+            .expect("account blocks must load");
+        let (_, account_block) = account_blocks
+            .get(HashBytes(account.addr))
+            .expect("account block lookup must not fail")
+            .expect("account block must exist");
+        let (_, tx_ref) = account_block
+            .transactions
+            .get(block.start_lt)
+            .expect("transaction lookup must not fail")
+            .expect("transaction must exist in account block");
+        let tx = tx_ref.load().expect("transaction ref must load");
+
+        assert_eq!(tx.account, HashBytes(account.addr));
+        assert_eq!(tx.lt, block.start_lt);
+        assert_eq!(block.tx_hashes, vec![Hash256::from(tx_ref.repr_hash())]);
+    }
+
+    #[test]
+    fn mine_block_defers_messages_after_lt_delta_hard_limit() {
+        let account = test_addr(0x45);
+        let mut node = make_test_node(Box::new(SingleTxExecutor));
+        let limits = BlockLimits {
+            bytes_hard_limit: usize::MAX,
+            gas_hard_limit: u64::MAX,
+            lt_delta_hard_limit: 2,
+        };
+
+        for value in 1..=3 {
+            let message = OwnedMessage {
+                info: MsgInfo::Int(IntMsgInfo {
+                    ihr_disabled: true,
+                    bounce: false,
+                    bounced: false,
+                    src: GIVER_ADDR.into(),
+                    dst: account.into(),
+                    ihr_fee: Default::default(),
+                    value: CurrencyCollection::new(value),
+                    fwd_fee: Default::default(),
+                    created_at: 0,
+                    created_lt: value as u64,
+                }),
+                init: None,
+                body: Default::default(),
+                layout: None,
+            };
+            node.send_internal_boc(
+                BocRepr::encode(message)
+                    .expect("message must serialize")
+                    .into(),
+            )
+            .expect("message must be queued");
+        }
+
+        let first_block = node
+            .mine_block_with_limits(limits)
+            .expect("first block must be mined");
+
+        assert_eq!(first_block.tx_hashes.len(), 2);
+        assert_eq!(node.pool.internal.len(), 1);
+        assert_eq!(node.globals.head_seqno, 1);
+
+        let second_block = node
+            .mine_block_with_limits(limits)
+            .expect("second block must be mined");
+
+        assert_eq!(second_block.tx_hashes.len(), 1);
+        assert!(node.pool.internal.is_empty());
+        assert_eq!(node.globals.head_seqno, 2);
+    }
+
+    #[test]
+    fn prev_blocks_info_before_block_uses_existing_blocks_and_zero_anchor() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        node.history.blocks.push(block_meta(1));
+        node.history.blocks.push(block_meta(2));
+
+        let info = node.prev_blocks_info_before_block(3);
+        let seqnos = info
+            .last_mc_blocks
+            .iter()
+            .map(|block| block.seqno)
+            .collect::<Vec<_>>();
+        let sparse_seqnos = info
+            .last_mc_blocks_100
+            .iter()
+            .map(|block| block.seqno)
+            .collect::<Vec<_>>();
+
+        assert_eq!(seqnos, vec![2, 1, 0]);
+        assert_eq!(info.prev_key_block.seqno, 2);
+        assert_eq!(sparse_seqnos, vec![0]);
+    }
+
+    #[allow(clippy::significant_drop_tightening)]
+    #[test]
+    fn mined_transaction_receives_prev_blocks_info_for_previous_block() {
+        let recorded_libs = Arc::new(Mutex::new(Vec::<Option<BocBytes>>::new()));
+        let recorded_prev_blocks_info = Arc::new(Mutex::new(Vec::<PrevBlocksInfo>::new()));
+        let executor = RecordingExecutor {
+            recorded_libs: Arc::clone(&recorded_libs),
+            recorded_prev_blocks_info: Arc::clone(&recorded_prev_blocks_info),
+        };
+        let mut node = make_test_node(Box::new(executor));
+        node.mine_block().expect("block 1 must be mined");
+        node.mine_block().expect("block 2 must be mined");
+
+        node.faucet(&test_addr(0x68), 1)
+            .expect("faucet message must be queued");
+        node.mine_block()
+            .expect("block with forced executor failure must still be mined");
+
+        let calls = recorded_prev_blocks_info
+            .lock()
+            .expect("recorded prev blocks info mutex poisoned");
+        assert!(!calls.is_empty(), "executor must be invoked");
+        let seqnos = calls[0]
+            .last_mc_blocks
+            .iter()
+            .map(|block| block.seqno)
+            .collect::<Vec<_>>();
+
+        assert_eq!(seqnos, vec![2, 1, 0]);
+        assert_eq!(calls[0].prev_key_block.seqno, 2);
+    }
+
+    #[test]
+    fn get_traces_uses_out_msg_index_to_find_parent_transaction() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let parent_account = test_addr(0x61);
+        let child_account = test_addr(0x62);
+        let external_msg_hash = Hash256([0x63; 32]);
+        let external_msg_hash_norm = Hash256([0x68; 32]);
+        let internal_msg_hash = Hash256([0x64; 32]);
+        let parent_tx_hash = Hash256([0x65; 32]);
+        let child_tx_hash = Hash256([0x66; 32]);
+        let block_hash = Hash256([0x67; 32]);
+        let dummy_boc = BocBytes::from(Boc::encode(Cell::default()));
+
+        for hash in [
+            external_msg_hash,
+            internal_msg_hash,
+            parent_tx_hash,
+            child_tx_hash,
+        ] {
+            node.cas.put(dummy_boc.clone(), hash);
+        }
+        node.history.msg_by_hash.insert(
+            external_msg_hash,
+            MsgMeta {
+                msg_hash: external_msg_hash,
+                hash_norm: Some(external_msg_hash_norm),
+                msg_boc_hash: external_msg_hash,
+                src: None,
+                dst: Some(parent_account),
+                value: None,
+                bounce: None,
+                created_lt: None,
+                created_at: None,
+            },
+        );
+        node.history.msg_by_hash.insert(
+            internal_msg_hash,
+            MsgMeta {
+                msg_hash: internal_msg_hash,
+                hash_norm: None,
+                msg_boc_hash: internal_msg_hash,
+                src: Some(parent_account),
+                dst: Some(child_account),
+                value: Some(1),
+                bounce: Some(false),
+                created_lt: Some(1),
+                created_at: Some(2),
+            },
+        );
+
+        let parent_tx = TxMeta {
+            tx_hash: parent_tx_hash,
+            account: parent_account,
+            lt: 1,
+            now: 2,
+            aborted: false,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+            in_msg_hash: Some(external_msg_hash),
+            out_msg_hashes: vec![internal_msg_hash],
+            block_seqno: 1,
+        };
+        let child_tx = TxMeta {
+            tx_hash: child_tx_hash,
+            account: child_account,
+            lt: 2,
+            now: 2,
+            aborted: false,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+            in_msg_hash: Some(internal_msg_hash),
+            out_msg_hashes: Vec::new(),
+            block_seqno: 1,
+        };
+        node.apply_commit(PendingCommit {
+            block_meta: BlockMeta {
+                seqno: 1,
+                prev_seqno: None,
+                gen_utime: 2,
+                start_lt: 1,
+                end_lt: 2,
+                tx_hashes: vec![parent_tx_hash, child_tx_hash],
+                block_hash,
+                file_hash: block_hash,
+            },
+            masterchain_block_meta: None,
+            tx_metas: vec![parent_tx, child_tx],
+            deltas: Vec::new(),
+            out_msg_hashes: vec![internal_msg_hash],
+            msg_to_tx: vec![
+                (external_msg_hash, parent_tx_hash),
+                (internal_msg_hash, child_tx_hash),
+            ],
+            deferred_msg_hashes: Vec::new(),
+        })
+        .expect("commit must index trace");
+
+        assert_eq!(
+            node.indexes.tx_by_out_msg.get(&internal_msg_hash),
+            Some(&parent_tx_hash)
+        );
+        let trace = node
+            .get_traces(&child_tx_hash)
+            .expect("child transaction trace must resolve to root");
+        assert_eq!(trace.transaction.meta.tx_hash, parent_tx_hash);
+        assert_eq!(trace.external_hash, Some(external_msg_hash));
+        assert_eq!(trace.external_hash_norm, Some(external_msg_hash_norm));
+        assert_eq!(trace.effective_external_hash_norm(), external_msg_hash_norm);
+        assert_eq!(trace.children.len(), 1);
+        assert_eq!(trace.children[0].transaction.meta.tx_hash, child_tx_hash);
     }
 
     fn found_library_entry(node: &Node, hash: Hash256) -> Option<GlobalLibraryEntry> {
-        single_library_lookup(node, hash).entry
+        let mut entries = node.get_libraries(&[hash]);
+        assert_eq!(entries.len(), 1, "expected one lookup result");
+        entries.remove(0)
     }
 
     #[test]
@@ -2413,6 +4518,15 @@ mod tests {
                 new_meta: Some(active_meta),
             }],
         ];
+        for (index, deltas) in node.history.deltas_by_seqno.iter().enumerate() {
+            for delta in deltas {
+                node.indexes
+                    .account_deltas_by_addr
+                    .entry(delta.addr)
+                    .or_default()
+                    .insert(index as Seqno + 1, delta.clone());
+            }
+        }
         node.globals.head_seqno = 3;
 
         let before_first_delta = node
@@ -2427,6 +4541,84 @@ mod tests {
         assert_eq!(
             node.get_shard_account_at_block(&account, Some(3))
                 .expect("must return latest active state"),
+            active_boc
+        );
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_old_meta_before_first_delta() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x24);
+        let remote_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 100_000_000);
+        let changed_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 90_000_000);
+        let remote_meta = store_test_account_meta(&mut node, &remote_boc, AccountStatus::Active);
+        let changed_meta = store_test_account_meta(&mut node, &changed_boc, AccountStatus::Active);
+
+        node.latest.accounts.insert(account, changed_meta.clone());
+        node.indexes
+            .account_deltas_by_addr
+            .entry(account)
+            .or_default()
+            .insert(
+                3,
+                AccountDelta {
+                    addr: account,
+                    old_hash: Some(remote_meta.account_hash),
+                    new_hash: Some(changed_meta.account_hash),
+                    old_meta: Some(remote_meta),
+                    new_meta: Some(changed_meta),
+                },
+            );
+        node.globals.head_seqno = 4;
+
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(2))
+                .expect("must return fork baseline state before first local delta"),
+            remote_boc
+        );
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_last_delta_in_same_block() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x25);
+        let uninit_boc = make_uninit_shard_account_boc(account);
+        let active_boc = make_active_shard_account_boc(account, Dict::new());
+        let uninit_meta = store_test_account_meta(&mut node, &uninit_boc, AccountStatus::Uninit);
+        let active_meta = store_test_account_meta(&mut node, &active_boc, AccountStatus::Active);
+
+        node.history.deltas_by_seqno = vec![vec![
+            AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(uninit_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(uninit_meta.clone()),
+            },
+            AccountDelta {
+                addr: account,
+                old_hash: Some(uninit_meta.account_hash),
+                new_hash: Some(active_meta.account_hash),
+                old_meta: Some(uninit_meta),
+                new_meta: Some(active_meta),
+            },
+        ]];
+        for (index, deltas) in node.history.deltas_by_seqno.iter().enumerate() {
+            for delta in deltas {
+                node.indexes
+                    .account_deltas_by_addr
+                    .entry(delta.addr)
+                    .or_default()
+                    .insert(index as Seqno + 1, delta.clone());
+            }
+        }
+        node.globals.head_seqno = 2;
+
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(1))
+                .expect("must return final state from historical block"),
             active_boc
         );
     }
@@ -2516,12 +4708,153 @@ mod tests {
         )
         .expect("must update library diff");
 
-        let entry = found_library_entry(&node, Hash256(hash.0))
+        let entry = found_library_entry(&node, Hash256::from(&hash))
             .expect("public library must appear globally");
         assert!(
             entry.publishers.contains(&account_a),
             "publisher A must be tracked"
         );
+    }
+
+    #[test]
+    fn account_code_library_reference_from_cache_is_visible_globally() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x21);
+        let library = make_lib_root(21);
+        let hash = Hash256::from(library.repr_hash());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+
+        node.register_account_code_libraries(&account, None, &account_boc, 21)
+            .expect("cached code library must be registered");
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
+    }
+
+    #[test]
+    fn set_shard_account_registers_cached_code_reference_libraries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x25);
+        let library = make_lib_root(25);
+        let hash = Hash256::from(library.repr_hash());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+
+        node.set_shard_account(&account, account_boc)
+            .expect("imported account code library must be registered");
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
+    }
+
+    #[test]
+    fn get_shard_account_registers_cached_code_reference_libraries_for_cached_account() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x26);
+        let library = make_lib_root(26);
+        let hash = Hash256::from(library.repr_hash());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+        let meta = store_test_account_meta(&mut node, &account_boc, AccountStatus::Active);
+        node.latest.accounts.insert(account, meta);
+
+        assert!(
+            found_library_entry(&node, hash).is_none(),
+            "test must start without a registered code library"
+        );
+        assert_eq!(
+            node.get_shard_account(&account)
+                .expect("cached account must load"),
+            account_boc
+        );
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
+    }
+
+    #[test]
+    fn account_code_library_reference_from_cache_registers_nested_libraries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x24);
+
+        let nested = make_lib_root(24);
+        let nested_hash = Hash256::from(nested.repr_hash());
+        node.cas.put(Boc::encode(nested).into(), nested_hash);
+
+        let nested_ref = CellBuilder::build_library(&HashBytes(nested_hash.0));
+        let mut parent_builder = CellBuilder::new();
+        parent_builder.store_u32(25).expect("must store seed");
+        parent_builder
+            .store_reference(nested_ref)
+            .expect("must store nested library ref");
+        let parent = parent_builder.build().expect("must build parent library");
+        let parent_hash = Hash256::from(parent.repr_hash());
+        node.cas.put(Boc::encode(parent).into(), parent_hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(parent_hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+
+        node.register_account_code_libraries(&account, None, &account_boc, 24)
+            .expect("cached code libraries must be registered recursively");
+
+        assert!(
+            found_library_entry(&node, parent_hash).is_some(),
+            "parent code library must be registered"
+        );
+        assert!(
+            found_library_entry(&node, nested_hash).is_some(),
+            "nested code library must be registered"
+        );
+    }
+
+    #[test]
+    fn rebuild_global_libraries_registers_cached_code_reference_libraries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x23);
+        let library = make_lib_root(23);
+        let hash = Hash256::from(library.repr_hash());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+        let account_hash = account_boc.hash().expect("account BOC must hash");
+        node.cas.put(account_boc, account_hash);
+        node.latest.accounts.insert(
+            account,
+            AccountMeta {
+                account_hash,
+                status: AccountStatus::Active,
+                balance: 1,
+                extra_currencies: Vec::new(),
+                last_trans_lt: Some(23),
+                last_trans_hash: None,
+                code_hash: None,
+                data_hash: None,
+                frozen_hash: None,
+            },
+        );
+
+        node.rebuild_global_libraries_from_accounts()
+            .expect("rebuild must register cached code refs");
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
     }
 
     #[test]
@@ -2553,7 +4886,7 @@ mod tests {
         )
         .expect("must add publisher B");
 
-        let entry = found_library_entry(&node, Hash256(hash.0))
+        let entry = found_library_entry(&node, Hash256::from(&hash))
             .expect("library hash must have one global entry");
         assert_eq!(entry.publishers.len(), 2, "must have 2 publishers");
         assert!(entry.publishers.contains(&account_a));
@@ -2596,7 +4929,7 @@ mod tests {
         )
         .expect("must remove publisher A");
 
-        let entry = found_library_entry(&node, Hash256(hash.0))
+        let entry = found_library_entry(&node, Hash256::from(&hash))
             .expect("entry must remain while publisher B exists");
         assert_eq!(entry.publishers.len(), 1);
         assert!(entry.publishers.contains(&account_b));
@@ -2647,7 +4980,7 @@ mod tests {
         .expect("must remove publisher B");
 
         assert!(
-            found_library_entry(&node, Hash256(hash.0)).is_none(),
+            found_library_entry(&node, Hash256::from(&hash)).is_none(),
             "entry must be deleted when last publisher is removed"
         );
     }
@@ -2692,7 +5025,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("state transition {name} failed: {e}"));
 
             assert!(
-                found_library_entry(&node, Hash256(hash.0)).is_none(),
+                found_library_entry(&node, Hash256::from(&hash)).is_none(),
                 "state transition {name} must clear published library"
             );
         }
@@ -2722,7 +5055,7 @@ mod tests {
         .expect("nonexist transition must be processed");
 
         assert!(
-            found_library_entry(&node, Hash256(hash.0)).is_none(),
+            found_library_entry(&node, Hash256::from(&hash)).is_none(),
             "nonexist transition must clear published library"
         );
     }
@@ -2751,7 +5084,7 @@ mod tests {
         .expect("must index from final state");
 
         assert!(
-            found_library_entry(&node, Hash256(hash.0)).is_some(),
+            found_library_entry(&node, Hash256::from(&hash)).is_some(),
             "final state with public library must be indexed"
         );
     }
@@ -2774,7 +5107,7 @@ mod tests {
         )
         .expect("unchanged public library must still be indexed");
 
-        let entry = found_library_entry(&node, Hash256(hash.0))
+        let entry = found_library_entry(&node, Hash256::from(&hash))
             .expect("unchanged public library must be visible");
         assert!(
             entry.publishers.contains(&account),
@@ -2800,7 +5133,7 @@ mod tests {
         let library =
             Boc::decode_base64(USDT_WALLET_LIBRARY_B64).expect("USDT wallet library must decode");
 
-        let library_hash = Hash256(*library.repr_hash().as_array());
+        let library_hash = Hash256::from(library.repr_hash());
         assert_eq!(
             library_hash.to_hex().to_uppercase(),
             "8F452D7A4DFD74066B682365177259ED05734435BE76B5FD4BD5D8AF2B7C3D68"
@@ -2816,9 +5149,9 @@ mod tests {
             },
         );
 
-        let code_hash = Hash256(*code.repr_hash().as_array());
+        let code_hash = Hash256::from(code.repr_hash());
         node.cas.put(Boc::encode(code.clone()).into(), code_hash);
-        let data_hash = Hash256(*data.repr_hash().as_array());
+        let data_hash = Hash256::from(data.repr_hash());
         node.cas.put(Boc::encode(data.clone()).into(), data_hash);
         let account_boc = make_active_shard_account_boc_with_state(
             wallet_address,
@@ -2827,14 +5160,15 @@ mod tests {
             Dict::new(),
             974_433,
         );
-        let account_hash = compute_boc_hash(&account_boc).expect("account BOC must hash");
+        let account_hash = account_boc.hash().expect("account BOC must hash");
         node.cas.put(account_boc, account_hash);
         node.latest.accounts.insert(
             wallet_address,
             AccountMeta {
                 account_hash,
                 status: AccountStatus::Active,
-                cached_balance: Some(974_433),
+                balance: 974_433,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(42),
                 last_trans_hash: None,
                 code_hash: Some(code_hash),
@@ -2843,7 +5177,7 @@ mod tests {
             },
         );
 
-        node.detect_jetton_wallets(&wallet_address)
+        node.detect_assets(&wallet_address)
             .expect("library-backed jetton wallet must be detected");
 
         let wallet = node
@@ -2855,6 +5189,18 @@ mod tests {
         assert_eq!(wallet.owner_address, owner_address);
         assert_eq!(wallet.jetton_address, jetton_address);
         assert_eq!(wallet.last_transaction_lt, 42);
+
+        let meta = node
+            .latest
+            .accounts
+            .get_mut(&wallet_address)
+            .expect("wallet account metadata must exist");
+        meta.status = AccountStatus::Nonexist;
+        meta.code_hash = None;
+        meta.data_hash = None;
+        node.detect_assets(&wallet_address)
+            .expect("removed account must no longer be detected as a jetton wallet");
+        assert!(!node.history.jetton_wallets.contains_key(&wallet_address));
     }
 
     #[test]
@@ -2911,8 +5257,10 @@ mod tests {
     #[test]
     fn next_transaction_receives_global_libs_via_set_libs_argument() {
         let recorded_libs = Arc::new(Mutex::new(Vec::<Option<BocBytes>>::new()));
+        let recorded_prev_blocks_info = Arc::new(Mutex::new(Vec::<PrevBlocksInfo>::new()));
         let executor = RecordingExecutor {
             recorded_libs: Arc::clone(&recorded_libs),
+            recorded_prev_blocks_info,
         };
         let mut node = make_test_node(Box::new(executor));
 
@@ -2932,6 +5280,7 @@ mod tests {
 
         let destination = test_addr(0xEF);
         let _ = node.faucet(&destination, 1);
+        let _ = node.mine_one();
 
         let calls = recorded_libs.lock().expect("recorded libs mutex poisoned");
         assert!(!calls.is_empty(), "executor must be invoked");
@@ -2948,6 +5297,75 @@ mod tests {
                 .expect("must query lib hash")
                 .is_some(),
             "executor libs dict must include published library"
+        );
+    }
+
+    #[allow(clippy::significant_drop_tightening)]
+    #[test]
+    fn state_init_code_library_reference_is_registered_before_execute() {
+        let recorded_libs = Arc::new(Mutex::new(Vec::<Option<BocBytes>>::new()));
+        let recorded_prev_blocks_info = Arc::new(Mutex::new(Vec::<PrevBlocksInfo>::new()));
+        let executor = RecordingExecutor {
+            recorded_libs: Arc::clone(&recorded_libs),
+            recorded_prev_blocks_info,
+        };
+        let mut node = make_test_node(Box::new(executor));
+
+        let destination = test_addr(0xF1);
+        let library = make_lib_root(18);
+        let hash = Hash256::from(library.repr_hash());
+        node.cas.put(Boc::encode(library).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let state_init = StateInit {
+            split_depth: None,
+            special: None,
+            code: Some(code_ref),
+            data: None,
+            libraries: Dict::new(),
+        };
+        let message_info = IntMsgInfo {
+            ihr_disabled: true,
+            bounce: true,
+            bounced: false,
+            src: GIVER_ADDR.into(),
+            dst: destination.into(),
+            ihr_fee: Default::default(),
+            value: CurrencyCollection::new(1),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        };
+        let message = OwnedMessage {
+            info: MsgInfo::Int(message_info),
+            init: Some(state_init),
+            body: Default::default(),
+            layout: None,
+        };
+
+        node.send_internal_boc(
+            BocRepr::encode(message)
+                .expect("message must serialize")
+                .into(),
+        )
+        .expect("message must be queued");
+        let _ = node.mine_one();
+
+        let calls = recorded_libs.lock().expect("recorded libs mutex poisoned");
+        assert!(!calls.is_empty(), "executor must be invoked");
+        let libs_boc = calls[0]
+            .as_ref()
+            .expect("state init code library must be passed to executor");
+        let libs_cell = Boc::decode(libs_boc).expect("libs boc must decode");
+        let mut slice = libs_cell.as_slice_allow_exotic();
+        let dict =
+            Dict::<HashBytes, LibDescr>::load_from_root_ext(&mut slice, Cell::empty_context())
+                .expect("libs dict must decode");
+        assert!(
+            dict.get(HashBytes(hash.0))
+                .expect("must query lib hash")
+                .is_some(),
+            "executor libs dict must include state init code library"
         );
     }
 
@@ -2980,7 +5398,7 @@ mod tests {
         )
         .expect("private transition must succeed");
         assert!(
-            found_library_entry(&node, Hash256(hash.0)).is_none(),
+            found_library_entry(&node, Hash256::from(&hash)).is_none(),
             "private library must stay hidden"
         );
 
@@ -2992,7 +5410,7 @@ mod tests {
         )
         .expect("public transition must succeed");
         assert!(
-            found_library_entry(&node, Hash256(hash.0)).is_some(),
+            found_library_entry(&node, Hash256::from(&hash)).is_some(),
             "public transition must expose library"
         );
     }
@@ -3022,7 +5440,7 @@ mod tests {
             .expect("rollback-like noop for B must succeed");
 
         assert!(
-            found_library_entry(&node, Hash256(hash_a.0)).is_some(),
+            found_library_entry(&node, Hash256::from(&hash_a)).is_some(),
             "unrelated noop update must not affect existing global library"
         );
     }
@@ -3043,8 +5461,8 @@ mod tests {
                 last_seen_lt: 1,
             },
         );
-        node.vm_global_libs_dirty = true;
-        node.vm_global_libs_boc = None;
+        node.global_libs_dirty = true;
+        node.global_libs_boc = None;
 
         let err = node
             .build_vm_global_libs_boc()
@@ -3073,17 +5491,21 @@ mod tests {
             .expect("must index libraries");
 
         let missing = Hash256([0xEE; 32]);
-        let entries = node.get_libraries(&[missing, Hash256(hash_b.0), Hash256(hash_a.0)]);
+        let entries =
+            node.get_libraries(&[missing, Hash256::from(&hash_b), Hash256::from(&hash_a)]);
         assert_eq!(entries.len(), 3);
-        assert_eq!(entries[0].hash, missing);
         assert!(
-            entries[0].entry.is_none(),
+            entries[0].is_none(),
             "missing hash must be returned as not found"
         );
-        assert_eq!(entries[1].hash, Hash256(hash_b.0));
-        assert!(entries[1].entry.is_some());
-        assert_eq!(entries[2].hash, Hash256(hash_a.0));
-        assert!(entries[2].entry.is_some());
+        assert_eq!(
+            entries[1].as_ref().map(|entry| entry.hash),
+            Some(Hash256::from(&hash_b))
+        );
+        assert_eq!(
+            entries[2].as_ref().map(|entry| entry.hash),
+            Some(Hash256::from(&hash_a))
+        );
     }
 
     #[test]
@@ -3098,8 +5520,7 @@ mod tests {
             .set(lib_hash, lib.clone())
             .expect("must insert high-lt library");
         let high_boc = make_active_shard_account_boc(account_high_lt, high_libs);
-        let high_account_hash =
-            compute_boc_hash(&high_boc).expect("must hash high-lt shard account");
+        let high_account_hash = high_boc.hash().expect("must hash high-lt shard account");
         node.cas.put(high_boc, high_account_hash);
 
         let mut low_libs = Dict::<HashBytes, SimpleLib>::new();
@@ -3107,7 +5528,7 @@ mod tests {
             .set(lib_hash, lib)
             .expect("must insert low-lt library");
         let low_boc = make_active_shard_account_boc(account_low_lt, low_libs);
-        let low_account_hash = compute_boc_hash(&low_boc).expect("must hash low-lt shard account");
+        let low_account_hash = low_boc.hash().expect("must hash low-lt shard account");
         node.cas.put(low_boc, low_account_hash);
 
         node.latest.accounts.insert(
@@ -3115,7 +5536,8 @@ mod tests {
             AccountMeta {
                 account_hash: high_account_hash,
                 status: AccountStatus::Active,
-                cached_balance: Some(0),
+                balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(100),
                 last_trans_hash: None,
                 code_hash: None,
@@ -3128,7 +5550,8 @@ mod tests {
             AccountMeta {
                 account_hash: low_account_hash,
                 status: AccountStatus::Active,
-                cached_balance: Some(0),
+                balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(5),
                 last_trans_hash: None,
                 code_hash: None,
@@ -3139,7 +5562,7 @@ mod tests {
 
         node.rebuild_global_libraries_from_accounts()
             .expect("must rebuild global libraries from accounts");
-        let entry = found_library_entry(&node, Hash256(lib_hash.0))
+        let entry = found_library_entry(&node, Hash256::from(&lib_hash))
             .expect("shared public library must be present");
         assert_eq!(
             entry.first_seen_lt, 5,

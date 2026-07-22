@@ -1,9 +1,7 @@
 use crate::Network;
-use crate::remote::{DtonClient, TonCenterClient, TonHubClient};
-use crate::types::{
-    AccountFromAPI, BaseTxInfo, Block, BlockInfo, ComputeInfo, RawTransaction, StateFromAPI,
-    StorageStat, StorageUsed, TraceMoneyResult,
-};
+use crate::remote::{TonCenterClient, TonHubClient};
+use crate::types::{BaseTxInfo, Block, BlockInfo, ComputeInfo, RawTransaction, TraceMoneyResult};
+use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
@@ -13,11 +11,10 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, ExtraCurrencyCollection, IntAddr, MsgInfo,
-    OptionalAccount, OutAction, OutActionsRevIter, ShardAccount, StdAddr, StorageExtra,
-    StorageInfo, TxInfo,
+    Account, AccountState, CurrencyCollection, IntAddr, MsgInfo, OptionalAccount, OutAction,
+    OutActionsRevIter, ShardAccount, StdAddr, StorageInfo, TxInfo,
 };
-use tycho_types::num::{Tokens, VarUint56};
+use tycho_types::num::Tokens;
 use tycho_types::prelude::{Cell, HashBytes};
 
 /// Returns base transaction information by its hash.
@@ -152,21 +149,15 @@ pub(crate) async fn find_full_block_for_seqno(
 /// # Arguments
 ///
 /// * `net`   — Network to use.
-/// * `block` — Full master‑block object.
+/// * `seqno` — Master-block sequence number.
 ///
 /// # Returns
 ///
-/// Returns the config cell as a hex-encoded string.
-pub(crate) async fn get_block_config(net: Network, block: &BlockInfo) -> anyhow::Result<String> {
-    let client = TonHubClient::new(net)?;
-
-    let block_seqno = block
-        .shards
-        .first()
-        .map(|s| s.seqno)
-        .ok_or_else(|| anyhow::anyhow!("No shards found in master block"))?;
-
-    client.get_config(block_seqno).await
+/// Returns the config cell as a base64-encoded `BoC`.
+pub(crate) async fn get_block_config(net: Network, seqno: u32) -> anyhow::Result<String> {
+    let client = TonCenterClient::new(net)?;
+    let config = client.get_config_all(seqno).await?;
+    Ok(Boc::encode_base64(config))
 }
 
 /// Retrieves all transactions of an account within a logical-time interval.
@@ -267,101 +258,41 @@ pub(crate) async fn get_block_account(
     address: &StdAddr,
     block: &BlockInfo,
 ) -> anyhow::Result<ShardAccount> {
-    let client = TonHubClient::new(net)?;
+    let client = TonCenterClient::new(net)?;
 
     let block_seqno = block
         .shards
         .first()
         .map(|s| s.seqno)
         .ok_or_else(|| anyhow::anyhow!("No shards found in master block"))?;
+    let prev_block_seqno = block_seqno
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("Cannot fetch account state before block seqno 0"))?;
+    let address_str = address.to_string();
 
-    let address_str = address.display_base64_url(false).to_string();
-    let api_account = client.get_account(block_seqno - 1, &address_str).await?;
+    let shard_account_cell = client
+        .get_shard_account_cell(prev_block_seqno, &address_str)
+        .await?;
 
-    create_shard_account_from_api(api_account, address)
-}
+    let shard_account: ShardAccount = shard_account_cell
+        .parse()
+        .context("Failed to parse getShardAccountCell response as ShardAccount")?;
 
-/// Converts an API-provided account snapshot into a [`ShardAccount`].
-///
-/// Handles different account states (Active, Uninit, Frozen) and correctly
-/// maps balance, code, and data into the internal `tycho` model.
-pub(crate) fn create_shard_account_from_api(
-    api_account: AccountFromAPI,
-    address: &StdAddr,
-) -> anyhow::Result<ShardAccount> {
-    let last_trans_lt = api_account
-        .last
-        .as_ref()
-        .map(|l| l.lt.parse::<u64>())
-        .transpose()?
-        .unwrap_or(0);
-    let last_trans_hash = api_account
-        .last
-        .as_ref()
-        .map(|l| HashBytes::from_str(&l.hash))
-        .transpose()?
-        .unwrap_or(HashBytes::ZERO);
+    if shard_account.load_account()?.is_some() {
+        return Ok(shard_account);
+    }
 
-    let state = match api_account.state {
-        StateFromAPI::Uninit => AccountState::Uninit,
-        StateFromAPI::Active { data, code } => {
-            let data = data.map(Boc::decode_base64).transpose()?;
-            let code = code.map(Boc::decode_base64).transpose()?;
-            AccountState::Active(tycho_types::models::StateInit {
-                split_depth: None,
-                special: None,
-                code,
-                data,
-                libraries: Dict::default(),
-            })
-        }
-        StateFromAPI::Frozen { state_hash } => {
-            AccountState::Frozen(HashBytes::from_str(&state_hash)?)
-        }
-    };
-
-    let coins = api_account.balance.coins.parse::<u128>()?;
-
-    let storage_stat = api_account.storage_stat.unwrap_or(StorageStat {
-        last_paid: 0,
-        due_payment: None,
-        used: StorageUsed {
-            bits: 0,
-            cells: 0,
-            public_cells: None,
-        },
-    });
-
-    let account = Account {
-        address: IntAddr::Std(address.clone()),
-        storage_stat: StorageInfo {
-            used: tycho_types::models::StorageUsed {
-                cells: VarUint56::new(storage_stat.used.cells),
-                bits: VarUint56::new(storage_stat.used.bits),
-            },
-            last_paid: storage_stat.last_paid as u32,
-            due_payment: storage_stat
-                .due_payment
-                .map(|d| d.parse::<u128>())
-                .transpose()?
-                .map(Tokens::new),
-            storage_extra: StorageExtra::None,
-        },
-        last_trans_lt,
-        balance: CurrencyCollection {
-            tokens: Tokens::new(coins),
-            other: ExtraCurrencyCollection::default(),
-        },
-        state,
-    };
-
-    let shard_account = ShardAccount {
-        account: Lazy::new(&OptionalAccount(Some(account)))?,
-        last_trans_lt,
-        last_trans_hash,
-    };
-
-    Ok(shard_account)
+    Ok(ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(Account {
+            address: IntAddr::Std(address.clone()),
+            storage_stat: StorageInfo::default(),
+            last_trans_lt: shard_account.last_trans_lt,
+            balance: CurrencyCollection::default(),
+            state: AccountState::Uninit,
+        })))?,
+        last_trans_lt: shard_account.last_trans_lt,
+        last_trans_hash: shard_account.last_trans_hash,
+    })
 }
 
 /// Extracts out-actions from the `c5` register of a successful emulation.
@@ -500,18 +431,11 @@ pub(crate) fn compute_final_data(
 
 /// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
-/// Attempts to fetch from `TonCenter` first, falling back to dton.io if needed.
+/// Fetches the library from `TonCenter`.
 pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
-    let toncenter = TonCenterClient::new(net.clone())?;
-
-    Ok(if let Ok(data) = toncenter.get_libraries(hash).await {
-        Boc::decode_base64(data)?
-    } else {
-        let dton_api_key = std::env::var("DTON_API_KEY").ok();
-        let dton = DtonClient::new(dton_api_key);
-        let data = dton.get_lib(net, hash).await?;
-        Boc::decode_base64(data)?
-    })
+    let toncenter = TonCenterClient::new(net)?;
+    let data = toncenter.get_libraries(hash).await?;
+    Boc::decode_base64(data).context("Failed to decode library BOC data")
 }
 
 async fn add_maybe_exotic_library(

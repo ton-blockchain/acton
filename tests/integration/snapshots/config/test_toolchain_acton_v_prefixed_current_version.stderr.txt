@@ -6,4 +6,7 @@ Installed acton version is "[ACTON_VERSION]".
 Install the expected version:
   acton up [ACTON_VERSION]
 
-Or update [toolchain].acton if this project supports acton [ACTON_VERSION].
+Or update Acton.toml if this project supports the installed Acton CLI:
+
+[toolchain]
+acton = "[ACTON_VERSION]"

@@ -778,32 +778,32 @@ export const ChangeMinterMetadata = {
 }
 
 /**
- > struct (0xd372158c) TopUpTons {
+ > struct (0xd372158c) TopUpGrams {
  > }
  */
-export interface TopUpTons {
-    readonly $: 'TopUpTons'
+export interface TopUpGrams {
+    readonly $: 'TopUpGrams'
 }
 
-export const TopUpTons = {
+export const TopUpGrams = {
     PREFIX: 0xd372158c,
 
-    create(): TopUpTons {
+    create(): TopUpGrams {
         return {
-            $: 'TopUpTons',
+            $: 'TopUpGrams',
         }
     },
-    fromSlice(s: c.Slice): TopUpTons {
-        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpTons');
+    fromSlice(s: c.Slice): TopUpGrams {
+        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpGrams');
         return {
-            $: 'TopUpTons',
+            $: 'TopUpGrams',
         }
     },
-    store(self: TopUpTons, b: c.Builder): void {
+    store(self: TopUpGrams, b: c.Builder): void {
         b.storeUint(0xd372158c, 32);
     },
-    toCell(self: TopUpTons): c.Cell {
-        return makeCellFrom<TopUpTons>(self, TopUpTons.store);
+    toCell(self: TopUpGrams): c.Cell {
+        return makeCellFrom<TopUpGrams>(self, TopUpGrams.store);
     }
 }
 
@@ -1086,9 +1086,9 @@ export class JettonMinter implements c.Contract {
         return UpgradeMinterCode.toCell(UpgradeMinterCode.create(body));
     }
 
-    static createCellOfTopUpTons(body: {
+    static createCellOfTopUpGrams(body: {
     }) {
-        return TopUpTons.toCell(TopUpTons.create());
+        return TopUpGrams.toCell(TopUpGrams.create());
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, msgValue: coins, extraOptions?: ExtraSendOptions) {
@@ -1191,11 +1191,11 @@ export class JettonMinter implements c.Contract {
         });
     }
 
-    async sendTopUpTons(provider: ContractProvider, via: Sender, msgValue: coins, body: {
+    async sendTopUpGrams(provider: ContractProvider, via: Sender, msgValue: coins, body: {
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
-            body: TopUpTons.toCell(TopUpTons.create()),
+            body: TopUpGrams.toCell(TopUpGrams.create()),
             ...extraOptions
         });
     }

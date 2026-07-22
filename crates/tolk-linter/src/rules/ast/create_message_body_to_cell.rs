@@ -25,7 +25,7 @@ use tree_sitter::Node;
 /// fun send(dest: address) {
 ///     val msg = createMessage({
 ///         bounce: false,
-///         value: ton("0.1"),
+///         value: grams("0.1"),
 ///         dest,
 ///         body: Transfer { amount: 1 }.toCell(),
 ///         //                          ^^^^^^^^^ E029: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
@@ -42,7 +42,7 @@ use tree_sitter::Node;
 /// fun send(dest: address) {
 ///     val msg = createMessage({
 ///         bounce: false,
-///         value: ton("0.1"),
+///         value: grams("0.1"),
 ///         dest,
 ///         body: Transfer { amount: 1 },
 ///     });

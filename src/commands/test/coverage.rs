@@ -110,11 +110,12 @@ pub(super) fn collect_coverage(
     Coverage { files }
 }
 
-pub(super) fn compile_project_contracts_for_coverage(
+pub(super) fn compile_project_contracts(
     build_cache: &mut BuildCache,
     file_cache: &mut FileBuildCache,
     acton_config: &ActonConfig,
     project_root: &Path,
+    need_debug_info: bool,
 ) -> anyhow::Result<()> {
     let Some(contracts) = acton_config.contracts() else {
         return Ok(());
@@ -129,7 +130,7 @@ pub(super) fn compile_project_contracts_for_coverage(
         if build_cache
             .built
             .get(&path)
-            .is_some_and(|result| result.source_map.has_debug_marks())
+            .is_some_and(|result| !need_debug_info || result.source_map.has_debug_marks())
         {
             // already compiled earlier
             continue;
@@ -140,7 +141,7 @@ pub(super) fn compile_project_contracts_for_coverage(
             project_root,
             contract_id,
             contract,
-            true,
+            need_debug_info,
             Some(&mut *file_cache),
         )?;
         build_cache.built.insert(path, result);

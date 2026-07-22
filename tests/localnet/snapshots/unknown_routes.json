@@ -1,0 +1,46 @@
+{
+  "not_found": {
+    "control": {
+      "code": 404,
+      "error": "Not Found",
+      "status": 404
+    },
+    "emulate": {
+      "code": 404,
+      "error": "Not Found",
+      "status": 404
+    },
+    "streaming": {
+      "code": 404,
+      "error": "Not Found",
+      "status": 404
+    },
+    "v2": {
+      "code": 404,
+      "error": "Not Found",
+      "status": 404
+    },
+    "v3": {
+      "code": 404,
+      "error": "Not Found",
+      "status": 404
+    }
+  },
+  "ui": {
+    "content_type": "text/html",
+    "html_shell": true,
+    "status": 200
+  },
+  "unauthorized": {
+    "api": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "status": 401
+    },
+    "control": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "status": 401
+    }
+  }
+}

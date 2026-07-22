@@ -1,0 +1,16 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "contract": "counter",
+  "exitCode": 0,
+  "method": "double",
+  "network": "localnet",
+  "rawAddress": "0:3ed6c7960b9a7ae8841e2100582e6f8a04466b0ab20154ce37fff5bc4702173b",
+  "rawStack": [
+    [
+      "num",
+      "0xe"
+    ]
+  ],
+  "result": "14",
+  "signature": "double(value: uint32): int"
+}

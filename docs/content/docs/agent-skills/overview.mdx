@@ -22,26 +22,26 @@ Acton development skills are reusable instructions for coding agents working on 
 Use `npx skills add -g` to install Acton skills globally:
 
 ```bash
-npx skills add -g https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+npx skills add https://github.com/ton-blockchain/skills -g
 ```
 
 Remove the `-g` flag to install skills in the current Acton project only:
 
 ```bash
-npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+npx skills add https://github.com/ton-blockchain/skills
 ```
 
 Pass `-a <AGENT_NAME>` to install skills for a specific agent only:
 
 ```bash
 # Codex
-npx skills add -a codex https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+npx skills add https://github.com/ton-blockchain/skills -a codex
 
 # Claude Code
-npx skills add -a claude-code https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+npx skills add https://github.com/ton-blockchain/skills -a claude-code
 ```
 
-After installation, mention a skill by name in the coding-agent prompt, for example `$acton`, `$tolk`, `$ton-blockchain`, or `$func2tolk`.
+After installation, mention a skill by name in the coding-agent prompt. For example: `$acton`, `$tolk`, `$ton-blockchain`, or `$func2tolk`.
 
 ## Updates
 

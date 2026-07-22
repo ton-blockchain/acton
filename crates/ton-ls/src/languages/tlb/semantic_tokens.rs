@@ -33,10 +33,10 @@ fn collect_tlb_tokens(file: &ParsedSnapshot<tlb_syntax::SourceFile>) -> Vec<Sema
 
     for node in file.traverse() {
         match node.kind() {
-            "#" | "##" | "#<" | "#<=" | "builtin_field" => {
-                if !parent_has_kind(node, "constructor_tag") {
-                    push_token(&mut builder, file, node, TokenType::Macro);
-                }
+            "#" | "##" | "#<" | "#<=" | "builtin_field"
+                if !parent_has_kind(node, "constructor_tag") =>
+            {
+                push_token(&mut builder, file, node, TokenType::Macro);
             }
             "field_named" => {
                 if let Some(identifier) = node.child_by_field_name("name") {

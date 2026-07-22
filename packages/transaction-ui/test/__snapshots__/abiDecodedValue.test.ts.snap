@@ -1,0 +1,10 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI decoded value renders a decoded struct as Tolk initialization 1`] = `
+"GetTradeFeeReply {
+    tradeFeeNumerator: 100
+    tradeFeeDenominator: 10000
+    numericLabel: "123"
+    externalAddress: "External<4:15>"
+}"
+`;

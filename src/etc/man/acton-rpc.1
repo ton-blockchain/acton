@@ -21,6 +21,10 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'call contract get\-methods with ABI\-parsed or raw TVM stack arguments
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'check whether an account is active, frozen, or uninitialized
 .RE
 .sp
@@ -37,14 +41,16 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'decode account storage through local ABI metadata when a match is found
+\h'-04'\(bu\h'+03'decode account storage and get\-method results through local or bundled ABI
+metadata when a match is found
 .RE
 .sp
 The command works without a project manifest for raw remote inspection.
 .sp
 When Acton can resolve a local project and finds a contract with the same
 compiled \fBcode_hash\fR, it also prints the matched contract name and decodes the
-account storage using the local compiler ABI.
+account storage using the local compiler ABI. If no local match exists, Acton
+falls back to its bundled ABI catalog.
 .SH "SUBCOMMANDS"
 .SS "acton rpc info"
 Show information about a single account.
@@ -79,16 +85,105 @@ hashes
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'local contract match information when a project contract has the same
-\fBcode_hash\fR
+\h'-04'\(bu\h'+03'ABI match information when a project contract or bundled catalog entry has
+the same \fBcode_hash\fR
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'decoded storage in a YAML\-like view when compiler ABI metadata is available
 .RE
 .sp
-If no local ABI match is found, Acton still prints the raw remote account
-information and reports that decoded storage is unavailable.
+If no ABI match is found, Acton still prints the raw remote account information
+and reports that decoded storage is unavailable.
+.SS "acton rpc call"
+Call a contract get\-method through TonCenter.
+.SS "Synopsis"
+\fBacton rpc call\fR [\fIoptions\fR] \fIaddress\fR \fImethod\fR [\fIargs\fR\[u2026]]
+.SS "Options"
+.sp
+\fIaddress\fR
+.RS 4
+Contract address in friendly or raw format.
+.RE
+.sp
+\fImethod\fR
+.RS 4
+Get\-method name or numeric TVM method id.
+.RE
+.sp
+\fIargs\fR
+.RS 4
+Arguments to pass to the get\-method.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to query.
+.sp
+Defaults to \fBtestnet\fR\&.
+.sp
+Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
+\fBcustom:<name>\fR\&.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Print machine\-readable JSON output.
+.RE
+.sp
+\fB\-\-raw\fR
+.RS 4
+Print the raw TonCenter stack without ABI decoding.
+.RE
+.SS "ABI Arguments"
+When Acton finds local or bundled ABI metadata for the remote contract,
+get\-method arguments are parsed against that ABI.
+.sp
+The \fImethod\fR argument can be either an ABI get\-method name or a numeric TVM
+method id. When the numeric id is present in the ABI, Acton still uses ABI
+metadata for arguments and result decoding. When the numeric id is not present
+in the ABI, Acton sends the call as a raw get\-method request.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'integers use Tolk integer literal syntax such as \fB42\fR, \fB\-1\fR, \fB0xff\fR, and
+\fB0b1010\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBbool\fR accepts \fBtrue\fR and \fBfalse\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'nullable supported types accept \fBnull\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcell\fR, \fBslice\fR, and \fBbitsN\fR accept plain BoC hex without \fBC{}\fR or \fBCS{}\fR
+prefixes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
+.RE
+.sp
+Unsupported ABI argument types currently include \fBstructs\fR, shaped tuples,
+maps, dictionaries, builders, continuations, and other complex values.
+.sp
+Without ABI metadata, \fBacton rpc call\fR builds a raw stack from CLI arguments.
+Raw arguments support Tolk integer literals, \fBtrue\fR, \fBfalse\fR, \fBnull\fR, internal
+addresses, \fBaddr_none\fR, plain BoC hex as \fBcell\fR, and explicit \fBcell:\fR, \fBslice:\fR,
+\fBbuilder:\fR, and \fBstring:\fR prefixes.
+.SS "Output"
+When ABI metadata is available and the result stack width matches the
+get\-method return type, Acton prints the decoded Tolk value. Otherwise it prints
+the raw TonCenter stack in a compact field\-per\-line format.
+.sp
+Raw output uses decimal integers, URL\-friendly addresses, \fBaddr_none\fR for
+two\-bit none addresses, and one \fBfieldN: type = value\fR line per stack item.
 .SS "acton rpc block"
 Print the latest masterchain block info returned by TonCenter.
 .SS "Synopsis"
@@ -190,9 +285,9 @@ Print decoded message bodies in the transaction tree.
 .RE
 .sp
 Tree and verbose modes then reuse the same transaction tree formatter as Acton
-tests. When current account code matches a local contract in the project,
-Acton prints local contract names through the local ABI. Add \fB\-\-show\-bodies\fR
-to print decoded inbound message bodies.
+tests. When current account code matches a local contract or bundled catalog
+entry, Acton prints the matched contract name. Add \fB\-\-show\-bodies\fR to print
+decoded inbound message bodies.
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -246,7 +341,8 @@ Acton loads \fB\&.env\fR automatically, so the simplest setup during project wor
 usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.
 .SH "ABI MATCHING"
-Storage decoding is best\-effort and depends on local project context.
+Storage decoding, get\-method argument parsing, and get\-method result decoding
+are best\-effort and depend on local project context or the bundled ABI catalog.
 .sp
 Acton attempts to:
 .sp
@@ -263,11 +359,19 @@ Acton attempts to:
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'decode storage with the matched contract\[cq]s compiler ABI
+\h'-04' 4.\h'+01'fall back to the bundled ABI catalog when there is no local ABI
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'decode storage and get\-method results with the matched compiler ABI
 .RE
 .sp
 This means decoding is robust for contracts you control in the current Acton
-project, but not guaranteed for arbitrary third\-party deployments.
+project, and available for known third\-party deployments in the bundled
+catalog.
+.sp
+For \fBacton rpc call\fR, missing ABI metadata does not prevent a get\-method call.
+Acton sends raw stack arguments instead and prints the raw result stack.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -276,7 +380,8 @@ project, but not guaranteed for arbitrary third\-party deployments.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: The address was invalid, the network could not be resolved, the remote
-request failed, or local ABI decoding encountered an unrecoverable error.
+request failed, raw or ABI argument parsing failed, a named get\-method was not
+found in ABI metadata, or the get\-method returned a non\-zero exit code.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -311,7 +416,47 @@ acton rpc info EQC... \-\-net localnet
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Use a custom network defined in another manifest:
+\h'-04' 4.\h'+01'Call a get\-method with ABI\-parsed arguments:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... get_wallet_data \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Call a get\-method by numeric TVM method id:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... 85143 \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Call a get\-method without ABI metadata by passing raw stack arguments:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... 85143 0xff true cell:B5EE9C... \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Pass \fBaddr_none\fR to an \fBany_address\fR get\-method argument:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... accepts_any_address addr_none \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 8.\h'+01'Use a custom network defined in another manifest:
 .sp
 .RS 4
 .nf
@@ -321,7 +466,7 @@ acton \-\-manifest\-path ../incident/Acton.toml rpc info EQC... \-\-net custom:s
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Print the latest mainnet masterchain block JSON:
+\h'-04' 9.\h'+01'Print the latest mainnet masterchain block JSON:
 .sp
 .RS 4
 .nf
@@ -331,23 +476,23 @@ acton rpc block \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Print the latest mainnet masterchain block number:
+\h'-04' 10.\h'+01'Print the latest mainnet masterchain block number:
+.RE
 .sp
 .RS 4
 .nf
 acton rpc block\-number \-\-net mainnet
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Print a transaction trace from localnet:
+\h'-04' 11.\h'+01'Print a transaction trace from localnet:
+.RE
 .sp
 .RS 4
 .nf
 acton rpc trace <tx\-hash> \-\-net localnet
 .fi
-.RE
 .RE
 .SH "SEE ALSO"
 .sp

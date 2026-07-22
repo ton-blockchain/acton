@@ -3,7 +3,8 @@ use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
     append_custom_network, format_captured_requests, spawn_toncenter_v2_mock,
     spawn_toncenter_v2_mock_with_capture, toncenter_v2_account_info_ok_response,
-    toncenter_v2_error_response,
+    toncenter_v2_error_response, write_fork_account_cache_summary,
+    write_fork_account_cache_tree_summary,
 };
 use base64::Engine;
 use std::fmt::Write as _;
@@ -214,6 +215,269 @@ fn fork_block_number_is_forwarded_to_remote_account_requests() {
     output.assert_file_snapshot_matches(
         "fork-block-requests.txt",
         "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn fork_block_number_reuses_persistent_account_cache_between_cli_runs() {
+    let last_hash_bytes = [0x66_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 777777_u64;
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 505, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_cache_block",
+            &remote_shard_account_last_lt_test_source("persistent fork block cache", 505),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.first.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.second.stdout.txt",
+    );
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "remote-cache",
+        fork_block_number,
+        "fork-block-cache-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "fork-block-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.summary.txt",
+    );
+}
+
+#[test]
+fn fork_net_without_block_number_does_not_persist_account_cache_between_cli_runs() {
+    let last_hash_bytes = [0x99_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 808, &last_hash_b64),
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 808, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-live-no-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_live_cache",
+            &remote_shard_account_last_lt_test_source("live fork does not persist cache", 808),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-live-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let mut last_output = None;
+    for _ in 0..2 {
+        let output = project
+            .acton()
+            .test()
+            .fork_net("custom:remote-live-cache")
+            .run()
+            .success();
+        output.assert_passed(1);
+        last_output = Some(output);
+    }
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_tree_summary(
+        project.path(),
+        "remote-live-cache",
+        "fork-live-no-cache-summary.txt",
+        &captured_requests,
+    );
+    let last_output = last_output.expect("at least one live fork test run must execute");
+    last_output.assert_file_snapshot_matches(
+        "fork-live-no-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_net_without_block_number_does_not_persist_account_cache_between_cli_runs.summary.txt",
+    );
+}
+
+#[test]
+fn fork_account_cache_isolated_by_block_number() {
+    let first_hash_b64 = base64::engine::general_purpose::STANDARD.encode([0xaa_u8; 32]);
+    let second_hash_b64 = base64::engine::general_purpose::STANDARD.encode([0xbb_u8; 32]);
+    let first_block_number = 111111_u64;
+    let second_block_number = 222222_u64;
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 909, &first_hash_b64),
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 1001, &second_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-cache-isolated")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_isolated_block",
+            &remote_shard_account_last_lt_test_source("fork block cache isolation", 909),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-block-isolated",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&first_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1);
+
+    fs::write(
+        project.path().join("tests/remote_isolated_block.test.tolk"),
+        remote_shard_account_last_lt_test_source("fork block cache isolation", 1001),
+    )
+    .expect("failed to update fork block isolation test source");
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&second_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1);
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    fs::write(
+        project.path().join("tests/remote_isolated_block.test.tolk"),
+        remote_shard_account_last_lt_test_source("fork block cache isolation", 909),
+    )
+    .expect("failed to restore fork block isolation test source");
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&first_block_number.to_string())
+        .run()
+        .success();
+    output.assert_passed(1);
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_tree_summary(
+        project.path(),
+        "remote-block-isolated",
+        "fork-block-cache-isolated-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "fork-block-cache-isolated-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_account_cache_isolated_by_block_number.summary.txt",
+    );
+}
+
+#[test]
+fn no_fork_cache_keeps_remote_account_fetches_between_cli_runs() {
+    let last_hash_bytes = [0x77_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 888888_u64;
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 606, &last_hash_b64),
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 606, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("i-fork-block-no-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_no_cache_block",
+            &remote_shard_account_test_source("skip persistent fork block cache"),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-no-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let mut last_output = None;
+    for _ in 0..2 {
+        let output = project
+            .acton()
+            .test()
+            .fork_net("custom:remote-no-cache")
+            .arg("--fork-block-number")
+            .arg(&fork_block_number.to_string())
+            .arg("--no-fork-cache")
+            .run()
+            .success();
+        output.assert_passed(1);
+        last_output = Some(output);
+    }
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "remote-no-cache",
+        fork_block_number,
+        "fork-block-no-cache-summary.txt",
+        &captured_requests,
+    );
+    let last_output = last_output.expect("at least one no-cache test run must execute");
+    last_output.assert_file_snapshot_matches(
+        "fork-block-no-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/no_fork_cache_keeps_remote_account_fetches_between_cli_runs.summary.txt",
     );
 }
 
@@ -475,6 +739,25 @@ fn remote_shard_account_test_source(test_name: &str) -> String {
         "#
     .replace("__TEST_NAME__", test_name)
     .replace("__REMOTE_ADDRESS__", RAW_ADDRESS_MAINNET)
+}
+
+fn remote_shard_account_last_lt_test_source(test_name: &str, last_lt: u64) -> String {
+    r#"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test __TEST_NAME__`() {
+                val shard = testing.getShardAccount(address("__REMOTE_ADDRESS__"));
+                expect(shard).toBeNotNull();
+
+                if (shard != null) {
+                    expect(shard!.lastTransLt).toEqual(__LAST_LT__);
+                }
+            }
+        "#
+    .replace("__TEST_NAME__", test_name)
+    .replace("__REMOTE_ADDRESS__", RAW_ADDRESS_MAINNET)
+    .replace("__LAST_LT__", &last_lt.to_string())
 }
 
 fn append_test_fork_settings(project_path: &Path, fork_net: &str, fork_block_number: u64) {

@@ -41,7 +41,7 @@ fun promptJettonAddress(envName: string, message: string, default: address? = nu
 }
 
 fun promptJettonCoins(envName: string, message: string, default: string): coins {
-    return env<coins>(envName) ?? promptInt(message, default, "in nanotons/nano-jettons");
+    return env<coins>(envName) ?? promptInt(message, default, "in nanograms/nano-jettons");
 }
 
 fun promptJettonWallet(envName: string, message: string): ActonWallet {
@@ -92,7 +92,7 @@ fun promptJettonMinterStorage(admin: address): MinterStorage {
 
 fun deployJettonMinter(deployer: ActonWallet, storage: MinterStorage): JettonMinter {
     val minter = JettonMinter.fromStorage(storage);
-    val res = minter.sendDeploy(deployer.address, { value: ton("0.05") });
+    val res = minter.sendDeploy(deployer.address, { value: grams("0.05") });
     res.waitForFirstTransaction();
     return minter;
 }

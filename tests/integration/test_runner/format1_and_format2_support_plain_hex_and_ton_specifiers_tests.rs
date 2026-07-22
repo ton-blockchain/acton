@@ -37,10 +37,43 @@ get fun `test y stdlib format1 format2 specifiers`() {
     expect(hex).toEqual("0xff");
 
     val ton = format("{} {:ton}", "balance", 1500000000);
-    expect(ton).toEqual("balance 1.5 TON");
+    expect(ton).toEqual("balance 1.5 GRAM");
+
+    val gram = format("{} {:gram}", "balance", 1500000000);
+    expect(gram).toEqual("balance 1.5 GRAM");
+
+    println("printed {:grams}", 500000000);
 }
 "#,
         "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format1_and_format2_support_plain_hex_and_ton_specifiers.stdout.txt",
+    );
+}
+
+#[test]
+fn format_supports_constant_width_and_padding() {
+    run_fmt_success(
+        "y-stdlib-format-width-padding",
+        r#"
+get fun `test y stdlib format width padding`() {
+    println(format("flag={{:5}} value=|{:5}|", "hi"));
+    println(format("flag={{:>5}} value=|{:>5}|", "hi"));
+    println(format("flag={{:_>5}} value=|{:_>5}|", "hi"));
+    println(format("flag={{:>>5}} value=|{:>>5}|", "hi"));
+    println(format("flag={{:.^7}} value=|{:.^7}|", "hi"));
+    println(format("flag={{:05}} value=|{:05}|", 42));
+    println(format("flag={{:06x}} value=|{:06x}|", 255));
+    println(format("flag={{:X}} value=|{:X}|", 255));
+    println(format("flag={{:08X}} value=|{:08X}|", 255));
+    println(format("flag={{:b}} value=|{:b}|", 10));
+    println(format("flag={{:B}} value=|{:B}|", 10));
+    println(format("flag={{:08B}} value=|{:08B}|", 10));
+    println(format("flag={{:0>6x}} value=|{:0>6x}|", -255));
+    println(format("flag={{:>12ton}} value=|{:>12ton}|", 1500000000));
+    println(format("flag={{:0>8:x}} value=|{:0>8:x}|", 255));
+    println(format("flag={{:*>6}} value=|{:*>6}|", "ok"));
+}
+"#,
+        "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format_supports_constant_width_and_padding.stdout.txt",
     );
 }
 
@@ -51,10 +84,10 @@ fn format3_and_format4_support_mixed_plain_hex_and_ton() {
         r#"
 get fun `test y stdlib format3 format4 mixed specifiers`() {
     val formatted3 = format("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
-    expect(formatted3).toEqual("hex=ff ton=2.5 TON label=ok");
+    expect(formatted3).toEqual("hex=ff ton=2.5 GRAM label=ok");
 
     val formatted4 = format("a={} b={:x} c={:ton} d={}", "left", 16, 1230000000, "right");
-    expect(formatted4).toEqual("a=left b=10 c=1.23 TON d=right");
+    expect(formatted4).toEqual("a=left b=10 c=1.23 GRAM d=right");
 }
 "#,
         "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format3_and_format4_support_mixed_plain_hex_and_ton.stdout.txt",
@@ -68,7 +101,7 @@ fn format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug() {
         r#"
 get fun `test y stdlib format5 placeholder order bug`() {
     val rendered = format("{} | {:x} | {:ton} | {} | {}", 255, 16, 1500000000, "left", "right");
-    expect(rendered).toEqual("255 | 10 | 1.5 TON | left | right");
+    expect(rendered).toEqual("255 | 10 | 1.5 GRAM | left | right");
 }
 "#,
         "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug.stdout.txt",
@@ -76,7 +109,7 @@ get fun `test y stdlib format5 placeholder order bug`() {
 }
 
 #[test]
-fn format_ton_preserves_nanoton_precision_for_large_values() {
+fn format_ton_preserves_nanogram_precision_for_large_values() {
     run_fmt_success(
         "y-stdlib-format-ton-precision",
         r#"
@@ -85,11 +118,11 @@ get fun `test y stdlib format ton precision`() {
     println(format("above_i64_max={:ton}", parseInt("9223372036854775808")));
     println(format("huge={:ton}", parseInt("123456789012345678901234567890123456789")));
     println(format("negative_huge={:ton}", parseInt("-123456789012345678901234567890123456789")));
-    println(format("one_nanoton={:ton}", 1));
+    println(format("one_nanogram={:ton}", 1));
     println(format("trailing_zeros={:ton}", 1234500000));
 }
 "#,
-        "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format_ton_preserves_nanoton_precision_for_large_values.stdout.txt",
+        "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format_ton_preserves_nanogram_precision_for_large_values.stdout.txt",
     );
 }
 

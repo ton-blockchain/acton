@@ -3,7 +3,7 @@ use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
-use acton::commands::doc::doc_tvm_cmd;
+use acton::commands::doc::{doc_abi_cmd, doc_tvm_cmd};
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
@@ -35,7 +35,8 @@ use acton_config::config::{
     project_root as configured_project_root,
 };
 use acton_config::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -199,12 +200,17 @@ enum Commands {
         command: RpcCommand,
     },
     #[command(
-        about = "Run tests from a file or directory",
+        about = "Run tests from files or directories",
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
-        path: Option<String>,
+        #[arg(
+            help = "Test files or directories containing test files (default: project root)",
+            value_name = "PATH",
+            num_args = 0..,
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
+        paths: Vec<String>,
         // Filtering
         #[arg(
             short,
@@ -258,6 +264,13 @@ enum Commands {
         debug_port: Option<u16>,
         #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
         backtrace: Option<BacktraceMode>,
+        #[arg(
+            long,
+            help = "Print test stdout/stderr immediately while still capturing it for reporters",
+            help_heading = "Debugging",
+            conflicts_with = "mutate"
+        )]
+        no_capture: bool,
 
         // Coverage
         #[arg(long, help = "Generate a coverage profile", help_heading = "Coverage")]
@@ -315,6 +328,25 @@ enum Commands {
             requires = "baseline_snapshot"
         )]
         fail_on_diff: bool,
+        #[arg(
+            long,
+            help = "Write a gas-weighted execution profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Output gas profile in specified format",
+            help_heading = "Profiling"
+        )]
+        gas_profile_format: Option<GasProfileFormat>,
+        #[arg(
+            long,
+            help = "Include .test.tolk unit-test execution in the gas profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile_include_tests: bool,
 
         // Reporting
         #[arg(
@@ -368,6 +400,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Tracing
         #[arg(
@@ -609,6 +647,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Broadcasting
         #[arg(
@@ -681,6 +725,12 @@ enum Commands {
             help = "Directory to save compiled Fift files"
         )]
         output_fift: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save source registration artifacts"
+        )]
+        output_sources: Option<String>,
         #[arg(long, help = "Show compiled contract info")]
         info: bool,
     },
@@ -791,6 +841,8 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
+        #[arg(long = "new", hide = true, help = "Use the new Acton verifier service")]
+        new_verifier: bool,
         #[arg(
             long,
             help = "Use TON Connect wallet approval for the verification transaction",
@@ -925,7 +977,7 @@ enum Commands {
         range: Option<String>,
     },
     #[command(
-        about = "Look up TVM reference documentation",
+        about = "Look up reference documentation and contract ABIs",
         after_help = detailed_help_pointer("doc")
     )]
     Doc {
@@ -1069,7 +1121,10 @@ pub enum LocalnetCommand {
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
-        #[arg(long, help = "Path to SQLite database for persistent storage")]
+        #[arg(
+            long,
+            help = "Path to SQLite database for persistent storage (default: [localnet].db-path)"
+        )]
         db_path: Option<String>,
         #[arg(
             long,
@@ -1078,6 +1133,30 @@ pub enum LocalnetCommand {
             help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
+        #[arg(
+            long,
+            value_name = "MS",
+            value_parser = clap::value_parser!(u64).range(1..),
+            help = "Delay TonCenter v2/v3 and Emulate API responses, in milliseconds (default: [localnet].response-delay-ms)"
+        )]
+        response_delay_ms: Option<u64>,
+        #[arg(
+            long,
+            value_name = "MS",
+            value_parser = clap::value_parser!(u64).range(1..),
+            help = "Localnet block production interval, in milliseconds (default: [localnet].block-interval-ms or 500)"
+        )]
+        block_interval_ms: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable automatic block production; mine blocks manually with `acton localnet mine` (default: [localnet].no-mining)"
+        )]
+        no_mining: bool,
+        #[arg(
+            long,
+            help = "Mine blocks even when no messages are pending (default: [localnet].mine-empty-blocks or false)"
+        )]
+        mine_empty_blocks: bool,
         #[arg(
             long,
             help = "Load Localnet state from JSON snapshot before startup",
@@ -1091,17 +1170,35 @@ pub enum LocalnetCommand {
             value_name = "PATH"
         )]
         dump_state: Option<String>,
+        #[arg(
+            long,
+            help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
+        )]
+        require_auth: bool,
+        #[arg(
+            long,
+            help = "Start the LiteAPI server (default port: Localnet HTTP port + 1)"
+        )]
+        liteapi: bool,
+        #[arg(
+            long,
+            requires = "liteapi",
+            value_name = "PORT",
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "LiteAPI server port (default: Localnet HTTP port + 1)"
+        )]
+        liteapi_port: Option<u16>,
     },
-    #[command(about = "Request TON from faucet")]
+    #[command(about = "Request GRAM from faucet")]
     Airdrop {
-        #[arg(help = "Address to receive TON")]
+        #[arg(help = "Address to receive funds")]
         address: String,
         #[arg(
             long,
             short,
-            help = "Amount of TON to request",
+            help = "Amount of GRAM to request",
             default_value = "100",
-            value_parser = parse_positive_ton_amount
+            value_parser = parse_positive_gram_amount
         )]
         amount: f64,
         #[arg(
@@ -1110,6 +1207,72 @@ pub enum LocalnetCommand {
             help = "Localnet server port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Mine localnet blocks manually")]
+    Mine {
+        #[arg(
+            help = "Number of blocks to mine",
+            default_value_t = 1,
+            value_name = "N",
+            value_parser = clap::value_parser!(u32).range(1..)
+        )]
+        blocks: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Increase localnet virtual time")]
+    IncreaseTime {
+        #[arg(
+            help = "Seconds to add to localnet virtual time",
+            value_name = "SECONDS",
+            value_parser = clap::value_parser!(u64).range(1..)
+        )]
+        seconds: u64,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Set localnet virtual unix time")]
+    SetTime {
+        #[arg(help = "Unix timestamp in seconds", value_name = "TIMESTAMP")]
+        timestamp: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Set timestamp for the next localnet block")]
+    SetNextBlockTimestamp {
+        #[arg(
+            help = "Unix timestamp in seconds for the next mined block",
+            value_name = "TIMESTAMP"
+        )]
+        timestamp: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
     },
     #[command(about = "Inspect localnet status")]
     Status {
@@ -1121,6 +1284,155 @@ pub enum LocalnetCommand {
         port: Option<u16>,
         #[arg(long, help = "Print machine-readable JSON")]
         json: bool,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Dump or load the current localnet state")]
+    State {
+        #[command(subcommand)]
+        command: LocalnetStateCommand,
+    },
+    #[command(about = "Manage named in-memory localnet checkpoints")]
+    Checkpoint {
+        #[command(subcommand)]
+        command: LocalnetCheckpointCommand,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LocalnetStateCommand {
+    #[command(about = "Dump the current localnet state to a JSON file")]
+    Dump {
+        #[arg(help = "Output JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(long, help = "Overwrite the output file if it already exists")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Replace the current localnet state from a JSON file")]
+    Load {
+        #[arg(help = "State JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LocalnetCheckpointCommand {
+    #[command(about = "Create a named in-memory checkpoint")]
+    Create {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "List in-memory checkpoints")]
+    List {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Restore localnet state from a checkpoint")]
+    Restore {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Delete an in-memory checkpoint")]
+    Delete {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Delete all in-memory checkpoints")]
+    Clear {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Export a checkpoint to a JSON file")]
+    Export {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(long, help = "Output JSON file", value_name = "PATH")]
+        out: PathBuf,
+        #[arg(long, help = "Overwrite the output file if it already exists")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Import a JSON file as an in-memory checkpoint")]
+    Import {
+        #[arg(help = "Checkpoint JSON file to import", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(
+            long,
+            help = "Checkpoint name (defaults to the file stem)",
+            value_name = "NAME"
+        )]
+        name: Option<String>,
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
     },
 }
 
@@ -1155,7 +1467,7 @@ pub enum LibraryCommand {
             help_heading = "Broadcasting"
         )]
         tonconnect_port: u16,
-        #[arg(long, help = "Amount of TON to send for publication")]
+        #[arg(long, help = "Amount of GRAM to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
@@ -1221,7 +1533,7 @@ pub enum LibraryCommand {
         tonconnect_port: u16,
         #[arg(
             long,
-            help = "Amount of TON to send (overrides duration-based calculation)"
+            help = "Amount of GRAM to send (overrides duration-based calculation)"
         )]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -1231,6 +1543,14 @@ pub enum LibraryCommand {
 
 #[derive(Subcommand, Clone)]
 pub enum DocCommand {
+    #[command(about = "Print compiler ABI for a local or bundled contract")]
+    Abi {
+        #[arg(
+            help = "Contract name, local contract id, or bundled catalog name",
+            add = ArgValueCompleter::new(complete_contracts)
+        )]
+        contract: String,
+    },
     #[command(about = "Lookup an instruction in the TVM specification")]
     Tvm {
         #[arg(
@@ -1433,7 +1753,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("compile", "<PATH>"),
         ("wrapper", "<CONTRACT_NAME>"),
         ("disasm", "[BOC_FILE]"),
-        ("doc", "tvm <QUERY...>"),
+        ("doc", "<COMMAND>"),
     ];
     let support_commands = vec![
         // ("ls", ""),
@@ -1863,7 +2183,7 @@ fn main() {
             templates,
         ),
         Commands::Test {
-            path,
+            paths,
             filter,
             reporter,
             show_bodies,
@@ -1871,6 +2191,7 @@ fn main() {
             debug,
             debug_port,
             backtrace,
+            no_capture,
             coverage,
             coverage_format,
             coverage_file,
@@ -1885,6 +2206,9 @@ fn main() {
             snapshot,
             baseline_snapshot,
             fail_on_diff,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             save_test_trace,
             mutate,
@@ -1902,6 +2226,7 @@ fn main() {
             fail_fast,
             fuzz_seed,
             fork_block_number,
+            no_fork_cache,
             ui,
             ui_port,
         } => match (
@@ -1916,6 +2241,7 @@ fn main() {
                     debug,
                     debug_port,
                     backtrace,
+                    no_capture,
                     coverage,
                     coverage_format,
                     coverage_file,
@@ -1930,9 +2256,17 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    gas_profile,
+                    gas_profile_format,
+                    if gas_profile_include_tests {
+                        Some(true)
+                    } else {
+                        None
+                    },
                     fail_on_diff,
                     fork_net,
                     fork_block_number,
+                    !no_fork_cache,
                     save_test_trace,
                     mutate,
                     mutate_overrides,
@@ -1953,9 +2287,9 @@ fn main() {
                 ) {
                     Ok(config) => {
                         if mutate {
-                            mutation::test_mutate_cmd(path.as_deref(), &config)
+                            mutation::test_mutate_cmd(&paths, &config)
                         } else {
-                            test_cmd(path, &config)
+                            test_cmd(paths, &config)
                         }
                     }
                     Err(err) => Err(err),
@@ -2002,6 +2336,7 @@ fn main() {
             clear_cache,
             fork_net,
             fork_block_number,
+            no_fork_cache,
             net,
             tonconnect,
             tonconnect_port,
@@ -2018,6 +2353,7 @@ fn main() {
                 clear_cache,
                 fork_net,
                 fork_block_number,
+                !no_fork_cache,
                 net,
                 explorer,
                 show_bodies,
@@ -2034,6 +2370,7 @@ fn main() {
             gen_dir,
             output_abi,
             output_fift,
+            output_sources,
             info,
         } => build_cmd(BuildCommandOptions {
             contract_id,
@@ -2043,6 +2380,7 @@ fn main() {
             gen_dir,
             output_abi,
             output_fift,
+            output_sources,
             show_info: info,
             quiet_no_contracts: false,
         }),
@@ -2128,6 +2466,7 @@ fn main() {
             dry_run,
             tonconnect,
             tonconnect_port,
+            new_verifier,
         } => verify_cmd(
             contract_id,
             address,
@@ -2135,6 +2474,7 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
+            new_verifier,
             tonconnect,
             tonconnect_port,
         ),
@@ -2239,6 +2579,7 @@ fn main() {
             range,
         } => fmt_cmd(paths, check, stdin, stdin_filepath, range),
         Commands::Doc { command } => match command {
+            DocCommand::Abi { contract } => doc_abi_cmd(&contract),
             DocCommand::Tvm {
                 instruction,
                 find,
@@ -2304,15 +2645,27 @@ fn main() {
                 accounts,
                 db_path,
                 rate_limit,
+                response_delay_ms,
+                block_interval_ms,
+                no_mining,
+                mine_empty_blocks,
                 load_state,
                 dump_state,
+                require_auth,
+                liteapi,
+                liteapi_port,
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
+                    db_path,
                     fork_net,
                     fork_block_number,
                     accounts,
                     rate_limit,
+                    response_delay_ms,
+                    block_interval_ms,
+                    no_mining,
+                    mine_empty_blocks,
                 );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -2321,13 +2674,20 @@ fn main() {
                 rt.block_on(async {
                     commands::localnet::localnet_start_cmd(
                         resolved_localnet.port,
-                        db_path,
+                        resolved_localnet.db_path,
                         resolved_localnet.fork_net,
                         resolved_localnet.fork_block_number,
                         resolved_localnet.accounts,
                         resolved_localnet.rate_limit,
+                        resolved_localnet.response_delay_ms,
+                        resolved_localnet.block_interval_ms,
+                        resolved_localnet.no_mining,
+                        resolved_localnet.mine_empty_blocks,
                         load_state,
                         dump_state,
+                        require_auth,
+                        liteapi,
+                        liteapi_port,
                     )
                     .await
                 })
@@ -2336,6 +2696,7 @@ fn main() {
                 address,
                 amount,
                 port,
+                auth_token,
             } => {
                 let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
@@ -2343,16 +2704,206 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::localnet::localnet_airdrop_cmd(&address, amount, port).await
+                    commands::localnet::localnet_airdrop_cmd(&address, amount, port, auth_token)
+                        .await
                 })
             }
-            LocalnetCommand::Status { port, json } => {
+            LocalnetCommand::Mine {
+                blocks,
+                port,
+                auth_token,
+            } => {
                 let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
-                rt.block_on(async { commands::localnet::localnet_status_cmd(port, json).await })
+                rt.block_on(async {
+                    commands::localnet::localnet_mine_cmd(blocks, port, auth_token).await
+                })
+            }
+            LocalnetCommand::IncreaseTime {
+                seconds,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_increase_time_cmd(seconds, port, auth_token).await
+                })
+            }
+            LocalnetCommand::SetTime {
+                timestamp,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_set_time_cmd(timestamp, port, auth_token).await
+                })
+            }
+            LocalnetCommand::SetNextBlockTimestamp {
+                timestamp,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_set_next_block_timestamp_cmd(
+                        timestamp, port, auth_token,
+                    )
+                    .await
+                })
+            }
+            LocalnetCommand::Status {
+                port,
+                json,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_status_cmd(port, json, auth_token).await
+                })
+            }
+            LocalnetCommand::State { command } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                match command {
+                    LocalnetStateCommand::Dump {
+                        path,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_dump_cmd(
+                                path, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetStateCommand::Load {
+                        path,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_load_cmd(path, port, auth_token)
+                                .await
+                        })
+                    }
+                }
+            }
+            LocalnetCommand::Checkpoint { command } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                match command {
+                    LocalnetCheckpointCommand::Create {
+                        name,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_create_cmd(
+                                &name, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::List { port, auth_token } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_list_cmd(port, auth_token).await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Restore {
+                        name,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_restore_cmd(
+                                &name, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Delete {
+                        name,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_delete_cmd(
+                                &name, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Clear { port, auth_token } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_clear_cmd(port, auth_token)
+                                .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Export {
+                        name,
+                        out,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_export_cmd(
+                                &name, out, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Import {
+                        path,
+                        name,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_import_cmd(
+                                path, name, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                }
             }
         },
     };
@@ -2410,8 +2961,14 @@ fn validate_project_toolchain_version() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let suggested_config_acton = if acton::build_info::is_trunk_build() {
+        "trunk"
+    } else {
+        installed
+    };
+
     anyhow::bail!(
-        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update [toolchain].acton if this project supports acton {installed}."
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update Acton.toml if this project supports the installed Acton CLI:\n\n[toolchain]\nacton = \"{suggested_config_acton}\""
     );
 }
 
@@ -2447,31 +3004,72 @@ fn lint_command_error(args: &[String]) -> anyhow::Error {
 
 struct ResolvedLocalnetSettings {
     port: u16,
+    db_path: Option<String>,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
     rate_limit: Option<u32>,
+    response_delay_ms: Option<u64>,
+    block_interval_ms: u64,
+    no_mining: bool,
+    mine_empty_blocks: bool,
 }
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
-    resolve_localnet_settings(cli_port, None, None, None, None).port
+    resolve_localnet_settings(
+        cli_port, None, None, None, None, None, None, None, false, false,
+    )
+    .port
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_localnet_settings(
     cli_port: Option<u16>,
+    cli_db_path: Option<String>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
+    cli_response_delay_ms: Option<u64>,
+    cli_block_interval_ms: Option<u64>,
+    cli_no_mining: bool,
+    cli_mine_empty_blocks: bool,
 ) -> ResolvedLocalnetSettings {
     let config = load_localnet_settings_from_config();
     ResolvedLocalnetSettings {
         port: cli_port.or(config.port).unwrap_or(5411),
+        db_path: resolve_localnet_db_path(cli_db_path, config.db_path),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
         rate_limit: cli_rate_limit.or(config.rate_limit),
+        response_delay_ms: cli_response_delay_ms.or(config.response_delay_ms),
+        block_interval_ms: cli_block_interval_ms
+            .or(config.block_interval_ms)
+            .unwrap_or(ton_localnet::DEFAULT_BLOCK_INTERVAL_MS),
+        no_mining: cli_no_mining || config.no_mining.unwrap_or(false),
+        mine_empty_blocks: cli_mine_empty_blocks || config.mine_empty_blocks.unwrap_or(false),
     }
+}
+
+fn resolve_localnet_db_path(
+    cli_db_path: Option<String>,
+    config_db_path: Option<String>,
+) -> Option<String> {
+    if cli_db_path.is_some() {
+        return cli_db_path;
+    }
+
+    config_db_path
+        .map(|path| {
+            let path = PathBuf::from(path);
+            if path.is_absolute() {
+                path
+            } else {
+                configured_project_root().join(path)
+            }
+        })
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn load_localnet_settings_from_config() -> LocalnetSettings {
@@ -2493,17 +3091,17 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn parse_positive_ton_amount(value: &str) -> Result<f64, String> {
+fn parse_positive_gram_amount(value: &str) -> Result<f64, String> {
     let amount = value
         .parse::<f64>()
-        .map_err(|err| format!("invalid TON amount '{value}': {err}"))?;
+        .map_err(|err| format!("invalid GRAM amount '{value}': {err}"))?;
 
     if !amount.is_finite() {
-        return Err(format!("TON amount must be finite, got '{value}'"));
+        return Err(format!("GRAM amount must be finite, got '{value}'"));
     }
 
     if amount <= 0.0 {
-        return Err(format!("TON amount must be greater than 0, got '{value}'"));
+        return Err(format!("GRAM amount must be greater than 0, got '{value}'"));
     }
 
     Ok(amount)
@@ -2608,6 +3206,7 @@ fn create_test_config(
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
+    no_capture: bool,
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
@@ -2622,9 +3221,13 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    gas_profile: Option<String>,
+    gas_profile_format: Option<GasProfileFormat>,
+    gas_profile_include_tests: Option<bool>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     save_test_trace: Option<String>,
     mutate: bool,
     mutate_overrides: Option<String>,
@@ -2686,8 +3289,12 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             fork_block_number,
+            fork_cache_enabled,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -2704,6 +3311,7 @@ fn create_test_config(
             ui_port,
         );
         config.verbosity = verbosity;
+        config.no_capture = no_capture;
         config.mutation_ids = mutation_ids;
         if mutation_rules_file.is_some() {
             config.mutation_rules_file = mutation_rules_file;
@@ -2721,6 +3329,7 @@ fn create_test_config(
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
+        no_capture,
         coverage,
         coverage_minimum_percent,
         coverage_include_wrappers,
@@ -2736,8 +3345,12 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        gas_profile,
+        gas_profile_format: gas_profile_format.unwrap_or_default(),
+        gas_profile_include_tests: gas_profile_include_tests.unwrap_or(false),
         fail_on_diff,
         fork_block_number,
+        fork_cache_enabled,
         save_test_trace,
         mutate,
         mutate_overrides,
@@ -2776,6 +3389,14 @@ fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
     if let Some(fork_net) = test_settings.fork_net.as_deref() {
         Network::from_str(fork_net)
             .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
+    }
+
+    if let Some(format) = test_settings.gas_profile_format.as_deref()
+        && !matches!(format.to_lowercase().as_str(), "cpuprofile" | "collapsed")
+    {
+        anyhow::bail!(
+            "Invalid [test].gas-profile-format '{format}': expected 'cpuprofile' or 'collapsed'"
+        );
     }
 
     Ok(())
@@ -2913,6 +3534,10 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            true,
             save_test_trace_override.map(str::to_owned),
             false,
             None,

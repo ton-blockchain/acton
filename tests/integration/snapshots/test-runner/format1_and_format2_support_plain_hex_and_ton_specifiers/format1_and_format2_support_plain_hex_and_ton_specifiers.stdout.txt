@@ -6,5 +6,7 @@
 
  > tests/fmt_behavior.test.tolk (1 test)
   ✓ y stdlib format1 format2 specifiers [TIME]
+    └─ Test output:
+       printed 0.5 GRAM
 
  ✓ 1 passed in 1 file

@@ -14,6 +14,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
+    DeployExplorer(tasks::deploy_explorer::DeployExplorerArgs),
     Dist(tasks::dist::DistArgs),
     GithubCleanup(tasks::github_cleanup::GithubCleanupArgs),
     Hello,
@@ -22,6 +23,7 @@ enum CliCommand {
     Schema(tasks::schema::SchemaArgs),
     SyncArtifacts,
     UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
+    UpdateDefaultConfig(tasks::update_default_config::UpdateDefaultConfigArgs),
     UpdateTemplateWrappers,
 }
 
@@ -29,6 +31,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
+        CliCommand::DeployExplorer(args) => tasks::deploy_explorer::run(args),
         CliCommand::Dist(args) => tasks::dist::run(args),
         CliCommand::GithubCleanup(args) => tasks::github_cleanup::run(args),
         CliCommand::Hello => tasks::hello::run(),
@@ -37,6 +40,7 @@ fn main() -> Result<()> {
         CliCommand::Schema(args) => tasks::schema::run(args),
         CliCommand::SyncArtifacts => tasks::sync_artifacts::run(),
         CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
+        CliCommand::UpdateDefaultConfig(args) => tasks::update_default_config::run(args),
         CliCommand::UpdateTemplateWrappers => tasks::update_template_wrappers::run(),
     }
 }

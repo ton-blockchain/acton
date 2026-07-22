@@ -1,0 +1,30 @@
+[
+  {
+    "case": "unknown method",
+    "code": 404,
+    "error": "Method not found",
+    "id": null,
+    "status": 404
+  },
+  {
+    "case": "zero shards seqno",
+    "code": 422,
+    "error": "seqno should be positive",
+    "id": null,
+    "status": 422
+  },
+  {
+    "case": "missing config param",
+    "code": 422,
+    "error": "only one of config_id or param should be specified",
+    "id": null,
+    "status": 422
+  },
+  {
+    "case": "invalid hash",
+    "code": 422,
+    "error": "Invalid hash format",
+    "id": null,
+    "status": 422
+  }
+]

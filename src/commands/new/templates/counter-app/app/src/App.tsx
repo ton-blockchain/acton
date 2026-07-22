@@ -384,7 +384,7 @@ export default function App() {
               </dt>
               <dd className="text-[13px] font-medium">
                 {walletBalance.data
-                  ? `${walletBalance.data} TON`
+                  ? `${walletBalance.data} GRAM`
                   : 'Connect to load'}
               </dd>
             </div>
@@ -425,7 +425,7 @@ export default function App() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="deploy-value">Deploy value (TON)</Label>
+                  <Label htmlFor="deploy-value">Deploy value (GRAM)</Label>
                   <Input
                     id="deploy-value"
                     inputMode="decimal"
@@ -532,7 +532,7 @@ export default function App() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="message-value">Message value (TON)</Label>
+                    <Label htmlFor="message-value">Message value (GRAM)</Label>
                     <Input
                       id="message-value"
                       inputMode="decimal"

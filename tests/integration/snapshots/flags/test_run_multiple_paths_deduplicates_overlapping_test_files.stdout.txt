@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/selected/test1.test.tolk (1 test)
+  ✓ overlapping file 1 [TIME]
+ > tests/selected/test2.test.tolk (1 test)
+  ✓ overlapping file 2 [TIME]
+
+ ✓ 2 passed in 2 files

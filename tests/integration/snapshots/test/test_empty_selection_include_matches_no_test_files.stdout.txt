@@ -10,4 +10,4 @@
 
  ✓ 0 passed in 0 files
 
-No test files found. Check the test path or --include/--exclude patterns.
+No test files found. Check the test paths or --include/--exclude patterns.

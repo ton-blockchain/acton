@@ -1,4 +1,4 @@
   Installing standard library [ACTON_VERSION]
 N/A -> sender A
-└── ScriptBodyMsg 0.1 TON -> script_body_sink B                                 gas=333
+└── ScriptBodyMsg 0.1 GRAM -> script_body_sink B                                gas=333
 

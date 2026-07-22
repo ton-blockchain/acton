@@ -7,7 +7,7 @@ icon: Library
 On-chain libraries let the TON blockchain store code once and reuse it across multiple contracts, which cuts storage use compared to duplicating the same code in every account.
 
 <Callout type="info" title="Background">
-  Usage of on-chain libraries is covered in the corresponding [TON documentation guide](https://docs.ton.org/contract-dev/techniques/using-on-chain-libraries).
+  Usage of on-chain libraries is covered in the corresponding [TON documentation guide](https://docs.ton.org/contracts/techniques/using-on-chain-libraries).
 </Callout>
 
 ## Publishing a library
@@ -56,8 +56,8 @@ Upon success, the output includes the **library hash** used to reference the lib
 
 ```text noCopy title="terminal"
 ...
-> Enter amount in TON (at least 0.1124 TON for 1 year):
-> Send 0.1124 TON to publish library? Note that any extra TON will be refunded. Yes
+> Enter amount in GRAM (at least 0.1124 GRAM for 1 year):
+> Send 0.1124 GRAM to publish library? Note that any extra GRAM will be refunded. Yes
 ✓ Transaction sent successfully
 → Library should be available soon at hash: b993c68...
 ```
@@ -98,7 +98,7 @@ For account state transitions (`active`, `frozen`, `nonexist`) and storage debt,
 
 ## Extending library lifetime
 
-When the balance is low, top up with `acton library topup`. Pass either a duration or a TON amount:
+When the balance is low, top up with `acton library topup`. Pass either a duration or a GRAM amount:
 
 ```bash
 # Top up for another 2 years

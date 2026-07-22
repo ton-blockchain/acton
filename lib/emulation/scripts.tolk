@@ -101,7 +101,7 @@ fun ActonWallet.rawSign(self, data: int): slice {
 ///         counter: 0,
 ///     });
 ///
-///     val result = counter.deploy(deployer.address, ton("0.05"));
+///     val result = counter.deploy(deployer.address, grams("0.05"));
 ///     result.waitForFirstTransaction();
 ///
 ///     println("Deployed counter to {}", counter.address);
@@ -133,7 +133,7 @@ fun scripts.wallet(name: string): ActonWallet {
 /// ```tolk
 /// val state = scripts.fetchAccountState(contract.address);
 /// if (state != null) {
-///     println("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:gram}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -150,7 +150,7 @@ fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
 /// ```tolk
 /// val storageFee = scripts.fetchAccountStorageFee(contract.address, 86400); // 1 day
 /// if (storageFee != null) {
-///     println("Daily storage fee: {:ton}", storageFee);
+///     println("Daily storage fee: {:gram}", storageFee);
 /// }
 /// ```
 fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
@@ -164,7 +164,7 @@ fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
 /// Example:
 /// ```tolk
 /// val balance = scripts.fetchAccountBalance(address);
-/// println("{:ton}", balance);
+/// println("{:gram}", balance);
 /// ```
 fun scripts.fetchAccountBalance(of: address): coins {
     return impl.getAccountBalance(of);

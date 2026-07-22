@@ -1,6 +1,7 @@
 [advisories]
 ignore = [
   "RUSTSEC-2024-0388", # derivative via ton_liteapi -> ton
+  "RUSTSEC-2026-0205", # dependency `scc` does not use `Array`, only `HashSet`
 ]
 
 [output]

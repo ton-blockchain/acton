@@ -147,7 +147,7 @@ impl Compiler {
                     abi,
                     ..
                 } = result;
-                let source_map = if let Some(symbol_types) = symbol_types_json {
+                let source_map = if let Some(symbol_types) = symbol_types_json.clone() {
                     let marks_dict = match crate::debug_marks_dict::parse_debug_marks(
                         debug_mark_base64.as_deref(),
                         &code_boc64,
@@ -161,7 +161,7 @@ impl Compiler {
                     };
                     Some(crate::source_map::SourceMap::from_parts(
                         symbol_types,
-                        debug_marks_json.unwrap_or_default(),
+                        debug_marks_json.clone().unwrap_or_default(),
                         marks_dict,
                     ))
                 } else {
@@ -173,6 +173,9 @@ impl Compiler {
                     code_boc64,
                     code_hash_hex,
                     source_map,
+                    debug_marks_base64: debug_mark_base64,
+                    symbol_types_json,
+                    debug_marks_json,
                     abi,
                 })
             }
@@ -416,6 +419,9 @@ pub struct CompilerResultSuccess {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub source_map: Option<crate::source_map::SourceMap>,
+    pub debug_marks_base64: Option<String>,
+    pub symbol_types_json: Option<crate::source_map::SymbolTypesJson>,
+    pub debug_marks_json: Option<Vec<crate::source_map::DebugMark>>,
     pub abi: Option<ContractABI>,
 }
 

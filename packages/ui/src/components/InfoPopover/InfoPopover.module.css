@@ -1,0 +1,56 @@
+.infoPopover {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  min-height: 1.125rem;
+  border-radius: var(--acton-radius-round);
+  cursor: help;
+  vertical-align: -0.125em;
+}
+
+.infoPopover.infoPopover:focus-visible {
+  border-radius: var(--acton-radius-round);
+}
+
+.trigger {
+  align-items: center;
+  justify-content: center;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1px solid transparent;
+  border-radius: var(--acton-radius-round);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.infoPopover:hover .button,
+.infoPopover:focus-visible .button {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.panel {
+  width: min(26.25rem, var(--available-width));
+  max-width: min(26.25rem, var(--available-width));
+  padding: 0;
+}
+
+.content {
+  display: grid;
+  gap: var(--acton-space-2);
+  box-sizing: border-box;
+  max-height: min(24rem, calc(100vh - 1.5rem));
+  padding: var(--acton-space-3) var(--acton-space-4);
+  overflow-y: auto;
+}

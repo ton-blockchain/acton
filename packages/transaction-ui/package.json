@@ -1,0 +1,41 @@
+{
+  "name": "@acton/transaction-ui",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abi": "./src/abi.ts"
+  },
+  "scripts": {
+    "doctor": "CI=1 react-doctor",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@acton/ui": "workspace:*",
+    "@ton-community/tlb-runtime": "1.0.0-alpha.3",
+    "@ton/core": "0.63.1",
+    "@ton/tasm": "^0.6.1",
+    "@ton/tolk-abi-to-typescript": "^0.5.0",
+    "buffer": "^6.0.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.474.0",
+    "react-d3-tree": "^3.6.6",
+    "react-icons": "^5.5.0",
+    "shiki": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^7.0.2"
+  }
+}

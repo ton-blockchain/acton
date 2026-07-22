@@ -159,6 +159,14 @@ acton up --trunk
 acton up --stable
 ```
 
+If the project pins the CLI in `Acton.toml`, update the pin when switching to
+the preview channel:
+
+```acton-toml title="Acton.toml"
+[toolchain]
+acton = "trunk"
+```
+
 Use `trunk` to try a new feature or verify a fix before it reaches stable. `trunk` builds may include regressions or incomplete work, so if something breaks there, check whether it also reproduces on the latest stable release.
 
 ## Docker image

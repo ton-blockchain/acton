@@ -1,0 +1,99 @@
+.pillTabs {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pillTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.pillTab {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-1) var(--acton-space-3);
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.pillTab:hover:not(:disabled) {
+  color: var(--acton-color-text);
+}
+
+.pillTab:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -2px;
+}
+
+.pillTab:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.variantDefault {
+  background: transparent;
+}
+
+.variantGroup {
+  background: var(--acton-color-surface-group);
+  color: var(--acton-color-text-muted);
+}
+
+.variantMuted {
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
+}
+
+.selected {
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.variantMuted.selected,
+.variantGroup.selected {
+  background: transparent;
+}
+
+.toggleIcon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggleIcon svg {
+  display: block;
+  width: 0.8125rem;
+  height: 0.8125rem;
+  stroke-width: 2;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

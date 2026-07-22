@@ -1,6 +1,23 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
+const DOC_ABI_LOCAL_CONTRACT: &str = r"
+struct Storage {
+    value: uint32
+}
+
+struct (0x12345678) Increase {
+    amount: uint32
+}
+
+contract MyContract {
+    storage: Storage
+    incomingMessages: Increase
+}
+
+fun onInternalMessage(_: InMessage) {}
+";
+
 #[test]
 fn test_doc_tvm_add_text() {
     let project = ProjectBuilder::new("doc-tvm-add-text").build();
@@ -252,6 +269,42 @@ fn test_doc_tvm_empty_query_is_rejected() {
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/doc/test_doc_tvm_empty_query.stderr.txt",
+        );
+}
+
+#[test]
+fn test_doc_abi_catalog_contract() {
+    let project = ProjectBuilder::new("doc-abi-catalog").build();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("doc")
+        .arg("abi")
+        .arg("WalletV1r1")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/doc/test_doc_abi_catalog_contract.stdout.json.txt",
+        );
+}
+
+#[test]
+fn test_doc_abi_local_contract_by_abi_name() {
+    let project = ProjectBuilder::new("doc-abi-local")
+        .contract("my_contract", DOC_ABI_LOCAL_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("doc")
+        .arg("abi")
+        .arg("MyContract")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/doc/test_doc_abi_local_contract_by_abi_name.stdout.json.txt",
         );
 }
 

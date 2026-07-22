@@ -43,7 +43,7 @@ const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 /// Represents a set of parameters for creating a message.
 struct SendParams {
     /// Value to send with the message.
-    value: coins = ton("0.1")
+    value: coins = grams("0.1")
     /// Whether to bounce the message if the contract does not exist or fails (default: false)
     bounce: bool = false
 }
@@ -172,10 +172,10 @@ fun SendResult.allOutActions(self): OutActionList {
 /// Example output:
 /// ```acton-trace
 /// N/A -> sender A
-/// └── AskToTransfer 0.3 TON -> JettonWallet B                                  gas=5158
-///     └── InternalTransferStep 0.19 TON -> JettonWallet C                      gas=6974
-///         ├── TransferNotificationForRecipient 0.05 TON -> receiver D          gas=1234
-///         └── ReturnExcessesBack 0.13 TON -> sender A                          gas=4321
+/// └── AskToTransfer 0.3 GRAM -> JettonWallet B                                 gas=5158
+///     └── InternalTransferStep 0.19 GRAM -> JettonWallet C                     gas=6974
+///         ├── TransferNotificationForRecipient 0.05 GRAM -> receiver D         gas=1234
+///         └── ReturnExcessesBack 0.13 GRAM -> sender A                         gas=4321
 /// ```
 ///
 /// To get a single send result, use [SendResultList.at] method.
@@ -307,6 +307,19 @@ fun ExternalSendResult.giveName(
     self.unwrap(location).giveName(nameForUI);
 }
 
+/// Hide a trace chain produced by [net.sendExternal] from saved traces and the Test UI.
+///
+/// Fails with external-error metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.hideTraceFromUi(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): void {
+    self.unwrap(location).hideTraceFromUi();
+}
+
 /// Give a custom name for a trace chain produced by [net.send].
 ///
 /// The custom name is used in the Test UI and gas/fee profiling reports instead of "trace N".
@@ -321,13 +334,20 @@ fun SendResultList.giveName(self, nameForUI: string): void {
     ffi.saveTraceName(self, nameForUI);
 }
 
+/// Hide this trace chain from saved traces and the Test UI.
+///
+/// The transactions are still available to test code and console assertions.
+fun SendResultList.hideTraceFromUi(self): void {
+    ffi.hideTraceFromUi(self);
+}
+
 /// Wait for the first (root) message of the send result to be applied on the blockchain.
 ///
 /// This method is useful when broadcasting transactions to the real network.
 /// It polls the network until the transaction is applied or the maximum number of attempts is reached.
 ///
 /// The lookup follows the TON docs message-lookup reference
-/// (https://docs.ton.org/ecosystem/ton-connect/message-lookup): the external-in message
+/// (https://docs.ton.org/applications/ton-connect/how-to/message-lookup): the external-in message
 /// actually delivered to the network is identified by its TEP-467 normalized hash
 /// (returned by `sendBocReturnHash` at send time), and the destination account's recent
 /// transactions are scanned until one with a matching `inMessage` shows up.
@@ -336,6 +356,9 @@ fun SendResultList.giveName(self, nameForUI: string): void {
 /// otherwise. Fields that cannot be reconstructed from a single on-chain transaction
 /// (`childTxs`, `parentLt`, `outActions`) are left empty/null; `outMessages`, `externals`,
 /// and `gasUsed` are derived from the transaction itself.
+///
+/// If the matched root transaction is already known to have failed, the method returns
+/// `null` immediately and prints a warning instead of waiting for the remaining attempts.
 ///
 /// In emulation mode (without `--net`), this method returns the first [SendResult] immediately
 /// (or `null` if the list is empty), because the trace is already fully processed locally.
@@ -396,6 +419,8 @@ fun SendResultList.waitForFirstTransaction(
 /// the method returns `self` as-is (or `null` if the list is empty).
 ///
 /// Returns `null` if the chain cannot be fetched within the given attempt budget.
+/// If the matched root transaction is already known to have failed, the method returns
+/// `null` immediately and prints a warning.
 fun SendResultList.waitForTrace(
     self,
     quiet: bool = false,
@@ -455,7 +480,7 @@ struct SearchParams {
     to: (address -> bool) | address | null = null
     /// Source address of the transaction.
     from: (address -> bool) | address | null = null
-    /// Value of the message in nanotons.
+    /// Value of the message in nanograms.
     value: (coins -> bool) | coins | null = null
     /// Exit code of the transaction.
     exitCode: (int32 -> bool) | int32 | null = null
@@ -739,7 +764,7 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///     val message = createMessage({
 ///         bounce: false,
 ///         dest: counter.address,
-///         value: ton("1"),
+///         value: grams("1"),
 ///     });
 ///     net.send(deployer.address, message);
 /// }
@@ -782,7 +807,7 @@ struct ExternalInMessage {
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
 /// Full TL-B scheme of the message is.
-/// ```
+/// ```tlb
 /// ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
 ///   import_fee:Grams = CommonMsgInfo;
 /// message$_ {X:Type} info:CommonMsgInfo
@@ -814,7 +839,7 @@ fun net.createExternalMessage<TBody>(
                 src,
                 dest,
                 // It is better to fairly calculate the import fee right here or in acton
-                importFee: ton("0.1"),
+                importFee: grams("0.1"),
             },
             init,
             body: TlbEither<TBody, Cell<TBody>>.right(body.__asPayload()),
@@ -869,7 +894,7 @@ fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
 /// ```tolk
 /// val msg = createMessage({
 ///     bounce: false,
-///     value: ton("1"),
+///     value: grams("1"),
 ///     dest: counter.address,
 /// });
 /// val bouncedMsg = msg.bounced();
@@ -881,7 +906,7 @@ fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
 /// ```tolk
 /// val bouncedMsg = createMessage({
 ///     bounce: false,
-///     value: ton("0.95"),
+///     value: grams("0.95"),
 ///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
@@ -1601,6 +1626,9 @@ fun ffi.getConfig(): dict
 
 fun ffi.saveTraceName(txs: SendResultList, name: string): void
     asm "35 EXTCALL"
+
+fun ffi.hideTraceFromUi(txs: SendResultList): void
+    asm "58 EXTCALL"
 
 fun ffi.crc16(data: string): int
     asm "13 EXTCALL"

@@ -12,7 +12,7 @@ fun main() {
         owner: deployer.address,
         counter: 0,
     });
-    val res = counter.deploy(deployer.address, { value: ton("0.005") });
+    val res = counter.deploy(deployer.address, { value: grams("0.005") });
     println(res.waitForTrace());
 
     println("Deployed counter to {}", counter.address);

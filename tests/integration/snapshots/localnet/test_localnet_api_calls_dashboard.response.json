@@ -1,0 +1,101 @@
+{
+  "failed_status": 404,
+  "initial_log": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "calls": [
+        {
+          "api_family": "v2",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "GET",
+          "method": "getMasterchainInfo",
+          "path": "/v2/getMasterchainInfo",
+          "request_id": null,
+          "sequence": 1,
+          "status": "success",
+          "status_code": 200,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        }
+      ],
+      "max_retained": 500,
+      "total_retained": 1
+    }
+  },
+  "logged_calls": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "calls": [
+        {
+          "api_family": "v2",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "GET",
+          "method": "getMasterchainInfo",
+          "path": "/v2/getMasterchainInfo",
+          "request_id": null,
+          "sequence": 1,
+          "status": "success",
+          "status_code": 200,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        },
+        {
+          "api_family": "control",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "GET",
+          "method": "acton_getStartupWallets",
+          "path": "/acton_getStartupWallets",
+          "request_id": null,
+          "sequence": 2,
+          "status": "success",
+          "status_code": 200,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        },
+        {
+          "api_family": "v2",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "GET",
+          "method": "getMasterchainInfo",
+          "path": "/v2/getMasterchainInfo",
+          "request_id": null,
+          "sequence": 3,
+          "status": "success",
+          "status_code": 200,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        },
+        {
+          "api_family": "json_rpc",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "POST",
+          "method": "getMasterchainInfo",
+          "path": "/api/v2/jsonRPC",
+          "request_id": 1,
+          "sequence": 4,
+          "status": "success",
+          "status_code": 200,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        },
+        {
+          "api_family": "json_rpc",
+          "call_type": "read",
+          "duration_ns": "[DURATION_NS]",
+          "http_method": "POST",
+          "method": "missingMethod",
+          "path": "/api/v2/jsonRPC",
+          "request_id": "missing",
+          "sequence": 5,
+          "status": "failed",
+          "status_code": 404,
+          "timestamp_ms": "[TIMESTAMP_MS]"
+        }
+      ],
+      "max_retained": 500,
+      "total_retained": 5
+    }
+  }
+}

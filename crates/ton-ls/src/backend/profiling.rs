@@ -49,8 +49,8 @@ impl ProfilingContext {
             let count = stats.count.load(Ordering::Relaxed);
             let total_ns = stats.total_duration_ns.load(Ordering::Relaxed);
 
-            if count > 0 {
-                let avg_duration = Duration::from_nanos(total_ns / count);
+            if let Some(avg_ns) = total_ns.checked_div(count) {
+                let avg_duration = Duration::from_nanos(avg_ns);
                 let total_duration = Duration::from_nanos(total_ns);
                 log::info!(
                     "Feature: {name:<20} | Count: {count:<5} | Avg: {avg_duration:?} | Total: {total_duration:?}"

@@ -11,17 +11,17 @@
   ✓ formatter decoded body supported compiler abi types [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmAbiMegaIncoming 0.4 TON -> fm_abi_mega_sink B                             gas=297
+       └── FmAbiMegaMessage 0.4 GRAM -> fm_abi_mega_sink B                             gas=297
                flag: true
                amount: 777000000
-               owner: [WALLET_ADDRESS_BASE] (sender)
+               owner: [WALLET_ADDRESS_BASE] (sender A)
                scalars: {
                    addresses: {
                        ownerOrNull: null
                        ownerOrFriend: [WALLET_ADDRESS_BASE] (friend)
-                       anyInternal: [WALLET_ADDRESS_BASE] (sender)
+                       anyInternal: [WALLET_ADDRESS_BASE] (sender A)
                        anyExternal: :beef0001
-                       anyNone: "none"
+                       anyNone: addr_none
                    }
                    values: {
                        tiny: 7
@@ -52,7 +52,7 @@
                    }
                    boxedLeaf: {
                        amount: 70000000
-                       owner: [WALLET_ADDRESS_BASE] (sender)
+                       owner: [WALLET_ADDRESS_BASE] (sender A)
                        tag: 0x99AABBCC
                    }
                    nested: {
@@ -61,7 +61,7 @@
                        target: [WALLET_ADDRESS_BASE] (friend)
                        meta: {
                            amount: 80000000
-                           owner: [WALLET_ADDRESS_BASE] (sender)
+                           owner: [WALLET_ADDRESS_BASE] (sender A)
                            tag: 0xDDEEFF00
                        }
                    }
@@ -71,7 +71,7 @@
                        items: {
                            1 => {
                                amount: 10000000
-                               owner: [WALLET_ADDRESS_BASE] (sender)
+                               owner: [WALLET_ADDRESS_BASE] (sender A)
                                tag: 0x01020304
                            }
                            2 => {
@@ -83,7 +83,7 @@
                        boxedItems: {
                            1 => {
                                amount: 200000000
-                               owner: [WALLET_ADDRESS_BASE] (sender)
+                               owner: [WALLET_ADDRESS_BASE] (sender A)
                                tag: 0xA1B2C3D4
                            }
                            2 => {
@@ -99,7 +99,7 @@
                        extra: {
                            nonce: 88
                            enabled: true
-                           target: [WALLET_ADDRESS_BASE] (sender)
+                           target: [WALLET_ADDRESS_BASE] (sender A)
                            meta: null
                        }
                    }

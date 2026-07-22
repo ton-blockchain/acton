@@ -1,0 +1,1569 @@
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  Fragment,
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+
+import type {StackElement} from "@ton/tasm/dist/trace"
+import {
+  Braces,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FileCode2,
+  SkipBack,
+  SkipForward,
+} from "lucide-react"
+
+import type {ContractData} from "@acton/transaction-ui"
+import {CopyInlineAction, InlineLoader} from "@acton/ui"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+
+import type {
+  SourceBundle,
+  SourceFile,
+  SourceTraceLocation,
+  SourceTraceResponse,
+  SourceTraceStep,
+  SourceTraceVariable,
+} from "../../../../api/types"
+import {normalizeAddress} from "../../../../components/utils"
+import {useAddressFormat} from "../../../../hooks/useNetworkInfo"
+import {useLineExecutionData} from "../../hooks/useLineExecutionData"
+import {useTraceStepper} from "../../hooks/useTraceStepper"
+import {findAddressContract, isTonAddress} from "../../lib/addressContracts"
+import {formatExitCode} from "../../lib/exitCodeFormatting"
+import type {ExitCode, RetraceResultAndCode} from "../../lib/types"
+import {
+  buildInstructionDetails,
+  calculateCumulativeGasSinceBegin,
+  getImplicitRet,
+  getStoredSourceDebugCollapsedSections,
+  getStoredSourceDebugPanelWidth,
+  getStoredSourceDebugSectionHeights,
+  getStoredTraceViewMode,
+  setStoredSourceDebugCollapsedSections,
+  setStoredSourceDebugPanelWidth,
+  setStoredSourceDebugSectionHeights,
+  setStoredTraceViewMode,
+  type TraceViewMode,
+} from "../../lib/traceViewModel"
+import StatusBadge from "../StatusBadge"
+import TraceSidePanel from "../TraceSidePanel"
+import TraceStepsChainView from "../TraceStepsChainView"
+import TraceViewModeToggle from "../TraceViewModeToggle"
+import StackItemDetails from "../stack/StackItemDetails"
+
+import styles from "./RetraceWorkspace.module.css"
+
+const CodeEditor = lazy(() => import("../../../ui/CodeEditor"))
+
+type WorkspaceTab = "trace" | "sources"
+type SourceEditorLanguage = "tolk" | "func" | "tasm"
+type SourceDebugSectionId = "exception" | "locals" | "callStack"
+
+interface TraceStepToolbarModel {
+  readonly selectedStep: number
+  readonly totalSteps: number
+  readonly locationLabel?: string
+  readonly instructionLabel?: string
+  readonly instructionGasLabel?: string
+  readonly gasLabel?: string
+  readonly truncated?: boolean
+  readonly onFirst: () => void
+  readonly onPrev: () => void
+  readonly onNext: () => void
+  readonly onLast: () => void
+}
+
+const SOURCE_DEBUG_SECTION_MIN_HEIGHT = 72
+const SOURCE_DEBUG_PANEL_DEFAULT_WIDTH = 360
+const SOURCE_DEBUG_PANEL_MIN_WIDTH = 280
+const SOURCE_DEBUG_PANEL_MAX_WIDTH = 1080
+const SOURCE_DEBUG_EDITOR_MIN_WIDTH = 360
+
+const DEFAULT_SOURCE_DEBUG_SECTION_HEIGHTS: Record<SourceDebugSectionId, number> = {
+  exception: 180,
+  locals: 180,
+  callStack: 180,
+}
+
+const DEFAULT_SOURCE_DEBUG_COLLAPSED: Record<SourceDebugSectionId, boolean> = {
+  exception: false,
+  locals: false,
+  callStack: false,
+}
+
+interface RetraceWorkspaceProps {
+  readonly result: RetraceResultAndCode
+  readonly contractAbi?: ContractABI
+  readonly contracts?: Map<string, ContractData>
+  readonly onContractClick?: (address: string) => void
+  readonly className?: string
+}
+
+function hasVisibleSourceBundles(result: RetraceResultAndCode): boolean {
+  return (
+    result.verifiedSource?.bundles.some(bundle => visibleSourceBundle(bundle).files.length > 0) ??
+    false
+  )
+}
+
+function normalizeSourcePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\//, "")
+}
+
+function findSourceFile(files: readonly SourceFile[], path: string): SourceFile | undefined {
+  const normalizedPath = normalizeSourcePath(path)
+  return files.find(file => normalizeSourcePath(file.path) === normalizedPath)
+}
+
+function sourcePathBasename(path: string): string {
+  const normalizedPath = normalizeSourcePath(path)
+  return normalizedPath.split("/").pop() || normalizedPath
+}
+
+function defaultSourcePath(bundle: SourceBundle): string {
+  return findSourceFile(bundle.files, bundle.entrypoint)?.path ?? bundle.files[0]?.path ?? ""
+}
+
+function shouldShowSourceFile(path: string): boolean {
+  return !normalizeSourcePath(path).toLowerCase().endsWith(".abi.json")
+}
+
+function visibleSourceBundle(bundle: SourceBundle): SourceBundle {
+  return {
+    ...bundle,
+    files: bundle.files.filter(file => shouldShowSourceFile(file.path)),
+  }
+}
+
+function sourceFileLabel(path: string): string {
+  return sourcePathBasename(path)
+}
+
+function sourceLocationLabel(location: SourceTraceLocation): string {
+  return `${sourceFileLabel(location.file)}:${location.line}`
+}
+
+function sourceLocationWithColumnLabel(location: SourceTraceLocation): string {
+  return `${sourceFileLabel(location.file)}:${location.line}:${location.column}`
+}
+
+function sourceTraceExceptionStep(steps: readonly SourceTraceStep[]): SourceTraceStep | undefined {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index]
+    if (step?.exception?.isUncaught) {
+      return step
+    }
+  }
+
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index]
+    if (step?.exception) {
+      return step
+    }
+  }
+
+  return undefined
+}
+
+function sourceTraceExitStep(
+  steps: readonly SourceTraceStep[],
+  exitCode: ExitCode | undefined,
+): SourceTraceStep | undefined {
+  const exceptionStep = sourceTraceExceptionStep(steps)
+  if (exceptionStep) {
+    return exceptionStep
+  }
+
+  const vmPosition = exitCode?.vmPosition
+  if (vmPosition) {
+    for (let index = steps.length - 1; index >= 0; index -= 1) {
+      const step = steps[index]
+      if (
+        step?.vmPosition &&
+        step.vmPosition.cellHash.toLowerCase() === vmPosition.cellHash &&
+        step.vmPosition.offset === vmPosition.offset
+      ) {
+        return step
+      }
+    }
+  }
+
+  return exitCode && steps.length > 0 ? steps.at(-1) : undefined
+}
+
+function sourceExceptionCodeLensAnnotation(
+  step: SourceTraceStep | undefined,
+  activeFile: SourceFile | undefined,
+  exitCode: ExitCode | undefined,
+  compilerAbi: ContractABI | undefined,
+) {
+  if (!step || !activeFile) {
+    return undefined
+  }
+
+  const code = step.exception?.errno ?? exitCode?.num
+  if (code === undefined) {
+    return undefined
+  }
+  if (normalizeSourcePath(step.location.file) !== normalizeSourcePath(activeFile.path)) {
+    return undefined
+  }
+
+  const formatted = formatExitCode(code, {
+    compilerAbi,
+    vmDescription: step.exception?.symbolicName ?? exitCode?.description,
+  })
+
+  return {
+    line: step.location.line,
+    id: `sourceException-${step.index}`,
+    title: formatted.title,
+    tooltip: formatted.tooltip,
+  }
+}
+
+function sourceExceptionLabel(
+  exception: NonNullable<SourceTraceStep["exception"]>,
+  compilerAbi: ContractABI | undefined,
+): string {
+  return formatExitCode(exception.errno, {
+    compilerAbi,
+    vmDescription: exception.symbolicName,
+  }).description
+}
+
+function decodeSourceFile(file: SourceFile): string {
+  return file.content
+}
+
+function sourceLanguage(path: string): SourceEditorLanguage {
+  const normalizedPath = normalizeSourcePath(path).toLowerCase()
+  if (normalizedPath.endsWith(".fc") || normalizedPath.endsWith(".func")) {
+    return "func"
+  }
+  if (normalizedPath.endsWith(".tasm") || normalizedPath.endsWith(".asm")) {
+    return "tasm"
+  }
+  return "tolk"
+}
+
+function shouldIgnoreSourceDebugKey(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(target.closest("input, textarea, select, button, [contenteditable='true']"))
+}
+
+function clampSourceDebugPanelWidth(width: number, layoutWidth: number): number {
+  const maxWidth = Math.max(
+    SOURCE_DEBUG_PANEL_MIN_WIDTH,
+    Math.min(SOURCE_DEBUG_PANEL_MAX_WIDTH, layoutWidth - SOURCE_DEBUG_EDITOR_MIN_WIDTH),
+  )
+  return Math.min(maxWidth, Math.max(SOURCE_DEBUG_PANEL_MIN_WIDTH, width))
+}
+
+function ToolbarSeparator({className}: {readonly className?: string}) {
+  return (
+    <span
+      className={
+        className ? `${styles.sourceDebugSeparator} ${className}` : styles.sourceDebugSeparator
+      }
+      aria-hidden="true"
+    />
+  )
+}
+
+function TraceStepToolbar({
+  selectedStep,
+  totalSteps,
+  locationLabel,
+  instructionLabel,
+  instructionGasLabel,
+  gasLabel,
+  truncated,
+  onFirst,
+  onPrev,
+  onNext,
+  onLast,
+}: TraceStepToolbarModel) {
+  const canGoPrev = totalSteps > 0 && selectedStep > 0
+  const canGoNext = totalSteps > 0 && selectedStep < totalSteps - 1
+  const metaItems: {readonly key: string; readonly node: ReactNode}[] = []
+
+  if (instructionLabel) {
+    metaItems.push({
+      key: "instruction",
+      node: <span className={styles.sourceDebugInstruction}>{instructionLabel}</span>,
+    })
+  }
+  if (instructionGasLabel) {
+    metaItems.push({
+      key: "instruction-gas",
+      node: <span className={styles.sourceDebugInstructionGas}>{instructionGasLabel}</span>,
+    })
+  }
+  if (gasLabel) {
+    metaItems.push({
+      key: "gas",
+      node: <span className={styles.sourceDebugGas}>{gasLabel}</span>,
+    })
+  }
+  if (truncated) {
+    metaItems.push({
+      key: "truncated",
+      node: <span className={styles.sourceDebugWarning}>truncated</span>,
+    })
+  }
+
+  return (
+    <div className={styles.sourceDebugToolbar} aria-label="Trace step controls">
+      <div className={styles.sourceDebugMeta}>
+        {metaItems.map((item, index) => (
+          <Fragment key={item.key}>
+            {index > 0 && <ToolbarSeparator />}
+            {item.node}
+          </Fragment>
+        ))}
+      </div>
+
+      {metaItems.length > 0 && <ToolbarSeparator className={styles.sourceDebugGroupSeparator} />}
+
+      <div className={styles.sourceDebugControls}>
+        <span className={styles.sourceDebugStepPart}>
+          <span className={styles.sourceDebugStepCounter}>
+            {totalSteps > 0 ? `Step ${selectedStep + 1} of ${totalSteps}` : "No trace steps"}
+          </span>
+          {locationLabel && <span className={styles.sourceDebugLocation}>{locationLabel}</span>}
+        </span>
+
+        <div className={styles.sourceDebugNavigation}>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onFirst}
+            disabled={!canGoPrev}
+            title="Go to first trace step"
+            aria-label="Go to first trace step"
+            data-testid="go-to-first-step-button"
+          >
+            <SkipBack size={15} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onPrev}
+            disabled={!canGoPrev}
+            title="Previous trace step"
+            aria-label="Previous trace step"
+            data-testid="prev-step-button"
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onNext}
+            disabled={!canGoNext}
+            title="Next trace step"
+            aria-label="Next trace step"
+            data-testid="next-step-button"
+          >
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onLast}
+            disabled={!canGoNext}
+            title="Go to last trace step"
+            aria-label="Go to last trace step"
+            data-testid="go-to-last-step-button"
+          >
+            <SkipForward size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SourceVariableList({
+  variables,
+  contracts,
+  depth = 0,
+  parentPath = "",
+}: {
+  readonly variables: readonly SourceTraceVariable[]
+  readonly contracts?: Map<string, ContractData>
+  readonly depth?: number
+  readonly parentPath?: string
+}) {
+  if (variables.length === 0) {
+    return <div className={styles.sourceDebugEmpty}>No locals</div>
+  }
+
+  return (
+    <div className={styles.sourceVariableList} role={depth === 0 ? "tree" : "group"}>
+      {variables.map((variable, index) => {
+        const variablePath = `${parentPath}/${index}:${variable.name}`
+        return (
+          <SourceVariableRow
+            key={variablePath}
+            variable={variable}
+            contracts={contracts}
+            depth={depth}
+            path={variablePath}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function SourceVariableIcon() {
+  return (
+    <svg
+      className={styles.sourceVariableIcon}
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.5 14V12C3.5 11.7239 3.72386 11.5 4 11.5H12C12.2761 11.5 12.5 11.7239 12.5 12V14C12.5 14.2761 12.2761 14.5 12 14.5H4C3.72386 14.5 3.5 14.2761 3.5 14Z"
+        stroke="currentColor"
+      />
+      <path
+        d="M3.5 9V7C3.5 6.72386 3.72386 6.5 4 6.5H12C12.2761 6.5 12.5 6.72386 12.5 7V9C12.5 9.27614 12.2761 9.5 12 9.5H4C3.72386 9.5 3.5 9.27614 3.5 9Z"
+        stroke="currentColor"
+      />
+      <path
+        d="M3.5 4V2C3.5 1.72386 3.72386 1.5 4 1.5H12C12.2761 1.5 12.5 1.72386 12.5 2V4C12.5 4.27614 12.2761 4.5 12 4.5H4C3.72386 4.5 3.5 4.27614 3.5 4Z"
+        stroke="currentColor"
+      />
+    </svg>
+  )
+}
+
+function sourceVariableTooltip(variable: SourceTraceVariable, value: string): string {
+  const typeLabel = variable.type ? ` {${variable.type}}` : ""
+  return `${variable.name}${typeLabel} = ${value}`
+}
+
+function isAddressVariable(variable: SourceTraceVariable): boolean {
+  const normalizedType = variable.type?.trim().toLowerCase().replace(/\?+$/, "")
+  return normalizedType === "address" || normalizedType === "any_address"
+}
+
+function sourceVariableAddress(variable: SourceTraceVariable): string | undefined {
+  if (!isAddressVariable(variable)) {
+    return undefined
+  }
+
+  const directValue = variable.value.trim()
+  if (directValue && isTonAddress(directValue)) {
+    return directValue
+  }
+
+  for (const child of variable.children) {
+    const childValue = child.value.trim()
+    if (childValue && isTonAddress(childValue)) {
+      return childValue
+    }
+  }
+
+  return undefined
+}
+
+function SourceVariableValue({value, label}: {readonly value: string; readonly label: string}) {
+  return (
+    <span className={styles.sourceVariableValueWrap}>
+      <span className={styles.sourceVariableValue}>{value}</span>
+      <CopyInlineAction
+        className={styles.sourceVariableCopyButton}
+        value={value}
+        label={`Copy ${label}`}
+        copiedLabel={`Copied ${label}`}
+        size="compact"
+      />
+    </span>
+  )
+}
+
+function SourceVariableRow({
+  variable,
+  contracts,
+  depth,
+  path,
+}: {
+  readonly variable: SourceTraceVariable
+  readonly contracts?: Map<string, ContractData>
+  readonly depth: number
+  readonly path: string
+}) {
+  const addressFormat = useAddressFormat()
+  const address = sourceVariableAddress(variable)
+  const showAddressBadge = address !== undefined
+  const addressContract = address ? findAddressContract(address, contracts) : undefined
+  const displayValue = address ? normalizeAddress(address, addressFormat) : variable.value
+  const hasChildren = variable.children.length > 0
+  const [expanded, setExpanded] = useState(false)
+  const rowStyle = {
+    "--source-variable-depth": depth,
+  } as CSSProperties
+  const toggleExpanded = useCallback(() => {
+    if (hasChildren) {
+      setExpanded(current => !current)
+    }
+  }, [hasChildren])
+
+  return (
+    // biome-ignore lint/a11y/useFocusableInteractive: Interaction is handled by the nested toggle button.
+    <div
+      className={styles.sourceVariableGroup}
+      role="treeitem"
+      aria-expanded={hasChildren ? expanded : undefined}
+    >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Pointer handlers manage selection and double-click; the nested button provides the accessible toggle. */}
+      <div
+        className={styles.sourceVariableRow}
+        style={rowStyle}
+        onMouseDown={event => {
+          if (
+            event.detail > 1 &&
+            !(event.target instanceof HTMLElement && event.target.closest("button"))
+          ) {
+            event.preventDefault()
+          }
+        }}
+        onDoubleClick={event => {
+          if (!(event.target instanceof HTMLElement && event.target.closest("button"))) {
+            event.preventDefault()
+            globalThis.getSelection()?.removeAllRanges()
+            toggleExpanded()
+          }
+        }}
+      >
+        <button
+          type="button"
+          className={styles.sourceVariableToggle}
+          onClick={toggleExpanded}
+          disabled={!hasChildren}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${variable.name}`}
+        >
+          {hasChildren ? (
+            expanded ? (
+              <ChevronDown size={14} aria-hidden="true" />
+            ) : (
+              <ChevronRight size={14} aria-hidden="true" />
+            )
+          ) : null}
+        </button>
+        <SourceVariableIcon />
+        <span
+          className={styles.sourceVariableExpression}
+          title={sourceVariableTooltip(variable, displayValue)}
+        >
+          <span className={styles.sourceVariableName}>{variable.name}</span>
+          <span className={styles.sourceVariableEquals}>=</span>
+          {variable.type && (
+            <span className={styles.sourceVariableType}>{`{${variable.type}}`}</span>
+          )}
+          {showAddressBadge && (
+            <span className={styles.sourceVariableAddressBadge}>
+              {addressContract?.letter ?? "?"}
+            </span>
+          )}
+          <SourceVariableValue value={displayValue} label={`${variable.name} value`} />
+        </span>
+      </div>
+      {hasChildren && expanded && (
+        <SourceVariableList
+          variables={variable.children}
+          contracts={contracts}
+          depth={depth + 1}
+          parentPath={path}
+        />
+      )}
+    </div>
+  )
+}
+
+function callFrameLabel(frame: SourceTraceStep["callStack"][number]): string {
+  if (frame.isBuiltin) {
+    return `${frame.functionName} (built-in)`
+  }
+  if (frame.isInlined) {
+    return `${frame.functionName} (inlined)`
+  }
+  return frame.functionName
+}
+
+function SourceCallFrameIcon() {
+  return (
+    <svg
+      className={styles.sourceCallFrameIcon}
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="8" r="6.5" fill="transparent" stroke="currentColor" />
+      <path
+        d="M7.25726 12H8.2744V7.32741H9.82869V6.43027H8.2744V5.48C8.2744 5.12 8.52012 4.87429 8.8744 4.87429H9.88012V4H8.77726C7.8744 4 7.25726 4.57143 7.25726 5.40571V6.43027H6.12012V7.32741H7.25726V12Z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+function SourceDebugResizableSection({
+  id,
+  title,
+  icon,
+  collapsed,
+  height,
+  grow,
+  resizePartnerId,
+  canResize,
+  onToggle,
+  onResizeStart,
+  setSectionElement,
+  children,
+}: {
+  readonly id: SourceDebugSectionId
+  readonly title: string
+  readonly icon?: ReactNode
+  readonly collapsed: boolean
+  readonly height: number
+  readonly grow: boolean
+  readonly resizePartnerId?: SourceDebugSectionId
+  readonly canResize: boolean
+  readonly onToggle: (id: SourceDebugSectionId) => void
+  readonly onResizeStart: (
+    id: SourceDebugSectionId,
+    partnerId: SourceDebugSectionId,
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => void
+  readonly setSectionElement: (id: SourceDebugSectionId, element: HTMLElement | null) => void
+  readonly children: ReactNode
+}) {
+  const contentId = `source-debug-section-${id}`
+  const style = {
+    "--source-debug-section-height": `${height}px`,
+  } as CSSProperties
+
+  return (
+    <section
+      ref={element => setSectionElement(id, element)}
+      className={`${styles.sourceDebugSectionPanel} ${
+        collapsed ? styles.sourceDebugSectionPanelCollapsed : ""
+      } ${grow ? styles.sourceDebugSectionPanelGrow : ""}`}
+      style={collapsed ? undefined : style}
+    >
+      <button
+        type="button"
+        className={styles.sourceDebugSectionHeader}
+        onClick={() => onToggle(id)}
+        aria-expanded={!collapsed}
+        aria-controls={contentId}
+      >
+        <span className={styles.sourceDebugSectionHeaderContent}>
+          {collapsed ? (
+            <ChevronRight size={14} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={14} aria-hidden="true" />
+          )}
+          {icon}
+          <span className={styles.sourceDebugSectionTitle}>{title}</span>
+        </span>
+      </button>
+      {!collapsed && (
+        <div id={contentId} className={styles.sourceDebugSectionBody}>
+          {children}
+        </div>
+      )}
+      {!collapsed && canResize && (
+        // biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only.
+        <div
+          className={styles.sourceDebugResizeHandle}
+          role="separator"
+          aria-label={`Resize ${title}`}
+          aria-orientation="horizontal"
+          aria-valuemin={SOURCE_DEBUG_SECTION_MIN_HEIGHT}
+          aria-valuenow={Math.round(height)}
+          onPointerDown={event => resizePartnerId && onResizeStart(id, resizePartnerId, event)}
+        />
+      )}
+    </section>
+  )
+}
+
+function SourceDebugPanel({
+  step,
+  selectedCallFrameIndex,
+  contractAbi,
+  contracts,
+  onCallFrameSelect,
+}: {
+  readonly step?: SourceTraceStep
+  readonly selectedCallFrameIndex: number | null
+  readonly contractAbi?: ContractABI
+  readonly contracts?: Map<string, ContractData>
+  readonly onCallFrameSelect: (index: number) => void
+}) {
+  const [collapsedSections, setCollapsedSections] = useState(() =>
+    getStoredSourceDebugCollapsedSections(DEFAULT_SOURCE_DEBUG_COLLAPSED),
+  )
+  const [sectionHeights, setSectionHeights] = useState(() =>
+    getStoredSourceDebugSectionHeights(
+      DEFAULT_SOURCE_DEBUG_SECTION_HEIGHTS,
+      SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+    ),
+  )
+  const sectionElementsRef = useRef<Partial<Record<SourceDebugSectionId, HTMLElement | null>>>({})
+
+  const setSectionElement = useCallback((id: SourceDebugSectionId, element: HTMLElement | null) => {
+    sectionElementsRef.current[id] = element
+  }, [])
+
+  const toggleSection = useCallback((id: SourceDebugSectionId) => {
+    setCollapsedSections(current => {
+      const next = {
+        ...current,
+        [id]: !current[id],
+      }
+      setStoredSourceDebugCollapsedSections(next)
+      return next
+    })
+  }, [])
+
+  const startSectionResize = useCallback(
+    (
+      id: SourceDebugSectionId,
+      partnerId: SourceDebugSectionId,
+      event: ReactPointerEvent<HTMLDivElement>,
+    ) => {
+      event.preventDefault()
+
+      const targetElement = sectionElementsRef.current[id]
+      const partnerElement = sectionElementsRef.current[partnerId]
+      if (!targetElement || !partnerElement) {
+        return
+      }
+
+      const startY = event.clientY
+      const measuredHeights = {...sectionHeights}
+      for (const [sectionId, element] of Object.entries(sectionElementsRef.current) as [
+        SourceDebugSectionId,
+        HTMLElement | null,
+      ][]) {
+        if (element && !collapsedSections[sectionId]) {
+          measuredHeights[sectionId] = Math.round(element.getBoundingClientRect().height)
+        }
+      }
+
+      const startHeight = Math.max(
+        SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+        Math.round(targetElement.getBoundingClientRect().height),
+      )
+      const partnerStartHeight = Math.max(
+        SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+        Math.round(partnerElement.getBoundingClientRect().height),
+      )
+      const pairedHeight = startHeight + partnerStartHeight
+      const maxHeight = pairedHeight - SOURCE_DEBUG_SECTION_MIN_HEIGHT
+      const previousCursor = document.body.style.cursor
+      const previousUserSelect = document.body.style.userSelect
+      document.body.style.cursor = "row-resize"
+      document.body.style.userSelect = "none"
+      let latestSectionHeights = measuredHeights
+      setSectionHeights(measuredHeights)
+
+      const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
+        const nextHeight = Math.min(
+          maxHeight,
+          Math.max(
+            SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+            Math.round(startHeight + moveEvent.clientY - startY),
+          ),
+        )
+        const nextPartnerHeight = Math.max(
+          SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+          pairedHeight - nextHeight,
+        )
+        const nextSectionHeights = {
+          ...measuredHeights,
+          [id]: nextHeight,
+          [partnerId]: nextPartnerHeight,
+        }
+        latestSectionHeights = nextSectionHeights
+        setSectionHeights(current =>
+          current[id] === nextHeight && current[partnerId] === nextPartnerHeight
+            ? current
+            : nextSectionHeights,
+        )
+      }
+
+      const finishResize = () => {
+        document.body.style.cursor = previousCursor
+        document.body.style.userSelect = previousUserSelect
+        setStoredSourceDebugSectionHeights(latestSectionHeights, SOURCE_DEBUG_SECTION_MIN_HEIGHT)
+        globalThis.removeEventListener("pointermove", handlePointerMove)
+        globalThis.removeEventListener("pointerup", finishResize)
+        globalThis.removeEventListener("pointercancel", finishResize)
+      }
+
+      globalThis.addEventListener("pointermove", handlePointerMove)
+      globalThis.addEventListener("pointerup", finishResize)
+      globalThis.addEventListener("pointercancel", finishResize)
+    },
+    [collapsedSections, sectionHeights],
+  )
+
+  if (!step) {
+    return (
+      <aside className={styles.sourceDebugPanel} aria-label="Source trace state">
+        <div className={styles.sourceDebugEmptyState}>No source trace steps</div>
+      </aside>
+    )
+  }
+
+  const visibleSectionIds: SourceDebugSectionId[] = [
+    ...(step.exception ? (["exception"] as const) : []),
+    "locals",
+    "callStack",
+  ]
+  const activeCallFrameIndex = selectedCallFrameIndex ?? (step.callStack.length > 0 ? 0 : null)
+  const resizePartnerId = (id: SourceDebugSectionId): SourceDebugSectionId | undefined => {
+    const startIndex = visibleSectionIds.indexOf(id)
+    if (startIndex < 0 || collapsedSections[id]) {
+      return undefined
+    }
+
+    return visibleSectionIds.slice(startIndex + 1).find(sectionId => !collapsedSections[sectionId])
+  }
+
+  return (
+    <aside className={styles.sourceDebugPanel} aria-label="Source trace state">
+      {step.exception && (
+        <SourceDebugResizableSection
+          id="exception"
+          title="Exception"
+          collapsed={collapsedSections.exception}
+          height={sectionHeights.exception}
+          grow={true}
+          resizePartnerId={resizePartnerId("exception")}
+          canResize={resizePartnerId("exception") !== undefined}
+          onToggle={toggleSection}
+          onResizeStart={startSectionResize}
+          setSectionElement={setSectionElement}
+        >
+          <div className={styles.sourceDebugException}>
+            <div className={styles.sourceDebugExceptionText}>
+              {sourceExceptionLabel(step.exception, contractAbi)}
+            </div>
+          </div>
+        </SourceDebugResizableSection>
+      )}
+
+      <SourceDebugResizableSection
+        id="locals"
+        title="Locals"
+        collapsed={collapsedSections.locals}
+        height={sectionHeights.locals}
+        grow={true}
+        resizePartnerId={resizePartnerId("locals")}
+        canResize={resizePartnerId("locals") !== undefined}
+        onToggle={toggleSection}
+        onResizeStart={startSectionResize}
+        setSectionElement={setSectionElement}
+      >
+        <SourceVariableList variables={step.locals} contracts={contracts} />
+      </SourceDebugResizableSection>
+
+      <SourceDebugResizableSection
+        id="callStack"
+        title="Call Stack"
+        collapsed={collapsedSections.callStack}
+        height={sectionHeights.callStack}
+        grow={true}
+        resizePartnerId={resizePartnerId("callStack")}
+        canResize={resizePartnerId("callStack") !== undefined}
+        onToggle={toggleSection}
+        onResizeStart={startSectionResize}
+        setSectionElement={setSectionElement}
+      >
+        {step.callStack.length > 0 ? (
+          <div className={styles.sourceCallStack}>
+            {step.callStack.map((frame, index) => (
+              <button
+                key={`${frame.functionName}-${index}`}
+                type="button"
+                className={`${styles.sourceCallFrame} ${
+                  index === activeCallFrameIndex ? styles.sourceCallFrameActive : ""
+                }`}
+                onClick={() => onCallFrameSelect(index)}
+              >
+                <SourceCallFrameIcon />
+                <span className={styles.sourceCallFrameName}>{callFrameLabel(frame)}</span>
+                {frame.location && (
+                  <span className={styles.sourceCallFrameLocation}>
+                    {sourceLocationWithColumnLabel(frame.location)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.sourceDebugEmpty}>No frames</div>
+        )}
+      </SourceDebugResizableSection>
+    </aside>
+  )
+}
+
+function SourceFilesEditor({
+  bundles,
+  traceId,
+  sourceTrace,
+  sourceTraceBundleHash,
+  exitCode,
+  contractAbi,
+  contracts,
+  onToolbarModelChange,
+}: {
+  readonly bundles: readonly SourceBundle[]
+  readonly traceId: string
+  readonly sourceTrace?: SourceTraceResponse
+  readonly sourceTraceBundleHash?: string
+  readonly exitCode?: ExitCode
+  readonly contractAbi?: ContractABI
+  readonly contracts?: Map<string, ContractData>
+  readonly onToolbarModelChange: (model: TraceStepToolbarModel | null) => void
+}) {
+  const [activeBundleHash, setActiveBundleHash] = useState(bundles[0]?.source_bundle_hash ?? "")
+  const activeBundle =
+    bundles.find(bundle => bundle.source_bundle_hash === activeBundleHash) ?? bundles[0]
+  const [activePath, setActivePath] = useState(activeBundle ? defaultSourcePath(activeBundle) : "")
+  const activeFile = activeBundle
+    ? (findSourceFile(activeBundle.files, activePath) ?? activeBundle.files[0])
+    : undefined
+  const code = activeFile ? decodeSourceFile(activeFile) : ""
+  const activeSourceTrace =
+    activeBundle && sourceTraceBundleHash === activeBundle.source_bundle_hash
+      ? sourceTrace
+      : undefined
+  const sourceSteps = activeSourceTrace?.steps ?? []
+  const [activeSourceStepIndex, setActiveSourceStepIndex] = useState(0)
+  const [selectedCallFrameIndex, setSelectedCallFrameIndex] = useState<number | null>(null)
+  const [shouldCenterSourceStep, setShouldCenterSourceStep] = useState(false)
+  const [sourceDebugPanelWidth, setSourceDebugPanelWidth] = useState(() =>
+    Math.min(
+      SOURCE_DEBUG_PANEL_MAX_WIDTH,
+      Math.max(
+        SOURCE_DEBUG_PANEL_MIN_WIDTH,
+        getStoredSourceDebugPanelWidth(SOURCE_DEBUG_PANEL_DEFAULT_WIDTH),
+      ),
+    ),
+  )
+  const sourceDebugLayoutRef = useRef<HTMLDivElement | null>(null)
+  const currentSourceStep = sourceSteps[Math.min(activeSourceStepIndex, sourceSteps.length - 1)]
+  const currentSourceStepIndex = currentSourceStep
+    ? Math.min(activeSourceStepIndex, sourceSteps.length - 1)
+    : 0
+  const selectedCallFrameLocation =
+    selectedCallFrameIndex === null
+      ? null
+      : (currentSourceStep?.callStack[selectedCallFrameIndex]?.location ?? null)
+  const highlightedSourceLine =
+    currentSourceStep &&
+    activeFile &&
+    activeBundle &&
+    normalizeSourcePath(currentSourceStep.location.file) === normalizeSourcePath(activeFile.path)
+      ? currentSourceStep.location.line
+      : undefined
+  const selectedCallFrameLine =
+    selectedCallFrameLocation &&
+    activeFile &&
+    activeBundle &&
+    normalizeSourcePath(selectedCallFrameLocation.file) === normalizeSourcePath(activeFile.path)
+      ? selectedCallFrameLocation.line
+      : undefined
+  const shouldHighlightSelectedCallFrame =
+    selectedCallFrameLine !== undefined && selectedCallFrameLine !== highlightedSourceLine
+  const frameHighlightGroups = shouldHighlightSelectedCallFrame
+    ? [
+        {
+          lines: [selectedCallFrameLine],
+          className: "source-debug-frame-line",
+        },
+      ]
+    : []
+  const centerSourceLine = selectedCallFrameLine ?? highlightedSourceLine
+  const sourceExceptionAnnotation = sourceExceptionCodeLensAnnotation(
+    sourceTraceExitStep(sourceSteps, exitCode),
+    activeFile,
+    exitCode,
+    contractAbi,
+  )
+
+  useEffect(() => {
+    const nextBundle = bundles[0]
+    setActiveBundleHash(nextBundle?.source_bundle_hash ?? "")
+    setActivePath(nextBundle ? defaultSourcePath(nextBundle) : "")
+  }, [bundles])
+
+  useEffect(() => {
+    setActiveSourceStepIndex(0)
+  }, [sourceTraceBundleHash])
+
+  useEffect(() => {
+    setSelectedCallFrameIndex(null)
+  }, [sourceTraceBundleHash, currentSourceStepIndex])
+
+  useEffect(() => {
+    if (sourceSteps.length > 0 && activeSourceStepIndex >= sourceSteps.length) {
+      setActiveSourceStepIndex(sourceSteps.length - 1)
+    }
+  }, [activeSourceStepIndex, sourceSteps.length])
+
+  useEffect(() => {
+    const locationToShow = selectedCallFrameLocation ?? currentSourceStep?.location
+    if (!activeBundle || !locationToShow) {
+      return
+    }
+    const sourceFile = findSourceFile(activeBundle.files, locationToShow.file)
+    if (sourceFile) {
+      setActivePath(sourceFile.path)
+    }
+  }, [activeBundle, currentSourceStep, selectedCallFrameLocation])
+
+  const selectBundle = (bundle: SourceBundle) => {
+    setActiveBundleHash(bundle.source_bundle_hash)
+    setActivePath(defaultSourcePath(bundle))
+  }
+
+  const goToSourceStep = useCallback(
+    (step: number) => {
+      const lastStep = Math.max(0, sourceSteps.length - 1)
+      setShouldCenterSourceStep(true)
+      setActiveSourceStepIndex(Math.max(0, Math.min(step, lastStep)))
+    },
+    [sourceSteps.length],
+  )
+
+  useEffect(() => {
+    return () => onToolbarModelChange(null)
+  }, [onToolbarModelChange])
+
+  useEffect(() => {
+    if (!activeSourceTrace) {
+      onToolbarModelChange(null)
+      return
+    }
+
+    onToolbarModelChange({
+      selectedStep: currentSourceStepIndex,
+      totalSteps: sourceSteps.length,
+      locationLabel: currentSourceStep
+        ? `at ${sourceLocationLabel(currentSourceStep.location)}`
+        : undefined,
+      truncated: activeSourceTrace.truncated,
+      onFirst: () => goToSourceStep(0),
+      onPrev: () => goToSourceStep(currentSourceStepIndex - 1),
+      onNext: () => goToSourceStep(currentSourceStepIndex + 1),
+      onLast: () => goToSourceStep(sourceSteps.length - 1),
+    })
+  }, [
+    activeSourceTrace,
+    currentSourceStep,
+    currentSourceStepIndex,
+    goToSourceStep,
+    onToolbarModelChange,
+    sourceSteps.length,
+  ])
+
+  const handleSourceFileSelect = (path: string) => {
+    setShouldCenterSourceStep(false)
+    setSelectedCallFrameIndex(null)
+    setActivePath(path)
+  }
+
+  const handleCallFrameSelect = useCallback(
+    (index: number) => {
+      const frameLocation = currentSourceStep?.callStack[index]?.location
+      if (!activeBundle || !frameLocation) {
+        return
+      }
+
+      const sourceFile = findSourceFile(activeBundle.files, frameLocation.file)
+      if (sourceFile) {
+        setActivePath(sourceFile.path)
+      }
+      setSelectedCallFrameIndex(index)
+      setShouldCenterSourceStep(true)
+    },
+    [activeBundle, currentSourceStep],
+  )
+
+  const startSourceDebugPanelResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const layoutElement = sourceDebugLayoutRef.current
+      if (!layoutElement) {
+        return
+      }
+
+      event.preventDefault()
+
+      const startX = event.clientX
+      const startWidth = sourceDebugPanelWidth
+      const layoutWidth = layoutElement.getBoundingClientRect().width
+      const previousCursor = document.body.style.cursor
+      const previousUserSelect = document.body.style.userSelect
+      let latestWidth = startWidth
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+
+      const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
+        const nextWidth = clampSourceDebugPanelWidth(
+          Math.round(startWidth - (moveEvent.clientX - startX)),
+          layoutWidth,
+        )
+        latestWidth = nextWidth
+        setSourceDebugPanelWidth(current => (current === nextWidth ? current : nextWidth))
+      }
+
+      const finishResize = () => {
+        document.body.style.cursor = previousCursor
+        document.body.style.userSelect = previousUserSelect
+        setStoredSourceDebugPanelWidth(latestWidth)
+        globalThis.removeEventListener("pointermove", handlePointerMove)
+        globalThis.removeEventListener("pointerup", finishResize)
+        globalThis.removeEventListener("pointercancel", finishResize)
+      }
+
+      globalThis.addEventListener("pointermove", handlePointerMove)
+      globalThis.addEventListener("pointerup", finishResize)
+      globalThis.addEventListener("pointercancel", finishResize)
+    },
+    [sourceDebugPanelWidth],
+  )
+
+  useEffect(() => {
+    if (!activeSourceTrace || !sourceDebugLayoutRef.current) {
+      return
+    }
+
+    const layoutElement = sourceDebugLayoutRef.current
+    const clampToLayout = () => {
+      const layoutWidth = layoutElement.getBoundingClientRect().width
+      setSourceDebugPanelWidth(current => clampSourceDebugPanelWidth(current, layoutWidth))
+    }
+    const observer = new ResizeObserver(clampToLayout)
+
+    clampToLayout()
+    observer.observe(layoutElement)
+
+    return () => observer.disconnect()
+  }, [activeSourceTrace])
+
+  useEffect(() => {
+    if (!activeSourceTrace || sourceSteps.length === 0) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        shouldIgnoreSourceDebugKey(event.target)
+      ) {
+        return
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault()
+        goToSourceStep(currentSourceStepIndex - 1)
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault()
+        goToSourceStep(currentSourceStepIndex + 1)
+      }
+    }
+
+    globalThis.addEventListener("keydown", handleKeyDown)
+    return () => globalThis.removeEventListener("keydown", handleKeyDown)
+  }, [activeSourceTrace, currentSourceStepIndex, goToSourceStep, sourceSteps.length])
+
+  if (!activeBundle || !activeFile) {
+    return <div className={styles.emptySourceState}>No verified source files</div>
+  }
+
+  const editorModelPath = `retrace-source-${traceId}/${activeBundle.source_bundle_hash}/${normalizeSourcePath(activeFile.path)}`
+  const sourceDebugLayoutStyle = activeSourceTrace
+    ? ({
+        "--source-debug-panel-width": `${sourceDebugPanelWidth}px`,
+      } as CSSProperties)
+    : undefined
+
+  return (
+    <section className={styles.sourceShell} aria-label="Verified source files">
+      {bundles.length > 1 && (
+        <div className={styles.sourceBundleTabs} role="tablist" aria-label="Source bundles">
+          {bundles.map(bundle => (
+            <button
+              key={bundle.source_bundle_hash}
+              type="button"
+              className={`${styles.sourceBundleTab} ${
+                bundle.source_bundle_hash === activeBundle.source_bundle_hash
+                  ? styles.sourceBundleTabActive
+                  : ""
+              }`}
+              onClick={() => selectBundle(bundle)}
+              title={bundle.source_bundle_hash}
+              role="tab"
+              aria-selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
+            >
+              {bundle.source_bundle_hash.slice(0, 10)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.sourceFileTabs} role="tablist" aria-label="Source files">
+        {activeBundle.files.map(file => (
+          <button
+            key={file.path}
+            type="button"
+            className={`${styles.sourceFileTab} ${
+              file.path === activeFile.path ? styles.sourceFileTabActive : ""
+            }`}
+            onClick={() => handleSourceFileSelect(file.path)}
+            title={file.path}
+            role="tab"
+            aria-selected={file.path === activeFile.path}
+          >
+            <span className={styles.sourceFileTabName}>{sourceFileLabel(file.path)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div
+        ref={sourceDebugLayoutRef}
+        className={`${styles.sourceDebugLayout} ${
+          activeSourceTrace ? "" : styles.sourceDebugLayoutSingle
+        }`}
+        style={sourceDebugLayoutStyle}
+      >
+        <div className={styles.sourceEditorPane}>
+          <Suspense
+            fallback={
+              <div className={styles.editorLoader}>
+                <InlineLoader message="Loading editor" />
+              </div>
+            }
+          >
+            <CodeEditor
+              code={code}
+              language={sourceLanguage(activeFile.path)}
+              modelPath={editorModelPath}
+              highlightLine={highlightedSourceLine}
+              highlightGroups={frameHighlightGroups}
+              shouldCenter={shouldCenterSourceStep && centerSourceLine !== undefined}
+              centerLine={centerSourceLine}
+              needFloatingTip={false}
+              showInstructionDocs={false}
+              sourceDebugVariables={currentSourceStep?.locals ?? []}
+              codeLensAnnotation={sourceExceptionAnnotation}
+              compilerAbi={contractAbi}
+            />
+          </Suspense>
+        </div>
+        {activeSourceTrace && (
+          // biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only.
+          <div
+            className={styles.sourceDebugPanelResizeHandle}
+            role="separator"
+            aria-label="Resize debug panel"
+            aria-orientation="vertical"
+            aria-valuemin={SOURCE_DEBUG_PANEL_MIN_WIDTH}
+            aria-valuemax={SOURCE_DEBUG_PANEL_MAX_WIDTH}
+            aria-valuenow={sourceDebugPanelWidth}
+            onPointerDown={startSourceDebugPanelResize}
+          />
+        )}
+        {activeSourceTrace && (
+          <SourceDebugPanel
+            step={currentSourceStep}
+            selectedCallFrameIndex={selectedCallFrameIndex}
+            contractAbi={contractAbi}
+            contracts={contracts}
+            onCallFrameSelect={handleCallFrameSelect}
+          />
+        )}
+      </div>
+    </section>
+  )
+}
+
+function RetraceWorkspaceFc({
+  result,
+  contractAbi,
+  contracts,
+  onContractClick,
+  className,
+}: RetraceWorkspaceProps) {
+  const [selectedStackItem, setSelectedStackItem] = useState<{
+    element: StackElement
+    title: string
+  } | null>(null)
+  const [traceViewMode, setTraceViewMode] = useState<TraceViewMode>(() => getStoredTraceViewMode())
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>(() =>
+    hasVisibleSourceBundles(result) ? "sources" : "trace",
+  )
+  const [sourceToolbarModel, setSourceToolbarModel] = useState<TraceStepToolbarModel | null>(null)
+
+  const lineExecutionData = useLineExecutionData(result.trace)
+  const {
+    selectedStep,
+    highlightLine,
+    currentStep,
+    currentStack,
+    goToStep,
+    handlePrev,
+    handleNext,
+    goToFirstStep,
+    goToLastStep,
+    findStepByLine,
+    transitionType,
+    totalSteps,
+  } = useTraceStepper(result.trace)
+
+  const instructionDetails = useMemo(() => buildInstructionDetails(result), [result])
+  const cumulativeGasSinceBegin = useMemo(
+    () => calculateCumulativeGasSinceBegin(result.trace, selectedStep),
+    [result.trace, selectedStep],
+  )
+  const implicitRet = useMemo(
+    () => getImplicitRet(result.trace, selectedStep),
+    [result.trace, selectedStep],
+  )
+  const stateUpdateHashOk = result.result.stateUpdateHashOk
+  const sourceBundles = useMemo(
+    () =>
+      result.verifiedSource?.bundles
+        .map(visibleSourceBundle)
+        .filter(bundle => bundle.files.length > 0) ?? [],
+    [result.verifiedSource],
+  )
+  const hasSourceBundles = sourceBundles.length > 0
+
+  const handleTraceViewModeChange = useCallback((mode: TraceViewMode) => {
+    setTraceViewMode(mode)
+    setStoredTraceViewMode(mode)
+  }, [])
+
+  const handleWorkspaceTabChange = useCallback((tab: WorkspaceTab) => {
+    setWorkspaceTab(tab)
+    if (tab === "sources") {
+      setSelectedStackItem(null)
+    } else {
+      setSourceToolbarModel(null)
+    }
+  }, [])
+
+  const handleStackItemClick = useCallback(
+    (element: StackElement, title: string) => {
+      if (
+        selectedStackItem &&
+        selectedStackItem.element === element &&
+        selectedStackItem.title === title
+      ) {
+        setSelectedStackItem(null)
+        return
+      }
+
+      setSelectedStackItem({element, title})
+    },
+    [selectedStackItem],
+  )
+
+  useEffect(() => {
+    if (!hasSourceBundles && workspaceTab === "sources") {
+      setWorkspaceTab("trace")
+    }
+  }, [hasSourceBundles, workspaceTab])
+
+  const currentInstructionGas = instructionDetails[selectedStep]?.gasCost
+  const traceToolbarModel: TraceStepToolbarModel = {
+    selectedStep,
+    totalSteps,
+    instructionLabel: currentStep?.instructionName,
+    instructionGasLabel: Number.isFinite(currentInstructionGas)
+      ? `${currentInstructionGas} gas`
+      : undefined,
+    gasLabel: totalSteps > 0 ? `Used gas: ${cumulativeGasSinceBegin}` : undefined,
+    onFirst: goToFirstStep,
+    onPrev: handlePrev,
+    onNext: handleNext,
+    onLast: goToLastStep,
+  }
+  const activeToolbarModel = workspaceTab === "sources" ? sourceToolbarModel : traceToolbarModel
+
+  return (
+    <section className={`${styles.root} ${className ?? ""}`} aria-label="Transaction debug">
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarLeft}>
+          <div className={styles.primaryTabs} role="tablist" aria-label="Debug views">
+            {hasSourceBundles && (
+              <button
+                type="button"
+                className={`${styles.primaryTab} ${
+                  workspaceTab === "sources" ? styles.primaryTabActive : ""
+                }`}
+                onClick={() => handleWorkspaceTabChange("sources")}
+                role="tab"
+                aria-selected={workspaceTab === "sources"}
+              >
+                <FileCode2 size={16} aria-hidden="true" />
+                Sources
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${styles.primaryTab} ${
+                workspaceTab === "trace" ? styles.primaryTabActive : ""
+              }`}
+              onClick={() => handleWorkspaceTabChange("trace")}
+              role="tab"
+              aria-selected={workspaceTab === "trace"}
+            >
+              <Braces size={16} aria-hidden="true" />
+              Disassembled
+            </button>
+          </div>
+
+          {workspaceTab === "trace" && (
+            <TraceViewModeToggle value={traceViewMode} onChange={handleTraceViewModeChange} />
+          )}
+
+          {stateUpdateHashOk === false && (
+            <div className={styles.statusContainer} role="status" aria-live="polite">
+              <StatusBadge
+                type="warning"
+                text="Trace Incomplete"
+                popoverContent="Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
+              />
+            </div>
+          )}
+        </div>
+
+        {activeToolbarModel && (
+          <div className={styles.toolbarRight}>
+            <TraceStepToolbar {...activeToolbarModel} />
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`${styles.workspace} ${workspaceTab === "sources" ? styles.sourcesWorkspace : ""}`}
+      >
+        <section className={styles.codeArea} aria-label="Trace code">
+          <div
+            className={`${styles.codeEditorWrapper} ${
+              workspaceTab === "trace" && selectedStackItem ? styles.codeEditorHidden : ""
+            }`}
+          >
+            {workspaceTab === "sources" ? (
+              <SourceFilesEditor
+                bundles={sourceBundles}
+                traceId={result.result.emulatedTx.lt.toString()}
+                sourceTrace={result.sourceTrace}
+                sourceTraceBundleHash={result.sourceTraceBundleHash}
+                exitCode={result.exitCode}
+                contractAbi={contractAbi}
+                contracts={contracts}
+                onToolbarModelChange={setSourceToolbarModel}
+              />
+            ) : traceViewMode === "assembler" ? (
+              <Suspense
+                fallback={
+                  <div className={styles.editorLoader}>
+                    <InlineLoader message="Loading editor" />
+                  </div>
+                }
+              >
+                <CodeEditor
+                  code={result.code}
+                  modelPath={`retrace-${result.result.emulatedTx.lt.toString()}.tasm`}
+                  highlightLine={highlightLine}
+                  implicitRetLine={implicitRet.line}
+                  implicitRetLabel={
+                    implicitRet.approx ? "implicit RET (approximate position)" : undefined
+                  }
+                  lineExecutionData={lineExecutionData}
+                  onLineClick={findStepByLine}
+                  shouldCenter={transitionType === "button"}
+                  exitCode={result.exitCode}
+                  compilerAbi={contractAbi}
+                />
+              </Suspense>
+            ) : (
+              <TraceStepsChainView
+                steps={instructionDetails}
+                selectedStep={selectedStep}
+                onStepClick={goToStep}
+              />
+            )}
+          </div>
+
+          {workspaceTab === "trace" && selectedStackItem && (
+            <div className={styles.stackItemOverlay}>
+              <StackItemDetails
+                itemData={selectedStackItem.element}
+                title={selectedStackItem.title}
+                contracts={contracts}
+                onContractClick={onContractClick}
+                onClose={() => setSelectedStackItem(null)}
+              />
+            </div>
+          )}
+        </section>
+
+        {workspaceTab === "trace" && (
+          <TraceSidePanel
+            currentStack={currentStack}
+            contracts={contracts}
+            onStackItemClick={handleStackItemClick}
+            className={styles.sidePanel}
+          />
+        )}
+      </div>
+    </section>
+  )
+}
+
+const RetraceWorkspace = memo(RetraceWorkspaceFc)
+RetraceWorkspace.displayName = "RetraceWorkspace"
+
+export default RetraceWorkspace

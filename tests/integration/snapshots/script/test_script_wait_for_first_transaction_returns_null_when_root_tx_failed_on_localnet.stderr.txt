@@ -1,0 +1,4 @@
+Warning: the broadcast message was included in a block, but its root transaction failed.
+Acton stopped waiting for waitForFirstTransaction(); the script receives null.
+Reason: Compute phase failed with [EXIT_STATUS] 10 (Dictionary error)
+Open transaction in explorer: [EXPLORER_TX_URL]

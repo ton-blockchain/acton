@@ -1,0 +1,20 @@
+{
+  "endTime": 0,
+  "nodes": [
+    {
+      "callFrame": {
+        "columnNumber": -1,
+        "functionName": "(root)",
+        "lineNumber": -1,
+        "scriptId": "0",
+        "url": ""
+      },
+      "children": [],
+      "hitCount": 0,
+      "id": 1
+    }
+  ],
+  "samples": [],
+  "startTime": 0,
+  "timeDeltas": []
+}

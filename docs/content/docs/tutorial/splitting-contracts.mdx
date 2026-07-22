@@ -147,7 +147,7 @@ fun onInternalMessage(in: InMessage) {
             };
             val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
-                value:  ton("0.05"),
+                value:  grams("0.05"),
                 dest:   { stateInit: voterInit },
                 body:   msg,
             });

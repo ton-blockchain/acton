@@ -169,6 +169,52 @@ fn test_wrapper_generation_defaults() {
 }
 
 #[test]
+fn test_wrapper_deploy_preserves_address_sharding_options() {
+    let project = ProjectBuilder::new("wrapper_sharded_deploy")
+        .mapping("acton", ".acton")
+        .contract(
+            "my_contract",
+            r"
+                get fun answer(): int {
+                    return 42;
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            ",
+        )
+        .test_file(
+            "sharded_deploy",
+            r#"
+                import "@stdlib/gas-payments"
+                import "@acton/emulation/network"
+                import "@acton/emulation/testing"
+                import "@acton/testing/expect"
+                import "../wrappers/MyContract.gen"
+
+                get fun `test wrapper deploy preserves address sharding options`() {
+                    val deployer = testing.treasury("deployer");
+                    val unsharded = MyContract.fromStorage();
+                    val sharded = MyContract.fromStorage({
+                        fixedPrefixLength: 8,
+                        closeTo: deployer.address,
+                    });
+
+                    expect(sharded.address).toNotEqual(unsharded.address);
+
+                    val result = sharded.deploy(deployer.address, { value: grams("1") });
+                    expect(result).toHaveSuccessfulDeploy({ to: sharded.address });
+                    expect(sharded.answer()).toEqual(42);
+                }
+            "#,
+        )
+        .build();
+
+    project.acton().wrapper("my_contract").run().success();
+    project.acton().test().run().success().assert_passed(1);
+}
+
+#[test]
 fn test_wrapper_generation_without_test_stub() {
     let project = ProjectBuilder::new("wrapper_simple")
         .contract("my_contract", SIMPLE_CONTRACT)
@@ -1520,6 +1566,65 @@ fn test_wrapper_generation_imports_both_storage_and_deployment_storage_types() {
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_imports_both_storage_and_deployment_storage_types/wrapper.tolk.txt",
+        );
+
+    project.acton().test().run().success().assert_passed(1);
+}
+
+#[test]
+fn test_wrapper_generation_with_storage_alias_union() {
+    let project = ProjectBuilder::new("wrapper_storage_alias_union")
+        .mapping("acton", ".acton")
+        .contract(
+            "my_contract",
+            r#"
+                import "storage"
+
+                contract MyContract {
+                    storage: ContractStorage
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .file(
+            "contracts/storage",
+            r"
+                struct (0b0) ActiveStorage {
+                    counter: uint32
+                }
+
+                struct (0b1) FrozenStorage {
+                    reason: uint32
+                }
+
+                type ContractStorage = ActiveStorage | FrozenStorage;
+            ",
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .generate_test_stub()
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/MyContract.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_storage_alias_union/wrapper.tolk.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/my_contract.test.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_storage_alias_union/test.tolk.txt",
         );
 
     project.acton().test().run().success().assert_passed(1);

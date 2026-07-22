@@ -11,9 +11,9 @@
   ✓ show bodies prints decoded transaction body [TIME]
     └─ Test output:
        N/A -> sender A
-       └── TestBodyMsg 0.1 TON -> test_body_sink B                                     gas=333
+       └── TestBodyMsg 0.1 GRAM -> test_body_sink B                                    gas=333
                queryId: 11
-               recipient: [WALLET_ADDRESS_BASE] (sender)
+               recipient: [WALLET_ADDRESS_BASE] (sender A)
                amount: 20000000
 
  ✓ 1 passed in 1 file

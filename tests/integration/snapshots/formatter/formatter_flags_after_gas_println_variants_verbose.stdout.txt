@@ -11,25 +11,25 @@
   ✓ formatter flags after gas variants verbose [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmFlagsOk 0.2 TON -> fm_flags B                                             gas=516
+       └── FmFlagsOk 0.2 GRAM -> fm_flags B                                            gas=516
            queryId: 1
        
        N/A -> sender A
-       └── FmFlagsThrow 0.2 TON -> fm_flags B                                          gas=682 exit_code=10 aborted
+       └── FmFlagsThrow 0.2 GRAM -> fm_flags B                                         gas=682 exit_code=10 aborted
            queryId: 2
            └── Compute phase failed: Dictionary error
        
        N/A -> sender A
-       └── FmFlagsActionFail 0.2 TON -> fm_flags B                                     gas=1245 aborted action_result_code=37
+       └── FmFlagsActionFail 0.2 GRAM -> fm_flags B                                    gas=1245 aborted action_result_code=37
            queryId: 3
            ├── Action phase failed
-           ├── Description: Not enough Toncoin
+           ├── Description: Not enough GRAM
            ├── Re-run with --backtrace full to get actions location
            └── Executed actions:
-               └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
+               └── reserve 100 GRAM BOUNCE_ON_ACTION_FAIL  balance: 0 GRAM
        
        N/A -> sender A
-       └── FmFlagsOk 0.2 TON -> EQAAAA..ALrXfh B                                       compute phase skipped aborted
+       └── FmFlagsOk 0.2 GRAM -> kQAAAA..ALrcxr B                                      compute phase skipped aborted
            queryId: 4
 
  ✓ 1 passed in 1 file

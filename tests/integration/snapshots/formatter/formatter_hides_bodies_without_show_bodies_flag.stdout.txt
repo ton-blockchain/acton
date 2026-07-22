@@ -15,8 +15,8 @@
   ✓ formatter hides bodies without show bodies flag [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828
-           └── FmRelay 0.199902466 TON -> fm_linear_mid C                              gas=1782
-               └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
+       └── FmRoute 0.6 GRAM -> fm_linear_root B                                        gas=1828
+           └── FmRelay 0.199902466 GRAM -> fm_linear_mid C                             gas=1782
+               └── FmDelivered 0.1 GRAM -> fm_linear_sink D                            gas=333
 
  ✓ 1 passed in 1 file

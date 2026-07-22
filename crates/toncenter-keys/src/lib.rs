@@ -8,13 +8,16 @@ pub const TONCENTER_MAINNET_API_KEY_ENV: &str = "TONCENTER_MAINNET_API_KEY";
 /// Environment variable for the testnet `TonCenter` API key.
 pub const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
 
+/// Environment variable for the protected Acton localnet API token.
+pub const LOCALNET_API_KEY_ENV: &str = "ACTON_LOCALNET_AUTH_TOKEN";
+
 /// Returns the `TonCenter` API key env var name for the selected network.
 #[must_use]
 pub fn env_var_name(network: &Network) -> Option<String> {
     match network {
         Network::Mainnet => Some(TONCENTER_MAINNET_API_KEY_ENV.to_string()),
         Network::Testnet => Some(TONCENTER_TESTNET_API_KEY_ENV.to_string()),
-        Network::Localnet => None,
+        Network::Localnet => Some(LOCALNET_API_KEY_ENV.to_string()),
         Network::Custom(name) => custom_env_var_name(name),
     }
 }
@@ -94,8 +97,21 @@ mod tests {
     }
 
     #[test]
-    fn does_not_resolve_for_localnet_or_custom_networks() {
-        assert_eq!(api_key(&Network::Localnet), None);
+    fn resolves_localnet_key_from_localnet_env() {
+        let lookup = |name: &str| match name {
+            LOCALNET_API_KEY_ENV => Some(" localnet-token ".to_string()),
+            _ => None,
+        };
+
+        assert_eq!(
+            api_key_with(&Network::Localnet, lookup),
+            Some("localnet-token".to_string())
+        );
+    }
+
+    #[test]
+    fn does_not_resolve_when_localnet_env_is_missing() {
+        assert_eq!(api_key_with(&Network::Localnet, |_| None), None);
     }
 
     #[test]

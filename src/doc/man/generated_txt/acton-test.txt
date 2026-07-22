@@ -4,7 +4,7 @@ NAME
        acton-test — Discover and run Tolk smart contract tests
 
 SYNOPSIS
-       acton test [options] [path]
+       acton test [options] [path…]
 
 DESCRIPTION
        Discover and execute tests from .test.tolk files.
@@ -15,10 +15,12 @@ DESCRIPTION
 
 OPTIONS
    Discovery Options
-       path
-           Test file or directory to run.
+       path…
+           Test files or directories to run.
 
            If omitted, Acton discovers tests from the resolved project root.
+
+           May be passed multiple times.
 
        -f, --filter pattern
            Filter tests by regular expression.
@@ -66,6 +68,17 @@ OPTIONS
            verbosity to collect source locations and call stacks without
            opening the debugger.
 
+       --no-capture
+           Print test println and eprintln output as it is produced.
+
+           The output is still captured for reporters such as JUnit and the
+           test UI. Executor debug logs from --verbose, including
+           debug.dumpStack(), are not printed live by this flag.
+
+           This flag is not supported with --mutate, because mutation testing
+           executes child test processes and captures their output for mutation
+           reports.
+
    Coverage Options
        --coverage
            Generate a coverage profile.
@@ -108,6 +121,25 @@ OPTIONS
 
            Requires --baseline-snapshot.
 
+       --gas-profile path
+           Write a gas-weighted execution profile.
+
+           By default, Acton records contract transactions produced by test
+           messages. Combine with --ui to browse the profile as a flamegraph in
+           the Test UI.
+
+       --gas-profile-format format
+           Execution profile output format.
+
+           Possible values: cpuprofile, collapsed. Defaults to cpuprofile.
+
+       --gas-profile-include-tests
+           Include .test.tolk unit-test get-method execution in the gas
+           profile.
+
+           Use this when the expensive work is called directly from a unit test
+           instead of through a contract message transaction.
+
    Reporting Options
        --reporter format[,format…]_
            Report format list.
@@ -147,6 +179,18 @@ OPTIONS
 
        --fork-block-number seqno
            Historical block sequence number to fork from.
+
+           When a fork block number is set, Acton caches resolved remote
+           accounts under
+           build/cache/<network>/<seqno>/<workchain>_<address-hash>.json. Later
+           test runs with the same fork network, block number, and address read
+           that file before calling the remote API.
+
+       --no-fork-cache
+           Disable persistent account cache for pinned fork block numbers. Use
+           this when you want every test run to fetch forked accounts from the
+           remote API. The regular --clear-cache flag removes this cache
+           together with the rest of build/cache.
 
    Tracing Options
        --save-test-trace [dir]
@@ -289,8 +333,17 @@ REPORTING AND ARTIFACTS
        o  --coverage --ui adds a Coverage tab to the browser UI for browsing
           coverage summaries, files, and annotated source
 
+       o  --gas-profile --ui adds a Profile tab to the browser UI; the
+          top-level view is grouped by contract, and selected tests with
+          recorded samples get a per-test profile next to Info, Transactions,
+          and Logs
+
        o  --junit-path matters when the JUnit reporter is enabled; it defaults
           to [test].junit-path, or test-results when it is not configured
+
+       o  --no-capture prints println and eprintln output during the test run,
+          while keeping captured stdout and stderr available to non-console
+          reporters
 
        o  executor debug logs are hidden by default; re-run with --verbose when
           you need level-1 executor output such as debug.dumpStack()
@@ -336,6 +389,17 @@ REPORTING AND ARTIFACTS
        o  gas snapshot files are written only to the explicit paths passed to
           --snapshot or --baseline-snapshot
 
+       o  gas execution profiles are written only to the explicit path passed
+          to --gas-profile; relative paths are resolved from the project root
+
+       o  --gas-profile-format cpuprofile writes Chrome DevTools-compatible
+          JSON; --gas-profile-format collapsed writes folded stacks for
+          flamegraph-style tooling
+
+       o  --gas-profile-include-tests records .test.tolk unit-test get-method
+          execution; the Test UI hides Acton runtime frames from the per-test
+          profile, but exported cpuprofile and collapsed files remain complete
+
        o  [test.fuzz] applies only to parameterized tests that explicitly opt
           in with @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
 
@@ -380,6 +444,9 @@ CONFIGURATION
            filter = ".*jetton.*"
            junit-path = "reports"
            junit-merge = false
+           gas-profile = "build/gas.cpuprofile"
+           gas-profile-format = "cpuprofile"
+           gas-profile-include-tests = false
            
            [test.fuzz]
            runs = 512
@@ -407,6 +474,9 @@ NOTES
           in comparison mode and does not overwrite the snapshot file
 
        o  --fail-on-diff requires --baseline-snapshot
+
+       o  --gas-profile-format and --gas-profile-include-tests affect output
+          only when --gas-profile or [test].gas-profile is configured
 
        o  The UI and trace export features are useful for debugging failing
           tests and inspecting transaction trees
@@ -466,64 +536,76 @@ EXAMPLES
 
               acton test
 
-       2. Filter tests by name:
+       2. Run selected test files/directories:
+
+              acton test tests/wallet.test.tolk tests/jetton
+
+       3. Filter tests by name:
 
               acton test --filter "wallet.*"
 
-       3. Show executor debug logs from debug.* helpers:
+       4. Show executor debug logs from debug.* helpers:
 
               acton test --verbose --filter "debug.*"
 
-       4. Generate coverage and JUnit output:
+       5. Generate coverage and JUnit output:
 
               acton test --coverage --coverage-format lcov --reporter junit \
                                                            --junit-path test-results
 
-       5. Fail the run when line coverage drops below 85%:
+       6. Fail the run when line coverage drops below 85%:
 
               acton test --coverage --coverage-minimum-percent 85
 
-       6. Compare gas usage against a baseline:
+       7. Compare gas usage against a baseline:
 
               acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff
 
-       7. Run mutation testing for one contract:
+       8. Write a collapsed gas execution profile:
 
-              acton test --mutate --mutate-contract Wallet
+              acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
 
-       8. Run mutation testing only for changed lines in the current worktree:
+       9. Open Test UI with gas profile flamegraphs:
 
-              acton test --mutate --mutate-contract Wallet --mutation-diff worktree
+              acton test --gas-profile build/gas.cpuprofile --ui
 
-       9. Run mutation testing for selected levels on the current branch:
+       10. Run mutation testing for one contract:
 
-              acton test --mutate --mutate-contract Wallet --mutation-diff branch \
-                                                           --mutation-levels critical,major
+           acton test --mutate --mutate-contract Wallet
 
-       10. Re-run one specific mutant from a previous report:
+       11. Run mutation testing only for changed lines in the current worktree:
+
+           acton test --mutate --mutate-contract Wallet --mutation-diff worktree
+
+       12. Run mutation testing for selected levels on the current branch:
+
+           acton test --mutate --mutate-contract Wallet --mutation-diff branch \
+                                                        --mutation-levels critical,major
+
+       13. Re-run one specific mutant from a previous report:
 
            acton test --mutate --mutate-contract Wallet --mutation-id 2
 
-       11. Resume an unfinished mutation session:
+       14. Resume an unfinished mutation session:
 
            acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 \
                                                         --mutation-diff worktree
 
-       12. Fail the run when mutation score drops below 85%:
+       15. Fail the run when mutation score drops below 85%:
 
            acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
 
-       13. Limit mutation testing to four workers:
+       16. Limit mutation testing to four workers:
 
            acton test --mutate --mutate-contract Wallet --mutation-workers 4
 
-       14. Debug a forked-state failure with traces and the UI:
+       17. Debug a forked-state failure with traces and the UI:
 
            acton test tests/wallet.test.tolk --fork-net testnet \
                                              --fork-block-number 55000000 \
                                              --save-test-trace --ui
 
-       15. Enforce a gas baseline in CI:
+       18. Enforce a gas baseline in CI:
 
            acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff \
                                                                   --reporter console,junit

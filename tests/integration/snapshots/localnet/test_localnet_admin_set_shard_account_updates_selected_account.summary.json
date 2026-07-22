@@ -3,11 +3,8 @@
     "@extra": "[EXTRA]",
     "ok": true,
     "result": {
-      "ok": true,
-      "result": {
-        "block_seqno": 1,
-        "tx_hash": "[HASH]"
-      }
+      "@type": "ok",
+      "hash": "[HASH]"
     }
   },
   "invalid": {

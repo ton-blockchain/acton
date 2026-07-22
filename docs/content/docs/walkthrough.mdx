@@ -88,7 +88,7 @@ Awaiting trace... [Attempt 1/20]
 Trace settled with 2 transaction(s)
 N/A -> external
 └── ext-in 0x7369676e -> EQD36X..ur8XSS A      gas=4939
-    └── empty 0.005 TON -> EQBoxX..16Bfkg B    gas=692
+    └── empty 0.005 GRAM -> EQBoxX..16Bfkg B    gas=692
 
 Deployed counter to kQD...tVe (Counter)
 Counter owner is kQB...iD (deployer)
@@ -430,7 +430,7 @@ $ acton test --backtrace full
   ✗ increase counter 12ms
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B           gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B           gas=1513 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── at contracts/src/Counter.tolk:42
                    onInternalMessage   at contracts/src/Counter.tolk:18
@@ -463,11 +463,11 @@ It provides the expected source-level debugging features:
 
 The `--debug` flag is available on three commands:
 
-| Command | What gets debugged |
-|---------|--------------------|
-| `acton test [path] --debug` | A live local test session — combine with `--filter` to narrow down to one test |
-| `acton script <path> --debug` | A locally executing script |
-| `acton retrace <HASH> --contract <NAME> --debug` | Debug a real on-chain transaction |
+| Command                                          | What gets debugged                                                                                               |
+|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `acton test [path...] --debug`                   | A live local test session for one or more files/directories — combine with `--filter` to narrow down to one test |
+| `acton script <path> --debug`                    | A locally executing script                                                                                       |
+| `acton retrace <HASH> --contract <NAME> --debug` | Debug a real on-chain transaction                                                                                |
 
 See the [debugging guide](/docs/debug) for more.
 
@@ -662,7 +662,7 @@ $ acton wallet new --name deployer --local --airdrop --version v5r1
 ✓ Challenge solved in 46.8ms
 ✓ Your claim has been queued. It will be processed soon.
 
-NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
+NOTE: This is a testnet wallet. Testnet GRAM has NO VALUE.
 
 To check wallet balances run acton wallet list --balance.
 ```

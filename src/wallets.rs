@@ -14,6 +14,7 @@ use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{
     Mnemonic, TonWallet, WALLET_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET,
@@ -21,6 +22,7 @@ use ton::ton_wallet::{
 };
 use ton_retrace::Network;
 
+const WALLET_MESSAGE_TTL_SECONDS: u64 = 600;
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
 
@@ -28,6 +30,18 @@ type MnemonicBundle = BTreeMap<String, String>;
 
 static KEYRING_BUNDLE_CACHE: LazyLock<Mutex<HashMap<String, MnemonicBundle>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn wallet_message_expire_at(network: &Network) -> anyhow::Result<u32> {
+    if matches!(network, Network::Localnet) {
+        return Ok(u32::MAX);
+    }
+
+    let expires_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .saturating_add(Duration::from_secs(WALLET_MESSAGE_TTL_SECONDS))
+        .as_secs();
+    Ok(expires_at.try_into().unwrap_or(u32::MAX))
+}
 
 fn format_ton_address(address: &TonAddress, testnet: bool, bounceable: bool) -> String {
     address.to_base64(!testnet, bounceable, true)

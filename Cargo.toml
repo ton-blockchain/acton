@@ -17,16 +17,16 @@ dist = true
 members = ["crates/*", "xtask"]
 
 exclude = [
-  "crates/acton-test-ui",
-  "crates/acton-shared-ui",
-  "crates/acton-localnet-ui",
+  "crates/ton-language-server-core",
+  "crates/ton-language-server-native",
+  "crates/ton-language-server-wasm",
 ]
 
 [workspace.package]
 version = "1.1.0"
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.94.1"
+rust-version = "1.96.1"
 homepage = "https://ton-blockchain.github.io/acton"
 documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
 repository = "https://github.com/ton-blockchain/acton"
@@ -35,10 +35,13 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
-acton-debug = { path = "crates/acton-debug" }
+acton-abi-catalog = { path = "crates/acton-abi-catalog" }
+acton-debug = { path = "crates/acton-debug", default-features = false }
+acton-source-trace = { path = "crates/acton-source-trace" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
+tolk-source-map = { path = "crates/tolk-source-map" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
@@ -55,12 +58,13 @@ tolk-linter = { path = "crates/tolk-linter" }
 tolk-macros = { path = "crates/tolk-macros" }
 tolk-dataflow = { path = "crates/tolk-dataflow" }
 tvm-ffi = { path = "crates/tvm-ffi" }
+tvm-ffi-derive = { path = "crates/tvm-ffi-derive" }
 tvm-logs = { path = "crates/tvm-logs" }
 tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
+ton-liteapi = { path = "crates/ton-liteapi" }
 ton-retrace = { path = "crates/ton-retrace" }
-ton-source-map = { path = "crates/ton-source-map" }
 tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
@@ -99,7 +103,9 @@ globset = "0.4"
 
 # formats
 serde = { version = "1.0.228", features = ["derive"] }
+serde_html_form = "0.4.1"
 serde_json = "1.0.145"
+indexmap = { version = "2.12.0", features = ["serde"] }
 serde-sarif = "0.8.0"
 schemars = { version = "0.8.22", features = ["derive"] }
 toml = "0.9.8"
@@ -118,13 +124,30 @@ walkdir = "2.5" # test discovery
 sha2 = { version = "0.10", features = ["asm"] } # for cache; hardware SHA-256 backends
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] } # fast file content hash for cache
 fs2 = "0.4" # build cache locking
-quick-junit = "0.5.2" # junit format for tests
+quick-junit = "0.6.1" # junit format for tests
 
 # disasm for blockchain addresses
-reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "blocking",
+  "multipart",
+  "default-tls",
+] }
+tungstenite = { version = "0.28", features = ["native-tls"] }
 urlencoding = "2.1"
 base64 = "0.22.1"
 rand = "0.8"
+aes = "0.8"
+ctr = "0.9"
+curve25519-dalek = "4.1"
+derivative = "2.2"
+futures = "0.3"
+pin-project = "1.1"
+tl-proto = { version = "0.5.3", features = ["derive"] }
+tokio-tower = "0.6.0"
+tokio-util = { version = "0.7", features = ["codec"] }
+tower = { version = "0.5", features = ["make", "util"] }
+tl-scheme = "0.3.0"
 machine-uid = "0.5.4"
 
 tempfile = "3.10.1" # testing
@@ -141,13 +164,15 @@ ctrlc = "3.4.5" # graceful Ctrl+C handling
 semver = "1.0.27"
 indicatif = "0.18.3"
 flate2 = "1.1.5"
-tar = "0.4.44"
+tar = "0.4.46"
+zstd = "0.13.3"
 
 # axum for test ui
-axum = "0.8.1"
+axum = { version = "0.8.1", features = ["ws"] }
 tower-http = { version = "0.6.2", features = ["fs", "cors"] }
-tower_governor = "0.8.0"
+tower_governor = { version = "0.8.0", default-features = false, features = ["axum"] }
 opener = "0.8.4"
+tokio-stream = "0.1.18"
 
 # acton wallet
 hmac = "0.12.1"
@@ -190,15 +215,18 @@ path-absolutize = "3.1.1"
 tracing = "0.1"
 function_name = "0.3.0"
 parking_lot = "0.12.5"
+wasm-bindgen = "0.2.105"
 
 cc = "1.2"
 
 [dependencies]
 # local crates
 acton-config = { workspace = true }
-acton-debug = { workspace = true }
+acton-abi-catalog = { workspace = true }
+acton-debug = { workspace = true, features = ["dap-server"] }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
+tolk-source-map = { workspace = true }
 ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
 tolk-syntax = { workspace = true }
@@ -213,9 +241,10 @@ tvm-logs = { workspace = true }
 tasm-core = { workspace = true }
 ton-api = { workspace = true }
 ton-retrace = { workspace = true }
-ton-source-map = { workspace = true }
+toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
+ton-indexer = { workspace = true }
 
 # remote crates
 # base TON libraries

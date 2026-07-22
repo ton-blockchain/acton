@@ -119,7 +119,7 @@ impl GenericSubstitutionsDeducing {
                         let a_union = interner.union(a_sub_p);
                         self.consider_next_condition(p_generic[0], a_union, interner);
                     } else if p_generic.len() == a_sub_p.len() {
-                        for (p, a) in p_generic.into_iter().zip(a_sub_p.into_iter()) {
+                        for (p, a) in p_generic.into_iter().zip(a_sub_p) {
                             self.consider_next_condition(p, a, interner);
                         }
                     }

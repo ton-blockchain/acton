@@ -455,7 +455,7 @@ Step 27 (step_in):
      93|
      94| get fun `test should run counter through tx cursor`() {
      95|     val (counter, deployer) = setupTest();
-                 ^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^
      96|
   Registers:
     c4 (storage): cell = empty cell

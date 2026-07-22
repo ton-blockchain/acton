@@ -9,7 +9,7 @@
     └─ Test output:
        hex_zero=0
        hex_i64_max=7fffffffffffffff
-       ton_zero=0 TON
-       ton_i64_max=9223372036.854775807 TON
+       ton_zero=0 GRAM
+       ton_i64_max=9223372036.854775807 GRAM
 
  ✓ 1 passed in 1 file

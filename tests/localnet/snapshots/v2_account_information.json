@@ -1,0 +1,174 @@
+{
+  "frozen": {
+    "frozen_hash": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
+    "type": "uninited.accountState"
+  },
+  "nonexist": {
+    "optional_fields_omitted": true,
+    "raw_address_uses_upstream_bounceable_form": true,
+    "state": {
+      "frozen_hash": "",
+      "type": "uninited.accountState"
+    },
+    "wallet": false
+  },
+  "uninit": {
+    "frozen_hash": "",
+    "type": "uninited.accountState"
+  },
+  "wallets": [
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 0,
+        "state": {
+          "code_present": true,
+          "data_present": true,
+          "frozen_hash": "",
+          "type": "raw.accountState"
+        }
+      },
+      "version": "v2r2",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": null,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno"
+        ],
+        "seqno": 1,
+        "wallet_id": null,
+        "wallet_type": "wallet v2 r2"
+      }
+    },
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 1,
+        "state": {
+          "seqno": 1,
+          "type": "wallet.v3.accountState",
+          "wallet_id": 698983191
+        }
+      },
+      "version": "v3r1",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": null,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno",
+          "wallet_id"
+        ],
+        "seqno": 1,
+        "wallet_id": 698983191,
+        "wallet_type": "wallet v3 r1"
+      }
+    },
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 2,
+        "state": {
+          "seqno": 1,
+          "type": "wallet.v3.accountState",
+          "wallet_id": 698983191
+        }
+      },
+      "version": "v3r2",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": null,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno",
+          "wallet_id"
+        ],
+        "seqno": 1,
+        "wallet_id": 698983191,
+        "wallet_type": "wallet v3 r2"
+      }
+    },
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 0,
+        "state": {
+          "code_present": true,
+          "data_present": true,
+          "frozen_hash": "",
+          "type": "raw.accountState"
+        }
+      },
+      "version": "v4r1",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": null,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno",
+          "wallet_id"
+        ],
+        "seqno": 1,
+        "wallet_id": 698983191,
+        "wallet_type": "wallet v4 r1"
+      }
+    },
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 2,
+        "state": {
+          "seqno": 1,
+          "type": "wallet.v4.accountState",
+          "wallet_id": 698983191
+        }
+      },
+      "version": "v4r2",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": null,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno",
+          "wallet_id"
+        ],
+        "seqno": 1,
+        "wallet_id": 698983191,
+        "wallet_type": "wallet v4 r2"
+      }
+    },
+    {
+      "extended": {
+        "address_preserves_request_flags": true,
+        "revision": 0,
+        "state": {
+          "code_present": true,
+          "data_present": true,
+          "frozen_hash": "",
+          "type": "raw.accountState"
+        }
+      },
+      "version": "v5r1",
+      "wallet": {
+        "has_extra_currencies": false,
+        "is_signature_allowed": true,
+        "is_wallet": true,
+        "present_optional_fields": [
+          "wallet_type",
+          "seqno",
+          "wallet_id",
+          "is_signature_allowed"
+        ],
+        "seqno": 1,
+        "wallet_id": 2147483645,
+        "wallet_type": "wallet v5 r1"
+      }
+    }
+  ]
+}

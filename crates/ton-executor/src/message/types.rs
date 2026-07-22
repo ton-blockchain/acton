@@ -54,6 +54,9 @@ pub struct PrevBlockId {
     /// Workchain ID.
     pub workchain: i32,
     /// Shard ID in signed representation used by TON APIs.
+    ///
+    /// It is serialized into TVM c7 as an unsigned 64-bit integer, matching TON
+    /// core behavior for `BlockId`.
     pub shard: i64,
     /// Block sequence number.
     pub seqno: u32,
@@ -70,8 +73,46 @@ pub struct PrevBlocksInfo {
     pub last_mc_blocks: Vec<PrevBlockId>,
     /// Block used by `PREVKEYBLOCK`.
     pub prev_key_block: PrevBlockId,
-    /// Optional list used by `PREVMCBLOCKS_100`.
-    pub last_mc_blocks_100: Option<Vec<PrevBlockId>>,
+    /// List used by `PREVMCBLOCKS_100`.
+    pub last_mc_blocks_100: Vec<PrevBlockId>,
+}
+
+impl PrevBlocksInfo {
+    /// Creates c7 previous-blocks info for `PREVBLOCKS*` instructions.
+    #[must_use]
+    pub const fn new(
+        last_mc_blocks: Vec<PrevBlockId>,
+        prev_key_block: PrevBlockId,
+        last_mc_blocks_100: Vec<PrevBlockId>,
+    ) -> Self {
+        Self {
+            last_mc_blocks,
+            prev_key_block,
+            last_mc_blocks_100,
+        }
+    }
+
+    /// Serializes previous-blocks info into the base64 stack-entry `BoC` expected by
+    /// TON native emulators.
+    pub fn to_stack_entry_boc_base64(&self) -> anyhow::Result<String> {
+        let fields = vec![
+            block_ids_to_tuple_item(&self.last_mc_blocks),
+            block_id_to_tuple(&self.prev_key_block),
+            block_ids_to_tuple_item(&self.last_mc_blocks_100),
+        ];
+
+        let tuple_item = TupleItem::Tuple(Tuple(fields));
+        let mut builder = CellBuilder::new();
+
+        tvm_ffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
+            .context("failed to serialize prev_blocks_info tuple item")?;
+
+        let cell = builder
+            .build()
+            .context("failed to build prev_blocks_info stack-entry cell")?;
+
+        Ok(Boc::encode_base64(&cell))
+    }
 }
 
 /// Arguments for running a transaction emulation.
@@ -157,7 +198,7 @@ impl TryFrom<&RunTransactionArgs> for EmulationInternalParams {
         let prev_blocks_info = args
             .prev_blocks_info
             .as_ref()
-            .map(serialize_prev_blocks_info_as_stack_entry)
+            .map(PrevBlocksInfo::to_stack_entry_boc_base64)
             .transpose()?;
 
         Ok(Self {
@@ -176,7 +217,7 @@ impl TryFrom<&RunTransactionArgs> for EmulationInternalParams {
 fn block_id_to_tuple(block_id: &PrevBlockId) -> TupleItem {
     TupleItem::Tuple(Tuple(vec![
         TupleItem::Int(BigInt::from(block_id.workchain)),
-        TupleItem::Int(BigInt::from(block_id.shard)),
+        TupleItem::Int(BigInt::from(block_id.shard as u64)),
         TupleItem::Int(BigInt::from(block_id.seqno)),
         TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &block_id.root_hash)),
         TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &block_id.file_hash)),
@@ -185,29 +226,4 @@ fn block_id_to_tuple(block_id: &PrevBlockId) -> TupleItem {
 
 fn block_ids_to_tuple_item(blocks: &[PrevBlockId]) -> TupleItem {
     TupleItem::Tuple(Tuple(blocks.iter().map(block_id_to_tuple).collect()))
-}
-
-fn serialize_prev_blocks_info_as_stack_entry(
-    prev_blocks_info: &PrevBlocksInfo,
-) -> anyhow::Result<String> {
-    let mut fields = vec![
-        block_ids_to_tuple_item(&prev_blocks_info.last_mc_blocks),
-        block_id_to_tuple(&prev_blocks_info.prev_key_block),
-    ];
-
-    if let Some(last_mc_blocks_100) = &prev_blocks_info.last_mc_blocks_100 {
-        fields.push(block_ids_to_tuple_item(last_mc_blocks_100));
-    }
-
-    let tuple_item = TupleItem::Tuple(Tuple(fields));
-    let mut builder = CellBuilder::new();
-
-    tvm_ffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
-        .context("failed to serialize prev_blocks_info tuple item")?;
-
-    let cell = builder
-        .build()
-        .context("failed to build prev_blocks_info stack-entry cell")?;
-
-    Ok(Boc::encode_base64(&cell))
 }

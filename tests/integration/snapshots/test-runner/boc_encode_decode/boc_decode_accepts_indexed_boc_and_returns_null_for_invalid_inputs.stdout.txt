@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/boc.test.tolk (1 test)
+  ✓ boc decode accepts indexed and rejects invalid inputs [TIME]
+
+ ✓ 1 passed in 1 file

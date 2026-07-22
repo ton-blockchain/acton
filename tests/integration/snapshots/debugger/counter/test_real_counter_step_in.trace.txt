@@ -455,7 +455,7 @@ Step 27 (step_in):
      68|
      69| get fun `test should run counter script`() {
      70|     val (counter, deployer) = setupTest();
-                 ^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^
      71|
   Registers:
     c4 (storage): cell = empty cell

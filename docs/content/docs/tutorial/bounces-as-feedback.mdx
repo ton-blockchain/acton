@@ -121,10 +121,10 @@ Add two tests to fill those gaps:
 get fun `test bounce on option 1 vote`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res1 = poll.sendVote(alice.address, 1, { value: ton("0.1") });
+    val res1 = poll.sendVote(alice.address, 1, { value: grams("0.1") });
     expect(res1).toHaveAllSuccessfulTxs();
 
-    poll.sendVote(alice.address, 1, { value: ton("0.1") });
+    poll.sendVote(alice.address, 1, { value: grams("0.1") });
     val (_, opt1) = poll.results();
     expect(opt1).toEqual(1);
 }
@@ -134,7 +134,7 @@ get fun `test voter rejects direct vote`() {
     val intruder = testing.treasury("intruder");
 
     // Deploy the Voter by having Alice vote normally first.
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveAllSuccessfulTxs();
 
     val voterAddr = poll.calcVoterAddress(alice.address);
@@ -142,7 +142,7 @@ get fun `test voter rejects direct vote`() {
 
     val directMsg = createMessage({
         bounce: false,
-        value:  ton("0.05"),
+        value:  grams("0.05"),
         dest:   voter.address,
         body:   Vote { option: 0 },
     });

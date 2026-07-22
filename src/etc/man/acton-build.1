@@ -20,7 +20,8 @@ directory. When compiler ABI is available, Acton also writes a contract ABI JSON
 file to the ABI output directory. When the contract config has an \fBoutput\fR path,
 Acton writes the compiled \fB\&.boc\fR file there. Dependency helper files are emitted
 into the generated\-code directory, and optional Fift output can be written
-separately.
+separately. Source registration artifacts for local explorer source upload can
+also be written when explicitly configured.
 .sp
 Contracts with \fB\&.boc\fR sources are treated as precompiled inputs: Acton loads
 their code, includes them in dependency resolution, and skips code
@@ -77,6 +78,14 @@ Directory for compiled Fift output for \fB\&.tolk\fR contracts.
 .sp
 Defaults to \fB[build].output\-fift\fR when configured. If neither the flag nor the
 config value is set, Acton does not write \fB\&.fif\fR files.
+.RE
+.sp
+\fB\-\-output\-sources\fR \fIdir\fR
+.RS 4
+Directory for source registration artifacts generated from \fB\&.tolk\fR contracts.
+.sp
+Defaults to \fB[build].output\-sources\fR when configured. If neither the flag nor
+the config value is set, Acton does not write source registration artifacts.
 .RE
 .sp
 \fB\-\-info\fR
@@ -145,6 +154,7 @@ out\-dir = "build"
 gen\-dir = "gen"
 output\-abi = "build/abi"
 output\-fift = "build/fift"
+output\-sources = "build/sources"
 .fi
 .RE
 .sp
@@ -174,6 +184,11 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB<output\-fift>/<contract\-name>.fif\fR for compiled \fB\&.tolk\fR contracts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB<output\-sources>/<contract\-name>.source.json\fR with a source registration
+artifact for compiled \fB\&.tolk\fR contracts
 .RE
 .sp
 .RS 4
@@ -274,7 +289,8 @@ acton build \-\-graph deps.dot
 .nf
 acton build \-\-out\-dir artifacts \-\-gen\-dir artifacts/gen \(rs
                                 \-\-output\-abi artifacts/abi \(rs
-                                \-\-output\-fift artifacts/fift
+                                \-\-output\-fift artifacts/fift \(rs
+                                \-\-output\-sources artifacts/sources
 .fi
 .RE
 .RE

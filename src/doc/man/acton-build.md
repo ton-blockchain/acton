@@ -22,7 +22,8 @@ directory. When compiler ABI is available, Acton also writes a contract ABI JSON
 file to the ABI output directory. When the contract config has an `output` path,
 Acton writes the compiled `.boc` file there. Dependency helper files are emitted
 into the generated-code directory, and optional Fift output can be written
-separately.
+separately. Source registration artifacts for local explorer source upload can
+also be written when explicitly configured.
 
 Contracts with `.boc` sources are treated as precompiled inputs: Acton loads
 their code, includes them in dependency resolution, and skips code
@@ -79,6 +80,7 @@ out-dir = "build"
 gen-dir = "gen"
 output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 ```
 
 CLI flags override config values for the current invocation.
@@ -96,6 +98,8 @@ Depending on command flags and project configuration, `acton build` may write:
 - `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
   (or a dependency-specific custom path when `depends[].path` is configured)
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
+- `<output-sources>/<contract-name>.source.json` with a source registration
+  artifact for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
 Existing output files at those paths are replaced with freshly generated
@@ -167,7 +171,8 @@ refresh for the current process.
    ```bash
    acton build --out-dir artifacts --gen-dir artifacts/gen \
                                    --output-abi artifacts/abi \
-                                   --output-fift artifacts/fift
+                                   --output-fift artifacts/fift \
+                                   --output-sources artifacts/sources
    ```
 
 6. Print compiled code and hashes after the build:

@@ -11,6 +11,6 @@
   ✓ foo [TIME]
     └─ Test output:
        N/A -> treasury A
-       └── empty 1 TON -> EQC2je..T7AHot B                                             compute phase skipped aborted
+       └── empty 1 GRAM -> kQC2je..T7AMGn B                                            compute phase skipped aborted
 
  ✓ 1 passed in 1 file

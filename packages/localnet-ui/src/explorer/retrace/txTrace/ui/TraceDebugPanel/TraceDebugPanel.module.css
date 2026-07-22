@@ -1,0 +1,119 @@
+.root {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: min(var(--retrace-flow-width, 100vw), var(--retrace-panel-max-width));
+  max-width: min(var(--retrace-flow-width, 100vw), var(--retrace-panel-max-width));
+  height: var(--retrace-panel-height);
+  min-height: 560px;
+  margin-top: 12px;
+  margin-left: calc(-1 * var(--retrace-flow-offset, 0px));
+  margin-right: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+  overflow: visible;
+  --retrace-panel-header-height: 44px;
+  --retrace-panel-max-width: 1800px;
+  --retrace-panel-viewport-height: 100vh;
+  --retrace-panel-height: calc(
+    var(--retrace-panel-viewport-height) +
+    var(--retrace-panel-header-height)
+  );
+  --retrace-workspace-height: var(--retrace-panel-viewport-height);
+  --retrace-workspace-narrow-height: var(--retrace-panel-viewport-height);
+}
+
+.header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 0 0 18px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.title {
+  color: var(--acton-color-text);
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 0 16px 0 0;
+  color: var(--acton-color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--acton-duration-fast);
+}
+
+.closeButton:hover {
+  color: var(--acton-color-text);
+}
+
+.content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0 0 16px 16px;
+}
+
+.loadingState,
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.loadingState {
+  min-height: 0;
+}
+
+.errorState {
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.errorTitle {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.errorMessage {
+  max-width: 760px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+@media (width <= 980px) {
+  .root {
+    min-height: 620px;
+  }
+}
+
+@supports (height: 100dvh) {
+  .root {
+    --retrace-panel-viewport-height: 100dvh;
+  }
+}

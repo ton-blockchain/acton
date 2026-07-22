@@ -19,13 +19,13 @@ use tolk_ty::InferenceResult;
 ///
 /// ### Example
 /// ```tolk twoslash
-/// reserveToncoinsOnBalance(ton("0.1"), 3);
-/// //                                   ^ E015: reserve mode should use RESERVE_MODE_* constants
+/// reserveGramsOnBalance(grams("0.1"), 3);
+/// //                                  ^ E015: reserve mode should use RESERVE_MODE_* constants
 /// ```
 ///
 /// Use instead:
 /// ```tolk
-/// reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
+/// reserveGramsOnBalance(grams("0.1"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
@@ -105,7 +105,7 @@ fn is_reserve_mode_call(
 
     let is_reserve_call = matches!(
         symbol.name.as_ref(),
-        "reserveToncoinsOnBalance" | "reserveExtraCurrenciesOnBalance"
+        "reserveGramsOnBalance" | "reserveToncoinsOnBalance" | "reserveExtraCurrenciesOnBalance"
     );
     if !is_reserve_call {
         return false;

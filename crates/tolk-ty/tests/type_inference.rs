@@ -170,9 +170,7 @@ fn run_tests_from_file(path: &Path) {
     };
 
     let mut updates = Vec::new();
-    let update_snapshots = std::env::var("UPDATE_SNAPSHOTS")
-        .map(|v| !v.is_empty())
-        .unwrap_or(false);
+    let update_snapshots = std::env::var("UPDATE_SNAPSHOTS").is_ok_and(|v| !v.is_empty());
 
     for test in tests_to_run {
         let actual = run_type_test(test);

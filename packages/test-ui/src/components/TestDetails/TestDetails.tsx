@@ -1,0 +1,1255 @@
+import path from "node:path"
+
+import {Address} from "@ton/core"
+import {PanelLeft} from "lucide-react"
+import type React from "react"
+import {useEffect, useMemo, useState} from "react"
+import {
+  FiArrowUpRight,
+  FiCheck,
+  FiChevronDown,
+  FiChevronUp,
+  FiCircle,
+  FiMinus,
+  FiX,
+} from "react-icons/fi"
+import {
+  ContractChip,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableGroupRow,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  getIdeUrl,
+  IdeSelector,
+  RawDataBlock,
+  useIdePreference,
+} from "@acton/ui"
+
+import type {ContractData, SourceLocation, TransactionInfo} from "@acton/transaction-ui"
+import {
+  applyParsedBodies,
+  buildValueFlowItems,
+  fmt,
+  getTransactionOpcode,
+  processTransactions,
+  TransactionTree,
+  resolveAbiOpcodeName,
+  ValueFlowTable,
+} from "@acton/transaction-ui"
+
+import {useContracts} from "../../hooks/useContracts"
+import {useGasProfileReport} from "../../hooks/useGasProfileReport"
+import {useTestExecutionLogs} from "../../hooks/useTestExecutionLogs"
+import {type FailedMessage, type TestReport, TestStatus, type Trace} from "../../types/test"
+import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
+import {GasProfile} from "../GasProfile/GasProfile"
+
+import styles from "./TestDetails.module.css"
+
+type TestDetailsTab = "info" | "logs" | "profile" | "transactions"
+
+interface TestDetailsProps {
+  readonly test: TestReport
+  readonly trace: Trace | undefined
+  readonly traceError?: string
+  readonly isTraceLoading?: boolean
+  readonly projectRoot?: string
+  readonly gasProfileAvailable: boolean
+  readonly gasProfileAvailabilityLoaded: boolean
+  readonly isSidebarCollapsed?: boolean
+  readonly onExpandSidebar?: () => void
+}
+
+interface TraceFeeSummary {
+  readonly traceIndex: number
+  readonly traceName: string
+  readonly firstMessageName: string
+  readonly transactionCount: number
+  readonly transactionFees: readonly bigint[]
+  readonly totalGasUsed: bigint
+  readonly totalGasFees: bigint
+  readonly totalForwardFees: bigint
+  readonly totalFees: bigint
+}
+
+interface ParsedTraceResult {
+  readonly transactions: readonly TransactionInfo[]
+  readonly error?: string
+}
+
+interface TraceParseIssue {
+  readonly traceIndex: number
+  readonly traceName: string
+  readonly transactionCount: number
+  readonly error: string
+}
+
+const formatTraceName = (name: string | undefined, index: number): string => {
+  const trimmed = name?.trim()
+  if (trimmed && trimmed.length > 0) {
+    return trimmed
+  }
+  return `Trace #${index + 1}`
+}
+
+const formatSkippedTraceCount = (count: number): string => {
+  return count === 1 ? "1 trace skipped" : `${count} traces skipped`
+}
+
+const formatTreasuryDeployTraceCount = (count: number): string => {
+  return count === 1 ? "1 treasury deploy" : `${count} treasury deploys`
+}
+
+const isExternalMessageNotAcceptedError = (error: string): boolean => {
+  const normalized = error.toLowerCase()
+  const mentionsExternal = normalized.includes("external")
+  const mentionsRejectedExternal =
+    normalized.includes("not accepted") ||
+    normalized.includes("cannot apply external") ||
+    normalized.includes("did not accept")
+  return mentionsExternal && mentionsRejectedExternal
+}
+
+const MISSING_VM_LOG_HINT = [
+  "No VM logs were collected for this trace",
+  "Re-run with --verbose flag",
+].join("\n")
+const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
+
+const toIdeSourceLocation = (location: SourceLocation) => ({
+  filePath: location.file,
+  line: Math.max(1, location.line),
+  column: Math.max(1, location.column - 1),
+})
+
+const hasNonEmptyLog = (value: string | undefined): boolean => (value ?? "").trim().length > 0
+
+const getStatusDescription = (test: TestReport): string | undefined => {
+  if (test.status === TestStatus.Todo) {
+    return test.details ?? "TODO"
+  }
+
+  if (test.status === TestStatus.Skipped) {
+    return test.details
+  }
+
+  return undefined
+}
+
+const stringifyError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+const formatDuration = (duration: {secs: number; nanos: number}): string => {
+  const ms = duration.secs * 1000 + duration.nanos / 1_000_000
+  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
+  if (ms < 1000) return `${ms.toFixed(1)}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
+export const TestDetails: React.FC<TestDetailsProps> = ({
+  test,
+  trace,
+  traceError,
+  isTraceLoading = false,
+  projectRoot,
+  gasProfileAvailable,
+  gasProfileAvailabilityLoaded,
+  isSidebarCollapsed = false,
+  onExpandSidebar,
+}) => {
+  const [activeTab, setActiveTab] = useState<TestDetailsTab>(() => {
+    const saved = localStorage.getItem("activeTab")
+    if (saved === "vm" || saved === "executor") return "logs"
+    return saved === "info" || saved === "logs" || saved === "profile" || saved === "transactions"
+      ? saved
+      : "info"
+  })
+  const [selectedTraceIndex, setSelectedTraceIndex] = useState<number>(() => {
+    const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
+    return saved ? Number.parseInt(saved, 10) : 0
+  })
+  const [isValueFlowExpanded, setIsValueFlowExpanded] = useState(() => {
+    return localStorage.getItem(VALUE_FLOW_EXPANDED_STORAGE_KEY) === "true"
+  })
+  const [isTreasuryDeployTracesExpanded, setIsTreasuryDeployTracesExpanded] = useState(false)
+  const [selectedIde, selectIde] = useIdePreference()
+
+  const contractNames = useMemo(() => {
+    const names = new Set<string>(trace?.contracts ?? [])
+
+    for (const traceItem of trace?.traces ?? []) {
+      for (const transaction of traceItem.transactions) {
+        if (transaction.dest_contract_info) {
+          names.add(transaction.dest_contract_info)
+        }
+      }
+    }
+
+    for (const transaction of test.failed_transactions ?? []) {
+      if (transaction.dest_contract_info) {
+        names.add(transaction.dest_contract_info)
+      }
+    }
+
+    return [...names]
+  }, [trace, test.failed_transactions])
+  const {contracts: backendContracts} = useContracts(contractNames)
+  const {executionLogs, isLoadingExecutionLogs} = useTestExecutionLogs(test)
+  const {
+    profile: gasProfileReport,
+    error: gasProfileError,
+    loading: isGasProfileLoading,
+    loaded: gasProfileLoaded,
+  } = useGasProfileReport(gasProfileAvailable && activeTab === "profile")
+  const gasProfile = gasProfileReport?.tests?.find(profile => profile.name === test.name)
+
+  const errorLocation = useMemo(() => {
+    if (test.status !== TestStatus.Failed || !test.details) {
+      return {filePath: test.file_path, row: test.row, column: test.column}
+    }
+
+    const parts = test.details.split(":")
+    if (parts.length >= 3) {
+      const colStr = parts.pop() ?? "0"
+      const rowStr = parts.pop() ?? "0"
+      const col = Number.parseInt(colStr, 10)
+      const row = Number.parseInt(rowStr, 10)
+      const filePathRaw = parts.join(":")
+      const filePath =
+        path.isAbsolute(filePathRaw) || projectRoot === undefined
+          ? filePathRaw
+          : path.join(projectRoot, filePathRaw)
+      return {filePath, row: row - 1, column: col - 2}
+    }
+    return {filePath: test.file_path, row: test.row, column: test.column}
+  }, [test, projectRoot])
+
+  const getRelativePath = (path: string) => {
+    if (projectRoot && path.startsWith(projectRoot)) {
+      const rel = path.slice(projectRoot.length)
+      return rel || path
+    }
+    const parts = path.split("/")
+    if (parts.length > 3) {
+      return `.../${parts.slice(-3).join("/")}`
+    }
+    return path
+  }
+
+  const renderSourceLocation = (location: SourceLocation) => {
+    const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
+
+    return (
+      <a
+        href={getIdeUrl(selectedIde, toIdeSourceLocation(location))}
+        className={styles.sourceLocationLink}
+        title={`Open ${label} in ${selectedIde}`}
+      >
+        {label}
+      </a>
+    )
+  }
+
+  const transactionCount = useMemo(() => {
+    if (!trace) return 0
+    return trace.traces.reduce((acc, t) => acc + t.transactions.length, 0)
+  }, [trace])
+
+  const transactionStats = isTraceLoading
+    ? "loading trace..."
+    : traceError
+      ? "trace load failed"
+      : `${transactionCount} transactions`
+  const skippedTracesCount = trace?.skipped_traces_count ?? 0
+  const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
+  const traceEntries = useMemo(() => {
+    return (trace?.traces ?? []).map((traceItem, index) => ({
+      traceItem,
+      index,
+    }))
+  }, [trace])
+  const treasuryDeployTraceEntries = useMemo(
+    () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy === true),
+    [traceEntries],
+  )
+  const regularTraceEntries = useMemo(
+    () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy !== true),
+    [traceEntries],
+  )
+  const treasuryDeployTraceLabel = formatTreasuryDeployTraceCount(treasuryDeployTraceEntries.length)
+  const isSelectedTraceTreasuryDeploy =
+    trace?.traces[selectedTraceIndex]?.is_treasury_deploy === true
+  const shouldShowTreasuryDeployTraces =
+    isTreasuryDeployTracesExpanded || isSelectedTraceTreasuryDeploy
+  const hasGasProfile = gasProfile !== undefined && gasProfile.total_gas > 0
+  const shouldShowTraceSelector =
+    activeTab !== "info" &&
+    activeTab !== "profile" &&
+    trace !== undefined &&
+    (trace.traces.length > 1 || skippedTracesCount > 0)
+
+  const parsedTraceResults = useMemo((): ParsedTraceResult[] => {
+    if (!trace) return []
+    return trace.traces.map((traceItem, index) => {
+      try {
+        return {transactions: processTransactions(traceItem.transactions)}
+      } catch (error) {
+        const message = stringifyError(error)
+        console.error("Failed to process trace transactions", {
+          traceIndex: index,
+          traceName: formatTraceName(traceItem.name, index),
+          transactionCount: traceItem.transactions.length,
+          error,
+        })
+        return {transactions: [], error: message}
+      }
+    })
+  }, [trace])
+
+  const traceParseIssues = useMemo((): TraceParseIssue[] => {
+    if (!trace) return []
+
+    return parsedTraceResults.flatMap((result, index) => {
+      if (!result.error) return []
+
+      return [
+        {
+          traceIndex: index,
+          traceName: formatTraceName(trace.traces[index]?.name, index),
+          transactionCount: trace.traces[index]?.transactions.length ?? 0,
+          error: result.error,
+        },
+      ]
+    })
+  }, [parsedTraceResults, trace])
+
+  const parsedTraceTransactionsWithBodies = useMemo((): TransactionInfo[][] => {
+    return parsedTraceResults.map(result =>
+      applyParsedBodies([...result.transactions], backendContracts),
+    )
+  }, [backendContracts, parsedTraceResults])
+
+  const parsedTransactions = useMemo(() => {
+    return parsedTraceTransactionsWithBodies[selectedTraceIndex] ?? []
+  }, [parsedTraceTransactionsWithBodies, selectedTraceIndex])
+  const valueFlowItems = useMemo(
+    () => buildValueFlowItems(parsedTransactions),
+    [parsedTransactions],
+  )
+  const shouldShowValueFlowToggle = activeTab === "transactions" && valueFlowItems.length > 0
+
+  const currentTraceParseIssue = traceParseIssues.find(
+    issue => issue.traceIndex === selectedTraceIndex,
+  )
+
+  const allContracts = useMemo(() => Object.values(backendContracts), [backendContracts])
+  const statusDescription = getStatusDescription(test)
+
+  const traceFeeSummaries = useMemo((): TraceFeeSummary[] => {
+    const getFirstTraceTransaction = (transactions: readonly TransactionInfo[]) => {
+      const roots = transactions.filter(tx => !tx.parent)
+      const candidates = roots.length > 0 ? roots : transactions
+      if (candidates.length === 0) return
+
+      return [...candidates].sort((a, b) => {
+        try {
+          const aLt = BigInt(a.lt)
+          const bLt = BigInt(b.lt)
+          if (aLt < bLt) return -1
+          if (aLt > bLt) return 1
+          return 0
+        } catch {
+          return a.lt.localeCompare(b.lt)
+        }
+      })[0]
+    }
+
+    const resolveFirstMessageName = (tx: TransactionInfo | undefined): string => {
+      if (!tx) return "unknown"
+
+      const opcode = getTransactionOpcode(tx.transaction)
+      if (opcode === undefined) return "empty"
+
+      const targetContract = tx.contractName ? backendContracts[tx.contractName] : undefined
+      let opcodeName = resolveAbiOpcodeName(targetContract?.abi, opcode, "incoming")
+
+      if (!opcodeName) {
+        for (const contract of allContracts) {
+          const found = resolveAbiOpcodeName(contract.abi, opcode)
+          if (found) {
+            opcodeName = found
+            break
+          }
+        }
+      }
+
+      return opcodeName ?? `0x${opcode.toString(16)}`
+    }
+
+    return parsedTraceTransactionsWithBodies.map((transactions, traceIndex) => {
+      const traceName = formatTraceName(trace?.traces[traceIndex]?.name, traceIndex)
+      let totalGasUsed = 0n
+      let totalGasFees = 0n
+      let totalForwardFees = 0n
+      let totalFees = 0n
+      const transactionFees: bigint[] = []
+      const firstTraceTransaction = getFirstTraceTransaction(transactions)
+      const firstMessageName = resolveFirstMessageName(firstTraceTransaction)
+
+      for (const tx of transactions) {
+        const description = tx.transaction.description
+        const computePhase = description.type === "generic" ? description.computePhase : undefined
+
+        const transactionFee = tx.transaction.totalFees.coins
+        transactionFees.push(transactionFee)
+        totalFees += transactionFee
+
+        if (computePhase?.type === "vm") {
+          totalGasUsed += computePhase.gasUsed
+          totalGasFees += computePhase.gasFees
+        }
+
+        if (tx.transaction.inMessage?.info.type === "internal") {
+          totalForwardFees += tx.transaction.inMessage.info.forwardFee
+        }
+      }
+
+      return {
+        traceIndex,
+        traceName,
+        firstMessageName,
+        transactionCount: transactions.length,
+        transactionFees,
+        totalGasUsed,
+        totalGasFees,
+        totalForwardFees,
+        totalFees,
+      }
+    })
+  }, [allContracts, backendContracts, parsedTraceTransactionsWithBodies, trace])
+  const treasuryDeployTraceFeeSummaries = useMemo(
+    () =>
+      traceFeeSummaries.filter(summary => trace?.traces[summary.traceIndex]?.is_treasury_deploy),
+    [trace, traceFeeSummaries],
+  )
+  const regularTraceFeeSummaries = useMemo(
+    () =>
+      traceFeeSummaries.filter(summary => !trace?.traces[summary.traceIndex]?.is_treasury_deploy),
+    [trace, traceFeeSummaries],
+  )
+
+  const failedTransactions = useMemo(() => {
+    if (!test.failed_transactions) return []
+    try {
+      return applyParsedBodies(processTransactions(test.failed_transactions), backendContracts)
+    } catch (error) {
+      console.error("Failed to process failed transactions", error)
+      return []
+    }
+  }, [backendContracts, test.failed_transactions])
+
+  const contracts = useMemo(() => {
+    const map = new Map<string, ContractData>()
+    const priorities = new Map<string, number>()
+    const walletPriority = 2
+    const transactionPriority = 1
+    const failedTransactionPriority = 0
+
+    const addContract = (address: Address, name: string | undefined, priority: number) => {
+      const addrStr = address.toString()
+      const existing = map.get(addrStr)
+      const existingPriority = priorities.get(addrStr)
+      const backendContract = name ? backendContracts[name] : undefined
+
+      if (existing && existingPriority !== undefined) {
+        if (existingPriority > priority) return
+        const addressFallback = fmt.formatAddress(addrStr)
+        if (
+          existingPriority === priority &&
+          name === undefined &&
+          existing.displayName !== addressFallback
+        ) {
+          return
+        }
+      }
+
+      priorities.set(addrStr, priority)
+      map.set(addrStr, {
+        displayName: backendContract?.display_name ?? name ?? fmt.formatAddress(addrStr),
+        address,
+        letter: existing?.letter ?? String.fromCodePoint(65 + (map.size % 26)),
+        abi: backendContract?.abi ?? existing?.abi,
+      })
+    }
+
+    if (trace?.wallets) {
+      for (const [address, name] of Object.entries(trace.wallets)) {
+        try {
+          addContract(Address.parse(address), name, walletPriority)
+        } catch (error) {
+          console.error("Failed to parse wallet address", address, error)
+        }
+      }
+    }
+
+    if (parsedTransactions) {
+      for (const tx of parsedTransactions) {
+        if (tx.address) {
+          addContract(tx.address, tx.contractName, transactionPriority)
+        }
+      }
+    }
+
+    if (failedTransactions) {
+      for (const tx of failedTransactions) {
+        if (tx.address) {
+          addContract(tx.address, tx.contractName, failedTransactionPriority)
+        }
+      }
+    }
+
+    return map
+  }, [parsedTransactions, failedTransactions, trace, backendContracts])
+
+  const normalizeAddress = (addr: string | undefined) => {
+    if (!addr) return
+    try {
+      return Address.parse(addr).toString()
+    } catch {
+      return addr
+    }
+  }
+
+  useEffect(() => {
+    if (trace) {
+      const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
+      const index = saved ? Number.parseInt(saved, 10) : 0
+      const firstRegularTraceIndex = regularTraceEntries[0]?.index ?? 0
+      if (saved && Number.isInteger(index) && index >= 0 && index < trace.traces.length) {
+        setSelectedTraceIndex(index)
+      } else {
+        setSelectedTraceIndex(firstRegularTraceIndex)
+      }
+    }
+  }, [regularTraceEntries, trace, test.suite_name, test.name])
+
+  const handleSelectTraceIndex = (index: number) => {
+    setSelectedTraceIndex(index)
+    localStorage.setItem(`selectedTraceIndex:${test.suite_name}::${test.name}`, index.toString())
+  }
+
+  const handleToggleTreasuryDeployTraces = () => {
+    const nextExpanded = !shouldShowTreasuryDeployTraces
+    setIsTreasuryDeployTracesExpanded(nextExpanded)
+
+    if (!nextExpanded && isSelectedTraceTreasuryDeploy && regularTraceEntries.length > 0) {
+      handleSelectTraceIndex(regularTraceEntries[0].index)
+    }
+  }
+
+  const handleToggleValueFlow = () => {
+    const nextExpanded = !isValueFlowExpanded
+    setIsValueFlowExpanded(nextExpanded)
+    localStorage.setItem(VALUE_FLOW_EXPANDED_STORAGE_KEY, nextExpanded ? "true" : "false")
+  }
+
+  useEffect(() => {
+    if (gasProfileAvailabilityLoaded && !gasProfileAvailable && activeTab === "profile") {
+      setActiveTab("info")
+      localStorage.setItem("activeTab", "info")
+    }
+  }, [activeTab, gasProfileAvailabilityLoaded, gasProfileAvailable])
+
+  const handleTabChange = (tab: TestDetailsTab) => {
+    setActiveTab(tab)
+    localStorage.setItem("activeTab", tab)
+  }
+
+  const handleOpenTraceTransactions = (index: number) => {
+    handleSelectTraceIndex(index)
+    handleTabChange("transactions")
+  }
+
+  if (!test) return
+
+  const getStatusIcon = (status: TestStatus) => {
+    switch (status) {
+      case TestStatus.Passed: {
+        return <FiCheck className={styles.passedIcon} />
+      }
+      case TestStatus.Failed: {
+        return <FiX className={styles.failedIcon} />
+      }
+      case TestStatus.Skipped: {
+        return <FiCircle className={styles.skippedIcon} />
+      }
+      case TestStatus.Todo: {
+        return <FiMinus className={styles.todoIcon} />
+      }
+      default: {
+        return
+      }
+    }
+  }
+
+  const renderFailedMessages = (failedMessages: readonly FailedMessage[]) => {
+    const isSingleFailedMessage = failedMessages.length === 1
+
+    return failedMessages.map((failedMessage, index) => {
+      const hasVmLog = hasNonEmptyLog(failedMessage.vm_log_diff)
+      const hasExecutorLog = hasNonEmptyLog(failedMessage.executor_logs)
+      const showExternalNotAcceptedTitle =
+        isSingleFailedMessage && isExternalMessageNotAcceptedError(failedMessage.error)
+
+      return (
+        <div key={`failed-message-${index}`} className={styles.txLogs}>
+          {showExternalNotAcceptedTitle && (
+            <div className={styles.errorTitle}>External message was not accepted</div>
+          )}
+          {!isSingleFailedMessage && (
+            <div className={styles.txHeader}>
+              <span>Failed Message #{index + 1}</span>
+            </div>
+          )}
+          <div className={styles.logSection}>
+            <RawDataBlock
+              collapsible
+              copyLabel="Error"
+              defaultExpanded={false}
+              title="Error"
+              value={failedMessage.error}
+            />
+          </div>
+          {failedMessage.vm_exit_code !== undefined && (
+            <div className={styles.logSection}>
+              <RawDataBlock
+                collapsible
+                copyLabel="VM exit code"
+                defaultExpanded={false}
+                title="VM Exit Code"
+                value={failedMessage.vm_exit_code.toString()}
+              />
+            </div>
+          )}
+          {hasExecutorLog && (
+            <div className={styles.logSection}>
+              <RawDataBlock
+                collapsible
+                copyLabel="Executor log"
+                defaultExpanded={false}
+                title="Executor Log"
+                value={failedMessage.executor_logs ?? ""}
+              />
+            </div>
+          )}
+          <div className={styles.logSection}>
+            <RawDataBlock
+              collapsible
+              copyLabel="VM log"
+              defaultExpanded={false}
+              title="VM Log"
+              value={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT}
+            />
+          </div>
+        </div>
+      )
+    })
+  }
+
+  const renderTestExecutionLogs = () => {
+    const sections = [
+      {
+        copyLabel: "Test stdout",
+        emptyContent: "No test output was produced",
+        title: "Test Output",
+        value: executionLogs?.stdout ?? "",
+      },
+      {
+        copyLabel: "Test stderr",
+        emptyContent: "No test error output was produced",
+        title: "Test Error Output",
+        value: executionLogs?.stderr ?? "",
+      },
+      {
+        copyLabel: "Test VM log",
+        emptyContent: "No test VM log was collected",
+        title: "Test VM Log",
+        value: executionLogs?.vm_log ?? "",
+      },
+    ]
+
+    return (
+      <div className={styles.infoLogsSection}>
+        {sections.map(section => (
+          <RawDataBlock
+            key={section.title}
+            collapsible
+            copyLabel={section.copyLabel}
+            defaultExpanded={false}
+            empty={!isLoadingExecutionLogs && !hasNonEmptyLog(section.value)}
+            emptyContent={section.emptyContent}
+            loading={isLoadingExecutionLogs}
+            loadingLabel={`Loading ${section.title}`}
+            title={section.title}
+            value={section.value}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  const renderTraceFeeSummaryRow = (summary: TraceFeeSummary) => {
+    const isTreasuryDeploy = trace?.traces[summary.traceIndex]?.is_treasury_deploy === true
+
+    return (
+      <DataTableRow
+        key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
+        groupChild={isTreasuryDeploy}
+        hover
+      >
+        <DataTableCell truncate>
+          <button
+            type="button"
+            className={styles.traceLinkButton}
+            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
+            title={`Open ${summary.traceName} (${summary.firstMessageName}) in Transactions`}
+          >
+            <span>
+              {summary.traceName}
+              <span className={styles.traceMessageSeparator} aria-hidden="true">
+                {" · "}
+              </span>
+              <span className={styles.traceMessageName}>{summary.firstMessageName}</span>
+            </span>
+            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+          </button>
+        </DataTableCell>
+        <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
+        <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalGasFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalForwardFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalFees)}</DataTableCell>
+      </DataTableRow>
+    )
+  }
+
+  const renderTabContent = () => {
+    if (activeTab === "info") {
+      return (
+        <div className={styles.infoTab}>
+          <div className={styles.infoGrid}>
+            <div className={styles.infoItem}>
+              <div className={styles.infoLabel}>Status</div>
+              <div className={styles.infoValueGroup}>
+                <div className={`${styles.infoValue} ${styles[test.status.toLowerCase()]}`}>
+                  {test.status}
+                </div>
+                {statusDescription && (
+                  <div className={styles.statusDescription}>{statusDescription}</div>
+                )}
+              </div>
+            </div>
+            <div className={styles.infoItem}>
+              <div className={styles.infoLabel}>Suite</div>
+              <div className={styles.infoValue}>{test.suite_name}</div>
+            </div>
+            <div className={styles.infoItem}>
+              <div className={styles.infoLabel}>Location</div>
+              <div className={styles.infoValue}>
+                <span title={errorLocation.filePath}>
+                  {getRelativePath(errorLocation.filePath)}:{errorLocation.row + 1}:
+                  {errorLocation.column + 1}
+                </span>
+              </div>
+            </div>
+            <div className={styles.infoItem}>
+              <div className={styles.infoLabel}>Stats</div>
+              <div className={styles.infoValue}>
+                <span data-visual-dynamic="duration" data-visual-placeholder="<duration>">
+                  {formatDuration(test.duration)}
+                </span>{" "}
+                • {transactionStats}
+              </div>
+            </div>
+          </div>
+
+          {traceError && (
+            <div className={`${styles.traceNotice} ${styles.traceNoticeError}`} role="alert">
+              <div className={styles.traceNoticeTitle}>Trace could not be loaded</div>
+              <div className={styles.traceNoticeMessage}>{traceError}</div>
+              {test.trace_path && (
+                <div className={styles.traceNoticeMeta}>trace_path: {test.trace_path}</div>
+              )}
+            </div>
+          )}
+
+          {traceParseIssues.length > 0 && (
+            <div className={`${styles.traceNotice} ${styles.traceNoticeError}`} role="alert">
+              <div className={styles.traceNoticeTitle}>Trace could not be rendered completely</div>
+              <div className={styles.traceNoticeMessage}>
+                {traceParseIssues.length === 1
+                  ? `${traceParseIssues[0].traceName} contains ${traceParseIssues[0].transactionCount} raw transactions, but the browser failed to parse them.`
+                  : `${traceParseIssues.length} traces contain raw transactions that failed to parse in the browser.`}
+              </div>
+              <div className={styles.traceNoticeMeta}>
+                {traceParseIssues.map(issue => `${issue.traceName}: ${issue.error}`).join("\n")}
+              </div>
+            </div>
+          )}
+
+          {test.status === TestStatus.Failed && (
+            <div className={styles.errorSection}>
+              <div className={styles.errorTitle}>Error Message</div>
+              <RawDataBlock
+                value={
+                  test.failed_transaction_context
+                    ? (test.message ?? "expect(actual).toHaveTx(expected)")
+                    : (test.detailed_message ?? test.message ?? "No error message available")
+                }
+                className={styles.errorMessageBlock}
+              />
+
+              {failedTransactions.length > 0 && (
+                <div className={styles.failedTransactionsSection}>
+                  <TransactionTree
+                    transactions={failedTransactions}
+                    contracts={contracts}
+                    allContracts={allContracts}
+                    renderSourceLocation={renderSourceLocation}
+                  />
+                </div>
+              )}
+
+              {test.failed_transaction_context && (
+                <div className={styles.structuredError}>
+                  <div className={styles.structuredErrorTitle}>
+                    {test.message?.includes("Unexpected") || test.message?.includes("toNotHaveTx")
+                      ? "Unexpected transaction with the following parameters:"
+                      : "Cannot find transaction with the following parameters:"}
+                  </div>
+                  <div className={styles.errorHeader}>
+                    <div className={styles.errorRoute}>
+                      <span className={styles.routeLabel}>From:</span>
+                      {test.failed_transaction_context.from_address ? (
+                        <ContractChip
+                          address={normalizeAddress(test.failed_transaction_context.from_address)}
+                          contracts={contracts}
+                        />
+                      ) : (
+                        <span className={styles.anyAddress}>&lt;any&gt;</span>
+                      )}
+                    </div>
+                    <div className={styles.errorRoute}>
+                      <span className={styles.routeLabel}>To:</span>
+                      {test.failed_transaction_context.to_address ? (
+                        <ContractChip
+                          address={normalizeAddress(test.failed_transaction_context.to_address)}
+                          contracts={contracts}
+                        />
+                      ) : (
+                        <span className={styles.anyAddress}>&lt;any&gt;</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.errorParams}>
+                    {test.failed_transaction_context.params.map(([key, value]) => (
+                      <div key={key} className={styles.errorParam}>
+                        <span className={styles.paramKey}>{key}:</span>
+                        <span className={styles.paramValue}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <CodeSnippet
+                filePath={errorLocation.filePath}
+                line={errorLocation.row + 1}
+                projectRoot={projectRoot}
+                ideOpener={
+                  <IdeSelector
+                    value={selectedIde}
+                    onValueChange={selectIde}
+                    size="compact"
+                    location={{
+                      filePath: errorLocation.filePath,
+                      line: errorLocation.row + 1,
+                      column: errorLocation.column + 1,
+                    }}
+                  />
+                }
+              />
+            </div>
+          )}
+
+          <div className={styles.traceFeesSection}>
+            <div className={styles.traceFeesTitle}>Fee Summary</div>
+            <DataTable aria-busy={isTraceLoading} minWidth="62rem">
+              <DataTableTable aria-label="Trace fee summary">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth="16rem">Trace</DataTableHeaderCell>
+                    <DataTableHeaderCell align="center" columnWidth="8rem">
+                      Tx Count
+                    </DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="8rem">Gas Used</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="12rem">Gas Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Forward Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Total Fee</DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
+                  {isTraceLoading ? (
+                    <DataTableSkeletonRows
+                      alignments={["left", "center", "left", "left", "left", "left"]}
+                      columns={6}
+                      rowKeyPrefix="trace-fee-summary"
+                    />
+                  ) : traceFeeSummaries.length === 0 ? (
+                    <DataTableEmpty colSpan={6}>No transactions were recorded</DataTableEmpty>
+                  ) : (
+                    <>
+                      {treasuryDeployTraceFeeSummaries.length > 0 && (
+                        <DataTableGroupRow
+                          colSpan={6}
+                          expanded={shouldShowTreasuryDeployTraces}
+                          onToggle={handleToggleTreasuryDeployTraces}
+                        >
+                          {treasuryDeployTraceLabel}
+                        </DataTableGroupRow>
+                      )}
+                      {shouldShowTreasuryDeployTraces &&
+                        treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+                          renderTraceFeeSummaryRow(traceFeeSummary),
+                        )}
+                      {regularTraceFeeSummaries.map(traceFeeSummary =>
+                        renderTraceFeeSummaryRow(traceFeeSummary),
+                      )}
+                    </>
+                  )}
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
+          </div>
+
+          {renderTestExecutionLogs()}
+        </div>
+      )
+    }
+
+    if (activeTab === "profile") {
+      if (isGasProfileLoading) {
+        return <div className={styles.empty}>Loading gas profile...</div>
+      }
+
+      if (gasProfileError) {
+        return <div className={styles.empty}>Failed to load gas profile: {gasProfileError}</div>
+      }
+
+      if (hasGasProfile) {
+        return (
+          <div className={styles.profileTab}>
+            <GasProfile profile={gasProfile} projectRoot={projectRoot} />
+          </div>
+        )
+      }
+
+      if (gasProfileLoaded) {
+        return (
+          <div className={styles.empty}>No gas profile samples were recorded for this test</div>
+        )
+      }
+
+      return <div className={styles.empty}>Loading gas profile...</div>
+    }
+
+    if (trace && trace.traces.length === 0 && skippedTracesCount > 0) {
+      return <div className={styles.empty}>{skippedTraceLabel}</div>
+    }
+
+    if (activeTab === "logs") {
+      const currentTraceList = trace?.traces[selectedTraceIndex]
+      const transactionLogs =
+        currentTraceList?.transactions
+          .map((tx, idx) => {
+            const hasVmLog = hasNonEmptyLog(tx.vm_log_diff)
+            const hasExecutorLog = hasNonEmptyLog(tx.executor_logs)
+
+            if (!hasVmLog && !hasExecutorLog) return null
+
+            return (
+              <div key={tx.lt} className={styles.txLogs}>
+                <div className={styles.txHeader}>
+                  <span>Transaction #{idx + 1}</span>
+                </div>
+                {hasExecutorLog && (
+                  <div className={styles.logSection}>
+                    <RawDataBlock
+                      collapsible
+                      copyLabel="Executor log"
+                      defaultExpanded={false}
+                      title="Executor Log"
+                      value={tx.executor_logs}
+                      data-visual-dynamic="executor-log"
+                      data-visual-placeholder="<executor log>"
+                    />
+                  </div>
+                )}
+                <div className={styles.logSection}>
+                  <RawDataBlock
+                    collapsible
+                    copyLabel="VM log"
+                    defaultExpanded={false}
+                    title="VM Log"
+                    value={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    data-visual-dynamic="vm-log"
+                    data-visual-placeholder="<vm log>"
+                  />
+                </div>
+              </div>
+            )
+          })
+          .filter(Boolean) ?? []
+      const failedMessageLogs = currentTraceList
+        ? renderFailedMessages(currentTraceList.failed_messages ?? [])
+        : []
+      const logs = [...transactionLogs, ...failedMessageLogs]
+
+      if (logs.length === 0) {
+        return (
+          <div className={styles.txLogs}>
+            <div className={styles.logSection}>
+              <RawDataBlock
+                collapsible
+                copyLabel="VM log"
+                defaultExpanded={false}
+                title="VM Log"
+                value={MISSING_VM_LOG_HINT}
+                data-visual-dynamic="vm-log"
+                data-visual-placeholder="<vm log>"
+              />
+            </div>
+          </div>
+        )
+      }
+
+      return logs
+    }
+
+    if (!trace) {
+      if (traceError) {
+        return (
+          <div className={`${styles.traceNotice} ${styles.traceNoticeError}`} role="alert">
+            <div className={styles.traceNoticeTitle}>Trace could not be loaded</div>
+            <div className={styles.traceNoticeMessage}>{traceError}</div>
+            {test.trace_path && (
+              <div className={styles.traceNoticeMeta}>trace_path: {test.trace_path}</div>
+            )}
+          </div>
+        )
+      }
+
+      if (isTraceLoading) return <div className={styles.empty}>Loading trace...</div>
+      return <div className={styles.empty}>No trace data available</div>
+    }
+    const currentTraceList = trace.traces[selectedTraceIndex]
+    if (!currentTraceList) return <div className={styles.empty}>Trace not found</div>
+
+    if (activeTab === "transactions") {
+      const failedMessages = currentTraceList.failed_messages ?? []
+      if (parsedTransactions.length === 0) {
+        if (currentTraceParseIssue) {
+          return (
+            <div>
+              <div className={`${styles.traceNotice} ${styles.traceNoticeError}`} role="alert">
+                <div className={styles.traceNoticeTitle}>
+                  Trace transactions could not be parsed
+                </div>
+                <div className={styles.traceNoticeMessage}>
+                  {currentTraceParseIssue.traceName} contains{" "}
+                  {currentTraceParseIssue.transactionCount} raw transactions, but rendering stopped
+                  while decoding transaction data.
+                </div>
+                <div className={styles.traceNoticeMeta}>{currentTraceParseIssue.error}</div>
+              </div>
+              {failedMessages.length > 0 && <div>{renderFailedMessages(failedMessages)}</div>}
+            </div>
+          )
+        }
+
+        if (failedMessages.length === 0) {
+          return <div className={styles.empty}>No transaction data available for this trace</div>
+        }
+        return <div>{renderFailedMessages(failedMessages)}</div>
+      }
+      return (
+        <>
+          {isValueFlowExpanded && valueFlowItems.length > 0 && (
+            <div className={styles.valueFlowSection} data-testid="value-flow-section">
+              <ValueFlowTable items={valueFlowItems} contracts={contracts} />
+            </div>
+          )}
+          <div className={styles.treeWrapper}>
+            <TransactionTree
+              transactions={parsedTransactions}
+              contracts={contracts}
+              allContracts={allContracts}
+              renderSourceLocation={renderSourceLocation}
+            />
+          </div>
+          {failedMessages.length > 0 && <div>{renderFailedMessages(failedMessages)}</div>}
+        </>
+      )
+    }
+  }
+
+  return (
+    <div className={styles.details}>
+      <div className={styles.header}>
+        <div className={styles.titleInfo} data-testid="test-details-title">
+          {isSidebarCollapsed && onExpandSidebar && (
+            <button
+              type="button"
+              onClick={onExpandSidebar}
+              className={styles.expandButton}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <PanelLeft aria-hidden="true" />
+            </button>
+          )}
+          <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
+          <span className={styles.suiteName}>{test.suite_name} / </span>
+          <span className={styles.testName}>{test.name}</span>
+
+          <IdeSelector
+            value={selectedIde}
+            onValueChange={selectIde}
+            shortcut
+            location={{filePath: test.file_path, line: test.row + 1, column: test.column + 1}}
+          />
+        </div>
+      </div>
+
+      <div className={styles.tabsContainer}>
+        <div className={styles.tabsList} role="tablist" aria-label="Test details">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "info"}
+            className={`${styles.tabTrigger} ${activeTab === "info" ? styles.activeTabTrigger : ""}`}
+            onClick={() => handleTabChange("info")}
+          >
+            Info
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "transactions"}
+            className={`${styles.tabTrigger} ${activeTab === "transactions" ? styles.activeTabTrigger : ""}`}
+            onClick={() => handleTabChange("transactions")}
+          >
+            Transactions
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "logs"}
+            className={`${styles.tabTrigger} ${activeTab === "logs" ? styles.activeTabTrigger : ""}`}
+            onClick={() => handleTabChange("logs")}
+          >
+            Logs
+          </button>
+          {gasProfileAvailable && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "profile"}
+              className={`${styles.tabTrigger} ${activeTab === "profile" ? styles.activeTabTrigger : ""}`}
+              onClick={() => handleTabChange("profile")}
+            >
+              Profile
+            </button>
+          )}
+        </div>
+      </div>
+
+      {(shouldShowTraceSelector || shouldShowValueFlowToggle) && (
+        <div className={styles.traceSelector}>
+          {shouldShowTraceSelector && (
+            <div className={styles.traceTabs}>
+              {treasuryDeployTraceEntries.length > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.traceTab} ${styles.treasuryDeployTraceToggle}`}
+                  onClick={handleToggleTreasuryDeployTraces}
+                  aria-expanded={shouldShowTreasuryDeployTraces}
+                >
+                  {shouldShowTreasuryDeployTraces ? (
+                    <FiChevronUp aria-hidden="true" />
+                  ) : (
+                    <FiChevronDown aria-hidden="true" />
+                  )}
+                  <span>{treasuryDeployTraceLabel}</span>
+                </button>
+              )}
+              {shouldShowTreasuryDeployTraces &&
+                treasuryDeployTraceEntries.map(({traceItem, index}) => (
+                  <button
+                    key={`${trace.name}-${index}`}
+                    type="button"
+                    className={`${styles.traceTab} ${styles.treasuryDeployTraceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
+                    onClick={() => handleSelectTraceIndex(index)}
+                    aria-current={selectedTraceIndex === index ? "true" : undefined}
+                  >
+                    {formatTraceName(traceItem.name, index)}
+                  </button>
+                ))}
+              {regularTraceEntries.map(({traceItem, index}) => (
+                <button
+                  key={`${trace.name}-${index}`}
+                  type="button"
+                  className={`${styles.traceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
+                  onClick={() => handleSelectTraceIndex(index)}
+                  aria-current={selectedTraceIndex === index ? "true" : undefined}
+                >
+                  {formatTraceName(traceItem.name, index)}
+                </button>
+              ))}
+              {skippedTracesCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.traceTab} ${styles.skippedTraceTab}`}
+                  disabled
+                >
+                  {skippedTraceLabel}
+                </button>
+              )}
+            </div>
+          )}
+          {shouldShowValueFlowToggle && (
+            <button
+              type="button"
+              className={styles.valueFlowToggle}
+              onClick={handleToggleValueFlow}
+              aria-expanded={isValueFlowExpanded}
+            >
+              <span>{isValueFlowExpanded ? "Hide" : "Show"} Value Flow</span>
+              {isValueFlowExpanded ? <FiChevronUp /> : <FiChevronDown />}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={styles.tabContent} data-testid="test-details-content">
+        {renderTabContent()}
+      </div>
+    </div>
+  )
+}

@@ -3,6 +3,8 @@ mod common;
 #[cfg(test)]
 mod integration;
 #[cfg(test)]
+mod localnet;
+#[cfg(test)]
 mod support;
 
 use acton_config::schema::{
@@ -133,6 +135,19 @@ fn test_acton_compile_rejects_conflicting_stdout_formats() {
         .failure()
         .stdout_eq(snapbox::str![""]);
     assert_stderr_contains_all(&assert, &["cannot be used with", "--json", "--base64-only"]);
+}
+
+#[test]
+fn test_acton_test_rejects_no_capture_with_mutation_mode() {
+    let assert = snapbox::cmd::Command::acton_ui()
+        .args(["test", "--mutate", "--no-capture"])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""]);
+    assert_stderr_contains_all(
+        &assert,
+        &["cannot be used with", "--mutate", "--no-capture"],
+    );
 }
 
 #[test]

@@ -9,7 +9,7 @@
     └─ Test output:
        hex_neg_one=-1
        hex_neg_255=-ff
-       ton_neg_nano=-0.000000001 TON
-       ton_neg_one_and_half=-1.5 TON
+       ton_neg_nano=-0.000000001 GRAM
+       ton_neg_one_and_half=-1.5 GRAM
 
  ✓ 1 passed in 1 file

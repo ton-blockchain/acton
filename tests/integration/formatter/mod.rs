@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton::formatter::FormatterContext;
+use std::fs;
 use tycho_types::models::{ReserveCurrencyFlags, SendMsgFlags};
 
 const LINEAR_MESSAGES: &str = r"
@@ -21,6 +22,11 @@ struct (0xF1000003) FmDelivered {
 }
 ";
 
+const CATALOG_FALLBACK_SINK_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
 const LINEAR_ROOT_CONTRACT: &str = r#"
 import "fm_linear_messages"
 
@@ -36,7 +42,7 @@ fun onInternalMessage(in: InMessage) {
     val msg = lazy FmRoute.fromSlice(in.body);
     createMessage({
         bounce: false,
-        value: ton("0.2"),
+        value: grams("0.2"),
         dest: msg.mid,
         body: FmRelay {
             queryId: msg.queryId,
@@ -63,7 +69,7 @@ fun onInternalMessage(in: InMessage) {
     val msg = lazy FmRelay.fromSlice(in.body);
     createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: msg.sink,
         body: FmDelivered {
             queryId: msg.queryId,
@@ -90,7 +96,7 @@ fun onInternalMessage(in: InMessage) {
     val msg = lazy FmRoute.fromSlice(in.body);
     createMessage({
         bounce: false,
-        value: ton("0.2"),
+        value: grams("0.2"),
         dest: msg.mid,
         body: FmDelivered {
             queryId: msg.queryId,
@@ -152,7 +158,7 @@ fun deployFmLinearHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: rootInit,
         },
@@ -160,7 +166,7 @@ fun deployFmLinearHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: midInit,
         },
@@ -168,7 +174,7 @@ fun deployFmLinearHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: sinkInit,
         },
@@ -182,7 +188,7 @@ fun sendFmLinear(sender: Treasury, rootAddress: address, midAddress: address, si
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.6"),
+            value: grams("0.6"),
             dest: rootAddress,
             body: FmRoute {
                 queryId,
@@ -382,7 +388,7 @@ fun deployFmKnownAddressHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -424,7 +430,7 @@ fun onInternalMessage(in: InMessage) {
 
     createMessage({
         bounce: false,
-        value: ton("0.01"),
+        value: grams("0.01"),
         dest: in.senderAddress,
     }).send(SEND_MODE_REGULAR);
 }
@@ -452,7 +458,7 @@ fun deployFmWrappedKnownAddressHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -483,7 +489,7 @@ fun deployFmAbiMegaHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -525,7 +531,7 @@ fun onInternalMessage(in: InMessage) {
 
     createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: msg.left,
         body: FmLeftNotice {
             queryId: msg.queryId,
@@ -534,7 +540,7 @@ fun onInternalMessage(in: InMessage) {
 
     createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: msg.right,
         body: FmRightNotice {
             queryId: msg.queryId,
@@ -615,7 +621,7 @@ fun deployFmFanoutHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: rootInit,
         },
@@ -623,7 +629,7 @@ fun deployFmFanoutHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: leftInit,
         },
@@ -631,7 +637,7 @@ fun deployFmFanoutHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: rightInit,
         },
@@ -645,7 +651,7 @@ fun sendFmFanout(sender: Treasury, rootAddress: address, leftAddress: address, r
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.5"),
+            value: grams("0.5"),
             dest: rootAddress,
             body: FmFanKick {
                 queryId,
@@ -740,7 +746,7 @@ fun deployFmExternalHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: extInit,
         },
@@ -796,7 +802,7 @@ fun deployFmExternalThrowHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: extInit,
         },
@@ -832,7 +838,7 @@ fun onInternalMessage(in: InMessage) {
 
     createMessage({
         bounce: false,
-        value: ton("0.05"),
+        value: grams("0.05"),
         dest: in.senderAddress,
         body: FmBounceAck {
             queryId: msg.queryId,
@@ -860,7 +866,7 @@ fun deployFmBounceHarness() {
     val echoAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -886,12 +892,12 @@ fun onInternalMessage(_: InMessage) {
         },
     }.calculateAddress();
 
-    reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(grams("0.1"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val outMsg = createMessage({
         dest: addr,
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
     });
     outMsg.send(SEND_MODE_REGULAR);
 }
@@ -955,7 +961,7 @@ fun onInternalMessage(in: InMessage) {
     }
     if (opcode == 0xF5000003) {
         val _failMsg = lazy FmFlagsActionFail.fromSlice(in.body);
-        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
         return;
     }
 }
@@ -981,7 +987,7 @@ fun deployFmFlagsHarness() {
     val flagsAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -1039,7 +1045,7 @@ fun deployFmDebugHarness() {
 
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -1071,7 +1077,7 @@ fun onInternalMessage(in: InMessage) {
 
     createMessage({
         bounce: false,
-        value: ton("0"),
+        value: grams("0"),
         dest: in.senderAddress,
     }).send(SEND_MODE_DESTROY | SEND_MODE_CARRY_ALL_BALANCE);
 }
@@ -1096,7 +1102,7 @@ fun deployFmDestroyHarness() {
     val destroyAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
     expect(net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: init,
         },
@@ -1137,6 +1143,21 @@ fn run_success_case_verbose(project: ProjectBuilder, snapshot_path: &str) {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
+}
+
+fn compiled_formatter_catalog_sink_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("formatter-catalog-fallback-source")
+        .contract_with_output(
+            "catalog_sink",
+            CATALOG_FALLBACK_SINK_CONTRACT,
+            "contracts/catalog_sink.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(source_project.path().join("contracts/catalog_sink.boc"))
+        .expect("must read compiled catalog fallback sink BoC bytes")
 }
 
 fn linear_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
@@ -1304,6 +1325,215 @@ get fun `test-formatter-linear-chain-println`() {
 }
 
 #[test]
+fn formatter_catalog_opcode_fallback_decodes_manual_jetton_transfer() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-catalog-opcode-fallback-jetton-transfer")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_catalog_opcode_fallback",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter catalog opcode fallback decodes manual jetton transfer`() {
+                val sender = testing.treasury("sender");
+                val recipient = testing.treasury("recipient");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                val transferBody = beginCell()
+                    .storeUint(0x0f8a7ea5, 32)
+                    .storeUint(42, 64)
+                    .storeCoins(grams("1.25"))
+                    .storeAddress(recipient.address)
+                    .storeAddress(sender.address)
+                    .storeUint(0, 1)
+                    .storeCoins(grams("0.05"))
+                    .storeUint(0, 1)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("0.2"),
+                    dest: sinkAddress,
+                    body: transferBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                println(txs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_catalog_opcode_fallback_decodes_manual_jetton_transfer.stdout.txt",
+        );
+}
+
+#[test]
+fn formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-catalog-opcode-fallback-prefixless-payload")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_catalog_opcode_fallback_prefixless_payload",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter catalog opcode fallback does not name prefixless payloads`() {
+                val sender = testing.treasury("sender");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                var liquidityDict: map<uint32, int32> = [];
+                val prefixlessPayloadBody = beginCell()
+                    .storeUint(0xd1b02ea5, 32)
+                    .storeDict(liquidityDict.toLowLevelDict())
+                    .storeInt(0, 32)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("0.2"),
+                    dest: sinkAddress,
+                    body: prefixlessPayloadBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                println(txs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads.stdout.txt",
+        );
+}
+
+#[test]
+fn formatter_zero_opcode_text_comment_shows_tail() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-zero-opcode-text-comment")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_zero_opcode_text_comment",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter zero opcode text comment shows tail`() {
+                val sender = testing.treasury("sender");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                val commentBody = beginCell()
+                    .storeUint(0, 32)
+                    .storeString("approve")
+                    .endCell()
+                    .beginParse();
+                val longText = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789";
+                val longCommentBody = beginCell()
+                    .storeUint(0, 32)
+                    .storeString(longText)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("0.2"),
+                    dest: sinkAddress,
+                    body: commentBody,
+                }));
+                val longTxs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: grams("0.2"),
+                    dest: sinkAddress,
+                    body: longCommentBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                expect(longTxs).toHaveLength(1);
+                println(txs);
+                println(longTxs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_zero_opcode_text_comment_shows_tail.stdout.txt",
+        );
+}
+
+#[test]
 fn formatter_hides_bodies_without_show_bodies_flag() {
     linear_formatter_project(
         "formatter-hides-bodies-without-show-bodies-flag",
@@ -1359,7 +1589,7 @@ get fun `test formatter decoded body known addresses`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.05"),
+            value: grams("0.05"),
             dest: sinkAddress,
             body: FmKnownAddressBody {
                 queryId: 0,
@@ -1389,7 +1619,7 @@ get fun `test formatter decoded body deployed contract addresses`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.05"),
+            value: grams("0.05"),
             dest: sinkAddress,
             body: FmKnownAddressBody {
                 queryId: 0,
@@ -1419,13 +1649,13 @@ get fun `test formatter decoded body wrapped known addresses`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.05"),
+            value: grams("0.05"),
             dest: sinkAddress,
             body: FmWrappedKnownAddressBody {
                 internalTransferMsg: FmWrappedKnownAddress {
                     queryId: 0,
                     newAdminAddress: notDeployer.address,
-                    tonAmount: ton("1"),
+                    tonAmount: grams("1"),
                 }.toCell(),
             },
         }),
@@ -1452,13 +1682,13 @@ get fun `test formatter multiline body tree gutter`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.05"),
+            value: grams("0.05"),
             dest: sinkAddress,
             body: FmWrappedKnownAddressBody {
                 internalTransferMsg: FmWrappedKnownAddress {
                     queryId: 0,
                     newAdminAddress: notDeployer.address,
-                    tonAmount: ton("1"),
+                    tonAmount: grams("1"),
                 }.toCell(),
             },
         }),
@@ -1499,24 +1729,24 @@ get fun `test formatter decoded body supported compiler abi types`() {
 
     var items = createEmptyMap<uint16, FmAbiMegaLeaf>();
     items.set(1 as uint16, FmAbiMegaLeaf {
-        amount: ton("0.01"),
+        amount: grams("0.01"),
         owner: sender.address,
         tag: "01020304".hexToSlice() as bytes4,
     });
     items.set(2 as uint16, FmAbiMegaLeaf {
-        amount: ton("0.02"),
+        amount: grams("0.02"),
         owner: null,
         tag: "0A0B0C0D".hexToSlice() as bytes4,
     });
 
     var boxedItems = createEmptyMap<uint8, Cell<FmAbiMegaLeaf>>();
     boxedItems.set(1 as uint8, FmAbiMegaLeaf {
-        amount: ton("0.2"),
+        amount: grams("0.2"),
         owner: sender.address,
         tag: "A1B2C3D4".hexToSlice() as bytes4,
     }.toCell() as Cell<FmAbiMegaLeaf>);
     boxedItems.set(2 as uint8, FmAbiMegaLeaf {
-        amount: ton("0.3"),
+        amount: grams("0.3"),
         owner: friend.address,
         tag: "0BADF00D".hexToSlice() as bytes4,
     }.toCell() as Cell<FmAbiMegaLeaf>);
@@ -1549,17 +1779,17 @@ get fun `test formatter decoded body supported compiler abi types`() {
     }.toCell() as Cell<FmAbiMegaTuples>;
     val objectsCell = FmAbiMegaObjects {
         maybeLeaf: FmAbiMegaLeaf {
-            amount: ton("0.05"),
+            amount: grams("0.05"),
             owner: friend.address,
             tag: "11223344".hexToSlice() as bytes4,
         },
         aliasLeaf: FmAbiMegaLeaf {
-            amount: ton("0.06"),
+            amount: grams("0.06"),
             owner: null,
             tag: "55667788".hexToSlice() as bytes4,
         },
         boxedLeaf: FmAbiMegaLeaf {
-            amount: ton("0.07"),
+            amount: grams("0.07"),
             owner: sender.address,
             tag: "99AABBCC".hexToSlice() as bytes4,
         }.toCell() as Cell<FmAbiMegaLeaf>,
@@ -1568,7 +1798,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
             enabled: false,
             target: friend.address,
             meta: FmAbiMegaLeaf {
-                amount: ton("0.08"),
+                amount: grams("0.08"),
                 owner: sender.address,
                 tag: "DDEEFF00".hexToSlice() as bytes4,
             },
@@ -1594,7 +1824,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
     }.toCell() as Cell<FmAbiMegaTail>;
     val payload = FmAbiMegaMessage {
         flag: true,
-        amount: ton("0.777"),
+        amount: grams("0.777"),
         owner: sender.address,
         scalars: scalarsCell,
         tuples: tuplesCell,
@@ -1605,7 +1835,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.4"),
+            value: grams("0.4"),
             dest: sinkAddress,
             body: payload,
         }),
@@ -1625,7 +1855,7 @@ get fun `test formatter decoded body supported compiler abi types`() {
     val trailing = tail.trailing.load();
 
     expect(typedBody.flag).toBeTrue();
-    expect(typedBody.amount).toEqual(ton("0.777"));
+    expect(typedBody.amount).toEqual(grams("0.777"));
     expect(typedBody.owner).toEqual(sender.address);
     expect(scalarAddresses.ownerOrNull).toEqual(null);
     expect(scalarAddresses.ownerOrFriend).toEqual(friend.address);
@@ -1643,13 +1873,13 @@ get fun `test formatter decoded body supported compiler abi types`() {
     expect(scalarValues.mode).toEqual(FmAbiMegaMode.Beta);
     expect(tuples.pair).toEqual((7 as uint8, true, friend.address));
     expect(tuples.maybePair != null).toBeTrue();
-    expect(objects.maybeLeaf!.amount).toEqual(ton("0.05"));
+    expect(objects.maybeLeaf!.amount).toEqual(grams("0.05"));
     expect(objects.aliasLeaf.owner).toEqual(null);
-    expect(objects.boxedLeaf.load().amount).toEqual(ton("0.07"));
+    expect(objects.boxedLeaf.load().amount).toEqual(grams("0.07"));
     expect(objects.nested.load().meta!.tag).toEqual("DDEEFF00".hexToSlice() as bytes4);
     expect(collections.items).toHaveLength(2);
     expect(collections.boxedItems).toHaveLength(2);
-    expect(collections.items.get(1 as uint16).loadValue().amount).toEqual(ton("0.01"));
+    expect(collections.items.get(1 as uint16).loadValue().amount).toEqual(grams("0.01"));
     expect(collections.boxedItems.get(2 as uint8).loadValue().load().owner).toEqual(friend.address);
     expect(trailing.marker).toEqual(3);
     expect(trailing.payload.remainingBitsCount()).toEqual(8);
@@ -1826,16 +2056,21 @@ fn formatter_println_renders_bounced_and_compute_skipped_transactions() {
             r#"
 get fun `test formatter println bounced and compute skipped`() {
     val (sender, echoAddress) = deployFmBounceHarness();
+    val bouncedBody = beginCell()
+        .storeUint(0xFFFFFFFF, 32)
+        .storeAny(FmBouncePing {
+            queryId: 401,
+        })
+        .endCell()
+        .beginParse();
 
     val bounced = net.send(
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: echoAddress,
-            body: FmBouncePing {
-                queryId: 401,
-            },
+            body: bouncedBody,
         }).bounced(),
     );
 
@@ -1843,7 +2078,7 @@ get fun `test formatter println bounced and compute skipped`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: address("0:0000000000000000000000000000000000000000000000000000000000000BAD"),
             body: FmBouncePing {
                 queryId: 402,
@@ -1907,7 +2142,7 @@ get fun `test formatter action phase failure println with hint`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: {
                 stateInit: init,
             },
@@ -1936,7 +2171,7 @@ get fun `test formatter action phase failure println verbose`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: {
                 stateInit: init,
             },
@@ -1965,7 +2200,7 @@ get fun `test formatter action phase failure println with backtrace full`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: {
                 stateInit: init,
             },
@@ -2012,7 +2247,7 @@ get fun `test formatter flags after gas variants`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsOk { queryId: 1 },
         }),
@@ -2022,7 +2257,7 @@ get fun `test formatter flags after gas variants`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsThrow { queryId: 2 },
         }),
@@ -2032,7 +2267,7 @@ get fun `test formatter flags after gas variants`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsActionFail { queryId: 3 },
         }),
@@ -2042,7 +2277,7 @@ get fun `test formatter flags after gas variants`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: unknownFmFlagsAddress(),
             body: FmFlagsOk { queryId: 4 },
         }),
@@ -2077,7 +2312,7 @@ get fun `test formatter flags after gas variants verbose`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsOk { queryId: 1 },
         }),
@@ -2087,7 +2322,7 @@ get fun `test formatter flags after gas variants verbose`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsThrow { queryId: 2 },
         }),
@@ -2097,7 +2332,7 @@ get fun `test formatter flags after gas variants verbose`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsActionFail { queryId: 3 },
         }),
@@ -2107,7 +2342,7 @@ get fun `test formatter flags after gas variants verbose`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: unknownFmFlagsAddress(),
             body: FmFlagsOk { queryId: 4 },
         }),
@@ -2142,7 +2377,7 @@ get fun `test-formatter-exit-code-without-backtrace-full`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsThrow { queryId: 55 },
         }),
@@ -2170,7 +2405,7 @@ get fun `test-formatter-exit-code-with-backtrace-full`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: flagsAddress,
             body: FmFlagsThrow { queryId: 77 },
         }),
@@ -2217,7 +2452,7 @@ get fun `test-formatter-exit-code-with-backtrace-full-and-account-created-event`
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: {
                 stateInit: init,
             },
@@ -2282,7 +2517,7 @@ get fun `test formatter debug logs println`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: debugAddress,
             body: FmDebugPing { queryId: 1 },
         }),
@@ -2319,7 +2554,7 @@ get fun `test formatter account destroyed println`() {
         sender.address,
         createMessage({
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: destroyAddress,
             body: FmDestroyNow { queryId: 1 },
         }),
@@ -2345,7 +2580,7 @@ fn formatter_contract_letters_rollover_after_z_println_uses_a1_and_b1() {
         sender.address,
         createMessage({{
             bounce: false,
-            value: ton("0.2"),
+            value: grams("0.2"),
             dest: address("0:{address_hex}"),
             body: beginCell().storeUint({index}, 32).endCell(),
         }}),

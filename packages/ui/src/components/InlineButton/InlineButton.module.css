@@ -1,0 +1,117 @@
+.inlineButton {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition:
+    color var(--acton-duration-fast) var(--acton-ease-standard),
+    opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.inlineButton:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.inlineButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.content {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-1-5);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.inlineButton svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.variantDefault {
+  color: var(--acton-color-text-muted);
+}
+
+.variantDefault:hover:not(:disabled) {
+  color: var(--acton-color-text);
+}
+
+.variantUtility {
+  flex: 0 0 auto;
+  min-height: 1rem;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  font-weight: var(--acton-font-weight-utility);
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.variantUtility .content {
+  flex: 0 0 auto;
+  min-width: max-content;
+  gap: var(--acton-space-1);
+}
+
+.variantUtility .label {
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.variantUtility:hover:not(:disabled),
+.variantUtility:focus-visible {
+  color: var(--acton-color-text);
+}
+
+.variantUtility svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.variantAccent {
+  color: var(--acton-color-accent);
+}
+
+.variantAccent:hover:not(:disabled) {
+  color: var(--acton-color-accent-hover);
+}
+
+.variantDanger {
+  color: var(--acton-color-danger-text);
+}
+
+.variantDanger:hover:not(:disabled) {
+  color: var(--acton-color-danger-text-hover);
+}

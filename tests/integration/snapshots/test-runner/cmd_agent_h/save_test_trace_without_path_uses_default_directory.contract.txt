@@ -3,7 +3,7 @@
     "abi_schema_version": "1.0",
     "alias_instantiations": [],
     "compiler_name": "tolk",
-    "compiler_version": "1.4.1",
+    "compiler_version": "1.4.2",
     "contract_name": "",
     "declarations": [],
     "emitted_events": [],
@@ -69,7 +69,7 @@
         "file_id": 0,
         "file_name": "@stdlib/common.tolk",
         "imports": [],
-        "size_chars": 75177
+        "size_chars": 75314
       },
       {
         "file_id": 1,

@@ -13,19 +13,21 @@ import "@contracts/types"
 struct NftItem {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
 fun NftItem.fromStorage(
     storage: NftItemStorageNotInitialized,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): NftItem {
     val stateInit = ContractState {
         code: build("NftItem"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return NftItem { address, stateInit };
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+    return NftItem { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -41,7 +43,11 @@ fun NftItem.deploy(self, from: address, config: SendParams = {}): SendResultList
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }

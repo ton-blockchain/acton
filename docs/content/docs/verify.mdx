@@ -14,7 +14,7 @@ Prepare these inputs before running `acton verify`:
 
 - a [wallet configured in Acton](/docs/wallets) or a TON Connect wallet
 - a deployed `.tolk` contract that is defined in `Acton.toml`
-- enough Toncoin on the wallet to cover the final verification transaction when not using `--dry-run`; Acton sends `0.1 TON` plus normal wallet/network fees
+- enough GRAM on the wallet to cover the final verification transaction when not using `--dry-run`; Acton sends `0.1 GRAM` plus normal wallet/network fees
 
 Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
 
@@ -57,7 +57,7 @@ acton verify Counter --address EQDt7LL... --wallet deployer
 
 If exactly one wallet is configured, Acton selects it automatically. If multiple wallets are available and `--wallet` is omitted, Acton prompts for the selection.
 
-When `--dry-run` is not used, the final verification transaction sends `0.1 TON`. If the verifier backend reports that the same code hash is already verified, Acton exits successfully without sending another transaction.
+When `--dry-run` is not used, the final verification transaction sends `0.1 GRAM`. If the verifier backend reports that the same code hash is already verified, Acton exits successfully without sending another transaction.
 
 ## Use TON Connect for the verification transaction
 
@@ -79,7 +79,7 @@ acton verify Counter --address EQDt7LL... --dry-run
 
 `--dry-run` still compiles the contract, uploads the sources, and collects the required verifier signatures. It skips only the final blockchain transaction.
 
-Use this mode to confirm that the verifier backend accepts the source package before spending TON from the wallet.
+Use this mode to confirm that the verifier backend accepts the source package before spending GRAM from the wallet.
 
 ## Pin the compiler version
 

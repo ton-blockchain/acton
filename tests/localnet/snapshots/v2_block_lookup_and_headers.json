@@ -1,0 +1,114 @@
+{
+  "both_wrong_hashes": {
+    "code": 500,
+    "error": "root_hash mismatch",
+    "status": 500
+  },
+  "header": {
+    "after_merge": false,
+    "after_split": false,
+    "before_split": false,
+    "catchain_seqno": 0,
+    "global_id": -3,
+    "has_gen_utime": true,
+    "has_lt_range": true,
+    "is_key_block": false,
+    "min_ref_mc_seqno": 0,
+    "prev_key_block_seqno": 0,
+    "previous_seqnos": [
+      7
+    ],
+    "validator_list_hash_short": 0,
+    "version": 0,
+    "want_merge": false,
+    "want_split": false,
+    "workchain": 0
+  },
+  "lookup": {
+    "by_lt": true,
+    "by_seqno": true,
+    "by_time_is_at_or_after_fixture": true
+  },
+  "masterchain_header": {
+    "after_merge": false,
+    "after_split": false,
+    "before_split": false,
+    "catchain_seqno": 0,
+    "global_id": -3,
+    "has_gen_utime": true,
+    "has_lt_range": true,
+    "is_key_block": false,
+    "min_ref_mc_seqno": 7,
+    "prev_key_block_seqno": 0,
+    "previous_seqnos": [
+      7
+    ],
+    "validator_list_hash_short": 0,
+    "version": 0,
+    "want_merge": false,
+    "want_split": false,
+    "workchain": -1
+  },
+  "masterchain_transactions": {
+    "count": 0,
+    "incomplete": false,
+    "req_count": 2
+  },
+  "single_hash_is_lookup_hint": true,
+  "validation": [
+    {
+      "case": "missing selector",
+      "code": 422,
+      "error": "exactly one of seqno, lt, unixtime should be specified",
+      "status": 422
+    },
+    {
+      "case": "multiple selectors",
+      "code": 422,
+      "error": "exactly one of seqno, lt, unixtime should be specified",
+      "status": 422
+    },
+    {
+      "case": "zero seqno",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422
+    },
+    {
+      "case": "negative lt",
+      "code": 422,
+      "error": "lt should be non-negative",
+      "status": 422
+    },
+    {
+      "case": "lt i64 overflow",
+      "code": 422,
+      "error": "out of range integral type conversion attempted",
+      "status": 422
+    },
+    {
+      "case": "negative unixtime",
+      "code": 422,
+      "error": "unixtime should be non-negative",
+      "status": 422
+    },
+    {
+      "case": "unixtime i32 overflow",
+      "code": 422,
+      "error": "out of range integral type conversion attempted",
+      "status": 422
+    },
+    {
+      "case": "zero lt",
+      "code": 500,
+      "error": "Block not found for seqno=None, lt=Some(0), unixtime=None",
+      "status": 500
+    },
+    {
+      "case": "zero unixtime",
+      "code": 500,
+      "error": "Block not found for seqno=None, lt=None, unixtime=Some(0)",
+      "status": 500
+    }
+  ]
+}

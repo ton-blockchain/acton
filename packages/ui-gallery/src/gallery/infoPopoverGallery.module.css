@@ -1,0 +1,77 @@
+.samplePanel {
+  display: grid;
+  gap: var(--acton-space-3);
+  max-width: 34rem;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.infoRow {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.42fr) minmax(0, 1fr);
+  gap: var(--acton-space-4);
+  align-items: center;
+  min-width: 0;
+}
+
+.rowLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.rowValue {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.popoverTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.35;
+}
+
+.popoverText {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+.linkList {
+  display: grid;
+  gap: var(--acton-space-1);
+}
+
+.popoverLink {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: none;
+}
+
+.popoverLink:hover {
+  color: var(--acton-color-accent-hover);
+}
+
+@media (max-width: 520px) {
+  .samplePanel {
+    max-width: none;
+  }
+
+  .infoRow {
+    grid-template-columns: 1fr;
+    gap: var(--acton-space-1);
+  }
+}

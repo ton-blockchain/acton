@@ -1,0 +1,82 @@
+.container {
+  display: inline-flex;
+  flex-wrap: wrap;
+  row-gap: var(--acton-space-1);
+  font-size: var(--acton-font-size-compact);
+}
+
+.modeItem {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.constant {
+  color: var(--acton-color-accent);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
+}
+
+.interactiveConstant {
+  cursor: help;
+}
+
+.plus,
+.empty,
+.popoverDescription {
+  color: var(--acton-color-text-muted);
+}
+
+.plus {
+  margin-inline: var(--acton-space-1);
+}
+
+.empty {
+  font-size: var(--acton-font-size-compact);
+  font-style: italic;
+}
+
+.popoverDescription {
+  line-height: 1.4;
+}
+
+.codeReference {
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.codeLink {
+  color: var(--acton-color-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.codeLink:hover {
+  color: var(--acton-color-accent-hover);
+}
+
+.codeLink .codeReference {
+  color: inherit;
+}
+
+.popoverContent {
+  display: grid;
+  gap: var(--acton-space-2);
+  max-width: min(30rem, calc(100vw - 4rem));
+}
+
+.docsLink {
+  width: fit-content;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.docsLink:hover {
+  color: var(--acton-color-accent-hover);
+}

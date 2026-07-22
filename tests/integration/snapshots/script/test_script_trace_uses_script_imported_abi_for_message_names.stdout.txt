@@ -1,0 +1,5 @@
+  Installing standard library [ACTON_VERSION]
+N/A -> sender A
+└── ScriptOnlyTraceMsg 0.1 GRAM -> opaque_sink B                                gas=253
+    queryId: 17, amount: 30000000
+

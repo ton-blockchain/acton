@@ -13,24 +13,44 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::types_kernel::TyIdx;
+use tolk_source_map::SourceLocation;
 use ton::ton_wallet::TonWallet;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
-use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
+use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
 
 #[derive(Debug)]
 pub struct DebugStopRequested;
+
+// Keep in sync with `impl.treasuryCode()` in `lib/emulation/testing.tolk`.
+pub(crate) const TREASURY_CODE_BOC64: &str = "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe";
+
+static TREASURY_CODE_HASH: LazyLock<HashBytes> = LazyLock::new(|| {
+    let code =
+        Boc::decode_base64(TREASURY_CODE_BOC64).expect("testing.treasury code BoC must be valid");
+    code_lookup_hash(&code)
+});
+
+#[must_use]
+pub(crate) fn is_treasury_code_hash(code_hash: &HashBytes) -> bool {
+    code_hash == &*TREASURY_CODE_HASH
+}
+
+#[must_use]
+pub(crate) fn is_treasury_code(code: &Cell) -> bool {
+    is_treasury_code_hash(&code_lookup_hash(code))
+}
 
 impl std::fmt::Display for DebugStopRequested {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -87,6 +107,7 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
+    pub missing_libraries: Vec<String>,
     pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
@@ -391,6 +412,9 @@ pub(crate) fn compile_project_contract_with_cache(
                 code_boc64: cached.code_boc64,
                 code_hash_hex: cached.code_hash_hex,
                 source_map: cached.source_map,
+                debug_marks_base64: cached.debug_marks_base64,
+                symbol_types_json: cached.symbol_types_json,
+                debug_marks_json: cached.debug_marks_json,
                 abi: cached.abi,
             }
         } else {
@@ -466,6 +490,7 @@ pub struct Emulations {
     pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
     pub trace_position_by_tx_lt: FxHashMap<u64, TracePosition>,
     pub trace_names: FxHashMap<u64, String>,
+    pub traces_hidden_from_ui: FxHashSet<u64>,
     pub get_methods: Vec<GetMethodResultSuccess>,
 }
 
@@ -491,6 +516,15 @@ impl Emulations {
     pub fn trace_name(&self, trace_transactions: &[SendMessageResultSuccess]) -> Option<&str> {
         let root_lt = trace_transactions.first()?.transaction.lt;
         self.trace_names.get(&root_lt).map(String::as_str)
+    }
+
+    #[must_use]
+    pub fn is_trace_hidden_from_ui(&self, trace_transactions: &[SendMessageResultSuccess]) -> bool {
+        let Some(root_lt) = trace_transactions.first().map(|tx| tx.transaction.lt) else {
+            return false;
+        };
+
+        self.traces_hidden_from_ui.contains(&root_lt)
     }
 }
 
@@ -590,6 +624,7 @@ impl EmulationsState {
                 failed_messages: vec![],
                 trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
+                traces_hidden_from_ui: FxHashSet::default(),
                 get_methods: vec![],
             })
             .get_methods
@@ -601,14 +636,17 @@ impl EmulationsState {
             return;
         };
 
-        let trace_root_lt = emulations
-            .trace_position_by_tx_lt
-            .get(&lt)
-            .and_then(|position| emulations.messages.get(position.trace_index))
-            .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
-            .unwrap_or(lt);
-
+        let trace_root_lt = trace_root_lt_for(emulations, lt);
         emulations.trace_names.insert(trace_root_lt, trace_name);
+    }
+
+    pub fn hide_trace_from_ui(&mut self, env_name: &str, lt: u64) {
+        let Some(emulations) = self.results.get_mut(env_name) else {
+            return;
+        };
+
+        let trace_root_lt = trace_root_lt_for(emulations, lt);
+        emulations.traces_hidden_from_ui.insert(trace_root_lt);
     }
 
     #[must_use]
@@ -680,9 +718,19 @@ impl EmulationsState {
                 failed_messages: vec![],
                 trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
+                traces_hidden_from_ui: FxHashSet::default(),
                 get_methods: vec![],
             })
     }
+}
+
+fn trace_root_lt_for(emulations: &Emulations, lt: u64) -> u64 {
+    emulations
+        .trace_position_by_tx_lt
+        .get(&lt)
+        .and_then(|position| emulations.messages.get(position.trace_index))
+        .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
+        .unwrap_or(lt)
 }
 
 fn split_send_message_results(
@@ -935,6 +983,7 @@ pub struct Context<'a> {
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,
     pub network: Option<Network>,
+    pub execution_started_at: i64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -948,6 +997,7 @@ pub struct IoContext {
     pub stdout_buffer: String,
     pub stderr_buffer: String,
     pub capture_output: bool,
+    pub live_output: bool,
 }
 
 pub struct AssertsContext<'a> {
@@ -1083,12 +1133,12 @@ impl ChainContext<'_> {
     #[must_use]
     pub fn build_libs_with_hash_owner(&self, owner: &HashBytes) -> Dict<HashBytes, LibDescr> {
         let mut libs = Dict::<HashBytes, LibDescr>::new();
-        for lib in &self.world_state.libs() {
+        for (hash, lib) in self.world_state.libs() {
             let mut publishers = Dict::new();
             publishers.add(owner, ()).ok();
 
             libs.add(
-                lib.repr_hash(),
+                hash,
                 LibDescr {
                     lib: lib.clone(),
                     publishers,

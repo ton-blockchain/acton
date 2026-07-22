@@ -1,0 +1,85 @@
+.shapeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.shapeSample {
+  display: grid;
+  align-content: center;
+  min-height: 7rem;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.shapeSample span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.textBlock,
+.tableFrame,
+.cardList {
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.textBlock {
+  max-width: 42rem;
+}
+
+.tableFrame,
+.cardList {
+  display: grid;
+  min-width: 0;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) 7rem auto;
+  gap: var(--acton-space-4);
+  align-items: center;
+  min-height: 3rem;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.tableRow:last-child,
+.cardRow:last-child {
+  border-bottom: 0;
+}
+
+.cardRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--acton-space-4);
+  align-items: center;
+  min-height: 4.5rem;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.cardMain {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+@media (max-width: 640px) {
+  .shapeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableRow {
+    grid-template-columns: 3rem minmax(0, 1fr);
+  }
+
+  .tableRow > :nth-child(n + 3),
+  .cardRow > :last-child {
+    display: none;
+  }
+}

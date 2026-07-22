@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -58,9 +58,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive
@@ -98,15 +98,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Restore Playwright cache
+        id: test-ui-e2e-playwright-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-test-ui-e2e-playwright-cache-path |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-playwright-
+
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
           CC: clang-16
           CXX: clang++-16
         # language=Bash
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
@@ -114,6 +125,21 @@ jobs:
       - name: Test acton binary
         run: |
           acton --help
+
+      - name: Run Test UI E2E
+        id: test-ui-e2e
+        env:
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
+        run: just test-ui-e2e-run
+
+      - name: Upload Test UI E2E artifacts
+        if: failure() && steps.test-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-ui-e2e-results
+          path: test-results/acton-test-ui-e2e
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Run tests
         run: |
@@ -125,6 +151,13 @@ jobs:
         with:
           path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+
+      - name: Save Playwright cache
+        if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-test-ui-e2e-playwright-cache-path
+          key: ${{ steps.test-ui-e2e-playwright-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -163,7 +196,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -177,9 +210,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.46.1
+          tool: just@1.52.0,cargo-shear@1.13.1,typos@1.47.2
           fallback: none
 
       - name: Download TON objects archive
@@ -210,14 +243,14 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0
+          tool: just@1.52.0
           fallback: none
 
       - name: Setup Bun
@@ -266,7 +299,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -280,9 +313,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive
@@ -311,12 +344,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
@@ -377,36 +411,6 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
-
-      - name: Delete download artifacts
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ github.token }}
-          # language=JavaScript
-          script: |
-            const {
-              data: artifacts,
-            } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-
-            if (artifacts.total_count === 0) {
-              core.warning('No downloadable artifacts to delete');
-              return;
-            } else {
-              core.info(`Found ${artifacts.total_count} artifacts to delete`);
-            }
-
-            for (const artifact of artifacts.artifacts) {
-              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-              });
-            }
 
       - name: Display structure of downloaded files
         run: ls -lhR artifacts

@@ -9,8 +9,8 @@ import "@wrappers/SimpleExtension.gen"
 import "@wrappers/WalletV5.gen"
 import "@wrappers/utils"
 
-const EXTENSION_DEPLOY_VALUE = ton("1")
-const SUBSCRIPTION_AMOUNT = ton("0.25")
+const EXTENSION_DEPLOY_VALUE = grams("1")
+const SUBSCRIPTION_AMOUNT = grams("0.25")
 const PAYMENT_INTERVAL = 3600
 const TEST_START_TIME = 1000
 
@@ -73,7 +73,7 @@ get fun `test extension: enforces payment interval`() {
 get fun `test admin: cancels subscription and removes extension from wallet`() {
     val (wallet, admin, extension) = setupInstalledExtension();
 
-    val receipt = extension.sendCancelSubscription(admin.address, 11, { value: ton("0.1") });
+    val receipt = extension.sendCancelSubscription(admin.address, 11, { value: grams("0.1") });
 
     expect(receipt).toHaveSuccessfulTx<CancelSubscription>({
         from: admin.address,

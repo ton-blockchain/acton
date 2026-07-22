@@ -15,13 +15,13 @@
   ✓ formatter fanout chain println [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmFanKick 0.5 TON -> fm_fanout_root B                                       gas=3108
+       └── FmFanKick 0.5 GRAM -> fm_fanout_root B                                      gas=3108
            │   queryId: 202
-           │   left: [WALLET_ADDRESS_BASE] (fm_fanout_left)
-           │   right: [WALLET_ADDRESS_BASE] (fm_fanout_right)
-           ├── FmLeftNotice 0.099933333 TON -> fm_fanout_left C                        gas=333
+           │   left: [WALLET_ADDRESS_BASE] (fm_fanout_left C)
+           │   right: [WALLET_ADDRESS_BASE] (fm_fanout_right D)
+           ├── FmLeftNotice 0.099933333 GRAM -> fm_fanout_left C                       gas=333
            │   queryId: 202
-           └── FmRightNotice 0.1 TON -> fm_fanout_right D                              gas=437
+           └── FmRightNotice 0.1 GRAM -> fm_fanout_right D                             gas=437
                queryId: 202
 
  ✓ 1 passed in 1 file

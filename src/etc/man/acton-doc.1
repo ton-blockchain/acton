@@ -4,15 +4,40 @@
 .ad l
 .ss \n[.ss] 0
 .SH "NAME"
-acton\-doc \[em] Look up built\-in reference documentation from the CLI
+acton\-doc \[em] Look up reference documentation and contract ABIs from the CLI
 .SH "SYNOPSIS"
 \fBacton doc\fR [\fIoptions\fR] \fIcommand\fR
 .SH "DESCRIPTION"
-Look up built\-in reference documentation from the terminal.
+Look up reference documentation from the terminal.
 .sp
-At the moment, \fBacton doc\fR provides TVM instruction lookup through the \fBtvm\fR
-subcommand.
+\fBacton doc\fR provides contract ABI lookup through the \fBabi\fR subcommand and TVM
+instruction lookup through the \fBtvm\fR subcommand.
 .SH "SUBCOMMANDS"
+.SS "acton doc abi"
+Print compiler ABI JSON for a local or bundled contract.
+.SS "Synopsis"
+\fBacton doc abi\fR \fIcontract\fR
+.SS "Options"
+.sp
+\fIcontract\fR
+.RS 4
+Contract name, local contract id, or bundled catalog name.
+.RE
+.SS "Behavior"
+\fBacton doc abi\fR first looks at local contracts from \fBActon.toml\fR, then falls
+back to the bundled ABI catalog.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'local lookup accepts the contract id, display name, or ABI contract name
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'bundled catalog lookup accepts the catalog display name or ABI contract name
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'output is always formatted compiler ABI JSON
+.RE
 .SS "acton doc tvm"
 Lookup TVM instructions by exact name or fuzzy search query.
 .SS "Synopsis"
@@ -84,11 +109,14 @@ With \fB\-\-find\fR, each argument is treated as a search query.
 Currently available documentation namespaces:
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBabi\fR
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fBtvm\fR
 .RE
 .sp
-Additional namespaces may be added in future releases; \fBacton doc tvm\fR is the
-current built\-in reference surface.
+Additional namespaces may be added in future releases.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -164,6 +192,17 @@ acton doc tvm outcomng \-\-find \-\-description
 .nf
 acton doc tvm SENDRAWMSG
 acton doc tvm SENRAWMSG \-\-find
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Print contract ABI:
+.sp
+.RS 4
+.nf
+acton doc abi WalletV4r2
+acton doc abi counter
 .fi
 .RE
 .RE

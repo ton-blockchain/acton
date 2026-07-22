@@ -1,0 +1,6 @@
+BasicReply {
+    ok: true,
+    title: "hello",
+    owner: [WALLET_ADDRESS_BASE],
+    maybeOwner: null,
+}

@@ -1,4 +1,4 @@
-tolk 1.4.1
+tolk 1.4.2
 
 import "@stdlib/gas-payments"
 
@@ -17,7 +17,7 @@ fun onInternalMessage(in: InMessage) {
     val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation) +
     calculateStorageFee(MASTERCHAIN, DEFAULT_DURATION, libraryBits, libraryRefs);
 
-    reserveToncoinsOnBalance(toReserve, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(toReserve, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val excessesMessage = createMessage({
         dest: in.senderAddress,

@@ -82,6 +82,18 @@ network.
 
 {{#option "`--fork-block-number` _seqno_" }}
 Historical block sequence number to fork from.
+
+When a fork block number is set, Acton caches resolved remote accounts under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
+runs with the same fork network, block number, and address read that file before
+calling the remote API.
+{{/option}}
+
+{{#option "`--no-fork-cache`" }}
+Disable persistent account cache for pinned fork block numbers. Use this when
+you want every script run to fetch forked accounts from the remote API. The
+regular `--clear-cache` flag removes this cache together with the rest of
+`build/cache`.
 {{/option}}
 
 {{/options}}
@@ -177,10 +189,11 @@ Forwarded arguments are parsed against the ABI for `main()`.
 - `bool` accepts `true` and `false`
 - nullable supported types accept `null`
 - `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
 - arrays accept `[item1, item2]`
 
 Unsupported parameter types currently include `structs`, `tuple`, `map`,
-`dict`, `builder`, `any_address` and other complex types.
+`dict`, `builder` and other complex types.
 
 ## Side Effects
 
@@ -232,13 +245,19 @@ When a script can affect on-chain state, the usual safe sequence is:
    TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
    ```
 
-5. Broadcast a deploy flow and print explorer links:
+5. Run against a protected localnet:
+
+   ```bash
+   ACTON_LOCALNET_AUTH_TOKEN=localnet-token acton script scripts/deploy.tolk --net localnet
+   ```
+
+6. Broadcast a deploy flow and print explorer links:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
 
-6. Broadcast through TON Connect instead of local wallet keys:
+7. Broadcast through TON Connect instead of local wallet keys:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --tonconnect
@@ -248,6 +267,9 @@ When a script can affect on-chain state, the usual safe sequence is:
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Protected `localnet` requests read `ACTON_LOCALNET_AUTH_TOKEN`. Use the token
+printed by `acton localnet start --require-auth`.
 
 For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
 names are uppercased and non-alphanumeric characters are replaced with `_`, so
