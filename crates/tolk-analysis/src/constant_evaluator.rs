@@ -292,9 +292,7 @@ impl<'a> ConstantEvaluator<'a> {
         let value = argument.content(source);
 
         match name {
-            "grams" | "ton" => {
-                parse_nanotons(value).map_or(ConstantValue::Unknown, ConstantValue::Int)
-            }
+            "grams" | "ton" => parse_nanograms(value),
             "stringCrc32" => evaluate_string_function("crc32", value),
             "stringCrc16" => evaluate_string_function("crc16", value),
             "stringSha256" => evaluate_string_function("sha256", value),
@@ -449,31 +447,40 @@ fn evaluate_string_function(name: &str, value: &str) -> ConstantValue {
     }
 }
 
-fn parse_nanotons(value: &str) -> Option<BigInt> {
+fn parse_nanograms(value: &str) -> ConstantValue {
     let (negative, value) = if let Some(value) = value.strip_prefix('-') {
         (true, value)
     } else {
         (false, value.strip_prefix('+').unwrap_or(value))
     };
     let mut parts = value.split('.');
-    let integer = parts.next()?;
+    let Some(integer) = parts.next() else {
+        return ConstantValue::Unknown;
+    };
     let fractional = parts.next().unwrap_or("");
     if parts.next().is_some()
         || integer.is_empty()
-        || integer.len() > 9
         || fractional.len() > 9
         || !integer.bytes().all(|byte| byte.is_ascii_digit())
         || !fractional.bytes().all(|byte| byte.is_ascii_digit())
     {
-        return None;
+        return ConstantValue::Unknown;
+    }
+    if integer.len() > 9 {
+        return ConstantValue::Overflow;
     }
 
-    let integer = integer.parse::<i64>().ok()?;
+    let Ok(integer) = integer.parse::<i64>() else {
+        return ConstantValue::Unknown;
+    };
     let fractional = if fractional.is_empty() {
         0
     } else {
-        fractional.parse::<i64>().ok()? * 10_i64.pow(9 - fractional.len() as u32)
+        let Ok(parsed_fractional) = fractional.parse::<i64>() else {
+            return ConstantValue::Unknown;
+        };
+        parsed_fractional * 10_i64.pow(9 - fractional.len() as u32)
     };
     let nanotons = BigInt::from(integer * 1_000_000_000 + fractional);
-    Some(if negative { -nanotons } else { nanotons })
+    ConstantValue::Int(if negative { -nanotons } else { nanotons })
 }

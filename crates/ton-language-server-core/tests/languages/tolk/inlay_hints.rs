@@ -336,6 +336,11 @@ fn evaluates_constants_like_tolk_compiler() {
             const GRAMS = grams("1.5")
             const NEGATIVE_GRAMS = grams("-1.5")
             const ONE_NANOGRAM = grams("0.000000001")
+            const PLUS_GRAMS = grams("+321.123456798")
+            const PADDED_GRAMS = grams("0001.1000")
+            const TRAILING_DOT_GRAMS = grams("1.")
+            const GRAMS_OVERFLOW = grams("1000000000")
+            const INVALID_GRAMS = grams("0.0.0")
             const TEXT = "hello"
             const TEXT_ALIAS = TEXT
             const CRC_METHOD = "hello".crc32()
@@ -367,6 +372,11 @@ fn evaluates_constants_like_tolk_compiler() {
             const GRAMS/* : coins */ = grams(/* floatString: */"1.5")/* = 1500000000 (0x59682F00) */
             const NEGATIVE_GRAMS/* : coins */ = grams(/* floatString: */"-1.5")/* = 0x-59682F00 */
             const ONE_NANOGRAM/* : coins */ = grams(/* floatString: */"0.000000001")/* = 1 (0x1) */
+            const PLUS_GRAMS/* : coins */ = grams(/* floatString: */"+321.123456798")/* = 0x4AC473171E */
+            const PADDED_GRAMS/* : coins */ = grams(/* floatString: */"0001.1000")/* = 1100000000 (0x4190AB00) */
+            const TRAILING_DOT_GRAMS/* : coins */ = grams(/* floatString: */"1.")/* = 1000000000 (0x3B9ACA00) */
+            const GRAMS_OVERFLOW/* : coins */ = grams(/* floatString: */"1000000000")/* = overflow */
+            const INVALID_GRAMS/* : coins */ = grams(/* floatString: */"0.0.0")
             const TEXT/* : string */ = "hello"
             const TEXT_ALIAS/* : string */ = TEXT/* = "hello" */
             const CRC_METHOD/* : int */ = "hello".crc32()/* = 907060870 (0x3610A686) */
