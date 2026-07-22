@@ -1,6 +1,7 @@
 name: Build verifier Docker image
 
 on:
+  pull_request:
   workflow_dispatch:
 
 concurrency:
