@@ -21,6 +21,8 @@ pub trait ConstantEvaluationContext {
 pub enum ConstantValue {
     Int(BigInt),
     Bool(bool),
+    String(String),
+    Overflow,
     Unknown,
 }
 
@@ -39,6 +41,8 @@ impl ConstantValue {
             }
             Self::Int(value) => format!("0x{}", value.to_str_radix(16).to_uppercase()),
             Self::Bool(value) => value.to_string(),
+            Self::String(value) => format!("{value:?}"),
+            Self::Overflow => "overflow".to_owned(),
             Self::Unknown => "unknown".to_owned(),
         }
     }
@@ -160,9 +164,9 @@ impl<'a> ConstantEvaluator<'a> {
         for (member, member_symbol) in body.members().zip(members) {
             let value = member.default().map_or_else(
                 || {
-                    previous.as_ref().map_or(ConstantValue::Unknown, |value| {
-                        ConstantValue::Int(value + 1)
-                    })
+                    previous
+                        .as_ref()
+                        .map_or(ConstantValue::Unknown, |value| checked_integer(value + 1))
                 },
                 |expression| {
                     normalize_enum_value(self.evaluate_expression(
@@ -174,7 +178,10 @@ impl<'a> ConstantEvaluator<'a> {
             );
             previous = match &value {
                 ConstantValue::Int(value) => Some(value.clone()),
-                ConstantValue::Bool(_) | ConstantValue::Unknown => None,
+                ConstantValue::Bool(_)
+                | ConstantValue::String(_)
+                | ConstantValue::Overflow
+                | ConstantValue::Unknown => None,
             };
             values.insert(member_symbol.id, value);
         }
@@ -191,6 +198,7 @@ impl<'a> ConstantEvaluator<'a> {
         match expression {
             Expr::NumberLit(literal) => parse_integer(literal.text(source)),
             Expr::BoolLit(literal) => ConstantValue::Bool(literal.value()),
+            Expr::StringLit(literal) => ConstantValue::String(literal.content(source).to_owned()),
             Expr::Ident(identifier) => self.evaluate_reference(file_id, identifier.span()),
             Expr::DotAccess(access) => access.field().map_or(ConstantValue::Unknown, |field| {
                 self.evaluate_reference(file_id, field.span())
@@ -219,7 +227,7 @@ impl<'a> ConstantEvaluator<'a> {
             Expr::AsCast(cast) => cast.expr().map_or(ConstantValue::Unknown, |inner| {
                 self.evaluate_expression(file_id, inner, source)
             }),
-            Expr::Call(call) => evaluate_compile_time_call(call, source),
+            Expr::Call(call) => self.evaluate_compile_time_call(file_id, call, source),
             _ => ConstantValue::Unknown,
         }
     }
@@ -235,6 +243,63 @@ impl<'a> ConstantEvaluator<'a> {
         match symbol.kind {
             SymbolKind::Constant => self.evaluate_constant(symbol_id),
             SymbolKind::EnumMember => self.evaluate_enum_member(symbol_id),
+            _ => ConstantValue::Unknown,
+        }
+    }
+
+    fn evaluate_compile_time_call(
+        &mut self,
+        file_id: FileId,
+        call: tolk_syntax::Call<'_>,
+        source: &str,
+    ) -> ConstantValue {
+        let Some(callee) = call.callee_identifier() else {
+            return ConstantValue::Unknown;
+        };
+        let name = callee.utf8_text(source.as_bytes()).unwrap_or("");
+
+        if let Some(receiver) = call.callee_qualifier() {
+            let mut arguments = call.arguments();
+            let value = if matches!(&receiver, Expr::Ident(identifier) if identifier.text(source) == "string")
+            {
+                let Some(argument) = arguments.next().and_then(|argument| argument.expr()) else {
+                    return ConstantValue::Unknown;
+                };
+                if arguments.next().is_some() {
+                    return ConstantValue::Unknown;
+                }
+                self.evaluate_expression(file_id, argument, source)
+            } else {
+                if arguments.next().is_some() {
+                    return ConstantValue::Unknown;
+                }
+                self.evaluate_expression(file_id, receiver, source)
+            };
+            let ConstantValue::String(value) = value else {
+                return ConstantValue::Unknown;
+            };
+            return evaluate_string_function(name, &value);
+        }
+
+        let mut arguments = call.arguments();
+        let Some(Expr::StringLit(argument)) = arguments.next().and_then(|argument| argument.expr())
+        else {
+            return ConstantValue::Unknown;
+        };
+        if arguments.next().is_some() {
+            return ConstantValue::Unknown;
+        }
+        let value = argument.content(source);
+
+        match name {
+            "grams" | "ton" => {
+                parse_nanotons(value).map_or(ConstantValue::Unknown, ConstantValue::Int)
+            }
+            "stringCrc32" => evaluate_string_function("crc32", value),
+            "stringCrc16" => evaluate_string_function("crc16", value),
+            "stringSha256" => evaluate_string_function("sha256", value),
+            "stringSha256_32" => evaluate_string_function("sha256_32", value),
+            "stringToBase256" => evaluate_string_function("toBase256", value),
             _ => ConstantValue::Unknown,
         }
     }
@@ -261,7 +326,7 @@ fn parse_integer(text: &str) -> ConstantValue {
 fn checked_integer(value: BigInt) -> ConstantValue {
     let limit = BigInt::from(1u8) << 256;
     if value < -&limit || value >= limit {
-        ConstantValue::Unknown
+        ConstantValue::Overflow
     } else {
         ConstantValue::Int(value)
     }
@@ -272,75 +337,81 @@ fn normalize_enum_value(value: ConstantValue) -> ConstantValue {
         ConstantValue::Int(value) => ConstantValue::Int(value),
         ConstantValue::Bool(true) => ConstantValue::Int(BigInt::from(-1)),
         ConstantValue::Bool(false) => ConstantValue::Int(BigInt::ZERO),
-        ConstantValue::Unknown => ConstantValue::Unknown,
+        ConstantValue::String(_) | ConstantValue::Unknown => ConstantValue::Unknown,
+        ConstantValue::Overflow => ConstantValue::Overflow,
     }
 }
 
 fn apply_binary(operator: &str, left: ConstantValue, right: ConstantValue) -> ConstantValue {
-    if matches!(operator, "==" | "!=" | "<" | ">" | "<=" | ">=") {
-        return apply_comparison(operator, &left, &right);
+    if matches!(&left, ConstantValue::Overflow) || matches!(&right, ConstantValue::Overflow) {
+        return ConstantValue::Overflow;
     }
 
     if let (ConstantValue::Int(left), ConstantValue::Int(right)) = (&left, &right) {
-        let value = match operator {
-            "+" => left + right,
-            "-" => left - right,
-            "*" => left * right,
-            "/" if !right.is_zero() => left / right,
-            "%" if !right.is_zero() => left % right,
-            "<<" | ">>" => {
-                let Some(shift) = right.to_usize().filter(|shift| *shift <= 256) else {
-                    return ConstantValue::Unknown;
-                };
-                if operator == "<<" {
-                    left << shift
+        return match operator {
+            "+" => checked_integer(left + right),
+            "-" => checked_integer(left - right),
+            "*" => checked_integer(left * right),
+            "/" if !right.is_zero() => {
+                let quotient = left / right;
+                let remainder = left % right;
+                if !remainder.is_zero() && remainder.sign() != right.sign() {
+                    checked_integer(quotient - 1)
                 } else {
-                    left >> shift
+                    checked_integer(quotient)
                 }
             }
-            "&" => left & right,
-            "|" => left | right,
-            "^" => left ^ right,
-            _ => return ConstantValue::Unknown,
+            "%" if !right.is_zero() => {
+                let remainder = left % right;
+                if !remainder.is_zero() && remainder.sign() != right.sign() {
+                    checked_integer(remainder + right)
+                } else {
+                    checked_integer(remainder)
+                }
+            }
+            "/" | "%" => ConstantValue::Overflow,
+            "<<" | ">>" => {
+                let Some(shift) = right.to_usize().filter(|shift| *shift <= 256) else {
+                    return ConstantValue::Overflow;
+                };
+                if operator == "<<" {
+                    checked_integer(left << shift)
+                } else {
+                    checked_integer(left >> shift)
+                }
+            }
+            "&" => checked_integer(left & right),
+            "|" => checked_integer(left | right),
+            "^" => checked_integer(left ^ right),
+            "&&" => ConstantValue::Bool(!left.is_zero() && !right.is_zero()),
+            "||" => ConstantValue::Bool(!left.is_zero() || !right.is_zero()),
+            "==" => ConstantValue::Bool(left == right),
+            "!=" => ConstantValue::Bool(left != right),
+            "<" => ConstantValue::Bool(left < right),
+            ">" => ConstantValue::Bool(left > right),
+            "<=" => ConstantValue::Bool(left <= right),
+            ">=" => ConstantValue::Bool(left >= right),
+            _ => ConstantValue::Unknown,
         };
-        return checked_integer(value);
     }
 
-    match operator {
-        "&&" => match (to_bool(&left), to_bool(&right)) {
-            (Some(left), Some(right)) => ConstantValue::Bool(left && right),
+    if let (ConstantValue::Bool(left), ConstantValue::Bool(right)) = (&left, &right) {
+        return match operator {
+            "&" | "&&" => ConstantValue::Bool(*left && *right),
+            "|" | "||" => ConstantValue::Bool(*left || *right),
+            "^" => ConstantValue::Bool(*left ^ *right),
+            "==" => ConstantValue::Bool(left == right),
+            "!=" => ConstantValue::Bool(left != right),
             _ => ConstantValue::Unknown,
-        },
-        "||" => match (to_bool(&left), to_bool(&right)) {
-            (Some(left), Some(right)) => ConstantValue::Bool(left || right),
-            _ => ConstantValue::Unknown,
-        },
-        _ => apply_comparison(operator, &left, &right),
+        };
     }
-}
 
-fn apply_comparison(operator: &str, left: &ConstantValue, right: &ConstantValue) -> ConstantValue {
-    match operator {
-        "==" => ConstantValue::Bool(left == right),
-        "!=" => ConstantValue::Bool(left != right),
-        "<" | ">" | "<=" | ">=" => {
-            let (ConstantValue::Int(left), ConstantValue::Int(right)) = (left, right) else {
-                return ConstantValue::Unknown;
-            };
-            ConstantValue::Bool(match operator {
-                "<" => left < right,
-                ">" => left > right,
-                "<=" => left <= right,
-                ">=" => left >= right,
-                _ => unreachable!(),
-            })
-        }
-        _ => ConstantValue::Unknown,
-    }
+    ConstantValue::Unknown
 }
 
 fn apply_unary(operator: &str, argument: ConstantValue) -> ConstantValue {
     match (operator, argument) {
+        (_, ConstantValue::Overflow) => ConstantValue::Overflow,
         ("!", argument) => {
             to_bool(&argument).map_or(ConstantValue::Unknown, |value| ConstantValue::Bool(!value))
         }
@@ -355,36 +426,54 @@ fn to_bool(value: &ConstantValue) -> Option<bool> {
     match value {
         ConstantValue::Bool(value) => Some(*value),
         ConstantValue::Int(value) => Some(!value.is_zero()),
-        ConstantValue::Unknown => None,
+        ConstantValue::String(_) | ConstantValue::Overflow | ConstantValue::Unknown => None,
     }
 }
 
-fn evaluate_compile_time_call(call: tolk_syntax::Call<'_>, source: &str) -> ConstantValue {
-    let Some(callee) = call.callee_identifier() else {
-        return ConstantValue::Unknown;
-    };
-    let name = callee.text(source);
-    let Some(Expr::StringLit(argument)) = call.arguments().next().and_then(|arg| arg.expr()) else {
-        return ConstantValue::Unknown;
-    };
-    let value = argument.content(source);
-
+fn evaluate_string_function(name: &str, value: &str) -> ConstantValue {
     match name {
-        "stringCrc32" => ConstantValue::Int(BigInt::from(crc32(value.as_bytes()))),
-        "stringCrc16" => ConstantValue::Int(BigInt::from(crc16(value.as_bytes()))),
-        "stringSha256" => ConstantValue::Int(BigInt::from_bytes_be(
+        "crc32" => ConstantValue::Int(BigInt::from(crc32(value.as_bytes()))),
+        "crc16" => ConstantValue::Int(BigInt::from(crc16(value.as_bytes()))),
+        "sha256" => ConstantValue::Int(BigInt::from_bytes_be(
             Sign::Plus,
             &Sha256::digest(value.as_bytes()),
         )),
-        "stringSha256_32" => {
+        "sha256_32" => {
             let digest = Sha256::digest(value.as_bytes());
             ConstantValue::Int(BigInt::from(u32::from_be_bytes([
                 digest[0], digest[1], digest[2], digest[3],
             ])))
         }
-        "stringToBase256" => {
-            ConstantValue::Int(BigInt::from_bytes_be(Sign::Plus, value.as_bytes()))
-        }
+        "toBase256" => checked_integer(BigInt::from_bytes_be(Sign::Plus, value.as_bytes())),
         _ => ConstantValue::Unknown,
     }
+}
+
+fn parse_nanotons(value: &str) -> Option<BigInt> {
+    let (negative, value) = if let Some(value) = value.strip_prefix('-') {
+        (true, value)
+    } else {
+        (false, value.strip_prefix('+').unwrap_or(value))
+    };
+    let mut parts = value.split('.');
+    let integer = parts.next()?;
+    let fractional = parts.next().unwrap_or("");
+    if parts.next().is_some()
+        || integer.is_empty()
+        || integer.len() > 9
+        || fractional.len() > 9
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || !fractional.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+
+    let integer = integer.parse::<i64>().ok()?;
+    let fractional = if fractional.is_empty() {
+        0
+    } else {
+        fractional.parse::<i64>().ok()? * 10_i64.pow(9 - fractional.len() as u32)
+    };
+    let nanotons = BigInt::from(integer * 1_000_000_000 + fractional);
+    Some(if negative { -nanotons } else { nanotons })
 }

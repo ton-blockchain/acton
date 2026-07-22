@@ -314,6 +314,72 @@ fn evaluates_compile_time_functions_and_skips_cycles() {
 }
 
 #[test]
+fn evaluates_constants_like_tolk_compiler() {
+    case_tolk_inlay_hints(
+        r#"
+            const NEG_DIV = -5 / 2
+            const NEG_MOD = -5 % 2
+            const POS_NEG_DIV = 5 / -2
+            const POS_NEG_MOD = 5 % -2
+            const NEG_NEG_DIV = -5 / -2
+            const NEG_NEG_MOD = -5 % -2
+            const INT_AND = 2 && 3
+            const INT_OR = 0 || -1
+            const BOOL_AND = true & false
+            const BOOL_OR = true | false
+            const BOOL_XOR = true ^ false
+            const ADD_OVERFLOW = (1 << 255) + (1 << 255)
+            const DIVISION_BY_ZERO = 1 / 0
+            const SHIFT_OVERFLOW = 1 >> 257
+
+            const NANOTONS = ton("1.5")
+            const GRAMS = grams("1.5")
+            const NEGATIVE_GRAMS = grams("-1.5")
+            const ONE_NANOGRAM = grams("0.000000001")
+            const TEXT = "hello"
+            const TEXT_ALIAS = TEXT
+            const CRC_METHOD = "hello".crc32()
+            const CRC_CONST_METHOD = TEXT.crc32()
+            const CRC_STATIC_METHOD = string.crc32("hello")
+
+            fun runtime(): int { return 1 }
+            const UNKNOWN_EQUALITY = runtime() == runtime()
+            const TOO_MANY_ARGS = stringCrc32("hello", "ignored")
+        "#,
+        full_document_range(),
+        expect![[r#"
+            const NEG_DIV/* : int */ = -5 / 2/* = 0x-3 */
+            const NEG_MOD/* : int */ = -5 % 2/* = 1 (0x1) */
+            const POS_NEG_DIV/* : int */ = 5 / -2/* = 0x-3 */
+            const POS_NEG_MOD/* : int */ = 5 % -2/* = 0x-1 */
+            const NEG_NEG_DIV/* : int */ = -5 / -2/* = 2 (0x2) */
+            const NEG_NEG_MOD/* : int */ = -5 % -2/* = 0x-1 */
+            const INT_AND/* : bool */ = 2 && 3/* = true */
+            const INT_OR/* : bool */ = 0 || -1/* = true */
+            const BOOL_AND/* : bool */ = true & false/* = false */
+            const BOOL_OR/* : bool */ = true | false/* = true */
+            const BOOL_XOR/* : bool */ = true ^ false/* = true */
+            const ADD_OVERFLOW/* : int */ = (1 << 255) + (1 << 255)/* = overflow */
+            const DIVISION_BY_ZERO/* : int */ = 1 / 0/* = overflow */
+            const SHIFT_OVERFLOW/* : int */ = 1 >> 257/* = overflow */
+
+            const NANOTONS/* : coins */ = ton("1.5")/* = 1500000000 (0x59682F00) */
+            const GRAMS/* : coins */ = grams(/* floatString: */"1.5")/* = 1500000000 (0x59682F00) */
+            const NEGATIVE_GRAMS/* : coins */ = grams(/* floatString: */"-1.5")/* = 0x-59682F00 */
+            const ONE_NANOGRAM/* : coins */ = grams(/* floatString: */"0.000000001")/* = 1 (0x1) */
+            const TEXT/* : string */ = "hello"
+            const TEXT_ALIAS/* : string */ = TEXT/* = "hello" */
+            const CRC_METHOD/* : int */ = "hello".crc32()/* = 907060870 (0x3610A686) */
+            const CRC_CONST_METHOD/* : int */ = TEXT.crc32()/* = 907060870 (0x3610A686) */
+            const CRC_STATIC_METHOD/* : int */ = string.crc32("hello")/* = 907060870 (0x3610A686) */
+
+            fun runtime(): int { return 1 }
+            const UNKNOWN_EQUALITY/* : bool */ = runtime() == runtime()
+            const TOO_MANY_ARGS/* : int */ = stringCrc32("hello", "ignored")"#]],
+    );
+}
+
+#[test]
 fn evaluates_operators_and_casts() {
     case_tolk_inlay_hints(
         r"
@@ -372,6 +438,11 @@ fn evaluates_enum_values_like_tolk() {
                 Reset = 7,
                 Last,
             }
+
+            enum Overflowing {
+                Max = 115792089237316195423570985008687907853269984665640564039457584007913129639935,
+                Next,
+            }
         ",
         full_document_range(),
         expect![[r#"
@@ -411,6 +482,11 @@ fn evaluates_enum_values_like_tolk() {
                 After,
                 Reset = 7,
                 Last/* = 8 */,
+            }
+
+            enum Overflowing {
+                Max = 115792089237316195423570985008687907853269984665640564039457584007913129639935,
+                Next/* = overflow */,
             }"#]],
     );
 }

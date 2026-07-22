@@ -440,10 +440,14 @@ fn collect_enum_value_hints(
     let values = evaluator.evaluate_enum_values(symbol.id)?;
 
     for (member, member_symbol) in body.members().zip(members) {
-        let Some(ConstantValue::Int(value)) = values.get(&member_symbol.id) else {
+        let Some(value) = values.get(&member_symbol.id) else {
             continue;
         };
-        let value = value.to_string();
+        let value = match value {
+            ConstantValue::Int(value) => value.to_string(),
+            ConstantValue::Overflow => "overflow".to_owned(),
+            _ => continue,
+        };
         let explicit_value = member.default();
         if explicit_value
             .is_some_and(|expression| expression.text(builder.document.text()) == value)
