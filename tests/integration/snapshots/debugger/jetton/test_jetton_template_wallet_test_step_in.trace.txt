@@ -205,11 +205,11 @@ Step 15 (step_in):
 
 Step 16 (step_in):
   Code:
-     23| ): JettonMinter {
-     24|     val stateInit = ContractState {
-     25|         code: build("JettonMinter"),
+     24| ): JettonMinter {
+     25|     val stateInit = ContractState {
+     26|         code: build("JettonMinter"),
                              ^^^^^^^^^^^^^^
-     26|         data: storage.toCell(),
+     27|         data: storage.toCell(),
   Variables:
     storage: MinterStorage
       totalSupply: coins = 0
@@ -223,11 +223,11 @@ Step 16 (step_in):
 
 Step 17 (step_in):
   Code:
-     24|     val stateInit = ContractState {
-     25|         code: build("JettonMinter"),
-     26|         data: storage.toCell(),
+     25|     val stateInit = ContractState {
+     26|         code: build("JettonMinter"),
+     27|         data: storage.toCell(),
                        ^^^^^^^^^^^^^^^^
-     27|     };
+     28|     };
   Variables:
     storage: MinterStorage
       totalSupply: coins = 0
@@ -241,11 +241,11 @@ Step 17 (step_in):
 
 Step 18 (step_in):
   Code:
-     22|     workchain: int8 = BASECHAIN,
-     23| ): JettonMinter {
-     24|     val stateInit = ContractState {
+     23|     workchain: int8 = BASECHAIN,
+     24| ): JettonMinter {
+     25|     val stateInit = ContractState {
                  ^^^^^^^^^
-     25|         code: build("JettonMinter"),
+     26|         code: build("JettonMinter"),
   Variables:
     storage: MinterStorage = (last seen)
       totalSupply: coins = 0
@@ -259,11 +259,11 @@ Step 18 (step_in):
 
 Step 19 (step_in):
   Code:
-     26|         data: storage.toCell(),
-     27|     };
-     28|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+     27|         data: storage.toCell(),
+     28|     };
+     29|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
                                                ^^^^^^^^^
-     29|     return JettonMinter { address, stateInit };
+     30|     return JettonMinter { address, stateInit, toShard };
   Variables:
     storage: MinterStorage = (last seen)
       totalSupply: coins = 0
@@ -280,11 +280,11 @@ Step 19 (step_in):
 
 Step 20 (step_in):
   Code:
-     27|     };
-     28|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-     29|     return JettonMinter { address, stateInit };
+     28|     };
+     29|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+     30|     return JettonMinter { address, stateInit, toShard };
                                    ^^^^^^^
-     30| }
+     31| }
   Variables:
     storage: MinterStorage = (last seen)
       totalSupply: coins = 0
@@ -305,11 +305,11 @@ Step 20 (step_in):
 
 Step 21 (step_in):
   Code:
-     27|     };
-     28|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-     29|     return JettonMinter { address, stateInit };
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     30| }
+     28|     };
+     29|     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+     30|     return JettonMinter { address, stateInit, toShard };
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     31| }
   Variables:
     storage: MinterStorage = (last seen)
       totalSupply: coins = 0
@@ -328,6 +328,7 @@ Step 21 (step_in):
     (return value): JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
   Registers:
     c4 (storage): cell = empty cell
 
@@ -363,6 +364,7 @@ Step 23 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
   Registers:
     c4 (storage): cell = empty cell
 
@@ -377,6 +379,7 @@ Step 24 (step_in):
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -393,11 +396,12 @@ Step 25 (step_in):
      11|         bounce: false,
      12|         value: params.value,
                  ^^^^^^^^^^^^^^^^^^^
-     13|         dest: { stateInit: self.stateInit! },
+     13|         dest: {
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -410,15 +414,16 @@ Step 25 (step_in):
 
 Step 26 (step_in):
   Code:
-     11|         bounce: false,
      12|         value: params.value,
-     13|         dest: { stateInit: self.stateInit! },
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     14|         body: TopUpGrams {},
+     13|         dest: {
+     14|             workchain: self.address.getWorkchain(),
+                                             ^^^^^^^^^^^^
+     15|             stateInit: self.stateInit!,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -431,15 +436,16 @@ Step 26 (step_in):
 
 Step 27 (step_in):
   Code:
-     12|         value: params.value,
-     13|         dest: { stateInit: self.stateInit! },
-     14|         body: TopUpGrams {},
-                 ^^^^^^^^^^^^^^^^^^^
-     15|     });
+     13|         dest: {
+     14|             workchain: self.address.getWorkchain(),
+     15|             stateInit: self.stateInit!,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     16|             toShard: self.toShard,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -452,15 +458,16 @@ Step 27 (step_in):
 
 Step 28 (step_in):
   Code:
-      8| // Needed because autogenerated .deploy() sends empty message, not TopUpGrams
-      9| fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResultList {
-     10|     val outMessage = createMessage({
-                              ^
-     11|         bounce: false,
+     14|             workchain: self.address.getWorkchain(),
+     15|             stateInit: self.stateInit!,
+     16|             toShard: self.toShard,
+                     ^^^^^^^^^^^^^^^^^^^^^
+     17|         },
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -473,15 +480,82 @@ Step 28 (step_in):
 
 Step 29 (step_in):
   Code:
-     14|         body: TopUpGrams {},
-     15|     });
-     16|     return net.send(from, outMessage);
+     11|         bounce: false,
+     12|         value: params.value,
+     13|         dest: {
+                 ^
+     14|             workchain: self.address.getWorkchain(),
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit: ContractState
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    params: SendParams
+      value: coins = 10000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 30 (step_in):
+  Code:
+     16|             toShard: self.toShard,
+     17|         },
+     18|         body: TopUpGrams {},
+                 ^^^^^^^^^^^^^^^^^^^
+     19|     });
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit: ContractState
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    params: SendParams
+      value: coins = 10000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 31 (step_in):
+  Code:
+      8| // Needed because autogenerated .deploy() sends empty message, not TopUpGrams
+      9| fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResultList {
+     10|     val outMessage = createMessage({
+                              ^
+     11|         bounce: false,
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit: ContractState
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    params: SendParams
+      value: coins = 10000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 32 (step_in):
+  Code:
+     18|         body: TopUpGrams {},
+     19|     });
+     20|     return net.send(from, outMessage);
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-     17| }
+     21| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -494,7 +568,7 @@ Step 29 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 30 (step_in):
+Step 33 (step_in):
   Code:
      39| }
      40|
@@ -518,7 +592,7 @@ Step 30 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 31 (step_in):
+Step 34 (step_in):
   Code:
      40|
      41| fun onInternalMessage(in: InMessage) {
@@ -542,7 +616,7 @@ Step 31 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 32 (step_in):
+Step 35 (step_in):
   Code:
      42|     val msg = lazy AllowedMessageToMinter.fromSlice(in.body);
      43|
@@ -567,17 +641,18 @@ Step 32 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 33 (step_in):
+Step 36 (step_in):
   Code:
-     14|         body: TopUpGrams {},
-     15|     });
-     16|     return net.send(from, outMessage);
+     18|         body: TopUpGrams {},
+     19|     });
+     20|     return net.send(from, outMessage);
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     17| }
+     21| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -592,7 +667,7 @@ Step 33 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 34 (step_in):
+Step 37 (step_in):
   Code:
     216|     });
     217|
@@ -608,10 +683,11 @@ Step 34 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
   Registers:
     c4 (storage): cell = empty cell
 
-Step 35 (step_in):
+Step 38 (step_in):
   Code:
     217|
     218|     val transactions = minter.sendDeploy(deployer.address, { value: grams("10") });
@@ -627,12 +703,13 @@ Step 35 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     transactions: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 36 (step_in):
+Step 39 (step_in):
   Code:
     218|     val transactions = minter.sendDeploy(deployer.address, { value: grams("10") });
     219|     expect(transactions).toHaveSuccessfulDeploy({
@@ -648,12 +725,13 @@ Step 36 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     transactions: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 37 (step_in):
+Step 40 (step_in):
   Code:
     217|
     218|     val transactions = minter.sendDeploy(deployer.address, { value: grams("10") });
@@ -669,12 +747,13 @@ Step 37 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     transactions: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 38 (step_in):
+Step 41 (step_in):
   Code:
     221|     });
     222|
@@ -690,6 +769,7 @@ Step 38 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit: ContractState = (last seen)
+      toShard = <optimized out>
     transactions: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
     (return value): (JettonMinter, Treasury, Treasury) = 3 items
@@ -699,7 +779,7 @@ Step 38 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 39 (step_in):
+Step 42 (step_in):
   Code:
      12|
      13| get fun `test wallet: owner can send jettons`() {
@@ -709,7 +789,7 @@ Step 39 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 40 (step_in):
+Step 43 (step_in):
   Code:
      13| get fun `test wallet: owner can send jettons`() {
      14|     val (minter, deployer, notDeployer) = setupTest();
@@ -720,6 +800,7 @@ Step 40 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     notDeployer: Treasury
@@ -727,7 +808,7 @@ Step 40 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 41 (step_in):
+Step 44 (step_in):
   Code:
      14|     val (minter, deployer, notDeployer) = setupTest();
      15|     val transferAmount = grams("5");
@@ -738,6 +819,7 @@ Step 41 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     notDeployer: Treasury
@@ -746,7 +828,7 @@ Step 41 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 42 (step_in):
+Step 45 (step_in):
   Code:
     225|
     226| fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: coins): JettonWallet {
@@ -757,6 +839,7 @@ Step 42 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -767,35 +850,37 @@ Step 42 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 43 (step_in):
+Step 46 (step_in):
   Code:
-     49|
-     50| fun JettonMinter.getTotalSupply(self): int {
-     51|     return self.getJettonData().totalSupply;
+     53|
+     54| fun JettonMinter.getTotalSupply(self): int {
+     55|     return self.getJettonData().totalSupply;
                          ^^^^^^^^^^^^^
-     52| }
+     56| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
   Registers:
     c4 (storage): cell = empty cell
 
-Step 44 (step_in):
+Step 47 (step_in):
   Code:
-    207|
-    208| fun JettonMinter.getJettonData(self): JettonDataReply {
-    209|     return net.runGetMethod(self.address, "get_jetton_data");
+    212|
+    213| fun JettonMinter.getJettonData(self): JettonDataReply {
+    214|     return net.runGetMethod(self.address, "get_jetton_data");
                                                    ^^^^^^^^^^^^^^^^^
-    210| }
+    215| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
   Registers:
     c4 (storage): cell = empty cell
 
-Step 45 (step_in):
+Step 48 (step_in):
   Code:
     181|
     182| get fun get_jetton_data(): JettonDataReply {
@@ -810,7 +895,7 @@ Step 45 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 46 (step_in):
+Step 49 (step_in):
   Code:
     182| get fun get_jetton_data(): JettonDataReply {
     183|     val storage = lazy MinterStorage.load();
@@ -831,7 +916,7 @@ Step 46 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 47 (step_in):
+Step 50 (step_in):
   Code:
     184|     val jettonWalletCode = jettonWalletCompiledCode();
     185|
@@ -857,7 +942,7 @@ Step 47 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 48 (step_in):
+Step 51 (step_in):
   Code:
     185|
     186|     return {
@@ -883,7 +968,7 @@ Step 48 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 49 (step_in):
+Step 52 (step_in):
   Code:
     186|     return {
     187|         totalSupply: storage.totalSupply,
@@ -909,7 +994,7 @@ Step 49 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 50 (step_in):
+Step 53 (step_in):
   Code:
     187|         totalSupply: storage.totalSupply,
     188|         mintable: storage.adminAddress != null,
@@ -935,7 +1020,7 @@ Step 50 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 51 (step_in):
+Step 54 (step_in):
   Code:
     188|         mintable: storage.adminAddress != null,
     189|         adminAddress: storage.adminAddress,
@@ -961,7 +1046,7 @@ Step 51 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 52 (step_in):
+Step 55 (step_in):
   Code:
     189|         adminAddress: storage.adminAddress,
     190|         jettonContent: storage.metadata as Cell<OnchainMetadataReply>,
@@ -987,7 +1072,7 @@ Step 52 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 53 (step_in):
+Step 56 (step_in):
   Code:
     184|     val jettonWalletCode = jettonWalletCompiledCode();
     185|
@@ -1019,7 +1104,7 @@ Step 53 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 54 (step_in):
+Step 57 (step_in):
   Code:
     184|     val jettonWalletCode = jettonWalletCompiledCode();
     185|
@@ -1034,17 +1119,18 @@ Step 54 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 55 (step_in):
+Step 58 (step_in):
   Code:
-    207|
-    208| fun JettonMinter.getJettonData(self): JettonDataReply {
-    209|     return net.runGetMethod(self.address, "get_jetton_data");
+    212|
+    213| fun JettonMinter.getJettonData(self): JettonDataReply {
+    214|     return net.runGetMethod(self.address, "get_jetton_data");
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    210| }
+    215| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     (return value): JettonDataReply
       totalSupply: int = 0
       mintable = <optimized out>
@@ -1054,22 +1140,23 @@ Step 55 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 56 (step_in):
+Step 59 (step_in):
   Code:
-     49|
-     50| fun JettonMinter.getTotalSupply(self): int {
-     51|     return self.getJettonData().totalSupply;
+     53|
+     54| fun JettonMinter.getTotalSupply(self): int {
+     55|     return self.getJettonData().totalSupply;
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     52| }
+     56| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     (return value): int = 0
   Registers:
     c4 (storage): cell = empty cell
 
-Step 57 (step_in):
+Step 60 (step_in):
   Code:
     225|
     226| fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: coins): JettonWallet {
@@ -1080,6 +1167,7 @@ Step 57 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -1090,7 +1178,7 @@ Step 57 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 58 (step_in):
+Step 61 (step_in):
   Code:
     226| fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: coins): JettonWallet {
     227|     val supplyBefore = minter.getTotalSupply();
@@ -1101,6 +1189,7 @@ Step 58 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -1112,7 +1201,7 @@ Step 58 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 59 (step_in):
+Step 62 (step_in):
   Code:
      94|
      95| fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
@@ -1123,6 +1212,7 @@ Step 59 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     userAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1130,17 +1220,18 @@ Step 59 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 60 (step_in):
+Step 63 (step_in):
   Code:
-    211|
-    212| fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
-    213|     return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
+    216|
+    217| fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
+    218|     return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
                                                    ^^^^^^^^^^^^^^^^^^^^
-    214| }
+    219| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     ownerAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1148,7 +1239,7 @@ Step 60 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 61 (step_in):
+Step 64 (step_in):
   Code:
     194|
     195| get fun get_wallet_address(ownerAddress: address): address {
@@ -1168,7 +1259,7 @@ Step 61 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 62 (step_in):
+Step 65 (step_in):
   Code:
     195| get fun get_wallet_address(ownerAddress: address): address {
     196|     val jettonWalletCode = jettonWalletCompiledCode();
@@ -1193,7 +1284,7 @@ Step 62 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 63 (step_in):
+Step 66 (step_in):
   Code:
      25|     jettonWalletCode: cell,
      26| ): address {
@@ -1222,7 +1313,7 @@ Step 63 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 64 (step_in):
+Step 67 (step_in):
   Code:
       8| ): AutoDeployAddress {
       9|     val emptyWalletStorage: WalletStorage = {
@@ -1251,7 +1342,7 @@ Step 64 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 65 (step_in):
+Step 68 (step_in):
   Code:
       9|     val emptyWalletStorage: WalletStorage = {
      10|         jettonBalance: 0,
@@ -1280,7 +1371,7 @@ Step 65 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 66 (step_in):
+Step 69 (step_in):
   Code:
      10|         jettonBalance: 0,
      11|         ownerAddress,
@@ -1309,7 +1400,7 @@ Step 66 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 67 (step_in):
+Step 70 (step_in):
   Code:
       7|     jettonWalletCode: cell,
       8| ): AutoDeployAddress {
@@ -1338,7 +1429,7 @@ Step 67 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 68 (step_in):
+Step 71 (step_in):
   Code:
      14|
      15|     return {
@@ -1371,7 +1462,7 @@ Step 68 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 69 (step_in):
+Step 72 (step_in):
   Code:
      15|     return {
      16|         workchain: MY_WORKCHAIN,
@@ -1404,7 +1495,7 @@ Step 69 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 70 (step_in):
+Step 73 (step_in):
   Code:
      16|         workchain: MY_WORKCHAIN,
      17|         stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() },
@@ -1437,7 +1528,7 @@ Step 70 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 71 (step_in):
+Step 74 (step_in):
   Code:
      13|     };
      14|
@@ -1474,7 +1565,7 @@ Step 71 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 72 (step_in):
+Step 75 (step_in):
   Code:
      25|     jettonWalletCode: cell,
      26| ): address {
@@ -1503,7 +1594,7 @@ Step 72 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 73 (step_in):
+Step 76 (step_in):
   Code:
      26| ): address {
      27|     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);
@@ -1536,7 +1627,7 @@ Step 73 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 74 (step_in):
+Step 77 (step_in):
   Code:
      26| ): address {
      27|     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);
@@ -1573,7 +1664,7 @@ Step 74 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 75 (step_in):
+Step 78 (step_in):
   Code:
     195| get fun get_wallet_address(ownerAddress: address): address {
     196|     val jettonWalletCode = jettonWalletCompiledCode();
@@ -1602,7 +1693,7 @@ Step 75 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 76 (step_in):
+Step 79 (step_in):
   Code:
      26| ): address {
      27|     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);
@@ -1617,7 +1708,7 @@ Step 76 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 77 (step_in):
+Step 80 (step_in):
   Code:
      26| ): address {
      27|     val jwDeployed = calcDeployedJettonWallet(ownerAddress, minterAddress, jettonWalletCode);
@@ -1632,7 +1723,7 @@ Step 77 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 78 (step_in):
+Step 81 (step_in):
   Code:
     195| get fun get_wallet_address(ownerAddress: address): address {
     196|     val jettonWalletCode = jettonWalletCompiledCode();
@@ -1647,17 +1738,18 @@ Step 78 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 79 (step_in):
+Step 82 (step_in):
   Code:
-    211|
-    212| fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
-    213|     return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
+    216|
+    217| fun JettonMinter.getWalletAddress(self, ownerAddress: address): address {
+    218|     return net.runGetMethod(self.address, "get_wallet_address", [ownerAddress]);
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    214| }
+    219| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     ownerAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1669,7 +1761,7 @@ Step 79 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 80 (step_in):
+Step 83 (step_in):
   Code:
      94|
      95| fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
@@ -1680,6 +1772,7 @@ Step 80 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     userAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1687,7 +1780,7 @@ Step 80 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 81 (step_in):
+Step 84 (step_in):
   Code:
      95| fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
      96|     val address = minter.getWalletAddress(userAddress);
@@ -1698,6 +1791,7 @@ Step 81 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     userAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1709,7 +1803,7 @@ Step 81 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 82 (step_in):
+Step 85 (step_in):
   Code:
      95| fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
      96|     val address = minter.getWalletAddress(userAddress);
@@ -1720,6 +1814,7 @@ Step 82 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     userAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1731,10 +1826,11 @@ Step 82 (step_in):
     (return value): JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
   Registers:
     c4 (storage): cell = empty cell
 
-Step 83 (step_in):
+Step 86 (step_in):
   Code:
     226| fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: coins): JettonWallet {
     227|     val supplyBefore = minter.getTotalSupply();
@@ -1745,6 +1841,7 @@ Step 83 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -1756,7 +1853,7 @@ Step 83 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 84 (step_in):
+Step 87 (step_in):
   Code:
     228|     val wallet = userWallet(minter, recipient);
     229|
@@ -1767,6 +1864,7 @@ Step 84 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -1778,20 +1876,22 @@ Step 84 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
   Registers:
     c4 (storage): cell = empty cell
 
-Step 85 (step_in):
+Step 88 (step_in):
   Code:
-     26|     customPayload: cell? = null,
-     27| ): SendResultList {
-     28|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
+     30|     customPayload: cell? = null,
+     31| ): SendResultList {
+     32|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
                                   ^^^^^^^^^^^
-     29|     val outMessage = createMessage({
+     33|     val outMessage = createMessage({
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1807,110 +1907,18 @@ Step 85 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 86 (step_in):
-  Code:
-     28|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
-     29|     val outMessage = createMessage({
-     30|         bounce: false,
-                         ^^^^^
-     31|         value: totalTonAmount + grams("0.015"),
-  Variables:
-    self: JettonMinter
-      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      stateInit = <optimized out>
-    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    jettonAmount: int = 20000000000
-    forwardTonAmount: int = 50000000
-    totalTonAmount: int = 300000000
-    customPayload: cell? = null (last seen)
-    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
-      bits = 1
-      refs = 0
-      hash = [HASH]
-      raw = slice{[HEX]}
-  Registers:
-    c4 (storage): cell = empty cell
-
-Step 87 (step_in):
-  Code:
-     29|     val outMessage = createMessage({
-     30|         bounce: false,
-     31|         value: totalTonAmount + grams("0.015"),
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     32|         dest: self.address,
-  Variables:
-    self: JettonMinter
-      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      stateInit = <optimized out>
-    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    jettonAmount: int = 20000000000
-    forwardTonAmount: int = 50000000
-    totalTonAmount: int = 300000000
-    customPayload: cell? = null (last seen)
-    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
-      bits = 1
-      refs = 0
-      hash = [HASH]
-      raw = slice{[HEX]}
-  Registers:
-    c4 (storage): cell = empty cell
-
-Step 88 (step_in):
-  Code:
-     30|         bounce: false,
-     31|         value: totalTonAmount + grams("0.015"),
-     32|         dest: self.address,
-                 ^^^^^^^^^^^^^^^^^^
-     33|         body: MintNewJettons {
-  Variables:
-    self: JettonMinter
-      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      stateInit = <optimized out>
-    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      mainnet = [WALLET_ADDRESS_BASE]
-      testnet = [WALLET_ADDRESS_BASE]
-    jettonAmount: int = 20000000000
-    forwardTonAmount: int = 50000000
-    totalTonAmount: int = 300000000
-    customPayload: cell? = null (last seen)
-    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
-      bits = 1
-      refs = 0
-      hash = [HASH]
-      raw = slice{[HEX]}
-  Registers:
-    c4 (storage): cell = empty cell
-
 Step 89 (step_in):
   Code:
-     32|         dest: self.address,
-     33|         body: MintNewJettons {
-     34|             queryId: 0,
-                     ^^^^^^^^^^
-     35|             mintRecipient: recipient,
+     32|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
+     33|     val outMessage = createMessage({
+     34|         bounce: false,
+                         ^^^^^
+     35|         value: totalTonAmount + grams("0.015"),
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1933,15 +1941,16 @@ Step 89 (step_in):
 
 Step 90 (step_in):
   Code:
-     33|         body: MintNewJettons {
-     34|             queryId: 0,
-     35|             mintRecipient: recipient,
-                     ^^^^^^^^^^^^^^^^^^^^^^^^
-     36|             tonAmount: totalTonAmount,
+     33|     val outMessage = createMessage({
+     34|         bounce: false,
+     35|         value: totalTonAmount + grams("0.015"),
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     36|         dest: self.address,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1964,15 +1973,16 @@ Step 90 (step_in):
 
 Step 91 (step_in):
   Code:
-     34|             queryId: 0,
-     35|             mintRecipient: recipient,
-     36|             tonAmount: totalTonAmount,
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^
-     37|             internalTransferMsg: InternalTransferStep {
+     34|         bounce: false,
+     35|         value: totalTonAmount + grams("0.015"),
+     36|         dest: self.address,
+                 ^^^^^^^^^^^^^^^^^^
+     37|         body: MintNewJettons {
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -1995,15 +2005,16 @@ Step 91 (step_in):
 
 Step 92 (step_in):
   Code:
-     36|             tonAmount: totalTonAmount,
-     37|             internalTransferMsg: InternalTransferStep {
-     38|                 queryId: 0,
-                         ^^^^^^^^^^
-     39|                 jettonAmount,
+     36|         dest: self.address,
+     37|         body: MintNewJettons {
+     38|             queryId: 0,
+                     ^^^^^^^^^^
+     39|             mintRecipient: recipient,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2026,15 +2037,16 @@ Step 92 (step_in):
 
 Step 93 (step_in):
   Code:
-     37|             internalTransferMsg: InternalTransferStep {
-     38|                 queryId: 0,
-     39|                 jettonAmount,
-                         ^^^^^^^^^^^^
-     40|                 transferInitiator: null,
+     37|         body: MintNewJettons {
+     38|             queryId: 0,
+     39|             mintRecipient: recipient,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+     40|             tonAmount: totalTonAmount,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2057,15 +2069,16 @@ Step 93 (step_in):
 
 Step 94 (step_in):
   Code:
-     38|                 queryId: 0,
-     39|                 jettonAmount,
-     40|                 transferInitiator: null,
-                                            ^^^^
-     41|                 sendExcessesTo: self.address,
+     38|             queryId: 0,
+     39|             mintRecipient: recipient,
+     40|             tonAmount: totalTonAmount,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+     41|             internalTransferMsg: InternalTransferStep {
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2088,15 +2101,16 @@ Step 94 (step_in):
 
 Step 95 (step_in):
   Code:
-     39|                 jettonAmount,
-     40|                 transferInitiator: null,
-     41|                 sendExcessesTo: self.address,
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     42|                 forwardTonAmount,
+     40|             tonAmount: totalTonAmount,
+     41|             internalTransferMsg: InternalTransferStep {
+     42|                 queryId: 0,
+                         ^^^^^^^^^^
+     43|                 jettonAmount,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2119,15 +2133,16 @@ Step 95 (step_in):
 
 Step 96 (step_in):
   Code:
-     40|                 transferInitiator: null,
-     41|                 sendExcessesTo: self.address,
-     42|                 forwardTonAmount,
-                         ^^^^^^^^^^^^^^^^
-     43|                 forwardPayload,
+     41|             internalTransferMsg: InternalTransferStep {
+     42|                 queryId: 0,
+     43|                 jettonAmount,
+                         ^^^^^^^^^^^^
+     44|                 transferInitiator: null,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2150,15 +2165,16 @@ Step 96 (step_in):
 
 Step 97 (step_in):
   Code:
-     41|                 sendExcessesTo: self.address,
-     42|                 forwardTonAmount,
-     43|                 forwardPayload,
-                         ^^^^^^^^^^^^^^
-     44|             }.toCell(),
+     42|                 queryId: 0,
+     43|                 jettonAmount,
+     44|                 transferInitiator: null,
+                                            ^^^^
+     45|                 sendExcessesTo: self.address,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2181,15 +2197,16 @@ Step 97 (step_in):
 
 Step 98 (step_in):
   Code:
-     35|             mintRecipient: recipient,
-     36|             tonAmount: totalTonAmount,
-     37|             internalTransferMsg: InternalTransferStep {
-                                          ^
-     38|                 queryId: 0,
+     43|                 jettonAmount,
+     44|                 transferInitiator: null,
+     45|                 sendExcessesTo: self.address,
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     46|                 forwardTonAmount,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2212,15 +2229,16 @@ Step 98 (step_in):
 
 Step 99 (step_in):
   Code:
-     31|         value: totalTonAmount + grams("0.015"),
-     32|         dest: self.address,
-     33|         body: MintNewJettons {
-                 ^
-     34|             queryId: 0,
+     44|                 transferInitiator: null,
+     45|                 sendExcessesTo: self.address,
+     46|                 forwardTonAmount,
+                         ^^^^^^^^^^^^^^^^
+     47|                 forwardPayload,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2230,10 +2248,10 @@ Step 99 (step_in):
       mainnet = [WALLET_ADDRESS_BASE]
       testnet = [WALLET_ADDRESS_BASE]
     jettonAmount: int = 20000000000
-    forwardTonAmount: int = 50000000 (last seen)
+    forwardTonAmount: int = 50000000
     totalTonAmount: int = 300000000
     customPayload: cell? = null (last seen)
-    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH] (last seen)
+    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
       bits = 1
       refs = 0
       hash = [HASH]
@@ -2243,15 +2261,80 @@ Step 99 (step_in):
 
 Step 100 (step_in):
   Code:
-     27| ): SendResultList {
-     28|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
-     29|     val outMessage = createMessage({
-                              ^
-     30|         bounce: false,
+     45|                 sendExcessesTo: self.address,
+     46|                 forwardTonAmount,
+     47|                 forwardPayload,
+                         ^^^^^^^^^^^^^^
+     48|             }.toCell(),
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    jettonAmount: int = 20000000000
+    forwardTonAmount: int = 50000000
+    totalTonAmount: int = 300000000
+    customPayload: cell? = null (last seen)
+    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
+      bits = 1
+      refs = 0
+      hash = [HASH]
+      raw = slice{[HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 101 (step_in):
+  Code:
+     39|             mintRecipient: recipient,
+     40|             tonAmount: totalTonAmount,
+     41|             internalTransferMsg: InternalTransferStep {
+                                          ^
+     42|                 queryId: 0,
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    jettonAmount: int = 20000000000
+    forwardTonAmount: int = 50000000
+    totalTonAmount: int = 300000000
+    customPayload: cell? = null (last seen)
+    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH]
+      bits = 1
+      refs = 0
+      hash = [HASH]
+      raw = slice{[HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 102 (step_in):
+  Code:
+     35|         value: totalTonAmount + grams("0.015"),
+     36|         dest: self.address,
+     37|         body: MintNewJettons {
+                 ^
+     38|             queryId: 0,
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2272,17 +2355,50 @@ Step 100 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 101 (step_in):
+Step 103 (step_in):
   Code:
-     45|         },
-     46|     });
-     47|     return net.send(from, outMessage);
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
-     48| }
+     31| ): SendResultList {
+     32|     val forwardPayload = beginCell().storeMaybeRef(customPayload).endCell().beginParse();
+     33|     val outMessage = createMessage({
+                              ^
+     34|         bounce: false,
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    jettonAmount: int = 20000000000
+    forwardTonAmount: int = 50000000 (last seen)
+    totalTonAmount: int = 300000000
+    customPayload: cell? = null (last seen)
+    forwardPayload: slice = 1 bits, 0 refs, hash: [HASH] (last seen)
+      bits = 1
+      refs = 0
+      hash = [HASH]
+      raw = slice{[HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 104 (step_in):
+  Code:
+     49|         },
+     50|     });
+     51|     return net.send(from, outMessage);
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     52| }
+  Variables:
+    self: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -2305,7 +2421,7 @@ Step 101 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 102 (step_in):
+Step 105 (step_in):
   Code:
      39| }
      40|
@@ -2329,7 +2445,7 @@ Step 102 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 103 (step_in):
+Step 106 (step_in):
   Code:
      40|
      41| fun onInternalMessage(in: InMessage) {
@@ -2353,7 +2469,7 @@ Step 103 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 104 (step_in):
+Step 107 (step_in):
   Code:
      42|     val msg = lazy AllowedMessageToMinter.fromSlice(in.body);
      43|
@@ -2378,7 +2494,7 @@ Step 104 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 105 (step_in):
+Step 108 (step_in):
   Code:
     100|         }
     101|
@@ -2407,7 +2523,7 @@ Step 105 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 106 (step_in):
+Step 109 (step_in):
   Code:
     101|
     102|         MintNewJettons => {
@@ -2436,7 +2552,7 @@ Step 106 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 107 (step_in):
+Step 110 (step_in):
   Code:
     102|         MintNewJettons => {
     103|             var storage = lazy MinterStorage.load();
@@ -2470,7 +2586,7 @@ Step 107 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 108 (step_in):
+Step 111 (step_in):
   Code:
      36|
      37| fun assertSenderIsAdmin(senderAddress: address, adminAddress: address?) {
@@ -2494,7 +2610,7 @@ Step 108 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 109 (step_in):
+Step 112 (step_in):
   Code:
     103|             var storage = lazy MinterStorage.load();
     104|             assertSenderIsAdmin(in.senderAddress, storage.adminAddress);
@@ -2528,7 +2644,7 @@ Step 109 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 110 (step_in):
+Step 113 (step_in):
   Code:
     105|             assert (msg.mintRecipient.getWorkchain() == MY_WORKCHAIN) throw Errors.WrongWorkchain;
     106|
@@ -2562,7 +2678,7 @@ Step 110 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 111 (step_in):
+Step 114 (step_in):
   Code:
     107|             val internalTransferMsg = lazy msg
     108|                 .internalTransferMsg
@@ -2596,7 +2712,7 @@ Step 111 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 112 (step_in):
+Step 115 (step_in):
   Code:
     105|             assert (msg.mintRecipient.getWorkchain() == MY_WORKCHAIN) throw Errors.WrongWorkchain;
     106|
@@ -2630,7 +2746,7 @@ Step 112 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 113 (step_in):
+Step 116 (step_in):
   Code:
     108|                 .internalTransferMsg
     109|                 .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp });
@@ -2671,7 +2787,7 @@ Step 113 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 114 (step_in):
+Step 117 (step_in):
   Code:
     109|                 .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp });
     110|             val forwardTonAmount = internalTransferMsg.forwardTonAmount;
@@ -2713,7 +2829,7 @@ Step 114 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 115 (step_in):
+Step 118 (step_in):
   Code:
     102|
     103| fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self) {
@@ -2734,7 +2850,7 @@ Step 115 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 116 (step_in):
+Step 119 (step_in):
   Code:
     103| fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self) {
     104|     var mutableCopy = self;
@@ -2760,7 +2876,7 @@ Step 116 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 117 (step_in):
+Step 120 (step_in):
   Code:
     111|             internalTransferMsg.forwardPayload.checkIsCorrectTlbEither();
     112|
@@ -2802,7 +2918,7 @@ Step 117 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 118 (step_in):
+Step 121 (step_in):
   Code:
      57|
      58| fun checkAmountIsEnoughToTransfer(msgValue: int, forwardTonAmount: int, fwdFee: int) {
@@ -2821,7 +2937,7 @@ Step 118 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 119 (step_in):
+Step 122 (step_in):
   Code:
      40|
      41| fun calcMinimalTransferAmount(forwardTonAmount: int, fwdFee: int): int {
@@ -2839,7 +2955,7 @@ Step 119 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 120 (step_in):
+Step 123 (step_in):
   Code:
      42|     val fwdCount = forwardTonAmount != 0 ? 2 : 1;
      43|
@@ -2858,7 +2974,7 @@ Step 120 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 121 (step_in):
+Step 124 (step_in):
   Code:
      43|
      44|     val jettonWalletGasConsumption = getPrecompiledGasConsumption();
@@ -2878,7 +2994,7 @@ Step 121 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 122 (step_in):
+Step 125 (step_in):
   Code:
      44|     val jettonWalletGasConsumption = getPrecompiledGasConsumption();
      45|     val sendTransferGasConsumption = (jettonWalletGasConsumption == null)
@@ -2898,7 +3014,7 @@ Step 122 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 123 (step_in):
+Step 126 (step_in):
   Code:
      43|
      44|     val jettonWalletGasConsumption = getPrecompiledGasConsumption();
@@ -2918,7 +3034,7 @@ Step 123 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 124 (step_in):
+Step 127 (step_in):
   Code:
      46|         ? GAS_CONSUMPTION_JETTON_TRANSFER
      47|         : jettonWalletGasConsumption;
@@ -2939,7 +3055,7 @@ Step 124 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 125 (step_in):
+Step 128 (step_in):
   Code:
      47|         : jettonWalletGasConsumption;
      48|     val receiveTransferGasConsumption = (jettonWalletGasConsumption == null)
@@ -2960,7 +3076,7 @@ Step 125 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 126 (step_in):
+Step 129 (step_in):
   Code:
      46|         ? GAS_CONSUMPTION_JETTON_TRANSFER
      47|         : jettonWalletGasConsumption;
@@ -2981,7 +3097,7 @@ Step 126 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 127 (step_in):
+Step 130 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3003,7 +3119,7 @@ Step 127 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 128 (step_in):
+Step 131 (step_in):
   Code:
      35|         MY_WORKCHAIN,
      36|         STORAGE_SIZE_INIT_STATE_WALLET_BITS,
@@ -3018,7 +3134,7 @@ Step 128 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 129 (step_in):
+Step 132 (step_in):
   Code:
      34|     return calculateForwardFeeWithoutLumpPrice(
      35|         MY_WORKCHAIN,
@@ -3033,7 +3149,7 @@ Step 129 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 130 (step_in):
+Step 133 (step_in):
   Code:
      33| fun forwardInitStateOverhead(): coins {
      34|     return calculateForwardFeeWithoutLumpPrice(
@@ -3048,7 +3164,7 @@ Step 130 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 131 (step_in):
+Step 134 (step_in):
   Code:
      32|
      33| fun forwardInitStateOverhead(): coins {
@@ -3063,7 +3179,7 @@ Step 131 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 132 (step_in):
+Step 135 (step_in):
   Code:
      32|
      33| fun forwardInitStateOverhead(): coins {
@@ -3080,7 +3196,7 @@ Step 132 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 133 (step_in):
+Step 136 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3102,7 +3218,7 @@ Step 133 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 134 (step_in):
+Step 137 (step_in):
   Code:
      51|
      52|     return forwardTonAmount + fwdCount * fwdFee + forwardInitStateOverhead() +
@@ -3124,7 +3240,7 @@ Step 134 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 135 (step_in):
+Step 138 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3146,7 +3262,7 @@ Step 135 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 136 (step_in):
+Step 139 (step_in):
   Code:
      52|     return forwardTonAmount + fwdCount * fwdFee + forwardInitStateOverhead() +
      53|     calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
@@ -3168,7 +3284,7 @@ Step 136 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 137 (step_in):
+Step 140 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3190,7 +3306,7 @@ Step 137 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 138 (step_in):
+Step 141 (step_in):
   Code:
      53|     calculateGasFee(MY_WORKCHAIN, sendTransferGasConsumption) +
      54|     calculateGasFee(MY_WORKCHAIN, receiveTransferGasConsumption) +
@@ -3212,7 +3328,7 @@ Step 138 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 139 (step_in):
+Step 142 (step_in):
   Code:
      27|         MIN_STORAGE_DURATION,
      28|         STORAGE_SIZE_MAX_WALLET_BITS,
@@ -3227,7 +3343,7 @@ Step 139 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 140 (step_in):
+Step 143 (step_in):
   Code:
      26|         MY_WORKCHAIN,
      27|         MIN_STORAGE_DURATION,
@@ -3242,7 +3358,7 @@ Step 140 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 141 (step_in):
+Step 144 (step_in):
   Code:
      25|     return calculateStorageFee(
      26|         MY_WORKCHAIN,
@@ -3257,7 +3373,7 @@ Step 141 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 142 (step_in):
+Step 145 (step_in):
   Code:
      24| fun calculateJettonWalletMinStorageFee(): coins {
      25|     return calculateStorageFee(
@@ -3272,7 +3388,7 @@ Step 142 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 143 (step_in):
+Step 146 (step_in):
   Code:
      23|
      24| fun calculateJettonWalletMinStorageFee(): coins {
@@ -3287,7 +3403,7 @@ Step 143 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 144 (step_in):
+Step 147 (step_in):
   Code:
      23|
      24| fun calculateJettonWalletMinStorageFee(): coins {
@@ -3304,7 +3420,7 @@ Step 144 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 145 (step_in):
+Step 148 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3326,7 +3442,7 @@ Step 145 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 146 (step_in):
+Step 149 (step_in):
   Code:
      50|         : jettonWalletGasConsumption;
      51|
@@ -3349,7 +3465,7 @@ Step 146 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 147 (step_in):
+Step 150 (step_in):
   Code:
      57|
      58| fun checkAmountIsEnoughToTransfer(msgValue: int, forwardTonAmount: int, fwdFee: int) {
@@ -3368,7 +3484,7 @@ Step 147 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 148 (step_in):
+Step 151 (step_in):
   Code:
      58| fun checkAmountIsEnoughToTransfer(msgValue: int, forwardTonAmount: int, fwdFee: int) {
      59|     val minTransferAmount = calcMinimalTransferAmount(forwardTonAmount, fwdFee);
@@ -3388,7 +3504,7 @@ Step 148 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 149 (step_in):
+Step 152 (step_in):
   Code:
     113|             checkAmountIsEnoughToTransfer(msg.tonAmount, forwardTonAmount, in.originalForwardFee);
     114|
@@ -3430,7 +3546,7 @@ Step 149 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 150 (step_in):
+Step 153 (step_in):
   Code:
     114|
     115|             storage.totalSupply += internalTransferMsg.jettonAmount;
@@ -3472,7 +3588,7 @@ Step 150 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 151 (step_in):
+Step 154 (step_in):
   Code:
      19|
      20| fun MinterStorage.save(self) {
@@ -3493,7 +3609,7 @@ Step 151 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 152 (step_in):
+Step 155 (step_in):
   Code:
     117|
     118|             reserveGramsOnBalance(
@@ -3535,7 +3651,7 @@ Step 152 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 153 (step_in):
+Step 156 (step_in):
   Code:
     118|             reserveGramsOnBalance(
     119|                 grams("0.01"),
@@ -3577,7 +3693,7 @@ Step 153 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 154 (step_in):
+Step 157 (step_in):
   Code:
     116|             storage.save();
     117|
@@ -3619,7 +3735,7 @@ Step 154 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 155 (step_in):
+Step 158 (step_in):
   Code:
     121|             );
     122|
@@ -3661,7 +3777,7 @@ Step 155 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 156 (step_in):
+Step 159 (step_in):
   Code:
     126|                 dest: calcDeployedJettonWallet(
     127|                     msg.mintRecipient,
@@ -3708,7 +3824,7 @@ Step 156 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 157 (step_in):
+Step 160 (step_in):
   Code:
     124|             val deployMsg = createMessage({
     125|                 bounce: BounceMode.Only256BitsOfBody,
@@ -3755,7 +3871,7 @@ Step 157 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 158 (step_in):
+Step 161 (step_in):
   Code:
       8| ): AutoDeployAddress {
       9|     val emptyWalletStorage: WalletStorage = {
@@ -3784,7 +3900,7 @@ Step 158 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 159 (step_in):
+Step 162 (step_in):
   Code:
       9|     val emptyWalletStorage: WalletStorage = {
      10|         jettonBalance: 0,
@@ -3813,7 +3929,7 @@ Step 159 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 160 (step_in):
+Step 163 (step_in):
   Code:
      10|         jettonBalance: 0,
      11|         ownerAddress,
@@ -3842,7 +3958,7 @@ Step 160 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 161 (step_in):
+Step 164 (step_in):
   Code:
       7|     jettonWalletCode: cell,
       8| ): AutoDeployAddress {
@@ -3871,7 +3987,7 @@ Step 161 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 162 (step_in):
+Step 165 (step_in):
   Code:
      14|
      15|     return {
@@ -3904,7 +4020,7 @@ Step 162 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 163 (step_in):
+Step 166 (step_in):
   Code:
      15|     return {
      16|         workchain: MY_WORKCHAIN,
@@ -3937,7 +4053,7 @@ Step 163 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 164 (step_in):
+Step 167 (step_in):
   Code:
      16|         workchain: MY_WORKCHAIN,
      17|         stateInit: { code: jettonWalletCode, data: emptyWalletStorage.toCell() },
@@ -3970,7 +4086,7 @@ Step 164 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 165 (step_in):
+Step 168 (step_in):
   Code:
      13|     };
      14|
@@ -4007,7 +4123,7 @@ Step 165 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 166 (step_in):
+Step 169 (step_in):
   Code:
     122|
     123|             val jettonWalletCode = jettonWalletCompiledCode();
@@ -4054,7 +4170,7 @@ Step 166 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 167 (step_in):
+Step 170 (step_in):
   Code:
     132|                 body: msg.internalTransferMsg,
     133|             });
@@ -4103,7 +4219,7 @@ Step 167 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 168 (step_in):
+Step 171 (step_in):
   Code:
      37| }
      38|
@@ -4127,7 +4243,7 @@ Step 168 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 169 (step_in):
+Step 172 (step_in):
   Code:
      38|
      39| fun onInternalMessage(in: InMessage) {
@@ -4151,7 +4267,7 @@ Step 169 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 170 (step_in):
+Step 173 (step_in):
   Code:
      40|     val msg = lazy AllowedMessageToWallet.fromSlice(in.body);
      41|
@@ -4176,7 +4292,7 @@ Step 170 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 171 (step_in):
+Step 174 (step_in):
   Code:
      41|
      42|     match (msg) {
@@ -4207,7 +4323,7 @@ Step 171 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 172 (step_in):
+Step 175 (step_in):
   Code:
      42|     match (msg) {
      43|         InternalTransferStep => {
@@ -4238,7 +4354,7 @@ Step 172 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 173 (step_in):
+Step 176 (step_in):
   Code:
      43|         InternalTransferStep => {
      44|             var storage = lazy WalletStorage.load();
@@ -4273,7 +4389,7 @@ Step 173 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 174 (step_in):
+Step 177 (step_in):
   Code:
      53|                 ) throw Errors.NotValidWallet;
      54|             }
@@ -4308,7 +4424,7 @@ Step 174 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 175 (step_in):
+Step 178 (step_in):
   Code:
      54|             }
      55|             storage.jettonBalance += msg.jettonAmount;
@@ -4343,7 +4459,7 @@ Step 175 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 176 (step_in):
+Step 179 (step_in):
   Code:
      27|
      28| fun WalletStorage.save(self) {
@@ -4363,7 +4479,7 @@ Step 176 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 177 (step_in):
+Step 180 (step_in):
   Code:
      56|             storage.save();
      57|
@@ -4398,7 +4514,7 @@ Step 177 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 178 (step_in):
+Step 181 (step_in):
   Code:
      58|             if (msg.forwardTonAmount != 0) {
      59|                 val notifyOwnerMsg = createMessage({
@@ -4433,7 +4549,7 @@ Step 178 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 179 (step_in):
+Step 182 (step_in):
   Code:
      60|                     bounce: BounceMode.NoBounce,
      61|                     dest: storage.ownerAddress,
@@ -4468,7 +4584,7 @@ Step 179 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 180 (step_in):
+Step 183 (step_in):
   Code:
      59|                 val notifyOwnerMsg = createMessage({
      60|                     bounce: BounceMode.NoBounce,
@@ -4503,7 +4619,7 @@ Step 180 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 181 (step_in):
+Step 184 (step_in):
   Code:
      62|                     value: msg.forwardTonAmount,
      63|                     body: TransferNotificationForRecipient {
@@ -4538,7 +4654,7 @@ Step 181 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 182 (step_in):
+Step 185 (step_in):
   Code:
      63|                     body: TransferNotificationForRecipient {
      64|                         queryId: msg.queryId,
@@ -4573,7 +4689,7 @@ Step 182 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 183 (step_in):
+Step 186 (step_in):
   Code:
      64|                         queryId: msg.queryId,
      65|                         jettonAmount: msg.jettonAmount,
@@ -4608,7 +4724,7 @@ Step 183 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 184 (step_in):
+Step 187 (step_in):
   Code:
      65|                         jettonAmount: msg.jettonAmount,
      66|                         transferInitiator: msg.transferInitiator,
@@ -4643,7 +4759,7 @@ Step 184 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 185 (step_in):
+Step 188 (step_in):
   Code:
      61|                     dest: storage.ownerAddress,
      62|                     value: msg.forwardTonAmount,
@@ -4678,7 +4794,7 @@ Step 185 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 186 (step_in):
+Step 189 (step_in):
   Code:
      57|
      58|             if (msg.forwardTonAmount != 0) {
@@ -4713,7 +4829,7 @@ Step 186 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 187 (step_in):
+Step 190 (step_in):
   Code:
      69|                 });
      70|                 notifyOwnerMsg.send(
@@ -4750,7 +4866,7 @@ Step 187 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 188 (step_in):
+Step 191 (step_in):
   Code:
      68|                     },
      69|                 });
@@ -4787,7 +4903,7 @@ Step 188 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 189 (step_in):
+Step 192 (step_in):
   Code:
      73|             }
      74|
@@ -4822,7 +4938,7 @@ Step 189 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 190 (step_in):
+Step 193 (step_in):
   Code:
      74|
      75|             if (msg.sendExcessesTo != null) {
@@ -4857,7 +4973,7 @@ Step 190 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 191 (step_in):
+Step 194 (step_in):
   Code:
      75|             if (msg.sendExcessesTo != null) {
      76|                 val toLeaveOnBalance = contract.getOriginalBalance() - in.valueCoins +
@@ -4892,7 +5008,7 @@ Step 191 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 192 (step_in):
+Step 195 (step_in):
   Code:
      74|
      75|             if (msg.sendExcessesTo != null) {
@@ -4927,7 +5043,7 @@ Step 192 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 193 (step_in):
+Step 196 (step_in):
   Code:
      77|                 contract.getStorageDuePayment();
      78|                 reserveGramsOnBalance(
@@ -4963,7 +5079,7 @@ Step 193 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 194 (step_in):
+Step 197 (step_in):
   Code:
      27|         MIN_STORAGE_DURATION,
      28|         STORAGE_SIZE_MAX_WALLET_BITS,
@@ -4978,7 +5094,7 @@ Step 194 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 195 (step_in):
+Step 198 (step_in):
   Code:
      26|         MY_WORKCHAIN,
      27|         MIN_STORAGE_DURATION,
@@ -4993,7 +5109,7 @@ Step 195 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 196 (step_in):
+Step 199 (step_in):
   Code:
      25|     return calculateStorageFee(
      26|         MY_WORKCHAIN,
@@ -5008,7 +5124,7 @@ Step 196 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 197 (step_in):
+Step 200 (step_in):
   Code:
      24| fun calculateJettonWalletMinStorageFee(): coins {
      25|     return calculateStorageFee(
@@ -5023,7 +5139,7 @@ Step 197 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 198 (step_in):
+Step 201 (step_in):
   Code:
      23|
      24| fun calculateJettonWalletMinStorageFee(): coins {
@@ -5038,7 +5154,7 @@ Step 198 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 199 (step_in):
+Step 202 (step_in):
   Code:
      23|
      24| fun calculateJettonWalletMinStorageFee(): coins {
@@ -5055,7 +5171,7 @@ Step 199 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 200 (step_in):
+Step 203 (step_in):
   Code:
      77|                 contract.getStorageDuePayment();
      78|                 reserveGramsOnBalance(
@@ -5091,7 +5207,7 @@ Step 200 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 201 (step_in):
+Step 204 (step_in):
   Code:
      78|                 reserveGramsOnBalance(
      79|                     max(toLeaveOnBalance, calculateJettonWalletMinStorageFee()),
@@ -5127,7 +5243,7 @@ Step 201 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 202 (step_in):
+Step 205 (step_in):
   Code:
      76|                 val toLeaveOnBalance = contract.getOriginalBalance() - in.valueCoins +
      77|                 contract.getStorageDuePayment();
@@ -5163,7 +5279,7 @@ Step 202 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 203 (step_in):
+Step 206 (step_in):
   Code:
      82|
      83|                 val excessesMsg = createMessage({
@@ -5199,7 +5315,7 @@ Step 203 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 204 (step_in):
+Step 207 (step_in):
   Code:
      84|                     bounce: BounceMode.NoBounce,
      85|                     dest: msg.sendExcessesTo,
@@ -5235,7 +5351,7 @@ Step 204 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 205 (step_in):
+Step 208 (step_in):
   Code:
      83|                 val excessesMsg = createMessage({
      84|                     bounce: BounceMode.NoBounce,
@@ -5271,7 +5387,7 @@ Step 205 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 206 (step_in):
+Step 209 (step_in):
   Code:
      85|                     dest: msg.sendExcessesTo,
      86|                     value: 0,
@@ -5307,7 +5423,7 @@ Step 206 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 207 (step_in):
+Step 210 (step_in):
   Code:
      81|                 );
      82|
@@ -5343,7 +5459,7 @@ Step 207 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 208 (step_in):
+Step 211 (step_in):
   Code:
      88|                 });
      89|                 // SAFETY: It is safe because of reserveGramsOnBalance() called earlier
@@ -5381,7 +5497,7 @@ Step 208 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 209 (step_in):
+Step 212 (step_in):
   Code:
      39| }
      40|
@@ -5405,7 +5521,7 @@ Step 209 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 210 (step_in):
+Step 213 (step_in):
   Code:
      40|
      41| fun onInternalMessage(in: InMessage) {
@@ -5429,7 +5545,7 @@ Step 210 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 211 (step_in):
+Step 214 (step_in):
   Code:
      42|     val msg = lazy AllowedMessageToMinter.fromSlice(in.body);
      43|
@@ -5454,7 +5570,7 @@ Step 211 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 212 (step_in):
+Step 215 (step_in):
   Code:
     176|         }
     177|
@@ -5479,17 +5595,18 @@ Step 212 (step_in):
       hash = [HASH]
       raw = cell{[BOC_HEX]}
 
-Step 213 (step_in):
+Step 216 (step_in):
   Code:
-     45|         },
-     46|     });
-     47|     return net.send(from, outMessage);
+     49|         },
+     50|     });
+     51|     return net.send(from, outMessage);
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     48| }
+     52| }
   Variables:
     self: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       mainnet = [WALLET_ADDRESS_BASE]
@@ -5514,7 +5631,7 @@ Step 213 (step_in):
   Registers:
     c4 (storage): cell = empty cell
 
-Step 214 (step_in):
+Step 217 (step_in):
   Code:
     228|     val wallet = userWallet(minter, recipient);
     229|
@@ -5525,6 +5642,7 @@ Step 214 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -5536,10 +5654,11 @@ Step 214 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
   Registers:
     c4 (storage): cell = empty cell
 
-Step 215 (step_in):
+Step 218 (step_in):
   Code:
     229|
     230|     val mintResult = minter.sendMint(admin.address, recipient, amount, grams("0.05"), grams("0.3"));
@@ -5550,6 +5669,7 @@ Step 215 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -5561,12 +5681,13 @@ Step 215 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
     mintResult: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 216 (step_in):
+Step 219 (step_in):
   Code:
     231|     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
     232|         from: admin.address,
@@ -5577,6 +5698,7 @@ Step 216 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -5588,12 +5710,13 @@ Step 216 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
     mintResult: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 217 (step_in):
+Step 220 (step_in):
   Code:
     230|     val mintResult = minter.sendMint(admin.address, recipient, amount, grams("0.05"), grams("0.3"));
     231|     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
@@ -5604,6 +5727,7 @@ Step 217 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -5615,12 +5739,13 @@ Step 217 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
     mintResult: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:
     c4 (storage): cell = empty cell
 
-Step 218 (step_in):
+Step 221 (step_in):
   Code:
     229|
     230|     val mintResult = minter.sendMint(admin.address, recipient, amount, grams("0.05"), grams("0.3"));
@@ -5631,6 +5756,7 @@ Step 218 (step_in):
     minter: JettonMinter
       address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
+      toShard = <optimized out>
     admin: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
     recipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -5642,6 +5768,7 @@ Step 218 (step_in):
     wallet: JettonWallet
       address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
     mintResult: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
   Registers:

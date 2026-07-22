@@ -16,6 +16,15 @@ build-source-trace-wasm:
 sync-artifacts:
     cargo xtask sync-artifacts
 
+install-tools:
+    cargo install cargo-shear --version 1.13.1 --locked
+    cargo install cargo-deny --version 0.19.8 --locked
+    cargo install cargo-audit --version 0.22.1 --locked
+    cargo install typos-cli --version 1.47.2 --locked
+    cargo install cargo-llvm-cov --locked
+    rustup component add llvm-tools-preview
+    cargo install wasm-pack --version 0.15.0 --locked
+
 test-unit:
     cargo nextest run --workspace --lib --bins {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
     cargo test --workspace --doc
@@ -31,13 +40,13 @@ install-test-ui-e2e-browsers:
     bun run playwright install chromium
 
 test-ui-e2e-run: install-test-ui-e2e-browsers
-    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     bun run test:e2e:test-ui
 
 test-ui-e2e: build-ui build-dev test-ui-e2e-run
 
 test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
-    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
 
 _tree-sitter-test grammar:
@@ -146,14 +155,16 @@ coverage-clean:
 
 build-ui:
     bun ci
-    cd crates/acton-test-ui && bun ci && bun run build
-    cd crates/acton-localnet-ui && bun ci && bun run build
+    cd packages/test-ui && bun ci && bun run build
+    cd packages/localnet-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint
     bun run fmt:check
+    bun run doctor
 
 check-ui: fmt-ui
+    bun run doctor
     bun run lint:fix
 
 fmt-ui:
@@ -169,4 +180,9 @@ precommit: fmt fmt-ui build build-ui check check-ui
 
 clean:
     cargo clean
-    rm -rf crates/acton-test-ui/dist
+    rm -rf packages/test-ui/dist
+
+generate-schema:
+    cargo run -p xtask -- schema --schema acton-toml
+    cargo run -p xtask -- schema --schema lint-report
+    cargo run -p xtask -- schema --schema mutation-rules

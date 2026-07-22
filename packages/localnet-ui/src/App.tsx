@@ -1,0 +1,562 @@
+import {BrowserRouter, Navigate, Route, Routes, useLocation} from "react-router-dom"
+import {Check, KeyRound, ShieldCheck} from "lucide-react"
+import {Dialog, Input, ToastProvider} from "@acton/ui"
+import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
+import type {FC, ReactNode} from "react"
+
+import {TonClient} from "./explorer/api/client"
+import {getBundledCompilerAbis} from "./explorer/api/compilerAbiCatalog"
+import {useExplorerPageTitle} from "./explorer/components/ExplorerDocumentTitle"
+import {AccountPage} from "./explorer/pages/AccountPage"
+import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
+import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
+import {CellInspectorPage} from "./explorer/pages/CellInspectorPage"
+import {EmulatePage} from "./explorer/pages/EmulatePage"
+import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
+import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
+import {TransactionPage} from "./explorer/pages/TransactionPage"
+import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
+import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
+import {ExplorerRoutesProvider} from "./explorer/hooks/useExplorerRoutes"
+import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
+import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
+import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "./explorer/metadata/verifierRegistry"
+import {DashboardPage} from "./dashboard/DashboardPage"
+import {FaucetPage} from "./dashboard/pages/FaucetPage"
+import {HomePage} from "./dashboard/pages/HomePage"
+import {NftsPage} from "./dashboard/pages/NftsPage"
+import {TokensPage} from "./dashboard/pages/TokensPage"
+import {WalletsPage} from "./dashboard/pages/WalletsPage"
+import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
+import "@acton/ui/styles/tokens.css"
+import "./index.css"
+import styles from "./App.module.css"
+
+const HOST = (import.meta.env.VITE_LOCALNET_HOST || "").replace(/\/$/, "")
+const LOCALNET_API_TOKEN_STORAGE_KEY = "localnetApiToken"
+const ENV_LOCALNET_API_TOKEN = import.meta.env.VITE_LOCALNET_API_TOKEN?.trim() || undefined
+const TONCENTER_API_KEY = import.meta.env.VITE_LOCALNET_TONCENTER_API_KEY?.trim() || undefined
+const TONCENTER_API_V2_URL =
+  import.meta.env.VITE_LOCALNET_TONCENTER_API_V2_URL?.trim().replace(/\/$/, "") || undefined
+const TONCENTER_API_V3_URL =
+  import.meta.env.VITE_LOCALNET_TONCENTER_API_V3_URL?.trim().replace(/\/$/, "") || undefined
+const API_V2_BASE_URL = TONCENTER_API_V2_URL ?? `${HOST}/api/v2`
+const API_V3_BASE_URL = TONCENTER_API_V3_URL ?? `${HOST}/api/v3`
+
+const readInitialLocalnetApiToken = (): string | undefined => {
+  return ENV_LOCALNET_API_TOKEN || localStorage.getItem(LOCALNET_API_TOKEN_STORAGE_KEY) || undefined
+}
+
+const ApiReferencePage = lazy(async () => {
+  const module = await import("./dashboard/pages/ApiReferencePage")
+  return {default: module.ApiReferencePage}
+})
+const ApiCallsPage = lazy(async () => {
+  const module = await import("./dashboard/pages/ApiCallsPage")
+  return {default: module.ApiCallsPage}
+})
+
+const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
+  "/dashboard": "Dashboard",
+  "/faucet": "Faucet",
+  "/wallets": "Wallets",
+  "/tokens": "Tokens",
+  "/nfts": "NFTs",
+  "/api-reference/v2": "API Reference v2",
+  "/api-reference/v3": "API Reference v3",
+  "/api-reference/control": "Control API Reference",
+  "/api-calls": "API Calls",
+}
+export const App: FC = () => {
+  const [localnetApiToken, setLocalnetApiTokenState] = useState<string | undefined>(
+    readInitialLocalnetApiToken,
+  )
+  const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false)
+  const [isAuthOverlayRequired, setIsAuthOverlayRequired] = useState(false)
+
+  const setLocalnetApiToken = useCallback((token: string | undefined) => {
+    const nextToken = token?.trim() || undefined
+    if (nextToken) {
+      localStorage.setItem(LOCALNET_API_TOKEN_STORAGE_KEY, nextToken)
+    } else {
+      localStorage.removeItem(LOCALNET_API_TOKEN_STORAGE_KEY)
+    }
+    setLocalnetApiTokenState(nextToken)
+  }, [])
+
+  const openAuthOverlay = useCallback(() => {
+    setIsAuthOverlayRequired(false)
+    setIsAuthOverlayOpen(true)
+  }, [])
+
+  const closeAuthOverlay = useCallback(() => {
+    setIsAuthOverlayRequired(false)
+    setIsAuthOverlayOpen(false)
+  }, [])
+
+  const handleUnauthorized = useCallback(() => {
+    setIsAuthOverlayRequired(true)
+    setIsAuthOverlayOpen(true)
+  }, [])
+
+  const saveAuthToken = useCallback(
+    (token: string) => {
+      setLocalnetApiToken(token)
+      setIsAuthOverlayRequired(false)
+      setIsAuthOverlayOpen(false)
+    },
+    [setLocalnetApiToken],
+  )
+
+  const clearAuthToken = useCallback(() => {
+    setLocalnetApiToken(undefined)
+    if (!isAuthOverlayRequired) {
+      setIsAuthOverlayOpen(false)
+    }
+  }, [isAuthOverlayRequired, setLocalnetApiToken])
+
+  const client = useMemo(
+    () =>
+      new TonClient({
+        v2BaseUrl: API_V2_BASE_URL,
+        v3BaseUrl: API_V3_BASE_URL,
+        addressNameBaseUrl: HOST,
+        localnetApiToken,
+        onUnauthorized: handleUnauthorized,
+        toncenterApiKey: TONCENTER_API_KEY,
+      }),
+    [handleUnauthorized, localnetApiToken],
+  )
+  const metadataRegistry = useMemo(
+    () =>
+      new CompositeMetadataRegistry([
+        new LocalnetMetadataRegistry(client),
+        new BundledAbiRegistry(getBundledCompilerAbis),
+        new VerifierMetadataRegistry(),
+      ]),
+    [client],
+  )
+  const explorerApi = useMemo(
+    () => ({
+      v2BaseUrl: API_V2_BASE_URL,
+      v3BaseUrl: API_V3_BASE_URL,
+      toncenterApiKey: TONCENTER_API_KEY,
+    }),
+    [],
+  )
+  return (
+    <BrowserRouter>
+      <ToastProvider>
+        <NetworkInfoProvider client={client} api={explorerApi}>
+          <ExplorerRoutesProvider>
+            <MetadataRegistryProvider registry={metadataRegistry}>
+              <AddressBookProvider>
+                <WalletRuntimeProvider
+                  client={client}
+                  host={HOST}
+                  localnetApiToken={localnetApiToken}
+                >
+                  <AppContent
+                    client={client}
+                    isAuthOverlayOpen={isAuthOverlayOpen}
+                    isAuthOverlayRequired={isAuthOverlayRequired}
+                    localnetApiToken={localnetApiToken}
+                    onClearAuthToken={clearAuthToken}
+                    onCloseAuthOverlay={closeAuthOverlay}
+                    onOpenAuthOverlay={openAuthOverlay}
+                    onRequireAuthToken={handleUnauthorized}
+                    onSaveAuthToken={saveAuthToken}
+                  />
+                </WalletRuntimeProvider>
+              </AddressBookProvider>
+            </MetadataRegistryProvider>
+          </ExplorerRoutesProvider>
+        </NetworkInfoProvider>
+      </ToastProvider>
+    </BrowserRouter>
+  )
+}
+
+interface AppContentProps {
+  readonly client: TonClient
+  readonly isAuthOverlayOpen: boolean
+  readonly isAuthOverlayRequired: boolean
+  readonly localnetApiToken?: string
+  readonly onClearAuthToken: () => void
+  readonly onCloseAuthOverlay: () => void
+  readonly onOpenAuthOverlay: () => void
+  readonly onRequireAuthToken: () => void
+  readonly onSaveAuthToken: (token: string) => void
+}
+
+const AppContent: FC<AppContentProps> = ({
+  client,
+  isAuthOverlayOpen,
+  isAuthOverlayRequired,
+  localnetApiToken,
+  onClearAuthToken,
+  onCloseAuthOverlay,
+  onOpenAuthOverlay,
+  onRequireAuthToken,
+  onSaveAuthToken,
+}) => {
+  const dashboardProps = {
+    client,
+    localnetApiToken,
+    onOpenAuthTokenOverlay: onOpenAuthOverlay,
+  }
+
+  return (
+    <>
+      <LocalnetDocumentTitle />
+      <div className={styles.app}>
+        <main className={styles.main}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              path="/dashboard"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <RouteSuspense>
+                    <HomePage client={client} />
+                  </RouteSuspense>
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/faucet"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <FaucetPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route path="/blocks" element={<Navigate to="/explorer/blocks" replace />} />
+            <Route
+              path="/explorer/blocks"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <BlocksPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/block/last"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <BlockDetailsPage client={client} latest />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/block/:workchain/:shard/:seqno"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <BlockDetailsPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/wallets"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <WalletsPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/tokens"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <TokensPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/nfts"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <NftsPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route path="/api-reference" element={<Navigate to="/api-reference/v2" replace />} />
+            <Route
+              path="/api-reference/v2"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <RouteSuspense>
+                    <ApiReferencePage
+                      apiBaseUrl={API_V2_BASE_URL}
+                      localnetApiToken={TONCENTER_API_V2_URL ? undefined : localnetApiToken}
+                      onUnauthorized={onRequireAuthToken}
+                      toncenterApiKey={TONCENTER_API_KEY}
+                      version="v2"
+                    />
+                  </RouteSuspense>
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/api-reference/v3"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <RouteSuspense>
+                    <ApiReferencePage
+                      apiBaseUrl={API_V3_BASE_URL}
+                      localnetApiToken={TONCENTER_API_V3_URL ? undefined : localnetApiToken}
+                      onUnauthorized={onRequireAuthToken}
+                      toncenterApiKey={TONCENTER_API_KEY}
+                      version="v3"
+                    />
+                  </RouteSuspense>
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/api-reference/control"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <RouteSuspense>
+                    <ApiReferencePage
+                      apiBaseUrl={HOST}
+                      localnetApiToken={localnetApiToken}
+                      onUnauthorized={onRequireAuthToken}
+                      version="control"
+                    />
+                  </RouteSuspense>
+                </DashboardPage>
+              }
+            />
+            <Route path="/dashboard/faucet" element={<Navigate to="/faucet" replace />} />
+            <Route path="/dashboard/wallets" element={<Navigate to="/wallets" replace />} />
+            <Route path="/dashboard/tokens" element={<Navigate to="/tokens" replace />} />
+            <Route path="/dashboard/nfts" element={<Navigate to="/nfts" replace />} />
+            <Route
+              path="/dashboard/json-rpc-calls"
+              element={<Navigate to="/api-calls" replace />}
+            />
+            <Route path="/dashboard/api-calls" element={<Navigate to="/api-calls" replace />} />
+            <Route path="/json-rpc-calls" element={<Navigate to="/api-calls" replace />} />
+            <Route
+              path="/api-calls"
+              element={
+                <DashboardPage {...dashboardProps}>
+                  <RouteSuspense>
+                    <ApiCallsPage client={client} />
+                  </RouteSuspense>
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <ExplorerIndexPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/abi"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <AbiCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/abi/:slug"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <AbiDetailsPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/sources"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <SourceCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/cell"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <CellInspectorPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/emulate"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <EmulatePage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/favorites"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <FavoriteAccountsPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/address/:address"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <AccountPage client={client} enableJettonMint />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/tx/:hash/trace"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <TransactionPage client={client} openRetraceOnLoad />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/tx/:hash"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <TransactionPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </main>
+      </div>
+
+      {isAuthOverlayOpen && (
+        <LocalnetAuthOverlay
+          localnetApiToken={localnetApiToken}
+          onClear={onClearAuthToken}
+          onClose={onCloseAuthOverlay}
+          onSave={onSaveAuthToken}
+          required={isAuthOverlayRequired}
+        />
+      )}
+    </>
+  )
+}
+
+const LocalnetDocumentTitle: FC = () => {
+  const {pathname} = useLocation()
+  const explorerPageTitle = useExplorerPageTitle()
+  const pageTitle = explorerPageTitle ?? LOCALNET_PAGE_TITLES[pathname]
+
+  return <title>{pageTitle ? `${pageTitle} · TON Localnet UI` : "TON Localnet UI"}</title>
+}
+
+const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
+  <Suspense fallback={<div className={styles.routeLoading}>Loading…</div>}>{children}</Suspense>
+)
+
+interface LocalnetAuthOverlayProps {
+  readonly localnetApiToken?: string
+  readonly onClear: () => void
+  readonly onClose: () => void
+  readonly onSave: (token: string) => void
+  readonly required: boolean
+}
+
+const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
+  localnetApiToken,
+  onClear,
+  onClose,
+  onSave,
+  required,
+}) => {
+  const [draftToken, setDraftToken] = useState(localnetApiToken ?? "")
+  const inputRef = useRef<HTMLInputElement>(null)
+  const canDismiss = !required
+
+  useEffect(() => {
+    setDraftToken(localnetApiToken ?? "")
+  }, [localnetApiToken])
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const title = required ? "Localnet API token required" : "Localnet API token"
+  const description =
+    required && localnetApiToken
+      ? "The saved token was rejected by the localnet API. Paste the current token printed by the running localnet process."
+      : "Paste the localnet API token to use protected routes from this browser. The token will be saved locally."
+
+  return (
+    <Dialog
+      open
+      title={title}
+      description={description}
+      className={styles.authDialog}
+      leadingIcon={
+        <span className={styles.authIcon} aria-hidden="true">
+          <ShieldCheck size={21} />
+        </span>
+      }
+      maxWidth={440}
+      dismissible={canDismiss}
+      closeLabel="Close localnet API token dialog"
+      onOpenChange={open => {
+        if (!open) onClose()
+      }}
+    >
+      <form
+        className={styles.authForm}
+        onSubmit={event => {
+          event.preventDefault()
+          const nextToken = draftToken.trim()
+          if (nextToken) {
+            onSave(nextToken)
+          }
+        }}
+      >
+        <Input
+          ref={inputRef}
+          id="localnet-api-token"
+          className={styles.authInput}
+          type="password"
+          label="API token"
+          leadingIcon={<KeyRound size={17} />}
+          value={draftToken}
+          placeholder="Paste token"
+          onChange={event => setDraftToken(event.target.value)}
+        />
+
+        <div className={styles.authActions}>
+          <button
+            type="submit"
+            className={`${styles.authActionButton} ${styles.authPrimaryButton}`}
+            disabled={!draftToken.trim()}
+          >
+            <Check size={16} />
+            <span>Save token</span>
+          </button>
+          {localnetApiToken && (
+            <button
+              type="button"
+              className={styles.authActionButton}
+              onClick={() => {
+                setDraftToken("")
+                onClear()
+              }}
+            >
+              Clear stored token
+            </button>
+          )}
+        </div>
+      </form>
+    </Dialog>
+  )
+}

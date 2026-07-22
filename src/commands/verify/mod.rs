@@ -17,7 +17,7 @@ use std::sync::Arc;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
-use ton_api::{GetMethodResult, Network, TonApiClient};
+use ton_api::{Network, TonApiClient, toncenter::v2};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, CellSliceParts, HashBytes, Load};
@@ -1398,14 +1398,14 @@ fn get_verifier_quorum(
     parse_verifier_quorum_from_get_method(&result, verifier_id)
 }
 
-fn parse_verifier_registry_address(result: &GetMethodResult) -> anyhow::Result<TonAddress> {
+fn parse_verifier_registry_address(result: &v2::RunGetMethodResult) -> anyhow::Result<TonAddress> {
     let cell = parse_stack_cell(result, "get_verifier_registry_address")?;
     TonAddress::from_cell(&TonCell::from_boc(Boc::encode(cell))?)
         .context("Failed to parse registry address from object")
 }
 
 fn parse_verifier_quorum_from_get_method(
-    result: &GetMethodResult,
+    result: &v2::RunGetMethodResult,
     verifier_id: &str,
 ) -> anyhow::Result<u8> {
     let cell = parse_stack_cell(result, "get_verifiers")?;
@@ -1449,7 +1449,7 @@ fn parse_verifier_quorum_from_get_method(
     );
 }
 
-fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Result<Cell> {
+fn parse_stack_cell(result: &v2::RunGetMethodResult, method_name: &str) -> anyhow::Result<Cell> {
     if result.exit_code != 0 {
         anyhow::bail!(
             "{method_name} returned non-zero exit code: {}",

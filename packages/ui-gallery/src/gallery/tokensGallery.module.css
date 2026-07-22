@@ -1,0 +1,113 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: var(--acton-space-5) var(--acton-space-4);
+}
+
+.sample {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--acton-space-2);
+}
+
+.preview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.color {
+  background-color: var(--acton-color-surface);
+  background-image:
+    linear-gradient(45deg, var(--acton-color-border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--acton-color-border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--acton-color-border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--acton-color-border) 75%);
+  background-position:
+    0 0,
+    0 0.5rem,
+    0.5rem -0.5rem,
+    -0.5rem 0;
+  background-size: 1rem 1rem;
+}
+
+.colorFill {
+  position: absolute;
+  inset: 0;
+}
+
+.border {
+  border-width: var(--acton-space-2);
+  background: var(--acton-color-surface);
+}
+
+.shadow {
+  width: calc(100% - var(--acton-space-4));
+  margin: var(--acton-space-2);
+  border-color: var(--acton-color-popover-border);
+  background: var(--acton-color-popover-surface);
+}
+
+.font {
+  background: var(--acton-color-surface-raised);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.spacing,
+.motion {
+  background: var(--acton-color-surface-raised);
+}
+
+.spacingMark {
+  min-width: 0.25rem;
+  min-height: 0.25rem;
+  max-width: calc(100% - var(--acton-space-4));
+  max-height: calc(100% - var(--acton-space-4));
+  background: var(--acton-color-accent);
+}
+
+.radius {
+  width: calc(100% - var(--acton-space-4));
+  margin: var(--acton-space-2);
+  border-color: transparent;
+  background: var(--acton-color-accent);
+}
+
+.motionMark {
+  color: var(--acton-color-accent);
+  font-family: var(--acton-font-mono);
+  font-size: 2rem;
+  transition-property: transform;
+  transition-duration: var(--acton-duration-normal);
+  transition-timing-function: var(--acton-ease-standard);
+}
+
+.motion:hover .motionMark {
+  transform: translateX(var(--acton-space-3));
+}
+
+.name {
+  display: block;
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-2xs);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--acton-space-4) var(--acton-space-3);
+  }
+}

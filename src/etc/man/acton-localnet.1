@@ -39,7 +39,8 @@ Wallet names to auto\-fund and deploy on startup.
 .sp
 \fB\-\-db\-path\fR \fIpath\fR
 .RS 4
-Path to a SQLite database for persistent node state.
+Path to a SQLite database for persistent node state. Defaults to
+\fB[localnet].db\-path\fR when configured.
 .RE
 .sp
 \fB\-\-rate\-limit\fR \fIrps\fR
@@ -65,12 +66,24 @@ Disable automatic block production. Mine blocks manually with
 .sp
 \fB\-\-load\-state\fR \fIpath\fR
 .RS 4
-Load Localnet state from a JSON snapshot before startup.
+Load Localnet state from a JSON state file before startup.
 .RE
 .sp
 \fB\-\-dump\-state\fR \fIpath\fR
 .RS 4
-Dump Localnet state to a JSON snapshot on shutdown.
+Dump Localnet state to a JSON state file on shutdown.
+.RE
+.sp
+\fB\-\-liteapi\fR
+.RS 4
+Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+port. LiteAPI is disabled by default.
+.RE
+.sp
+\fB\-\-liteapi\-port\fR \fIport\fR
+.RS 4
+Set the LiteAPI TCP port explicitly. Requires \fB\-\-liteapi\fR; otherwise LiteAPI
+uses the Localnet HTTP port plus one.
 .RE
 .sp
 \fB\-\-require\-auth\fR
@@ -79,7 +92,8 @@ Require a token for all Localnet HTTP API, control, emulate, and streaming
 endpoints. The server prints the token on startup.
 .RE
 .sp
-\fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
+\fB\-\-load\-state\fR cannot be used when a database path comes from either
+\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR\&.
 .SS "acton localnet airdrop"
 Send GRAM from the local faucet to an address.
 .SS "Synopsis"
@@ -214,37 +228,60 @@ Print machine\-readable JSON.
 Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
 Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
-.SS "acton localnet snapshot"
-Manage named runtime state snapshots for a running localnet.
+.SS "acton localnet state"
+Transfer the current state of a running localnet as a portable JSON file.
 .SS "Synopsis"
-\fBacton localnet snapshot\fR [\fIoptions\fR] \fIcommand\fR
+\fBacton localnet state\fR [\fIoptions\fR] \fIcommand\fR
 .SS "Subcommands"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBcreate <name>\fR stores the current localnet state as an in\-memory snapshot
+\h'-04'\(bu\h'+03'\fBdump <path>\fR downloads the current live state directly to a file
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBlist\fR prints named in\-memory snapshots
+\h'-04'\(bu\h'+03'\fBload <path>\fR uploads a state file and replaces the current live state
+.RE
+.sp
+\fBdump\fR refuses to overwrite an existing file unless \fB\-\-force\fR is passed. A
+successful \fBload\fR clears all in\-memory checkpoints.
+.SS "acton localnet checkpoint"
+Manage named in\-memory restore points for a running localnet.
+.SS "Synopsis"
+\fBacton localnet checkpoint\fR [\fIoptions\fR] \fIcommand\fR
+.SS "Subcommands"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcreate <name>\fR stores the current localnet state as a checkpoint
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBrevert <name>\fR restores a named in\-memory snapshot and invalidates that
-snapshot plus newer snapshots
+\h'-04'\(bu\h'+03'\fBlist\fR prints named checkpoints and their block seqnos
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBexport <name> \-\-out <path>\fR writes a named in\-memory snapshot to a JSON file
+\h'-04'\(bu\h'+03'\fBrestore <name>\fR restores a checkpoint without deleting any checkpoints
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBimport <path>\fR loads a JSON file as a named in\-memory snapshot, using the
-file stem as the snapshot name unless \fB\-\-name\fR is passed
+\h'-04'\(bu\h'+03'\fBdelete <name>\fR deletes one checkpoint
 .RE
 .sp
-Relative export and import paths resolve from the Acton project root. Snapshot
-create, list, revert, export, and import all call the running localnet control
-API, so pass \fB\-\-port\fR or \fB\-\-auth\-token\fR when the node does not use defaults.
+.RS 4
+\h'-04'\(bu\h'+03'\fBclear\fR deletes all checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBexport <name> \-\-out <path>\fR downloads a checkpoint as a JSON file
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBimport <path>\fR uploads a JSON file as a checkpoint, using the file stem as
+the name unless \fB\-\-name\fR is passed
+.RE
+.sp
+Relative paths resolve from the Acton project root. These commands call the
+running localnet control API, so pass \fB\-\-port\fR or \fB\-\-auth\-token\fR when the node
+does not use defaults.
 .SH "CONFIGURATION"
 You can store defaults in \fBActon.toml\fR:
 .sp
@@ -252,6 +289,7 @@ You can store defaults in \fBActon.toml\fR:
 .nf
 [localnet]
 port = 5411
+db\-path = ".acton/localnet.sqlite"
 fork\-net = "testnet"
 fork\-block\-number = 55000000
 accounts = ["deployer", "user"]
@@ -262,7 +300,10 @@ no\-mining = false
 .fi
 .RE
 .sp
-CLI flags override config values for the current invocation.
+CLI flags override config values for the current invocation. In particular,
+\fB\-\-db\-path\fR overrides \fB[localnet].db\-path\fR\&. A relative path in \fBActon.toml\fR
+resolves from the project root, while a relative \fB\-\-db\-path\fR resolves from the
+current working directory.
 .SH "TONCENTER API KEYS"
 When localnet forks from the built\-in \fBmainnet\fR/\fBtestnet\fR backends,
 authenticated requests read \fBTONCENTER_MAINNET_API_KEY\fR or
@@ -363,7 +404,7 @@ the same frontend shell
 .RS 4
 \h'-04'\(bu\h'+03'the UI reads chain data from \fB/api/v2\fR and \fB/api/v3\fR, and uses \fBacton_*\fR
 control endpoints for local address aliases, registered compiler ABIs,
-status, and snapshot tooling
+status, state files, and checkpoint tooling
 .RE
 .sp
 .RS 4
@@ -392,7 +433,7 @@ server is running, and \fBGET /acton_nodeInfo\fR reports the current value
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR writes a snapshot during graceful shutdown
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR writes a state file during graceful shutdown
 .RE
 .SH "CONTROL ENDPOINTS"
 The localnet server exposes \fBacton_*\fR control routes for local development
@@ -404,39 +445,44 @@ source
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_dumpState\fR with \fB{"path":"snapshots/localnet.json"}\fR writes a
-JSON state snapshot without stopping the server
+\h'-04'\(bu\h'+03'\fBGET /acton_dumpState\fR downloads the current live state as JSON bytes
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_loadState\fR with \fB{"path":"snapshots/localnet.json"}\fR replaces
-the current node state with a JSON state snapshot
+\h'-04'\(bu\h'+03'\fBPOST /acton_loadState\fR accepts JSON state bytes, replaces the current node
+state, and clears all checkpoints
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_snapshot\fR with \fB{"name":"before\-upgrade"}\fR creates a named
-runtime in\-memory recovery point
+\h'-04'\(bu\h'+03'\fBPOST /acton_createCheckpoint\fR with \fB{"name":"before\-upgrade"}\fR creates a
+named in\-memory checkpoint
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_listSnapshots\fR lists named runtime recovery points
+\h'-04'\(bu\h'+03'\fBGET /acton_listCheckpoints\fR lists checkpoints
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_revert\fR with \fB{"name":"before\-upgrade"}\fR restores a runtime
-recovery point and invalidates that point plus every newer point
+\h'-04'\(bu\h'+03'\fBPOST /acton_restoreCheckpoint\fR with \fB{"name":"before\-upgrade"}\fR restores a
+checkpoint without deleting it or newer checkpoints
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_exportSnapshot\fR with
-\fB{"name":"before\-upgrade","path":"snapshots/bug.json"}\fR writes a runtime
-recovery point to a JSON state snapshot
+\h'-04'\(bu\h'+03'\fBPOST /acton_deleteCheckpoint\fR deletes one named checkpoint
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBPOST /acton_importSnapshot\fR with
-\fB{"name":"bug","path":"snapshots/bug.json"}\fR imports a JSON state snapshot as
-a named runtime recovery point
+\h'-04'\(bu\h'+03'\fBPOST /acton_clearCheckpoints\fR deletes all checkpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBGET /acton_exportCheckpoint?name=before\-upgrade\fR downloads a checkpoint as
+JSON bytes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_importCheckpoint?name=bug\fR accepts JSON state bytes and imports
+them as a named checkpoint
 .RE
 .sp
 .RS 4
@@ -487,20 +533,22 @@ expose the localnet server publicly.
 .SH "PERSISTENCE"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR enables persistent SQLite\-backed node state across runs
+\h'-04'\(bu\h'+03'\fB\-\-db\-path\fR or \fB[localnet].db\-path\fR enables persistent SQLite\-backed node
+state across runs
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-load\-state\fR initializes state from a JSON snapshot and cannot be combined
-with \fB\-\-db\-path\fR
+\h'-04'\(bu\h'+03'\fB\-\-load\-state\fR initializes state from a JSON state file and cannot be combined
+with a database path from either CLI or \fBActon.toml\fR
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR exports a JSON snapshot on shutdown
+\h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR exports a JSON state file on shutdown
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'when \fB\-\-db\-path\fR is not used, node state is ephemeral unless loaded or dumped
+\h'-04'\(bu\h'+03'when no database path is configured, node state is ephemeral unless loaded
+or dumped
 .RE
 .SH "EXIT STATUS"
 .sp
@@ -562,11 +610,11 @@ acton localnet start \-\-fork\-net testnet \-\-fork\-block\-number 55000000
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Load and dump JSON state snapshots:
+\h'-04' 3.\h'+01'Load and dump JSON state files:
 .sp
 .RS 4
 .nf
-acton localnet start \-\-load\-state snapshots/localnet.json \-\-dump\-state snapshots/localnet.json
+acton localnet start \-\-load\-state states/localnet.json \-\-dump\-state states/localnet.json
 .fi
 .RE
 .RE
@@ -602,15 +650,16 @@ acton localnet status \-\-json
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Save, list, restore, export, and import runtime snapshots:
+\h'-04' 7.\h'+01'Dump/load state files and manage runtime checkpoints:
 .sp
 .RS 4
 .nf
-acton localnet snapshot create before\-upgrade
-acton localnet snapshot list
-acton localnet snapshot revert before\-upgrade
-acton localnet snapshot export before\-upgrade \-\-out snapshots/bug.json
-acton localnet snapshot import snapshots/bug.json
+acton localnet state dump states/localnet.json
+acton localnet checkpoint create before\-upgrade
+acton localnet checkpoint list
+acton localnet checkpoint restore before\-upgrade
+acton localnet checkpoint export before\-upgrade \-\-out states/before\-upgrade.json
+acton localnet checkpoint import states/before\-upgrade.json
 .fi
 .RE
 .RE

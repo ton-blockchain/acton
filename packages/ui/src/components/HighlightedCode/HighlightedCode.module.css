@@ -1,0 +1,52 @@
+.root {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: var(--acton-highlighted-code-max-height, 37.5rem);
+  min-height: var(--acton-highlighted-code-min-height, 0);
+  overflow: auto;
+  background: transparent;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-highlighted-code-font-size, var(--acton-font-size-compact));
+  line-height: var(--acton-highlighted-code-line-height, 1.6);
+  tab-size: 2;
+}
+
+.highlighted,
+.fallback {
+  min-height: inherit;
+}
+
+.highlighted :global(pre),
+.fallback {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  min-height: inherit;
+  margin: 0;
+  padding: var(--acton-highlighted-code-padding, var(--acton-space-4));
+  overflow: visible;
+  background: transparent !important;
+  color: inherit;
+  font: inherit;
+  white-space: pre;
+  word-break: normal;
+}
+
+.highlighted :global(code),
+.fallback code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  font: inherit;
+}
+
+.root[data-wrap="true"] .highlighted :global(pre),
+.root[data-wrap="true"] .highlighted :global(code),
+.root[data-wrap="true"] .fallback,
+.root[data-wrap="true"] .fallback code {
+  width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

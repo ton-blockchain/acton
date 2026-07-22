@@ -795,6 +795,7 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     let _ = writeln!(code, "struct {contract} {{");
     code.push_str("    address: address\n");
     code.push_str("    stateInit: ContractState? = null\n");
+    code.push_str("    toShard: AddressShardingOptions? = null\n");
     code.push_str("}\n\n");
 
     if let Some(storage_type_name) = &model.storage_type_name {
@@ -860,7 +861,10 @@ fn generate_from_storage(
     code.push_str(
         "    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();\n",
     );
-    let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
+    let _ = writeln!(
+        code,
+        "    return {contract_name} {{ address, stateInit, toShard }}"
+    );
     code.push_str("}\n");
 
     code
@@ -895,7 +899,10 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     code.push_str(
         "    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();\n",
     );
-    let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
+    let _ = writeln!(
+        code,
+        "    return {contract_name} {{ address, stateInit, toShard }}"
+    );
     code.push_str("}\n");
 
     code
@@ -916,7 +923,9 @@ fn generate_deploy(contract_name: &str) -> String {
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
     code.push_str("        dest: {\n");
+    code.push_str("            workchain: self.address.getWorkchain(),\n");
     code.push_str("            stateInit: self.stateInit,\n");
+    code.push_str("            toShard: self.toShard,\n");
     code.push_str("        },\n");
     code.push_str("    });\n");
     code.push_str("    return net.send(from, genericMsg)\n");

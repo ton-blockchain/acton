@@ -1,0 +1,53 @@
+name: Check Dependencies with OSV-Scanner
+
+on:
+  workflow_call:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-osv.yml"
+      - "**/Cargo.lock"
+      - "**/bun.lock"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+      - "**/osv-scanner.toml"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-osv.yml"
+      - "**/Cargo.lock"
+      - "**/bun.lock"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+      - "**/osv-scanner.toml"
+  workflow_dispatch:
+
+concurrency:
+  group: check-osv-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  scan-pr:
+    name: OSV-Scanner PR scan
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@c51854704019a247608d928f370c98740469d4b5 # v2.3.5
+    permissions:
+      actions: read # upload SARIF results
+      contents: read # scan repository lockfiles
+      security-events: write # publish Code Scanning alerts
+
+  scan-full:
+    name: OSV-Scanner full scan
+    if: ${{ github.event_name != 'pull_request' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@f6fb127369c122785bf90c4148a2721e7a9d3727 # v2.3.8 + pinned download-artifact
+    with:
+      # Report the existing baseline in Code Scanning; PR scans still block new findings.
+      fail-on-vuln: false
+    permissions:
+      actions: read # upload SARIF results
+      contents: read # scan repository lockfiles
+      security-events: write # publish Code Scanning alerts

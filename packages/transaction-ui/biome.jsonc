@@ -1,0 +1,75 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**"]
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noNoninteractiveElementInteractions": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "useSemanticElements": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noUselessContinue": "off",
+        "noUselessReturn": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useMaxParams": "off",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "correctness": {
+        "noUnresolvedImports": "off",
+        "useExhaustiveDependencies": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "noReExportAll": "off",
+        "useSolidForComponent": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noDescendingSpecificity": "off",
+        "noHexColors": "off",
+        "noImplicitBoolean": "off",
+        "noIncrementDecrement": "off",
+        "noJsxLiterals": "off",
+        "noNestedTernary": "off",
+        "noNonNullAssertion": "off",
+        "useBlockStatements": "off",
+        "useComponentExportOnlyModules": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentCurlyBraces": "off",
+        "useConsistentMethodSignatures": "off",
+        "useConsistentObjectDefinitions": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useDefaultSwitchClause": "off",
+        "useDestructuring": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off",
+        "useSelfClosingElements": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noBitwiseOperators": "off",
+        "noConsole": "off",
+        "noLeakedRender": "off",
+        "noReactSpecificProps": "off",
+        "noShadow": "off",
+        "noUnnecessaryConditions": "off",
+        "useAwait": "off"
+      }
+    }
+  }
+}

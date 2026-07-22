@@ -1,0 +1,316 @@
+:root {
+  /* Page background behind application surfaces. */
+  --acton-color-canvas: hsl(240 7% 97%);
+  /* Default component and panel surface. */
+  --acton-color-surface: hsl(0 0% 100%);
+  /* Slightly raised surface for controls and elevated regions. */
+  --acton-color-surface-raised: hsl(0 0% 99%);
+  /* Hover surface for neutral interactive elements. */
+  --acton-color-surface-hover: hsl(240 5% 96%);
+  /* Table header and row-hover surface aligned with localnet row bands. */
+  --acton-color-surface-row: hsl(240 5% 94%);
+  /* Subtle fill behind inline markdown code fragments. */
+  --acton-color-inline-code-surface: hsl(240 5% 92%);
+  /* Grouped-control and collapsible-row surface. */
+  --acton-color-surface-group: hsl(0 0% 98%);
+  /* Pressed or selected surface for neutral elements. */
+  --acton-color-surface-active: hsl(240 4% 95%);
+  /* Primary text color for readable foreground content. */
+  --acton-color-text: hsl(240 10% 4%);
+  /* Secondary text color for labels, metadata, and icons. */
+  --acton-color-text-muted: hsl(240 4% 46%);
+  /* Tertiary text color for placeholders and low-emphasis hints. */
+  --acton-color-text-subtle: hsl(240 4% 64%);
+  /* Hairline border for layout separators. */
+  --acton-color-border: hsl(240 6% 90%);
+  /* Default border for inputs, buttons, and other controls. */
+  --acton-color-border-control: hsl(240 6% 90%);
+  /* Emphasized border for hover and active control states. */
+  --acton-color-border-strong: hsl(240 5% 84%);
+  /* Inverted neutral fill for primary command buttons. */
+  --acton-color-primary: hsl(240 6% 10%);
+  /* Hover state for primary command buttons. */
+  --acton-color-primary-hover: hsl(240 4% 16%);
+  /* Text and icon color placed on primary command buttons. */
+  --acton-color-primary-foreground: hsl(0 0% 98%);
+  /* Accent color for links and informational highlights. */
+  --acton-color-accent: hsl(216 81% 48%);
+  /* Hover state for accent color. */
+  --acton-color-accent-hover: hsl(216 83% 41%);
+  /* Text and icon color placed on accent backgrounds when needed. */
+  --acton-color-accent-foreground: hsl(0 0% 100%);
+  /* Success status color for completed non-destructive feedback. */
+  --acton-color-success: hsl(142 64% 36%);
+  /* Success border color for feedback surfaces. */
+  --acton-color-success-border: hsl(142 44% 72%);
+  /* Passed-status accent for test and validation results. */
+  --acton-color-status-passed: #10b981;
+  /* Passed-status background for test and validation results. */
+  --acton-color-status-passed-surface: #ecfdf5;
+  /* Passed-status foreground for test and validation results. */
+  --acton-color-status-passed-text: #065f46;
+  /* Added-value accent used by structured diffs. */
+  --acton-color-diff-added: #10b981;
+  /* Added-value surface used by structured diffs. */
+  --acton-color-diff-added-surface: #ecfdf5;
+  /* Added-value text used by structured diffs. */
+  --acton-color-diff-added-text: #065f46;
+  /* Warning action and status color. */
+  --acton-color-warning: hsl(45 93% 47%);
+  /* Hover state for warning actions. */
+  --acton-color-warning-hover: hsl(38 92% 42%);
+  /* Text and icon color for warning inline feedback. */
+  --acton-color-warning-text: hsl(32 81% 29%);
+  /* Hover state for warning inline text and icons. */
+  --acton-color-warning-text-hover: hsl(26 90% 37%);
+  /* Text and icon color placed on warning backgrounds. */
+  --acton-color-warning-foreground: hsl(26 83% 14%);
+  /* Destructive action color. */
+  --acton-color-danger: hsl(0 84% 60%);
+  /* Hover state for destructive action color. */
+  --acton-color-danger-hover: hsl(0 72% 51%);
+  /* Text and icon color for destructive inline actions. */
+  --acton-color-danger-text: hsl(0 72% 51%);
+  /* Hover state for destructive inline text and icons. */
+  --acton-color-danger-text-hover: hsl(0 74% 42%);
+  /* Text and icon color placed on danger backgrounds. */
+  --acton-color-danger-foreground: hsl(0 0% 98%);
+  /* Failed-status accent for test and validation results. */
+  --acton-color-status-failed: #ef4444;
+  /* Failed-status background for test and validation results. */
+  --acton-color-status-failed-surface: #fef2f2;
+  /* Failed-status foreground for test and validation results. */
+  --acton-color-status-failed-text: #991b1b;
+  /* Removed-value accent used by structured diffs. */
+  --acton-color-diff-removed: #ef4444;
+  /* Removed-value surface used by structured diffs. */
+  --acton-color-diff-removed-surface: #fef2f2;
+  /* Removed-value text used by structured diffs. */
+  --acton-color-diff-removed-text: #991b1b;
+  /* Accessible focus halo around keyboard-focused controls. */
+  --acton-color-focus-ring: hsl(240 6% 10% / 0.18);
+  /* Neutral track behind progress indicators. */
+  --acton-color-progress-track: #f4f4f5;
+  /* Scrim behind temporary overlays such as mobile drawers. */
+  --acton-color-backdrop: hsl(240 10% 4% / 0.42);
+  /* Translucent surface used by frosted overlay backdrops. */
+  --acton-color-overlay-surface: rgba(250, 250, 250, 0.68);
+  /* Floating overlay surface for popovers. */
+  --acton-color-popover-surface: hsl(0 0% 100%);
+  /* Floating overlay border for popovers. */
+  --acton-color-popover-border: hsl(240 6% 84%);
+  /* Subtle elevation for cards, panels, and selected surfaces. */
+  --acton-shadow-surface: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
+  /* Deep elevation for dialogs, drawers, and other large overlays. */
+  --acton-shadow-overlay: 0 30px 80px rgb(15 23 42 / 16%), 0 1px 2px rgb(15 23 42 / 8%);
+  /* Compact floating shadow for tooltips. */
+  --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 15%);
+  /* Floating overlay shadow used only by popovers. */
+  --acton-shadow-popover:
+    0 1rem 2.5rem hsl(240 10% 4% / 0.14), 0 0.25rem 0.75rem hsl(240 10% 4% / 0.08);
+  /* Base fill for loading skeleton placeholders. */
+  --acton-color-skeleton-base: hsl(240 6% 90%);
+  /* Passing highlight used by loading skeleton shimmer. */
+  --acton-color-skeleton-highlight: hsl(0 0% 100% / 0.64);
+
+  /* Primary sans font stack for UI text. */
+  --acton-font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Monospace font stack for code, hashes, and technical values. */
+  --acton-font-mono:
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Micro text reserved for dense diagnostic annotations. */
+  --acton-font-size-4xs: 0.5rem;
+  /* Smallest text for compact structural labels. */
+  --acton-font-size-3xs: 0.625rem;
+  /* Micro text for inline utility captions and dense technical actions. */
+  --acton-font-size-2xs: 0.6875rem;
+  /* Extra-small text for dense metadata. */
+  --acton-font-size-xs: 0.75rem;
+  /* Compact value text used in dense inline rows. */
+  --acton-font-size-compact: 0.8125rem;
+  /* Small text for compact controls and labels. */
+  --acton-font-size-sm: 0.875rem;
+  /* Default UI text size for controls. */
+  --acton-font-size-md: 0.9375rem;
+  /* Large text for prominent controls and small headings. */
+  --acton-font-size-lg: 1rem;
+  /* Small heading text. */
+  --acton-font-size-xl: 1.125rem;
+  /* Medium heading text. */
+  --acton-font-size-2xl: 1.25rem;
+  /* Large heading text. */
+  --acton-font-size-3xl: 1.5rem;
+
+  /* Regular text weight for body copy. */
+  --acton-font-weight-normal: 400;
+  /* Medium text weight for buttons, labels, and active items. */
+  --acton-font-weight-medium: 560;
+  /* Medium text weight for tiny inline utility labels. */
+  --acton-font-weight-utility: 500;
+  /* Emphasis weight for labels that need more contrast without full semibold density. */
+  --acton-font-weight-emphasis: 600;
+  /* Semibold text weight for section labels and emphasis. */
+  --acton-font-weight-semibold: 650;
+  /* Bold text weight for strong selected-state and summary emphasis. */
+  --acton-font-weight-bold: 700;
+
+  /* Micro spacing step for dense legacy-compatible offsets. */
+  --acton-space-micro: 0.1rem;
+  /* Quarter-rem spacing step for tight offsets. */
+  --acton-space-1: 0.25rem;
+  /* Six-pixel spacing step for compact icon padding. */
+  --acton-space-1-5: 0.375rem;
+  /* Half-rem spacing step for icon gaps and compact padding. */
+  --acton-space-2: 0.5rem;
+  /* Three-quarter-rem spacing step for small control padding. */
+  --acton-space-3: 0.75rem;
+  /* One-rem spacing step for default control padding. */
+  --acton-space-4: 1rem;
+  /* Larger spacing step for roomy controls. */
+  --acton-space-5: 1.25rem;
+  /* Section-level spacing step inside compact layouts. */
+  --acton-space-6: 1.5rem;
+  /* Large section spacing for roomy empty states and responsive layouts. */
+  --acton-space-8: 2rem;
+  /* Extra-large section spacing between major feature regions. */
+  --acton-space-12: 3rem;
+
+  /* Extra-small radius for compact badges and nested data surfaces. */
+  --acton-radius-control-xs: 0.25rem;
+  /* Small radius for compact controls. */
+  --acton-radius-control-sm: 0.5rem;
+  /* Default radius for buttons, inputs, and selects. */
+  --acton-radius-control: 0.625rem;
+  /* Larger radius for panels and grouped surfaces. */
+  --acton-radius-panel: 0.75rem;
+  /* Fully rounded radius for pills, avatars, and circular controls. */
+  --acton-radius-round: 9999px;
+
+  /* Fast transition timing for immediate control feedback. */
+  --acton-duration-fast: 120ms;
+  /* Default transition timing for small UI state changes. */
+  --acton-duration-normal: 180ms;
+  /* Slow transition timing for deliberate state changes. */
+  --acton-duration-slow: 300ms;
+  /* Standard easing curve for responsive UI motion. */
+  --acton-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root.dark-theme,
+[data-theme="dark"] {
+  /* Dark page background behind application surfaces. */
+  --acton-color-canvas: hsl(240 10% 4%);
+  /* Dark default component and panel surface. */
+  --acton-color-surface: hsl(240 10% 4%);
+  /* Dark raised surface for controls and elevated regions. */
+  --acton-color-surface-raised: hsl(240 6% 10%);
+  /* Dark hover surface for neutral interactive elements. */
+  --acton-color-surface-hover: hsl(240 4% 16%);
+  /* Dark table header and row-hover surface aligned with localnet row bands. */
+  --acton-color-surface-row: hsl(240 6% 10%);
+  /* Dark subtle fill behind inline markdown code fragments. */
+  --acton-color-inline-code-surface: hsl(240 4% 16%);
+  /* Dark grouped-control and collapsible-row surface. */
+  --acton-color-surface-group: hsl(240 5% 14%);
+  /* Dark pressed or selected surface for neutral elements. */
+  --acton-color-surface-active: hsl(240 4% 16%);
+  /* Dark primary text color for readable foreground content. */
+  --acton-color-text: hsl(0 0% 98%);
+  /* Dark secondary text color for labels, metadata, and icons. */
+  --acton-color-text-muted: hsl(240 5% 65%);
+  /* Dark tertiary text color for placeholders and low-emphasis hints. */
+  --acton-color-text-subtle: hsl(240 4% 46%);
+  /* Dark hairline border for layout separators. */
+  --acton-color-border: hsl(240 4% 16%);
+  /* Dark default border for inputs, buttons, and other controls. */
+  --acton-color-border-control: hsl(240 4% 16%);
+  /* Dark emphasized border for hover and active control states. */
+  --acton-color-border-strong: hsl(240 5% 26%);
+  /* Dark inverted neutral fill for primary command buttons. */
+  --acton-color-primary: hsl(0 0% 98%);
+  /* Dark hover state for primary command buttons. */
+  --acton-color-primary-hover: hsl(240 5% 90%);
+  /* Dark text and icon color placed on primary command buttons. */
+  --acton-color-primary-foreground: hsl(240 6% 10%);
+  /* Dark accent color for links and informational highlights. */
+  --acton-color-accent: hsl(214 100% 69%);
+  /* Dark hover state for accent color. */
+  --acton-color-accent-hover: hsl(214 100% 76%);
+  /* Dark text and icon color placed on accent backgrounds when needed. */
+  --acton-color-accent-foreground: hsl(215 63% 7%);
+  /* Dark success status color for completed non-destructive feedback. */
+  --acton-color-success: hsl(142 69% 58%);
+  /* Dark success border color for feedback surfaces. */
+  --acton-color-success-border: hsl(142 39% 30%);
+  /* Dark passed-status accent for test and validation results. */
+  --acton-color-status-passed: #22c55e;
+  /* Dark passed-status background for test and validation results. */
+  --acton-color-status-passed-surface: rgb(20 83 45 / 32%);
+  /* Dark passed-status foreground for test and validation results. */
+  --acton-color-status-passed-text: #86efac;
+  /* Dark added-value accent used by structured diffs. */
+  --acton-color-diff-added: #22c55e;
+  /* Dark added-value surface used by structured diffs. */
+  --acton-color-diff-added-surface: rgb(20 83 45 / 32%);
+  /* Dark added-value text used by structured diffs. */
+  --acton-color-diff-added-text: #86efac;
+  /* Dark warning action and status color. */
+  --acton-color-warning: hsl(45 93% 47%);
+  /* Dark hover state for warning actions. */
+  --acton-color-warning-hover: hsl(48 96% 53%);
+  /* Dark text and icon color for warning inline feedback. */
+  --acton-color-warning-text: hsl(43 96% 56%);
+  /* Dark hover state for warning inline text and icons. */
+  --acton-color-warning-text-hover: hsl(48 96% 69%);
+  /* Dark text and icon color placed on warning backgrounds. */
+  --acton-color-warning-foreground: hsl(26 83% 14%);
+  /* Dark destructive action color. */
+  --acton-color-danger: hsl(0 63% 31%);
+  /* Dark hover state for destructive action color. */
+  --acton-color-danger-hover: hsl(0 74% 42%);
+  /* Dark text and icon color for destructive inline actions. */
+  --acton-color-danger-text: hsl(0 91% 71%);
+  /* Dark hover state for destructive inline text and icons. */
+  --acton-color-danger-text-hover: hsl(0 96% 79%);
+  /* Dark text and icon color placed on danger backgrounds. */
+  --acton-color-danger-foreground: hsl(0 86% 97%);
+  /* Dark failed-status accent for test and validation results. */
+  --acton-color-status-failed: #ef4444;
+  /* Dark failed-status background for test and validation results. */
+  --acton-color-status-failed-surface: rgb(127 29 29 / 32%);
+  /* Dark failed-status foreground for test and validation results. */
+  --acton-color-status-failed-text: #fca5a5;
+  /* Dark removed-value accent used by structured diffs. */
+  --acton-color-diff-removed: #ef4444;
+  /* Dark removed-value surface used by structured diffs. */
+  --acton-color-diff-removed-surface: rgb(127 29 29 / 32%);
+  /* Dark removed-value text used by structured diffs. */
+  --acton-color-diff-removed-text: #fca5a5;
+  /* Dark accessible focus halo around keyboard-focused controls. */
+  --acton-color-focus-ring: hsl(0 0% 98% / 0.22);
+  /* Dark neutral track behind progress indicators. */
+  --acton-color-progress-track: #18181b;
+  /* Dark scrim behind temporary overlays such as mobile drawers. */
+  --acton-color-backdrop: hsl(240 10% 4% / 0.68);
+  /* Dark translucent surface used by frosted overlay backdrops. */
+  --acton-color-overlay-surface: rgba(9, 9, 11, 0.72);
+  /* Dark floating overlay surface for popovers. */
+  --acton-color-popover-surface: hsl(240 6% 10%);
+  /* Dark floating overlay border for popovers. */
+  --acton-color-popover-border: hsl(240 5% 26%);
+  /* Dark subtle elevation for cards, panels, and selected surfaces. */
+  --acton-shadow-surface: none;
+  /* Dark deep elevation for dialogs, drawers, and other large overlays. */
+  --acton-shadow-overlay: 0 30px 80px rgb(0 0 0 / 42%), 0 1px 0 rgb(255 255 255 / 4%);
+  /* Dark compact floating shadow for tooltips. */
+  --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 36%);
+  /* Dark floating overlay shadow used only by popovers. */
+  --acton-shadow-popover:
+    0 1rem 2.5rem hsl(240 10% 2% / 0.52), 0 0.25rem 0.75rem hsl(240 10% 2% / 0.32);
+  /* Dark base fill for loading skeleton placeholders. */
+  --acton-color-skeleton-base: hsl(240 4% 16%);
+  /* Dark passing highlight used by loading skeleton shimmer. */
+  --acton-color-skeleton-highlight: hsl(0 0% 98% / 0.08);
+}

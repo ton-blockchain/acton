@@ -1,0 +1,93 @@
+name: Deploy actonscan
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/deploy-actonscan.yml"
+      - "packages/**"
+      - "crates/acton-abi-catalog/**"
+      - "xtask/src/tasks/deploy_explorer.rs"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-actonscan
+  cancel-in-progress: false
+
+permissions: { }
+
+jobs:
+  deploy:
+    name: Deploy actonscan
+    if: github.repository == 'ton-blockchain/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    timeout-minutes: 30
+
+    env:
+      ACTONSCAN_URL: https://actonscan.com
+
+    permissions:
+      contents: read
+
+    environment:
+      name: actonscan
+      url: ${{ env.ACTONSCAN_URL }}
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ runner.os }}-${{ runner.arch }}-deploy-actonscan
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &deploy-actonscan-bun-cache-path |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-deploy-actonscan-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-deploy-actonscan-
+
+      - name: Install UI dependencies
+        run: bun ci
+
+      - name: Configure deployment repository authentication
+        env:
+          GH_TOKEN: ${{ secrets.ACTONSCAN_TOKEN }}
+        run: |
+          gh auth setup-git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy actonscan
+        env:
+          GH_TOKEN: ${{ secrets.ACTONSCAN_TOKEN }}
+          EXPLORER_TONCENTER_API_KEY: ${{ secrets.TONCENTER_KEY }}
+          DEPLOY_COMMIT: ${{ github.sha }}
+        run: |
+          cargo xtask deploy-explorer \
+            --branch pages \
+            --checkout "${RUNNER_TEMP}/actonscan-pages" \
+            --cname "${ACTONSCAN_URL}" \
+            --message "Deploy actonscan from ${DEPLOY_COMMIT}"
+
+      - name: Save Bun cache
+        if: steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *deploy-actonscan-bun-cache-path
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}

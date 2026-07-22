@@ -1,0 +1,58 @@
+{
+  "actors": {
+    "collection": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c"
+  },
+  "filters": {
+    "contract_owner_count": 1,
+    "missing_address_error": {
+      "code": 400,
+      "error": "At least one `address` should be specified"
+    },
+    "missing_address_status": 400,
+    "mixed_sale_count": 1,
+    "real_owner_with_sale_count": 1,
+    "real_owner_without_sale_count": 0
+  },
+  "item": {
+    "address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "collection_address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "on_sale": true,
+    "owner_address": "0:cabaeb0033863fbd1d446846d9f1d59a84be5cc06615ea906f870956f7d5ae2c",
+    "owner_is_sale": true,
+    "real_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "sale_contract_address": "0:cabaeb0033863fbd1d446846d9f1d59a84be5cc06615ea906f870956f7d5ae2c"
+  },
+  "listing_transfer": {
+    "forward_amount": "50000000",
+    "new_owner": "0:cabaeb0033863fbd1d446846d9f1d59a84be5cc06615ea906f870956f7d5ae2c",
+    "new_owner_is_sale": true,
+    "nft_address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "nft_collection": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "old_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "query_id": "202",
+    "transaction_aborted": false
+  },
+  "sale": {
+    "address": "0:cabaeb0033863fbd1d446846d9f1d59a84be5cc06615ea906f870956f7d5ae2c",
+    "address_book_has_sale": true,
+    "created_at": 1700000000,
+    "details": {
+      "full_price": "2000000000",
+      "is_complete": false,
+      "marketplace_fee": "100000000",
+      "marketplace_fee_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "royalty_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "royalty_amount": "200000000"
+    },
+    "embedded_nft_on_sale": true,
+    "embedded_nft_real_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "embedded_nft_sale_contract": "0:cabaeb0033863fbd1d446846d9f1d59a84be5cc06615ea906f870956f7d5ae2c",
+    "has_embedded_nft_item": true,
+    "marketplace_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "metadata_has_item": true,
+    "nft_address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "nft_owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "type": "getgems_sale"
+  }
+}

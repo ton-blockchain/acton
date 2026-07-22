@@ -96,6 +96,37 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const ACCEPT_EXTERNAL_ONCE_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+struct Storage {
+    externalCount: uint32
+}
+
+fun loadStorage() {
+    val data = contract.getData();
+    val slice = data.beginParse();
+    if (slice.remainingBitsCount() == 0 && slice.remainingRefsCount() == 0) {
+        return Storage { externalCount: 0 };
+    }
+    return Storage.fromCell(data);
+}
+
+fun onExternalMessage() {
+    var storage = loadStorage();
+    if (storage.externalCount != 0) {
+        throw 10;
+    }
+
+    acceptExternalMessage();
+    storage.externalCount = 1;
+    contract.setData(storage.toCell());
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const WAIT_FOR_TRACE_SCRIPT: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
@@ -313,6 +344,68 @@ fun main() {
 }
 "#;
 
+const SEED_EXTERNAL_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val targetInit = ContractState {
+        code: build("accept_external_once"),
+        data: createEmptyCell(),
+    };
+    val targetAddress = AutoDeployAddress {
+        stateInit: targetInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: targetInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val result = net.sendExternal(
+        net.createExternalMessage(targetAddress, createEmptyCell()),
+    );
+    if (result.waitForFirstTransaction(true, 40, 25) == null) {
+        println("SEED_NULL");
+        return;
+    }
+
+    println("SEEDED=true");
+}
+"#;
+
+const WAIT_FOR_REJECTED_REPLAY_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {
+    val targetInit = ContractState {
+        code: build("accept_external_once"),
+        data: createEmptyCell(),
+    };
+    val targetAddress = AutoDeployAddress {
+        stateInit: targetInit,
+    }.calculateAddress();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(targetAddress, createEmptyCell()),
+    );
+
+    println(result.waitForFirstTransaction(false, 1, 1));
+}
+"#;
+
 const FORK_LOCALNET_DEPLOY_SCRIPT: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
@@ -399,13 +492,13 @@ fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2Moc
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "mocked-live-shape",
             "result": {
                 "@type": "configInfo",
                 "config": {
                     "@type": "tvm.cell",
                     "bytes": config_boc64
-                },
-                "@extra": "mocked-live-shape"
+                }
             }
         })
         .to_string(),
@@ -4504,6 +4597,49 @@ fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
 
     output.assert_snapshot_matches(
         "integration/snapshots/script/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
+fn test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet() {
+    let project = ProjectBuilder::new("script-wait-ignores-old-transaction-localnet")
+        .contract("accept_external_once", ACCEPT_EXTERNAL_ONCE_CONTRACT)
+        .script_file(
+            "seed_external_transaction",
+            SEED_EXTERNAL_TRANSACTION_SCRIPT,
+        )
+        .script_file("wait_for_rejected_replay", WAIT_FOR_REJECTED_REPLAY_SCRIPT)
+        .build();
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let seed_output = project
+        .acton()
+        .script("scripts/seed_external_transaction.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    seed_output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.seed.stdout.txt",
+    );
+
+    thread::sleep(Duration::from_secs(2));
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_rejected_replay.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.stdout.txt",
     );
 
     node.stop();

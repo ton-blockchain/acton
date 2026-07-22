@@ -23,7 +23,7 @@ use tower_http::services::ServeDir;
 
 // Static directory containing UI assets, embedded into the binary during release builds.
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/crates/acton-test-ui/dist");
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/packages/test-ui/dist");
 
 #[cfg(target_os = "macos")]
 static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
@@ -166,7 +166,7 @@ pub(crate) async fn start_ui_server(
     let app = {
         let dist_path = PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/crates/acton-test-ui/dist"
+            "/packages/test-ui/dist"
         ));
         app.fallback_service(
             ServeDir::new(&dist_path).fallback(ServeDir::new(dist_path.join("index.html"))),
@@ -384,11 +384,15 @@ async fn handle_api_file(
 #[derive(Serialize)]
 struct ConfigResponse {
     project_root: String,
+    coverage_available: bool,
+    gas_profile_available: bool,
 }
 
 async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     Json(ConfigResponse {
         project_root: state.project_root.clone(),
+        coverage_available: state.coverage_lcov.is_some(),
+        gas_profile_available: state.gas_profile.is_some(),
     })
 }
 

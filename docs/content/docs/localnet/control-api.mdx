@@ -6,11 +6,10 @@ description: >-
 
 
   These routes are intended for local development tooling and should not be
-  exposed publicly. They are unauthenticated by default, and --require-auth
-  protects them together with other localnet HTTP routes. Rate limiting applies
-  only to /api routes, and response delay applies only to TonCenter-compatible
-  API routes; control routes remain available when --rate-limit or
-  --response-delay-ms is enabled.
+  exposed publicly. When localnet is started with --require-auth, these routes
+  require the localnet API token. Rate limiting applies only to /api routes, and
+  response delay applies only to TonCenter-compatible API routes; control routes
+  remain available when --rate-limit or --response-delay-ms is enabled.
 full: true
 sidebarTitle: Control API
 _openapi:
@@ -18,6 +17,9 @@ _openapi:
     - depth: 2
       title: Fund an account
       url: '#fund-an-account'
+    - depth: 2
+      title: Mint jettons to an account
+      url: '#mint-jettons-to-an-account'
     - depth: 2
       title: Get address names
       url: '#get-address-names'
@@ -52,26 +54,32 @@ _openapi:
       title: Register contract sources
       url: '#register-contract-sources'
     - depth: 2
-      title: Dump local state
-      url: '#dump-local-state'
+      title: Download local state
+      url: '#download-local-state'
     - depth: 2
       title: Load local state
       url: '#load-local-state'
     - depth: 2
-      title: Create runtime recovery point
-      url: '#create-runtime-recovery-point'
+      title: Create checkpoint
+      url: '#create-checkpoint'
     - depth: 2
-      title: List runtime recovery points
-      url: '#list-runtime-recovery-points'
+      title: List checkpoints
+      url: '#list-checkpoints'
     - depth: 2
-      title: Revert runtime recovery point
-      url: '#revert-runtime-recovery-point'
+      title: Restore checkpoint
+      url: '#restore-checkpoint'
     - depth: 2
-      title: Export runtime recovery point
-      url: '#export-runtime-recovery-point'
+      title: Delete checkpoint
+      url: '#delete-checkpoint'
     - depth: 2
-      title: Import runtime recovery point
-      url: '#import-runtime-recovery-point'
+      title: Clear checkpoints
+      url: '#clear-checkpoints'
+    - depth: 2
+      title: Download checkpoint
+      url: '#download-checkpoint'
+    - depth: 2
+      title: Import checkpoint
+      url: '#import-checkpoint'
     - depth: 2
       title: Set a ShardAccount
       url: '#set-a-shardaccount'
@@ -106,6 +114,8 @@ _openapi:
     headings:
       - content: Fund an account
         id: fund-an-account
+      - content: Mint jettons to an account
+        id: mint-jettons-to-an-account
       - content: Get address names
         id: get-address-names
       - content: Set an address name
@@ -128,20 +138,24 @@ _openapi:
         id: register-compiler-abi-metadata
       - content: Register contract sources
         id: register-contract-sources
-      - content: Dump local state
-        id: dump-local-state
+      - content: Download local state
+        id: download-local-state
       - content: Load local state
         id: load-local-state
-      - content: Create runtime recovery point
-        id: create-runtime-recovery-point
-      - content: List runtime recovery points
-        id: list-runtime-recovery-points
-      - content: Revert runtime recovery point
-        id: revert-runtime-recovery-point
-      - content: Export runtime recovery point
-        id: export-runtime-recovery-point
-      - content: Import runtime recovery point
-        id: import-runtime-recovery-point
+      - content: Create checkpoint
+        id: create-checkpoint
+      - content: List checkpoints
+        id: list-checkpoints
+      - content: Restore checkpoint
+        id: restore-checkpoint
+      - content: Delete checkpoint
+        id: delete-checkpoint
+      - content: Clear checkpoints
+        id: clear-checkpoints
+      - content: Download checkpoint
+        id: download-checkpoint
+      - content: Import checkpoint
+        id: import-checkpoint
       - content: Set a ShardAccount
         id: set-a-shardaccount
       - content: Change account state
@@ -167,6 +181,13 @@ _openapi:
           Queues a local faucet transfer to credit an address. The transfer is
           included on the next automatic or manually mined block.
         heading: fund-an-account
+      - content: >-
+          Finds the jetton master in localnet state, verifies that it is
+          mintable and has an admin, converts the display amount using the
+          decimals from jetton metadata, preflights the legacy 0x15 and current
+          0x642b7d07 mint layouts, and queues the uniquely accepted message for
+          the next block.
+        heading: mint-jettons-to-an-account
       - content: >-
           Returns local names for the requested addresses. Missing names are
           returned as null.
@@ -205,31 +226,20 @@ _openapi:
           Registers one or more source artifacts for later explorer source-code
           and retrace lookups by code hash.
         heading: register-contract-sources
-      - content: Writes a JSON state snapshot without stopping the server.
-        heading: dump-local-state
-      - content: Replaces the current node state with a JSON state snapshot.
+      - content: Returns the current live localnet state as a JSON document.
+        heading: download-local-state
+      - content: >-
+          Replaces the current node state from the request body and clears all
+          checkpoints.
         heading: load-local-state
+      - content: Creates a named in-memory checkpoint for the current localnet state.
+        heading: create-checkpoint
+      - content: Lists named in-memory checkpoints in the current localnet process.
+        heading: list-checkpoints
       - content: >-
-          Creates an in-memory recovery point for the current localnet state.
-          Recovery points are process-local and are not persisted across
-          restart.
-        heading: create-runtime-recovery-point
-      - content: >-
-          Lists named in-memory recovery points available in the current
-          localnet process.
-        heading: list-runtime-recovery-points
-      - content: >-
-          Restores a previously created recovery point and invalidates that
-          point plus every newer recovery point.
-        heading: revert-runtime-recovery-point
-      - content: >-
-          Writes a named in-memory recovery point to a JSON snapshot file on the
-          localnet host.
-        heading: export-runtime-recovery-point
-      - content: >-
-          Reads a JSON snapshot file on the localnet host into the current
-          process as a named recovery point.
-        heading: import-runtime-recovery-point
+          Restores a checkpoint without deleting it or checkpoints created after
+          it.
+        heading: restore-checkpoint
       - content: >-
           Replaces the selected account state with a base64-encoded ShardAccount
           BOC.
@@ -280,6 +290,6 @@ _openapi:
 
 Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
 
-These routes are intended for local development tooling and should not be exposed publicly. They are unauthenticated by default, and --require-auth protects them together with other localnet HTTP routes. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+These routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
 
-<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_snapshot","method":"post"},{"path":"/acton_listSnapshots","method":"post"},{"path":"/acton_revert","method":"post"},{"path":"/acton_exportSnapshot","method":"post"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
+<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_fundJetton","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_dumpState","method":"get"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_createCheckpoint","method":"post"},{"path":"/acton_listCheckpoints","method":"get"},{"path":"/acton_restoreCheckpoint","method":"post"},{"path":"/acton_deleteCheckpoint","method":"post"},{"path":"/acton_clearCheckpoints","method":"post"},{"path":"/acton_exportCheckpoint","method":"get"},{"path":"/acton_importCheckpoint","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

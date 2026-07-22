@@ -1,0 +1,27 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`trace state changes aggregates contract balance changes across transactions ordered by LT 1`] = `
+{
+  "changed": [
+    {
+      "address": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+      "balanceDiff": {
+        "after": {
+          "kind": "scalar",
+          "typeName": "coins",
+          "value": "1750000000",
+        },
+        "before": {
+          "kind": "scalar",
+          "typeName": "coins",
+          "value": "3000000000",
+        },
+        "kind": "leaf",
+        "status": "changed",
+      },
+      "storageDiff": undefined,
+    },
+  ],
+  "unchanged": [],
+}
+`;

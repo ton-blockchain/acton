@@ -1,0 +1,55 @@
+.disasmSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-1);
+  min-width: 0;
+}
+
+.disasmTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+  font-size: 0.6875rem;
+  color: var(--acton-color-text-subtle);
+  letter-spacing: 0.4px;
+}
+
+.disasmBlock {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background-color: var(--acton-color-surface-raised);
+}
+
+.disasmCode {
+  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: min(32rem, 60vh);
+  --acton-highlighted-code-padding: var(--acton-space-4);
+}
+
+.disasmLoading,
+.disasmError {
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-xs);
+  font-size: var(--acton-font-size-xs);
+}
+
+.disasmLoading {
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 85%,
+    var(--acton-color-surface)
+  );
+  color: var(--acton-color-text-muted);
+}
+
+.disasmError {
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-diff-removed-surface) 88%,
+    var(--acton-color-surface)
+  );
+  color: var(--acton-color-diff-removed-text);
+}

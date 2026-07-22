@@ -1,0 +1,43 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.behaviorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.sample {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.frame {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.code {
+  --acton-highlighted-code-max-height: 15rem;
+}
+
+@media (max-width: 960px) {
+  .behaviorGrid {
+    grid-template-columns: 1fr;
+  }
+}

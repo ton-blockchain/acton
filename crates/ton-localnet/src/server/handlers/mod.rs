@@ -1,6 +1,8 @@
 pub mod admin;
 pub mod source_trace;
 pub mod streaming;
+pub mod toncenter_emulate;
+mod toncenter_enrichment;
 pub mod toncenter_v2;
 pub mod toncenter_v2_json_rpc;
 pub mod toncenter_v3;
@@ -9,6 +11,7 @@ pub mod utils;
 pub use admin::*;
 pub use source_trace::*;
 pub use streaming::*;
+pub use toncenter_emulate::*;
 pub use toncenter_v2::*;
 pub use toncenter_v2_json_rpc::*;
 pub use toncenter_v3::*;

@@ -1,7 +1,20 @@
 {
   "block": {
     "has_at_least_two_transactions": true,
-    "req_count": 2,
+    "pagination": {
+      "cursor_moves_window": true,
+      "first_count": 1,
+      "first_incomplete": true,
+      "first_req_count": 1,
+      "second_count": 1
+    },
+    "req_count": 40,
+    "short_transactions": {
+      "all_modes_are_135": true,
+      "count": 2,
+      "match_extended": true,
+      "type": "blocks.transactions"
+    },
     "transaction_count": 2
   },
   "faucet": {

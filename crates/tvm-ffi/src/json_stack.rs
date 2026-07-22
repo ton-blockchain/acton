@@ -6,62 +6,67 @@ use serde_json::Value;
 use std::ops::Mul;
 use tycho_types::boc::Boc;
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "@type")]
-pub enum JsonStackEntry {
-    #[serde(rename = "tvm.stackEntryNull")]
-    Null {},
-    #[serde(rename = "tvm.stackEntryNumber")]
-    Number { number: JsonNumber },
-    #[serde(rename = "tvm.stackEntryCell")]
-    Cell { cell: JsonBoc },
+const TVM_SLICE_TYPE: &str = "tvm.slice";
+const TVM_CELL_TYPE: &str = "tvm.cell";
+const TVM_NUMBER_DECIMAL_TYPE: &str = "tvm.numberDecimal";
+const TVM_TUPLE_TYPE: &str = "tvm.tuple";
+const TVM_LIST_TYPE: &str = "tvm.list";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "@type", deny_unknown_fields)]
+pub enum TvmStackEntry {
     #[serde(rename = "tvm.stackEntrySlice")]
-    Slice { slice: JsonBoc },
-    #[serde(rename = "tvm.stackEntryBuilder")]
-    Builder { builder: JsonBoc },
+    Slice { slice: TvmSlice },
+    #[serde(rename = "tvm.stackEntryCell")]
+    Cell { cell: TvmCell },
+    #[serde(rename = "tvm.stackEntryNumber")]
+    Number { number: TvmNumberDecimal },
     #[serde(rename = "tvm.stackEntryTuple")]
-    Tuple { tuple: JsonTuple },
-    #[serde(rename = "tvm.stackEntryList", alias = "list")]
-    List { list: JsonList },
+    Tuple { tuple: TvmTuple },
+    #[serde(rename = "tvm.stackEntryList")]
+    List { list: TvmList },
+    #[serde(rename = "tvm.stackEntryUnsupported")]
+    Unsupported {},
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct JsonNumber {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TvmSlice {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub bytes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TvmCell {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub bytes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TvmNumberDecimal {
+    #[serde(rename = "@type")]
+    pub type_field: String,
     pub number: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum JsonBoc {
-    String(String),
-    Object { bytes: String },
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TvmTuple {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub elements: Vec<TvmStackEntry>,
 }
 
-impl JsonBoc {
-    fn as_str(&self) -> &str {
-        match self {
-            JsonBoc::String(value) => value,
-            JsonBoc::Object { bytes } => bytes,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct JsonTuple {
-    pub elements: Vec<JsonStackEntry>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct JsonList {
-    pub elements: Vec<JsonStackEntry>,
-}
-
-pub fn stack_to_json(stack: &Tuple) -> anyhow::Result<Vec<Value>> {
-    let mut entries = Vec::new();
-    for item in &stack.0 {
-        entries.push(serde_json::to_value(item_to_json(item)?)?);
-    }
-    Ok(entries)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TvmList {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub elements: Vec<TvmStackEntry>,
 }
 
 pub fn legacy_stack_to_json(stack: &Tuple) -> anyhow::Result<Vec<Value>> {
@@ -70,39 +75,6 @@ pub fn legacy_stack_to_json(stack: &Tuple) -> anyhow::Result<Vec<Value>> {
         entries.push(legacy_item_to_json(item)?);
     }
     Ok(entries)
-}
-
-fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
-    match item {
-        TupleItem::Null => Ok(JsonStackEntry::Null {}),
-        TupleItem::Int(i) => Ok(JsonStackEntry::Number {
-            number: JsonNumber {
-                number: i.to_string(),
-            },
-        }),
-        TupleItem::Nan => anyhow::bail!("NaN not supported in JSON stack"),
-        TupleItem::Cell(c) => Ok(JsonStackEntry::Cell {
-            cell: JsonBoc::String(Boc::encode_base64(c)),
-        }),
-        TupleItem::Slice(c) => Ok(JsonStackEntry::Slice {
-            slice: JsonBoc::String(Boc::encode_base64(c)),
-        }),
-        TupleItem::Cont(cont) => Ok(JsonStackEntry::Slice {
-            slice: JsonBoc::String(Boc::encode_base64(&cont.code)),
-        }),
-        TupleItem::Builder(c) => Ok(JsonStackEntry::Builder {
-            builder: JsonBoc::String(Boc::encode_base64(c)),
-        }),
-        TupleItem::Tuple(t) => {
-            let mut elements = Vec::new();
-            for it in &t.0 {
-                elements.push(item_to_json(it)?);
-            }
-            Ok(JsonStackEntry::Tuple {
-                tuple: JsonTuple { elements },
-            })
-        }
-    }
 }
 
 pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
@@ -133,15 +105,6 @@ pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
     }
 }
 
-pub fn json_to_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
-    let mut items = Vec::new();
-    for entry in entries {
-        let entry: JsonStackEntry = serde_json::from_value(entry)?;
-        items.push(json_to_item(entry)?);
-    }
-    Ok(Tuple(items))
-}
-
 pub fn json_to_legacy_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
     let mut items = Vec::new();
     for entry in entries {
@@ -150,52 +113,146 @@ pub fn json_to_legacy_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
     Ok(Tuple(items))
 }
 
-fn json_to_item(entry: JsonStackEntry) -> anyhow::Result<TupleItem> {
-    match entry {
-        JsonStackEntry::Null {} => Ok(TupleItem::Null),
-        JsonStackEntry::Number { number } => {
-            let i = number
-                .number
-                .parse::<BigInt>()
-                .context("Failed to parse number")?;
-            Ok(TupleItem::Int(i))
-        }
-        JsonStackEntry::Cell { cell } => {
-            let c = Boc::decode_base64(cell.as_str()).context("Failed to decode cell BOC")?;
-            Ok(TupleItem::Cell(c))
-        }
-        JsonStackEntry::Slice { slice } => {
-            let c = Boc::decode_base64(slice.as_str()).context("Failed to decode slice BOC")?;
-            Ok(TupleItem::Slice(c))
-        }
-        JsonStackEntry::Builder { builder } => {
-            let c = Boc::decode_base64(builder.as_str()).context("Failed to decode builder BOC")?;
-            Ok(TupleItem::Builder(c))
-        }
-        JsonStackEntry::Tuple { tuple } => {
-            let mut elements = Vec::new();
-            for el in tuple.elements {
-                elements.push(json_to_item(el)?);
-            }
-            Ok(TupleItem::Tuple(Tuple(elements)))
-        }
-        JsonStackEntry::List { list } => {
-            let mut elements = Vec::new();
-            for el in list.elements {
-                elements.push(json_to_item(el)?);
-            }
-            Ok(TupleItem::Tuple(Tuple(elements)))
+impl TvmStackEntry {
+    #[must_use]
+    pub fn number(value: impl ToString) -> Self {
+        Self::Number {
+            number: TvmNumberDecimal {
+                type_field: TVM_NUMBER_DECIMAL_TYPE.to_owned(),
+                number: value.to_string(),
+            },
         }
     }
+
+    #[must_use]
+    pub fn cell(bytes: impl Into<String>) -> Self {
+        Self::Cell {
+            cell: TvmCell {
+                type_field: TVM_CELL_TYPE.to_owned(),
+                bytes: bytes.into(),
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn slice(bytes: impl Into<String>) -> Self {
+        Self::Slice {
+            slice: TvmSlice {
+                type_field: TVM_SLICE_TYPE.to_owned(),
+                bytes: bytes.into(),
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn tuple(elements: Vec<Self>) -> Self {
+        Self::Tuple {
+            tuple: TvmTuple {
+                type_field: TVM_TUPLE_TYPE.to_owned(),
+                elements,
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn list(elements: Vec<Self>) -> Self {
+        Self::List {
+            list: TvmList {
+                type_field: TVM_LIST_TYPE.to_owned(),
+                elements,
+            },
+        }
+    }
+
+    pub fn into_tuple_item(self) -> anyhow::Result<TupleItem> {
+        match self {
+            Self::Slice { slice } => {
+                ensure_type(&slice.type_field, TVM_SLICE_TYPE)?;
+                let cell =
+                    Boc::decode_base64(&slice.bytes).context("Failed to decode slice BOC")?;
+                Ok(TupleItem::Slice(cell))
+            }
+            Self::Cell { cell } => {
+                ensure_type(&cell.type_field, TVM_CELL_TYPE)?;
+                let cell = Boc::decode_base64(&cell.bytes).context("Failed to decode cell BOC")?;
+                Ok(TupleItem::Cell(cell))
+            }
+            Self::Number { number } => {
+                ensure_type(&number.type_field, TVM_NUMBER_DECIMAL_TYPE)?;
+                Ok(TupleItem::Int(
+                    number
+                        .number
+                        .parse::<BigInt>()
+                        .context("Failed to parse stack number")?,
+                ))
+            }
+            Self::Tuple { tuple } => {
+                ensure_type(&tuple.type_field, TVM_TUPLE_TYPE)?;
+                Ok(TupleItem::Tuple(Tuple(
+                    tuple
+                        .elements
+                        .into_iter()
+                        .map(Self::into_tuple_item)
+                        .collect::<anyhow::Result<_>>()?,
+                )))
+            }
+            Self::List { list } => {
+                ensure_type(&list.type_field, TVM_LIST_TYPE)?;
+                Ok(TupleItem::Tuple(Tuple(
+                    list.elements
+                        .into_iter()
+                        .map(Self::into_tuple_item)
+                        .collect::<anyhow::Result<_>>()?,
+                )))
+            }
+            Self::Unsupported {} => anyhow::bail!("Unsupported TVM stack entry"),
+        }
+    }
+
+    #[must_use]
+    pub fn from_tuple_item(item: &TupleItem) -> Self {
+        match item {
+            TupleItem::Int(value) => Self::number(value),
+            TupleItem::Cell(cell) => Self::cell(Boc::encode_base64(cell)),
+            TupleItem::Slice(cell) => Self::slice(Boc::encode_base64(cell)),
+            TupleItem::Cont(continuation) => Self::slice(Boc::encode_base64(&continuation.code)),
+            TupleItem::Tuple(tuple) => {
+                Self::tuple(tuple.0.iter().map(Self::from_tuple_item).collect())
+            }
+            TupleItem::Null | TupleItem::Nan | TupleItem::Builder(_) => Self::Unsupported {},
+        }
+    }
+}
+
+pub fn std_stack_into_tuple(entries: Vec<TvmStackEntry>) -> anyhow::Result<Tuple> {
+    Ok(Tuple(
+        entries
+            .into_iter()
+            .map(TvmStackEntry::into_tuple_item)
+            .collect::<anyhow::Result<_>>()?,
+    ))
+}
+
+#[must_use]
+pub fn std_stack_from_tuple(stack: &Tuple) -> Vec<TvmStackEntry> {
+    stack.0.iter().map(TvmStackEntry::from_tuple_item).collect()
+}
+
+fn ensure_type(actual: &str, expected: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        actual == expected,
+        "Invalid `@type`: expected `{expected}`, got `{actual}`"
+    );
+    Ok(())
 }
 
 fn json_to_mixed_item(value: Value) -> anyhow::Result<TupleItem> {
     match json_to_legacy_item(value.clone()) {
         Ok(item) => Ok(item),
         Err(legacy_err) => {
-            let entry: JsonStackEntry = serde_json::from_value(value)
+            let entry: TvmStackEntry = serde_json::from_value(value)
                 .with_context(|| format!("Failed to parse stack entry as legacy or std format. Legacy error: {legacy_err}"))?;
-            json_to_item(entry)
+            entry.into_tuple_item()
         }
     }
 }
@@ -308,14 +365,46 @@ mod tests {
     use tycho_types::cell::CellBuilder;
 
     #[test]
-    fn test_stack_json_roundtrip() {
-        let items = vec![TupleItem::Null, TupleItem::Int(BigInt::from(123))];
+    fn test_std_stack_uses_tonlib_wire_types() {
+        let cell = CellBuilder::new().build().unwrap();
+        let stack = Tuple(vec![
+            TupleItem::Int(BigInt::from(-7)),
+            TupleItem::Cell(cell.clone()),
+            TupleItem::Slice(cell.clone()),
+            TupleItem::Tuple(Tuple(vec![TupleItem::Int(BigInt::from(9))])),
+            TupleItem::Null,
+            TupleItem::Builder(cell.clone()),
+        ]);
 
-        let tuple = Tuple(items);
-        let json = stack_to_json(&tuple).unwrap();
-        let back = json_to_stack(json).unwrap();
-
-        assert_eq!(tuple, back);
+        assert_eq!(
+            serde_json::to_value(std_stack_from_tuple(&stack)).unwrap(),
+            serde_json::json!([
+                {
+                    "@type": "tvm.stackEntryNumber",
+                    "number": {"@type": "tvm.numberDecimal", "number": "-7"}
+                },
+                {
+                    "@type": "tvm.stackEntryCell",
+                    "cell": {"@type": "tvm.cell", "bytes": Boc::encode_base64(&cell)}
+                },
+                {
+                    "@type": "tvm.stackEntrySlice",
+                    "slice": {"@type": "tvm.slice", "bytes": Boc::encode_base64(&cell)}
+                },
+                {
+                    "@type": "tvm.stackEntryTuple",
+                    "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [{
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {"@type": "tvm.numberDecimal", "number": "9"}
+                        }]
+                    }
+                },
+                {"@type": "tvm.stackEntryUnsupported"},
+                {"@type": "tvm.stackEntryUnsupported"}
+            ])
+        );
     }
 
     #[test]
@@ -350,26 +439,53 @@ mod tests {
 
     #[test]
     fn test_std_stack_accepts_list_entries() {
-        assert_eq!(
-            json_to_stack(vec![serde_json::json!({
-                "@type": "tvm.stackEntryList",
-                "list": {
-                    "@type": "tvm.list",
-                    "elements": [
-                        {
-                            "@type": "tvm.stackEntryNumber",
-                            "number": {
-                                "@type": "tvm.numberDecimal",
-                                "number": "7"
-                            }
+        let entries: Vec<TvmStackEntry> = serde_json::from_value(serde_json::json!([{
+            "@type": "tvm.stackEntryList",
+            "list": {
+                "@type": "tvm.list",
+                "elements": [
+                    {
+                        "@type": "tvm.stackEntryNumber",
+                        "number": {
+                            "@type": "tvm.numberDecimal",
+                            "number": "7"
                         }
-                    ]
-                }
-            })])
-            .unwrap(),
+                    }
+                ]
+            }
+        }]))
+        .unwrap();
+
+        assert_eq!(
+            std_stack_into_tuple(entries).unwrap(),
             Tuple(vec![TupleItem::Tuple(Tuple(vec![TupleItem::Int(
                 BigInt::from(7)
             )]))])
+        );
+    }
+
+    #[test]
+    fn test_std_stack_validates_nested_type_markers() {
+        let entry: TvmStackEntry = serde_json::from_value(serde_json::json!({
+            "@type": "tvm.stackEntryNumber",
+            "number": {"@type": "wrong", "number": "1"}
+        }))
+        .unwrap();
+
+        assert_eq!(
+            entry.into_tuple_item().unwrap_err().to_string(),
+            "Invalid `@type`: expected `tvm.numberDecimal`, got `wrong`"
+        );
+    }
+
+    #[test]
+    fn test_std_stack_rejects_unsupported_input() {
+        assert_eq!(
+            TvmStackEntry::Unsupported {}
+                .into_tuple_item()
+                .unwrap_err()
+                .to_string(),
+            "Unsupported TVM stack entry"
         );
     }
 

@@ -1,0 +1,84 @@
+{
+  "actions": {
+    "count": 4,
+    "external": {
+      "destination": null,
+      "error": null,
+      "parsed": true,
+      "parsed_body_type": "unknown",
+      "send_mode": 64,
+      "value": "0"
+    },
+    "send": {
+      "destination": "0:2222222222222222222222222222222222222222222222222222222222222222",
+      "error": null,
+      "parsed": true,
+      "parsed_body_type": "unknown",
+      "send_mode": 3,
+      "value": "10000000"
+    },
+    "unknown": {
+      "destination": null,
+      "error": "unsupported multisig order action",
+      "parsed": false,
+      "parsed_body_type": "unknown",
+      "send_mode": 0,
+      "value": null
+    },
+    "update": {
+      "destination": null,
+      "error": null,
+      "parsed": true,
+      "parsed_body": {
+        "new_proposers": [],
+        "new_signers": [
+          "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+          "0:2222222222222222222222222222222222222222222222222222222222222222"
+        ],
+        "new_threshold": 2
+      },
+      "parsed_body_type": "multisig_update_params",
+      "send_mode": 0,
+      "value": null
+    }
+  },
+  "filters": {
+    "embedded_orders_disabled_count": 0,
+    "orders_after_offset_count": 0,
+    "orders_by_multisig_count": 1,
+    "orders_without_actions_count": 1,
+    "unparsed_action_count": 0,
+    "wallet_by_cosigner_count": 1,
+    "wallet_by_owner_count": 1,
+    "wallet_by_unrelated_count": 0
+  },
+  "multisig": {
+    "address": "0:b9c8d48cdb398686de3feedeee929dda257e9ea080a255e5faa65b94e87998a8",
+    "address_book_has_cosigner": true,
+    "address_book_has_multisig": true,
+    "address_book_has_owner": true,
+    "embedded_order_count": 1,
+    "next_order_seqno": "1",
+    "proposers": [],
+    "signers": [
+      "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "0:2222222222222222222222222222222222222222222222222222222222222222"
+    ],
+    "threshold": 2
+  },
+  "order": {
+    "address": "0:86e6277b3dd4bc4878a8ee9db0d8c567e0621dca937f2740075da75ccc8e2731",
+    "address_book_has_order": true,
+    "approvals_mask": "1",
+    "approvals_num": 1,
+    "has_expiration_date": true,
+    "multisig_address": "0:b9c8d48cdb398686de3feedeee929dda257e9ea080a255e5faa65b94e87998a8",
+    "order_seqno": "0",
+    "sent_for_execution": false,
+    "signers": [
+      "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "0:2222222222222222222222222222222222222222222222222222222222222222"
+    ],
+    "threshold": 2
+  }
+}

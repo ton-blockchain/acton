@@ -1,14 +1,19 @@
 use anyhow::{Context, Result, bail};
 use clap::Args;
+use std::env;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use url::Url;
 
 const DEFAULT_REPOSITORY: &str = "https://github.com/i582/actonscan";
 const DEFAULT_BRANCH: &str = "pages";
 const DEFAULT_CHECKOUT_DIR: &str = "target/actonscan-pages";
-const EXPLORER_PACKAGE: &str = "acton-explorer-ui";
+const EXPLORER_PACKAGE: &str = "@acton/explorer-ui";
+const EXPLORER_PACKAGE_DIR: &str = "packages/explorer-ui";
+const EXPLORER_TONCENTER_API_KEY_ENV: &str = "EXPLORER_TONCENTER_API_KEY";
+const VITE_EXPLORER_TONCENTER_API_KEY_ENV: &str = "VITE_EXPLORER_TONCENTER_API_KEY";
 
 #[derive(Args)]
 pub(crate) struct DeployExplorerArgs {
@@ -21,7 +26,7 @@ pub(crate) struct DeployExplorerArgs {
     #[arg(long, value_name = "PATH", default_value = DEFAULT_CHECKOUT_DIR)]
     checkout: PathBuf,
 
-    #[arg(long, value_name = "DOMAIN")]
+    #[arg(long, value_name = "DOMAIN_OR_URL")]
     cname: Option<String>,
 
     #[arg(long, value_name = "MESSAGE", default_value = "Deploy actonscan")]
@@ -31,31 +36,57 @@ pub(crate) struct DeployExplorerArgs {
 pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     let workspace_root = workspace_root()?;
     let checkout_dir = resolve_path(&workspace_root, &args.checkout);
-    let dist_dir = workspace_root
-        .join("crates")
-        .join(EXPLORER_PACKAGE)
-        .join("dist");
+    let dist_dir = workspace_root.join(EXPLORER_PACKAGE_DIR).join("dist");
+    let cname = normalize_cname(args.cname.as_deref())?;
 
     println!("Building `{EXPLORER_PACKAGE}`");
-    run_inherited(
-        Command::new("bun")
-            .arg("--filter")
-            .arg(EXPLORER_PACKAGE)
-            .arg("build")
-            .current_dir(&workspace_root),
-    )?;
+    let mut build_command = Command::new("bun");
+    build_command
+        .arg("--filter")
+        .arg(EXPLORER_PACKAGE)
+        .arg("build")
+        .current_dir(&workspace_root);
+    if let Some(api_key) =
+        env::var_os(EXPLORER_TONCENTER_API_KEY_ENV).filter(|value| !value.is_empty())
+    {
+        build_command.env(VITE_EXPLORER_TONCENTER_API_KEY_ENV, api_key);
+    }
+    run_inherited(&mut build_command)?;
 
     ensure_dist_ready(&dist_dir)?;
     ensure_checkout(&checkout_dir, &args.repository)?;
     prepare_branch(&checkout_dir, &args.branch)?;
-    sync_dist(&dist_dir, &checkout_dir, args.cname.as_deref())?;
-    commit_and_push(&checkout_dir, &args.branch, &args.message)?;
+    sync_dist(&dist_dir, &checkout_dir, cname.as_deref())?;
+    let deployed_commit = commit_and_push(&checkout_dir, &args.branch, &args.message)?;
 
-    println!(
-        "Explorer deploy pushed to `{}` branch `{}`",
-        args.repository, args.branch
-    );
+    if let Some(commit) = deployed_commit {
+        println!(
+            "Explorer deploy pushed to `{}` branch `{}`",
+            args.repository, args.branch
+        );
+        if let Some(url) = github_commit_url(&args.repository, &commit) {
+            println!("Deployed commit: {url}");
+        } else {
+            println!("Deployed commit: {commit}");
+        }
+    }
     Ok(())
+}
+
+fn normalize_cname(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+
+    if !value.contains("://") {
+        return Ok(Some(value.to_owned()));
+    }
+
+    let url = Url::parse(value).with_context(|| format!("invalid CNAME URL `{value}`"))?;
+    let host = url
+        .host_str()
+        .with_context(|| format!("CNAME URL `{value}` does not contain a host"))?;
+    Ok(Some(host.to_owned()))
 }
 
 fn workspace_root() -> Result<PathBuf> {
@@ -238,21 +269,64 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-fn commit_and_push(checkout_dir: &Path, branch: &str, message: &str) -> Result<()> {
+fn commit_and_push(checkout_dir: &Path, branch: &str, message: &str) -> Result<Option<String>> {
     run_inherited(git(checkout_dir).arg("add").arg("-A"))?;
 
     if !has_staged_changes(checkout_dir)? {
         println!("Deploy checkout has no changes; skipping commit and push");
-        return Ok(());
+        return Ok(None);
     }
 
     run_inherited(git(checkout_dir).arg("commit").arg("-m").arg(message))?;
+    let commit = current_commit(checkout_dir)?;
     run_inherited(
         git(checkout_dir)
             .arg("push")
             .arg("origin")
             .arg(format!("HEAD:{branch}")),
-    )
+    )?;
+    Ok(Some(commit))
+}
+
+fn current_commit(checkout_dir: &Path) -> Result<String> {
+    let output = git(checkout_dir)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .context("failed to read deployed commit SHA")?;
+    if !output.status.success() {
+        bail!("git rev-parse HEAD failed with status {}", output.status);
+    }
+
+    let commit = String::from_utf8(output.stdout).context("deployed commit SHA is not UTF-8")?;
+    let commit = commit.trim();
+    if commit.is_empty() {
+        bail!("git rev-parse HEAD returned an empty commit SHA");
+    }
+    Ok(commit.to_owned())
+}
+
+fn github_commit_url(repository: &str, commit: &str) -> Option<String> {
+    let repository_path = if let Some(path) = repository.strip_prefix("git@github.com:") {
+        path.to_owned()
+    } else {
+        let url = Url::parse(repository).ok()?;
+        if url.host_str()? != "github.com" {
+            return None;
+        }
+        url.path().trim_start_matches('/').to_owned()
+    };
+    let repository_path = repository_path.trim_end_matches('/');
+    let repository_path = repository_path
+        .strip_suffix(".git")
+        .unwrap_or(repository_path);
+    if repository_path.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "https://github.com/{repository_path}/commit/{commit}"
+    ))
 }
 
 fn has_staged_changes(checkout_dir: &Path) -> Result<bool> {
@@ -295,4 +369,52 @@ fn run_inherited(command: &mut Command) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{github_commit_url, normalize_cname};
+
+    #[test]
+    fn cname_keeps_bare_domain() {
+        assert_eq!(
+            normalize_cname(Some(" actonscan.com ")).unwrap(),
+            Some("actonscan.com".to_owned())
+        );
+    }
+
+    #[test]
+    fn cname_extracts_host_from_url() {
+        assert_eq!(
+            normalize_cname(Some("https://actonscan.com/explorer")).unwrap(),
+            Some("actonscan.com".to_owned())
+        );
+    }
+
+    #[test]
+    fn cname_ignores_empty_value() {
+        assert_eq!(normalize_cname(Some("  ")).unwrap(), None);
+    }
+
+    #[test]
+    fn cname_rejects_url_without_host() {
+        let error = normalize_cname(Some("file:///explorer")).unwrap_err();
+        assert!(error.to_string().contains("does not contain a host"));
+    }
+
+    #[test]
+    fn commit_url_supports_https_repository() {
+        assert_eq!(
+            github_commit_url("https://github.com/i582/actonscan", "abc123").as_deref(),
+            Some("https://github.com/i582/actonscan/commit/abc123")
+        );
+    }
+
+    #[test]
+    fn commit_url_supports_ssh_repository() {
+        assert_eq!(
+            github_commit_url("git@github.com:i582/actonscan.git", "abc123").as_deref(),
+            Some("https://github.com/i582/actonscan/commit/abc123")
+        );
+    }
 }

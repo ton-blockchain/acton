@@ -13,7 +13,7 @@
         "@type": "raw.transaction",
         "address": {
           "@type": "accountAddress",
-          "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
+          "account_address": "[WALLET_ADDRESS_BASE]"
         },
         "data": "[DATA]",
         "fee": "147956",
@@ -23,7 +23,7 @@
           "created_lt": "[LT]",
           "destination": {
             "@type": "accountAddress",
-            "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
+            "account_address": "[WALLET_ADDRESS_BASE]"
           },
           "extra_currencies": [],
           "fwd_fee": "92269",
@@ -36,7 +36,7 @@
           },
           "source": {
             "@type": "accountAddress",
-            "account_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c"
+            "account_address": "[WALLET_ADDRESS_BASE]"
           },
           "value": "1000000000"
         },
@@ -48,7 +48,7 @@
             "created_lt": "[LT]",
             "destination": {
               "@type": "accountAddress",
-              "account_address": "0:52f9cf864fbe8616aa05f6627ac3d623fe2b44ccfe89f303d37485261068c533"
+              "account_address": "[WALLET_ADDRESS_BASE]"
             },
             "extra_currencies": [],
             "fwd_fee": "63113",
@@ -61,7 +61,7 @@
             },
             "source": {
               "@type": "accountAddress",
-              "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
+              "account_address": "[WALLET_ADDRESS_BASE]"
             },
             "value": "199905332"
           }

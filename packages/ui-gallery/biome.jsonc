@@ -1,0 +1,49 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**"]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noUselessFragments": "off",
+        "noVoid": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "noUnresolvedImports": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      },
+      "performance": {
+        "noJsxPropsBind": "off",
+        "useSolidForComponent": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noImplicitBoolean": "off",
+        "noJsxLiterals": "off",
+        "noNestedTernary": "off",
+        "useBlockStatements": "off",
+        "useComponentExportOnlyModules": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentCurlyBraces": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noLeakedRender": "off",
+        "noReactSpecificProps": "off",
+        "noShadow": "off"
+      }
+    }
+  }
+}

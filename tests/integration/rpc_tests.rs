@@ -985,17 +985,35 @@ fn toncenter_v3_trace_ok_response(
         body: serde_json::json!({
             "traces": [{
                 "trace_id": TRACE_ROOT_HASH,
+                "mc_seqno_start": "10000",
+                "mc_seqno_end": "10002",
+                "start_lt": "100",
+                "start_utime": 1_700_000_000_u32,
+                "trace_info": {
+                    "transactions": 3,
+                    "messages": 3,
+                    "pending_messages": 0,
+                    "trace_state": "complete",
+                    "classification_state": "unclassified"
+                },
                 "transactions_order": [TRACE_ROOT_HASH, TRACE_CHILD_HASH, TRACE_RETURN_HASH],
                 "transactions": {
                     TRACE_ROOT_HASH: {
                         "account": counter_address,
                         "hash": TRACE_ROOT_HASH,
                         "lt": "100",
+                        "block_ref": {"workchain": 0, "shard": "8000000000000000", "seqno": 100},
                         "now": 1_700_000_000_u32,
                         "mc_block_seqno": 10_000_u32,
+                        "emulated": false,
+                        "finality": "finalized",
+                        "prev_trans_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                        "prev_trans_lt": "0",
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "1200",
+                        "account_state_before": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+                        "account_state_after": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
                         "description": successful_v3_description(1),
                         "in_msg": {
                             "hash": "root-in-msg",
@@ -1031,11 +1049,18 @@ fn toncenter_v3_trace_ok_response(
                         "account": owner_address,
                         "hash": TRACE_CHILD_HASH,
                         "lt": "101",
+                        "block_ref": {"workchain": 0, "shard": "8000000000000000", "seqno": 101},
                         "now": 1_700_000_001_u32,
                         "mc_block_seqno": 10_001_u32,
+                        "emulated": false,
+                        "finality": "finalized",
+                        "prev_trans_hash": TRACE_ROOT_HASH,
+                        "prev_trans_lt": "100",
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "100",
+                        "account_state_before": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+                        "account_state_after": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
                         "description": successful_v3_description(0),
                         "in_msg": {
                             "hash": "child-msg",
@@ -1051,11 +1076,18 @@ fn toncenter_v3_trace_ok_response(
                         "account": counter_address,
                         "hash": TRACE_RETURN_HASH,
                         "lt": "102",
+                        "block_ref": {"workchain": 0, "shard": "8000000000000000", "seqno": 102},
                         "now": 1_700_000_002_u32,
                         "mc_block_seqno": 10_002_u32,
+                        "emulated": false,
+                        "finality": "finalized",
+                        "prev_trans_hash": TRACE_CHILD_HASH,
+                        "prev_trans_lt": "101",
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "100",
+                        "account_state_before": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+                        "account_state_after": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
                         "description": successful_v3_description(0),
                         "in_msg": {
                             "hash": "return-msg",
@@ -1115,12 +1147,14 @@ fn toncenter_v3_account_states_ok_response(
             "accounts": [
                 {
                     "address": counter_address,
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "1000000000",
                     "code_boc": counter_code_boc64,
                     "status": "active"
                 },
                 {
                     "address": owner_address,
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "0",
                     "code_boc": null,
                     "status": "uninit"
@@ -1137,17 +1171,35 @@ fn toncenter_v3_trace_without_in_msg_response(account: &str) -> ToncenterV2MockR
         body: serde_json::json!({
             "traces": [{
                 "trace_id": TRACE_ROOT_HASH,
+                "mc_seqno_start": "10000",
+                "mc_seqno_end": "10000",
+                "start_lt": "100",
+                "start_utime": 1_700_000_000_u32,
+                "trace_info": {
+                    "transactions": 1,
+                    "messages": 0,
+                    "pending_messages": 0,
+                    "trace_state": "complete",
+                    "classification_state": "unclassified"
+                },
                 "transactions_order": [TRACE_ROOT_HASH],
                 "transactions": {
                     TRACE_ROOT_HASH: {
                         "account": account,
                         "hash": TRACE_ROOT_HASH,
                         "lt": "100",
+                        "block_ref": {"workchain": 0, "shard": "8000000000000000", "seqno": 100},
                         "now": 1_700_000_000_u32,
                         "mc_block_seqno": 10_000_u32,
+                        "emulated": false,
+                        "finality": "finalized",
+                        "prev_trans_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                        "prev_trans_lt": "0",
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "1200",
+                        "account_state_before": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+                        "account_state_after": {"hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
                         "description": successful_v3_description(0),
                         "out_msgs": []
                     }

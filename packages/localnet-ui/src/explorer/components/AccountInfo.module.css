@@ -1,0 +1,845 @@
+.card {
+  position: relative;
+  height: 100%;
+  background: var(--acton-color-surface-raised);
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.cardBody {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 150px;
+  padding: 20px 24px;
+}
+
+.infoColumn {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 680px;
+  gap: 12px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.infoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 20px;
+  min-width: 0;
+  padding: 0;
+}
+
+.addressInfoRow .rowValue {
+  flex: 0 1 auto;
+  max-width: 100%;
+  flex-wrap: nowrap;
+}
+
+.label {
+  flex: 0 0 144px;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 20px;
+}
+
+.rowValue {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-width: 0;
+  min-height: 20px;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 20px;
+}
+
+.primaryValue {
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.contractTypeValue {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  min-width: 0;
+}
+
+.contractTypeItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.contractTypeSeparator {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.contractDescriptionTitle,
+.contractDescriptionText,
+.contractDescriptionLink {
+  display: block;
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.contractDescriptionTitle {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+}
+
+.contractDescriptionText,
+.contractDescriptionLink {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+}
+
+.contractDescriptionLink {
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.contractDescriptionLink:hover {
+  color: var(--acton-color-accent);
+  text-decoration: underline;
+}
+
+.contractDescriptionLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.contractDescriptionLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  min-width: 0;
+}
+
+.contractDescriptionLinkItem {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  color: var(--acton-color-accent);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: color var(--acton-duration-fast);
+}
+
+.contractDescriptionLinkItem:hover {
+  color: var(--acton-color-accent);
+}
+
+.contractDescriptionLinkItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.contractDescriptionLinkKind {
+  display: block;
+  min-width: 0;
+  color: color-mix(in srgb, var(--acton-color-text-muted) 72%, transparent);
+  font-size: 11px;
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 13px;
+  text-transform: lowercase;
+}
+
+.contractDescriptionLinkTitle {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.contractDescriptionLinkItem:hover .contractDescriptionLinkTitle {
+  text-decoration: underline;
+}
+
+.mutedValue {
+  color: var(--acton-color-text-muted);
+}
+
+.addressValue {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--acton-color-text);
+  cursor: help;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressPopover {
+  flex: 0 1 auto;
+}
+
+.addressFormats {
+  display: grid;
+  gap: 10px;
+  width: min(32rem, calc(100vw - 56px));
+}
+
+.addressFormatRow {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.addressFormatLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1.35;
+}
+
+.addressFormatValueRow {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.addressFormatValue {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.addressActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: 2px;
+  line-height: 20px;
+  position: static;
+  top: auto;
+  vertical-align: baseline;
+  white-space: normal;
+}
+
+.customName {
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.renamePanel {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.editInput {
+  background: var(--acton-color-surface-raised);
+  border-radius: 10px;
+  font-size: var(--acton-font-size-sm);
+}
+
+.renameSaveButton,
+.renameCancelButton {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
+}
+
+.renameSaveButton {
+  border: 1px solid var(--acton-color-primary);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
+}
+
+.renameSaveButton:hover:not(:disabled) {
+  border-color: var(--acton-color-primary-hover);
+  background: var(--acton-color-primary-hover);
+}
+
+.renameSaveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.renameCancelButton {
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+}
+
+.renameCancelButton:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.iconButton,
+.qrToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: var(--acton-color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.iconButton:hover,
+.qrToggle:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--acton-color-text);
+}
+
+.favoriteButtonActive {
+  color: #d3a416;
+}
+
+.favoriteIconActive {
+  fill: currentColor;
+}
+
+.iconButton:focus-visible,
+.qrToggle:focus-visible,
+.moreLink:focus-visible,
+.externalLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.qrToggle {
+  display: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -2px;
+  margin-right: -2px;
+}
+
+.addressActions .iconButton {
+  width: 16px;
+  height: 16px;
+}
+
+.saveIcon {
+  color: var(--acton-color-status-passed);
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.assetLink,
+.collectiblesLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 20px;
+  padding: 0;
+  color: var(--acton-color-text);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.assetLink {
+  flex: 0 1 auto;
+}
+
+.assetLink:disabled,
+.collectiblesLink:disabled {
+  cursor: default;
+}
+
+.assetLink:focus-visible,
+.assetPreviewStack:focus-visible,
+.collectiblesLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.assetIconImage {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.assetPreviewStack {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.assetPreviewStack:disabled {
+  cursor: default;
+}
+
+.assetPreviewIcon,
+.assetPreviewPlaceholder {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border: 2px solid var(--acton-color-surface-raised);
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.assetPreviewIcon {
+  display: block;
+  object-fit: cover;
+  background: var(--acton-color-surface-group);
+}
+
+.assetPreviewPlaceholder {
+  display: inline-block;
+  background: var(--acton-color-surface-group);
+}
+
+.assetPreviewIcon + .assetPreviewIcon,
+.assetPreviewIcon + .assetPreviewPlaceholder,
+.assetPreviewPlaceholder + .assetPreviewIcon,
+.assetPreviewPlaceholder + .assetPreviewPlaceholder {
+  margin-left: -6px;
+}
+
+.moreLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0;
+  color: var(--acton-color-accent);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.moreLink:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.collectiblesRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.collectibleThumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.collectibleThumb,
+.collectibleThumbPlaceholder,
+.skeletonThumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.collectibleThumb {
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--acton-color-surface-group);
+}
+
+.collectibleThumbImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blurredImage {
+  filter: blur(4px);
+  transform: scale(1.35);
+}
+
+.collectibleThumbPlaceholder {
+  display: inline-block;
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-group);
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+  min-height: 18px;
+  margin-top: auto;
+  padding-top: 0;
+  border-top: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 18px;
+}
+
+.status::before {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.statusActive {
+  background: transparent;
+  color: var(--acton-color-status-passed);
+}
+
+.statusFrozen {
+  background: transparent;
+  color: var(--acton-color-accent);
+}
+
+.statusUninit {
+  background: transparent;
+  color: var(--acton-color-text-muted);
+}
+
+.statusNonexist {
+  background: transparent;
+  color: var(--acton-color-text-muted);
+}
+
+.statusAddress {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.externalLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.externalLink:hover {
+  color: var(--acton-color-accent);
+  text-decoration: underline;
+}
+
+.qrPanel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 132px;
+  min-width: 132px;
+  min-height: 132px;
+  align-self: flex-start;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.cardCompactQr .qrPanel {
+  display: none;
+}
+
+.cardCompactQr .cardBody {
+  position: relative;
+}
+
+.cardCompactQr .infoColumn {
+  flex: none;
+  padding-right: 34px;
+}
+
+.cardCompactQr .qrToggle {
+  display: inline-flex;
+  position: absolute;
+  top: 20px;
+  right: 24px;
+}
+
+.qrSvg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  color: var(--acton-color-text);
+}
+
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.skeletonValue {
+  width: min(100%, 132px);
+  height: 20px;
+  border-radius: 6px;
+}
+
+.skeletonIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.skeletonTag {
+  width: 64px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.statusSkeleton {
+  display: flex;
+  align-items: center;
+  width: 58px;
+  height: 18px;
+  background: none;
+  border-radius: 999px;
+  animation: none;
+}
+
+.statusSkeleton::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 16px;
+  background: linear-gradient(
+    90deg,
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
+  );
+  background-size: 220% 100%;
+  border-radius: 999px;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.skeletonTagWide {
+  width: 110px;
+  height: 20px;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .cardBody {
+    min-height: 0;
+  }
+
+  .qrPanel {
+    display: none;
+  }
+
+  .qrToggle {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 620px) {
+  .card {
+    border-radius: 12px;
+  }
+
+  .cardBody {
+    padding: 14px 16px;
+  }
+
+  .rows {
+    gap: 8px;
+  }
+
+  .infoRow {
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+  }
+
+  .label {
+    flex-basis: auto;
+  }
+
+  .rowValue {
+    width: 100%;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .assetRow,
+  .collectiblesRow {
+    width: 100%;
+  }
+
+  .assetLink {
+    align-items: flex-start;
+  }
+
+  .assetLink .primaryValue {
+    min-width: 0;
+  }
+
+  .addressInfoRow .rowValue {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+  }
+
+  .addressValue {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .addressActions {
+    margin-left: 0;
+  }
+
+  .renamePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .renameSaveButton,
+  .renameCancelButton {
+    width: 100%;
+  }
+
+  .statusBar {
+    align-items: flex-start;
+  }
+}

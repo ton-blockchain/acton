@@ -4,7 +4,6 @@ use crate::Network;
 use crate::types::{BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse};
 use anyhow::Context;
 use reqwest::Client;
-use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::env;
 use std::ffi::OsStr;
@@ -25,7 +24,7 @@ const fn user_agent() -> &'static str {
 }
 
 fn http_client_builder() -> reqwest::ClientBuilder {
-    let builder = Client::builder();
+    let builder = Client::builder().user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {
@@ -101,7 +100,6 @@ impl TonCenterClient {
         let mut request = self
             .client
             .get(format!("{}/transactions", self.base_url))
-            .header(USER_AGENT, user_agent())
             .query(&[("hash", hash), ("limit", &limit.to_string())]);
 
         if let Some(key) = &self.api_key {
@@ -135,7 +133,6 @@ impl TonCenterClient {
         let mut request = self
             .client
             .get(format!("{}/blocks", self.base_url))
-            .header(USER_AGENT, user_agent())
             .query(&[
                 ("workchain", workchain.to_string()),
                 ("shard", shard.to_string()),
@@ -190,11 +187,7 @@ impl TonCenterClient {
             }
         });
 
-        let mut request = self
-            .client
-            .post(url)
-            .header(USER_AGENT, user_agent())
-            .json(&body);
+        let mut request = self.client.post(url).json(&body);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -223,11 +216,7 @@ impl TonCenterClient {
             self.base_url.replace("/api/v3", "/api/v2")
         );
 
-        let mut request = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .query(&[("libraries", hash)]);
+        let mut request = self.client.get(url).query(&[("libraries", hash)]);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -265,11 +254,7 @@ impl TonCenterClient {
             self.base_url.replace("/api/v3", "/api/v2")
         );
 
-        let mut request = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .query(&[("seqno", seqno.to_string())]);
+        let mut request = self.client.get(url).query(&[("seqno", seqno.to_string())]);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -335,11 +320,7 @@ impl TonCenterClient {
             ("seqno", seqno.to_string()),
         ];
 
-        let mut request = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .query(&query);
+        let mut request = self.client.get(url).query(&query);
 
         if let Some(key) = &self.api_key {
             request = request.header("X-API-Key", key);
@@ -417,12 +398,7 @@ impl TonHubClient {
         hash: &str,
     ) -> anyhow::Result<TransactionTransactionsResponse> {
         let url = format!("{}/account/{}/tx/{}/{}", self.base_url, address, lt, hash);
-        let response = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .send()
-            .await?;
+        let response = self.client.get(url).send().await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {
@@ -443,12 +419,7 @@ impl TonHubClient {
             block: Option<BlockInfo>,
         }
 
-        let response = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .send()
-            .await?;
+        let response = self.client.get(url).send().await?;
         let status = response.status();
         let text = response.text().await?;
         if !status.is_success() {

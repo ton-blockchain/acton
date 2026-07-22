@@ -33,7 +33,7 @@ pub(crate) fn create_masterchain_block_boc(
 ) -> anyhow::Result<MasterchainBlockBuildResult> {
     let new_state = create_masterchain_state_cell(&ctx)?;
     let old_state = ctx.prev_state.clone().unwrap_or_else(|| new_state.clone());
-    let state_update = masterchain_state_update(&old_state, &new_state, ctx.config_cell)?;
+    let state_update = masterchain_state_update(&old_state, &new_state)?;
     let info = masterchain_block_info(&ctx)?;
     let extra = masterchain_block_extra(&ctx)?;
     let block = Block {
@@ -179,15 +179,27 @@ pub(crate) fn create_masterchain_state_cell(
     CellBuilder::build_from(&state).context("Failed to serialize masterchain state")
 }
 
-fn masterchain_state_update(
-    old_state: &Cell,
-    new_state: &Cell,
-    config_cell: &Cell,
-) -> anyhow::Result<MerkleUpdate> {
+fn masterchain_state_update(old_state: &Cell, new_state: &Cell) -> anyhow::Result<MerkleUpdate> {
     let old_cells = OldStateCells::new(if old_state.repr_hash() == new_state.repr_hash() {
         Vec::new()
     } else {
-        old_state_config_path(old_state, config_cell.repr_hash())?
+        let parsed_old_state = old_state
+            .parse::<ShardStateUnsplit>()
+            .context("Failed to parse previous masterchain state")?;
+        let old_extra = parsed_old_state
+            .custom
+            .as_ref()
+            .context("Previous masterchain state has no custom data")?
+            .load()
+            .context("Failed to load previous masterchain state extra")?;
+        let old_config = old_extra
+            .config
+            .params
+            .as_dict()
+            .root()
+            .as_ref()
+            .context("Previous masterchain state has no config dictionary")?;
+        old_state_config_path(old_state, old_config.repr_hash())?
     });
 
     MerkleUpdate::create(old_state.as_ref(), new_state.as_ref(), old_cells)

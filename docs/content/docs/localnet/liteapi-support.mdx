@@ -3,16 +3,26 @@ title: "LiteAPI Support"
 description: "LiteServer binary API coverage in Acton local development node"
 ---
 
-Acton localnet exposes a `LiteServer`-compatible binary endpoint for tools that
-talk to TON nodes through LiteAPI instead of TonCenter HTTP APIs. The endpoint is
-intended for local indexing, ABI discovery, and get-method execution against the
-localnet state. It returns real TON block cells for the local basechain and
-masterchain streams, but it is not a validator liteserver.
+Acton localnet can expose a `LiteServer`-compatible binary endpoint for tools
+that talk to TON nodes through LiteAPI instead of TonCenter HTTP APIs. The
+endpoint is intended for local indexing, ABI discovery, and get-method execution
+against the localnet state. It returns real TON block cells for the local
+basechain and masterchain streams, but it is not a validator liteserver.
 
 ## Endpoint
 
-When `acton localnet start` runs on HTTP port `5411`, LiteAPI listens on TCP port
-`5412`. In general, the LiteAPI port is always the localnet HTTP port plus one.
+LiteAPI is disabled by default. Enable it with `--liteapi`:
+
+```bash
+acton localnet start --liteapi
+```
+
+When Localnet runs on HTTP port `5411`, LiteAPI listens on TCP port `5412` by
+default. Set another port explicitly with `--liteapi-port`:
+
+```bash
+acton localnet start --liteapi --liteapi-port 15000
+```
 
 Startup output prints both values:
 

@@ -1,9 +1,7 @@
 use crate::localnet::Localnet;
 use crate::server::ShutdownSignal;
 use crate::streaming::{
-    StreamingEnvelope, StreamingErrorResponse, StreamingOperation, StreamingStatusResponse,
-    StreamingSubscribeRequest, StreamingSubscription, StreamingUnsubscribeRequest,
-    notifications_for_commit, validate_unsubscribe_request,
+    StreamingSubscription, notifications_for_commit, validate_unsubscribe_request,
 };
 use axum::{
     Json,
@@ -18,32 +16,32 @@ use axum::{
         sse::{Event, KeepAlive, Sse},
     },
 };
-use serde::de::DeserializeOwned;
 use std::{convert::Infallible, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
+use ton_api::toncenter::streaming::v2 as streaming;
 
 pub async fn streaming_sse(
     State(node): State<Arc<Localnet>>,
     State(shutdown): State<ShutdownSignal>,
     body: Bytes,
 ) -> Response {
-    let payload = match serde_json::from_slice::<StreamingSubscribeRequest>(&body) {
+    let payload = match serde_json::from_slice::<streaming::Subscription>(&body) {
         Ok(payload) => payload,
         Err(e) => return streaming_bad_request(None, format!("invalid subscription request: {e}")),
     };
     let subscription = match StreamingSubscription::from_subscribe_request(&payload) {
         Ok(subscription) => subscription,
-        Err(e) => return streaming_bad_request(payload.id, e.to_string()),
+        Err(e) => return streaming_bad_request(None, e.to_string()),
     };
 
     let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(32);
     let _ = tx
         .send(Ok(sse_json_event(
             "connected",
-            &StreamingStatusResponse {
-                id: payload.id,
-                status: "subscribed",
+            &streaming::StatusResponse {
+                id: None,
+                status: streaming::Status::Subscribed,
             },
         )))
         .await;
@@ -179,82 +177,57 @@ async fn handle_ws_message(
         Message::Pong(_) => return true,
     }
 
-    let envelope = match parse_ws_json::<StreamingEnvelope>(message) {
-        Ok(envelope) => envelope,
+    let request = match parse_ws_json(message) {
+        Ok(request) => request,
         Err(e) => {
             let _ = send_ws_error(socket, None, format!("invalid request envelope: {e}")).await;
             return true;
         }
     };
 
-    match envelope.operation {
-        StreamingOperation::Ping => {
+    match request {
+        streaming::WebSocketRequest::Ping { id } => {
             let _ = send_ws_json(
                 socket,
-                &StreamingStatusResponse {
-                    id: envelope.id,
-                    status: "pong",
+                &streaming::StatusResponse {
+                    id,
+                    status: streaming::Status::Pong,
                 },
             )
             .await;
         }
-        StreamingOperation::Subscribe => {
-            let request = match parse_ws_json::<StreamingSubscribeRequest>(message) {
-                Ok(request) => request,
-                Err(e) => {
-                    let _ = send_ws_error(
-                        socket,
-                        envelope.id,
-                        format!("invalid subscribe request: {e}"),
-                    )
-                    .await;
-                    return true;
-                }
-            };
-
-            match StreamingSubscription::from_subscribe_request(&request) {
-                Ok(next_subscription) => {
-                    *subscription = next_subscription;
-                    let _ = send_ws_json(
-                        socket,
-                        &StreamingStatusResponse {
-                            id: request.id.or(envelope.id),
-                            status: "subscribed",
-                        },
-                    )
-                    .await;
-                }
-                Err(e) => {
-                    let _ = send_ws_error(socket, request.id.or(envelope.id), e.to_string()).await;
-                }
+        streaming::WebSocketRequest::Subscribe {
+            id,
+            subscription: request,
+        } => match StreamingSubscription::from_subscribe_request(&request) {
+            Ok(next_subscription) => {
+                *subscription = next_subscription;
+                let _ = send_ws_json(
+                    socket,
+                    &streaming::StatusResponse {
+                        id,
+                        status: streaming::Status::Subscribed,
+                    },
+                )
+                .await;
             }
-        }
-        StreamingOperation::Unsubscribe => {
-            let request = match parse_ws_json::<StreamingUnsubscribeRequest>(message) {
-                Ok(request) => request,
-                Err(e) => {
-                    let _ = send_ws_error(
-                        socket,
-                        envelope.id,
-                        format!("invalid unsubscribe request: {e}"),
-                    )
-                    .await;
-                    return true;
-                }
-            };
-
+            Err(e) => {
+                let _ = send_ws_error(socket, id, e.to_string()).await;
+            }
+        },
+        streaming::WebSocketRequest::Unsubscribe { id, request } => {
             if let Err(e) = validate_unsubscribe_request(&request)
                 .and_then(|()| subscription.unsubscribe(&request))
             {
-                let _ = send_ws_error(socket, request.id.or(envelope.id), e.to_string()).await;
+                let _ = send_ws_error(socket, id, e.to_string()).await;
                 return true;
             }
 
             let _ = send_ws_json(
                 socket,
-                &StreamingStatusResponse {
-                    id: request.id.or(envelope.id),
-                    status: "unsubscribed",
+                &streaming::StatusResponse {
+                    id,
+                    status: streaming::Status::Unsubscribed,
                 },
             )
             .await;
@@ -264,7 +237,7 @@ async fn handle_ws_message(
     true
 }
 
-fn parse_ws_json<T: DeserializeOwned>(message: &Message) -> anyhow::Result<T> {
+fn parse_ws_json(message: &Message) -> anyhow::Result<streaming::WebSocketRequest> {
     match message {
         Message::Text(text) => Ok(serde_json::from_str(text)?),
         Message::Binary(bytes) => Ok(serde_json::from_slice(bytes)?),
@@ -277,36 +250,27 @@ async fn send_ws_error(
     id: Option<String>,
     error: String,
 ) -> Result<(), axum::Error> {
-    send_ws_json(socket, &StreamingErrorResponse { id, error }).await
+    send_ws_json(socket, &streaming::ErrorResponse { id, error }).await
 }
 
 async fn send_ws_json<T: serde::Serialize + Sync>(
     socket: &mut WebSocket,
     value: &T,
 ) -> Result<(), axum::Error> {
-    let text = serde_json::to_string(value).unwrap_or_else(|e| {
-        serde_json::json!({
-            "error": format!("failed to serialize websocket response: {e}")
-        })
-        .to_string()
-    });
+    let text =
+        serde_json::to_string(value).expect("typed streaming WebSocket responses must serialize");
     socket.send(Message::Text(text.into())).await
 }
 
 fn streaming_bad_request(id: Option<String>, error: String) -> Response {
     (
         StatusCode::BAD_REQUEST,
-        Json(StreamingErrorResponse { id, error }),
+        Json(streaming::ErrorResponse { id, error }),
     )
         .into_response()
 }
 
 fn sse_json_event<T: serde::Serialize>(event: &'static str, value: &T) -> Event {
-    let data = serde_json::to_string(value).unwrap_or_else(|e| {
-        serde_json::json!({
-            "error": format!("failed to serialize event: {e}")
-        })
-        .to_string()
-    });
+    let data = serde_json::to_string(value).expect("typed streaming SSE responses must serialize");
     Event::default().event(event).data(data)
 }

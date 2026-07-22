@@ -380,6 +380,7 @@ impl<'a> TestRunner<'a> {
             debug: DebugCtx::Disabled,
             is_broadcasting: false,
             network: self.config.fork_net.clone(),
+            execution_started_at: params.unixtime,
         };
 
         let stack = Boc::encode_base64(serialize_tuple(stack)?);

@@ -983,6 +983,7 @@ pub struct Context<'a> {
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,
     pub network: Option<Network>,
+    pub execution_started_at: i64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
