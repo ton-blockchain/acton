@@ -9,6 +9,7 @@ describe("pageOgPreviewForPath", () => {
     ["/blocks/", "blocks"],
     ["/abi", "abi"],
     ["/sources", "sources"],
+    ["/faucet", "faucet"],
     ["/verified", "verified"],
     ["/verified/92bf1e3962a54b88", "verified-contract"],
     ["/cell", "cell"],
@@ -40,6 +41,13 @@ test("favorites preview describes every supported favorite type", () => {
     title: "Favorites",
     metadataTitle: "TON favorites · actonscan",
     metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
+  })
+})
+
+test("faucet preview makes the Testnet scope explicit", () => {
+  expect(pageOgPreviewForKey("faucet")).toMatchObject({
+    title: "Testnet Faucet",
+    metadataTitle: "TON Testnet Faucet · actonscan",
   })
 })
 

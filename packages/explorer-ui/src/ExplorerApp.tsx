@@ -58,6 +58,7 @@ import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
+import {FaucetPage} from "./faucet/FaucetPage"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -892,6 +893,12 @@ const DesktopMoreMenu: FC = () => {
       contentClassName={styles.desktopMorePopover}
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Faucet</span>
+              <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
+            </span>
+          </Link>
           <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
@@ -994,6 +1001,18 @@ export const ExplorerApp: FC = () => {
         toncenterApiKey: networkConfig.api.toncenterApiKey,
       }),
     [networkConfig],
+  )
+  const testnetClient = useMemo(
+    () =>
+      new TonClient({
+        v2BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v2BaseUrl,
+        v3BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v3BaseUrl,
+        addressNameBaseUrl: "",
+        localnetControlEnabled: false,
+        toncenterApiCompatible: true,
+        toncenterApiKey: EXPLORER_API_CONFIGS.testnet.api.toncenterApiKey,
+      }),
+    [],
   )
   const metadataRegistry = useMemo(
     () =>
@@ -1232,6 +1251,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/sources" onClick={closeMobileHeaderPanels}>
                                 Sources
                               </Link>
+                              <Link to="/faucet" onClick={closeMobileHeaderPanels}>
+                                Faucet
+                              </Link>
                               <Link to="/verified" onClick={closeMobileHeaderPanels}>
                                 Verified contracts
                               </Link>
@@ -1274,6 +1296,17 @@ export const ExplorerApp: FC = () => {
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route
+                        path="/faucet"
+                        element={
+                          <FaucetPage
+                            isTestnetSelected={networkId === "testnet"}
+                            selectedNetworkLabel={networkConfig.label}
+                            testnetClient={testnetClient}
+                            onSwitchToTestnet={() => handleNetworkChange("testnet")}
+                          />
+                        }
+                      />
                       <Route path="/verified" element={<VerifiedContractsRoute />} />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
@@ -1287,7 +1320,10 @@ export const ExplorerApp: FC = () => {
                         path="/block/:workchain/:shard/:seqno"
                         element={<BlockDetailsPage client={client} />}
                       />
-                      <Route path="/address/:address" element={<AccountPage client={client} />} />
+                      <Route
+                        path="/address/:address"
+                        element={<AccountPage client={client} />}
+                      />
                       <Route
                         path="/tx/:hash/trace"
                         element={<TransactionPage client={client} openRetraceOnLoad />}

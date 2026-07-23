@@ -1,6 +1,7 @@
 NEXTEST_PROFILE_ARGS := if env_var_or_default("CI", "") != "" { "-P ci" } else { "" }
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
+FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
 
 all: precommit
 
@@ -12,6 +13,10 @@ build-dev:
 
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm
+
+build-faucet-pow-wasm:
+    wasm-pack build crates/acton-faucet-pow-wasm --release --target web --out-dir "{{ FAUCET_POW_WASM_OUT }}" --out-name acton_faucet_pow_wasm
+    rm -f "{{ FAUCET_POW_WASM_OUT }}/.gitignore"
 
 sync-artifacts:
     cargo xtask sync-artifacts

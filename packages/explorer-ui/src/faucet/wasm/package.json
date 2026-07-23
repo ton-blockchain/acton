@@ -1,0 +1,24 @@
+{
+  "name": "acton-faucet-pow-wasm",
+  "type": "module",
+  "collaborators": [
+    "TON Core"
+  ],
+  "version": "1.1.0",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ton-blockchain/acton"
+  },
+  "files": [
+    "acton_faucet_pow_wasm_bg.wasm",
+    "acton_faucet_pow_wasm.js",
+    "acton_faucet_pow_wasm.d.ts"
+  ],
+  "main": "acton_faucet_pow_wasm.js",
+  "homepage": "https://ton-blockchain.github.io/acton",
+  "types": "acton_faucet_pow_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

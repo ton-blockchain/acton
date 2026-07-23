@@ -6,6 +6,7 @@ export type PageOgKey =
   | "block"
   | "abi"
   | "sources"
+  | "faucet"
   | "verified"
   | "verified-contract"
   | "cell"
@@ -64,6 +65,14 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     description: "Read the verified code behind on-chain contracts",
     metadataTitle: "Verified TON sources · actonscan",
     metadataDescription: "Browse verified TON smart-contract source code on actonscan.",
+  },
+  faucet: {
+    key: "faucet",
+    title: "Testnet Faucet",
+    badge: "Proof of work",
+    description: "Fund a TON Testnet address without leaving the explorer",
+    metadataTitle: "TON Testnet Faucet · actonscan",
+    metadataDescription: "Request testnet GRAM through Acton's proof-of-work protected faucet",
   },
   verified: {
     key: "verified",
@@ -128,6 +137,7 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
   if (normalizedPath === "/blocks") return PAGE_OG_PREVIEWS.blocks
   if (normalizedPath === "/abi") return PAGE_OG_PREVIEWS.abi
   if (normalizedPath === "/sources") return PAGE_OG_PREVIEWS.sources
+  if (normalizedPath === "/faucet") return PAGE_OG_PREVIEWS.faucet
   if (normalizedPath === "/verified") return PAGE_OG_PREVIEWS.verified
   if (/^\/verified\/[^/]+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS["verified-contract"]
   if (normalizedPath === "/cell") return PAGE_OG_PREVIEWS.cell
