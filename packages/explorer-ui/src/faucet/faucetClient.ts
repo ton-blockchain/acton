@@ -3,6 +3,9 @@ const DEFAULT_MAX_SOLVE_TTL_SECONDS = 60
 const DEFAULT_MAX_NONCE_ATTEMPTS = 1_000_000_000
 const FAUCET_CLIENT_HEADER = "actonscan/1.0.0"
 const FAUCET_DEVICE_UID_STORAGE_KEY = "actonscanFaucetDeviceUid"
+const FAUCET_SESSION_STORAGE_KEY = "actonscanFaucetSession"
+
+export type FaucetTier = "guest" | "verified" | "established"
 
 export interface FaucetChallenge {
   readonly version: number
@@ -14,6 +17,24 @@ export interface FaucetChallenge {
 
 export interface FaucetClaim {
   readonly message: string
+}
+
+export interface FaucetAuthStatus {
+  readonly enabled: boolean
+  readonly guestMaxRequests: number
+  readonly verifiedMaxRequests: number
+  readonly establishedMaxRequests: number
+  readonly windowSeconds: number
+}
+
+export interface FaucetSession {
+  readonly githubUserId: number
+  readonly login: string
+  readonly tier: FaucetTier
+  readonly maxRequests: number
+  readonly accountAgeDays: number
+  readonly publicRepos: number
+  readonly followers: number
 }
 
 export class FaucetRequestError extends Error {
@@ -37,6 +58,99 @@ interface FaucetChallengeResponse {
 interface FaucetMessageResponse {
   readonly error?: unknown
   readonly message?: unknown
+}
+
+interface FaucetAuthStatusResponse {
+  readonly enabled?: unknown
+  readonly guestMaxRequests?: unknown
+  readonly verifiedMaxRequests?: unknown
+  readonly establishedMaxRequests?: unknown
+  readonly windowSeconds?: unknown
+}
+
+interface FaucetSessionResponse {
+  readonly authenticated?: unknown
+  readonly githubUserId?: unknown
+  readonly login?: unknown
+  readonly tier?: unknown
+  readonly maxRequests?: unknown
+  readonly accountAgeDays?: unknown
+  readonly publicRepos?: unknown
+  readonly followers?: unknown
+  readonly token?: unknown
+}
+
+export async function requestFaucetAuthStatus(signal?: AbortSignal): Promise<FaucetAuthStatus> {
+  const payload = await faucetGet<FaucetAuthStatusResponse>("auth/status", signal, false)
+
+  return {
+    enabled: payload.enabled === true,
+    guestMaxRequests: positiveSafeInteger(payload.guestMaxRequests, "guest request limit"),
+    verifiedMaxRequests: positiveSafeInteger(payload.verifiedMaxRequests, "verified request limit"),
+    establishedMaxRequests: positiveSafeInteger(
+      payload.establishedMaxRequests,
+      "established request limit",
+    ),
+    windowSeconds: positiveSafeInteger(payload.windowSeconds, "request window"),
+  }
+}
+
+export function githubAuthorizationUrl(): string {
+  const url = new URL("auth/github/start", faucetBaseUrl())
+  url.searchParams.set("device_uid", faucetDeviceUid())
+  return url.toString()
+}
+
+export async function exchangeGitHubGrant(
+  grant: string,
+  signal?: AbortSignal,
+): Promise<FaucetSession> {
+  const payload = await faucetRequest<FaucetSessionResponse>(
+    "auth/exchange",
+    {grant},
+    signal,
+    false,
+  )
+  if (typeof payload.token !== "string" || payload.token.length < 32) {
+    throw new Error("Faucet returned an invalid GitHub session token")
+  }
+  writeFaucetSessionToken(payload.token)
+  return parseFaucetSession(payload)
+}
+
+export async function requestFaucetSession(
+  signal?: AbortSignal,
+): Promise<FaucetSession | undefined> {
+  if (!readFaucetSessionToken()) return undefined
+
+  try {
+    const payload = await faucetGet<FaucetSessionResponse>("auth/session", signal)
+    return parseFaucetSession(payload)
+  } catch (error) {
+    if (error instanceof FaucetRequestError && error.status === 401) {
+      clearFaucetSession()
+      return undefined
+    }
+    throw error
+  }
+}
+
+export async function disconnectFaucetSession(signal?: AbortSignal): Promise<void> {
+  try {
+    if (readFaucetSessionToken()) {
+      await faucetFetch("auth/session", {method: "DELETE", signal})
+    }
+  } finally {
+    clearFaucetSession()
+  }
+}
+
+export function clearFaucetSession(): void {
+  try {
+    sessionStorage.removeItem(FAUCET_SESSION_STORAGE_KEY)
+  } catch {
+    // The page remains usable as a guest when browser storage is unavailable
+  }
 }
 
 export async function requestFaucetChallenge(
@@ -107,27 +221,58 @@ export async function submitFaucetClaim(
   }
 }
 
-async function faucetRequest<T>(
+function faucetRequest<T>(
   path: string,
   payload: Record<string, unknown>,
   signal?: AbortSignal,
+  authorized = true,
 ): Promise<T> {
-  const response = await fetch(new URL(path, faucetBaseUrl()), {
+  return faucetFetch<T>(path, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-acton-client": FAUCET_CLIENT_HEADER,
-      "x-device-uid": faucetDeviceUid(),
-    },
     body: JSON.stringify(payload),
     signal,
+    authorized,
+    contentType: true,
+  })
+}
+
+function faucetGet<T>(path: string, signal?: AbortSignal, authorized = true): Promise<T> {
+  return faucetFetch<T>(path, {method: "GET", signal, authorized})
+}
+
+interface FaucetFetchOptions {
+  readonly method: "GET" | "POST" | "DELETE"
+  readonly body?: string
+  readonly signal?: AbortSignal
+  readonly authorized?: boolean
+  readonly contentType?: boolean
+}
+
+async function faucetFetch<T = unknown>(path: string, options: FaucetFetchOptions): Promise<T> {
+  const headers: Record<string, string> = {
+    "x-acton-client": FAUCET_CLIENT_HEADER,
+    "x-device-uid": faucetDeviceUid(),
+  }
+  if (options.contentType) headers["content-type"] = "application/json"
+  if (options.authorized !== false) {
+    const sessionToken = readFaucetSessionToken()
+    if (sessionToken) headers.authorization = `Bearer ${sessionToken}`
+  }
+
+  const response = await fetch(new URL(path, faucetBaseUrl()), {
+    method: options.method,
+    headers,
+    body: options.body,
+    signal: options.signal,
   })
   const text = await response.text()
   const parsed = parseJson(text)
 
   if (!response.ok) {
+    if (response.status === 401) clearFaucetSession()
     throw new FaucetRequestError(faucetErrorMessage(parsed, text, response.status), response.status)
   }
+  if (response.status === 204) return undefined as T
   if (!isRecord(parsed)) {
     throw new Error("Faucet returned an invalid JSON response")
   }
@@ -156,6 +301,23 @@ function faucetDeviceUid(): string {
   }
 }
 
+function readFaucetSessionToken(): string | undefined {
+  try {
+    const token = sessionStorage.getItem(FAUCET_SESSION_STORAGE_KEY)?.trim()
+    return token || undefined
+  } catch {
+    return undefined
+  }
+}
+
+function writeFaucetSessionToken(token: string): void {
+  try {
+    sessionStorage.setItem(FAUCET_SESSION_STORAGE_KEY, token)
+  } catch {
+    // Requests continue as guest when browser storage is unavailable
+  }
+}
+
 function generateDeviceUid(): string {
   if (typeof crypto.randomUUID === "function") {
     return crypto.randomUUID()
@@ -174,6 +336,34 @@ function positiveSafeInteger(value: unknown, label: string): number {
     throw new Error(`Faucet returned an invalid ${label}: ${String(value)}`)
   }
   return value
+}
+
+function nonNegativeSafeInteger(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Faucet returned an invalid ${label}: ${String(value)}`)
+  }
+  return value
+}
+
+function parseFaucetSession(payload: FaucetSessionResponse): FaucetSession {
+  if (
+    payload.authenticated !== true ||
+    typeof payload.login !== "string" ||
+    payload.login.length === 0 ||
+    (payload.tier !== "guest" && payload.tier !== "verified" && payload.tier !== "established")
+  ) {
+    throw new Error("Faucet returned an invalid GitHub session")
+  }
+
+  return {
+    githubUserId: positiveSafeInteger(payload.githubUserId, "GitHub user ID"),
+    login: payload.login,
+    tier: payload.tier,
+    maxRequests: positiveSafeInteger(payload.maxRequests, "request limit"),
+    accountAgeDays: nonNegativeSafeInteger(payload.accountAgeDays, "account age"),
+    publicRepos: nonNegativeSafeInteger(payload.publicRepos, "public repository count"),
+    followers: nonNegativeSafeInteger(payload.followers, "follower count"),
+  }
 }
 
 function parseJson(value: string): unknown {

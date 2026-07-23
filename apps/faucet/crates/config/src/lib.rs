@@ -14,6 +14,7 @@ pub struct Config {
     pub pow: PowConfig,
     pub valkey: ValkeyConfig,
     pub antifraud: AntifraudConfig,
+    pub github_auth: GitHubAuthConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -116,8 +117,31 @@ pub struct SuccessfulClaimWindowCheckConfig {
     pub window_seconds: u64,
 }
 
+#[derive(Clone, Debug)]
+pub struct GitHubAuthConfig {
+    pub enabled: bool,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub callback_url: String,
+    pub frontend_url: String,
+    pub state_ttl_seconds: u64,
+    pub grant_ttl_seconds: u64,
+    pub session_ttl_seconds: u64,
+    pub verified: GitHubTierConfig,
+    pub established: GitHubTierConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct GitHubTierConfig {
+    pub max_requests: u32,
+    pub min_account_age_days: u64,
+    pub min_public_repos: u32,
+    pub min_followers: u32,
+}
+
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
+        let github_auth_enabled = parse_env_bool("GITHUB_AUTH_ENABLED", false);
         let config = Config {
             database: DatabaseConfig {
                 url: std::env::var("DATABASE_URL")
@@ -212,10 +236,81 @@ impl Config {
                     ),
                 },
             },
+            github_auth: GitHubAuthConfig {
+                enabled: github_auth_enabled,
+                client_id: optional_env("GITHUB_CLIENT_ID"),
+                client_secret: optional_env("GITHUB_CLIENT_SECRET"),
+                callback_url: std::env::var("GITHUB_CALLBACK_URL").unwrap_or_else(|_| {
+                    "https://faucet.acton.monster/auth/github/callback".to_string()
+                }),
+                frontend_url: std::env::var("GITHUB_FRONTEND_URL")
+                    .unwrap_or_else(|_| "https://actonscan.com/faucet".to_string()),
+                state_ttl_seconds: parse_env_number("GITHUB_STATE_TTL_SECONDS", 600),
+                grant_ttl_seconds: parse_env_number("GITHUB_GRANT_TTL_SECONDS", 120),
+                session_ttl_seconds: parse_env_number("GITHUB_SESSION_TTL_SECONDS", 604_800),
+                verified: GitHubTierConfig {
+                    max_requests: parse_env_number("GITHUB_VERIFIED_MAX_REQUESTS", 4),
+                    min_account_age_days: parse_env_number(
+                        "GITHUB_VERIFIED_MIN_ACCOUNT_AGE_DAYS",
+                        90,
+                    ),
+                    min_public_repos: parse_env_number("GITHUB_VERIFIED_MIN_PUBLIC_REPOS", 2),
+                    min_followers: parse_env_number("GITHUB_VERIFIED_MIN_FOLLOWERS", 0),
+                },
+                established: GitHubTierConfig {
+                    max_requests: parse_env_number("GITHUB_ESTABLISHED_MAX_REQUESTS", 8),
+                    min_account_age_days: parse_env_number(
+                        "GITHUB_ESTABLISHED_MIN_ACCOUNT_AGE_DAYS",
+                        365,
+                    ),
+                    min_public_repos: parse_env_number("GITHUB_ESTABLISHED_MIN_PUBLIC_REPOS", 5),
+                    min_followers: parse_env_number("GITHUB_ESTABLISHED_MIN_FOLLOWERS", 5),
+                },
+            },
         };
 
+        config.validate()?;
         Ok(config)
     }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if !self.github_auth.enabled {
+            return Ok(());
+        }
+
+        anyhow::ensure!(
+            self.github_auth.client_id.is_some(),
+            "GITHUB_CLIENT_ID must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            self.github_auth.client_secret.is_some(),
+            "GITHUB_CLIENT_SECRET must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            self.github_auth.state_ttl_seconds > 0
+                && self.github_auth.grant_ttl_seconds > 0
+                && self.github_auth.session_ttl_seconds > 0,
+            "GitHub authentication TTLs must be positive"
+        );
+        anyhow::ensure!(
+            self.github_auth.verified.max_requests
+                >= self.antifraud.successful_claim_window.max_requests,
+            "GITHUB_VERIFIED_MAX_REQUESTS must not be below the guest limit"
+        );
+        anyhow::ensure!(
+            self.github_auth.established.max_requests >= self.github_auth.verified.max_requests,
+            "GITHUB_ESTABLISHED_MAX_REQUESTS must not be below the verified limit"
+        );
+
+        Ok(())
+    }
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn parse_env_number<T>(name: &str, default: T) -> T
@@ -312,10 +407,7 @@ mod tests {
         assert_eq!(parse_nanograms("0.5GRAM"), Some(500_000_000));
         assert_eq!(parse_nanograms(".25gram"), Some(250_000_000));
         assert_eq!(parse_nanograms("1e-9GRAM"), Some(1));
-        assert_eq!(
-            parse_nanograms("1.000000001GRAM"),
-            Some(1_000_000_001)
-        );
+        assert_eq!(parse_nanograms("1.000000001GRAM"), Some(1_000_000_001));
     }
 
     #[test]

@@ -7,12 +7,29 @@ const MAINNET_ADDRESS = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgQ"
 const DEVICE_UID = "12345678-1234-1234-1234-123456789abc"
 const ADDRESS_HISTORY_KEY = "actonscanFaucetAddressHistory"
 const REQUEST_HISTORY_KEY = "actonscanFaucetRequestHistory"
+const SESSION_KEY = "actonscanFaucetSession"
+const AUTH_STATUS_URL = "https://faucet.acton.monster/auth/status"
 
 test.describe("Testnet faucet", () => {
   test.beforeEach(async ({page}) => {
     await prepareVisualPage(page, {
       app: "explorer",
       storage: {actonscanFaucetDeviceUid: DEVICE_UID},
+    })
+    await page.route(AUTH_STATUS_URL, async route => {
+      const origin = route.request().headers().origin ?? "*"
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({
+          status: 204,
+          headers: faucetCorsHeaders(origin),
+        })
+        return
+      }
+      await route.fulfill({
+        contentType: "application/json",
+        headers: {"access-control-allow-origin": origin},
+        body: JSON.stringify(authStatus(false)),
+      })
     })
   })
 
@@ -90,6 +107,62 @@ test.describe("Testnet faucet", () => {
     await expect(notifications).toContainText("Enter a valid TON address")
   })
 
+  test("exchanges a GitHub grant and restores the higher tier session", async ({page}) => {
+    await page.unroute(AUTH_STATUS_URL)
+    await page.route("https://faucet.acton.monster/**", async route => {
+      const request = route.request()
+      const origin = request.headers().origin ?? "*"
+      if (request.method() === "OPTIONS") {
+        await route.fulfill({status: 204, headers: faucetCorsHeaders(origin)})
+        return
+      }
+      if (request.url().endsWith("/auth/status")) {
+        await route.fulfill({
+          contentType: "application/json",
+          headers: {"access-control-allow-origin": origin},
+          body: JSON.stringify(authStatus(true)),
+        })
+        return
+      }
+      if (request.url().endsWith("/auth/exchange")) {
+        expect(request.headers()["x-device-uid"]).toBe(DEVICE_UID)
+        expect(request.postDataJSON()).toEqual({grant: "one-time-grant"})
+        await route.fulfill({
+          contentType: "application/json",
+          headers: {"access-control-allow-origin": origin},
+          body: JSON.stringify(githubSessionResponse("opaque-session-token-with-enough-entropy")),
+        })
+        return
+      }
+      if (request.url().endsWith("/auth/session")) {
+        expect(request.headers().authorization).toBe(
+          "Bearer opaque-session-token-with-enough-entropy",
+        )
+        await route.fulfill({
+          contentType: "application/json",
+          headers: {"access-control-allow-origin": origin},
+          body: JSON.stringify(githubSessionResponse()),
+        })
+        return
+      }
+      await route.abort()
+    })
+
+    await page.goto("/faucet?network=testnet#github_grant=one-time-grant")
+
+    await expect(page.getByText("Connected as @acton-dev")).toBeVisible()
+    await expect(page.getByText("Verified tier · 4 requests per hour")).toBeVisible()
+    await expect(page.getByText("Maximum of 4 requests per hour")).toBeVisible()
+    await expect(page).toHaveURL(/\/faucet\?network=testnet$/)
+    expect(await page.evaluate(key => sessionStorage.getItem(key), SESSION_KEY)).toBe(
+      "opaque-session-token-with-enough-entropy",
+    )
+
+    await page.reload()
+    await expect(page.getByText("Connected as @acton-dev")).toBeVisible()
+    await expect(page.getByRole("button", {name: "Disconnect"})).toBeVisible()
+  })
+
   test("rejects mainnet-friendly addresses before requesting a challenge", async ({page}) => {
     let faucetRequests = 0
     await page.route("https://faucet.acton.monster/**", async route => {
@@ -125,11 +198,15 @@ test.describe("Testnet faucet", () => {
       if (request.method() === "OPTIONS") {
         await route.fulfill({
           status: 204,
-          headers: {
-            "access-control-allow-origin": requestOrigin,
-            "access-control-allow-methods": "POST",
-            "access-control-allow-headers": "content-type,x-acton-client,x-device-uid",
-          },
+          headers: faucetCorsHeaders(requestOrigin),
+        })
+        return
+      }
+      if (request.url().endsWith("/auth/status")) {
+        await route.fulfill({
+          contentType: "application/json",
+          headers: {"access-control-allow-origin": requestOrigin},
+          body: JSON.stringify(authStatus(false)),
         })
         return
       }
@@ -228,3 +305,35 @@ test.describe("Testnet faucet", () => {
       .toBe("preserved")
   })
 })
+
+function faucetCorsHeaders(origin: string): Record<string, string> {
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET,POST,DELETE",
+    "access-control-allow-headers": "content-type,authorization,x-acton-client,x-device-uid",
+  }
+}
+
+function authStatus(enabled: boolean): Record<string, unknown> {
+  return {
+    enabled,
+    guestMaxRequests: 2,
+    verifiedMaxRequests: 4,
+    establishedMaxRequests: 8,
+    windowSeconds: 3600,
+  }
+}
+
+function githubSessionResponse(token?: string): Record<string, unknown> {
+  return {
+    authenticated: true,
+    githubUserId: 42,
+    login: "acton-dev",
+    tier: "verified",
+    maxRequests: 4,
+    accountAgeDays: 800,
+    publicRepos: 12,
+    followers: 7,
+    ...(token ? {token} : {}),
+  }
+}

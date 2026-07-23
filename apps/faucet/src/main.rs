@@ -10,9 +10,9 @@ use faucet_pow::Pow;
 use faucet_valkey::{
     AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
 };
+use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
-use moka::sync::Cache;
 use real::RealIpLayer;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
@@ -29,6 +29,7 @@ use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
+mod github_auth;
 mod handlers;
 mod logger;
 mod wallet;
@@ -97,18 +98,17 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to create Valkey store")?;
     info!("Connected to Valkey");
     let antifraud = Antifraud::new(&config.antifraud);
+    let github_auth = GitHubAuth::new(config.github_auth.clone(), valkey.clone())
+        .context("Failed to create GitHub authentication service")?;
 
     let shared_state = AppState {
         storage: storage.clone(),
         wallet: Arc::new(wallet),
         client: client.clone(),
         pow: Pow::new(config.pow.difficulty),
-        pow_challenges: Cache::builder()
-            .time_to_live(StdDuration::from_secs(config.pow.challenge_ttl_seconds))
-            .max_capacity(config.pow.max_challenges)
-            .build(),
         valkey,
         antifraud,
+        github_auth,
         config: Arc::new(config),
     };
 
@@ -203,9 +203,9 @@ pub(crate) struct AppState {
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,
-    pub(crate) pow_challenges: Cache<String, u32>,
     pub(crate) valkey: ValkeyStore,
     pub(crate) antifraud: Antifraud,
+    pub(crate) github_auth: GitHubAuth,
     pub(crate) config: Arc<Config>,
 }
 
@@ -236,7 +236,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
     info!("Processing claim for address: {}", task.address);
 
-    if !can_process_successful_claim_window(&state, &task.address).await? {
+    if !can_process_successful_claim_window(&state, &task).await? {
         return Ok(());
     }
 
@@ -256,7 +256,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
         match status {
             Ok(_) => {
-                record_successful_claim(&state, &task.address).await;
+                record_successful_claim(&state, &task).await;
                 match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanograms) => {
                         info!(
@@ -311,17 +311,57 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 // TODO: вынести куда-то
 async fn can_process_successful_claim_window(
     state: &AppState,
-    address: &str,
+    task: &CreateClaim,
 ) -> anyhow::Result<bool> {
     let Some(window) = state.antifraud.successful_claim_window() else {
         return Ok(true);
     };
 
-    let address_key = normalized_address_key(address)?;
+    let max_requests = if task.max_requests == 0 {
+        window.max_requests
+    } else {
+        task.max_requests
+    };
+    let address_key = normalized_address_key(&task.address)?;
 
+    if !claim_window_allows(
+        state,
+        &address_key,
+        max_requests,
+        window.window_seconds,
+        &task.address,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+
+    if let Some(github_user_id) = task.github_user_id
+        && !claim_window_allows(
+            state,
+            &handlers::github_claim_window_key(github_user_id),
+            max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+async fn claim_window_allows(
+    state: &AppState,
+    subject: &str,
+    max_requests: u32,
+    window_seconds: u64,
+    address: &str,
+) -> anyhow::Result<bool> {
     match state
         .valkey
-        .check_successful_claim_window(&address_key, window.max_requests, window.window_seconds)
+        .check_successful_claim_window(subject, max_requests, window_seconds)
         .await?
     {
         SuccessfulClaimWindowDecision::Allowed {
@@ -331,6 +371,7 @@ async fn can_process_successful_claim_window(
         } => {
             info!(
                 address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -349,6 +390,7 @@ async fn can_process_successful_claim_window(
                 .await;
             warn!(
                 address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -360,16 +402,16 @@ async fn can_process_successful_claim_window(
     }
 }
 
-async fn record_successful_claim(state: &AppState, address: &str) {
+async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
     let Some(window) = state.antifraud.successful_claim_window() else {
         return;
     };
 
-    let address_key = match normalized_address_key(address) {
+    let address_key = match normalized_address_key(&task.address) {
         Ok(address_key) => address_key,
         Err(err) => {
             warn!(
-                address = %address,
+                address = %task.address,
                 error = %err,
                 "Failed to normalize successful claim address"
             );
@@ -377,22 +419,43 @@ async fn record_successful_claim(state: &AppState, address: &str) {
         }
     };
 
+    record_successful_claim_subject(state, &address_key, &task.address, window.window_seconds)
+        .await;
+    if let Some(github_user_id) = task.github_user_id {
+        record_successful_claim_subject(
+            state,
+            &handlers::github_claim_window_key(github_user_id),
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+}
+
+async fn record_successful_claim_subject(
+    state: &AppState,
+    subject: &str,
+    address: &str,
+    window_seconds: u64,
+) {
     match state
         .valkey
-        .record_successful_claim(&address_key, window.window_seconds)
+        .record_successful_claim(subject, window_seconds)
         .await
     {
         Ok(successful_claims) => {
             info!(
                 address = %address,
+                subject,
                 successful_claims,
-                window_seconds = window.window_seconds,
+                window_seconds,
                 "Recorded successful claim in Valkey"
             );
         }
         Err(err) => {
             warn!(
                 address = %address,
+                subject,
                 error = %err,
                 "Failed to record successful claim in Valkey"
             );

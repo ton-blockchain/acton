@@ -12,16 +12,28 @@ pub const ACTON_CLIENT_HEADER: HeaderName = HeaderName::from_static("x-acton-cli
 pub const DEVICE_UID_HEADER: HeaderName = HeaderName::from_static("x-device-uid");
 const DEFAULT_DEVICE_UID: &str = "default";
 
-pub async fn require_airdrop_headers(request: Request, next: Next) -> Response {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClientContext {
+    pub device_uid: String,
+}
+
+pub async fn require_airdrop_headers(mut request: Request, next: Next) -> Response {
     let headers = request.headers();
     let user_agent = headers.get(USER_AGENT);
     let browser_client = headers.get(&ACTON_CLIENT_HEADER);
     let device_uid = headers.get(&DEVICE_UID_HEADER);
     let is_client_allowed = user_agent.is_some_and(is_allowed_user_agent)
         || browser_client.is_some_and(is_allowed_browser_client);
-    let is_device_uid_allowed = device_uid.is_some_and(is_allowed_device_uid);
+    let is_device_uid_allowed = device_uid.is_some_and(is_allowed_device_uid_header);
 
     if is_client_allowed && is_device_uid_allowed {
+        let device_uid = device_uid
+            .and_then(|value| value.to_str().ok())
+            .expect("validated device UID must be UTF-8")
+            .to_string();
+        request
+            .extensions_mut()
+            .insert(ClientContext { device_uid });
         return next.run(request).await;
     }
 
@@ -59,10 +71,12 @@ fn is_allowed_user_agent(value: &HeaderValue) -> bool {
     })
 }
 
-fn is_allowed_device_uid(value: &HeaderValue) -> bool {
-    value.to_str().is_ok_and(|device_uid| {
-        device_uid == DEFAULT_DEVICE_UID || matches!(device_uid.len(), 32 | 36)
-    })
+pub fn is_allowed_device_uid(value: &str) -> bool {
+    value == DEFAULT_DEVICE_UID || matches!(value.len(), 32 | 36)
+}
+
+fn is_allowed_device_uid_header(value: &HeaderValue) -> bool {
+    value.to_str().is_ok_and(is_allowed_device_uid)
 }
 
 fn header_value(value: Option<&HeaderValue>) -> &str {
@@ -74,7 +88,10 @@ fn header_value(value: Option<&HeaderValue>) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_allowed_browser_client, is_allowed_device_uid, is_allowed_user_agent};
+    use super::{
+        is_allowed_browser_client, is_allowed_device_uid, is_allowed_device_uid_header,
+        is_allowed_user_agent,
+    };
 
     #[test]
     fn allows_actonscan_version_browser_client() {
@@ -115,25 +132,26 @@ mod tests {
 
     #[test]
     fn allows_device_uid_values_from_supported_platforms() {
-        assert!(is_allowed_device_uid(&"default".parse().unwrap()));
-        assert!(is_allowed_device_uid(
+        assert!(is_allowed_device_uid_header(&"default".parse().unwrap()));
+        assert!(is_allowed_device_uid_header(
             &"87c4bc1848a84471997203ee530d2fda".parse().unwrap()
         ));
-        assert!(is_allowed_device_uid(
+        assert!(is_allowed_device_uid_header(
             &"550e8400-e29b-41d4-a716-446655440000".parse().unwrap()
         ));
-        assert!(is_allowed_device_uid(
+        assert!(is_allowed_device_uid_header(
             &"550E8400-E29B-41D4-A716-446655440000".parse().unwrap()
         ));
+        assert!(is_allowed_device_uid("default"));
     }
 
     #[test]
     fn rejects_invalid_device_uid() {
-        assert!(!is_allowed_device_uid(&"".parse().unwrap()));
-        assert!(!is_allowed_device_uid(&" ".parse().unwrap()));
-        assert!(!is_allowed_device_uid(&"device-1".parse().unwrap()));
-        assert!(!is_allowed_device_uid(&"another".parse().unwrap()));
-        assert!(!is_allowed_device_uid(
+        assert!(!is_allowed_device_uid_header(&"".parse().unwrap()));
+        assert!(!is_allowed_device_uid_header(&" ".parse().unwrap()));
+        assert!(!is_allowed_device_uid_header(&"device-1".parse().unwrap()));
+        assert!(!is_allowed_device_uid_header(&"another".parse().unwrap()));
+        assert!(!is_allowed_device_uid_header(
             &"{00000000-0000-0000-0000-000000000000}".parse().unwrap()
         ));
     }

@@ -1,6 +1,9 @@
 use axum::{
     Router,
-    http::{HeaderValue, Method, header::CONTENT_TYPE},
+    http::{
+        HeaderValue, Method,
+        header::{AUTHORIZATION, CONTENT_TYPE},
+    },
     middleware::{self, from_fn_with_state},
     routing::{get, post},
 };
@@ -12,13 +15,14 @@ use tower_http::cors::CorsLayer;
 use crate::AppState;
 
 mod address;
+mod auth;
 mod challenge;
 mod claim;
 mod health;
 mod robots;
 mod stats;
 
-pub(crate) use claim::CreateClaim;
+pub(crate) use claim::{CreateClaim, github_claim_window_key};
 
 pub(crate) fn router(state: AppState) -> Router {
     let airdrop_routes = Router::new()
@@ -30,6 +34,15 @@ pub(crate) fn router(state: AppState) -> Router {
         ))
         .route_layer(middleware::from_fn(require_airdrop_headers));
 
+    let browser_auth_routes = Router::new()
+        .route("/auth/status", get(auth::status))
+        .route("/auth/exchange", post(auth::exchange_grant))
+        .route(
+            "/auth/session",
+            get(auth::get_session).delete(auth::delete_session),
+        )
+        .route_layer(middleware::from_fn(require_airdrop_headers));
+
     Router::new()
         .route("/", get(health::root))
         .route("/robots.txt", get(robots::robots_txt))
@@ -38,6 +51,9 @@ pub(crate) fn router(state: AppState) -> Router {
         .route("/metrics", get(health::ok))
         .route("/stats", get(stats::get_stats))
         .route("/version", get(health::version))
+        .route("/auth/github/start", get(auth::github_start))
+        .route("/auth/github/callback", get(auth::github_callback))
+        .merge(browser_auth_routes)
         .merge(airdrop_routes)
         .with_state(state)
 }
@@ -49,8 +65,13 @@ pub(crate) fn airdrop_cors_layer() -> CorsLayer {
             HeaderValue::from_static("http://localhost:3007"),
             HeaderValue::from_static("http://127.0.0.1:3007"),
         ])
-        .allow_methods([Method::POST])
-        .allow_headers([CONTENT_TYPE, DEVICE_UID_HEADER, ACTON_CLIENT_HEADER])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_headers([
+            CONTENT_TYPE,
+            AUTHORIZATION,
+            DEVICE_UID_HEADER,
+            ACTON_CLIENT_HEADER,
+        ])
 }
 
 #[cfg(test)]
@@ -87,7 +108,7 @@ mod tests {
             .header(ACCESS_CONTROL_REQUEST_METHOD, "POST")
             .header(
                 ACCESS_CONTROL_REQUEST_HEADERS,
-                "content-type,x-device-uid,x-acton-client",
+                "content-type,authorization,x-device-uid,x-acton-client",
             )
             .body(Body::empty())
             .unwrap();
@@ -104,14 +125,14 @@ mod tests {
                 .headers()
                 .get(ACCESS_CONTROL_ALLOW_METHODS)
                 .unwrap(),
-            "POST"
+            "GET,POST,DELETE"
         );
         assert_eq!(
             response
                 .headers()
                 .get(ACCESS_CONTROL_ALLOW_HEADERS)
                 .unwrap(),
-            "content-type,x-device-uid,x-acton-client"
+            "content-type,authorization,x-device-uid,x-acton-client"
         );
     }
 

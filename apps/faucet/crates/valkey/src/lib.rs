@@ -106,6 +106,53 @@ impl ValkeyStore {
             .context("Failed to increment total sent amount")
     }
 
+    pub async fn store_ephemeral(
+        &self,
+        key: &str,
+        value: &str,
+        ttl_seconds: u64,
+    ) -> anyhow::Result<()> {
+        anyhow::ensure!(ttl_seconds > 0, "Ephemeral value TTL must be positive");
+
+        let mut connection = self.connection.clone();
+        redis::cmd("SET")
+            .arg(key)
+            .arg(value)
+            .arg("EX")
+            .arg(ttl_seconds)
+            .query_async(&mut connection)
+            .await
+            .context("Failed to store ephemeral value")
+    }
+
+    pub async fn get_ephemeral(&self, key: &str) -> anyhow::Result<Option<String>> {
+        let mut connection = self.connection.clone();
+        redis::cmd("GET")
+            .arg(key)
+            .query_async(&mut connection)
+            .await
+            .context("Failed to get ephemeral value")
+    }
+
+    pub async fn take_ephemeral(&self, key: &str) -> anyhow::Result<Option<String>> {
+        let mut connection = self.connection.clone();
+        redis::cmd("GETDEL")
+            .arg(key)
+            .query_async(&mut connection)
+            .await
+            .context("Failed to take ephemeral value")
+    }
+
+    pub async fn delete_ephemeral(&self, key: &str) -> anyhow::Result<bool> {
+        let mut connection = self.connection.clone();
+        let removed: u64 = redis::cmd("DEL")
+            .arg(key)
+            .query_async(&mut connection)
+            .await
+            .context("Failed to delete ephemeral value")?;
+        Ok(removed > 0)
+    }
+
     pub async fn increment_antifraud_trigger_count(
         &self,
         module: AntifraudModule,

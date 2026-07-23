@@ -1,9 +1,19 @@
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+};
+use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::AntifraudModule;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::AppState;
+use crate::github_auth::FaucetTier;
 use crate::handlers::address::{AddressValidationError, parse_testnet_address};
+use crate::handlers::auth;
+
+const POW_CHALLENGE_KEY_PREFIX: &str = "faucet:pow:challenge";
 
 #[derive(Deserialize)]
 pub(super) struct ChallengeRequest {
@@ -26,31 +36,65 @@ pub(super) struct ErrorResponse {
     error: &'static str,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(super) struct ChallengeContext {
+    pub(super) version: u32,
+    pub(super) address: String,
+    pub(super) device_uid: String,
+    pub(super) github_user_id: Option<u64>,
+    pub(super) tier: FaucetTier,
+    pub(super) max_requests: u32,
+}
+
+impl ChallengeContext {
+    pub(super) fn matches_claim(
+        &self,
+        address: &str,
+        device_uid: &str,
+        github_user_id: Option<u64>,
+        tier: FaucetTier,
+        max_requests: u32,
+    ) -> bool {
+        self.address == address
+            && self.device_uid == device_uid
+            && self.github_user_id == github_user_id
+            && self.tier == tier
+            && self.max_requests == max_requests
+    }
+}
+
 type ChallengeResult =
     Result<(StatusCode, Json<ChallengeResponse>), (StatusCode, Json<ErrorResponse>)>;
 
 pub(super) async fn create_challenge(
     State(state): State<AppState>,
+    Extension(client): Extension<ClientContext>,
+    headers: HeaderMap,
     Json(payload): Json<ChallengeRequest>,
 ) -> ChallengeResult {
-    match parse_testnet_address(&payload.address) {
-        Ok(_) => {}
+    let address = match parse_testnet_address(&payload.address) {
+        Ok(address) => address.to_hex(),
         Err(AddressValidationError::Invalid) => {
             return Err(bad_request("Invalid TON address"));
         }
         Err(AddressValidationError::Mainnet) => {
             return Err(bad_request("Testnet TON address required"));
         }
-    }
+    };
 
     if payload.token_type == 0 {
         return Err(bad_request("Invalid challenge type"));
     }
 
+    let identity = auth::optional_identity(&state, &headers, &client)
+        .await
+        .map_err(|(status, _)| response_error(status, "Invalid or expired GitHub session"))?;
+    let max_requests = auth::effective_max_requests(&state, identity.as_ref());
+
     if state.antifraud.wallet_balance_enabled() {
         let balance = state
             .client
-            .get_address_balance(&payload.address)
+            .get_address_balance(&address)
             .await
             .map_err(|_| {
                 response_error(
@@ -72,8 +116,37 @@ pub(super) async fn create_challenge(
 
     let challenge = state.pow.create();
     let version = state.pow.version();
-
-    state.pow_challenges.insert(challenge.clone(), version);
+    let context = ChallengeContext {
+        version,
+        address,
+        device_uid: client.device_uid,
+        github_user_id: identity.as_ref().map(|identity| identity.github_user_id),
+        tier: identity
+            .as_ref()
+            .map(|identity| identity.tier)
+            .unwrap_or(FaucetTier::Guest),
+        max_requests,
+    };
+    let encoded_context = serde_json::to_string(&context).map_err(|_| {
+        response_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to create challenge",
+        )
+    })?;
+    state
+        .valkey
+        .store_ephemeral(
+            &challenge_key(&challenge),
+            &encoded_context,
+            state.config.pow.challenge_ttl_seconds,
+        )
+        .await
+        .map_err(|_| {
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to create challenge",
+            )
+        })?;
 
     Ok((
         StatusCode::OK,
@@ -85,6 +158,13 @@ pub(super) async fn create_challenge(
             max_nonce_attempts: state.config.pow.client.max_nonce_attempts,
         }),
     ))
+}
+
+pub(super) fn challenge_key(challenge: &str) -> String {
+    format!(
+        "{POW_CHALLENGE_KEY_PREFIX}:{}",
+        hex::encode(Sha256::digest(challenge.as_bytes()))
+    )
 }
 
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
@@ -99,7 +179,9 @@ fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<
 mod tests {
     use serde_json::json;
 
-    use super::{ChallengeRequest, ChallengeResponse};
+    use crate::github_auth::FaucetTier;
+
+    use super::{ChallengeContext, ChallengeRequest, ChallengeResponse, challenge_key};
 
     #[test]
     fn serializes_challenge_response() {
@@ -136,5 +218,57 @@ mod tests {
             "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
         );
         assert_eq!(request.token_type, 1);
+    }
+
+    #[test]
+    fn hashes_pow_challenge_before_using_it_as_a_valkey_key() {
+        let key = challenge_key("challenge");
+
+        assert_eq!(
+            key,
+            "faucet:pow:challenge:2dd00bd77e0222ced882665481a9c1d9f907309d16e05ed007a1ea63928477a9"
+        );
+        assert!(!key.ends_with(":challenge"));
+    }
+
+    #[test]
+    fn binds_challenge_to_address_browser_and_github_session() {
+        let context = ChallengeContext {
+            version: 1,
+            address: "0:abc".to_string(),
+            device_uid: "12345678-1234-1234-1234-123456789abc".to_string(),
+            github_user_id: Some(42),
+            tier: FaucetTier::Verified,
+            max_requests: 4,
+        };
+
+        assert!(context.matches_claim(
+            "0:abc",
+            "12345678-1234-1234-1234-123456789abc",
+            Some(42),
+            FaucetTier::Verified,
+            4,
+        ));
+        assert!(!context.matches_claim(
+            "0:def",
+            "12345678-1234-1234-1234-123456789abc",
+            Some(42),
+            FaucetTier::Verified,
+            4,
+        ));
+        assert!(!context.matches_claim(
+            "0:abc",
+            "abcdefab-abcd-abcd-abcd-abcdefabcdef",
+            Some(42),
+            FaucetTier::Verified,
+            4,
+        ));
+        assert!(!context.matches_claim(
+            "0:abc",
+            "12345678-1234-1234-1234-123456789abc",
+            Some(43),
+            FaucetTier::Verified,
+            4,
+        ));
     }
 }

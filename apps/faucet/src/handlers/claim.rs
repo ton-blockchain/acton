@@ -1,7 +1,13 @@
 use crate::AppState;
 use crate::handlers::address::{AddressValidationError, parse_testnet_address};
+use crate::handlers::{auth, challenge};
 use apalis::prelude::TaskSink;
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+};
+use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
@@ -11,6 +17,10 @@ pub(crate) struct CreateClaim {
     pub(crate) address: String,
     pub(crate) challenge: String,
     pub(crate) nonce: u64,
+    #[serde(default)]
+    pub(crate) github_user_id: Option<u64>,
+    #[serde(default)]
+    pub(crate) max_requests: u32,
 }
 
 #[derive(Deserialize)]
@@ -38,6 +48,8 @@ type ClaimLimitResult = Result<(), (StatusCode, Json<ErrorResponse>)>;
 #[axum::debug_handler]
 pub(super) async fn create_claim(
     State(mut state): State<AppState>,
+    Extension(client): Extension<ClientContext>,
+    headers: HeaderMap,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
     let address = match parse_testnet_address(&payload.address) {
@@ -54,22 +66,73 @@ pub(super) async fn create_claim(
         return Err(bad_request("Unsupported challenge version"));
     }
 
-    let challenge_version = state
-        .pow_challenges
-        .get(&payload.challenge)
+    let challenge_key = challenge::challenge_key(&payload.challenge);
+    let encoded_context = state
+        .valkey
+        .get_ephemeral(&challenge_key)
+        .await
+        .map_err(|_| {
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to load challenge",
+            )
+        })?
         .ok_or_else(|| bad_request("Invalid or expired challenge"))?;
+    let challenge_context: challenge::ChallengeContext = serde_json::from_str(&encoded_context)
+        .map_err(|_| {
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to decode challenge",
+            )
+        })?;
 
-    if challenge_version != payload.version {
+    if challenge_context.version != payload.version {
         return Err(bad_request("Invalid challenge version"));
+    }
+    let identity = auth::optional_identity(&state, &headers, &client)
+        .await
+        .map_err(|(status, _)| response_error(status, "Invalid or expired GitHub session"))?;
+    let github_user_id = identity.as_ref().map(|identity| identity.github_user_id);
+    let tier = identity
+        .as_ref()
+        .map(|identity| identity.tier)
+        .unwrap_or(crate::github_auth::FaucetTier::Guest);
+    let max_requests = auth::effective_max_requests(&state, identity.as_ref());
+    if !challenge_context.matches_claim(
+        &address,
+        &client.device_uid,
+        github_user_id,
+        tier,
+        max_requests,
+    ) {
+        return Err(bad_request("Challenge authorization does not match claim"));
     }
 
     if !state.pow.verify(&payload.challenge, payload.nonce) {
         return Err(bad_request("Invalid PoW solution"));
     }
 
-    check_successful_claim_window(&state, &address).await?;
+    check_successful_claim_window(&state, &address, max_requests).await?;
+    if let Some(github_user_id) = github_user_id {
+        check_successful_claim_window(
+            &state,
+            &github_claim_window_key(github_user_id),
+            max_requests,
+        )
+        .await?;
+    }
 
-    if state.pow_challenges.remove(&payload.challenge).is_none() {
+    let consumed_context = state
+        .valkey
+        .take_ephemeral(&challenge_key)
+        .await
+        .map_err(|_| {
+            response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to consume challenge",
+            )
+        })?;
+    if consumed_context.as_deref() != Some(encoded_context.as_str()) {
         return Err(bad_request("Invalid or expired challenge"));
     }
 
@@ -79,6 +142,8 @@ pub(super) async fn create_claim(
             address,
             challenge: payload.challenge,
             nonce: payload.nonce,
+            github_user_id,
+            max_requests,
         })
         .await
         .map_err(|_| response_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to queue claim"))?;
@@ -92,14 +157,18 @@ pub(super) async fn create_claim(
 }
 
 // TODO: сделать по другому
-async fn check_successful_claim_window(state: &AppState, address: &str) -> ClaimLimitResult {
+async fn check_successful_claim_window(
+    state: &AppState,
+    subject: &str,
+    max_requests: u32,
+) -> ClaimLimitResult {
     let Some(window) = state.antifraud.successful_claim_window() else {
         return Ok(());
     };
 
     match state
         .valkey
-        .check_successful_claim_window(address, window.max_requests, window.window_seconds)
+        .check_successful_claim_window(subject, max_requests, window.window_seconds)
         .await
     {
         Ok(SuccessfulClaimWindowDecision::Allowed {
@@ -108,7 +177,7 @@ async fn check_successful_claim_window(state: &AppState, address: &str) -> Claim
             window_seconds,
         }) => {
             info!(
-                address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -126,7 +195,7 @@ async fn check_successful_claim_window(state: &AppState, address: &str) -> Claim
                 .record_antifraud_trigger(AntifraudModule::SuccessfulClaimWindow)
                 .await;
             warn!(
-                address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -140,7 +209,7 @@ async fn check_successful_claim_window(state: &AppState, address: &str) -> Claim
         }
         Err(err) => {
             error!(
-                address = %address,
+                subject,
                 error = %err,
                 "Failed to check successful claim window"
             );
@@ -150,6 +219,10 @@ async fn check_successful_claim_window(state: &AppState, address: &str) -> Claim
             ))
         }
     }
+}
+
+pub(crate) fn github_claim_window_key(github_user_id: u64) -> String {
+    format!("github:{github_user_id}")
 }
 
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
@@ -164,7 +237,7 @@ fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<
 mod tests {
     use serde_json::json;
 
-    use super::CreateClaimRequest;
+    use super::{CreateClaim, CreateClaimRequest};
 
     #[test]
     fn deserializes_challenge_version() {
@@ -183,5 +256,18 @@ mod tests {
         assert_eq!(request.challenge, "challenge");
         assert_eq!(request.nonce, 42);
         assert_eq!(request.version, 1);
+    }
+
+    #[test]
+    fn keeps_queued_claims_from_before_github_limits_compatible() {
+        let claim: CreateClaim = serde_json::from_value(json!({
+            "address": "0:abc",
+            "challenge": "challenge",
+            "nonce": 42,
+        }))
+        .unwrap();
+
+        assert_eq!(claim.github_user_id, None);
+        assert_eq!(claim.max_requests, 0);
     }
 }

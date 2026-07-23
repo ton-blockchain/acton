@@ -1,17 +1,25 @@
 import {Button, SearchInput, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {Address} from "@ton/core"
-import {ArrowRight, Check, ChevronDown, Circle, History, ShieldCheck, X} from "lucide-react"
+import {ArrowRight, Check, ChevronDown, Circle, Github, History, ShieldCheck, X} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../../../localnet-ui/src/explorer/api/client"
 import {
+  clearFaucetSession,
+  disconnectFaucetSession,
+  exchangeGitHubGrant,
   FaucetRequestError,
+  githubAuthorizationUrl,
+  requestFaucetAuthStatus,
   requestFaucetChallenge,
+  requestFaucetSession,
   submitFaucetClaim,
+  type FaucetAuthStatus,
   type FaucetChallenge,
+  type FaucetSession,
 } from "./faucetClient"
 import type {
   FaucetPowProgress,
@@ -22,6 +30,7 @@ import type {
 import {
   FAUCET_REQUEST_HISTORY_STORAGE_KEY,
   FAUCET_REQUEST_LIMIT,
+  FAUCET_REQUEST_WINDOW_MS,
   readFaucetUsage,
   recordFaucetRequest,
   type FaucetUsage,
@@ -128,13 +137,23 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const {isTestnetSelected, selectedNetworkLabel, testnetClient} = props
   const {dismissToast, showToast, updateToast} = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [initialAuthParams] = useState(() => readGitHubRedirectParams(searchParams))
   const [address, setAddress] = useState(() => searchParams.get("address") ?? "")
   const [addressHistory, setAddressHistory] = useState<readonly string[]>(readFaucetAddressHistory)
   const [addressInvalid, setAddressInvalid] = useState(false)
   const [phase, setPhase] = useState<FaucetPhase>("idle")
   const [usage, setUsage] = useState<FaucetUsage>(() => readFaucetUsage())
+  const [authStatus, setAuthStatus] = useState<FaucetAuthStatus | undefined>(undefined)
+  const [githubSession, setGitHubSession] = useState<FaucetSession | undefined>(undefined)
+  const [authBusy, setAuthBusy] = useState(false)
   const activeRunRef = useRef<FaucetRun | undefined>(undefined)
   const activeToastRef = useRef<string | undefined>(undefined)
+  const authInitializationRef = useRef<
+    Promise<{readonly status: FaucetAuthStatus; readonly session?: FaucetSession}> | undefined
+  >(undefined)
+  const requestLimit =
+    githubSession?.maxRequests ?? authStatus?.guestMaxRequests ?? FAUCET_REQUEST_LIMIT
+  const requestWindowMs = (authStatus?.windowSeconds ?? FAUCET_REQUEST_WINDOW_MS / 1000) * 1000
   const running = isRunningPhase(phase)
   const requestBlocked = !isTestnetSelected || running || usage.limitReached
   const primaryButtonLabel =
@@ -191,7 +210,57 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   )
 
   useEffect(() => {
-    const refreshUsage = () => setUsage(readFaucetUsage())
+    let cancelled = false
+    authInitializationRef.current ??= initializeFaucetAuth(initialAuthParams.grant)
+
+    void authInitializationRef.current
+      .then(({status, session}) => {
+        if (cancelled) return
+        setAuthStatus(status)
+        setGitHubSession(session)
+        if (initialAuthParams.error) {
+          showToast({
+            variant: "error",
+            title: "GitHub connection failed",
+            description: "Authorization was cancelled or expired",
+            durationMs: 8000,
+          })
+        } else if (initialAuthParams.grant && session) {
+          showToast({
+            variant: "success",
+            title: "GitHub connected",
+            description: `${tierLabel(session)} tier unlocks ${session.maxRequests} requests`,
+            durationMs: 6000,
+          })
+        }
+      })
+      .catch(error => {
+        if (cancelled) return
+        clearFaucetSession()
+        setGitHubSession(undefined)
+        if (initialAuthParams.grant) {
+          showToast({
+            variant: "error",
+            title: "GitHub connection failed",
+            description: error instanceof Error ? error.message : "Unable to connect GitHub",
+            durationMs: 8000,
+          })
+        }
+      })
+
+    clearGitHubRedirectParams(initialAuthParams, setSearchParams)
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialAuthParams, setSearchParams, showToast])
+
+  useEffect(() => {
+    setUsage(readFaucetUsage(Date.now(), requestLimit, requestWindowMs))
+  }, [requestLimit, requestWindowMs])
+
+  useEffect(() => {
+    const refreshUsage = () => setUsage(readFaucetUsage(Date.now(), requestLimit, requestWindowMs))
     const handleStorage = (event: StorageEvent) => {
       if (event.key === FAUCET_REQUEST_HISTORY_STORAGE_KEY || event.key === null) {
         refreshUsage()
@@ -207,10 +276,38 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
       globalThis.removeEventListener("storage", handleStorage)
       if (refreshTimer !== undefined) globalThis.clearTimeout(refreshTimer)
     }
-  }, [usage.refreshAt])
+  }, [requestLimit, requestWindowMs, usage.refreshAt])
 
   const handleCancel = () => {
     cancelActiveRun()
+  }
+
+  const handleConnectGitHub = () => {
+    setAuthBusy(true)
+    globalThis.location.assign(githubAuthorizationUrl())
+  }
+
+  const handleDisconnectGitHub = async () => {
+    setAuthBusy(true)
+    try {
+      await disconnectFaucetSession()
+      setGitHubSession(undefined)
+      showToast({
+        variant: "info",
+        title: "GitHub disconnected",
+        description: "Guest limits now apply",
+        durationMs: 4000,
+      })
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Could not disconnect GitHub",
+        description: error instanceof Error ? error.message : "Try again",
+        durationMs: 8000,
+      })
+    } finally {
+      setAuthBusy(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -291,7 +388,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
         solution.nonce,
         controller.signal,
       )
-      setUsage(recordFaucetRequest())
+      setUsage(recordFaucetRequest(Date.now(), requestLimit, requestWindowMs))
       setPhase("waiting")
       updateToast(toastId, {
         variant: "loading",
@@ -324,6 +421,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
         durationMs: 10_000,
       })
     } catch (requestError) {
+      setGitHubSession(currentSession => sessionAfterRequestError(currentSession, requestError))
       if (controller.signal.aborted) {
         setPhase("cancelled")
         updateToast(toastId, {
@@ -367,7 +465,9 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           <div className={styles.cardHeader}>
             <div>
               <h1>Request testnet GRAM</h1>
-              <p className={styles.limitCopy}>{faucetUsageCopy(usage)}</p>
+              <p className={styles.limitCopy}>
+                {faucetUsageCopy(usage, requestLimit, requestWindowMs)}
+              </p>
             </div>
           </div>
 
@@ -428,6 +528,15 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           </form>
         </section>
 
+        <GitHubLimitsCard
+          status={authStatus}
+          session={githubSession}
+          requestWindowMs={requestWindowMs}
+          busy={authBusy}
+          onConnect={handleConnectGitHub}
+          onDisconnect={() => void handleDisconnectGitHub()}
+        />
+
         <section className={styles.processCard}>
           <div className={styles.cardHeader}>
             <div>
@@ -467,6 +576,47 @@ interface FaucetStepProps {
   readonly step: (typeof STEPS)[number]
   readonly index: number
   readonly phase: FaucetPhase
+}
+
+interface GitHubLimitsCardProps {
+  readonly status?: FaucetAuthStatus
+  readonly session?: FaucetSession
+  readonly requestWindowMs: number
+  readonly busy: boolean
+  readonly onConnect: () => void
+  readonly onDisconnect: () => void
+}
+
+const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
+  const {status, session} = props
+  if (!status?.enabled) return null
+
+  return (
+    <section className={styles.githubCard} aria-label="GitHub faucet limits">
+      <div className={styles.githubCopy}>
+        <span className={styles.githubIcon}>
+          <Github size={18} aria-hidden="true" />
+        </span>
+        <div>
+          <h2>{session ? `Connected as @${session.login}` : "Higher limits"}</h2>
+          <p>
+            {session
+              ? `${tierLabel(session)} tier · ${session.maxRequests} requests ${requestWindowSuffix(props.requestWindowMs)}`
+              : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${requestWindowSuffix(props.requestWindowMs)}`}
+          </p>
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant={session ? "ghost" : "secondary"}
+        size="sm"
+        loading={props.busy}
+        onClick={session ? props.onDisconnect : props.onConnect}
+      >
+        {session ? "Disconnect" : "Connect GitHub"}
+      </Button>
+    </section>
+  )
 }
 
 const FaucetStep: FC<FaucetStepProps> = ({step, index, phase}) => {
@@ -598,14 +748,18 @@ function requestButtonLabel(phase: FaucetPhase): string {
   return "Get testnet GRAM"
 }
 
-function faucetUsageCopy(usage: FaucetUsage): string {
+function faucetUsageCopy(
+  usage: FaucetUsage,
+  requestLimit: number,
+  requestWindowMs: number,
+): string {
   if (usage.limitReached && usage.availableAgainAt !== undefined) {
-    return `${usage.used} of ${FAUCET_REQUEST_LIMIT} requests used · available again at ${formatRequestTime(usage.availableAgainAt)}`
+    return `${usage.used} of ${requestLimit} requests used · available again at ${formatRequestTime(usage.availableAgainAt)}`
   }
   if (usage.used > 0 && usage.lastRequestAt !== undefined) {
-    return `${usage.used} of ${FAUCET_REQUEST_LIMIT} requests used · last request at ${formatRequestTime(usage.lastRequestAt)}`
+    return `${usage.used} of ${requestLimit} requests used · last request at ${formatRequestTime(usage.lastRequestAt)}`
   }
-  return `Maximum of ${FAUCET_REQUEST_LIMIT} requests per hour`
+  return `Maximum of ${requestLimit} requests ${requestWindowSuffix(requestWindowMs)}`
 }
 
 function rateLimitButtonLabel(usage: FaucetUsage): string {
@@ -616,6 +770,82 @@ function rateLimitButtonLabel(usage: FaucetUsage): string {
 
 function formatRequestTime(timestamp: number): string {
   return REQUEST_TIME_FORMATTER.format(new Date(timestamp))
+}
+
+function requestWindowSuffix(windowMs: number): string {
+  if (windowMs === 60 * 60 * 1000) return "per hour"
+  if (windowMs === 24 * 60 * 60 * 1000) return "per day"
+  const minutes = Math.max(1, Math.round(windowMs / 60_000))
+  return `every ${minutes} minutes`
+}
+
+interface GitHubRedirectParams {
+  readonly grant: string | null
+  readonly error: string | null
+  readonly fromFragment: boolean
+}
+
+function readGitHubRedirectParams(searchParams: URLSearchParams): GitHubRedirectParams {
+  const fragmentParams = new URLSearchParams(globalThis.location.hash.slice(1))
+  const fragmentGrant = fragmentParams.get("github_grant")
+  const fragmentError = fragmentParams.get("github_error")
+  return {
+    grant: fragmentGrant ?? searchParams.get("github_grant"),
+    error: fragmentError ?? searchParams.get("github_error"),
+    fromFragment: fragmentGrant !== null || fragmentError !== null,
+  }
+}
+
+function clearGitHubRedirectParams(
+  params: GitHubRedirectParams,
+  setSearchParams: ReturnType<typeof useSearchParams>[1],
+): void {
+  if (!params.grant && !params.error) return
+
+  if (params.fromFragment) {
+    globalThis.history.replaceState(
+      globalThis.history.state,
+      "",
+      `${globalThis.location.pathname}${globalThis.location.search}`,
+    )
+    return
+  }
+
+  setSearchParams(
+    currentSearchParams => {
+      const nextSearchParams = new URLSearchParams(currentSearchParams)
+      nextSearchParams.delete("github_grant")
+      nextSearchParams.delete("github_error")
+      return nextSearchParams
+    },
+    {replace: true},
+  )
+}
+
+async function initializeFaucetAuth(
+  grant: string | null,
+): Promise<{readonly status: FaucetAuthStatus; readonly session?: FaucetSession}> {
+  const status = await requestFaucetAuthStatus()
+  if (!status.enabled) {
+    clearFaucetSession()
+    return {status}
+  }
+
+  const session = grant ? await exchangeGitHubGrant(grant) : await requestFaucetSession()
+  return {status, session}
+}
+
+function tierLabel(session: FaucetSession): string {
+  if (session.tier === "established") return "Established"
+  if (session.tier === "verified") return "Verified"
+  return "Guest"
+}
+
+function sessionAfterRequestError(
+  session: FaucetSession | undefined,
+  error: unknown,
+): FaucetSession | undefined {
+  return error instanceof FaucetRequestError && error.status === 401 ? undefined : session
 }
 
 function statusTitle(phase: FaucetPhase): string {

@@ -1,7 +1,7 @@
 export const FAUCET_REQUEST_HISTORY_STORAGE_KEY = "actonscanFaucetRequestHistory"
 export const FAUCET_REQUEST_LIMIT = 2
 
-const FAUCET_REQUEST_WINDOW_MS = 60 * 60 * 1000
+export const FAUCET_REQUEST_WINDOW_MS = 60 * 60 * 1000
 
 export interface FaucetUsage {
   readonly used: number
@@ -11,18 +11,26 @@ export interface FaucetUsage {
   readonly refreshAt?: number
 }
 
-export function readFaucetUsage(now = Date.now()): FaucetUsage {
-  return usageFromTimestamps(readActiveTimestamps(now))
+export function readFaucetUsage(
+  now = Date.now(),
+  limit = FAUCET_REQUEST_LIMIT,
+  windowMs = FAUCET_REQUEST_WINDOW_MS,
+): FaucetUsage {
+  return usageFromTimestamps(readActiveTimestamps(now, windowMs), limit, windowMs)
 }
 
-export function recordFaucetRequest(now = Date.now()): FaucetUsage {
-  const timestamps = readActiveTimestamps(now)
+export function recordFaucetRequest(
+  now = Date.now(),
+  limit = FAUCET_REQUEST_LIMIT,
+  windowMs = FAUCET_REQUEST_WINDOW_MS,
+): FaucetUsage {
+  const timestamps = readActiveTimestamps(now, windowMs)
   timestamps.push(now)
   writeTimestamps(timestamps)
-  return usageFromTimestamps(timestamps)
+  return usageFromTimestamps(timestamps, limit, windowMs)
 }
 
-function readActiveTimestamps(now: number): number[] {
+function readActiveTimestamps(now: number, windowMs: number): number[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(FAUCET_REQUEST_HISTORY_STORAGE_KEY) ?? "[]")
     if (!Array.isArray(parsed)) {
@@ -30,7 +38,7 @@ function readActiveTimestamps(now: number): number[] {
       return []
     }
 
-    const cutoff = now - FAUCET_REQUEST_WINDOW_MS
+    const cutoff = now - windowMs
     const timestamps = parsed
       .filter(
         (timestamp): timestamp is number =>
@@ -59,19 +67,21 @@ function writeTimestamps(timestamps: readonly number[]): void {
   }
 }
 
-function usageFromTimestamps(timestamps: readonly number[]): FaucetUsage {
-  const used = Math.min(timestamps.length, FAUCET_REQUEST_LIMIT)
-  const limitReached = timestamps.length >= FAUCET_REQUEST_LIMIT
-  const availableAgainIndex = timestamps.length - FAUCET_REQUEST_LIMIT
-  const availableAgainAt = limitReached
-    ? timestamps[availableAgainIndex] + FAUCET_REQUEST_WINDOW_MS
-    : undefined
+function usageFromTimestamps(
+  timestamps: readonly number[],
+  limit: number,
+  windowMs: number,
+): FaucetUsage {
+  const used = Math.min(timestamps.length, limit)
+  const limitReached = timestamps.length >= limit
+  const availableAgainIndex = timestamps.length - limit
+  const availableAgainAt = limitReached ? timestamps[availableAgainIndex] + windowMs : undefined
 
   return {
     used,
     limitReached,
     lastRequestAt: timestamps.at(-1),
     availableAgainAt,
-    refreshAt: timestamps.length > 0 ? timestamps[0] + FAUCET_REQUEST_WINDOW_MS : undefined,
+    refreshAt: timestamps.length > 0 ? timestamps[0] + windowMs : undefined,
   }
 }
