@@ -1,0 +1,227 @@
+.activity {
+  min-width: 0;
+  margin-top: clamp(4rem, 8vw, 7rem);
+  border-top: 1px solid var(--acton-color-border-strong);
+}
+
+.header {
+  display: flex;
+  min-height: 4.2rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header > div {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.header span {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.6rem;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.header button {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+}
+
+.header button:hover:not(:disabled) {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.header button:disabled {
+  cursor: default;
+}
+
+.list {
+  display: grid;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(10rem, 1fr) minmax(9rem, auto) minmax(10rem, auto);
+  align-items: center;
+  gap: var(--acton-space-4);
+  min-height: 5rem;
+  border-top: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
+  padding: 0 var(--acton-space-2);
+  text-decoration: none;
+  transition: background-color var(--acton-duration-fast);
+}
+
+.row:last-child {
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.row:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.direction {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 50%;
+  color: var(--acton-color-text-muted);
+}
+
+.direction[data-direction="incoming"] {
+  border-color: color-mix(in srgb, var(--wallet-success) 40%, var(--acton-color-border));
+  color: var(--wallet-success);
+}
+
+.direction[data-direction="outgoing"] {
+  border-color: color-mix(in srgb, var(--wallet-accent) 42%, var(--acton-color-border));
+  color: var(--wallet-accent);
+}
+
+.details,
+.time {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.details strong,
+.amount strong {
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.details small,
+.time small {
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.61rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  text-align: right;
+}
+
+.time time {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.amount {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--acton-space-3);
+  font-family: var(--acton-font-mono);
+  text-align: right;
+}
+
+.amount svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+}
+
+.empty,
+.error {
+  margin: 0;
+  border-top: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  padding: var(--acton-space-5) var(--acton-space-2);
+  font-size: var(--acton-font-size-sm);
+}
+
+.error {
+  color: var(--acton-color-danger-text);
+}
+
+.loading {
+  display: grid;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.loading span {
+  height: 5rem;
+  border-bottom: 1px solid var(--acton-color-border);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--acton-color-text) 4%, transparent),
+    transparent
+  );
+  background-size: 220% 100%;
+  animation: activity-loading 1.2s linear infinite;
+}
+
+.spinning {
+  animation: activity-spin 800ms linear infinite;
+}
+
+@keyframes activity-loading {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@keyframes activity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .time {
+    display: none;
+  }
+
+  .amount strong {
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .row {
+    gap: var(--acton-space-3);
+    padding-inline: 0;
+  }
+
+  .amount svg {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading span,
+  .spinning {
+    animation: none;
+  }
+}

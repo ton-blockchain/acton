@@ -1,0 +1,48 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**", "!dist", "!src-tauri/target", "!src-tauri/gen"]
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useAriaPropsSupportedByRole": "off"
+      },
+      "complexity": {
+        "noExcessiveLinesPerFunction": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "noUnresolvedImports": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off",
+        "noJsxPropsBind": "off",
+        "useSolidForComponent": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noHexColors": "off",
+        "noJsxLiterals": "off",
+        "useBlockStatements": "off",
+        "useExportsLast": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noLeakedRender": "off",
+        "noReactSpecificProps": "off",
+        "useAwait": "off"
+      }
+    }
+  }
+}

@@ -1,0 +1,1000 @@
+.application {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--wallet-canvas);
+}
+
+.ambient {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 16.95rem,
+      var(--wallet-grid) 16.95rem 17rem,
+      transparent 17rem
+    ),
+    radial-gradient(circle at 82% -10%, var(--wallet-glow), transparent 32rem);
+}
+
+.sidebar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--acton-color-border);
+  background: color-mix(in srgb, var(--wallet-sidebar) 94%, transparent);
+  backdrop-filter: blur(24px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  height: 4.5rem;
+  padding: 0 var(--acton-space-5);
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.brand > span:nth-child(2) {
+  display: grid;
+  line-height: 1;
+}
+
+.brand strong {
+  letter-spacing: 0.16em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.8rem;
+}
+
+.brand small {
+  margin-top: 0.32rem;
+  color: var(--acton-color-text-muted);
+  letter-spacing: 0.18em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.54rem;
+}
+
+.brandMark {
+  display: block;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex: 0 0 auto;
+  background: url("/favicon.svg") center / contain no-repeat;
+}
+
+.alphaBadge {
+  margin-left: auto;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 99px;
+  color: var(--acton-color-text-muted);
+  padding: 0.22rem 0.42rem;
+  font-family: var(--acton-font-mono);
+  font-size: 0.58rem;
+}
+
+.sidebarSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--acton-space-5) var(--acton-space-5) var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.62rem;
+}
+
+.sidebarSectionHeader button,
+.sectionHeader button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+}
+
+.sidebarSectionHeader button:hover,
+.sectionHeader button:hover {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.walletList {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 0;
+  padding: 0 var(--acton-space-3);
+  overflow: auto;
+}
+
+.walletListItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--acton-space-3);
+  min-height: 3.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--acton-radius-control);
+  background: transparent;
+  color: var(--acton-color-text);
+  padding: 0 var(--acton-space-3);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast);
+}
+
+.walletListItem:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.walletListItemActive {
+  border-color: var(--acton-color-border);
+  background: var(--wallet-selected);
+}
+
+.walletGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 0.48rem;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.walletListBody {
+  display: grid;
+  min-width: 0;
+  gap: 0.22rem;
+}
+
+.walletListBody strong {
+  overflow: hidden;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletListBody small {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.61rem;
+}
+
+.networkDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--wallet-network-testnet);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wallet-network-testnet) 16%, transparent);
+}
+
+.networkDot[data-network="mainnet"] {
+  background: var(--wallet-network-mainnet);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wallet-network-mainnet) 16%, transparent);
+}
+
+.sidebarEmpty {
+  color: var(--acton-color-text-muted);
+  padding: 0 var(--acton-space-3);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.sidebarFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  margin-top: auto;
+  padding: var(--acton-space-4);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.vaultStatus {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  flex: 1;
+  gap: var(--acton-space-2);
+  min-width: 0;
+}
+
+.vaultStatus svg {
+  color: var(--wallet-success);
+}
+
+.vaultStatus span {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.vaultStatus strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.vaultStatus small {
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main {
+  position: relative;
+  min-width: 0;
+  height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.main::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.5rem;
+  border-bottom: 1px solid var(--acton-color-border);
+  background: color-mix(in srgb, var(--wallet-canvas) 82%, transparent);
+  padding: 0 clamp(1.5rem, 3vw, 3.5rem);
+  backdrop-filter: blur(24px);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+}
+
+.breadcrumb span {
+  color: var(--acton-color-text-muted);
+}
+
+.breadcrumb strong {
+  overflow: hidden;
+  font-weight: var(--acton-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.networkBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 99px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  padding: 0.38rem 0.68rem;
+  font-family: var(--acton-font-mono);
+  font-size: 0.63rem;
+}
+
+.networkBadge svg {
+  color: var(--wallet-network-testnet);
+}
+
+.networkBadge[data-network="mainnet"] svg {
+  color: var(--wallet-network-mainnet);
+}
+
+.dashboard {
+  width: min(100%, 91rem);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 6rem) clamp(1.5rem, 4vw, 4.5rem);
+  animation: wallet-enter 480ms var(--acton-ease-standard) both;
+}
+
+.balanceHero {
+  max-width: 66rem;
+}
+
+.heroEyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.64rem;
+}
+
+.livePulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--wallet-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--wallet-success) 45%, transparent);
+  animation: wallet-pulse 2.4s infinite;
+}
+
+.balanceLine {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(0.75rem, 2vw, 1.4rem);
+  margin-top: clamp(1.25rem, 3vw, 2rem);
+}
+
+.balanceValue {
+  letter-spacing: -0.075em;
+  font-size: clamp(4.5rem, 10vw, 9.5rem);
+  font-weight: 520;
+  line-height: 0.88;
+}
+
+.balanceTicker {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.addressLine {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  max-width: 44rem;
+  margin-top: var(--acton-space-5);
+}
+
+.addressLine code {
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balanceError {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-sm);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--acton-space-2);
+  margin-top: var(--acton-space-6);
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 0.75fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  margin-top: clamp(4rem, 9vw, 8rem);
+}
+
+.ledger,
+.identityPanel {
+  min-width: 0;
+  border-top: 1px solid var(--acton-color-border-strong);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.2rem;
+}
+
+.sectionHeader > div {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.sectionIndex {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.6rem;
+}
+
+.sectionHeader > svg {
+  color: var(--acton-color-text-muted);
+}
+
+.assetTableHeader {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 0.7fr;
+  gap: var(--acton-space-4);
+  border-block: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  padding: var(--acton-space-3) var(--acton-space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.58rem;
+}
+
+.assetTableHeader span:last-child {
+  text-align: right;
+}
+
+.assetRow {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 0.7fr;
+  align-items: center;
+  gap: var(--acton-space-4);
+  min-height: 5.4rem;
+  border-bottom: 1px solid var(--acton-color-border);
+  padding: 0 var(--acton-space-2);
+}
+
+.assetIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.assetIdentity > span:last-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.assetIdentity strong {
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.assetIdentity small {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.62rem;
+}
+
+.gramLogo {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+}
+
+.assetNetwork {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.assetNetwork > span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--wallet-network-testnet);
+}
+
+.assetNetwork > span[data-network="mainnet"] {
+  background: var(--wallet-network-mainnet);
+}
+
+.assetBalance {
+  text-align: right;
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.ledgerEmpty {
+  color: var(--acton-color-text-muted);
+  padding: var(--acton-space-5) var(--acton-space-2);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.identityList {
+  display: grid;
+  margin: 0;
+}
+
+.identityList div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--acton-space-4);
+  border-top: 1px solid var(--acton-color-border);
+  padding: var(--acton-space-3) 0;
+}
+
+.identityList dt {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.identityList dd {
+  max-width: 12rem;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorerLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--acton-space-5);
+  border-bottom: 1px solid var(--acton-color-text);
+  color: var(--acton-color-text);
+  padding: var(--acton-space-2) 0;
+  font-size: var(--acton-font-size-sm);
+  text-decoration: none;
+}
+
+.explorerLink:hover {
+  color: var(--wallet-accent);
+  border-color: var(--wallet-accent);
+}
+
+.removeAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  margin-top: var(--acton-space-5);
+  border: 0;
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  padding: 0;
+  font: inherit;
+  font-size: var(--acton-font-size-xs);
+  cursor: pointer;
+}
+
+.removeAction:hover {
+  color: var(--acton-color-danger-text);
+}
+
+.emptyState {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+  width: min(100%, 82rem);
+  min-height: calc(100vh - 4.5rem);
+  margin: 0 auto;
+  padding: clamp(3rem, 8vw, 8rem);
+  overflow: hidden;
+  animation: wallet-enter 480ms var(--acton-ease-standard) both;
+}
+
+.emptyGrid {
+  position: absolute;
+  z-index: -1;
+  right: -5rem;
+  bottom: -9rem;
+  display: grid;
+  grid-template-columns: repeat(2, 16rem);
+  grid-template-rows: repeat(2, 16rem);
+  transform: rotate(9deg);
+  opacity: 0.55;
+}
+
+.emptyGrid span {
+  border: 1px solid var(--acton-color-border);
+}
+
+.emptyGrid span:first-child {
+  background: var(--wallet-accent-soft);
+}
+
+.emptyKicker {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--wallet-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-family: var(--acton-font-mono);
+  font-size: 0.65rem;
+}
+
+.emptyState h1 {
+  max-width: 57rem;
+  margin: var(--acton-space-5) 0 0;
+  letter-spacing: -0.055em;
+  font-size: clamp(3.1rem, 7vw, 7rem);
+  font-weight: 500;
+  line-height: 0.96;
+}
+
+.emptyState h1 em {
+  color: var(--acton-color-text-muted);
+  font-family: "Iowan Old Style", "Baskerville", Georgia, serif;
+  font-weight: 400;
+}
+
+.emptyState > p {
+  max-width: 36rem;
+  margin: var(--acton-space-6) 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.65;
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--acton-space-3);
+  margin-top: var(--acton-space-8);
+}
+
+.emptyMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--acton-space-6);
+  margin-top: clamp(3rem, 7vw, 6rem);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: 0.65rem;
+}
+
+.emptyMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.emptyMeta svg {
+  color: var(--wallet-success);
+}
+
+.recoveryBody {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.wordGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+}
+
+.wordGrid > span {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--acton-space-2);
+  border-right: 1px solid var(--acton-color-border);
+  border-bottom: 1px solid var(--acton-color-border);
+  padding: var(--acton-space-3);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+}
+
+.wordGrid > span:nth-child(4n) {
+  border-right: 0;
+}
+
+.wordGrid > span:nth-last-child(-n + 4) {
+  border-bottom: 0;
+}
+
+.wordGrid small {
+  color: var(--acton-color-text-muted);
+}
+
+.wordGrid strong {
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.confirmBackup {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  cursor: pointer;
+}
+
+.confirmBackup input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--wallet-accent);
+}
+
+.receiveBody {
+  display: grid;
+  justify-items: center;
+  gap: var(--acton-space-4);
+}
+
+.qrFrame {
+  display: flex;
+  border-radius: 1rem;
+  background: white;
+  padding: var(--acton-space-4);
+  box-shadow: var(--acton-shadow-surface);
+}
+
+.receiveBody code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.removeDialogBody {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.removeDialogBody p {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.removeDialogBody > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
+.spinning {
+  animation: wallet-spin 800ms linear infinite;
+}
+
+@keyframes wallet-enter {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+@keyframes wallet-pulse {
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@keyframes wallet-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .application {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+  }
+
+  .ambient {
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0 4.7rem,
+        var(--wallet-grid) 4.7rem 4.75rem,
+        transparent 4.75rem
+      ),
+      radial-gradient(circle at 82% -10%, var(--wallet-glow), transparent 32rem);
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .brand > span:nth-child(2),
+  .alphaBadge,
+  .sidebarSectionHeader span,
+  .walletListBody,
+  .networkDot,
+  .vaultStatus span {
+    display: none;
+  }
+
+  .sidebarSectionHeader {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .walletList {
+    padding-inline: var(--acton-space-2);
+  }
+
+  .walletListItem {
+    display: flex;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebarFooter {
+    flex-direction: column;
+  }
+
+  .vaultStatus {
+    display: flex;
+  }
+
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .application {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    z-index: 8;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    height: 4rem;
+    border-top: 1px solid var(--acton-color-border);
+    border-right: 0;
+  }
+
+  .brand {
+    height: 4rem;
+    padding: 0 var(--acton-space-3);
+    border: 0;
+  }
+
+  .brandMark {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .sidebarSectionHeader,
+  .sidebarFooter {
+    display: none;
+  }
+
+  .walletList {
+    display: flex;
+    align-items: center;
+    padding: var(--acton-space-2);
+    overflow-x: auto;
+  }
+
+  .walletListItem {
+    flex: 0 0 auto;
+    min-height: auto;
+    border-radius: 50%;
+  }
+
+  .main {
+    height: calc(100dvh - 4rem);
+    min-height: 0;
+  }
+
+  .topbar {
+    min-height: 4rem;
+    padding: 0 var(--acton-space-4);
+  }
+
+  .networkBadge {
+    display: none;
+  }
+
+  .dashboard {
+    padding: 3rem var(--acton-space-4) 6rem;
+  }
+
+  .balanceValue {
+    font-size: clamp(3.6rem, 20vw, 5rem);
+  }
+
+  .addressLine code {
+    font-size: var(--acton-font-size-xs);
+  }
+
+  .assetTableHeader {
+    grid-template-columns: 1fr auto;
+  }
+
+  .assetTableHeader span:nth-child(2) {
+    display: none;
+  }
+
+  .assetRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .assetNetwork {
+    display: none;
+  }
+
+  .emptyState {
+    min-height: calc(100vh - 8rem);
+    padding: 3rem var(--acton-space-5) 7rem;
+  }
+
+  .emptyState h1 {
+    font-size: clamp(3rem, 16vw, 4.8rem);
+  }
+
+  .emptyMeta {
+    display: grid;
+    gap: var(--acton-space-3);
+  }
+
+  .wordGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wordGrid > span:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .wordGrid > span:nth-child(4n) {
+    border-right: 0;
+  }
+
+  .wordGrid > span:nth-last-child(-n + 4) {
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .wordGrid > span:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard,
+  .emptyState,
+  .livePulse,
+  .spinning {
+    animation: none;
+  }
+}

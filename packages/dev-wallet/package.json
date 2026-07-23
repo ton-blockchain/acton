@@ -1,0 +1,43 @@
+{
+  "name": "@acton/dev-wallet",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build",
+    "dev": "vite --port 3012",
+    "doctor": "CI=1 react-doctor",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "precommit": "bun fmt && bun lint && bun build",
+    "preview": "vite preview --port 3012"
+  },
+  "dependencies": {
+    "@acton/ui": "workspace:*",
+    "@tauri-apps/api": "^2.4.1",
+    "@tauri-apps/plugin-opener": "^2.4.0",
+    "@ton/core": "0.63.1",
+    "@ton/crypto": "^3.3.0",
+    "@ton/walletkit": "0.0.9",
+    "lucide-react": "^0.474.0",
+    "qrcode.react": "^4.2.0",
+    "vite-plugin-node-polyfills": "^0.28.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.4.1",
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.16"
+  }
+}

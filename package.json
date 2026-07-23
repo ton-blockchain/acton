@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "bun --filter '*' build",
+    "dev:wallet": "bun --filter @acton/dev-wallet dev",
     "dev:ui": "bun --filter @acton/ui-gallery dev",
     "dev:localnet": "bun --filter @acton/localnet-ui dev",
     "dev:test": "bun --filter @acton/test-ui dev",

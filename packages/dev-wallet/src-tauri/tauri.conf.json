@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Acton Dev Wallet",
+  "version": "0.1.0",
+  "identifier": "org.ton.acton.devwallet",
+  "build": {
+    "beforeDevCommand": "bun run dev -- --host 0.0.0.0",
+    "devUrl": "http://localhost:3012",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Acton Dev Wallet",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 820,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://toncenter.com https://testnet.toncenter.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "icon": ["icons/icon.png"],
+    "shortDescription": "Standalone TON wallet for contract developers",
+    "longDescription": "Acton Dev Wallet is a standalone TON wallet for development identities, transaction inspection, and TON Connect workflows."
+  }
+}

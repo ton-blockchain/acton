@@ -24,6 +24,7 @@
     "./components/ide-selector": "./src/components/IdeSelector/index.ts",
     "./components/info-popover": "./src/components/InfoPopover/index.ts",
     "./components/input": "./src/components/Input/index.ts",
+    "./components/gram-logo": "./src/components/GramLogo/index.ts",
     "./components/inline-actions": "./src/components/InlineActions/index.ts",
     "./components/inline-button": "./src/components/InlineButton/index.ts",
     "./components/inline-loader": "./src/components/InlineLoader/index.ts",

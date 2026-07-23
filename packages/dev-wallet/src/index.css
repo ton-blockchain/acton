@@ -1,0 +1,111 @@
+@import "@acton/ui/styles/tokens.css";
+
+:root {
+  --wallet-canvas: #f3f2ed;
+  --wallet-sidebar: #ecebe5;
+  --wallet-selected: #f9f8f4;
+  --wallet-grid: rgba(22, 24, 28, 0.08);
+  --wallet-glow: rgba(38, 92, 246, 0.12);
+  --wallet-accent: #1d56f0;
+  --wallet-accent-soft: rgba(29, 86, 240, 0.07);
+  --wallet-accent-border: rgba(29, 86, 240, 0.22);
+  --wallet-focus: rgba(29, 86, 240, 0.14);
+  --wallet-signal: #b6f13d;
+  --wallet-success: #1a9b5a;
+  --wallet-network-mainnet: #1d56f0;
+  --wallet-network-testnet: #ee8a22;
+  --wallet-ton: #0b79d0;
+  --acton-color-canvas: var(--wallet-canvas);
+  --acton-color-surface: #f9f8f4;
+  --acton-color-surface-raised: #fffefa;
+  --acton-color-surface-hover: rgba(24, 27, 33, 0.055);
+  --acton-color-surface-active: rgba(24, 27, 33, 0.08);
+  --acton-color-surface-group: #ebeae4;
+  --acton-color-border: rgba(19, 22, 27, 0.11);
+  --acton-color-border-control: rgba(19, 22, 27, 0.16);
+  --acton-color-border-strong: rgba(19, 22, 27, 0.27);
+  --acton-color-text: #16181d;
+  --acton-color-text-muted: #6d6f73;
+  --acton-color-text-subtle: #a0a19e;
+  --acton-color-primary: #17191e;
+  --acton-color-primary-hover: #292c33;
+  --acton-color-primary-foreground: #f8f7f2;
+  --acton-color-focus-ring: rgba(29, 86, 240, 0.28);
+  --acton-font-sans: "Avenir Next", Avenir, "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root.dark-theme,
+[data-theme="dark"] {
+  --wallet-canvas: #090b0f;
+  --wallet-sidebar: #0d0f14;
+  --wallet-selected: #151820;
+  --wallet-grid: rgba(255, 255, 255, 0.055);
+  --wallet-glow: rgba(55, 106, 255, 0.16);
+  --wallet-accent: #6994ff;
+  --wallet-accent-soft: rgba(105, 148, 255, 0.09);
+  --wallet-accent-border: rgba(105, 148, 255, 0.23);
+  --wallet-focus: rgba(105, 148, 255, 0.16);
+  --wallet-signal: #c4ff47;
+  --wallet-success: #56d88e;
+  --wallet-network-mainnet: #76a0ff;
+  --wallet-network-testnet: #ffad5c;
+  --wallet-ton: #178cd8;
+  --acton-color-canvas: var(--wallet-canvas);
+  --acton-color-surface: #11141a;
+  --acton-color-surface-raised: #171a21;
+  --acton-color-surface-hover: rgba(255, 255, 255, 0.06);
+  --acton-color-surface-active: rgba(255, 255, 255, 0.09);
+  --acton-color-surface-group: #101217;
+  --acton-color-border: rgba(255, 255, 255, 0.09);
+  --acton-color-border-control: rgba(255, 255, 255, 0.13);
+  --acton-color-border-strong: rgba(255, 255, 255, 0.22);
+  --acton-color-text: #f2f2ed;
+  --acton-color-text-muted: #92969e;
+  --acton-color-text-subtle: #60646c;
+  --acton-color-primary: #f1f1ec;
+  --acton-color-primary-hover: #ffffff;
+  --acton-color-primary-foreground: #111318;
+  --acton-color-focus-ring: rgba(105, 148, 255, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  height: 100%;
+  overflow: hidden;
+  background: var(--wallet-canvas);
+}
+
+body {
+  min-width: 320px;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--wallet-canvas);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color var(--acton-duration-slow),
+    color var(--acton-duration-slow);
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: var(--wallet-accent);
+  color: white;
+}

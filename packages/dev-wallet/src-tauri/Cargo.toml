@@ -1,0 +1,28 @@
+[package]
+name = "acton-dev-wallet"
+version = "0.1.0"
+description = "Standalone TON developer wallet"
+authors = ["TON Core"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+
+[lib]
+name = "acton_dev_wallet_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+ton = "0.1.2"
+zeroize = "1"

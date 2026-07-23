@@ -1,5 +1,5 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {Button, Dialog, GramLogo, Input, useToast} from "@acton/ui"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router-dom"
@@ -27,9 +27,6 @@ interface FaucetPageProps {
 
 type FaucetMode = "ton" | "jetton"
 
-const GRAM_LOGO_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="none" viewBox="0 0 80 80"><path fill="#30A1F5" d="M52.017 12.097H27.984c-3.201 0-4.802 0-6.25.448a10 10 0 0 0-3.496 1.909c-1.159.975-2.024 2.322-3.755 5.014l-7.64 11.884c-1.144 1.78-1.716 2.668-1.87 3.605a4.6 4.6 0 0 0 .263 2.45c.35.882 1.098 1.63 2.593 3.125L36.217 68.92c1.325 1.324 1.987 1.986 2.75 2.234a3.34 3.34 0 0 0 2.067 0c.763-.248 1.425-.91 2.75-2.234l28.388-28.388c1.495-1.495 2.243-2.243 2.593-3.125.31-.778.4-1.625.263-2.45-.155-.937-.727-1.826-1.87-3.605l-7.64-11.884c-1.73-2.692-2.596-4.039-3.756-5.014a10 10 0 0 0-3.496-1.91c-1.448-.447-3.048-.447-6.249-.447"/><path fill="#fff" d="M47.465 21.472c.39-1.055 1.883-1.055 2.274 0l2.698 7.292a1.6 1.6 0 0 0 .945.946l7.293 2.698c1.055.39 1.055 1.883 0 2.274l-7.293 2.698a1.6 1.6 0 0 0-.945.945l-2.698 7.293c-.39 1.055-1.883 1.055-2.274 0l-2.698-7.293a1.6 1.6 0 0 0-.946-.945l-7.292-2.698c-1.055-.39-1.055-1.883 0-2.274l7.292-2.698a1.6 1.6 0 0 0 .946-.946z"/></svg>'
-const GRAM_LOGO_IMAGE = `data:image/svg+xml,${encodeURIComponent(GRAM_LOGO_SVG)}`
 const PINNED_USDT_MINTER_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
 const TOKEN_MINTER_NOT_FOUND_MESSAGE = "This address is not a token minter."
 const TOKEN_MINTER_NOT_MINTABLE_MESSAGE = "This token cannot be minted by the faucet."
@@ -572,7 +569,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
                   ) : isJettonMode ? (
                     <Coins size={17} />
                   ) : (
-                    <img src={GRAM_LOGO_IMAGE} alt="" />
+                    <GramLogo className={styles.assetSelectorLogo} />
                   )}
                 </span>
                 <span className={styles.assetSelectorText}>
@@ -650,7 +647,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
               className={`${styles.assetChoiceButton} ${isJettonMode ? "" : styles.assetChoiceButtonSelected}`}
               onClick={selectGramAsset}
             >
-              <img src={GRAM_LOGO_IMAGE} alt="" className={styles.assetChoiceImage} />
+              <GramLogo className={styles.assetChoiceImage} />
               <span className={styles.assetChoiceText}>
                 <span className={styles.assetChoiceTitle}>GRAM</span>
                 <span className={styles.assetChoiceSubtitle}>Native localnet balance</span>

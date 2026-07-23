@@ -1,0 +1,108 @@
+.form {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface-group);
+}
+
+.modeSwitch button {
+  min-height: 2.25rem;
+  border: 0;
+  border-radius: calc(var(--acton-radius-control) - 3px);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  cursor: pointer;
+  transition:
+    color var(--acton-duration-fast),
+    background-color var(--acton-duration-fast);
+}
+
+.modeSwitch button:hover {
+  color: var(--acton-color-text);
+}
+
+.modeSwitch .modeActive {
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  box-shadow: var(--acton-shadow-surface);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--acton-space-4);
+}
+
+.mnemonicField {
+  display: grid;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.mnemonicField textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  padding: var(--acton-space-3) var(--acton-space-4);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.75;
+  outline: none;
+}
+
+.mnemonicField textarea:focus {
+  border-color: var(--acton-color-border-strong);
+  box-shadow: 0 0 0 3px var(--wallet-focus);
+}
+
+.mnemonicField small {
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-normal);
+}
+
+.securityNote {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--acton-space-3);
+  border: 1px solid var(--wallet-accent-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--wallet-accent-soft);
+  color: var(--acton-color-text-muted);
+  padding: var(--acton-space-4);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.securityNote svg {
+  color: var(--wallet-accent);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+  padding-top: var(--acton-space-2);
+}
+
+@media (max-width: 520px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}
