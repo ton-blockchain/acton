@@ -22,8 +22,48 @@ concurrency:
 permissions: { }
 
 jobs:
-  verifier:
-    name: Build and check verifier
+  build:
+    name: Build verifier
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/verifier
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: apps-verifier-${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          workspaces: apps/verifier -> target
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install just
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Build verifier
+        run: just build
+
+  check:
+    name: Check verifier
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubicloud-standard-2-ubuntu-2204
 
@@ -62,12 +102,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/verifier/compiler-worker/package-lock.json
           node-version: 22
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-
-      - name: Build verifier
-        run: just build
 
       - name: Check verifier
         run: just check
