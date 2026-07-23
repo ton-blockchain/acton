@@ -1,0 +1,33 @@
+name: Build Rust Binary
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Cargo (master branch only)
+#      if: ${{ github.event_name != 'workflow_dispatch' }}
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      with:
+        key: ${{ runner.os }}-${{ runner.arch }}
+        save-if: ${{ github.ref == 'refs/heads/master' }}
+
+#    - name: Cache Cargo (release only)
+#      if: ${{ github.event_name == 'workflow_dispatch' }}
+#      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+#      with:
+#        key: ${{ runner.os }}-${{ runner.arch }}
+#        save-if: false
+#        lookup-only: true
+
+    - name: Install Rust
+      shell: bash
+      run: rustup toolchain install
+
+    - name: Installing additional Rust components
+      uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+      with:
+        tool: just@1.49.0
+        fallback: none
+
+    - name: Build binary
+      shell: bash
+      run: just build-ci

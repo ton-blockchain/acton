@@ -1,0 +1,129 @@
+name: Build Docker Image
+
+run-name: Build Docker Image from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: docker-image-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions: { }
+
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+      contents: read
+
+    env:
+      REF_NAME: ${{ github.ref_name }}
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ env.REF_NAME }}
+          submodules: recursive
+
+      - name: Build Rust Binaries
+        uses: ./.github/actions/build-rust
+
+      - name: Copy Faucet Backend
+        run: |
+          mkdir -p dist/docker
+          cp target/release/faucet-backend dist/docker/faucet-backend
+
+      - name: Read package version
+        id: package
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -er '.packages[] | select(.name == "faucet-backend") | .version')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute Docker image tags
+        id: image
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+          REF_NAME: ${{ env.REF_NAME }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        with:
+          # language=JavaScript
+          script: |
+            const sha = process.env.SHA;
+            const shortSha = sha.slice(0, 7);
+            const repository = process.env.REPOSITORY.toLowerCase();
+
+            const fullShaTag = `sha-${sha}`;
+            const shortShaTag = `sha-${shortSha}`;
+            const versionTag = `v${process.env.PACKAGE_VERSION.replace(/\+/g, '-')}`;
+            const branchTag = process.env.REF_NAME
+              .toLowerCase()
+              .replace(/[^a-z0-9_.-]+/g, '-')
+              .slice(0, 128)
+              .replace(/^[.-]+/, '')
+              .replace(/[.-]+$/, '') || 'master';
+
+            const imageRepo = `ghcr.io/${repository}`;
+            const tags = [
+              `${imageRepo}:${fullShaTag}`,
+              `${imageRepo}:${shortShaTag}`,
+              `${imageRepo}:${versionTag}`,
+              `${imageRepo}:${branchTag}`,
+            ].join('\n');
+
+            core.setOutput('repo', imageRepo);
+            core.setOutput('sha', sha);
+            core.setOutput('short_sha', shortSha);
+            core.setOutput('full_sha_tag', fullShaTag);
+            core.setOutput('short_sha_tag', shortShaTag);
+            core.setOutput('version_tag', versionTag);
+            core.setOutput('branch_tag', branchTag);
+            core.setOutput('tags', tags);
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        id: build_image
+        with:
+          context: .
+          file: ./build/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+
+      - name: Write build summary
+        env:
+          IMAGE_REPO: ${{ steps.image.outputs.repo }}
+          IMAGE_TAGS: ${{ steps.image.outputs.tags }}
+          SOURCE_REF: ${{ env.REF_NAME }}
+          FULL_SHA_TAG: ${{ steps.image.outputs.full_sha_tag }}
+          SHORT_SHA_TAG: ${{ steps.image.outputs.short_sha_tag }}
+          VERSION_TAG: ${{ steps.image.outputs.version_tag }}
+          BRANCH_TAG: ${{ steps.image.outputs.branch_tag }}
+        run: |
+          {
+            echo "### Docker image"
+            echo ""
+            echo "- Source branch: \`${SOURCE_REF}\`"
+            echo "- Image repo: \`${IMAGE_REPO}\`"
+            echo "- Full SHA tag: \`${FULL_SHA_TAG}\`"
+            echo "- Short SHA tag: \`${SHORT_SHA_TAG}\`"
+            echo "- Version tag: \`${VERSION_TAG}\`"
+            echo "- Branch tag: \`${BRANCH_TAG}\`"
+            echo ""
+            echo '```'
+            echo "$IMAGE_TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

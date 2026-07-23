@@ -1,0 +1,33 @@
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
+# Acton project directories
+Acton.toml
+.acton/
+gen/
+build/*
+!build/Dockerfile
+lcov.info
+libraries.toml
+global.libraries.toml
+
+# Mnemonic and wallet files
+*.mnemonic
+wallets.toml
+global.wallets.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project
+.env
+.env.*
+!.env.example
+!build/.env.production
+db.sqlite
+db.sqlite-*
+test*.sh

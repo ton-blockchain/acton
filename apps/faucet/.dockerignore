@@ -1,0 +1,7 @@
+*
+!build/
+!build/Dockerfile
+!build/.env.production
+!dist/
+!dist/docker/
+!dist/docker/faucet-backend

@@ -1,0 +1,29 @@
+services:
+  faucet:
+    image: ghcr.io/ton-blockchain/faucet:${FAUCET_IMAGE_TAG:-master}
+    pull_policy: always
+    env_file:
+      - ./.env
+    environment:
+      VALKEY_URI: "redis://redis:6379"
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: [ "redis-server", "--appendonly", "yes" ]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  redis-data:
