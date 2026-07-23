@@ -72,7 +72,6 @@ function usageFromTimestamps(timestamps: readonly number[]): FaucetUsage {
     limitReached,
     lastRequestAt: timestamps.at(-1),
     availableAgainAt,
-    refreshAt:
-      timestamps.length > 0 ? timestamps[0] + FAUCET_REQUEST_WINDOW_MS : undefined,
+    refreshAt: timestamps.length > 0 ? timestamps[0] + FAUCET_REQUEST_WINDOW_MS : undefined,
   }
 }

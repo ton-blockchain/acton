@@ -15,14 +15,9 @@
   margin: 0 auto 16px;
   box-sizing: border-box;
   padding: 12px 14px;
-  border: 1px solid
-    color-mix(in srgb, var(--acton-color-warning) 32%, var(--acton-color-border));
+  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 32%, var(--acton-color-border));
   border-radius: 16px;
-  background: color-mix(
-    in srgb,
-    var(--acton-color-warning) 8%,
-    var(--acton-color-surface-raised)
-  );
+  background: color-mix(in srgb, var(--acton-color-warning) 8%, var(--acton-color-surface-raised));
 }
 
 .networkNoticeCopy {

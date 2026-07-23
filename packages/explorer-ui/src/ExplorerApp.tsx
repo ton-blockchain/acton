@@ -1320,10 +1320,7 @@ export const ExplorerApp: FC = () => {
                         path="/block/:workchain/:shard/:seqno"
                         element={<BlockDetailsPage client={client} />}
                       />
-                      <Route
-                        path="/address/:address"
-                        element={<AccountPage client={client} />}
-                      />
+                      <Route path="/address/:address" element={<AccountPage client={client} />} />
                       <Route
                         path="/tx/:hash/trace"
                         element={<TransactionPage client={client} openRetraceOnLoad />}
