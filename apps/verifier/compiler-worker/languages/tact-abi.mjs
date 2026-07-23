@@ -10,7 +10,20 @@ import { importTolk, SUPPORTED_TOLK_VERSIONS } from "./registry.mjs";
 /** @typedef {import("@ton/core").ABITypeRef} ABITypeRef */
 /** @typedef {import("@ton/core").ContractABI} ContractABI */
 /** @typedef {{ path: string, content: string }} GeneratedSource */
-/** @typedef {{ name?: string, abi?: string | ContractABI }} TactPackage */
+/** @typedef {{ name: string, type: ABITypeRef }} ABIArgument */
+/** @typedef {{ type: ABIType, metadataFields: import("@ton/core").ABIField[] }} TactStorage */
+/**
+ * @typedef {{
+ *   name?: string,
+ *   abi?: string | ContractABI,
+ *   compiler?: { version?: string },
+ *   init?: {
+ *     args?: ABIArgument[],
+ *     prefix?: { bits?: number, value?: number },
+ *     deployment?: { kind?: string, system?: string | null },
+ *   },
+ * }} TactPackage
+ */
 /** @typedef {{ contractName: string, getters: Map<string, ABIGetter>, source: string }} GeneratedTolkSource */
 /** @typedef {(name: string, selected: Set<string>, serializable?: boolean) => void} CollectStruct */
 
@@ -86,7 +99,16 @@ export async function generatedTolkAbiSources(tactPackage, generatedSources) {
       return undefined;
     }
 
-    const generated = tactAbiToTolk(tactAbi);
+    const storage = await findTactStorage(
+      tactPackage,
+      tactAbi,
+      generatedSources,
+    ).catch(() => undefined);
+    const types = await prepareTactTypes(tactPackage, tactAbi, storage);
+    if (types === undefined) {
+      return undefined;
+    }
+    const generated = tactAbiToTolk(tactAbi, types);
     const typesPath = path.posix.join(
       "output",
       `${generated.contractName}.types.tolk`,
@@ -142,10 +164,592 @@ export async function generatedTolkAbiSources(tactPackage, generatedSources) {
 }
 
 /**
+ * Tact stores runtime metadata before contract fields, but does not expose it
+ * through ContractABI. Package metadata tells us whether the storage has a
+ * child-code system cell and a deployment-state bit. Older Tact ABIs also omit
+ * the contract fields themselves, so recover those from the verified sources.
+ *
+ * @param {TactPackage} tactPackage
  * @param {ContractABI} tactAbi
+ * @param {GeneratedSource[]} generatedSources
+ * @returns {Promise<TactStorage | undefined>}
+ */
+async function findTactStorage(
+  tactPackage,
+  tactAbi,
+  generatedSources,
+) {
+  const storageName = `${tactAbi.name}$Data`;
+  const existing = (Array.isArray(tactAbi.types) ? tactAbi.types : []).find(
+    (type) => type?.name === storageName,
+  );
+  const init = tactPackage?.init;
+  if (init === undefined) {
+    return existing === undefined
+      ? undefined
+      : { type: existing, metadataFields: [] };
+  }
+
+  const metadataFields = [];
+  if (
+    init.deployment?.kind === "system-cell" &&
+    typeof init.deployment.system === "string" &&
+    init.deployment.system.length > 0
+  ) {
+    metadataFields.push({
+      name: "tactSystemCell",
+      type: { kind: "simple", type: "cell", optional: false },
+    });
+  }
+
+  if (init.prefix !== undefined) {
+    if (init.prefix.bits !== 1) {
+      return undefined;
+    }
+    metadataFields.push({
+      name: "tactDeploymentCompleted",
+      type: { kind: "simple", type: "bool", optional: false },
+    });
+  }
+
+  let fields = existing?.fields;
+  if (!Array.isArray(fields)) {
+    if (init.prefix === undefined) {
+      fields = Array.isArray(init.args)
+        ? init.args.map((argument) => ({
+            name: argument.name,
+            type: argument.type,
+          }))
+        : undefined;
+    } else {
+      fields = await findTactContractFields(
+        tactPackage,
+        generatedSources,
+      );
+    }
+  }
+  if (!Array.isArray(fields)) {
+    return undefined;
+  }
+
+  const usedFieldNames = new Set(fields.map((field) => field.name));
+  for (const field of metadataFields) {
+    const base = field.name;
+    let suffix = 2;
+    while (usedFieldNames.has(field.name)) {
+      field.name = `${base}${suffix}`;
+      suffix += 1;
+    }
+    usedFieldNames.add(field.name);
+  }
+
+  return {
+    type: {
+      name: storageName,
+      header: null,
+      fields,
+    },
+    metadataFields,
+  };
+}
+
+/**
+ * Tact serializes a large struct into a chain of cells. Reuse the allocator
+ * from the exact compiler version that produced the verified package, then
+ * expose every continuation as an explicit `Cell<T>` in the Tolk ABI.
+ *
+ * @param {TactPackage} tactPackage
+ * @param {ContractABI} tactAbi
+ * @param {TactStorage | undefined} storage
+ * @returns {Promise<ABIType[] | undefined>}
+ */
+async function prepareTactTypes(tactPackage, tactAbi, storage) {
+  const storageName = `${tactAbi.name}$Data`;
+  const abiTypes = Array.isArray(tactAbi.types) ? tactAbi.types : [];
+  const originalTypes =
+    tactPackage.init !== undefined && storage === undefined
+      ? abiTypes.filter((type) => type?.name !== storageName)
+      : abiTypes;
+  let types = originalTypes;
+  if (storage !== undefined) {
+    types = [
+      ...originalTypes.filter((type) => type?.name !== storage.type.name),
+      storage.type,
+    ];
+  }
+
+  const version = tactPackage.compiler?.version;
+  if (typeof version !== "string") {
+    return undefined;
+  }
+
+  try {
+    const allocatorModule = await import(
+      `tact-${version}/dist/storage/allocator.js`
+    );
+    const allocate =
+      allocatorModule.allocate ?? allocatorModule.default?.allocate;
+    const getAllocationOperationFromField =
+      allocatorModule.getAllocationOperationFromField ??
+      allocatorModule.default?.getAllocationOperationFromField;
+    if (
+      typeof allocate !== "function" ||
+      typeof getAllocationOperationFromField !== "function"
+    ) {
+      return undefined;
+    }
+
+    const typesByName = new Map(types.map((type) => [type.name, type]));
+    const allocations = new Map();
+    const failedTypes = new Set();
+    const visiting = new Set();
+
+    /**
+     * @param {string} name
+     * @returns {{ root: object, size: { bits: number, refs: number } } | undefined}
+     */
+    const resolveAllocation = (name) => {
+      const cached = allocations.get(name);
+      if (cached !== undefined) {
+        return cached;
+      }
+      if (failedTypes.has(name) || visiting.has(name)) {
+        return undefined;
+      }
+      const type = typesByName.get(name);
+      if (type === undefined) {
+        return undefined;
+      }
+
+      visiting.add(name);
+      try {
+        const isStorage = type.name === storage?.type.name;
+        const headerBits =
+          type.header === null || type.header === undefined ? 0 : 32;
+        const ops = (Array.isArray(type.fields) ? type.fields : []).map(
+          (field) => ({
+            name: field.name,
+            type: field.type,
+            op: getAllocationOperationFromField(field.type, (referencedName) => {
+              const referenced = resolveAllocation(referencedName);
+              if (referenced === undefined) {
+                throw new Error(
+                  `Tact ABI type cannot be allocated: ${referencedName}`,
+                );
+              }
+              return referenced.size;
+            }),
+          }),
+        );
+        const root = allocate({
+          ops,
+          reserved: isStorage
+            ? // Tact reserves one root reference for its internal system cell,
+              // even when this particular contract does not end up storing it.
+              { bits: 0, refs: 1 }
+            : { bits: headerBits, refs: 0 },
+        });
+        const resolved = {
+          root,
+          size: {
+            bits: root.size.bits + (isStorage ? 0 : headerBits),
+            refs: root.size.refs + (isStorage ? 1 : 0),
+          },
+        };
+        allocations.set(name, resolved);
+        return resolved;
+      } catch {
+        failedTypes.add(name);
+        return undefined;
+      } finally {
+        visiting.delete(name);
+      }
+    };
+
+    for (const type of types) {
+      resolveAllocation(type.name);
+    }
+
+    const usedTypeNames = new Set(types.map((type) => type.name));
+    const result = [];
+    for (const type of types) {
+      const typeAllocation = allocations.get(type.name);
+      if (typeAllocation === undefined) {
+        if (type.name === storage?.type.name) {
+          return undefined;
+        }
+        result.push(type);
+        continue;
+      }
+      const cells = [];
+      for (
+        let cell = typeAllocation.root;
+        cell !== null;
+        cell = cell.next
+      ) {
+        cells.push(cell);
+      }
+
+      const names = [type.name];
+      for (let index = 1; index < cells.length; index += 1) {
+        const base = `${type.name}$Continuation${index === 1 ? "" : index}`;
+        let name = base;
+        let suffix = 2;
+        while (usedTypeNames.has(name)) {
+          name = `${base}_${suffix}`;
+          suffix += 1;
+        }
+        usedTypeNames.add(name);
+        names.push(name);
+      }
+
+      for (let index = 0; index < cells.length; index += 1) {
+        const fields = cells[index].ops.map((op) => ({
+          name: op.name,
+          type: op.type,
+        }));
+        if (index === 0 && type.name === storage?.type.name) {
+          fields.unshift(...storage.metadataFields);
+        }
+        if (index + 1 < cells.length) {
+          const usedFieldNames = new Set(fields.map((field) => field.name));
+          let continuationName = "tactContinuation";
+          let suffix = 2;
+          while (usedFieldNames.has(continuationName)) {
+            continuationName = `tactContinuation${suffix}`;
+            suffix += 1;
+          }
+          fields.push({
+            name: continuationName,
+            type: {
+              kind: "simple",
+              type: names[index + 1],
+              optional: false,
+              format: "ref",
+            },
+          });
+        }
+        result.push({
+          name: names[index],
+          header: index === 0 ? (type.header ?? null) : null,
+          fields,
+        });
+      }
+    }
+    return result;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * @param {TactPackage} tactPackage
+ * @param {GeneratedSource[]} generatedSources
+ * @returns {Promise<import("@ton/core").ABIField[] | undefined>}
+ */
+async function findTactContractFields(tactPackage, generatedSources) {
+  const version = tactPackage.compiler?.version;
+  if (typeof version !== "string") {
+    return undefined;
+  }
+
+  const parsedItems = [];
+  for (const source of generatedSources) {
+    if (!source.path.endsWith(".tact")) {
+      continue;
+    }
+    const module = await parseTactModule(version, source);
+    const items = Array.isArray(module?.entries)
+      ? module.entries
+      : Array.isArray(module?.items)
+        ? module.items
+        : [];
+    parsedItems.push(...items);
+  }
+
+  const contract = parsedItems.find(
+    (item) =>
+      (item?.kind === "def_contract" || item?.kind === "contract") &&
+      astName(item.name) === tactPackage.name,
+  );
+  if (contract === undefined) {
+    return undefined;
+  }
+
+  const contractFields = [];
+  for (const declaration of Array.isArray(contract.declarations)
+    ? contract.declarations
+    : []) {
+    if (
+      declaration?.kind !== "def_field" &&
+      declaration?.kind !== "field_decl"
+    ) {
+      continue;
+    }
+    const field = astFieldToAbi(declaration);
+    if (field === undefined) {
+      return undefined;
+    }
+    contractFields.push(field);
+  }
+  return contractFields;
+}
+
+/**
+ * @param {string} version
+ * @param {GeneratedSource} source
+ * @returns {Promise<object>}
+ */
+async function parseTactModule(version, source) {
+  const grammar = await import(`tact-${version}/dist/grammar/grammar.js`);
+  const parse = grammar.parse ?? grammar.default?.parse;
+  if (typeof parse === "function") {
+    return parse(source.content, source.path, "user");
+  }
+
+  const [parserModule, astModule] = await Promise.all([
+    import(`tact-${version}/dist/grammar/index.js`),
+    import(`tact-${version}/dist/ast/ast-helpers.js`),
+  ]);
+  const getParser = parserModule.getParser ?? parserModule.default?.getParser;
+  const getAstFactory =
+    astModule.getAstFactory ?? astModule.default?.getAstFactory;
+  if (typeof getParser !== "function" || typeof getAstFactory !== "function") {
+    throw new Error(`Tact ${version} parser is unavailable`);
+  }
+  return getParser(getAstFactory()).parse({
+    path: source.path,
+    code: source.content,
+    origin: "user",
+  });
+}
+
+/**
+ * @param {unknown} declaration
+ * @returns {import("@ton/core").ABIField | undefined}
+ */
+function astFieldToAbi(declaration) {
+  if (
+    declaration === null ||
+    typeof declaration !== "object" ||
+    (declaration.kind !== "def_field" && declaration.kind !== "field_decl")
+  ) {
+    return undefined;
+  }
+  const name = astName(declaration.name);
+  if (name === undefined) {
+    return undefined;
+  }
+  const type = astTypeToAbi(declaration.type, astName(declaration.as));
+  return type === undefined ? undefined : { name, type };
+}
+
+/**
+ * @param {unknown} type
+ * @param {string | undefined} format
+ * @returns {ABITypeRef | undefined}
+ */
+function astTypeToAbi(type, format) {
+  if (type === null || typeof type !== "object") {
+    return undefined;
+  }
+
+  if (type.kind === "type_ref_map" || type.kind === "map_type") {
+    const key = astName(type.key ?? type.keyType);
+    const value = astName(type.value ?? type.valueType);
+    const keyFormat = astName(type.keyAs ?? type.keyStorageType);
+    const valueFormat = astName(type.valueAs ?? type.valueStorageType);
+    if (key === undefined || value === undefined) {
+      return undefined;
+    }
+    return astMapTypeToAbi(key, keyFormat, value, valueFormat);
+  }
+
+  let optional = false;
+  let typeName;
+  if (type.kind === "type_ref_simple") {
+    typeName = astName(type.name);
+    optional = type.optional === true;
+  } else if (type.kind === "type_id") {
+    typeName = astName(type);
+  } else if (
+    type.kind === "optional_type" &&
+    type.typeArg?.kind === "type_id"
+  ) {
+    typeName = astName(type.typeArg);
+    optional = true;
+  }
+  if (typeName === undefined) {
+    return undefined;
+  }
+
+  if (typeName === "Int") {
+    const integer = tactIntegerFormat(format);
+    return integer === undefined
+      ? undefined
+      : { kind: "simple", ...integer, optional };
+  }
+  if (typeName === "Bool" || typeName === "Address") {
+    if (format !== undefined) {
+      return undefined;
+    }
+    return {
+      kind: "simple",
+      type: typeName === "Bool" ? "bool" : "address",
+      optional,
+    };
+  }
+  if (typeName === "Cell" || typeName === "Slice" || typeName === "Builder") {
+    const primitive = typeName.toLowerCase();
+    if (format === undefined) {
+      return { kind: "simple", type: primitive, optional };
+    }
+    if (format === "remaining") {
+      return {
+        kind: "simple",
+        type: primitive,
+        optional,
+        format: "remainder",
+      };
+    }
+    if (typeName === "Slice" && (format === "bytes32" || format === "bytes64")) {
+      return {
+        kind: "simple",
+        type: "fixed-bytes",
+        optional,
+        format: Number(format.slice(5)),
+      };
+    }
+    return undefined;
+  }
+  if (typeName === "String") {
+    return format === undefined
+      ? { kind: "simple", type: "string", optional }
+      : undefined;
+  }
+  if (typeName === "StringBuilder") {
+    return undefined;
+  }
+  if (format !== undefined && format !== "reference") {
+    return undefined;
+  }
+  return {
+    kind: "simple",
+    type: typeName,
+    optional,
+    ...(format === "reference" ? { format: "ref" } : {}),
+  };
+}
+
+/**
+ * @param {string} key
+ * @param {string | undefined} keyFormat
+ * @param {string} value
+ * @param {string | undefined} valueFormat
+ * @returns {ABITypeRef | undefined}
+ */
+function astMapTypeToAbi(key, keyFormat, value, valueFormat) {
+  let abiKey;
+  let abiKeyFormat;
+  if (key === "Int") {
+    const integer = tactIntegerFormat(keyFormat);
+    if (integer === undefined || integer.format === "coins") {
+      return undefined;
+    }
+    abiKey = integer.type;
+    abiKeyFormat = integer.format;
+  } else if (key === "Address" && keyFormat === undefined) {
+    abiKey = "address";
+  } else {
+    return undefined;
+  }
+
+  let abiValue;
+  let abiValueFormat;
+  if (value === "Int") {
+    const integer = tactIntegerFormat(valueFormat);
+    if (integer === undefined) {
+      return undefined;
+    }
+    abiValue = integer.type;
+    abiValueFormat = integer.format;
+  } else if (
+    (value === "Bool" || value === "Address") &&
+    valueFormat === undefined
+  ) {
+    abiValue = value === "Bool" ? "bool" : "address";
+  } else if (value === "Cell" && valueFormat === undefined) {
+    abiValue = "cell";
+    abiValueFormat = "ref";
+  } else if (
+    !["Slice", "Builder", "String", "StringBuilder"].includes(value) &&
+    (valueFormat === undefined || valueFormat === "reference")
+  ) {
+    abiValue = value;
+    abiValueFormat = "ref";
+  } else {
+    return undefined;
+  }
+
+  return {
+    kind: "dict",
+    key: abiKey,
+    keyFormat: abiKeyFormat,
+    value: abiValue,
+    valueFormat: abiValueFormat,
+  };
+}
+
+/**
+ * @param {string | undefined} format
+ * @returns {{ type: string, format: string | number } | undefined}
+ */
+function tactIntegerFormat(format) {
+  if (format === undefined || format === "int257") {
+    return { type: "int", format: 257 };
+  }
+  if (
+    format === "coins" ||
+    format === "varuint16" ||
+    format === "varuint32"
+  ) {
+    return { type: "uint", format };
+  }
+  if (format === "varint16" || format === "varint32") {
+    return { type: "int", format };
+  }
+  const fixed = /^(u?int)(\d+)$/.exec(format);
+  const bits = fixed === null ? 0 : Number(fixed[2]);
+  return bits > 0 && bits <= 256
+    ? { type: fixed[1] === "uint" ? "uint" : "int", format: bits }
+    : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function astName(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value !== null && typeof value === "object") {
+    if (typeof value.value === "string") {
+      return value.value;
+    }
+    if (typeof value.text === "string") {
+      return value.text;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * @param {ContractABI} tactAbi
+ * @param {ABIType[]} types
  * @returns {GeneratedTolkSource}
  */
-function tactAbiToTolk(tactAbi) {
+function tactAbiToTolk(tactAbi, types) {
   if (
     tactAbi === null ||
     typeof tactAbi !== "object" ||
@@ -163,7 +767,6 @@ function tactAbiToTolk(tactAbi) {
     "Contract",
     usedTypeNames,
   );
-  const types = Array.isArray(tactAbi.types) ? tactAbi.types : [];
   const typeNames = new Map();
   for (const type of types) {
     if (typeof type?.name !== "string" || type.name.length === 0) {
@@ -255,10 +858,10 @@ function tactAbiToTolk(tactAbi) {
   }
 
   const contractProperties = [];
-  const storageType = `${tactAbi.name}$Data`;
-  const storageName = typeNames.get(storageType);
+  const storageTypeName = `${tactAbi.name}$Data`;
+  const storageName = typeNames.get(storageTypeName);
   if (storageName !== undefined) {
-    collectStruct(storageType, selectedTypes, true);
+    collectStruct(storageTypeName, selectedTypes, true);
     contractProperties.push(`    storage: ${storageName}`);
   }
 
