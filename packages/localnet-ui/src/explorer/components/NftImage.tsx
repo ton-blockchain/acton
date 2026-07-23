@@ -57,6 +57,7 @@ export const NftImage: FC<NftImageProps> = ({
 }) => {
   const sourcesKey = sources.join("\u0000")
   const onNsfwRef = useRef(onNsfw)
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps NSFW detection on the latest callback without restarting image verification
   onNsfwRef.current = onNsfw
   const [image, setImage] = useState<ResolvedNftImage>(() =>
     getInitialImage(sources, blurred, collectionName),
