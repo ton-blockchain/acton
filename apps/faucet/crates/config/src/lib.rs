@@ -274,6 +274,11 @@ impl Config {
     }
 
     fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.pow.max_challenges > 0,
+            "POW_MAX_CHALLENGES must be positive"
+        );
+
         if !self.github_auth.enabled {
             return Ok(());
         }
@@ -300,6 +305,10 @@ impl Config {
         anyhow::ensure!(
             self.github_auth.established.max_requests >= self.github_auth.verified.max_requests,
             "GITHUB_ESTABLISHED_MAX_REQUESTS must not be below the verified limit"
+        );
+        anyhow::ensure!(
+            self.rate_limit.claim.max_requests >= self.github_auth.established.max_requests,
+            "RATE_LIMIT_CLAIM_MAX_REQUESTS must not be below the established GitHub limit"
         );
 
         Ok(())

@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use faucet_backend::middlewares::ClientContext;
-use faucet_valkey::AntifraudModule;
+use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -13,7 +13,9 @@ use crate::github_auth::FaucetTier;
 use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::auth;
 
-const POW_CHALLENGE_KEY_PREFIX: &str = "faucet:pow:challenge";
+// The shared hash tag keeps the index and challenge values in one Redis Cluster slot.
+const POW_CHALLENGE_KEY_PREFIX: &str = "faucet:pow:{challenges}:challenge";
+pub(super) const POW_CHALLENGE_INDEX_KEY: &str = "faucet:pow:{challenges}:active";
 
 #[derive(Deserialize)]
 pub(super) struct ChallengeRequest {
@@ -133,12 +135,14 @@ pub(super) async fn create_challenge(
             "Failed to create challenge",
         )
     })?;
-    state
+    let store_decision = state
         .valkey
-        .store_ephemeral(
+        .store_capped_ephemeral(
+            POW_CHALLENGE_INDEX_KEY,
             &challenge_key(&challenge),
             &encoded_context,
             state.config.pow.challenge_ttl_seconds,
+            state.config.pow.max_challenges,
         )
         .await
         .map_err(|_| {
@@ -147,6 +151,12 @@ pub(super) async fn create_challenge(
                 "Failed to create challenge",
             )
         })?;
+    if store_decision == CappedEphemeralStoreDecision::Full {
+        return Err(response_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many active challenges",
+        ));
+    }
 
     Ok((
         StatusCode::OK,
@@ -226,7 +236,7 @@ mod tests {
 
         assert_eq!(
             key,
-            "faucet:pow:challenge:2dd00bd77e0222ced882665481a9c1d9f907309d16e05ed007a1ea63928477a9"
+            "faucet:pow:{challenges}:challenge:2dd00bd77e0222ced882665481a9c1d9f907309d16e05ed007a1ea63928477a9"
         );
         assert!(!key.ends_with(":challenge"));
     }

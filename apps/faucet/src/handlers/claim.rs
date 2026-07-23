@@ -124,7 +124,7 @@ pub(super) async fn create_claim(
 
     let consumed_context = state
         .valkey
-        .take_ephemeral(&challenge_key)
+        .take_capped_ephemeral(challenge::POW_CHALLENGE_INDEX_KEY, &challenge_key)
         .await
         .map_err(|_| {
             response_error(

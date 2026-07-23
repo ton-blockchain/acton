@@ -10,6 +10,8 @@ const SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX: &str = "faucet:antifraud:successfu
 const CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT: &str =
     include_str!("../scripts/check_successful_claim_window.lua");
 const RECORD_SUCCESSFUL_CLAIM_SCRIPT: &str = include_str!("../scripts/record_successful_claim.lua");
+const STORE_CAPPED_EPHEMERAL_SCRIPT: &str = include_str!("../scripts/store_capped_ephemeral.lua");
+const TAKE_CAPPED_EPHEMERAL_SCRIPT: &str = include_str!("../scripts/take_capped_ephemeral.lua");
 
 // Keep the existing key so deployments retain their accumulated stats.
 const TOTAL_SENT_NANOGRAMS_KEY: &str = "faucet:stats:sent-nanotons";
@@ -80,6 +82,12 @@ pub enum SuccessfulClaimWindowDecision {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CappedEphemeralStoreDecision {
+    Stored,
+    Full,
+}
+
 #[derive(Clone)]
 pub struct ValkeyStore {
     connection: redis::aio::MultiplexedConnection,
@@ -125,6 +133,36 @@ impl ValkeyStore {
             .context("Failed to store ephemeral value")
     }
 
+    pub async fn store_capped_ephemeral(
+        &self,
+        index_key: &str,
+        key: &str,
+        value: &str,
+        ttl_seconds: u64,
+        max_entries: u64,
+    ) -> anyhow::Result<CappedEphemeralStoreDecision> {
+        anyhow::ensure!(ttl_seconds > 0, "Ephemeral value TTL must be positive");
+        anyhow::ensure!(max_entries > 0, "Ephemeral value cap must be positive");
+
+        let mut connection = self.connection.clone();
+        let response: i64 = redis::Script::new(STORE_CAPPED_EPHEMERAL_SCRIPT)
+            .key(index_key)
+            .key(key)
+            .arg(value)
+            .arg(ttl_seconds)
+            .arg(max_entries)
+            .invoke_async(&mut connection)
+            .await
+            .context("Failed to store capped ephemeral value")?;
+
+        match response {
+            1 => Ok(CappedEphemeralStoreDecision::Stored),
+            0 => Ok(CappedEphemeralStoreDecision::Full),
+            -1 => anyhow::bail!("Capped ephemeral value already exists"),
+            value => anyhow::bail!("Unexpected capped ephemeral store decision: {value}"),
+        }
+    }
+
     pub async fn get_ephemeral(&self, key: &str) -> anyhow::Result<Option<String>> {
         let mut connection = self.connection.clone();
         redis::cmd("GET")
@@ -141,6 +179,20 @@ impl ValkeyStore {
             .query_async(&mut connection)
             .await
             .context("Failed to take ephemeral value")
+    }
+
+    pub async fn take_capped_ephemeral(
+        &self,
+        index_key: &str,
+        key: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let mut connection = self.connection.clone();
+        redis::Script::new(TAKE_CAPPED_EPHEMERAL_SCRIPT)
+            .key(index_key)
+            .key(key)
+            .invoke_async(&mut connection)
+            .await
+            .context("Failed to take capped ephemeral value")
     }
 
     pub async fn delete_ephemeral(&self, key: &str) -> anyhow::Result<bool> {
@@ -311,9 +363,13 @@ fn antifraud_trigger_count_key(module: AntifraudModule) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use faucet_config::ValkeyConfig;
+
     use super::{
-        AntifraudModule, antifraud_trigger_count_key, successful_claim_window_key,
-        successful_claim_window_seq_key,
+        AntifraudModule, CappedEphemeralStoreDecision, ValkeyStore, antifraud_trigger_count_key,
+        successful_claim_window_key, successful_claim_window_seq_key,
     };
 
     #[test]
@@ -350,5 +406,65 @@ mod tests {
             antifraud_trigger_count_key(AntifraudModule::SuccessfulClaimWindow),
             "faucet:stats:antifraud:successful-claim-window"
         );
+    }
+
+    #[tokio::test]
+    async fn caps_active_ephemeral_values_and_reclaims_slots() {
+        let Ok(uri) = std::env::var("VALKEY_TEST_URI") else {
+            return;
+        };
+        let store = ValkeyStore::new(&ValkeyConfig { uri }).await.unwrap();
+        let namespace = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let index_key = format!("faucet:test:{{capped-{namespace}}}:active");
+        let first_key = format!("faucet:test:{{capped-{namespace}}}:first");
+        let second_key = format!("faucet:test:{{capped-{namespace}}}:second");
+
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &first_key, "first", 1, 1)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &second_key, "second", 1, 1)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Full
+        );
+        assert_eq!(
+            store
+                .take_capped_ephemeral(&index_key, &first_key)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("first")
+        );
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &second_key, "second", 1, 1)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+
+        tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &first_key, "first", 1, 1)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+
+        store
+            .take_capped_ephemeral(&index_key, &first_key)
+            .await
+            .unwrap();
     }
 }
