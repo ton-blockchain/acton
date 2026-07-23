@@ -156,7 +156,7 @@ impl ToncenterClient {
             return msg.contains("rate limit")
                 || msg.contains("too many requests")
                 || msg.contains("timeout")
-                || msg.contains("temporar");
+                || msg.contains("temporary");
         }
 
         false
