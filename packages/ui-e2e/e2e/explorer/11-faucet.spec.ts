@@ -4,6 +4,7 @@ import {prepareVisualPage} from "../support/visual"
 
 const ADDRESS = `0:${"11".repeat(32)}`
 const DEVICE_UID = "12345678-1234-1234-1234-123456789abc"
+const ADDRESS_HISTORY_KEY = "actonscanFaucetAddressHistory"
 const REQUEST_HISTORY_KEY = "actonscanFaucetRequestHistory"
 
 test.describe("Testnet faucet", () => {
@@ -49,11 +50,12 @@ test.describe("Testnet faucet", () => {
   test("makes the Testnet scope explicit when Mainnet is selected", async ({page}) => {
     await page.goto("/faucet")
 
-    await expect(page.getByText("This faucet always sends Testnet GRAM")).toBeVisible()
+    await expect(page.getByText("Mainnet selected")).toBeVisible()
+    await expect(page.getByText("Faucet payouts are always sent on Testnet")).toBeVisible()
     await page.getByRole("button", {name: "Switch to Testnet"}).click()
 
     await expect(page).toHaveURL(/\/faucet\?network=testnet$/)
-    await expect(page.getByText("This faucet always sends Testnet GRAM")).toHaveCount(0)
+    await expect(page.getByText("Mainnet selected")).toHaveCount(0)
     await expect(page.getByRole("button", {name: "Testnet", exact: true})).toBeVisible()
   })
 
@@ -158,10 +160,8 @@ test.describe("Testnet faucet", () => {
     await expect(notifications).toContainText("Requesting a challenge")
     await expect(notifications).toContainText("Testnet GRAM received", {timeout: 10_000})
     await expect(notifications).toContainText("Balance increased on TON Testnet")
-    await expect(notifications.getByRole("link", {name: "View on Testnet"})).toHaveAttribute(
-      "href",
-      /network=testnet/,
-    )
+    const viewOnTestnetLink = notifications.getByRole("link", {name: "View on Testnet"})
+    await expect(viewOnTestnetLink).toHaveAttribute("href", /network=testnet/)
     await expect(page.getByText(/1 of 2 requests used · last request at/)).toBeVisible()
     const requestHistory = await page.evaluate(
       storageKey => JSON.parse(localStorage.getItem(storageKey) ?? "[]") as unknown[],
@@ -170,5 +170,41 @@ test.describe("Testnet faucet", () => {
     expect(requestHistory).toHaveLength(1)
     expect(challengeAddress).toBeTruthy()
     expect(balanceRequests).toBe(2)
+    if (!challengeAddress) {
+      throw new Error("The faucet challenge address was not captured")
+    }
+
+    const addressHistory = await page.evaluate(
+      storageKey => JSON.parse(localStorage.getItem(storageKey) ?? "[]") as unknown[],
+      ADDRESS_HISTORY_KEY,
+    )
+    expect(addressHistory).toEqual([challengeAddress])
+
+    const addressInput = page.getByLabel("TON address")
+    await addressInput.fill("")
+    await addressInput.click()
+    const historyOption = page.getByRole("option").filter({hasText: challengeAddress})
+    await expect(historyOption).toBeVisible()
+    await historyOption.click()
+    await expect(addressInput).toHaveValue(challengeAddress)
+
+    await addressInput.fill("")
+    await addressInput.click()
+    await page.getByRole("button", {name: `Remove ${challengeAddress} from history`}).click()
+    await expect(historyOption).toHaveCount(0)
+    const addressHistoryAfterRemoval = await page.evaluate(
+      storageKey => JSON.parse(localStorage.getItem(storageKey) ?? "[]") as unknown[],
+      ADDRESS_HISTORY_KEY,
+    )
+    expect(addressHistoryAfterRemoval).toEqual([])
+
+    await page.evaluate(() => {
+      document.documentElement.dataset.faucetSpaNavigation = "preserved"
+    })
+    await viewOnTestnetLink.click()
+    await expect(page).toHaveURL(/\/address\/.+\?network=testnet$/)
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.faucetSpaNavigation))
+      .toBe("preserved")
   })
 })

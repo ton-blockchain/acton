@@ -1,9 +1,10 @@
-import {Button, Input, useToast} from "@acton/ui"
+import {Button, SearchInput, useToast} from "@acton/ui"
+import type {SearchInputItem} from "@acton/ui"
 import {Address} from "@ton/core"
-import {ArrowRight, Check, ChevronDown, Circle, ShieldCheck, X} from "lucide-react"
+import {ArrowRight, Check, ChevronDown, Circle, History, ShieldCheck, X} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
-import type {FC, FormEvent} from "react"
-import {useSearchParams} from "react-router-dom"
+import type {FC} from "react"
+import {Link, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../../../localnet-ui/src/explorer/api/client"
 import {
@@ -52,6 +53,8 @@ interface FaucetRun {
 
 const BALANCE_WAIT_ATTEMPTS = 10
 const BALANCE_WAIT_INTERVAL_MS = 2000
+const FAUCET_ADDRESS_HISTORY_STORAGE_KEY = "actonscanFaucetAddressHistory"
+const MAX_ADDRESS_HISTORY_ITEMS = 5
 const REQUEST_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
@@ -99,6 +102,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const {dismissToast, showToast, updateToast} = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [address, setAddress] = useState(() => searchParams.get("address") ?? "")
+  const [addressHistory, setAddressHistory] = useState<readonly string[]>(readFaucetAddressHistory)
   const [addressInvalid, setAddressInvalid] = useState(false)
   const [phase, setPhase] = useState<FaucetPhase>("idle")
   const [usage, setUsage] = useState<FaucetUsage>(() => readFaucetUsage())
@@ -108,6 +112,37 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const requestBlocked = running || usage.limitReached
   const primaryButtonLabel =
     !running && usage.limitReached ? rateLimitButtonLabel(usage) : requestButtonLabel(phase)
+  const addressHistoryItems: readonly SearchInputItem[] =
+    address.trim().length > 0
+      ? []
+      : addressHistory.map(historyAddress => ({
+          id: historyAddress,
+          label: historyAddress,
+          icon: <History size={16} />,
+          onSelect: () => {
+            setAddress(historyAddress)
+            setAddressInvalid(false)
+          },
+          onRemove: () => {
+            setAddressHistory(current => {
+              const nextHistory = current.filter(item => item !== historyAddress)
+              writeFaucetAddressHistory(nextHistory)
+              return nextHistory
+            })
+          },
+          removeLabel: `Remove ${historyAddress} from history`,
+        }))
+
+  const addAddressToHistory = useCallback((historyAddress: string) => {
+    setAddressHistory(current => {
+      const nextHistory = [
+        historyAddress,
+        ...current.filter(item => item !== historyAddress),
+      ].slice(0, MAX_ADDRESS_HISTORY_ITEMS)
+      writeFaucetAddressHistory(nextHistory)
+      return nextHistory
+    })
+  }, [])
 
   const cancelActiveRun = useCallback(() => {
     const activeRun = activeRunRef.current
@@ -151,8 +186,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
     cancelActiveRun()
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handleSubmit = async () => {
     if (requestBlocked) return
 
     let testnetAddress: string
@@ -177,6 +211,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
     const controller = new AbortController()
     activeRunRef.current = {controller}
     setAddress(testnetAddress)
+    addAddressToHistory(testnetAddress)
     setAddressInvalid(false)
     setPhase("challenge")
     const nextSearchParams = new URLSearchParams(searchParams)
@@ -257,9 +292,9 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             {statusDescription(finalPhase)}
             <br />
             <br />
-            <a href={`/address/${encodeURIComponent(testnetAddress)}?network=testnet`}>
+            <Link to={`/address/${encodeURIComponent(testnetAddress)}?network=testnet`}>
               View on Testnet
-            </a>
+            </Link>
           </span>
         ),
         durationMs: 10_000,
@@ -312,20 +347,32 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             </div>
           </div>
 
-          <form className={styles.form} onSubmit={event => void handleSubmit(event)}>
-            <Input
-              aria-label="TON address"
+          <form
+            className={styles.form}
+            onSubmit={event => {
+              event.preventDefault()
+              void handleSubmit()
+            }}
+          >
+            <SearchInput
+              ariaLabel="TON address"
               autoFocus
-              className={styles.addressInput}
+              inputClassName={styles.addressInput}
+              items={addressHistoryItems}
               value={address}
-              onChange={event => {
-                setAddress(event.target.value)
+              onSubmit={() => {
+                void handleSubmit()
+                return false
+              }}
+              onValueChange={nextAddress => {
+                setAddress(nextAddress)
                 setAddressInvalid(false)
               }}
               placeholder="Enter a friendly (kQ…) or raw (0:…) address"
               size="lg"
               invalid={addressInvalid}
               disabled={running}
+              variant="field"
             />
             <div className={styles.formActions}>
               <Button
@@ -556,8 +603,7 @@ function statusTitle(phase: FaucetPhase): string {
 }
 
 function statusDescription(phase: FaucetPhase, claimMessage?: string): string {
-  if (phase === "challenge")
-    return "Contacting the faucet and checking the current Testnet balance"
+  if (phase === "challenge") return "Contacting the faucet and checking the current Testnet balance"
   if (phase === "solving") return "The calculation runs locally in a background worker"
   if (phase === "claiming") return "The faucet is verifying the nonce and queueing the transfer"
   if (phase === "waiting")
@@ -590,4 +636,26 @@ function formatHashRate(progress: FaucetPowProgress): string {
   if (hashesPerSecond >= 1_000_000) return `${(hashesPerSecond / 1_000_000).toFixed(1)} MH/s`
   if (hashesPerSecond >= 1000) return `${Math.round(hashesPerSecond / 1000)} kH/s`
   return `${Math.round(hashesPerSecond)} H/s`
+}
+
+function readFaucetAddressHistory(): readonly string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FAUCET_ADDRESS_HISTORY_STORAGE_KEY) ?? "[]")
+    if (!Array.isArray(parsed)) return []
+
+    const addresses = parsed.filter(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    )
+    return [...new Set(addresses)].slice(0, MAX_ADDRESS_HISTORY_ITEMS)
+  } catch {
+    return []
+  }
+}
+
+function writeFaucetAddressHistory(addresses: readonly string[]): void {
+  try {
+    localStorage.setItem(FAUCET_ADDRESS_HISTORY_STORAGE_KEY, JSON.stringify(addresses))
+  } catch {
+    // The faucet still works when browser storage is unavailable
+  }
 }

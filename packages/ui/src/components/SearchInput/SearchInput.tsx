@@ -131,7 +131,7 @@ export function SearchInput({
         ref={setPortalContainer}
         className={rootClassName}
         role={variant === "search" ? "search" : undefined}
-        aria-label={ariaLabel}
+        aria-label={variant === "search" ? ariaLabel : undefined}
       >
         <div
           ref={controlRef}
