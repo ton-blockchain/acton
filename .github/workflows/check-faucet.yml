@@ -66,7 +66,7 @@ jobs:
 
     services:
       valkey:
-        image: valkey/valkey:8.1-alpine
+        image: valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
         ports:
           - 6379:6379
         options: >-
