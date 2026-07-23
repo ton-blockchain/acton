@@ -13,6 +13,7 @@ function VerifiedContractsEntry() {
     <AppShell>
       <VerifiedContractsPage
         api={api}
+        getContractHref={item => lookupPath(item.code_hash)}
         onOpenContract={item => globalThis.location.assign(lookupPath(item.code_hash))}
       />
     </AppShell>

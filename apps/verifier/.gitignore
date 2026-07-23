@@ -1,4 +1,9 @@
-/target/
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
 /compiler-worker/node_modules/
 # Acton generated/local state
 /.acton/

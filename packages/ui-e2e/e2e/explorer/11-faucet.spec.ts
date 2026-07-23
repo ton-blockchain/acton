@@ -57,11 +57,19 @@ test.describe("Testnet faucet", () => {
     await expect(page.getByText("No wallet connection or private key is required")).toBeVisible()
     const cliGuide = page.getByText("Use Acton CLI")
     const cliCommand = page.locator("code")
+    const walletFundingGuide = page.getByRole("link", {
+      name: "documentation",
+    })
     await expect(cliGuide).toBeVisible()
     await expect(cliCommand).toBeHidden()
     await cliGuide.click()
     await expect(cliCommand).toHaveText("acton wallet airdrop <WALLET_NAME>")
     await expect(cliCommand).toBeVisible()
+    await expect(walletFundingGuide).toHaveAttribute(
+      "href",
+      "https://ton-blockchain.github.io/acton/docs/wallets#fund-a-wallet-on-testnet",
+    )
+    await expect(walletFundingGuide).toHaveAttribute("target", "_blank")
     await expect(page.getByText("Wallet airdrop", {exact: true})).toHaveCount(0)
   })
 

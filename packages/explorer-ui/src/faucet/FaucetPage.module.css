@@ -339,6 +339,28 @@
   color: color-mix(in srgb, var(--acton-color-warning-text) 68%, var(--acton-color-text-muted));
 }
 
+.cliDocsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-emphasis);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--acton-color-accent) 45%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--acton-duration-fast);
+}
+
+.cliDocsLink:hover {
+  text-decoration-color: currentcolor;
+}
+
+.cliDocsLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
 @media (max-width: 560px) {
   .page {
     padding-top: 24px;

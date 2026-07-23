@@ -938,13 +938,116 @@ const DesktopMoreMenu: FC = () => {
   )
 }
 
+interface VerifiedContractsViewState {
+  readonly page: number
+  readonly scrollY: number
+}
+
+interface VerifiedContractsRouteState {
+  readonly verifiedContractsView?: VerifiedContractsViewState
+}
+
+function readVerifiedContractsViewState(value: unknown): VerifiedContractsViewState | undefined {
+  if (typeof value !== "object" || value === null || !("verifiedContractsView" in value)) {
+    return undefined
+  }
+
+  const view = (value as VerifiedContractsRouteState).verifiedContractsView
+  if (
+    !view ||
+    !Number.isFinite(view.page) ||
+    view.page < 0 ||
+    !Number.isFinite(view.scrollY) ||
+    view.scrollY < 0
+  ) {
+    return undefined
+  }
+
+  return {
+    page: Math.trunc(view.page),
+    scrollY: view.scrollY,
+  }
+}
+
+function readVerifiedContractsPage(search: string): number {
+  const value = new URLSearchParams(search).get("page")
+  if (value === null) {
+    return 0
+  }
+
+  const page = Number(value)
+  return Number.isInteger(page) && page > 0 ? page - 1 : 0
+}
+
 const VerifiedContractsRoute: FC = () => {
+  const location = useLocation()
   const navigate = useNavigate()
+  const restoration = readVerifiedContractsViewState(location.state)
+  const initialPage = readVerifiedContractsPage(location.search)
+  const currentPageRef = useRef(initialPage)
+  const restoredScrollRef = useRef(false)
+
+  useEffect(() => {
+    currentPageRef.current = initialPage
+  }, [initialPage])
 
   return (
     <VerifiedContractsPage
       api={ACTON_VERIFIER_API}
+      getContractHref={item => `/verified/${encodeURIComponent(item.code_hash)}`}
+      page={initialPage}
+      onPageChange={page => {
+        currentPageRef.current = page
+        const search = new URLSearchParams(location.search)
+        if (page === 0) {
+          search.delete("page")
+        } else {
+          search.set("page", String(page + 1))
+        }
+
+        const nextSearch = search.toString()
+        if (nextSearch !== location.search.slice(1)) {
+          void navigate(
+            {
+              pathname: location.pathname,
+              search: nextSearch ? `?${nextSearch}` : "",
+              hash: location.hash,
+            },
+            {replace: true},
+          )
+        }
+      }}
+      onContentReady={() => {
+        if (
+          restoredScrollRef.current ||
+          restoration === undefined ||
+          restoration.page !== initialPage
+        ) {
+          return
+        }
+
+        restoredScrollRef.current = true
+        globalThis.requestAnimationFrame(() => {
+          globalThis.scrollTo({top: restoration.scrollY, behavior: "auto"})
+        })
+      }}
       onOpenContract={item => {
+        void navigate(
+          {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          {
+            replace: true,
+            state: {
+              verifiedContractsView: {
+                page: currentPageRef.current,
+                scrollY: globalThis.scrollY,
+              },
+            } satisfies VerifiedContractsRouteState,
+          },
+        )
         void navigate(`/verified/${encodeURIComponent(item.code_hash)}`)
       }}
     />

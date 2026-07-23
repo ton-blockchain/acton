@@ -1,7 +1,17 @@
 import {Button, SearchInput, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {Address} from "@ton/core"
-import {ArrowRight, Check, ChevronDown, Circle, Github, History, ShieldCheck, X} from "lucide-react"
+import {
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Circle,
+  ExternalLink,
+  Github,
+  History,
+  ShieldCheck,
+  X,
+} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link, useSearchParams} from "react-router-dom"
@@ -560,11 +570,24 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             <ChevronDown size={18} aria-hidden="true" />
           </summary>
           <div className={styles.cliGuideBody}>
-            <p>Request Testnet GRAM for an Acton wallet with the same proof-of-work flow</p>
+            <p>Request Testnet GRAM for an Acton wallet with the same proof-of-work flow.</p>
             <code>
               <span className={styles.cliCommand}>acton wallet airdrop</span>{" "}
               <span className={styles.cliArgument}>&lt;WALLET_NAME&gt;</span>
             </code>
+            <p>
+              Learn more in the{" "}
+              <a
+                className={styles.cliDocsLink}
+                href="https://ton-blockchain.github.io/acton/docs/wallets#fund-a-wallet-on-testnet"
+                target="_blank"
+                rel="noreferrer"
+              >
+                documentation
+                <ExternalLink size={14} aria-hidden="true" />
+              </a>
+              .
+            </p>
           </div>
         </details>
       </div>

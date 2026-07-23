@@ -25,10 +25,40 @@
   line-height: 40px;
 }
 
+.contractRow {
+  position: relative;
+}
+
+.rowOverlayLink {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  text-decoration: none;
+}
+
+.rowOverlayLink:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .codeHashCell {
   min-width: 0;
   width: fit-content;
   max-width: 100%;
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -47,6 +77,11 @@
   color: var(--acton-color-accent);
   font-family: var(--acton-font-mono, monospace);
   font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.codeHash:hover {
+  text-decoration: underline;
 }
 
 .sourceName {

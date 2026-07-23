@@ -12,8 +12,8 @@ import {
   DataTableTable,
   Button,
 } from "@acton/ui"
-import {useEffect, useMemo, useState} from "react"
-import type {KeyboardEvent as ReactKeyboardEvent} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
+import type {MouseEvent as ReactMouseEvent} from "react"
 
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
 import {shortenMiddle} from "../lib/target"
@@ -73,40 +73,57 @@ function sourceName(item: LastVerifiedItem): string {
   return item.entrypoint || "Unknown"
 }
 
-function handleRowKeyDown(
-  event: ReactKeyboardEvent<HTMLTableRowElement>,
+function handleContractLinkClick(
+  event: ReactMouseEvent<HTMLAnchorElement>,
   item: LastVerifiedItem,
   onOpenContract: (item: LastVerifiedItem) => void,
 ): void {
-  if (event.currentTarget !== event.target) {
+  event.stopPropagation()
+  if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
     return
   }
 
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault()
-    onOpenContract(item)
-  }
+  event.preventDefault()
+  onOpenContract(item)
 }
 
 export interface VerifiedContractsPageProps {
   readonly api: VerifierApi
+  readonly getContractHref: (item: LastVerifiedItem) => string
   readonly onOpenContract: (item: LastVerifiedItem) => void
+  readonly page?: number
+  readonly onPageChange?: (page: number) => void
+  readonly onContentReady?: () => void
   readonly limit?: number
   readonly className?: string
 }
 
 export function VerifiedContractsPage({
   api,
+  getContractHref,
   onOpenContract,
+  page: controlledPage,
+  onPageChange,
+  onContentReady,
   limit = 25,
   className,
 }: VerifiedContractsPageProps) {
   const pageSize = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 100) : 25
-  const [page, setPage] = useState(0)
+  const [internalPage, setInternalPage] = useState(0)
+  const isPageControlled = controlledPage !== undefined
+  const page =
+    controlledPage !== undefined && Number.isFinite(controlledPage)
+      ? Math.max(0, Math.trunc(controlledPage))
+      : internalPage
   const [items, setItems] = useState<readonly LastVerifiedItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
+  const onPageChangeRef = useRef(onPageChange)
+
+  useEffect(() => {
+    onPageChangeRef.current = onPageChange
+  }, [onPageChange])
 
   useEffect(() => {
     let cancelled = false
@@ -124,7 +141,10 @@ export function VerifiedContractsPage({
           setTotal(nextTotal)
           if (page > lastPage) {
             setItems([])
-            setPage(lastPage)
+            if (!isPageControlled) {
+              setInternalPage(lastPage)
+            }
+            onPageChangeRef.current?.(lastPage)
             return
           }
 
@@ -147,7 +167,14 @@ export function VerifiedContractsPage({
     return () => {
       cancelled = true
     }
-  }, [api, page, pageSize])
+  }, [api, isPageControlled, page, pageSize])
+
+  useEffect(() => {
+    const contentReady = !isLoading && (items.length > 0 || Boolean(error) || total === 0)
+    if (contentReady) {
+      onContentReady?.()
+    }
+  }, [error, isLoading, items.length, onContentReady, total])
 
   const sortedItems = useMemo(
     () => [...items].sort((left, right) => right.verified_at - left.verified_at),
@@ -155,6 +182,13 @@ export function VerifiedContractsPage({
   )
   const totalPages = Math.ceil(total / pageSize)
   const visiblePages = useMemo(() => paginationItems(page, totalPages), [page, totalPages])
+  const changePage = (nextPage: number) => {
+    const normalizedPage = Math.max(0, Math.trunc(nextPage))
+    if (!isPageControlled) {
+      setInternalPage(normalizedPage)
+    }
+    onPageChange?.(normalizedPage)
+  }
 
   return (
     <section className={`${styles.container} ${className ?? ""}`}>
@@ -186,20 +220,28 @@ export function VerifiedContractsPage({
               <DataTableEmpty colSpan={5}>No verified contracts indexed yet</DataTableEmpty>
             ) : (
               sortedItems.map(item => (
-                <DataTableRow
-                  key={item.code_hash}
-                  interactive
-                  role="link"
-                  tabIndex={0}
-                  aria-label={`Open code hash ${item.code_hash}`}
-                  onClick={() => onOpenContract(item)}
-                  onKeyDown={event => handleRowKeyDown(event, item, onOpenContract)}
-                >
+                <DataTableRow key={item.code_hash} className={styles.contractRow} interactive>
                   <DataTableCell>
-                    <div className={styles.codeHashCell}>
-                      <span className={styles.codeHash} title={item.code_hash}>
-                        {shortenMiddle(item.code_hash, 18, 12)}
+                    <a
+                      className={styles.rowOverlayLink}
+                      href={getContractHref(item)}
+                      aria-label={`Open verified contract ${item.code_hash}`}
+                      onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                    >
+                      <span className={styles.visuallyHidden}>
+                        Open verified contract {item.code_hash}
                       </span>
+                    </a>
+                    <div className={styles.codeHashCell}>
+                      <a
+                        className={styles.codeHash}
+                        href={getContractHref(item)}
+                        title={item.code_hash}
+                        aria-label={`Open code hash ${item.code_hash}`}
+                        onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                      >
+                        {shortenMiddle(item.code_hash, 18, 12)}
+                      </a>
                       <CopyInlineAction
                         className={styles.hashCopyButton}
                         value={item.code_hash}
@@ -232,7 +274,7 @@ export function VerifiedContractsPage({
                         size="sm"
                         variant="outline"
                         disabled={isLoading || page === 0}
-                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        onClick={() => changePage(page - 1)}
                       >
                         Previous
                       </Button>
@@ -256,7 +298,7 @@ export function VerifiedContractsPage({
                                 disabled={isLoading}
                                 aria-current={item === page ? "page" : undefined}
                                 aria-label={`Go to page ${item + 1}`}
-                                onClick={() => setPage(item)}
+                                onClick={() => changePage(item)}
                               >
                                 {item + 1}
                               </Button>
@@ -268,7 +310,7 @@ export function VerifiedContractsPage({
                         size="sm"
                         variant="outline"
                         disabled={isLoading || Boolean(error) || page + 1 >= totalPages}
-                        onClick={() => setPage(current => current + 1)}
+                        onClick={() => changePage(page + 1)}
                       >
                         Next
                       </Button>
