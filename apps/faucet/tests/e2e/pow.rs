@@ -70,6 +70,7 @@ fn config(pow_enabled: bool) -> Config {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3001,
+            trust_proxy_headers: false,
         },
         rate_limit: RateLimitConfig {
             default: DefaultRateLimitConfig {
@@ -134,6 +135,7 @@ fn config(pow_enabled: bool) -> Config {
             client_secret: None,
             callback_url: "http://localhost/auth/github/callback".to_string(),
             frontend_url: "http://localhost/faucet".to_string(),
+            oauth_max_pending_states: 256,
             state_ttl_seconds: 600,
             grant_ttl_seconds: 120,
             session_ttl_seconds: 604_800,

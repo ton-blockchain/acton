@@ -73,6 +73,10 @@ interface FaucetRun {
 const BALANCE_WAIT_ATTEMPTS = 10
 const BALANCE_WAIT_INTERVAL_MS = 2000
 const FAUCET_ADDRESS_HISTORY_STORAGE_KEY = "actonscanFaucetAddressHistory"
+const GITHUB_RETURN_STATE_STORAGE_KEY = "actonscanFaucetGitHubReturnState"
+const GITHUB_RETURN_STATE_TTL_MS = 30 * 60 * 1000
+const MAX_GITHUB_RETURN_ADDRESS_LENGTH = 512
+const MAX_GITHUB_RETURN_NETWORK_LENGTH = 128
 const MAX_ADDRESS_HISTORY_ITEMS = 5
 const REQUEST_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
@@ -148,24 +152,26 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const {dismissToast, showToast, updateToast} = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [initialAuthParams] = useState(() => readGitHubRedirectParams(searchParams))
-  const [address, setAddress] = useState(() => searchParams.get("address") ?? "")
+  const [address, setAddress] = useState(
+    () => initialAuthParams.returnState?.address ?? searchParams.get("address") ?? "",
+  )
   const [addressHistory, setAddressHistory] = useState<readonly string[]>(readFaucetAddressHistory)
   const [addressInvalid, setAddressInvalid] = useState(false)
   const [phase, setPhase] = useState<FaucetPhase>("idle")
   const [usage, setUsage] = useState<FaucetUsage>(() => readFaucetUsage())
   const [authStatus, setAuthStatus] = useState<FaucetAuthStatus | undefined>(undefined)
   const [githubSession, setGitHubSession] = useState<FaucetSession | undefined>(undefined)
-  const [authBusy, setAuthBusy] = useState(false)
+  const [authBusy, setAuthBusy] = useState(true)
   const activeRunRef = useRef<FaucetRun | undefined>(undefined)
   const activeToastRef = useRef<string | undefined>(undefined)
-  const authInitializationRef = useRef<
-    Promise<{readonly status: FaucetAuthStatus; readonly session?: FaucetSession}> | undefined
-  >(undefined)
+  const authInitializationRef = useRef<Promise<FaucetAuthInitializationResult> | undefined>(
+    undefined,
+  )
   const requestLimit =
     githubSession?.maxRequests ?? authStatus?.guestMaxRequests ?? FAUCET_REQUEST_LIMIT
   const requestWindowMs = (authStatus?.windowSeconds ?? FAUCET_REQUEST_WINDOW_MS / 1000) * 1000
   const running = isRunningPhase(phase)
-  const requestBlocked = !isTestnetSelected || running || usage.limitReached
+  const requestBlocked = !isTestnetSelected || running || authBusy || usage.limitReached
   const primaryButtonLabel =
     !running && usage.limitReached ? rateLimitButtonLabel(usage) : requestButtonLabel(phase)
   const addressHistoryItems: readonly SearchInputItem[] =
@@ -224,30 +230,16 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
     authInitializationRef.current ??= initializeFaucetAuth(initialAuthParams.grant)
 
     void authInitializationRef.current
-      .then(({status, session}) => {
+      .then(({status, session, sessionError}) => {
         if (cancelled) return
         setAuthStatus(status)
         setGitHubSession(session)
-        if (initialAuthParams.error) {
-          showToast({
-            variant: "error",
-            title: "GitHub connection failed",
-            description: "Authorization was cancelled or expired",
-            durationMs: 8000,
-          })
-        } else if (initialAuthParams.grant && session) {
-          showToast({
-            variant: "success",
-            title: "GitHub connected",
-            description: `${tierLabel(session)} tier unlocks ${session.maxRequests} requests`,
-            durationMs: 6000,
-          })
-        }
+        const toast = faucetAuthToast(initialAuthParams, session, sessionError)
+        if (toast) showToast(toast)
+        clearGitHubRedirectParams(initialAuthParams, setSearchParams)
       })
       .catch(error => {
         if (cancelled) return
-        clearFaucetSession()
-        setGitHubSession(undefined)
         if (initialAuthParams.grant) {
           showToast({
             variant: "error",
@@ -255,10 +247,13 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
             description: error instanceof Error ? error.message : "Unable to connect GitHub",
             durationMs: 8000,
           })
+        } else {
+          clearGitHubRedirectParams(initialAuthParams, setSearchParams)
         }
       })
-
-    clearGitHubRedirectParams(initialAuthParams, setSearchParams)
+      .finally(() => {
+        if (!cancelled) setAuthBusy(false)
+      })
 
     return () => {
       cancelled = true
@@ -293,11 +288,19 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   }
 
   const handleConnectGitHub = () => {
+    if (running || authBusy) return
+
+    writeGitHubReturnState(
+      address,
+      searchParams.get("network") ?? (isTestnetSelected ? "testnet" : "mainnet"),
+    )
     setAuthBusy(true)
     globalThis.location.assign(githubAuthorizationUrl())
   }
 
   const handleDisconnectGitHub = async () => {
+    if (running || authBusy) return
+
     setAuthBusy(true)
     try {
       await disconnectFaucetSession()
@@ -505,7 +508,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
               placeholder="Enter a friendly (kQ…) or raw (0:…) address"
               size="lg"
               invalid={addressInvalid}
-              disabled={running}
+              disabled={running || authBusy}
               variant="field"
             />
             <div className={styles.formActions}>
@@ -514,12 +517,8 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
                 variant="primary"
                 size="lg"
                 loading={running}
-                disabled={!isTestnetSelected || usage.limitReached}
-                trailingIcon={
-                  running || !isTestnetSelected || usage.limitReached ? undefined : (
-                    <ArrowRight size={17} />
-                  )
-                }
+                disabled={requestBlocked}
+                trailingIcon={requestBlocked ? undefined : <ArrowRight size={17} />}
               >
                 {primaryButtonLabel}
               </Button>
@@ -543,6 +542,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           session={githubSession}
           requestWindowMs={requestWindowMs}
           busy={authBusy}
+          disabled={running}
           onConnect={handleConnectGitHub}
           onDisconnect={() => void handleDisconnectGitHub()}
         />
@@ -606,6 +606,7 @@ interface GitHubLimitsCardProps {
   readonly session?: FaucetSession
   readonly requestWindowMs: number
   readonly busy: boolean
+  readonly disabled: boolean
   readonly onConnect: () => void
   readonly onDisconnect: () => void
 }
@@ -634,6 +635,7 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
         variant={session ? "ghost" : "secondary"}
         size="sm"
         loading={props.busy}
+        disabled={props.disabled}
         onClick={session ? props.onDisconnect : props.onConnect}
       >
         {session ? "Disconnect" : "Connect GitHub"}
@@ -805,17 +807,70 @@ function requestWindowSuffix(windowMs: number): string {
 interface GitHubRedirectParams {
   readonly grant: string | null
   readonly error: string | null
-  readonly fromFragment: boolean
+  readonly returnState?: GitHubReturnState
+}
+
+interface GitHubReturnState {
+  readonly address: string
+  readonly network?: string
+  readonly createdAt: number
+}
+
+interface FaucetAuthInitializationResult {
+  readonly status: FaucetAuthStatus
+  readonly session?: FaucetSession
+  readonly sessionError?: unknown
+}
+
+interface FaucetAuthToast {
+  readonly variant: "error" | "success"
+  readonly title: string
+  readonly description: string
+  readonly durationMs: number
+}
+
+function faucetAuthToast(
+  params: GitHubRedirectParams,
+  session: FaucetSession | undefined,
+  sessionError: unknown,
+): FaucetAuthToast | undefined {
+  if (params.error) {
+    return {
+      variant: "error",
+      title: "GitHub connection failed",
+      description: "Authorization was cancelled or expired",
+      durationMs: 8000,
+    }
+  }
+  if (!params.grant) return undefined
+  if (sessionError) {
+    return {
+      variant: "error",
+      title: "GitHub connection failed",
+      description:
+        sessionError instanceof Error ? sessionError.message : "Unable to connect GitHub",
+      durationMs: 8000,
+    }
+  }
+  if (!session) return undefined
+  return {
+    variant: "success",
+    title: "GitHub connected",
+    description: `${tierLabel(session)} tier unlocks ${session.maxRequests} requests`,
+    durationMs: 6000,
+  }
 }
 
 function readGitHubRedirectParams(searchParams: URLSearchParams): GitHubRedirectParams {
   const fragmentParams = new URLSearchParams(globalThis.location.hash.slice(1))
   const fragmentGrant = fragmentParams.get("github_grant")
   const fragmentError = fragmentParams.get("github_error")
+  const grant = fragmentGrant ?? searchParams.get("github_grant")
+  const error = fragmentError ?? searchParams.get("github_error")
   return {
-    grant: fragmentGrant ?? searchParams.get("github_grant"),
-    error: fragmentError ?? searchParams.get("github_error"),
-    fromFragment: fragmentGrant !== null || fragmentError !== null,
+    grant,
+    error,
+    returnState: grant || error ? readGitHubReturnState() : undefined,
   }
 }
 
@@ -825,37 +880,95 @@ function clearGitHubRedirectParams(
 ): void {
   if (!params.grant && !params.error) return
 
-  if (params.fromFragment) {
-    globalThis.history.replaceState(
-      globalThis.history.state,
-      "",
-      `${globalThis.location.pathname}${globalThis.location.search}`,
-    )
-    return
-  }
-
+  clearGitHubReturnState()
   setSearchParams(
     currentSearchParams => {
       const nextSearchParams = new URLSearchParams(currentSearchParams)
       nextSearchParams.delete("github_grant")
       nextSearchParams.delete("github_error")
+      if (params.returnState?.network) {
+        nextSearchParams.set("network", params.returnState.network)
+      }
+      if (params.returnState?.address) {
+        nextSearchParams.set("address", params.returnState.address)
+      }
       return nextSearchParams
     },
     {replace: true},
   )
 }
 
-async function initializeFaucetAuth(
-  grant: string | null,
-): Promise<{readonly status: FaucetAuthStatus; readonly session?: FaucetSession}> {
+function writeGitHubReturnState(address: string, network: string | null): void {
+  const returnState: GitHubReturnState = {
+    address: address.slice(0, MAX_GITHUB_RETURN_ADDRESS_LENGTH),
+    network: network && network.length <= MAX_GITHUB_RETURN_NETWORK_LENGTH ? network : undefined,
+    createdAt: Date.now(),
+  }
+
+  try {
+    sessionStorage.setItem(GITHUB_RETURN_STATE_STORAGE_KEY, JSON.stringify(returnState))
+  } catch {
+    // OAuth still works when browser storage is unavailable, without restoring form state.
+  }
+}
+
+function readGitHubReturnState(now = Date.now()): GitHubReturnState | undefined {
+  let serialized: string | null
+  try {
+    serialized = sessionStorage.getItem(GITHUB_RETURN_STATE_STORAGE_KEY)
+  } catch {
+    return undefined
+  }
+  if (!serialized) return undefined
+
+  try {
+    const parsed = JSON.parse(serialized) as Partial<GitHubReturnState>
+    if (
+      typeof parsed.createdAt !== "number" ||
+      !Number.isSafeInteger(parsed.createdAt) ||
+      parsed.createdAt > now ||
+      now - parsed.createdAt > GITHUB_RETURN_STATE_TTL_MS ||
+      typeof parsed.address !== "string" ||
+      parsed.address.length > MAX_GITHUB_RETURN_ADDRESS_LENGTH ||
+      (parsed.network !== undefined &&
+        (typeof parsed.network !== "string" ||
+          parsed.network.length === 0 ||
+          parsed.network.length > MAX_GITHUB_RETURN_NETWORK_LENGTH))
+    ) {
+      return undefined
+    }
+
+    return {
+      address: parsed.address,
+      network: parsed.network,
+      createdAt: parsed.createdAt,
+    }
+  } catch {
+    return undefined
+  }
+}
+
+function clearGitHubReturnState(): void {
+  try {
+    sessionStorage.removeItem(GITHUB_RETURN_STATE_STORAGE_KEY)
+  } catch {
+    // Nothing else needs cleanup when browser storage is unavailable.
+  }
+}
+
+async function initializeFaucetAuth(grant: string | null): Promise<FaucetAuthInitializationResult> {
   const status = await requestFaucetAuthStatus()
   if (!status.enabled) {
     clearFaucetSession()
     return {status}
   }
 
-  const session = grant ? await exchangeGitHubGrant(grant) : await requestFaucetSession()
-  return {status, session}
+  try {
+    const session = grant ? await exchangeGitHubGrant(grant) : await requestFaucetSession()
+    return {status, session}
+  } catch (sessionError) {
+    return {status, sessionError}
+  }
 }
 
 function tierLabel(session: FaucetSession): string {

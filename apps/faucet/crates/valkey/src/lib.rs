@@ -363,7 +363,7 @@ fn antifraud_trigger_count_key(module: AntifraudModule) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use faucet_config::ValkeyConfig;
 
@@ -464,6 +464,64 @@ mod tests {
 
         store
             .take_capped_ephemeral(&index_key, &first_key)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn preserves_cap_when_new_values_have_shorter_ttl() {
+        let Ok(uri) = std::env::var("VALKEY_TEST_URI") else {
+            return;
+        };
+        let store = ValkeyStore::new(&ValkeyConfig { uri }).await.unwrap();
+        let namespace = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let index_key = format!("faucet:test:{{mixed-ttl-{namespace}}}:active");
+        let first_key = format!("faucet:test:{{mixed-ttl-{namespace}}}:first");
+        let second_key = format!("faucet:test:{{mixed-ttl-{namespace}}}:second");
+        let third_key = format!("faucet:test:{{mixed-ttl-{namespace}}}:third");
+        let fourth_key = format!("faucet:test:{{mixed-ttl-{namespace}}}:fourth");
+
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &first_key, "first", 30, 2)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &second_key, "second", 1, 2)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+
+        tokio::time::sleep(Duration::from_millis(1_100)).await;
+
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &third_key, "third", 2, 2)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Stored
+        );
+        assert_eq!(
+            store
+                .store_capped_ephemeral(&index_key, &fourth_key, "fourth", 2, 2)
+                .await
+                .unwrap(),
+            CappedEphemeralStoreDecision::Full
+        );
+
+        store
+            .take_capped_ephemeral(&index_key, &first_key)
+            .await
+            .unwrap();
+        store
+            .take_capped_ephemeral(&index_key, &third_key)
             .await
             .unwrap();
     }

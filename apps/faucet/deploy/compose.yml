@@ -10,7 +10,8 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      # Keep direct access local so only the host reverse proxy can supply client IP headers.
+      - "127.0.0.1:${FAUCET_PUBLIC_PORT:-3000}:3000"
     restart: unless-stopped
 
   redis:

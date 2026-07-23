@@ -3,6 +3,11 @@ use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
 use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
+use axum::{
+    extract::{ConnectInfo, Request, State},
+    middleware::{self, Next},
+    response::Response,
+};
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
 use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
@@ -13,7 +18,7 @@ use faucet_valkey::{
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
-use real::RealIpLayer;
+use real::RealIp;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -127,14 +132,20 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let cors = handlers::airdrop_cors_layer(&shared_state.config.github_auth.frontend_url)
+        .context("Failed to configure browser CORS")?;
+    let trust_proxy_headers = shared_state.config.server.trust_proxy_headers;
     let app = handlers::router(shared_state)
         .layer(
             ServiceBuilder::new()
-                .layer(RealIpLayer::default())
+                .layer(middleware::from_fn_with_state(
+                    trust_proxy_headers,
+                    insert_client_ip,
+                ))
                 .layer(GovernorLayer::default()),
         )
         // Preflight requests must not consume the stricter per-claim rate limit.
-        .layer(handlers::airdrop_cors_layer());
+        .layer(cors);
 
     info!("Listening on {}", bind_addr);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
@@ -195,6 +206,48 @@ async fn shutdown_signal() {
     }
 
     info!("Shutting down gracefully...");
+}
+
+async fn insert_client_ip(
+    State(trust_proxy_headers): State<bool>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let client_ip = client_ip(&request, trust_proxy_headers);
+    request.extensions_mut().insert(RealIp(client_ip));
+    next.run(request).await
+}
+
+fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
+    let Some(peer_ip) = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|connect_info| connect_info.0.ip())
+    else {
+        return std::net::Ipv4Addr::LOCALHOST.into();
+    };
+
+    if trust_proxy_headers
+        && is_trusted_proxy_peer(peer_ip)
+        && let Some(forwarded_ip) = request
+            .headers()
+            .get("x-real-ip")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse().ok())
+    {
+        return forwarded_ip;
+    }
+
+    peer_ip
+}
+
+fn is_trusted_proxy_peer(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
+        std::net::IpAddr::V6(ip) => {
+            ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local()
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -349,6 +402,20 @@ async fn can_process_successful_claim_window(
         return Ok(false);
     }
 
+    if task.tier == github_auth::FaucetTier::Guest
+        && let Some(client_subject) = task.client_window_subject.as_deref()
+        && !claim_window_allows(
+            state,
+            client_subject,
+            window.max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
     Ok(true)
 }
 
@@ -425,6 +492,17 @@ async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
         record_successful_claim_subject(
             state,
             &handlers::github_claim_window_key(github_user_id),
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+    // Record authenticated sends against the client subject as well. If the user
+    // later drops the bearer token, the stricter guest check still sees them.
+    if let Some(client_subject) = task.client_window_subject.as_deref() {
+        record_successful_claim_subject(
+            state,
+            client_subject,
             &task.address,
             window.window_seconds,
         )
@@ -601,4 +679,53 @@ fn build_message(
     let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
 
     Ok(message.to_cell()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::{ConnectInfo, Request},
+    };
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use super::client_ip;
+
+    fn request_from(peer_ip: IpAddr, forwarded_ip: &str) -> Request {
+        let mut request = Request::builder()
+            .header("x-real-ip", forwarded_ip)
+            .body(Body::empty())
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::new(peer_ip, 12345)));
+        request
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_when_proxy_headers_are_disabled() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(client_ip(&request, false), peer_ip);
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_from_untrusted_public_peer() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(client_ip(&request, true), peer_ip);
+    }
+
+    #[test]
+    fn accepts_forwarded_ip_only_from_configured_private_proxy_path() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(
+            client_ip(&request, true),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
 }

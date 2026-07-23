@@ -114,8 +114,9 @@ export async function exchangeGitHubGrant(
   if (typeof payload.token !== "string" || payload.token.length < 32) {
     throw new Error("Faucet returned an invalid GitHub session token")
   }
+  const session = parseFaucetSession(payload)
   writeFaucetSessionToken(payload.token)
-  return parseFaucetSession(payload)
+  return session
 }
 
 export async function requestFaucetSession(
@@ -140,9 +141,15 @@ export async function disconnectFaucetSession(signal?: AbortSignal): Promise<voi
     if (readFaucetSessionToken()) {
       await faucetFetch("auth/session", {method: "DELETE", signal})
     }
-  } finally {
-    clearFaucetSession()
+  } catch (error) {
+    if (!(error instanceof FaucetRequestError && error.status === 401)) {
+      throw error
+    }
   }
+
+  // A successful delete and a confirmed unauthorized response both mean there
+  // is no usable server-side session left. Transient failures keep the token.
+  clearFaucetSession()
 }
 
 export function clearFaucetSession(): void {
@@ -269,7 +276,7 @@ async function faucetFetch<T = unknown>(path: string, options: FaucetFetchOption
   const parsed = parseJson(text)
 
   if (!response.ok) {
-    if (response.status === 401) clearFaucetSession()
+    if (response.status === 401 && options.authorized !== false) clearFaucetSession()
     throw new FaucetRequestError(faucetErrorMessage(parsed, text, response.status), response.status)
   }
   if (response.status === 204) return undefined as T

@@ -10,6 +10,7 @@ use axum::{
 use faucet_backend::middlewares::{
     ACTON_CLIENT_HEADER, DEVICE_UID_HEADER, require_airdrop_headers, require_pow_enabled,
 };
+use reqwest::Url;
 use tower_http::cors::CorsLayer;
 
 use crate::AppState;
@@ -58,20 +59,29 @@ pub(crate) fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
-pub(crate) fn airdrop_cors_layer() -> CorsLayer {
-    CorsLayer::new()
-        .allow_origin([
-            HeaderValue::from_static("https://actonscan.com"),
-            HeaderValue::from_static("http://localhost:3007"),
-            HeaderValue::from_static("http://127.0.0.1:3007"),
-        ])
+pub(crate) fn airdrop_cors_layer(frontend_url: &str) -> anyhow::Result<CorsLayer> {
+    let frontend_url = Url::parse(frontend_url)
+        .map_err(|error| anyhow::anyhow!("Invalid frontend URL: {error}"))?;
+    let frontend_origin = HeaderValue::from_str(&frontend_url.origin().ascii_serialization())
+        .map_err(|error| anyhow::anyhow!("Invalid frontend origin: {error}"))?;
+    let mut origins = vec![
+        HeaderValue::from_static("https://actonscan.com"),
+        HeaderValue::from_static("http://localhost:3007"),
+        HeaderValue::from_static("http://127.0.0.1:3007"),
+    ];
+    if !origins.contains(&frontend_origin) {
+        origins.push(frontend_origin);
+    }
+
+    Ok(CorsLayer::new()
+        .allow_origin(origins)
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
         .allow_headers([
             CONTENT_TYPE,
             AUTHORIZATION,
             DEVICE_UID_HEADER,
             ACTON_CLIENT_HEADER,
-        ])
+        ]))
 }
 
 #[cfg(test)]
@@ -100,7 +110,10 @@ mod tests {
         let app = Router::new()
             .route("/challenge", post(|| async { "ok" }))
             .route_layer(middleware::from_fn(always_rate_limited))
-            .layer(airdrop_cors_layer());
+            .layer(
+                airdrop_cors_layer("https://actonscan.com/faucet")
+                    .expect("valid CORS configuration"),
+            );
         let request = Request::builder()
             .method(Method::OPTIONS)
             .uri("/challenge")
@@ -144,7 +157,10 @@ mod tests {
     async fn rejects_unknown_browser_origin() {
         let app = Router::new()
             .route("/challenge", post(|| async { "ok" }))
-            .layer(airdrop_cors_layer());
+            .layer(
+                airdrop_cors_layer("https://actonscan.com/faucet")
+                    .expect("valid CORS configuration"),
+            );
         let request = Request::builder()
             .method(Method::OPTIONS)
             .uri("/challenge")
@@ -161,6 +177,31 @@ mod tests {
                 .headers()
                 .get(ACCESS_CONTROL_ALLOW_ORIGIN)
                 .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn allows_configured_frontend_origin() {
+        let app = Router::new()
+            .route("/auth/exchange", post(|| async { "ok" }))
+            .layer(
+                airdrop_cors_layer("https://staging.example.com/faucet?network=testnet")
+                    .expect("valid CORS configuration"),
+            );
+        let request = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/auth/exchange")
+            .header(ORIGIN, "https://staging.example.com")
+            .header(ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "https://staging.example.com"
         );
     }
 }

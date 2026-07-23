@@ -2,7 +2,7 @@ use anyhow::Context;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use faucet_config::{GitHubAuthConfig, GitHubTierConfig};
-use faucet_valkey::ValkeyStore;
+use faucet_valkey::{CappedEphemeralStoreDecision, ValkeyStore};
 use rand::RngCore;
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,7 @@ const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
 const GITHUB_USER_URL: &str = "https://api.github.com/user";
 const GITHUB_API_VERSION: &str = "2022-11-28";
 const OAUTH_STATE_KEY_PREFIX: &str = "faucet:github:oauth-state";
+const OAUTH_STATE_INDEX_KEY: &str = "faucet:github:oauth-state:index";
 const GRANT_KEY_PREFIX: &str = "faucet:github:grant";
 const SESSION_KEY_PREFIX: &str = "faucet:github:session";
 
@@ -24,9 +25,10 @@ pub(crate) struct GitHubAuth {
     client: Client,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum FaucetTier {
+    #[default]
     Guest,
     Verified,
     Established,
@@ -37,10 +39,17 @@ pub(crate) enum FaucetTier {
 pub(crate) struct GitHubIdentity {
     pub(crate) github_user_id: u64,
     pub(crate) login: String,
+    #[serde(default)]
     pub(crate) tier: FaucetTier,
+    #[serde(default)]
     pub(crate) max_requests: u32,
+    #[serde(default)]
     pub(crate) account_age_days: u64,
+    #[serde(default)]
+    pub(crate) account_created_at: Option<i64>,
+    #[serde(default)]
     pub(crate) public_repos: u32,
+    #[serde(default)]
     pub(crate) followers: u32,
 }
 
@@ -86,6 +95,7 @@ pub(crate) struct SessionExchange {
 #[derive(Debug)]
 pub(crate) enum AuthError {
     Disabled,
+    CapacityReached,
     InvalidAuthorization,
     InvalidSession,
     Internal(anyhow::Error),
@@ -95,6 +105,9 @@ impl std::fmt::Display for AuthError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Disabled => formatter.write_str("GitHub authentication is disabled"),
+            Self::CapacityReached => {
+                formatter.write_str("Too many recent GitHub authorization attempts")
+            }
             Self::InvalidAuthorization => {
                 formatter.write_str("Invalid or expired GitHub authorization")
             }
@@ -110,7 +123,10 @@ impl std::error::Error for AuthError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Internal(error) => Some(error.as_ref()),
-            Self::Disabled | Self::InvalidAuthorization | Self::InvalidSession => None,
+            Self::Disabled
+            | Self::CapacityReached
+            | Self::InvalidAuthorization
+            | Self::InvalidSession => None,
         }
     }
 }
@@ -160,10 +176,12 @@ impl GitHubAuth {
             device_uid: device_uid.to_string(),
             pkce_verifier,
         };
-        self.store_json(
+        self.store_capped_json(
+            OAUTH_STATE_INDEX_KEY,
             &ephemeral_key(OAUTH_STATE_KEY_PREFIX, &state),
             &oauth_state,
             self.config.state_ttl_seconds,
+            self.config.oauth_max_pending_states,
         )
         .await?;
 
@@ -189,6 +207,8 @@ impl GitHubAuth {
                 AuthError::InvalidAuthorization,
             )
             .await?;
+        // Keep the hashed index member until the state TTL expires. This makes
+        // the cap a global start window that a bogus callback cannot recycle.
         let access_token = self
             .exchange_github_code(code, &oauth_state.pkce_verifier)
             .await?;
@@ -223,11 +243,12 @@ impl GitHubAuth {
             return Err(AuthError::InvalidAuthorization);
         }
 
+        let identity = self.refresh_identity(grant.identity);
         let token = random_token();
         let expires_at = Utc::now().timestamp() + self.config.session_ttl_seconds as i64;
         let session = BrowserSession {
             device_uid: grant.device_uid,
-            identity: grant.identity.clone(),
+            identity: identity.clone(),
             expires_at,
         };
         self.store_json(
@@ -239,7 +260,7 @@ impl GitHubAuth {
 
         Ok(SessionExchange {
             token,
-            identity: grant.identity,
+            identity,
             expires_at,
         })
     }
@@ -262,7 +283,7 @@ impl GitHubAuth {
         if session.device_uid != device_uid || session.expires_at <= Utc::now().timestamp() {
             return Err(AuthError::InvalidSession);
         }
-        Ok(session.identity)
+        Ok(self.refresh_identity(session.identity))
     }
 
     pub(crate) async fn delete_session(&self, token: &str) -> Result<(), AuthError> {
@@ -357,28 +378,20 @@ impl GitHubAuth {
             .signed_duration_since(profile.created_at)
             .num_days()
             .max(0) as u64;
-        let tier = evaluate_tier(
-            account_age_days,
-            profile.public_repos,
-            profile.followers,
-            &self.config.verified,
-            &self.config.established,
-        );
-        let max_requests = match tier {
-            FaucetTier::Guest => 0,
-            FaucetTier::Verified => self.config.verified.max_requests,
-            FaucetTier::Established => self.config.established.max_requests,
-        };
-
-        GitHubIdentity {
+        self.refresh_identity(GitHubIdentity {
             github_user_id: profile.id,
             login: profile.login,
-            tier,
-            max_requests,
+            tier: FaucetTier::Guest,
+            max_requests: 0,
             account_age_days,
+            account_created_at: Some(profile.created_at.timestamp()),
             public_repos: profile.public_repos,
             followers: profile.followers,
-        }
+        })
+    }
+
+    fn refresh_identity(&self, identity: GitHubIdentity) -> GitHubIdentity {
+        refresh_identity(identity, &self.config.verified, &self.config.established)
     }
 
     async fn store_json<T: Serialize>(
@@ -393,6 +406,26 @@ impl GitHubAuth {
             .await
             .context("Failed to store GitHub auth state")
             .map_err(Into::into)
+    }
+
+    async fn store_capped_json<T: Serialize>(
+        &self,
+        index_key: &str,
+        key: &str,
+        value: &T,
+        ttl_seconds: u64,
+        max_entries: u64,
+    ) -> Result<(), AuthError> {
+        let value = serde_json::to_string(value).context("Failed to encode GitHub auth state")?;
+        match self
+            .valkey
+            .store_capped_ephemeral(index_key, key, &value, ttl_seconds, max_entries)
+            .await
+            .context("Failed to store capped GitHub auth state")?
+        {
+            CappedEphemeralStoreDecision::Stored => Ok(()),
+            CappedEphemeralStoreDecision::Full => Err(AuthError::CapacityReached),
+        }
     }
 
     async fn take_json<T: for<'de> Deserialize<'de>>(
@@ -410,6 +443,34 @@ impl GitHubAuth {
             .context("Failed to decode GitHub auth state")
             .map_err(Into::into)
     }
+}
+
+fn refresh_identity(
+    mut identity: GitHubIdentity,
+    verified: &GitHubTierConfig,
+    established: &GitHubTierConfig,
+) -> GitHubIdentity {
+    if let Some(created_at) = identity.account_created_at
+        && let Some(created_at) = DateTime::from_timestamp(created_at, 0)
+    {
+        identity.account_age_days = Utc::now()
+            .signed_duration_since(created_at)
+            .num_days()
+            .max(0) as u64;
+    }
+    identity.tier = evaluate_tier(
+        identity.account_age_days,
+        identity.public_repos,
+        identity.followers,
+        verified,
+        established,
+    );
+    identity.max_requests = match identity.tier {
+        FaucetTier::Guest => 0,
+        FaucetTier::Verified => verified.max_requests,
+        FaucetTier::Established => established.max_requests,
+    };
+    identity
 }
 
 fn evaluate_tier(
@@ -469,9 +530,11 @@ fn frontend_redirect_url(base_url: &str, parameter: &str, value: &str) -> anyhow
 #[cfg(test)]
 mod tests {
     use faucet_config::GitHubTierConfig;
+    use serde_json::json;
 
     use super::{
-        FaucetTier, ephemeral_key, evaluate_tier, frontend_redirect_url, validate_redirect_url,
+        FaucetTier, GitHubIdentity, ephemeral_key, evaluate_tier, frontend_redirect_url,
+        refresh_identity, validate_redirect_url,
     };
 
     fn tier(max_requests: u32, age: u64, repos: u32, followers: u32) -> GitHubTierConfig {
@@ -528,5 +591,41 @@ mod tests {
                 .unwrap();
 
         assert_eq!(redirect, "https://actonscan.com/faucet#github_grant=secret");
+    }
+
+    #[test]
+    fn refreshes_stored_tier_and_quota_from_current_config() {
+        let identity = GitHubIdentity {
+            github_user_id: 42,
+            login: "octocat".to_string(),
+            tier: FaucetTier::Established,
+            max_requests: 8,
+            account_age_days: 400,
+            account_created_at: None,
+            public_repos: 5,
+            followers: 5,
+        };
+        let verified = tier(3, 90, 2, 0);
+        let established = tier(4, 500, 10, 10);
+
+        let identity = refresh_identity(identity, &verified, &established);
+
+        assert_eq!(identity.tier, FaucetTier::Verified);
+        assert_eq!(identity.max_requests, 3);
+    }
+
+    #[test]
+    fn safely_deserializes_sessions_created_before_profile_signal_fields() {
+        let identity: GitHubIdentity = serde_json::from_value(json!({
+            "githubUserId": 42,
+            "login": "octocat"
+        }))
+        .unwrap();
+
+        assert_eq!(identity.tier, FaucetTier::Guest);
+        assert_eq!(identity.max_requests, 0);
+        assert_eq!(identity.account_created_at, None);
+        assert_eq!(identity.public_repos, 0);
+        assert_eq!(identity.followers, 0);
     }
 }

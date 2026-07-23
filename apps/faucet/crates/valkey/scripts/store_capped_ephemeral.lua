@@ -15,6 +15,12 @@ if not stored then
 end
 
 redis.call("ZADD", KEYS[1], now_ms + ttl_seconds * 1000, KEYS[2])
-redis.call("EXPIRE", KEYS[1], ttl_seconds)
+
+local latest = redis.call("ZREVRANGE", KEYS[1], 0, 0, "WITHSCORES")
+if latest[2] then
+    -- Keep the index at least as long as its longest-lived value. The extra
+    -- second covers the small gap between TIME and SET's expiry timestamp.
+    redis.call("PEXPIREAT", KEYS[1], math.ceil(tonumber(latest[2])) + 1000)
+end
 
 return 1

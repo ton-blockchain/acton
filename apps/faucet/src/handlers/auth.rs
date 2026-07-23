@@ -258,6 +258,10 @@ fn auth_error(error: AuthError) -> AuthHttpError {
             StatusCode::SERVICE_UNAVAILABLE,
             "GitHub authentication is disabled",
         ),
+        AuthError::CapacityReached => response_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many recent GitHub authorization attempts",
+        ),
         AuthError::InvalidAuthorization | AuthError::InvalidSession => response_error(
             StatusCode::UNAUTHORIZED,
             "Invalid or expired GitHub session",
