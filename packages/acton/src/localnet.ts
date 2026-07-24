@@ -1,8 +1,5 @@
 import {Buffer} from "node:buffer"
 import type {ChildProcess} from "node:child_process"
-import {mkdtempSync, rmSync} from "node:fs"
-import {tmpdir} from "node:os"
-import path from "node:path"
 import process from "node:process"
 
 import {
@@ -32,23 +29,18 @@ import {LocalnetContractProvider} from "./provider.js"
 import {LocalnetSender} from "./sender.js"
 import {toContractState} from "./state.js"
 import {legacyJsonToTupleItem, tupleItemToLegacyJson} from "./stack.js"
-import {registerAfterAll, registerAfterEach} from "./test-lifecycle.js"
 import type {
   AccountInfoResult,
   CloseLocalnetOptions,
-  EmulateTraceResult,
   LocalnetAccountStateChange,
   LocalnetApiCallLog,
   LocalnetClockInfo,
   LocalnetCompilerAbiRegistration,
-  LocalnetCoverageRecord,
   LocalnetExtendedContractAbi,
   LocalnetMineResult,
   LocalnetNodeInfo,
   LocalnetNetworkConditions,
   LocalnetNetworkConditionsOptions,
-  LocalnetTraceRecord,
-  LocalnetTreasuryRecord,
   LocalnetOptions,
   LocalnetRecoveryPointResult,
   LocalnetStartupWallet,
@@ -73,12 +65,8 @@ export class Localnet {
   readonly endpoint: string
 
   private readonly child?: ChildProcess
-  private readonly coverageRecords: LocalnetCoverageRecord[] = []
-  private readonly traceRecords: LocalnetTraceRecord[] = []
-  private readonly treasuryRecords = new Map<string, LocalnetTreasuryRecord>()
   private readonly http: LocalnetHttpClient
   private unregisterAutoClose?: () => void
-  private unregisterAutoReset?: () => void
 
   constructor(options: LocalnetOptions = {}, child?: ChildProcess, autoClose = false) {
     this.endpoint = normalizeEndpoint(options.endpoint ?? "http://127.0.0.1:5411")
@@ -104,12 +92,6 @@ export class Localnet {
       timeoutMs: options.startupTimeoutMs,
       pollIntervalMs: options.pollIntervalMs,
     })
-    if (options.autoClose ?? true) {
-      await localnet.enableTestAutoClose()
-    }
-    if (options.autoReset ?? true) {
-      await localnet.enableAutoReset()
-    }
     return localnet
   }
 
@@ -132,10 +114,6 @@ export class Localnet {
 
   treasury(name: string, workchain = 0): LocalnetSender {
     const address = addressFromSeed(name, workchain)
-    this.treasuryRecords.set(`${workchain}:${name}`, {
-      address: formatAddress(address),
-      name,
-    })
     return this.sender(address)
   }
 
@@ -169,8 +147,6 @@ export class Localnet {
   }
 
   async close(options: CloseLocalnetOptions = {}): Promise<void> {
-    this.unregisterAutoReset?.()
-    this.unregisterAutoReset = undefined
     this.unregisterAutoClose?.()
     this.unregisterAutoClose = undefined
 
@@ -184,13 +160,7 @@ export class Localnet {
   }
 
   async sendBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
-    const encoded = encodeBoc(boc)
-
-    if (this.collectCoverage() || this.collectTraces()) {
-      await this.captureMessageDiagnostics(encoded)
-    }
-
-    return this.http.postJson<SendBocResult>("/api/v2/sendBocReturnHash", {boc: encoded})
+    return this.http.postJson<SendBocResult>("/api/v2/sendBocReturnHash", {boc: encodeBoc(boc)})
   }
 
   async sendMessage(message: Message): Promise<SendBocResult> {
@@ -439,7 +409,6 @@ export class Localnet {
     name: string | number,
     args: readonly TupleItem[],
   ): Promise<ContractGetMethodResult> {
-    const coverageState = this.collectCoverage() ? await this.getAccountState(address) : undefined
     const result = await this.http.postJson<RunGetMethodResult>("/api/v2/runGetMethod", {
       address: formatAddress(address),
       method: name,
@@ -450,89 +419,11 @@ export class Localnet {
       throw new ActonError(`Get method ${String(name)} failed with exit code ${result.exit_code}`)
     }
 
-    if (coverageState?.state.type === "active" && coverageState.state.code && result.vm_log) {
-      this.coverageRecords.push({
-        code: coverageState.state.code.toString("base64"),
-        vmLog: result.vm_log,
-      })
-    }
-
     return {
       stack: new TupleReader(result.stack.map(item => legacyJsonToTupleItem(item))),
       gasUsed: result.gas_used === undefined ? undefined : BigInt(result.gas_used),
       logs: result.vm_log,
     }
-  }
-
-  consumeCoverageRecords(): readonly LocalnetCoverageRecord[] {
-    const records = [...this.coverageRecords]
-    this.coverageRecords.length = 0
-    return records
-  }
-
-  consumeTraceRecords(): readonly LocalnetTraceRecord[] {
-    const records = [...this.traceRecords]
-    this.traceRecords.length = 0
-    return records
-  }
-
-  consumeTreasuryRecords(): readonly LocalnetTreasuryRecord[] {
-    const records = [...this.treasuryRecords.values()]
-    this.treasuryRecords.clear()
-    return records
-  }
-
-  private collectCoverage(): boolean {
-    return process.env.ACTON_NODE_COVERAGE === "1"
-  }
-
-  private collectTraces(): boolean {
-    return process.env.ACTON_NODE_TRACE === "1"
-  }
-
-  private async captureMessageDiagnostics(boc: string): Promise<void> {
-    const result = await this.http.postRawJson<EmulateTraceResult>("/api/emulate/v1/emulateTrace", {
-      boc,
-      include_code_data: true,
-    })
-
-    if (this.collectTraces()) {
-      this.traceRecords.push(...(result.acton_trace_records ?? []))
-    }
-
-    if (this.collectCoverage() && result.vm_log) {
-      for (const code of Object.values(result.code_cells ?? {})) {
-        this.coverageRecords.push({code, vmLog: result.vm_log})
-      }
-    }
-  }
-
-  private async enableAutoReset(): Promise<void> {
-    const snapshot = createStateSnapshotPath()
-    let active = true
-
-    const registered = await registerAfterEach(async () => {
-      if (active) {
-        await this.loadState(snapshot.path)
-      }
-    })
-
-    if (!registered) {
-      snapshot.cleanup()
-      return
-    }
-
-    await this.dumpState(snapshot.path)
-    this.unregisterAutoReset = () => {
-      active = false
-      snapshot.cleanup()
-    }
-  }
-
-  private async enableTestAutoClose(): Promise<void> {
-    await registerAfterAll(async () => {
-      await this.close()
-    })
   }
 }
 
@@ -631,14 +522,4 @@ function terminateChild(
       finish()
     }
   })
-}
-
-function createStateSnapshotPath(): {readonly path: string; readonly cleanup: () => void} {
-  const directory = mkdtempSync(path.join(tmpdir(), "acton-localnet-state-"))
-  return {
-    path: path.join(directory, "initial-state.json"),
-    cleanup: () => {
-      rmSync(directory, {force: true, recursive: true})
-    },
-  }
 }

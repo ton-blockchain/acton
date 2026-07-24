@@ -9,23 +9,17 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./test": {
-      "types": "./dist/test.d.ts",
-      "import": "./dist/test.js"
     }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "acton-test-worker": "./dist/test-worker.js"
-  },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "bun run clean && tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",

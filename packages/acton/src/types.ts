@@ -26,7 +26,6 @@ export type StartLocalnetOptions = {
   readonly pollIntervalMs?: number
   readonly stdio?: "ignore" | "inherit"
   readonly autoClose?: boolean
-  readonly autoReset?: boolean
 }
 
 export type WaitUntilReadyOptions = {
@@ -199,31 +198,4 @@ export type RunGetMethodResult = {
 
 export type RawTransaction = {
   readonly data: string
-}
-
-export type LocalnetCoverageRecord = {
-  readonly code: string
-  readonly vmLog: string
-}
-
-export type LocalnetTraceRecord = {
-  readonly rawTransaction: string
-  readonly shardAccountBefore: string
-  readonly shardAccount: string
-  readonly parentTransaction?: number
-  readonly code?: string
-  readonly vmLog: string
-  readonly executorLogs?: string
-  readonly actions?: string
-}
-
-export type LocalnetTreasuryRecord = {
-  readonly address: string
-  readonly name: string
-}
-
-export type EmulateTraceResult = {
-  readonly acton_trace_records?: readonly LocalnetTraceRecord[]
-  readonly code_cells?: Readonly<Record<string, string>>
-  readonly vm_log?: string
 }

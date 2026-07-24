@@ -13,9 +13,6 @@
     "packages/acton": {
       "name": "@ton/acton",
       "version": "0.0.0",
-      "bin": {
-        "acton-test-worker": "./dist/test-worker.js",
-      },
       "dependencies": {
         "@ton/core": "0.62.0",
       },

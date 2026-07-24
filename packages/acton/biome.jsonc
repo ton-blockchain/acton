@@ -61,17 +61,5 @@
         "useAwait": "off"
       }
     }
-  },
-  "overrides": [
-    {
-      "includes": ["examples/**"],
-      "linter": {
-        "rules": {
-          "correctness": {
-            "noUndeclaredDependencies": "off"
-          }
-        }
-      }
-    }
-  ]
+  }
 }
