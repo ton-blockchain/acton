@@ -24,6 +24,7 @@ import type {
   V3BlocksResponse,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
+  V3TransactionDetailsResponse,
   V3TracesResponse,
   V3TransactionsResponse,
   VerificationSourceResponse,
@@ -513,6 +514,13 @@ export class TonClient {
       url.searchParams.append("include_actions", "true")
     }
     return this.request(url, "Failed to fetch traces")
+  }
+
+  async getTransactionByHash(hash: string): Promise<V3TransactionDetailsResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/transactions")
+    url.searchParams.append("hash", hash)
+    url.searchParams.append("limit", "1")
+    return this.request(url, "Failed to fetch transaction")
   }
 
   async getAccountActions(

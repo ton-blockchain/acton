@@ -11,7 +11,8 @@ export async function waitForTraceTransactionHash(
 
     try {
       const response = await client.getTracesByMessageHash(msgHash)
-      const txHash = response.traces[0]?.trace.tx_hash ?? response.traces[0]?.transactions_order[0]
+      const trace = response.traces[0]
+      const txHash = trace?.trace?.tx_hash ?? trace?.transactions_order?.[0]
       if (txHash) {
         return txHash
       }

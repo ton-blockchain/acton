@@ -985,6 +985,11 @@ export interface V3TransactionsResponse {
   readonly transactions: readonly V3TransactionListItem[]
 }
 
+export interface V3TransactionDetailsResponse {
+  readonly address_book: Record<string, V3AddressBookRow>
+  readonly transactions: readonly V3Transaction[]
+}
+
 export interface V3BlockId {
   readonly workchain: number
   readonly shard: string
@@ -1187,10 +1192,11 @@ export interface V3Trace {
   readonly end_lt: string
   readonly end_utime: number
   readonly is_incomplete: boolean
-  readonly trace: V3TraceNode
-  readonly transactions: Record<string, V3Transaction>
-  readonly transactions_order: readonly string[]
+  readonly trace?: V3TraceNode
+  readonly transactions?: Record<string, V3Transaction>
+  readonly transactions_order?: readonly string[]
   readonly actions?: readonly V3Action[]
+  readonly warning?: string
   readonly trace_info: {
     readonly transactions: number
     readonly messages: number
@@ -1198,6 +1204,12 @@ export interface V3Trace {
     readonly trace_state: string
     readonly classification_state: string
   }
+}
+
+export interface V3CompleteTrace extends V3Trace {
+  readonly trace: V3TraceNode
+  readonly transactions: Record<string, V3Transaction>
+  readonly transactions_order: readonly string[]
 }
 
 export interface V3TraceNode {

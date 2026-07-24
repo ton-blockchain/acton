@@ -40,6 +40,25 @@
   max-width: 1400px;
 }
 
+.traceWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 32%, var(--acton-color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--acton-color-warning) 8%, var(--acton-color-surface-raised));
+  color: var(--acton-color-warning-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.traceWarning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--acton-color-warning);
+}
+
 .overviewCard {
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);

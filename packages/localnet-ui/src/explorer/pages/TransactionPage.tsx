@@ -309,6 +309,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [traceActions, setTraceActions] = useState<readonly V3Action[]>([])
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
   const [traceOverview, setTraceOverview] = useState<TraceOverviewData | undefined>()
+  const [traceWarning, setTraceWarning] = useState<string | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
   const [stateChangesStatus, setStateChangesStatus] = useState<{
     readonly traceHash?: string
@@ -515,6 +516,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setTraceActions([])
       setTraceActionMetadata({})
       setTraceOverview(undefined)
+      setTraceWarning(undefined)
       setHoveredAction(undefined)
       try {
         const data = await client.getTraces(traceLookupHash, {
@@ -525,7 +527,24 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
-          const transactionsMap = trace.transactions
+          let transactionsMap = trace.transactions
+          if (!transactionsMap || Object.keys(transactionsMap).length === 0) {
+            const transactionData = await client.getTransactionByHash(traceLookupHash)
+            if (!isActive) return
+
+            const transaction = transactionData.transactions[0]
+            if (!transaction) {
+              throw new Error(trace.warning ?? "Transaction data is unavailable.")
+            }
+
+            transactionsMap = {[transaction.hash]: transaction}
+            updateDomains(transactionData.address_book)
+            setTraceWarning(
+              trace.warning
+                ? `Full trace is unavailable: ${trace.warning}. Showing the requested transaction only.`
+                : "Full trace data is unavailable. Showing the requested transaction only.",
+            )
+          }
           const processed = buildTraceTransactionInfos(transactionsMap, trace.trace)
           const actions = trace.actions ?? []
           const enrichment = await enrichTraceTransactions({
@@ -720,6 +739,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       traceActions={traceActions}
       traceActionMetadata={traceActionMetadata}
       traceOverview={traceOverview}
+      traceWarning={traceWarning}
       hoveredAction={hoveredAction}
       nowSeconds={nowSeconds}
       breadcrumbs={[
@@ -768,6 +788,7 @@ export interface TransactionTraceViewProps {
   readonly traceActions?: readonly V3Action[]
   readonly traceActionMetadata?: V3Metadata
   readonly traceOverview?: TraceOverviewData
+  readonly traceWarning?: string
   readonly statusLabels?: {
     readonly success: string
     readonly error: string
@@ -810,6 +831,7 @@ export function TransactionTraceView({
   traceActions = [],
   traceActionMetadata = {},
   traceOverview,
+  traceWarning,
   statusLabels = {
     success: "Confirmed transaction",
     error: "Failed transaction",
@@ -901,6 +923,12 @@ export function TransactionTraceView({
         {traces.length > 0 && firstTrace && (
           <>
             {breadcrumbs && <ExplorerBreadcrumbs items={breadcrumbs} />}
+            {traceWarning && (
+              <div className={styles.traceWarning} role="status">
+                <AlertCircle size={18} aria-hidden="true" />
+                <span>{traceWarning}</span>
+              </div>
+            )}
             <div className={styles.preTreeContent}>
               <div className={styles.overviewCard}>
                 <div className={styles.overviewHeader}>

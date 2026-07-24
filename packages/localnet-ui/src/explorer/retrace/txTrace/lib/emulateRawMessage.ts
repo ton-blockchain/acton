@@ -11,7 +11,7 @@ import type {
 import type {TransactionInfo} from "@acton/transaction-ui"
 
 import {buildTraceTransactionInfos} from "../../../api/traceTransactions"
-import type {V3Message, V3Trace, V3TraceNode, V3Transaction} from "../../../api/types"
+import type {V3CompleteTrace, V3Message, V3TraceNode, V3Transaction} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {RetraceResultAndCode} from "./types"
 import {extractCodeAndTrace, getRetraceNetworkConfig} from "./traceTx"
@@ -23,7 +23,7 @@ export type RawMessageEmulationOptions = Pick<
 
 export interface RawMessageEmulationResult {
   readonly result: CoreEmulateRawMessageResult
-  readonly trace: V3Trace
+  readonly trace: V3CompleteTrace
   readonly transactions: readonly TransactionInfo[]
   readonly retraceResultsByHash: ReadonlyMap<string, RetraceResultAndCode>
 }
@@ -64,7 +64,7 @@ export async function emulateRawMessageBoc(
   }
 }
 
-function normalizeEmulatedTrace(trace: EmulatedTrace): V3Trace {
+function normalizeEmulatedTrace(trace: EmulatedTrace): V3CompleteTrace {
   return {
     ...trace,
     trace: normalizeTraceNode(trace.trace),

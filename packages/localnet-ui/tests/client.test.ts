@@ -239,6 +239,44 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("transaction lookup requests one full transaction by hash", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({transactions: [{hash: "transaction-hash"}], address_book: {}})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    const result = await client.getTransactionByHash("requested-hash")
+
+    expect({
+      request: requests[0]?.toString(),
+      result,
+    }).toMatchInlineSnapshot(`
+      {
+        "request": "https://toncenter.example/api/v3/transactions?hash=requested-hash&limit=1",
+        "result": {
+          "address_book": {},
+          "transactions": [
+            {
+              "hash": "transaction-hash",
+            },
+          ],
+        },
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("NFT metadata preserves scam flags and excludes flagged or registered NSFW items", async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = mock(async () =>
