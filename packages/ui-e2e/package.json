@@ -13,6 +13,7 @@
     "lint:fix": "biome check --formatter-enabled=false --write ."
   },
   "devDependencies": {
-    "@playwright/test": "1.59.0"
+    "@playwright/test": "1.59.0",
+    "@tonconnect/sdk": "3.4.1"
   }
 }

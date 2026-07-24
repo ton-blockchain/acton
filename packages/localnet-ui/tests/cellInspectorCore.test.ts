@@ -1,5 +1,5 @@
 import {describe, expect, test} from "bun:test"
-import {beginCell, Cell, storeStateInit} from "@ton/core"
+import {beginCell, Cell, Dictionary, storeStateInit} from "@ton/core"
 import {Buffer} from "buffer"
 
 import {
@@ -7,11 +7,17 @@ import {
   describeCellForest,
   ENCRYPTED_COMMENT_OPCODE,
   normalizeCellInput,
+  parseBlockMetadata,
   parseBlockTlb,
   recognizeStandardComment,
   toSerializable,
   tryParseCustomTlb,
 } from "../src/explorer/cell-inspector"
+import {
+  type Block,
+  type CurrencyCollection,
+  storeBlock,
+} from "../src/explorer/cell-inspector/block.tlb.generated"
 
 describe("cell inspector input", () => {
   const cell = beginCell().storeUint(0x12_34, 16).endCell()
@@ -124,6 +130,88 @@ describe("standard comments", () => {
 })
 
 describe("semantic helpers", () => {
+  test("extracts software and collected fees from a canonical block", () => {
+    const emptyCurrency: CurrencyCollection = {
+      kind: "CurrencyCollection",
+      grams: 0n,
+      other: {kind: "ExtraCurrencyCollection", dict: Dictionary.empty()},
+    }
+    const block: Block = {
+      kind: "Block",
+      global_id: -239,
+      info: {
+        kind: "BlockInfo",
+        version: 0,
+        not_master: 0,
+        after_merge: 0,
+        before_split: 0,
+        after_split: 0,
+        want_split: {kind: "Bool", value: false},
+        want_merge: {kind: "Bool", value: false},
+        key_block: {kind: "Bool", value: false},
+        vert_seqno_incr: 0,
+        flags: 1,
+        seq_no: 81_088_003,
+        vert_seq_no: 1,
+        shard: {
+          kind: "ShardIdent",
+          shard_pfx_bits: 0,
+          workchain_id: -1,
+          shard_prefix: 0x8000_0000_0000_0000n,
+        },
+        gen_utime: 1_783_961_264,
+        start_lt: 1n,
+        end_lt: 2n,
+        gen_validator_list_hash_short: 0,
+        gen_catchain_seqno: 1,
+        min_ref_mc_seqno: 81_088_002,
+        prev_key_block_seqno: 81_075_222,
+        gen_software: {kind: "GlobalVersion", version: 15, capabilities: 1006n},
+        master_ref: undefined,
+        prev_ref: {
+          kind: "BlkPrevInfo_prev_blk_info",
+          prev: {
+            kind: "ExtBlkRef",
+            end_lt: 0n,
+            seq_no: 81_088_002,
+            root_hash: Buffer.alloc(32),
+            file_hash: Buffer.alloc(32),
+          },
+        },
+        prev_vert_ref: undefined,
+      },
+      value_flow: {
+        kind: "ValueFlow_value_flow",
+        from_prev_blk: emptyCurrency,
+        to_next_blk: emptyCurrency,
+        imported: emptyCurrency,
+        exported: emptyCurrency,
+        fees_collected: {...emptyCurrency, grams: 2_700_000_000n},
+        fees_imported: emptyCurrency,
+        recovered: emptyCurrency,
+        created: emptyCurrency,
+        minted: emptyCurrency,
+      },
+      state_update: beginCell().endCell(),
+      extra: {
+        kind: "BlockExtra",
+        in_msg_descr: {kind: "InMsgDescr", anon0: Dictionary.empty()},
+        out_msg_descr: {kind: "OutMsgDescr", anon0: Dictionary.empty()},
+        account_blocks: {kind: "ShardAccountBlocks", anon0: Dictionary.empty()},
+        rand_seed: Buffer.alloc(32),
+        created_by: Buffer.alloc(32),
+        custom: {kind: "Maybe_nothing"},
+      },
+    }
+    const cell = beginCell().store(storeBlock(block)).endCell()
+
+    expect(parseBlockMetadata(cell)).toEqual({
+      genSoftwareVersion: 15,
+      genSoftwareCapabilities: 1006n,
+      feesCollected: 2_700_000_000n,
+    })
+  })
+
   test("parses a raw OutList BoC", () => {
     const bocHex =
       "b5ee9c720102070100010500020a0ec3c86d5001020000026162002aef29b142b4239f0d70edb653da95568b394f6da9c2ef92ad64e546dba508e20000000000000000000000000003c0030602013404050842028f452d7a4dfd74066b682365177259ed05734435be76b5fd4bd5d8af2b7c3d68008700800415d66e65d7160a8e2a1b344e2f09454ef19b569454fd5e36f14958df1e9b247002c44ea652d4092859c67da44e4ca3add6565b0e2897d640a2c51bfb370d8877fa00a9178d45190000000000000000402625a008011ac445debca569067cf73f05b9545361d0dd2c5bad6549bafb73bad27e85c7db00235888bbd794ad20cf9ee7e0b72a8a6c3a1ba58b75aca9375f6e775a4fd0b8fb4405"

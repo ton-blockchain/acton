@@ -1,0 +1,30 @@
+{
+  "dump": {
+    "output": "Dumped localnet state to [ROOT]/state.json",
+    "seqno": 1,
+    "state_head_seqno": 1
+  },
+  "load": {
+    "balance": "1000000000000000000",
+    "checkpoints": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": []
+    },
+    "output": "Loaded localnet state from [ROOT]/state.json",
+    "seqno": 1
+  },
+  "mutate": {
+    "balance": "1000000000",
+    "checkpoint": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "name": "cleared-on-load"
+      }
+    },
+    "fund_ok": true,
+    "seqno": 2
+  }
+}

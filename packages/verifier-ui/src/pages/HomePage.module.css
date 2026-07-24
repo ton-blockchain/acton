@@ -1,0 +1,128 @@
+.inputPage {
+  padding: var(--acton-space-6);
+  height: 100%;
+  min-height: calc(100dvh - 52px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+}
+
+.centeredInputContainer {
+  width: 100%;
+  max-width: 720px;
+  margin: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 clamp(96px, 14vh, 152px);
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-4);
+  margin-bottom: var(--acton-space-8);
+}
+
+.logoTitle {
+  font-size: 2.5rem;
+  font-weight: var(--acton-font-weight-bold);
+  color: var(--acton-color-text);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.32em;
+  row-gap: var(--acton-space-1);
+  line-height: 1.1;
+}
+
+.logoTitleAccent {
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(89deg, #2b82eb, #1cc8ff);
+  background-clip: text;
+  font-feature-settings:
+    "clig" off,
+    "liga" off;
+}
+
+.footer {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1;
+}
+
+.footer a {
+  color: var(--acton-color-text-muted);
+  text-decoration: none;
+  transition: color var(--acton-duration-fast);
+}
+
+.footerCredit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.footerBrand {
+  color: var(--acton-color-text);
+}
+
+.footerBy {
+  font-size: var(--acton-font-size-xs);
+  color: var(--acton-color-text-muted);
+}
+
+.footer .footerCreditLink {
+  color: var(--acton-color-accent);
+}
+
+.footer a:hover {
+  color: var(--acton-color-text);
+}
+
+.footer .footerCreditLink:hover {
+  color: var(--acton-color-accent);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 768px) {
+  .inputPage {
+    padding: 16px;
+  }
+
+  .logoTitle {
+    font-size: var(--acton-font-size-2xl);
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 0;
+  }
+}

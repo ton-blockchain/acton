@@ -19,7 +19,7 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import type {ExplorerRoutes} from "../hooks/explorerRoutesContext"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 
-import {formatAddress, hashToHex, parseAddress} from "./utils"
+import {formatAddress, hashToHex, parseAddress, parseTonDnsSearchQuery} from "./utils"
 import type {AddressFormatOptions} from "./utils"
 
 type ExplorerSearchVariant = "hero" | "header"
@@ -54,9 +54,8 @@ const MAX_BLOCK_NUMBER = 2_147_483_647
 const MIN_WORKCHAIN = -2_147_483_648
 const MAX_WORKCHAIN = 2_147_483_647
 const TONCENTER_BLOCK_ID_PATTERN = /^\(\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*\)$/i
-const TON_DNS_DOMAIN_PATTERN = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+ton$/i
 const INVALID_SEARCH_DESCRIPTION =
-  "Paste a valid TON address, .ton name, transaction hash, block ID, or ABI name."
+  "Paste a valid TON address, .ton or .t.me name, transaction hash, block ID, or ABI name."
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
 
 export const ExplorerSearch: FC<ExplorerSearchProps> = ({
@@ -304,11 +303,6 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
       value={input}
     />
   )
-}
-
-function parseTonDnsSearchQuery(value: string): string | undefined {
-  const domain = value.trim().toLowerCase()
-  return TON_DNS_DOMAIN_PATTERN.test(domain) ? domain : undefined
 }
 
 function resolveSearchTarget(

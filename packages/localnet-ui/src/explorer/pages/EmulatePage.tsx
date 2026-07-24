@@ -9,7 +9,9 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Send,
   SlidersHorizontal,
+  TriangleAlert,
   Trash2,
   WandSparkles,
 } from "lucide-react"
@@ -17,6 +19,8 @@ import {
   Button,
   Checkbox,
   ContentTabs,
+  CopyButton,
+  Dialog,
   InlineAction,
   InlineButton,
   Input,
@@ -26,7 +30,9 @@ import {
 import {
   AbiValueEditor,
   TonAddressInput,
+  abiMessageBuilderOptionMatchesName,
   buildAbiMessageBoc,
+  buildEmptyMessageBoc,
   buildAbiStorageDataBoc,
   createAbiMessageSymbols,
   createAbiStorageSymbols,
@@ -44,9 +50,17 @@ import {
   type TransactionInfo,
   type TonAddressSuggestion,
 } from "@acton/transaction-ui"
-import {useNavigate, useSearchParams} from "react-router-dom"
+import {useLocation, useNavigate, useSearchParams} from "react-router-dom"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Address, Cell, fromNano, loadShardAccount, toNano, type ShardAccount} from "@ton/core"
+import {
+  Address,
+  Cell,
+  fromNano,
+  loadMessage,
+  loadShardAccount,
+  toNano,
+  type ShardAccount,
+} from "@ton/core"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -54,8 +68,9 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-import {formatAddress, normalizeAddress} from "../components/utils"
+import {formatAddress, hashToHex} from "../components/utils"
 import type {TonClient} from "../api/client"
+import {waitForTraceTransactionHash} from "../api/waitForTraceTransactionHash"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -76,6 +91,11 @@ import {
   transactionHashHex,
 } from "./TransactionPage"
 import {
+  readEmulateNavigationPayload,
+  readStoredEmulateNavigationPayload,
+  type EmulateAbiEndpoint,
+} from "./emulateNavigation"
+import {
   enrichTraceTransactions,
   type TraceTransactionEnrichmentResult,
 } from "./transactionTraceEnrichment"
@@ -88,6 +108,7 @@ type StorageOverrideSource = "abi" | "raw"
 type TimeOverrideMode = "increase" | "timestamp"
 const EMULATE_ADDRESS_QUERY_PARAM = "address"
 const EMULATE_SOURCE_QUERY_PARAM = "source"
+const EMULATE_ABI_ENDPOINT_QUERY_PARAM = "abiEndpoint"
 const EMULATE_VALUE_QUERY_PARAM = "value"
 const EMULATE_BOUNCE_QUERY_PARAM = "bounce"
 const EMULATE_MC_SEQNO_QUERY_PARAM = "mcSeqno"
@@ -96,11 +117,13 @@ const EMULATE_TIME_MODE_QUERY_PARAM = "timeMode"
 const EMULATE_INCREASE_TIME_QUERY_PARAM = "increaseTime"
 const EMULATE_TIMESTAMP_QUERY_PARAM = "timestamp"
 const DEFAULT_MESSAGE_VALUE = "0.5"
+const EMPTY_MESSAGE_ID = "empty"
 const MAX_UINT32 = 0xff_ff_ff_ff
 
 interface EmulateSearchFields {
   readonly targetAddress: string
   readonly sourceAddress: string
+  readonly abiEndpoint: EmulateAbiEndpoint
   readonly messageValue: string
   readonly bounce: boolean
   readonly mcSeqnoInput: string
@@ -115,6 +138,8 @@ function readEmulateSearchFields(searchParams: URLSearchParams): EmulateSearchFi
   return {
     targetAddress: searchParams.get(EMULATE_ADDRESS_QUERY_PARAM) ?? "",
     sourceAddress: searchParams.get(EMULATE_SOURCE_QUERY_PARAM) ?? "",
+    abiEndpoint:
+      searchParams.get(EMULATE_ABI_ENDPOINT_QUERY_PARAM) === "source" ? "source" : "destination",
     messageValue: searchParams.get(EMULATE_VALUE_QUERY_PARAM) ?? DEFAULT_MESSAGE_VALUE,
     bounce: searchParams.get(EMULATE_BOUNCE_QUERY_PARAM) !== "false",
     mcSeqnoInput: searchParams.get(EMULATE_MC_SEQNO_QUERY_PARAM) ?? "",
@@ -132,6 +157,7 @@ function areEmulateSearchFieldsEqual(
   return (
     left.targetAddress === right.targetAddress &&
     left.sourceAddress === right.sourceAddress &&
+    left.abiEndpoint === right.abiEndpoint &&
     left.messageValue === right.messageValue &&
     left.bounce === right.bounce &&
     left.mcSeqnoInput === right.mcSeqnoInput &&
@@ -188,56 +214,83 @@ interface AccountStateOverrideDraft {
 }
 
 export function EmulatePage({client}: EmulatePageProps) {
-  const {network} = useNetworkInfo()
+  const {network, nodeInfo} = useNetworkInfo()
   const addressFormat = useAddressFormat()
   const {fetchName, getCachedName, prefetchNames} = useAddressBook()
   const {favorites} = useFavoriteAccounts()
   const metadataRegistry = useMetadataRegistry()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const routes = useExplorerRoutePaths()
-  const {showToast} = useToast()
-  const [inputMode, setInputMode] = useState<EmulateInputMode>("builder")
+  const {showToast, updateToast} = useToast()
+  const [navigationPayload] = useState(
+    () =>
+      readEmulateNavigationPayload(location.state) ??
+      readStoredEmulateNavigationPayload(searchParams),
+  )
+  const navigationBuilder =
+    navigationPayload?.inputMode === "builder" ? navigationPayload.builder : undefined
+  const [initialSearchFields] = useState(() => readEmulateSearchFields(searchParams))
+  const [initialArgsFormValue] = useState<unknown>(() =>
+    navigationBuilder ? parseAbiJson(navigationBuilder.argsJson, {}) : undefined,
+  )
+  const [inputMode, setInputMode] = useState<EmulateInputMode>(
+    () => navigationPayload?.inputMode ?? "builder",
+  )
   const [targetAddress, setTargetAddress] = useState(
-    () => readEmulateSearchFields(searchParams).targetAddress,
+    () => navigationPayload?.targetAddress ?? initialSearchFields.targetAddress,
   )
   const [sourceAddress, setSourceAddress] = useState(
-    () => readEmulateSearchFields(searchParams).sourceAddress,
+    () => navigationPayload?.sourceAddress ?? initialSearchFields.sourceAddress,
+  )
+  const [abiEndpoint, setAbiEndpoint] = useState<EmulateAbiEndpoint>(
+    () => navigationBuilder?.abiEndpoint ?? initialSearchFields.abiEndpoint,
   )
   const [messageValue, setMessageValue] = useState(
-    () => readEmulateSearchFields(searchParams).messageValue,
+    () => navigationPayload?.messageValue ?? initialSearchFields.messageValue,
   )
-  const [messageTransport, setMessageTransport] = useState<AbiMessageTransport>("internal")
-  const [bounce, setBounce] = useState(() => readEmulateSearchFields(searchParams).bounce)
+  const [messageTransport, setMessageTransport] = useState<AbiMessageTransport>(
+    () => navigationPayload?.messageTransport ?? "internal",
+  )
+  const [bounce, setBounce] = useState(
+    () => navigationPayload?.bounce ?? initialSearchFields.bounce,
+  )
   const [abiSourceMode, setAbiSourceMode] = useState<AbiSourceMode>("auto")
   const [manualAbiJson, setManualAbiJson] = useState("")
-  const [loadedAbi, setLoadedAbi] = useState<ContractABI | undefined>()
-  const [abiLoadState, setAbiLoadState] = useState<AbiLoadState>({type: "idle"})
-  const [selectedMessageId, setSelectedMessageId] = useState("")
-  const [argsJson, setArgsJson] = useState("{}")
-  const [argsFormValue, setArgsFormValue] = useState<unknown>({})
-  const [rawMessage, setRawMessage] = useState("")
+  const [loadedAbi, setLoadedAbi] = useState<ContractABI | undefined>(() => navigationBuilder?.abi)
+  const [abiLoadState, setAbiLoadState] = useState<AbiLoadState>(() =>
+    navigationBuilder
+      ? {type: "ready", label: navigationBuilder.abi.contract_name}
+      : {type: "idle"},
+  )
+  const [selectedMessageName, setSelectedMessageName] = useState(
+    () => navigationBuilder?.messageName ?? "",
+  )
+  const [argsJson, setArgsJson] = useState(() => navigationBuilder?.argsJson ?? "{}")
+  const [argsFormValue, setArgsFormValue] = useState<unknown>(() => initialArgsFormValue ?? {})
+  const [rawMessage, setRawMessage] = useState(() => navigationPayload?.rawMessage ?? "")
   const [mcSeqnoInput, setMcSeqnoInput] = useState(
-    () => readEmulateSearchFields(searchParams).mcSeqnoInput,
+    () => navigationPayload?.mcSeqnoInput ?? initialSearchFields.mcSeqnoInput,
   )
-  const [ignoreChksig, setIgnoreChksig] = useState(
-    () => readEmulateSearchFields(searchParams).ignoreChksig,
-  )
+  const [ignoreChksig, setIgnoreChksig] = useState(() => initialSearchFields.ignoreChksig)
   const [timeOverrideOpen, setTimeOverrideOpen] = useState(false)
   const [timeOverrideMode, setTimeOverrideMode] = useState<TimeOverrideMode>(
-    () => readEmulateSearchFields(searchParams).timeOverrideMode,
+    () => initialSearchFields.timeOverrideMode,
   )
   const [increaseTimeInput, setIncreaseTimeInput] = useState(
-    () => readEmulateSearchFields(searchParams).increaseTimeInput,
+    () => initialSearchFields.increaseTimeInput,
   )
   const [unixTimestampInput, setUnixTimestampInput] = useState(
-    () => readEmulateSearchFields(searchParams).unixTimestampInput,
+    () => initialSearchFields.unixTimestampInput,
   )
   const [baseBlockUnixTime, setBaseBlockUnixTime] = useState<number | undefined>()
   const [stateOverrideEntries, setStateOverrideEntries] = useState<
     readonly AccountStateOverrideDraft[]
   >([])
   const stateOverrideEnabled = stateOverrideEntries.length > 0
+  const [isSendingToLocalnet, setIsSendingToLocalnet] = useState(false)
+  const [sendConfirmationOpen, setSendConfirmationOpen] = useState(false)
   const [state, setState] = useState<EmulateState>({type: "idle"})
   const [activeTab, setActiveTab] = useState<TransactionTraceTabType>("value-flow")
   const [selectedHash, setSelectedHash] = useState<string | undefined>()
@@ -245,7 +298,7 @@ export function EmulatePage({client}: EmulatePageProps) {
   const latestAbiLoadRequest = useRef(0)
   const nextStateOverrideId = useRef(1)
   const baseBlockUnixTimeQuery = useRef<string | undefined>(undefined)
-  const lastSearchFields = useRef(readEmulateSearchFields(searchParams))
+  const lastSearchFields = useRef(initialSearchFields)
   const isApplyingSearchFields = useRef(false)
 
   useEffect(() => {
@@ -317,6 +370,15 @@ export function EmulatePage({client}: EmulatePageProps) {
   const valueFlow = enrichment?.valueFlow ?? []
   const manualAbi = useMemo(() => parseManualAbi(manualAbiJson), [manualAbiJson])
   const hasValidTargetAddress = isValidAddress(targetAddress.trim())
+  const abiAddress = abiEndpoint === "source" ? sourceAddress : targetAddress
+  const navigationBuilderAddress = navigationPayload
+    ? navigationBuilder?.abiEndpoint === "source"
+      ? navigationPayload.sourceAddress
+      : navigationPayload.targetAddress
+    : ""
+  const hasValidAbiAddress = isValidAddress(abiAddress.trim())
+  const canConfigureMessage =
+    hasValidTargetAddress && (abiSourceMode === "manual" || hasValidAbiAddress)
   const activeAbi = abiSourceMode === "manual" ? manualAbi.abi : loadedAbi
   const abiParseError = abiSourceMode === "manual" ? manualAbi.error : undefined
   const messageSymbols = useMemo(
@@ -324,18 +386,28 @@ export function EmulatePage({client}: EmulatePageProps) {
     [activeAbi],
   )
   const builderOptions = useMemo(
-    () => (activeAbi ? listAbiMessageBuilderOptions(activeAbi, messageTransport) : []),
-    [activeAbi, messageTransport],
+    () =>
+      activeAbi
+        ? listAbiMessageBuilderOptions(
+            activeAbi,
+            messageTransport,
+            abiEndpoint === "source" ? "outgoing" : "incoming",
+          )
+        : [],
+    [abiEndpoint, activeAbi, messageTransport],
   )
-  const selectedBuilderOption = useMemo(
-    () => builderOptions.find(option => option.id === selectedMessageId),
-    [builderOptions, selectedMessageId],
+  const selectedBuilderOption = builderOptions.find(option =>
+    abiMessageBuilderOptionMatchesName(option, selectedMessageName),
   )
+  const isEmptyMessageSelected =
+    selectedMessageName === EMPTY_MESSAGE_ID || builderOptions.length === 0
   const builderPreview = useMemo(
     () =>
       buildBuilderPreview({
         abi: activeAbi,
         option: selectedBuilderOption,
+        transport: messageTransport,
+        empty: isEmptyMessageSelected,
         destination: targetAddress,
         source: sourceAddress,
         value: messageValue,
@@ -346,7 +418,9 @@ export function EmulatePage({client}: EmulatePageProps) {
       activeAbi,
       argsJson,
       bounce,
+      isEmptyMessageSelected,
       messageValue,
+      messageTransport,
       selectedBuilderOption,
       sourceAddress,
       targetAddress,
@@ -422,12 +496,23 @@ export function EmulatePage({client}: EmulatePageProps) {
           preview?.error === undefined
         )
       }))
-  const canEmulate =
-    canApplyStateOverride &&
-    !timeOverrideInvalid &&
-    (inputMode === "builder"
+  const hasValidMessage =
+    inputMode === "builder"
       ? Boolean(builderPreview.boc) && builderPreview.error === undefined
-      : Boolean(rawMessage.trim()))
+      : Boolean(rawMessage.trim())
+  const canEmulate = canApplyStateOverride && !timeOverrideInvalid && hasValidMessage
+  const canSendToLocalnet = nodeInfo !== undefined && hasValidMessage
+  const copyMessageBocAction = (
+    <CopyButton
+      value={activeRawMessage}
+      label="Copy message BoC"
+      copiedLabel="Message BoC copied"
+      size="sm"
+      disabled={!activeRawMessage.trim()}
+    >
+      Copy BoC
+    </CopyButton>
+  )
 
   useEffect(() => {
     const fieldsFromUrl = readEmulateSearchFields(searchParams)
@@ -440,6 +525,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     isApplyingSearchFields.current = true
     setTargetAddress(fieldsFromUrl.targetAddress)
     setSourceAddress(fieldsFromUrl.sourceAddress)
+    setAbiEndpoint(fieldsFromUrl.abiEndpoint)
     setMessageValue(fieldsFromUrl.messageValue)
     setBounce(fieldsFromUrl.bounce)
     if (fieldsFromUrl.mcSeqnoInput !== previousFields.mcSeqnoInput) {
@@ -462,6 +548,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     const nextFields = {
       targetAddress: targetAddress.trim(),
       sourceAddress: sourceAddress.trim(),
+      abiEndpoint,
       messageValue: messageValue.trim() || DEFAULT_MESSAGE_VALUE,
       bounce,
       mcSeqnoInput: mcSeqnoInput.trim(),
@@ -484,6 +571,11 @@ export function EmulatePage({client}: EmulatePageProps) {
       nextParams.set(EMULATE_SOURCE_QUERY_PARAM, nextFields.sourceAddress)
     } else {
       nextParams.delete(EMULATE_SOURCE_QUERY_PARAM)
+    }
+    if (nextFields.abiEndpoint === "source") {
+      nextParams.set(EMULATE_ABI_ENDPOINT_QUERY_PARAM, "source")
+    } else {
+      nextParams.delete(EMULATE_ABI_ENDPOINT_QUERY_PARAM)
     }
     if (nextFields.messageValue === DEFAULT_MESSAGE_VALUE) {
       nextParams.delete(EMULATE_VALUE_QUERY_PARAM)
@@ -523,6 +615,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     lastSearchFields.current = nextFields
     setSearchParams(nextParams, {replace: true})
   }, [
+    abiEndpoint,
     bounce,
     ignoreChksig,
     increaseTimeInput,
@@ -637,23 +730,18 @@ export function EmulatePage({client}: EmulatePageProps) {
   }, [preloadStateOverrideEntry, stateOverrideEnabled, stateOverrideEntries])
 
   useEffect(() => {
-    if (builderOptions.length === 0) {
-      if (selectedMessageId) {
-        setSelectedMessageId("")
-      }
+    if (builderOptions.length === 0 || selectedMessageName) {
       return
     }
 
-    if (!builderOptions.some(option => option.id === selectedMessageId)) {
-      const firstOption = builderOptions[0]
-      setSelectedMessageId(firstOption.id)
-      setArgsJson(firstOption.sampleJson)
-      setArgsFormValue(parseAbiJson(firstOption.sampleJson, {}))
-    }
-  }, [builderOptions, selectedMessageId])
+    const firstOption = builderOptions[0]
+    setSelectedMessageName(firstOption.label)
+    setArgsJson(firstOption.sampleJson)
+    setArgsFormValue(parseAbiJson(firstOption.sampleJson, {}))
+  }, [builderOptions, selectedMessageName])
 
   useEffect(() => {
-    const address = targetAddress.trim()
+    const address = abiAddress.trim()
     if (!address) {
       setAbiSourceMode("auto")
       setLoadedAbi(undefined)
@@ -667,6 +755,16 @@ export function EmulatePage({client}: EmulatePageProps) {
       setAbiSourceMode("auto")
       setLoadedAbi(undefined)
       setAbiLoadState({type: "idle"})
+      return
+    }
+
+    if (
+      navigationBuilder &&
+      navigationBuilder.abiEndpoint === abiEndpoint &&
+      addressKey(navigationBuilderAddress) === addressKey(address)
+    ) {
+      setLoadedAbi(navigationBuilder.abi)
+      setAbiLoadState({type: "ready", label: navigationBuilder.abi.contract_name})
       return
     }
 
@@ -687,7 +785,9 @@ export function EmulatePage({client}: EmulatePageProps) {
           }
           const abi = resolved?.abiByAddress.get(addressKey(address))
           if (!abi) {
-            throw new Error("No ABI found for target contract.")
+            throw new Error(
+              `No ABI found for the ${abiEndpoint === "source" ? "From" : "To"} contract.`,
+            )
           }
           setLoadedAbi(abi)
           setAbiSourceMode("auto")
@@ -706,14 +806,20 @@ export function EmulatePage({client}: EmulatePageProps) {
     return () => {
       globalThis.clearTimeout(timeoutId)
     }
-  }, [client, metadataRegistry, targetAddress])
+  }, [
+    abiAddress,
+    abiEndpoint,
+    client,
+    metadataRegistry,
+    navigationBuilder,
+    navigationBuilderAddress,
+  ])
 
   const handleContractClick = useCallback(
     (address: string, event?: ExplorerNavigationClickEvent) => {
-      const formattedAddress = normalizeAddress(address, addressFormat)
-      openExplorerPath(navigate, routes.addressPath(formattedAddress), event)
+      openExplorerPath(navigate, routes.addressPath(address), event)
     },
-    [addressFormat, navigate, routes],
+    [navigate, routes],
   )
 
   const handleBlockClick = useCallback(
@@ -742,9 +848,14 @@ export function EmulatePage({client}: EmulatePageProps) {
 
   const handleMessageOptionChange = useCallback(
     (messageId: string) => {
+      if (messageId === EMPTY_MESSAGE_ID) {
+        setSelectedMessageName(EMPTY_MESSAGE_ID)
+        return
+      }
+
       const option = builderOptions.find(option => option.id === messageId)
-      setSelectedMessageId(messageId)
       if (option) {
+        setSelectedMessageName(option.label)
         setArgsJson(option.sampleJson)
         setArgsFormValue(parseAbiJson(option.sampleJson, {}))
       }
@@ -872,17 +983,82 @@ export function EmulatePage({client}: EmulatePageProps) {
     }
   }
 
+  const sendToLocalnet = async () => {
+    const toastId = showToast({
+      title: "Sending message",
+      description: "Submitting the message to localnet.",
+      variant: "loading",
+      durationMs: 60_000,
+    })
+
+    try {
+      setIsSendingToLocalnet(true)
+      const messageCell = parseRawMessageBoc(activeRawMessage)
+      const message = loadMessage(messageCell.asSlice())
+      const boc = messageCell.toBoc().toString("base64")
+      const hash =
+        message.info.type === "internal"
+          ? await client.sendInternalMessage(boc)
+          : message.info.type === "external-in"
+            ? await client.sendExternalMessage(boc)
+            : undefined
+
+      if (!hash) {
+        throw new Error("External-out messages cannot be sent to localnet")
+      }
+
+      updateToast(toastId, {
+        title: "Waiting for transaction",
+        description: "Message accepted. Resolving the trace link.",
+        variant: "loading",
+        durationMs: 60_000,
+      })
+
+      const rawTxHash = await waitForTraceTransactionHash(client, hash)
+      const txHash = hashToHex(rawTxHash) ?? rawTxHash
+
+      updateToast(toastId, {
+        title: "Message sent to localnet",
+        description: txHash ? (
+          <a href={routes.transactionPath(txHash)}>View transaction</a>
+        ) : (
+          "Message accepted. Its transaction is not indexed yet."
+        ),
+        variant: "success",
+        durationMs: 8000,
+      })
+    } catch (error) {
+      updateToast(toastId, {
+        title: "Failed to send message to localnet",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "error",
+        durationMs: 8000,
+      })
+    } finally {
+      setIsSendingToLocalnet(false)
+    }
+  }
+
+  const handleSendToLocalnet = () => {
+    if (stateOverrideEnabled) {
+      setSendConfirmationOpen(true)
+      return
+    }
+    void sendToLocalnet()
+  }
+
   const handleReset = () => {
     setTargetAddress("")
     setSourceAddress("")
     setMessageValue(DEFAULT_MESSAGE_VALUE)
     setMessageTransport("internal")
+    setAbiEndpoint("destination")
     setBounce(true)
     setAbiSourceMode("auto")
     setManualAbiJson("")
     setLoadedAbi(undefined)
     setAbiLoadState({type: "idle"})
-    setSelectedMessageId("")
+    setSelectedMessageName("")
     setArgsJson("{}")
     setArgsFormValue({})
     setRawMessage("")
@@ -1124,6 +1300,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       open={timeOverrideOpen}
       onToggle={event => setTimeOverrideOpen(event.currentTarget.open)}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Native summary is interactive; the click initializes the default timestamp before opening. */}
       <summary
         className={styles.timeOverrideSummary}
         aria-label="Override timestamp"
@@ -1226,6 +1403,21 @@ export function EmulatePage({client}: EmulatePageProps) {
           />
         )}
 
+        {inputMode === "builder" && messageTransport === "internal" && (
+          <Checkbox
+            checked={abiEndpoint === "source"}
+            onChange={event => {
+              setAbiEndpoint(event.target.checked ? "source" : "destination")
+              setAbiSourceMode("auto")
+              setSelectedMessageName("")
+            }}
+            disabled={isLoading}
+            label="Use ABI from From address"
+            description="Use the sender's outgoing message ABI"
+            className={styles.optionCheckbox}
+          />
+        )}
+
         <Checkbox
           checked={ignoreChksig}
           onChange={event => setIgnoreChksig(event.target.checked)}
@@ -1288,17 +1480,32 @@ export function EmulatePage({client}: EmulatePageProps) {
         onValueChange={setInputMode}
         panelClassName={styles.inputModePanel}
       >
-        <Button
-          className={styles.emulateAction}
-          type="submit"
-          variant="primary"
-          size="sm"
-          leadingIcon={<Play size={16} />}
-          loading={isLoading}
-          disabled={!canEmulate}
-        >
-          Emulate
-        </Button>
+        <div className={styles.emulateActions}>
+          {copyMessageBocAction}
+          {nodeInfo && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Send size={15} />}
+              loading={isSendingToLocalnet}
+              disabled={!canSendToLocalnet || isLoading}
+              onClick={handleSendToLocalnet}
+            >
+              Send to localnet
+            </Button>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            leadingIcon={<Play size={16} />}
+            loading={isLoading}
+            disabled={!canEmulate || isSendingToLocalnet}
+          >
+            Emulate
+          </Button>
+        </div>
 
         {inputMode === "builder" ? (
           <div className={styles.builderGrid}>
@@ -1320,7 +1527,12 @@ export function EmulatePage({client}: EmulatePageProps) {
                   className={`${styles.segment} ${
                     messageTransport === "internal" ? styles.segmentActive : ""
                   }`}
-                  onClick={() => setMessageTransport("internal")}
+                  onClick={() => {
+                    if (messageTransport !== "internal") {
+                      setSelectedMessageName("")
+                    }
+                    setMessageTransport("internal")
+                  }}
                   aria-pressed={messageTransport === "internal"}
                   disabled={isLoading}
                 >
@@ -1331,7 +1543,11 @@ export function EmulatePage({client}: EmulatePageProps) {
                   className={`${styles.segment} ${
                     messageTransport === "external" ? styles.segmentActive : ""
                   }`}
-                  onClick={() => setMessageTransport("external")}
+                  onClick={() => {
+                    setMessageTransport("external")
+                    setAbiEndpoint("destination")
+                    setSelectedMessageName("")
+                  }}
                   aria-pressed={messageTransport === "external"}
                   disabled={isLoading}
                 >
@@ -1388,6 +1604,15 @@ export function EmulatePage({client}: EmulatePageProps) {
                 </div>
               )}
 
+              {hasValidTargetAddress && abiSourceMode === "auto" && !hasValidAbiAddress && (
+                <div className={styles.messagePlaceholder}>
+                  <span>
+                    Enter a valid contract address in {abiEndpoint === "source" ? "From" : "To"} to
+                    load its ABI
+                  </span>
+                </div>
+              )}
+
               {hasValidTargetAddress && abiSourceMode === "manual" && (
                 <div className={styles.field}>
                   <div className={styles.payloadInputHeader}>
@@ -1412,6 +1637,7 @@ export function EmulatePage({client}: EmulatePageProps) {
               )}
 
               {hasValidTargetAddress &&
+                hasValidAbiAddress &&
                 abiSourceMode === "auto" &&
                 abiLoadState.type !== "ready" && (
                   <div className={styles.abiStatus}>
@@ -1442,31 +1668,42 @@ export function EmulatePage({client}: EmulatePageProps) {
                 </div>
               )}
 
-              {hasValidTargetAddress && activeAbi && (
+              {canConfigureMessage && (
                 <Select
                   fieldClassName={styles.field}
                   aria-label="Message"
-                  value={selectedMessageId}
+                  value={
+                    isEmptyMessageSelected ? EMPTY_MESSAGE_ID : (selectedBuilderOption?.id ?? "")
+                  }
                   onChange={event => handleMessageOptionChange(event.target.value)}
-                  disabled={isLoading || builderOptions.length === 0}
+                  disabled={isLoading}
                 >
-                  {builderOptions.length === 0 ? (
-                    <option value="">No {messageTransport} ABI messages</option>
-                  ) : (
-                    builderOptions.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {formatAbiMessageOptionSummary(option)}
+                  <option value={EMPTY_MESSAGE_ID}>Empty message</option>
+                  {selectedMessageName &&
+                    selectedMessageName !== EMPTY_MESSAGE_ID &&
+                    !selectedBuilderOption && (
+                      <option value="" disabled>
+                        {selectedMessageName} is not available in this ABI
                       </option>
-                    ))
-                  )}
+                    )}
+                  {builderOptions.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {formatAbiMessageOptionSummary(option)}
+                    </option>
+                  ))}
                 </Select>
               )}
 
-              {hasValidTargetAddress && selectedBuilderOption && messageSymbols && (
+              {canConfigureMessage && selectedBuilderOption && messageSymbols && (
                 <AbiValueEditor
                   symbols={messageSymbols}
                   tyIdx={selectedBuilderOption.valueTyIdx}
                   value={argsFormValue}
+                  initialValue={
+                    navigationBuilder && selectedMessageName === navigationBuilder.messageName
+                      ? initialArgsFormValue
+                      : undefined
+                  }
                   onChange={handleArgsFormChange}
                   addressSuggestions={favoriteAddressSuggestions}
                   disabled={isLoading}
@@ -1526,6 +1763,41 @@ export function EmulatePage({client}: EmulatePageProps) {
     </header>
   )
 
+  const sendConfirmationDialog = (
+    <Dialog
+      open={sendConfirmationOpen}
+      onOpenChange={setSendConfirmationOpen}
+      title="Send without account overrides?"
+      description="Account overrides are used only for emulation."
+      leadingIcon={<TriangleAlert size={20} aria-hidden="true" />}
+      maxWidth={460}
+      closeLabel="Cancel sending message"
+    >
+      <div className={styles.sendConfirmationContent}>
+        <p className={styles.sendConfirmationText}>
+          This message will execute against the current localnet state. The configured account
+          {stateOverrideAccountCount === 1 ? " override is" : " overrides are"} not written to
+          localnet, so the resulting transaction may differ from the emulation.
+        </p>
+        <div className={styles.sendConfirmationActions}>
+          <Button type="button" variant="secondary" onClick={() => setSendConfirmationOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              setSendConfirmationOpen(false)
+              void sendToLocalnet()
+            }}
+          >
+            Send without overrides
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  )
+
   if (state.type === "ready") {
     return (
       <div className={`${styles.page} ${styles.pageReady}`}>
@@ -1561,6 +1833,7 @@ export function EmulatePage({client}: EmulatePageProps) {
           {simulationHeader}
           {simulationForm}
         </section>
+        {sendConfirmationDialog}
       </div>
     )
   }
@@ -1570,6 +1843,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       <ExplorerBreadcrumbs items={[{label: "Emulate"}]} />
       {simulationHeader}
       {simulationForm}
+      {sendConfirmationDialog}
     </div>
   )
 }
@@ -1927,6 +2201,8 @@ function isValidAddress(value: string): boolean {
 function buildBuilderPreview({
   abi,
   option,
+  transport,
+  empty,
   destination,
   source,
   value,
@@ -1935,17 +2211,33 @@ function buildBuilderPreview({
 }: {
   readonly abi: ContractABI | undefined
   readonly option: AbiMessageBuilderOption | undefined
+  readonly transport: AbiMessageTransport
+  readonly empty: boolean
   readonly destination: string
   readonly source: string
   readonly value: string
   readonly bounce: boolean
   readonly argsJson: string
 }): {readonly boc: string; readonly error?: string} {
-  if (!abi || !option || !destination.trim()) {
+  if (!destination.trim()) {
     return {boc: ""}
   }
 
   try {
+    if (empty) {
+      return {
+        boc: buildEmptyMessageBoc({
+          transport,
+          destination,
+          source,
+          value,
+          bounce,
+        }),
+      }
+    }
+    if (!abi || !option) {
+      return {boc: ""}
+    }
     return {
       boc: buildAbiMessageBoc({
         abi,

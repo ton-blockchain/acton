@@ -13,6 +13,10 @@
   --acton-color-inline-code-surface: hsl(240 5% 92%);
   /* Grouped-control and collapsible-row surface. */
   --acton-color-surface-group: hsl(0 0% 98%);
+  /* Main canvas used by read-only code surfaces. */
+  --acton-color-code-surface: var(--acton-color-surface);
+  /* Supporting chrome around code: file trees, headers, and line-number gutters. */
+  --acton-color-code-chrome: var(--acton-color-surface-group);
   /* Pressed or selected surface for neutral elements. */
   --acton-color-surface-active: hsl(240 4% 95%);
   /* Primary text color for readable foreground content. */
@@ -214,6 +218,10 @@
   --acton-color-inline-code-surface: hsl(240 4% 16%);
   /* Dark grouped-control and collapsible-row surface. */
   --acton-color-surface-group: hsl(240 5% 14%);
+  /* Dark main canvas used by read-only code surfaces. */
+  --acton-color-code-surface: var(--acton-color-canvas);
+  /* Dark supporting chrome around code: file trees, headers, and line-number gutters. */
+  --acton-color-code-chrome: var(--acton-color-surface-row);
   /* Dark pressed or selected surface for neutral elements. */
   --acton-color-surface-active: hsl(240 4% 16%);
   /* Dark primary text color for readable foreground content. */

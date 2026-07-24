@@ -12,6 +12,8 @@ import {
   CodeCellDetails,
   type ContractData,
   type ContractVerifiedSource,
+  getTransactionBalanceAfter,
+  getTransactionBalanceBefore,
   type ResolveVerifiedSourceByCodeHash,
   type TransactionInfo,
 } from "@acton/transaction-ui"
@@ -32,7 +34,8 @@ interface TraceStateChangesPanelProps {
 
 interface TraceStateChangeItem {
   readonly address: string
-  readonly storageDiff: ParsedValueDiff
+  readonly balanceDiff?: ParsedValueDiff
+  readonly storageDiff?: ParsedValueDiff
 }
 
 export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
@@ -86,28 +89,41 @@ export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
               contracts={contracts}
               onContractClick={onContractClick}
             />
-          </div>
-          <div className={styles.storageScroll}>
-            <ParsedValueDiffView
-              diff={item.storageDiff}
-              contracts={contracts}
-              onContractClick={onContractClick}
-              renderCodeCellDetails={(cell: ParsedCodeCell) => (
-                <CodeCellDetails
-                  cell={cell}
-                  verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
-                  resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+            {item.balanceDiff && (
+              <div className={styles.balanceChange}>
+                <span className={styles.balanceLabel}>Balance</span>
+                <ParsedValueDiffView
+                  diff={item.balanceDiff}
+                  fieldName="balanceGrams"
+                  contracts={contracts}
+                  onContractClick={onContractClick}
                 />
-              )}
-            />
+              </div>
+            )}
           </div>
+          {item.storageDiff && (
+            <div className={styles.storageScroll}>
+              <ParsedValueDiffView
+                diff={item.storageDiff}
+                contracts={contracts}
+                onContractClick={onContractClick}
+                renderCodeCellDetails={(cell: ParsedCodeCell) => (
+                  <CodeCellDetails
+                    cell={cell}
+                    verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+                    resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+                  />
+                )}
+              />
+            </div>
+          )}
         </section>
       ))}
     </div>
   )
 }
 
-function buildTraceStateChangeItems(
+export function buildTraceStateChangeItems(
   transactions: readonly TransactionInfo[],
 ): readonly TraceStateChangeItem[] {
   const transactionsByAddress = new Map<string, TransactionInfo[]>()
@@ -126,12 +142,29 @@ function buildTraceStateChangeItems(
 
   return [...transactionsByAddress.entries()].flatMap(([address, addressTransactions]) => {
     const sortedTransactions = addressTransactions.toSorted(compareTraceTransactionLt)
+    const firstTransaction = sortedTransactions[0]
+    const lastTransaction = sortedTransactions.at(-1)
     const storageDiff = buildStorageDiff(
-      sortedTransactions[0]?.parsedStorageBefore,
-      sortedTransactions.at(-1)?.parsedStorageAfter,
+      firstTransaction?.parsedStorageBefore,
+      lastTransaction?.parsedStorageAfter,
     )
+    const changedStorageDiff =
+      storageDiff && storageDiff.status !== "unchanged" ? storageDiff : undefined
+    const balanceBefore = firstTransaction && getTransactionBalanceBefore(firstTransaction)
+    const balanceAfter = lastTransaction && getTransactionBalanceAfter(lastTransaction)
+    const balanceDiff: ParsedValueDiff | undefined =
+      balanceBefore !== undefined && balanceAfter !== undefined && balanceBefore !== balanceAfter
+        ? {
+            kind: "leaf",
+            status: "changed",
+            before: {kind: "scalar", value: balanceBefore.toString(), typeName: "coins"},
+            after: {kind: "scalar", value: balanceAfter.toString(), typeName: "coins"},
+          }
+        : undefined
 
-    return storageDiff && storageDiff.status !== "unchanged" ? [{address, storageDiff}] : []
+    return balanceDiff || changedStorageDiff
+      ? [{address, balanceDiff, storageDiff: changedStorageDiff}]
+      : []
   })
 }
 

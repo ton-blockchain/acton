@@ -151,8 +151,7 @@
   text-decoration: none;
 }
 
-.blocksLink:focus-visible,
-.blocksCopyButton:focus-visible {
+.blocksLink:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
@@ -170,33 +169,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.blocksCopyButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  color: var(--acton-color-text-muted);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.blocksCopyButton:hover {
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface-hover);
-}
-
-.blocksCopyButtonCopied {
-  color: var(--acton-color-text);
 }
 
 .blocksLink {
@@ -218,6 +190,25 @@
   min-width: 760px;
 }
 
+.shardBlocksTable {
+  min-width: 0;
+}
+
+.shardBlocksTable th:first-child {
+  width: 20%;
+}
+
+.shardBlocksTable th:nth-child(2),
+.shardBlocksTable th:nth-child(3) {
+  width: 18%;
+}
+
+.shardBlocksTable th:nth-child(n + 4),
+.shardBlocksTable td:nth-child(n + 4) {
+  width: 11%;
+  padding-inline: 6px;
+}
+
 .blockTransactionsTable th:first-child,
 .blockTransactionsTable td:first-child {
   width: 54px;
@@ -237,6 +228,10 @@
   text-align: right;
 }
 
+.blocksTable td.blocksExitCodeFailure {
+  color: var(--acton-color-danger-text);
+}
+
 .blockDetailToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -244,83 +239,326 @@
   gap: 8px;
 }
 
-.blockSummaryPanel {
+.blockDateForm {
+  width: 332px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.blockDateHint,
+.blockDateError {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.blockDateHint {
+  color: var(--acton-color-text-muted);
+}
+
+.blockDateError {
+  color: var(--acton-color-danger-text);
+}
+
+.blockDateActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.blockDateForm input::-webkit-datetime-edit-day-field:focus,
+.blockDateForm input::-webkit-datetime-edit-month-field:focus,
+.blockDateForm input::-webkit-datetime-edit-year-field:focus,
+.blockDateForm input::-webkit-datetime-edit-hour-field:focus,
+.blockDateForm input::-webkit-datetime-edit-minute-field:focus,
+.blockDateForm input::-webkit-datetime-edit-second-field:focus,
+.blockDateForm input::-webkit-datetime-edit-ampm-field:focus {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
+  border-radius: 4px;
+}
+
+.blockDateForm input::selection {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+[data-theme="dark"] .blockDateForm input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.72;
+}
+
+.blockDetailControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+}
+
+.blockHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.blockActionLink,
+.blockExplorerLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 2rem;
+  box-sizing: border-box;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.blockActionLink {
+  height: 2rem;
+  padding: 0 var(--acton-space-3);
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
+}
+
+.blockActionLink:hover {
+  color: var(--acton-color-accent);
+  background: var(--acton-color-surface-hover);
+}
+
+.blockExplorerLink:hover {
+  color: var(--acton-color-accent);
+  background: transparent;
+}
+
+.blockActionLink:focus-visible,
+.blockExplorerLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.blockActionLinkDisabled {
+  color: var(--acton-color-text-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.blockActionLinkDisabled:hover {
+  color: var(--acton-color-text-subtle);
+  background: var(--acton-color-surface);
+}
+
+.blockExplorerLink {
+  padding: 0 4px;
+  color: var(--acton-color-text-muted);
+}
+
+.blockActionSeparator {
+  width: 1px;
+  height: 18px;
+  margin-inline: 2px;
+  background: var(--acton-color-border);
+}
+
+.blockDetailsPanel {
   min-width: 0;
   border: 1px solid var(--acton-color-border);
-  border-radius: 12px;
+  border-radius: var(--acton-radius-control-sm);
   background: var(--acton-color-surface-raised);
   overflow: hidden;
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   box-sizing: border-box;
+  line-height: 1.6;
 }
 
-.blockSummaryPanel::before,
-.blockSummaryPanel::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--acton-color-border);
-  pointer-events: none;
-}
-
-.blockSummaryPanel::before {
-  left: calc(100% / 3);
-}
-
-.blockSummaryPanel::after {
-  left: calc(200% / 3);
-}
-
-.blockSummaryRow {
+.blockDetailRow {
   min-width: 0;
-  min-height: 46px;
-  padding: 8px 14px;
-  border-top: 1px solid var(--acton-color-border);
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr);
-  align-items: center;
-  column-gap: 14px;
+  display: flex;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.blockDetailRow:last-child {
+  border-bottom: 0;
+}
+
+.blockDetailLabel {
+  width: 160px;
+  flex: 0 0 160px;
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border-right: 1px solid var(--acton-color-border);
   box-sizing: border-box;
-}
-
-.blockSummaryRow:nth-child(-n + 3) {
-  border-top: 0;
-}
-
-.blockSummaryLabel {
   color: var(--acton-color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 650;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.blockSummaryValue {
-  min-width: 0;
-  color: var(--acton-color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.82rem;
-  font-weight: 400;
-}
-
-.blockSummaryValueWithCopy {
   display: flex;
   align-items: center;
-  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: var(--acton-font-weight-emphasis);
+  letter-spacing: 0.2px;
 }
 
-.blockSummaryValueText {
+.blockDetailGrid {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 100%;
+  padding: var(--acton-space-2) var(--acton-space-3);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--acton-space-3) var(--acton-space-4);
+  align-items: start;
+}
+
+.blockHashesGrid {
+  grid-template-columns: 1fr;
+  gap: var(--acton-space-2);
+}
+
+.blockFourColumnGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.blockSixColumnGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.blockDetailItem {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.blockDetailItemLabel {
+  color: var(--acton-color-text-subtle);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
+.blockDetailValue {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--acton-color-text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.blockCapabilitiesTrigger {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--acton-color-accent);
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.blockDetailDocLink {
+  color: var(--acton-color-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+}
+
+.blockDetailDocLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.blockDetailDocLink svg {
+  position: relative;
+  top: -1px;
+}
+
+.blockDetailRelativeTime {
+  color: var(--acton-color-text-muted);
+}
+
+.blockCapabilitiesPopover {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--acton-space-2);
+}
+
+.blockCapabilitiesPopoverTitle {
+  color: var(--acton-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.blockDetailInlineActions {
+  width: 100%;
+}
+
+.blockDetailValueText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.blockReferenceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.blockBooleanTrue {
+  color: var(--acton-color-success);
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.blockBooleanFalse {
+  color: var(--acton-color-text-muted);
+}
+
+.blockDetailsPanel .skeletonLine {
+  align-self: flex-start;
+  background: transparent;
+}
+
+.blockDetailsPanel .skeletonLine::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
+  transform: translateY(-50%);
+}
+
+.blockDetailsPanel .skeletonLine::after {
+  top: 50%;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: 10px;
+  border-radius: 999px;
+  transform: translate(-100%, -50%);
+  animation-name: blockDetailSkeletonShimmer;
+}
+
+.blockDetailsPanel .blockDetailLabel,
+.blockDetailsPanel .blockDetailGrid {
+  box-sizing: border-box;
 }
 
 .blocksTableState {
@@ -358,8 +596,26 @@
   animation: skeletonShimmer 1300ms ease-in-out infinite;
 }
 
-.blocksSkeletonValue {
-  width: min(220px, 74%);
+.blockDetailSkeletonValue,
+.blockDetailSkeletonValueWide {
+  width: min(112px, 72%);
+  height: 18.85px;
+}
+
+.blockDetailSkeletonValueWide {
+  width: min(520px, 72%);
+}
+
+.blockDetailSkeletonHashValue {
+  height: 19.3671875px;
+}
+
+.blockDetailSkeletonChipValue {
+  height: 22.9px;
+}
+
+.blockSixColumnGrid .blockDetailSkeletonValue {
+  width: 32px;
 }
 
 .blocksSkeletonBlock {
@@ -372,6 +628,10 @@
 
 .blocksSkeletonTime {
   width: 76px;
+}
+
+.blocksSkeletonFlag {
+  width: 34px;
 }
 
 .blocksSkeletonIndex {
@@ -416,34 +676,31 @@
   }
 }
 
+@keyframes blockDetailSkeletonShimmer {
+  to {
+    transform: translate(100%, -50%);
+  }
+}
+
 @media (max-width: 1100px) {
   .blocksTableGrid {
     grid-template-columns: 1fr;
   }
 
-  .blockSummaryPanel {
-    grid-template-columns: 1fr;
-  }
-
-  .blockSummaryPanel::before,
-  .blockSummaryPanel::after {
-    display: none;
-  }
-
-  .blockSummaryRow:nth-child(-n + 3) {
-    border-top: 1px solid var(--acton-color-border);
-  }
-
-  .blockSummaryRow:first-child {
-    border-top: 0;
+  .blockDetailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 920px) {
   .hero,
-  .blockDetailToolbar {
+  .blockDetailControls {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .blockHeaderActions {
+    justify-content: flex-start;
   }
 }
 
@@ -455,5 +712,28 @@
 
   .blocksLayout {
     gap: 14px;
+  }
+
+  .blockDetailRow {
+    display: block;
+  }
+
+  .blockDetailLabel {
+    width: 100%;
+    min-height: 38px;
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .blockDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .blockHeaderActions {
+    gap: 6px;
+  }
+
+  .blockActionSeparator {
+    display: none;
   }
 }

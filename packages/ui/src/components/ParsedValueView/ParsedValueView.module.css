@@ -16,6 +16,40 @@
   line-height: 1.4;
 }
 
+.parsedCollectionHeader {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.parsedCollectionCount {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.parsedCollectionToggle {
+  width: 4.5rem;
+  justify-content: flex-start;
+  margin-inline-start: var(--acton-space-4);
+}
+
+.parsedCollectionViewport {
+  max-height: min(24rem, 50dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: var(--acton-space-2);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.parsedCollectionViewport::-webkit-scrollbar {
+  display: none;
+}
+
 .parsedTypeLabel {
   align-self: flex-start;
   color: var(--acton-color-text);
@@ -59,6 +93,11 @@
   line-height: 1.35;
 }
 
+.parsedLargeCollectionValue {
+  align-self: start;
+  padding-block-start: var(--acton-space-1);
+}
+
 .codeCellPopover {
   max-height: calc(100dvh - var(--acton-space-8));
   overflow: auto;
@@ -75,6 +114,7 @@
 .parsedScalar {
   color: var(--acton-parsed-value-tone, inherit);
   font-family: var(--acton-font-mono);
+  font-variant-ligatures: none;
   font-size: var(--acton-parsed-value-font-size, var(--acton-font-size-xs));
   line-height: 1.45;
   overflow-wrap: anywhere;

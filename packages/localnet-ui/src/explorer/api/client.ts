@@ -12,9 +12,11 @@ import type {
   JettonMasterMetadata,
   JettonWallet,
   JettonWalletData,
+  LocalnetCheckpoint,
   LocalnetNodeInfo,
   LocalnetTimeInfo,
   NftItem,
+  Shards,
   StartupWallet,
   StreamingTransactionsEvent,
   SourceTraceResponse,
@@ -26,6 +28,7 @@ import type {
   V3TransactionsResponse,
   VerificationSourceResponse,
 } from "./types"
+import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
@@ -39,6 +42,7 @@ interface TonClientOptions {
 }
 
 export type AccountHistorySortOrder = "asc" | "desc"
+export type RawBlockNetwork = "mainnet" | "testnet"
 
 export type CompilerAbiLoader = (
   codeHashes: readonly string[],
@@ -55,8 +59,13 @@ interface SendInternalMessageResponse {
   readonly hash: string
 }
 
+interface SendExternalMessageResponse {
+  readonly hash: string
+}
+
 interface DnsRecordsResponse {
   readonly records: readonly {
+    readonly domain: string
     readonly dns_wallet?: string | null
   }[]
 }
@@ -82,6 +91,10 @@ interface GetBlockTransactionsOptions {
   readonly shard: string
   readonly seqno: number
   readonly limit?: number
+}
+
+interface RawBlockResponse {
+  readonly data: string
 }
 
 interface GetTracesOptions {
@@ -189,6 +202,7 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
   const tokenExtra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : {}
   const content: Record<string, unknown> = {...tokenExtra}
   const isNsfw = booleanValue(tokenInfo?.is_nsfw)
+  const isScam = booleanValue(tokenInfo?.is_scam)
 
   if (tokenInfo) {
     for (const key of NFT_CONTENT_KEYS) {
@@ -216,13 +230,14 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
     content.name = domainName
   }
 
-  if (Object.keys(content).length === 0 && isNsfw === undefined) {
+  if (Object.keys(content).length === 0 && isNsfw === undefined && isScam === undefined) {
     return item
   }
 
   return {
     ...item,
     ...(isNsfw === undefined ? {} : {is_nsfw: isNsfw}),
+    ...(isScam === undefined ? {} : {is_scam: isScam}),
     content: {
       ...item.content,
       ...content,
@@ -302,6 +317,17 @@ export class TonClient {
     url.searchParams.append("domain", domain)
     const response = await this.request<DnsRecordsResponse>(url, "Failed to resolve TON DNS name")
     return response.records.find(record => record.dns_wallet)?.dns_wallet ?? undefined
+  }
+
+  async getWalletDnsNames(address: string): Promise<readonly string[]> {
+    const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
+    url.searchParams.append("wallet", address)
+    url.searchParams.append("limit", "1000")
+    const response = await this.request<DnsRecordsResponse>(
+      url,
+      "Failed to load account TON DNS names",
+    )
+    return response.records.map(record => record.domain.trim())
   }
 
   async getAccountStates(addresses: string[], includeBoc = true): Promise<AccountStatesResponse> {
@@ -535,6 +561,36 @@ export class TonClient {
     return this.request(url, "Failed to fetch blocks")
   }
 
+  async getRawBlockBoc(extendedBlockId: string, network: RawBlockNetwork): Promise<Cell> {
+    const origin = network === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
+    const url = new URL(`/v2/liteserver/get_block/${encodeURIComponent(extendedBlockId)}`, origin)
+    const response = await this.request<RawBlockResponse>(url, "Failed to fetch raw block")
+    if (!/^(?:[0-9a-f]{2})+$/i.test(response.data)) {
+      throw new Error("Raw block response contains invalid BoC data")
+    }
+
+    return Cell.fromHex(response.data)
+  }
+
+  async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {
+    const url = this.buildUrl(this.v2BaseUrl, "/getShards")
+    url.searchParams.append("seqno", seqno.toString())
+    const {shards} = await this.request<Shards>(url, "Failed to fetch masterchain block shards")
+    const responses = await Promise.all(
+      shards.map(shard =>
+        this.getBlocks({
+          workchain: shard.workchain,
+          shard: v2ShardToV3Shard(shard.shard),
+          seqno: shard.seqno,
+          rootHash: shard.root_hash,
+          fileHash: shard.file_hash,
+          limit: 1,
+        }),
+      ),
+    )
+    return {blocks: responses.flatMap(response => response.blocks)}
+  }
+
   async getBlockTransactions(
     options: GetBlockTransactionsOptions,
   ): Promise<V3TransactionsResponse> {
@@ -573,7 +629,9 @@ export class TonClient {
       }
 
       const response = await this.request<NftItemsResponse>(url, "Failed to fetch NFTs")
-      return response.nft_items.map(item => attachNftItemMetadata(item, response.metadata))
+      return response.nft_items
+        .map(item => attachNftItemMetadata(item, response.metadata))
+        .filter(item => !isNftItemNsfw(item))
     }
 
     if (addresses && addresses.length > 0) {
@@ -782,6 +840,83 @@ export class TonClient {
     return this.request(url, "Failed to fetch node info")
   }
 
+  async downloadState(): Promise<Blob> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_dumpState")
+    return this.requestBlob(url, "Failed to download localnet state")
+  }
+
+  async loadState(state: Blob): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_loadState")
+    await this.request<null>(url, "Failed to load localnet state", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: state,
+    })
+  }
+
+  async createCheckpoint(name: string, force = false): Promise<LocalnetCheckpoint> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_createCheckpoint")
+    return this.request(url, "Failed to create checkpoint", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name, force}),
+    })
+  }
+
+  async listCheckpoints(): Promise<readonly LocalnetCheckpoint[]> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listCheckpoints")
+    return this.request(url, "Failed to list checkpoints")
+  }
+
+  async restoreCheckpoint(name: string): Promise<LocalnetCheckpoint> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_restoreCheckpoint")
+    return this.request(url, "Failed to restore checkpoint", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name}),
+    })
+  }
+
+  async deleteCheckpoint(name: string): Promise<LocalnetCheckpoint> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteCheckpoint")
+    return this.request(url, "Failed to delete checkpoint", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name}),
+    })
+  }
+
+  async clearCheckpoints(): Promise<number> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_clearCheckpoints")
+    const result = await this.request<{readonly deleted: number}>(
+      url,
+      "Failed to clear checkpoints",
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      },
+    )
+    return result.deleted
+  }
+
+  async downloadCheckpoint(name: string): Promise<Blob> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_exportCheckpoint")
+    url.searchParams.set("name", name)
+    return this.requestBlob(url, "Failed to download checkpoint")
+  }
+
+  async importCheckpoint(name: string, state: Blob, force = false): Promise<LocalnetCheckpoint> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_importCheckpoint")
+    url.searchParams.set("name", name)
+    url.searchParams.set("force", force.toString())
+    return this.request(url, "Failed to import checkpoint", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: state,
+    })
+  }
+
   async increaseTime(seconds: number): Promise<LocalnetTimeInfo> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_increaseTime")
     return this.request(url, "Failed to advance node time", {
@@ -828,6 +963,16 @@ export class TonClient {
     return response.hash
   }
 
+  async fundJetton(address: string, jettonMaster: string, amount: string): Promise<string> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_fundJetton")
+    const response = await this.request<SendInternalMessageResponse>(url, "Failed to fund jetton", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address, jetton_master: jettonMaster, amount}),
+    })
+    return response.hash
+  }
+
   async setShardAccount(address: string, shardAccount: string): Promise<void> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setShardAccount")
     await this.request<null>(url, "Failed to set shard account", {
@@ -842,6 +987,20 @@ export class TonClient {
     const response = await this.request<SendInternalMessageResponse>(
       url,
       "Failed to send internal message",
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({boc}),
+      },
+    )
+    return response.hash
+  }
+
+  async sendExternalMessage(boc: string): Promise<string> {
+    const url = this.buildUrl(this.v2BaseUrl, "/sendBocReturnHash")
+    const response = await this.request<SendExternalMessageResponse>(
+      url,
+      "Failed to send external message",
       {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -1032,6 +1191,24 @@ export class TonClient {
     return raw as T
   }
 
+  private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {
+    const response = await fetch(url.toString(), this.withApiAuthHeaders(url))
+    if (response.status === 401) {
+      this.onUnauthorized?.()
+    }
+    if (!response.ok) {
+      const text = await response.text()
+      let error = text
+      try {
+        error = this.extractError(JSON.parse(text) as unknown) ?? text
+      } catch {
+        // Preserve a non-JSON server response when one is available.
+      }
+      throw new Error(error || errorMessage)
+    }
+    return response.blob()
+  }
+
   private pendingRequestKey(url: URL, options?: RequestInit): string | undefined {
     const method = options?.method?.toUpperCase() ?? "GET"
     return method === "GET" ? url.toString() : undefined
@@ -1162,6 +1339,10 @@ function appendOptionalSearchParam(
   if (value !== undefined) {
     url.searchParams.append(name, value.toString())
   }
+}
+
+function v2ShardToV3Shard(shard: string): string {
+  return BigInt.asUintN(64, BigInt(shard)).toString(16).padStart(16, "0").toUpperCase()
 }
 
 function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {

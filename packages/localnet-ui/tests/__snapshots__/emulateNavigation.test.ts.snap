@@ -1,0 +1,242 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`transaction to emulation navigation falls back to a complete raw message when the transaction has no ABI 1`] = `
+{
+  "invalidState": undefined,
+  "payload": {
+    "bounce": false,
+    "inputMode": "raw",
+    "mcSeqnoInput": "42",
+    "messageTransport": "internal",
+    "messageValue": "1.25",
+    "rawMessage": "b5ee9c7241010101005a0000af48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444512a05f2000000000000000000220000002e091a40a2f635fa",
+    "sourceAddress": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    "targetAddress": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+  },
+  "restored": {
+    "body": "1234",
+    "bounce": false,
+    "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+    "source": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    "value": "1250000000",
+  },
+  "storedPayloadMatches": true,
+}
+`;
+
+exports[`transaction to emulation navigation uses raw mode instead of guessing an ABI without a message name 1`] = `
+{
+  "bounce": false,
+  "inputMode": "raw",
+  "mcSeqnoInput": "42",
+  "messageTransport": "internal",
+  "messageValue": "0.25",
+  "rawMessage": "b5ee9c724101010100600000bb48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444503b9aca000000000000000000220000002e0000000080000003c092a35ab6",
+  "sourceAddress": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+  "targetAddress": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+}
+`;
+
+exports[`transaction to emulation navigation uses the sender outgoing ABI when the destination ABI does not decode the message 1`] = `
+{
+  "bounce": false,
+  "builder": {
+    "abi": {
+      "alias_instantiations": [],
+      "compiler_name": "tolk",
+      "compiler_version": "test",
+      "contract_name": "Sender",
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 8,
+            },
+          ],
+          "kind": "struct",
+          "name": "InternalTransferStep",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 1,
+          },
+          "ty_idx": 12,
+        },
+      ],
+      "emitted_events": [],
+      "get_methods": [],
+      "incoming_external": [],
+      "incoming_messages": [],
+      "outgoing_messages": [
+        {
+          "body_ty_idx": 12,
+        },
+      ],
+      "storage": {},
+      "struct_instantiations": [],
+      "thrown_errors": [],
+      "unique_types": [
+        {
+          "kind": "void",
+        },
+        {
+          "kind": "int",
+        },
+        {
+          "kind": "slice",
+        },
+        {
+          "kind": "cell",
+        },
+        {
+          "kind": "builder",
+        },
+        {
+          "kind": "bool",
+        },
+        {
+          "kind": "coins",
+        },
+        {
+          "kind": "address",
+        },
+        {
+          "kind": "intN",
+          "n": 32,
+        },
+        {
+          "kind": "uintN",
+          "n": 32,
+        },
+        {
+          "kind": "intN",
+          "n": 64,
+        },
+        {
+          "kind": "uintN",
+          "n": 64,
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "InternalTransferStep",
+        },
+      ],
+    },
+    "abiEndpoint": "source",
+    "args": {
+      "$": "InternalTransferStep",
+      "value": "7",
+    },
+    "messageName": "InternalTransferStep",
+  },
+  "inputMode": "builder",
+  "mcSeqnoInput": "42",
+  "messageTransport": "internal",
+  "messageValue": "0.25",
+  "rawMessage": "b5ee9c724101010100600000bb48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444503b9aca000000000000000000220000002e0000000080000003c092a35ab6",
+  "sourceAddress": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+  "targetAddress": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+}
+`;
+
+exports[`transaction to emulation navigation uses the named source message instead of a false-positive destination decode 1`] = `
+{
+  "bounce": false,
+  "builder": {
+    "abi": {
+      "alias_instantiations": [],
+      "compiler_name": "tolk",
+      "compiler_version": "test",
+      "contract_name": "Sender",
+      "declarations": [
+        {
+          "fields": [
+            {
+              "name": "value",
+              "ty_idx": 8,
+            },
+          ],
+          "kind": "struct",
+          "name": "InternalTransferStep",
+          "prefix": {
+            "prefix_len": 32,
+            "prefix_num": 1,
+          },
+          "ty_idx": 12,
+        },
+      ],
+      "emitted_events": [],
+      "get_methods": [],
+      "incoming_external": [],
+      "incoming_messages": [],
+      "outgoing_messages": [
+        {
+          "body_ty_idx": 12,
+        },
+      ],
+      "storage": {},
+      "struct_instantiations": [],
+      "thrown_errors": [],
+      "unique_types": [
+        {
+          "kind": "void",
+        },
+        {
+          "kind": "int",
+        },
+        {
+          "kind": "slice",
+        },
+        {
+          "kind": "cell",
+        },
+        {
+          "kind": "builder",
+        },
+        {
+          "kind": "bool",
+        },
+        {
+          "kind": "coins",
+        },
+        {
+          "kind": "address",
+        },
+        {
+          "kind": "intN",
+          "n": 32,
+        },
+        {
+          "kind": "uintN",
+          "n": 32,
+        },
+        {
+          "kind": "intN",
+          "n": 64,
+        },
+        {
+          "kind": "uintN",
+          "n": 64,
+        },
+        {
+          "kind": "StructRef",
+          "struct_name": "InternalTransferStep",
+        },
+      ],
+    },
+    "abiEndpoint": "source",
+    "args": {
+      "$": "InternalTransferStep",
+      "value": "7",
+    },
+    "messageName": "InternalTransferStep",
+  },
+  "inputMode": "builder",
+  "mcSeqnoInput": "42",
+  "messageTransport": "internal",
+  "messageValue": "0.25",
+  "rawMessage": "b5ee9c724101010100600000bb48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444503b9aca000000000000000000220000002e0000000080000003c092a35ab6",
+  "sourceAddress": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+  "targetAddress": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+}
+`;

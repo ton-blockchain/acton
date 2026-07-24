@@ -1,0 +1,36 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**"]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "noExcessiveLinesPerFunction": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noAwaitInLoops": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noProcessEnv": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off"
+      },
+      "suspicious": {
+        "noEmptyBlockStatements": "off",
+        "noSkippedTests": "off"
+      }
+    }
+  }
+}

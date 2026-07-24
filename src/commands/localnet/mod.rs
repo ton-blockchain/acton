@@ -32,8 +32,9 @@ const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
 pub use snapshot::{
-    localnet_snapshot_create_cmd, localnet_snapshot_export_cmd, localnet_snapshot_import_cmd,
-    localnet_snapshot_list_cmd, localnet_snapshot_revert_cmd,
+    localnet_checkpoint_clear_cmd, localnet_checkpoint_create_cmd, localnet_checkpoint_delete_cmd,
+    localnet_checkpoint_export_cmd, localnet_checkpoint_import_cmd, localnet_checkpoint_list_cmd,
+    localnet_checkpoint_restore_cmd, localnet_state_dump_cmd, localnet_state_load_cmd,
 };
 pub use status::localnet_status_cmd;
 
@@ -52,6 +53,8 @@ pub async fn localnet_start_cmd(
     load_state: Option<String>,
     dump_state: Option<String>,
     require_auth: bool,
+    liteapi: bool,
+    liteapi_port: Option<u16>,
 ) -> anyhow::Result<()> {
     if load_state.is_some() && db_path.is_some() {
         anyhow::bail!(
@@ -88,7 +91,7 @@ pub async fn localnet_start_cmd(
         },
     ));
     if let Some(path) = load_state.as_deref() {
-        node.load_state(path.to_owned())
+        node.load_state_from_path(path.to_owned())
             .await
             .with_context(|| format!("Failed to load state snapshot from {path}"))?;
         println!(
@@ -111,6 +114,8 @@ pub async fn localnet_start_cmd(
             response_delay_ms,
             startup_wallets,
             auth_token,
+            liteapi,
+            liteapi_port,
         },
     )
     .await;
@@ -118,7 +123,7 @@ pub async fn localnet_start_cmd(
     if run_result.is_ok()
         && let Some(path) = dump_state.as_deref()
     {
-        node.dump_state(path.to_owned())
+        node.dump_state_to_path(path.to_owned())
             .await
             .with_context(|| format!("Failed to dump state snapshot to {path}"))?;
         println!(
@@ -517,13 +522,92 @@ pub(super) async fn post_localnet_control(
     let request = client
         .post(format!("http://127.0.0.1:{port}/{path}"))
         .json(&body);
-    let res = with_localnet_auth(request, auth_token.as_deref())
+    let response = with_localnet_auth(request, auth_token.as_deref())
         .send()
         .await
         .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
 
-    if res.status().is_success() {
-        let json: serde_json::Value = res.json().await?;
+    parse_localnet_control_response(response, action).await
+}
+
+pub(super) async fn get_localnet_control(
+    port: u16,
+    auth_token: Option<String>,
+    path: &str,
+    action: &str,
+) -> anyhow::Result<serde_json::Value> {
+    let client = crate::http::client_builder()
+        .user_agent(crate::build_info::user_agent())
+        .build()?;
+    let auth_token = resolve_localnet_auth_token(auth_token);
+    let request = client.get(format!("http://127.0.0.1:{port}/{path}"));
+    let response = with_localnet_auth(request, auth_token.as_deref())
+        .send()
+        .await
+        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
+
+    parse_localnet_control_response(response, action).await
+}
+
+pub(super) async fn get_localnet_control_bytes(
+    port: u16,
+    auth_token: Option<String>,
+    path: &str,
+    query: &[(&str, &str)],
+    action: &str,
+) -> anyhow::Result<Vec<u8>> {
+    let client = crate::http::client_builder()
+        .user_agent(crate::build_info::user_agent())
+        .build()?;
+    let auth_token = resolve_localnet_auth_token(auth_token);
+    let request = client
+        .get(format!("http://127.0.0.1:{port}/{path}"))
+        .query(query);
+    let response = with_localnet_auth(request, auth_token.as_deref())
+        .send()
+        .await
+        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
+
+    if response.status().is_success() {
+        return Ok(response.bytes().await?.to_vec());
+    }
+
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    anyhow::bail!("{action} failed with status {status}: {body}");
+}
+
+pub(super) async fn post_localnet_control_bytes(
+    port: u16,
+    auth_token: Option<String>,
+    path: &str,
+    query: &[(&str, &str)],
+    body: Vec<u8>,
+    action: &str,
+) -> anyhow::Result<serde_json::Value> {
+    let client = crate::http::client_builder()
+        .user_agent(crate::build_info::user_agent())
+        .build()?;
+    let auth_token = resolve_localnet_auth_token(auth_token);
+    let request = client
+        .post(format!("http://127.0.0.1:{port}/{path}"))
+        .query(query)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body);
+    let response = with_localnet_auth(request, auth_token.as_deref())
+        .send()
+        .await
+        .with_context(|| format!("Failed to reach localnet control endpoint /{path}"))?;
+
+    parse_localnet_control_response(response, action).await
+}
+
+async fn parse_localnet_control_response(
+    response: reqwest::Response,
+    action: &str,
+) -> anyhow::Result<serde_json::Value> {
+    if response.status().is_success() {
+        let json: serde_json::Value = response.json().await?;
         if json
             .get("ok")
             .and_then(serde_json::Value::as_bool)
@@ -541,8 +625,8 @@ pub(super) async fn post_localnet_control(
             anyhow::bail!("{action} failed: {error}");
         }
     } else {
-        let status = res.status();
-        let body = res.text().await.unwrap_or_default();
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
         anyhow::bail!("{action} failed with status {status}: {body}");
     }
 }

@@ -3,6 +3,7 @@ mod block;
 mod error;
 pub mod executor;
 mod indexer;
+mod jetton_faucet;
 mod liteapi;
 mod localnet;
 pub mod node;

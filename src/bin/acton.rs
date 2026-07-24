@@ -678,6 +678,7 @@ enum Commands {
         #[arg(
             value_enum,
             long,
+            default_value = "actonscan",
             help = "Explorer to use for transaction links",
             help_heading = "Broadcasting",
             value_name = "NAME"
@@ -1175,6 +1176,19 @@ pub enum LocalnetCommand {
             help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
         )]
         require_auth: bool,
+        #[arg(
+            long,
+            help = "Start the LiteAPI server (default port: Localnet HTTP port + 1)"
+        )]
+        liteapi: bool,
+        #[arg(
+            long,
+            requires = "liteapi",
+            value_name = "PORT",
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "LiteAPI server port (default: Localnet HTTP port + 1)"
+        )]
+        liteapi_port: Option<u16>,
     },
     #[command(about = "Request GRAM from faucet")]
     Airdrop {
@@ -1274,20 +1288,25 @@ pub enum LocalnetCommand {
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
         auth_token: Option<String>,
     },
-    #[command(about = "Manage named localnet state snapshots")]
-    Snapshot {
+    #[command(about = "Dump or load the current localnet state")]
+    State {
         #[command(subcommand)]
-        command: LocalnetSnapshotCommand,
+        command: LocalnetStateCommand,
+    },
+    #[command(about = "Manage named in-memory localnet checkpoints")]
+    Checkpoint {
+        #[command(subcommand)]
+        command: LocalnetCheckpointCommand,
     },
 }
 
 #[derive(Subcommand, Clone)]
-pub enum LocalnetSnapshotCommand {
-    #[command(about = "Create a named localnet state snapshot")]
-    Create {
-        #[arg(help = "Snapshot name", value_name = "NAME")]
-        name: String,
-        #[arg(long, help = "Overwrite an existing snapshot with the same name")]
+pub enum LocalnetStateCommand {
+    #[command(about = "Dump the current localnet state to a JSON file")]
+    Dump {
+        #[arg(help = "Output JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(long, help = "Overwrite the output file if it already exists")]
         force: bool,
         #[arg(
             long,
@@ -1298,7 +1317,39 @@ pub enum LocalnetSnapshotCommand {
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
         auth_token: Option<String>,
     },
-    #[command(about = "List named localnet state snapshots")]
+    #[command(about = "Replace the current localnet state from a JSON file")]
+    Load {
+        #[arg(help = "State JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LocalnetCheckpointCommand {
+    #[command(about = "Create a named in-memory checkpoint")]
+    Create {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "List in-memory checkpoints")]
     List {
         #[arg(
             long,
@@ -1309,9 +1360,9 @@ pub enum LocalnetSnapshotCommand {
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
         auth_token: Option<String>,
     },
-    #[command(about = "Revert localnet to a named state snapshot")]
-    Revert {
-        #[arg(help = "Snapshot name", value_name = "NAME")]
+    #[command(about = "Restore localnet state from a checkpoint")]
+    Restore {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
         name: String,
         #[arg(
             long,
@@ -1322,9 +1373,33 @@ pub enum LocalnetSnapshotCommand {
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
         auth_token: Option<String>,
     },
-    #[command(about = "Export a named localnet state snapshot to a JSON file")]
+    #[command(about = "Delete an in-memory checkpoint")]
+    Delete {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Delete all in-memory checkpoints")]
+    Clear {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Export a checkpoint to a JSON file")]
     Export {
-        #[arg(help = "Snapshot name", value_name = "NAME")]
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
         name: String,
         #[arg(long, help = "Output JSON file", value_name = "PATH")]
         out: PathBuf,
@@ -1339,17 +1414,17 @@ pub enum LocalnetSnapshotCommand {
         #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
         auth_token: Option<String>,
     },
-    #[command(about = "Import a JSON file as a named localnet state snapshot")]
+    #[command(about = "Import a JSON file as an in-memory checkpoint")]
     Import {
-        #[arg(help = "Snapshot JSON file to import", value_name = "PATH")]
+        #[arg(help = "Checkpoint JSON file to import", value_name = "PATH")]
         path: PathBuf,
         #[arg(
             long,
-            help = "Snapshot name (defaults to the file stem)",
+            help = "Checkpoint name (defaults to the file stem)",
             value_name = "NAME"
         )]
         name: Option<String>,
-        #[arg(long, help = "Overwrite an existing snapshot with the same name")]
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
         force: bool,
         #[arg(
             long,
@@ -2578,6 +2653,8 @@ fn main() {
                 load_state,
                 dump_state,
                 require_auth,
+                liteapi,
+                liteapi_port,
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
@@ -2610,6 +2687,8 @@ fn main() {
                         load_state,
                         dump_state,
                         require_auth,
+                        liteapi,
+                        liteapi_port,
                     )
                     .await
                 })
@@ -2703,13 +2782,46 @@ fn main() {
                     commands::localnet::localnet_status_cmd(port, json, auth_token).await
                 })
             }
-            LocalnetCommand::Snapshot { command } => {
+            LocalnetCommand::State { command } => {
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
                 match command {
-                    LocalnetSnapshotCommand::Create {
+                    LocalnetStateCommand::Dump {
+                        path,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_dump_cmd(
+                                path, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetStateCommand::Load {
+                        path,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_load_cmd(path, port, auth_token)
+                                .await
+                        })
+                    }
+                }
+            }
+            LocalnetCommand::Checkpoint { command } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                match command {
+                    LocalnetCheckpointCommand::Create {
                         name,
                         force,
                         port,
@@ -2717,32 +2829,52 @@ fn main() {
                     } => {
                         let port = resolve_localnet_port(port);
                         rt.block_on(async {
-                            commands::localnet::localnet_snapshot_create_cmd(
+                            commands::localnet::localnet_checkpoint_create_cmd(
                                 &name, force, port, auth_token,
                             )
                             .await
                         })
                     }
-                    LocalnetSnapshotCommand::List { port, auth_token } => {
+                    LocalnetCheckpointCommand::List { port, auth_token } => {
                         let port = resolve_localnet_port(port);
                         rt.block_on(async {
-                            commands::localnet::localnet_snapshot_list_cmd(port, auth_token).await
+                            commands::localnet::localnet_checkpoint_list_cmd(port, auth_token).await
                         })
                     }
-                    LocalnetSnapshotCommand::Revert {
+                    LocalnetCheckpointCommand::Restore {
                         name,
                         port,
                         auth_token,
                     } => {
                         let port = resolve_localnet_port(port);
                         rt.block_on(async {
-                            commands::localnet::localnet_snapshot_revert_cmd(
+                            commands::localnet::localnet_checkpoint_restore_cmd(
                                 &name, port, auth_token,
                             )
                             .await
                         })
                     }
-                    LocalnetSnapshotCommand::Export {
+                    LocalnetCheckpointCommand::Delete {
+                        name,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_delete_cmd(
+                                &name, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Clear { port, auth_token } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_clear_cmd(port, auth_token)
+                                .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Export {
                         name,
                         out,
                         force,
@@ -2751,13 +2883,13 @@ fn main() {
                     } => {
                         let port = resolve_localnet_port(port);
                         rt.block_on(async {
-                            commands::localnet::localnet_snapshot_export_cmd(
+                            commands::localnet::localnet_checkpoint_export_cmd(
                                 &name, out, force, port, auth_token,
                             )
                             .await
                         })
                     }
-                    LocalnetSnapshotCommand::Import {
+                    LocalnetCheckpointCommand::Import {
                         path,
                         name,
                         force,
@@ -2766,7 +2898,7 @@ fn main() {
                     } => {
                         let port = resolve_localnet_port(port);
                         rt.block_on(async {
-                            commands::localnet::localnet_snapshot_import_cmd(
+                            commands::localnet::localnet_checkpoint_import_cmd(
                                 path, name, force, port, auth_token,
                             )
                             .await

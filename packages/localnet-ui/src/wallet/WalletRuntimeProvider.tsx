@@ -1,5 +1,6 @@
 import {Check, Copy, KeyRound, Shield} from "lucide-react"
-import {Button, Dialog, useToast} from "@acton/ui"
+import {TlbCellViewer} from "@acton/transaction-ui"
+import {Button, Dialog, RawDataBlock, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -18,7 +19,6 @@ import {formatAddress, normalizeAddress} from "../explorer/components/utils"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import {addStartupWalletToKit, createWalletKit, getWalletNetworkLabel} from "./kit"
-import {SignRequestCellPreview} from "./SignRequestCellPreview"
 import type {RuntimeWallet, StartupWalletRecord} from "./types"
 import {isSupportedWalletVersion} from "./types"
 import {useTonConnectPasteHandler} from "./useTonConnectPasteHandler"
@@ -686,10 +686,17 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     <WalletRuntimeContext.Provider value={value}>
       {children}
       {pendingConnectRequest && (
-        <ModalShell
+        <Dialog
+          open
           title="Connection Request"
-          subtitle={`${getDappName(pendingConnectRequest.preview.dAppInfo?.name)} wants to connect`}
-          onDismiss={() => setPendingConnectRequest(undefined)}
+          description={`${getDappName(pendingConnectRequest.preview.dAppInfo?.name)} wants to connect`}
+          className={styles.modalDialog}
+          maxWidth={520}
+          closeLabel="Close request"
+          contentClassName={styles.modalContent}
+          onOpenChange={open => {
+            if (!open) setPendingConnectRequest(undefined)
+          }}
         >
           <div className={styles.permissionsList}>
             {pendingConnectRequest.preview.permissions.map((permission, index) => (
@@ -751,14 +758,21 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               Connect
             </Button>
           </div>
-        </ModalShell>
+        </Dialog>
       )}
 
       {pendingTransactionRequest && (
-        <ModalShell
+        <Dialog
+          open
           title="Transaction Request"
-          subtitle={`${getDappName(pendingTransactionRequest.dAppInfo?.name)} wants this wallet to send a transaction.`}
-          onDismiss={() => setPendingTransactionRequest(undefined)}
+          description={`${getDappName(pendingTransactionRequest.dAppInfo?.name)} wants this wallet to send a transaction.`}
+          className={styles.modalDialog}
+          maxWidth={520}
+          closeLabel="Close request"
+          contentClassName={styles.modalContent}
+          onOpenChange={open => {
+            if (!open) setPendingTransactionRequest(undefined)
+          }}
         >
           <div className={styles.requestSummary}>
             <MetaRow label="Messages">
@@ -813,16 +827,29 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               Approve
             </Button>
           </div>
-        </ModalShell>
+        </Dialog>
       )}
 
       {pendingSignDataRequest && (
-        <ModalShell
+        <Dialog
+          open
           title="Sign Request"
-          subtitle={`${getDappName(pendingSignDataRequest.preview.dAppInfo?.name)} wants a signature.`}
-          onDismiss={() => setPendingSignDataRequest(undefined)}
+          description={`${getDappName(pendingSignDataRequest.preview.dAppInfo?.name)} wants a signature`}
+          className={`${styles.modalDialog} ${
+            pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialog : ""
+          }`}
+          maxWidth={520}
+          closeLabel="Close request"
+          contentClassName={`${styles.modalContent} ${
+            pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialogContent : ""
+          }`}
+          onOpenChange={open => {
+            if (!open) setPendingSignDataRequest(undefined)
+          }}
         >
-          <SignRequestPreview preview={pendingSignDataRequest.preview.data} />
+          <div className={styles.signRequestPreview}>
+            <SignRequestPreview preview={pendingSignDataRequest.preview.data} />
+          </div>
 
           <div className={styles.modalActions}>
             <Button
@@ -840,35 +867,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               Sign
             </Button>
           </div>
-        </ModalShell>
+        </Dialog>
       )}
     </WalletRuntimeContext.Provider>
   )
 }
-
-interface ModalShellProps {
-  readonly title: string
-  readonly subtitle: string
-  readonly onDismiss: () => void
-  readonly children: ReactNode
-}
-
-const ModalShell: FC<ModalShellProps> = ({title, subtitle, onDismiss, children}) => (
-  <Dialog
-    open
-    title={title}
-    description={subtitle}
-    className={styles.modalDialog}
-    maxWidth={520}
-    closeLabel="Close request"
-    contentClassName={styles.modalContent}
-    onOpenChange={open => {
-      if (!open) onDismiss()
-    }}
-  >
-    {children}
-  </Dialog>
-)
 
 interface MetaRowProps {
   readonly label: string
@@ -910,32 +913,32 @@ const CopyableAddress: FC<CopyableAddressProps> = ({address, copiedAddress, onCo
 
 const SignRequestPreview: FC<SignRequestPreviewProps> = ({preview}) => {
   if (preview.type === "cell") {
-    return <SignRequestCellPreview preview={preview} />
+    return <TlbCellViewer boc={preview.value.content} schema={preview.value.schema} />
   }
+
+  const isText = preview.type === "text"
+  const content = preview.value.content
 
   return (
-    <div className={styles.messageItem}>
-      <KeyRound size={16} />
-      <div>
-        <div className={styles.messageAddress}>{preview.type.toUpperCase()}</div>
-        <div className={styles.permissionDescription}>{describeSignPreview(preview)}</div>
+    <div className={styles.signValuePreview}>
+      <div className={styles.signValueSummary}>
+        <KeyRound size={16} aria-hidden="true" />
+        <div className={styles.signValueTitle}>
+          <span className={styles.signValueType}>{isText ? "Text" : "Binary"}</span>
+          <span className={styles.signValueMetadata}>
+            · {content.length} {isText ? "characters" : "base64 characters"}
+          </span>
+        </div>
       </div>
+
+      <RawDataBlock
+        title={isText ? "Message" : "Payload"}
+        value={content}
+        copyLabel={isText ? "text payload" : "binary payload"}
+        customContent={isText ? <div className={styles.signTextContent}>{content}</div> : undefined}
+      />
     </div>
   )
-}
-
-function describeSignPreview(preview: SignDataRequestEvent["preview"]["data"]): string {
-  switch (preview.type) {
-    case "text": {
-      return preview.value.content
-    }
-    case "binary": {
-      return `${preview.value.content.length} base64 chars`
-    }
-    default: {
-      return "Unknown sign payload"
-    }
-  }
 }
 
 function shortenAddress(address: string, visibleChars: number): string {

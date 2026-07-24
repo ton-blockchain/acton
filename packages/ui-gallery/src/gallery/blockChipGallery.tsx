@@ -8,12 +8,13 @@ export const blockChipGallery = {
   title: "BlockChip",
   status: "ready",
   summary:
-    "BlockChip renders compact block seqnos with shared explorer link, hover, focus, and coordinated highlight styling.",
+    "BlockChip renders block seqnos or full block IDs with shared explorer link, hover, focus, and coordinated highlight styling.",
   importStatement: 'import {BlockChip} from "@acton/ui"',
   agentSummary:
-    "Use BlockChip for linked or read-only block seqnos while keeping route construction in the caller.",
+    "Use BlockChip for linked or read-only block IDs while keeping route construction in the caller.",
   usage: [
     "Pass href for a navigable block seqno.",
+    'Use display="full" when workchain and shard context must stay visible.',
     "Use highlighted to coordinate a block with another selected or hovered view.",
     "Keep workchain and shard context in the caller.",
   ],
@@ -45,6 +46,16 @@ export const blockChipGallery = {
           <article className={styles.sample}>
             <span className={styles.sampleTitle}>Highlighted</span>
             <BlockChip workchain={-1} shard="8000000000000000" seqno={80_323_933} highlighted />
+          </article>
+          <article className={styles.sample}>
+            <span className={styles.sampleTitle}>Full block ID</span>
+            <BlockChip
+              workchain={-1}
+              shard="8000000000000000"
+              seqno={80_323_933}
+              display="full"
+              href="#block-chip"
+            />
           </article>
         </div>
       ),

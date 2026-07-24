@@ -48,6 +48,7 @@ url = { workspace = true }
 include_dir = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

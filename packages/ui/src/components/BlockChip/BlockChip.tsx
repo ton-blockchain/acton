@@ -10,6 +10,7 @@ import type {ToncenterBlockId} from "./blockId"
 
 export interface BlockChipProps extends ToncenterBlockId {
   readonly className?: string
+  readonly display?: "seqno" | "full"
   readonly highlighted?: boolean
   readonly href?: string
   readonly label?: ReactNode
@@ -22,16 +23,17 @@ export function BlockChip({
   shard,
   seqno,
   className,
+  display = "seqno",
   highlighted = false,
   href,
   label,
   onClick,
   title,
 }: BlockChipProps) {
-  const content = label ?? seqno
-  const chipClassName = cx(styles.blockChip, highlighted && styles.highlighted, className)
-  const chipTitle = title ?? `Block ${seqno}`
   const toncenterBlockId = formatToncenterBlockId({workchain, shard, seqno})
+  const content = label ?? (display === "full" ? toncenterBlockId : seqno)
+  const chipClassName = cx(styles.blockChip, highlighted && styles.highlighted, className)
+  const chipTitle = title ?? (display === "full" ? toncenterBlockId : `Block ${seqno}`)
 
   return (
     <InlineActions

@@ -114,10 +114,8 @@ export const ContractCode: FC<ContractCodeProps> = ({
       ? "Storage data could not be decoded with this ABI"
       : "No storage data available for this account"
     : "No ABI registered for storage decoding"
-  const hasVerifiedSource = Boolean(verifiedSource?.verified && verifiedSource.bundles.length > 0)
-  const hasLocalVerifiedSource = Boolean(
-    verifiedSource?.bundles.some(bundle => bundle.storage_revision === "local"),
-  )
+  const hasVerifiedSource = Boolean(verifiedSource?.verified && verifiedSource.bundle)
+  const hasLocalVerifiedSource = verifiedSource?.bundle?.storage_revision === "local"
 
   const handleContractTabChange = (tab: ContractCodeTab) => {
     setActiveTab(tab)

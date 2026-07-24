@@ -15,9 +15,11 @@ import type {FC} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {NftItem} from "../../explorer/api/types"
-import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
-import {NFT_PLACEHOLDER_IMAGE} from "../constants"
+import {NftImage} from "../../explorer/components/NftImage"
+import {NFT_IMAGE_SOURCE_KEYS, getImageSources} from "../../explorer/components/imageFallbacks"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {contentString} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
@@ -34,11 +36,14 @@ interface NftsState {
 
 export const NftsPage: FC<NftsPageProps> = ({client}) => {
   const navigate = useNavigate()
+  const routes = useExplorerRoutePaths()
+  const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const [nftsState, setNftsState] = useState<NftsState>({
     items: [],
     isLoading: true,
   })
   const showLoadingSkeleton = useDelayedLoadingVisibility(nftsState.isLoading, 500)
+  const visibleItems = nftsState.items.filter(item => !hiddenAddresses.has(item.address))
 
   useEffect(() => {
     let cancelled = false
@@ -116,15 +121,15 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                     rowKeyPrefix="nft-table-skeleton"
                   />
                 ) : null
-              ) : nftsState.items.length === 0 ? (
+              ) : visibleItems.length === 0 ? (
                 <DataTableEmpty colSpan={5}>No NFTs yet</DataTableEmpty>
               ) : (
-                nftsState.items.map(item => {
+                visibleItems.map(item => {
                   const name = contentString(item.content, "name") || "NFT Item"
-                  const image = contentString(item.content, "image") || NFT_PLACEHOLDER_IMAGE
+                  const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
                   const collectionName =
                     contentString(item.collection?.collection_content, "name") || "Standalone"
-                  const href = `/explorer/address/${encodeURIComponent(item.address)}`
+                  const href = routes.addressPath(item.address)
 
                   return (
                     <DataTableRow
@@ -144,19 +149,19 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                     >
                       <DataTableCell>
                         <div className={styles.assetTableIdentity}>
-                          <img
-                            src={image}
-                            alt=""
-                            className={`${styles.assetTableImage} ${
-                              item.is_nsfw ? styles.nsfwImage : ""
-                            }`}
-                            onError={event => {
-                              const imageElement = event.currentTarget
-                              if (imageElement.getAttribute("src") !== NFT_PLACEHOLDER_IMAGE) {
-                                imageElement.src = NFT_PLACEHOLDER_IMAGE
-                              }
-                            }}
-                          />
+                          <span className={styles.assetTableImageFrame}>
+                            <NftImage
+                              sources={imageSources}
+                              alt=""
+                              className={styles.assetTableImage}
+                              blurredClassName={styles.blurredAssetImage}
+                              collectionName={collectionName}
+                              blurred={item.is_scam === true}
+                              onNsfw={() => {
+                                setHiddenAddresses(current => new Set(current).add(item.address))
+                              }}
+                            />
+                          </span>
                           <strong className={styles.assetTableName}>{name}</strong>
                         </div>
                       </DataTableCell>

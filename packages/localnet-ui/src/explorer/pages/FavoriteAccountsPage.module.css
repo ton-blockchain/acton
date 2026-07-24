@@ -123,6 +123,71 @@
   min-width: 0;
 }
 
+.transactionTable {
+  min-width: 860px;
+}
+
+.hashHeader,
+.hashCell {
+  width: 31%;
+}
+
+.transactionAccountHeader,
+.transactionAccountCell {
+  width: 31%;
+}
+
+.ltHeader,
+.ltCell {
+  width: 18%;
+  text-align: right !important;
+}
+
+.transactionLink {
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: 7px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.transactionLink:hover {
+  color: var(--acton-color-accent);
+  background: color-mix(in srgb, var(--acton-color-accent) 12%, transparent);
+  text-decoration: none;
+}
+
+.transactionLink:focus-visible {
+  border-radius: 3px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.ltCell {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  white-space: nowrap;
+}
+
+.missingValue,
+.emptyHint {
+  color: var(--acton-color-text-muted);
+}
+
+.emptyHint {
+  max-width: 30rem;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
 .balanceCell {
   padding-right: 18px !important;
   white-space: nowrap;

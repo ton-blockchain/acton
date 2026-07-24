@@ -283,7 +283,18 @@ Explorer to use for transaction links.
 
 <CommandOptionMeta label="Possible values">
 
-`tonscan`, `toncx`, `dton`, `tonviewer`
+`actonscan`, `tonscan`, `toncx`, `dton`, `tonviewer`
+
+</CommandOptionMeta>
+
+Actonscan is the default. For `custom:<name>` networks without an explicit
+`networks.<name>.explorer`, Acton embeds the configured `api.v2` and `api.v3`
+endpoints in an Actonscan shared-network URL. An explicit network explorer
+still takes precedence.
+
+<CommandOptionMeta label="Default">
+
+`actonscan`
 
 </CommandOptionMeta>
 

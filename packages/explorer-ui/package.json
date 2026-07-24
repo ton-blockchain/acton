@@ -20,6 +20,7 @@
   "dependencies": {
     "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
+    "@acton/verifier-ui": "workspace:*",
     "@cloudflare/pages-plugin-vercel-og": "^0.1.2",
     "@monaco-editor/react": "^4.7.0",
     "@ton/core": "0.63.1",

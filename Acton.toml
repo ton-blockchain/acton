@@ -14,7 +14,7 @@ fail-on-diff = false
 exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
 
 [fmt]
-ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
+ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**", "tests/integration/snapshots/check/**"]
 
 [localnet]
 port = 3010

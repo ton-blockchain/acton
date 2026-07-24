@@ -1,9 +1,24 @@
 {
+  "faucet": {
+    "in_opcode": 1680571655,
+    "invalid_amount": {
+      "code": 422,
+      "error": "Invalid jetton amount: expected a value greater than zero with up to 9 decimal places",
+      "ok": false,
+      "status": 422
+    },
+    "message_hash_present": true,
+    "ok": true,
+    "out_opcodes": [
+      395134233
+    ],
+    "result_type": "ok"
+  },
   "master": {
     "address_present": true,
     "content_type": "onchain",
     "contract_type": "jetton_master",
-    "total_supply_positive": true,
+    "total_supply": "100000000000",
     "type": "ext.tokens.jettonMasterData",
     "wallet_code_present": true
   },
@@ -14,7 +29,7 @@
   },
   "wallet": {
     "address_present": true,
-    "balance_positive": true,
+    "balance": "100000000000",
     "contract_type": "jetton_wallet",
     "master_present": true,
     "owner_present": true,

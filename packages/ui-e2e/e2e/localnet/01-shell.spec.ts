@@ -1,14 +1,10 @@
 import {expect, test, type Page} from "@playwright/test"
 
+import {mockTonConnectStartupWallet} from "../support/tonConnect"
 import {expectVisualSnapshot, prepareVisualPage, visualSnapshotsEnabled} from "../support/visual"
 
 const demoTonConnectUrl =
   "tc://?v=2&id=3b1cba70841d3695092dc3792246ffb6cb76398be67a5684b5c570dc85c4e172&trace_id=019f7f09-9036-7416-8c01-0c47c208000e&r=%7B%22manifestUrl%22%3A%22https%3A%2F%2Ftonconnect-sdk-demo-dapp.vercel.app%2Ftonconnect-manifest.json%22%2C%22items%22%3A%5B%7B%22name%22%3A%22ton_addr%22%7D%5D%7D&ret=none"
-const testWalletMnemonic =
-  "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later".split(
-    " ",
-  )
-
 const mockTonConnectRequest = async (page: Page) => {
   await page.route(
     "https://tonconnect-sdk-demo-dapp.vercel.app/tonconnect-manifest.json",
@@ -21,22 +17,9 @@ const mockTonConnectRequest = async (page: Page) => {
         },
       }),
   )
-  await page.route(
-    url => url.pathname === "/acton_getStartupWallets",
-    async route =>
-      route.fulfill({
-        json: [
-          {
-            name: "deployer",
-            mnemonic: testWalletMnemonic,
-            version: "v4r2",
-            network: "localnet",
-            address: "0:3029b3eaeda86a5381d86100f2a8b761c38de45642edb6e4bb1cca2e6dd7ffed",
-            public_key: "",
-            wallet_id: 698_983_191,
-          },
-        ],
-      }),
+  await mockTonConnectStartupWallet(
+    page,
+    "0:3029b3eaeda86a5381d86100f2a8b761c38de45642edb6e4bb1cca2e6dd7ffed",
   )
 }
 

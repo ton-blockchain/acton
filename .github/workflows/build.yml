@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
+      - "apps/**"
       - "docs/**"
     types:
       - opened
@@ -15,6 +16,8 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - "apps/**"
   workflow_dispatch:
 
 concurrency:

@@ -77,8 +77,7 @@
   color: var(--acton-color-text);
 }
 
-.editorTab:focus-visible,
-.bundleTab:focus-visible {
+.editorTab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
@@ -143,55 +142,6 @@
   min-width: 0;
 }
 
-.verifiedHeader {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.bundleTabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  max-width: 100%;
-  padding: 3px;
-  overflow-x: auto;
-  background: var(--acton-color-surface-hover);
-  border: 1px solid var(--acton-color-border);
-  border-radius: 10px;
-  scrollbar-width: none;
-}
-
-.bundleTabs::-webkit-scrollbar {
-  display: none;
-}
-
-.bundleTab {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--acton-color-text-muted);
-  cursor: pointer;
-  font-family: var(--acton-font-mono);
-  font-size: var(--acton-font-size-xs);
-  font-weight: var(--acton-font-weight-utility);
-  white-space: nowrap;
-  transition: color var(--acton-duration-fast);
-}
-
-.bundleTab:hover {
-  color: var(--acton-color-text);
-}
-
-.bundleTabActive {
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface);
-}
-
 .empty {
   display: flex;
   align-items: center;
@@ -223,10 +173,5 @@
 
   .editorTab {
     flex: 0 0 auto;
-  }
-
-  .verifiedHeader {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }

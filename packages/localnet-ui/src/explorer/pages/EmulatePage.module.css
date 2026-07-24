@@ -162,11 +162,34 @@
   overflow: visible;
 }
 
-.emulateAction {
+.emulateActions {
   position: absolute;
   z-index: 1;
   inset-block-start: var(--acton-space-3);
   inset-inline-end: var(--acton-space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+}
+
+.sendConfirmationContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-5);
+}
+
+.sendConfirmationText {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.sendConfirmationActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
 }
 
 .builderGrid {
@@ -629,6 +652,10 @@
   .payloadPanel {
     border-top: 1px solid var(--acton-color-border);
     border-left: 0;
+  }
+
+  .builderGrid > .builderPanel:first-child {
+    padding-block-start: calc(var(--acton-space-3) + 2rem + var(--acton-space-4));
   }
 
   .payloadInputHeader,

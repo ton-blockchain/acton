@@ -2,10 +2,11 @@ import {createHighlighterCore} from "shiki/core"
 import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
 
-import funcGrammarRaw from "../../../../../docs/grammars/grammar-func.json"
-import tasmGrammarRaw from "../../../../../docs/grammars/grammar-tasm.json"
-import tlbGrammarRaw from "../../../../../docs/grammars/grammar-tlb.json"
-import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
+import funcGrammarRaw from "./grammars/Func.tmLanguage.json"
+import tactGrammarRaw from "./grammars/Tact.tmLanguage.json"
+import tasmGrammarRaw from "./grammars/Tasm.tmLanguage.json"
+import tlbGrammarRaw from "./grammars/Tlb.tmLanguage.json"
+import tolkGrammarRaw from "./grammars/Tolk.tmLanguage.json"
 
 import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "./themes"
 import type {HighlightedCodeLanguage, HighlightedCodeTheme} from "./types"
@@ -23,6 +24,9 @@ export const getHighlightedCodeHighlighter = () => {
     themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
     langs: [
       grammarWithName(funcGrammarRaw, "func"),
+      // Source: tact-lang/tact-sublime@066e45b2de8bc6182ef5cffce8d5f7f99d602d25.
+      // The upstream MIT license is stored next to the grammar.
+      grammarWithName(tactGrammarRaw, "tact"),
       grammarWithName(tasmGrammarRaw, "tasm"),
       grammarWithName(tlbGrammarRaw, "tlb"),
       grammarWithName(tolkGrammarRaw, "tolk"),

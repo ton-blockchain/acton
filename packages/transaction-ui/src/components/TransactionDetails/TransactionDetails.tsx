@@ -32,7 +32,11 @@ import {
   type ContractVerifiedSource,
 } from "../ContractSourcePanel/ContractSourcePanel"
 import * as fmt from "../../lib/format"
-import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "../../lib/messageBody"
+import {
+  decodeStateInitData,
+  decodeTransactionMessageBody,
+  getShardAccountBalance,
+} from "../../lib/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -40,6 +44,7 @@ import {
   getTransactionOpcode,
   getTransactionSourceLabel,
   getTransactionTriggerLabel,
+  isSystemSourceAddress,
   resolveTransactionOpcodeName,
 } from "../../lib/transaction"
 
@@ -64,7 +69,10 @@ export interface TransactionDetailsProps {
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
-  readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => React.ReactNode
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick?: (
     blockRef: TransactionBlockRef,
@@ -170,7 +178,6 @@ export function TransactionDetails({
   const computePhase = getTransactionComputePhase(tx.transaction)
   const actionPhase = getTransactionActionPhase(tx.transaction)
   const triggerLabel = getTransactionTriggerLabel(tx.transaction)
-  const messageRouteAction = renderMessageRouteAction?.(tx)
   const blockRef = tx.blockRef
   const blockSeqno = blockRef?.seqno
   const blockPath = blockRef ? getBlockPath?.(blockRef) : undefined
@@ -215,6 +222,16 @@ export function TransactionDetails({
       ? {...targetContract, abi: targetAbi}
       : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
+  const internalSource = inMessage?.info.type === "internal" ? inMessage.info.src : undefined
+  const internalSourceAddress = internalSource?.toString()
+  const sourceContracts =
+    internalSource && internalSourceAddress && isSystemSourceAddress(internalSource)
+      ? new Map(contracts).set(internalSourceAddress, {
+          displayName: "System",
+          address: internalSource,
+          letter: "S",
+        })
+      : contracts
   const hasMessageBody =
     // biome-ignore lint/suspicious/noDoubleEquals: ok
     inMessage != undefined &&
@@ -248,11 +265,12 @@ export function TransactionDetails({
     ...allContracts.map(contract => contract.abi),
     ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
   ].filter((abi): abi is NonNullable<ContractData["abi"]> => abi !== undefined)
-  const parsedBody =
-    tx.parsedBody ??
-    (inMessage
-      ? decodeMessageBody(inMessage, contracts, tx.address?.toString(), additionalMessageBodyAbis)
-      : undefined)
+  const parsedBody = decodeTransactionMessageBody(
+    tx,
+    contracts,
+    allContracts,
+    compilerAbisByCodeHash,
+  )
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
     targetContractWithAbi,
@@ -261,8 +279,10 @@ export function TransactionDetails({
   )
   const sendMode = computeSendMode(tx)
 
-  const opcode = getTransactionOpcode(tx.transaction)
-  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
+  const opcode = getTransactionOpcode(tx.transaction, parsedBody)
+  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
+  const opcodeDisplayName = parsedBody && opcode === undefined ? parsedBody.name : opcodeName
+  const messageRouteAction = renderMessageRouteAction?.(tx, opcodeDisplayName)
   const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
   const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
 
@@ -395,12 +415,12 @@ export function TransactionDetails({
               </span>
             ) : (
               <span className={styles.triggerRoute}>
-                {sourceLabel ? (
+                {sourceLabel && !internalSource ? (
                   <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
                 ) : (
                   <ContractChip
-                    address={tx.transaction.inMessage?.info.src?.toString()}
-                    contracts={contracts}
+                    address={internalSourceAddress}
+                    contracts={sourceContracts}
                     onContractClick={onContractClick}
                   />
                 )}
@@ -508,10 +528,15 @@ export function TransactionDetails({
           >
             {messageCopyActions}
             <div className={styles.multiColumnRow}>
-              <div className={styles.multiColumnItem}>
+              <div className={`${styles.multiColumnItem} ${styles.messageOpcodeItem}`}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
                 <div className={styles.multiColumnItemValue}>
-                  <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
+                  <OpcodeChip
+                    className={styles.messageOpcode}
+                    opcode={opcode}
+                    abiName={opcodeDisplayName}
+                    showOpcode={true}
+                  />
                 </div>
               </div>
             </div>

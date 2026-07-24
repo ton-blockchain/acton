@@ -41,6 +41,10 @@
   font-weight: var(--acton-font-weight-bold);
 }
 
+.mobileHeadline {
+  display: none;
+}
+
 .developerIcon {
   display: block;
   flex: 0 0 auto;
@@ -124,7 +128,44 @@
     align-self: center;
   }
 
+  .desktopHeadline {
+    display: none;
+  }
+
+  .mobileHeadline {
+    display: inline;
+  }
+
   .separator:first-of-type {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .inner {
+    min-height: 40px;
+  }
+
+  .message {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .message strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .link {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .publicExplorerPrompt,
+  .separator {
     display: none;
   }
 }

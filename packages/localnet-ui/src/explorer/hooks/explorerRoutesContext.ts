@@ -1,5 +1,7 @@
 import {createContext} from "react"
 
+import {normalizeAddress, type AddressFormatOptions} from "../components/utils"
+
 export interface ExplorerRoutes {
   readonly rootPath: string
   readonly blocksPath: string
@@ -15,7 +17,10 @@ export interface ExplorerRoutes {
   readonly transactionTracePath: (hash: string) => string
 }
 
-export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
+export const createExplorerRoutes = (
+  basePath: string,
+  addressFormat: AddressFormatOptions = {testOnly: false},
+): ExplorerRoutes => {
   const base = basePath.replace(/\/$/, "")
   const path = (suffix = "") => `${base}${suffix}` || "/"
 
@@ -28,7 +33,8 @@ export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
     sourcesPath: path("/sources"),
     favoritesPath: path("/favorites"),
     abiDetailsPath: slug => path(`/abi/${encodeURIComponent(slug)}`),
-    addressPath: address => path(`/address/${encodeURIComponent(address)}`),
+    addressPath: address =>
+      path(`/address/${encodeURIComponent(normalizeAddress(address, addressFormat))}`),
     blockPath: (workchain, shard, seqno) =>
       `/block/${workchain}/${encodeURIComponent(shard)}/${seqno}`,
     transactionPath: hash => path(`/tx/${encodeURIComponent(hash)}`),

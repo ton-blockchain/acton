@@ -1,4 +1,5 @@
 import type {ParsedValue, ParsedValueLeaf} from "../ParsedValueView/types"
+import {formatScalarByFieldName} from "../ParsedValueView/scalarDisplay"
 
 import type {ParsedValueDiff, ParsedValueDiffContainerKind, ParsedValueDiffStatus} from "./types"
 
@@ -39,15 +40,20 @@ const objectValue = (
   entries,
 })
 
-function stringifyParsedValue(value: ParsedValue): string {
+function stringifyParsedValue(value: ParsedValue, isMapKey = false): string {
   switch (value.kind) {
     case "null":
       return "null"
     case "void":
       return "void"
     case "address":
-    case "scalar":
       return value.value
+    case "scalar":
+      return formatScalarByFieldName({
+        value: value.value,
+        typeName: value.typeName,
+        fieldName: isMapKey && value.typeName === "uint256" ? "key" : undefined,
+      })
     case "boolean":
       return value.value ? "true" : "false"
     case "array":
@@ -60,7 +66,10 @@ function stringifyParsedValue(value: ParsedValue): string {
     }
     case "map": {
       const renderedEntries = value.entries
-        .map(entry => `${stringifyParsedValue(entry.key)} => ${stringifyParsedValue(entry.value)}`)
+        .map(
+          entry =>
+            `${stringifyParsedValue(entry.key, true)} => ${stringifyParsedValue(entry.value)}`,
+        )
         .join(", ")
       return `${value.typeName ?? "map"} { ${renderedEntries} }`
     }
@@ -87,7 +96,7 @@ function normalizeParsedValue(value: ParsedValue): StorageValue {
     case "map":
       return objectValue(
         value.entries.map(entry => ({
-          key: stringifyParsedValue(entry.key),
+          key: stringifyParsedValue(entry.key, true),
           value: normalizeParsedValue(entry.value),
         })),
         value.typeName ?? "map",

@@ -16,6 +16,7 @@ export interface CellInspectorParseOptions {
   readonly strict: boolean
   readonly maxDepth: number
   readonly customTlb: string
+  readonly customTlbAuthoritative?: boolean
   readonly abi?: ExtendedContractABI
   readonly abiCodeHash?: string
   /** Report a failed ABI decode when the ABI was explicitly selected by the user. */
@@ -108,6 +109,38 @@ export function parseCell(
     bocBase64: originalBytes.toString("base64"),
   }
   const accumulatedWarnings: ParserWarning[] = [...rawForest.warnings]
+  const parseCustomTlb = (): CellInspectorParseResult | undefined => {
+    const custom = tryParseCustomTlb(selectedRoot, options.customTlb)
+    if (custom?.matched) {
+      const warnings = [...accumulatedWarnings, ...custom.warnings]
+      return {
+        status: warnings.length > 0 ? "partial" : "success",
+        parser: "custom-tlb",
+        data: custom.data,
+        provenance: custom.provenance,
+        warnings,
+        ...shared,
+      }
+    }
+    if (custom && !custom.matched) accumulatedWarnings.push(...custom.warnings)
+    return undefined
+  }
+
+  if (options.customTlbAuthoritative) {
+    const customResult = parseCustomTlb()
+    if (customResult) return customResult
+    return {
+      status: "error",
+      error: {
+        code: "custom-tlb-failed",
+        message: "Custom TL-B could not decode this root",
+        cause:
+          accumulatedWarnings.at(-1)?.message ?? "Enter a TL-B schema before inspecting this root",
+      },
+      warnings: accumulatedWarnings,
+      ...shared,
+    }
+  }
 
   const comment = recognizeStandardComment(selectedRoot)
   if (comment) {
@@ -209,19 +242,8 @@ export function parseCell(
     }
   }
 
-  const custom = tryParseCustomTlb(selectedRoot, options.customTlb)
-  if (custom?.matched) {
-    const warnings = [...accumulatedWarnings, ...custom.warnings]
-    return {
-      status: warnings.length > 0 ? "partial" : "success",
-      parser: "custom-tlb",
-      data: custom.data,
-      provenance: custom.provenance,
-      warnings,
-      ...shared,
-    }
-  }
-  if (custom && !custom.matched) accumulatedWarnings.push(...custom.warnings)
+  const customResult = parseCustomTlb()
+  if (customResult) return customResult
 
   const block = parseBlockTlb(selectedRoot, {strict: options.strict})
   if (block) {

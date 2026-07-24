@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Acton test dApp</title>
+  <rect width="64" height="64" rx="14" fill="rgb(23 23 23)"/>
+  <path d="M16 18h32L32 50 16 18Z" fill="rgb(242 240 233)"/>
+  <path d="M24 26h16l-8 16-8-16Z" fill="rgb(23 23 23)"/>
+</svg>

@@ -262,8 +262,9 @@ const renderActionDetails = (
         contractAddress,
         additionalMessageBodyAbis,
       )
-      const opcode = getMessageOpcode(message)
-      const opcodeName = resolveMessageOpcodeName(message, contracts, contractAddress)
+      const opcode = getMessageOpcode(message, parsedBody)
+      const opcodeName = resolveMessageOpcodeName(message, contracts, contractAddress, parsedBody)
+      const opcodeDisplayName = parsedBody && opcode === undefined ? parsedBody.name : opcodeName
       const showMessageDataSection =
         info.type === "internal" ||
         (info.type === "external-out" &&
@@ -388,7 +389,12 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Opcode:</span>
                   <div className={styles.detailValue}>
-                    <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
+                    <OpcodeChip
+                      className={styles.messageOpcode}
+                      opcode={opcode}
+                      abiName={opcodeDisplayName}
+                      showOpcode={true}
+                    />
                   </div>
                 </div>
                 {parsedBody && (

@@ -34,7 +34,7 @@ export function useExplorerPageTitle(): string | undefined {
   if (relativePath === "/cell") return "Cell Inspector"
   if (relativePath === "/emulate") return "Emulate Transaction"
   if (relativePath === "/sources") return "Verified Sources"
-  if (relativePath === "/favorites") return "Favorite Accounts"
+  if (relativePath === "/favorites") return "Favorites"
 
   if (address) {
     const preferredTitle = pageTitleFromState(location.state) ?? addressName

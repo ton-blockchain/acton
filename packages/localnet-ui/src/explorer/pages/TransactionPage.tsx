@@ -10,10 +10,11 @@ import {
   type TransactionInfo,
   TransactionTree,
   ValueFlowTable,
+  decodeTransactionMessageBody,
   decodeStorageShardAccount,
-  getTransactionComputePhase,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
+import {InlineAction} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -21,16 +22,18 @@ import {
   CheckCircle2,
   CircleDotDashed,
   Database,
+  FlaskConical,
   GitBranch,
   Info,
   ListChecks,
+  Star,
   XCircle,
 } from "lucide-react"
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {V3Action, V3Metadata, V3Trace} from "../api/types"
-import {buildTraceTransactionInfos} from "../api/traceTransactions"
+import {buildTraceTransactionInfos, isTraceSuccessful} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -40,6 +43,7 @@ import {hashToHex, normalizeAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useAvailableFlowMetrics} from "../hooks/useAvailableFlowMetrics"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useFavoriteTransactions} from "../hooks/useFavoriteTransactions"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -47,6 +51,11 @@ import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {RetraceResultAndCode, RetraceTraceResult} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
+import {
+  createEmulateNavigationState,
+  EMULATE_HANDOFF_QUERY_PARAM,
+  saveEmulateNavigationPayload,
+} from "./emulateNavigation"
 import {enrichTraceTransactions} from "./transactionTraceEnrichment"
 
 import styles from "./TransactionPage.module.css"
@@ -257,7 +266,7 @@ async function loadVerifiedSourceByCodeHash(
 ): Promise<ContractVerifiedSource | undefined> {
   try {
     const source = await metadataRegistry.getSource({codeHash})
-    return source.verified && source.bundles.length > 0 ? source : undefined
+    return source.verified && source.bundle ? source : undefined
   } catch (error) {
     console.debug(`Failed to fetch verified source for ${codeHash}`, error)
     return undefined
@@ -282,6 +291,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [error, setError] = useState<string | undefined>()
   const {fetchName, updateDomains} = useAddressBook()
   const {network} = useNetworkInfo()
+  const {isFavorite, toggleFavorite} = useFavoriteTransactions()
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
     (codeHash: string) => loadVerifiedSourceByCodeHash(metadataRegistry, codeHash),
@@ -315,6 +325,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     const requestedHash = hash.toLowerCase()
     return traces.find(tx => transactionHashHex(tx).toLowerCase() === requestedHash)
   }, [hash, traces])
+  const favorite = isFavorite(hash)
   const currentStateChangesStatus =
     stateChangesStatus.traceHash === traceLookupHash.toLowerCase() ? stateChangesStatus : undefined
 
@@ -324,8 +335,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   addressFormatRef.current = addressFormat
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
-    const formattedAddr = normalizeAddress(address, addressFormat)
-    openExplorerPath(navigate, routes.addressPath(formattedAddr), event)
+    openExplorerPath(navigate, routes.addressPath(address), event)
   }
   const handleBlockClick = (
     blockRef: TransactionBlockRef,
@@ -352,6 +362,35 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setRetraceAttempt(currentAttempt => currentAttempt + 1)
   }
 
+  const handleEmulate = (tx: TransactionInfo, messageName: string | undefined) => {
+    const message = tx.transaction.inMessage
+    if (!message) {
+      return
+    }
+
+    const sourceAbi =
+      message.info.type === "internal" ? contracts.get(message.info.src.toString())?.abi : undefined
+    const state = createEmulateNavigationState(
+      message,
+      {destination: tx.contractAbi, source: sourceAbi},
+      traceOverview?.masterchainSeqnoStart,
+      messageName,
+    )
+    const payloadId = saveEmulateNavigationPayload(state.emulatePayload)
+    if (!payloadId) {
+      void navigate(routes.emulatePath, {state})
+      return
+    }
+
+    const emulateUrl = new URL(routes.emulatePath, globalThis.location.origin)
+    emulateUrl.searchParams.set(EMULATE_HANDOFF_QUERY_PARAM, payloadId)
+    const networkParam = new URLSearchParams(globalThis.location.search).get("network")
+    if (networkParam) {
+      emulateUrl.searchParams.set("network", networkParam)
+    }
+    globalThis.open(emulateUrl.toString(), "_blank", "noopener,noreferrer")
+  }
+
   const handleCloseRetrace = () => {
     setExpandedRetraceHash(undefined)
     if (openRetraceOnLoad) {
@@ -374,6 +413,19 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     },
     [hash, navigate, openRetraceOnLoad, routes, searchParams],
   )
+
+  const handleToggleFavorite = useCallback(() => {
+    if (!selectedTraceTransaction) {
+      return
+    }
+
+    toggleFavorite({
+      hash: transactionHashHex(selectedTraceTransaction),
+      account: selectedTraceTransaction.address?.toString(),
+      lt: selectedTraceTransaction.lt,
+      timestamp: selectedTraceTransaction.transaction.now,
+    })
+  }, [selectedTraceTransaction, toggleFavorite])
 
   const loadTransactionActions = useCallback(
     async (tx: TransactionInfo): Promise<LoadedTransactionActions> => {
@@ -593,20 +645,36 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
   const traceAddress = traces[0]?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
-  const renderSelectedTransactionMessageRouteAction = (tx: TransactionInfo): JSX.Element => {
+  const renderSelectedTransactionMessageRouteAction = (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ): JSX.Element => {
     const txHash = transactionHashHex(tx)
     const isRetraceOpen = expandedRetraceHash === txHash
 
     return (
-      <button
-        type="button"
-        className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
-        onClick={() => handleRetrace(txHash)}
-        aria-expanded={isRetraceOpen}
-      >
-        <Bug size={14} />
-        Debug
-      </button>
+      <span className={styles.messageRouteActions}>
+        <button
+          type="button"
+          className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
+          onClick={() => handleRetrace(txHash)}
+          aria-expanded={isRetraceOpen}
+        >
+          <Bug size={14} />
+          Debug
+        </button>
+        {tx.transaction.inMessage ? (
+          <button
+            type="button"
+            className={styles.retraceInlineButton}
+            onClick={() => handleEmulate(tx, messageName)}
+            title="Open and edit this message in Emulate"
+          >
+            <FlaskConical size={14} />
+            Edit &amp; emulate
+          </button>
+        ) : null}
+      </span>
     )
   }
 
@@ -665,6 +733,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           },
         },
       ]}
+      isFavorite={favorite}
       stateChangesLoading={currentStateChangesStatus?.isLoading ?? false}
       stateChangesError={currentStateChangesStatus?.error}
       onTabChange={handleActiveTabChange}
@@ -672,6 +741,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       onContractClick={handleContractClick}
       onTransactionSelect={handleTransactionSelect}
       onBlockClick={handleBlockClick}
+      onToggleFavorite={selectedTraceTransaction ? handleToggleFavorite : undefined}
       loadActions={loadTransactionActions}
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
       renderSelectedTransactionExtra={renderSelectedTransactionExtra}
@@ -700,6 +770,7 @@ export interface TransactionTraceViewProps {
   readonly hoveredAction?: V3Action
   readonly nowSeconds?: number
   readonly breadcrumbs?: ComponentProps<typeof ExplorerBreadcrumbs>["items"]
+  readonly isFavorite?: boolean
   readonly stateChangesLoading?: boolean
   readonly stateChangesError?: string
   readonly onTabChange: (tab: TransactionTraceTabType) => void
@@ -710,11 +781,15 @@ export interface TransactionTraceViewProps {
     blockRef: TransactionBlockRef,
     event?: ExplorerNavigationClickEvent,
   ) => void
+  readonly onToggleFavorite?: () => void
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => JSX.Element | null
-  readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => JSX.Element
+  readonly renderSelectedTransactionMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => JSX.Element
 }
 
 export function TransactionTraceView({
@@ -737,6 +812,7 @@ export function TransactionTraceView({
   hoveredAction,
   nowSeconds = Math.floor(Date.now() / 1000),
   breadcrumbs,
+  isFavorite = false,
   stateChangesLoading = false,
   stateChangesError,
   onTabChange,
@@ -744,6 +820,7 @@ export function TransactionTraceView({
   onContractClick,
   onTransactionSelect,
   onBlockClick,
+  onToggleFavorite,
   getBlockPath = blockPath,
   loadActions,
   resolveVerifiedSourceByCodeHash,
@@ -752,20 +829,26 @@ export function TransactionTraceView({
 }: TransactionTraceViewProps): JSX.Element {
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
-  const firstTrace = traces[0]
-  const firstTraceComputePhase = firstTrace
-    ? getTransactionComputePhase(firstTrace.transaction)
-    : undefined
-  const firstTraceSucceeded =
-    firstTraceComputePhase?.type === "vm" && firstTraceComputePhase.success
-  const traceAddress = firstTrace?.address?.toString() ?? ""
   const rootTraceTransactions = [...traces]
     .filter(tx => !tx.parent)
     .sort(compareTransactionInfoByLt)
+  const firstTrace = rootTraceTransactions[0] ?? traces[0]
+  const traceSucceeded = isTraceSuccessful(traces, traceActions)
+  const traceAddress = firstTrace?.address?.toString() ?? ""
   const selectedTraceTransaction = traces.find(
     tx => transactionHashHex(tx).toLowerCase() === hash.toLowerCase(),
   )
   const selectedTransactionId = selectedTraceTransaction?.id
+  const decodedMessageNamesByTransactionHash = useMemo(() => {
+    const names = new Map<string, string>()
+    for (const tx of traces) {
+      const parsedBody = decodeTransactionMessageBody(tx, contracts, [], compilerAbisByCodeHash)
+      if (parsedBody && parsedBody.opcode === undefined) {
+        names.set(transactionHashHex(tx).toLowerCase(), parsedBody.name)
+      }
+    }
+    return names
+  }, [compilerAbisByCodeHash, contracts, traces])
   const highlightedTransactionIds = useMemo(() => {
     if (!hoveredAction) {
       return undefined
@@ -817,9 +900,9 @@ export function TransactionTraceView({
               <div className={styles.overviewCard}>
                 <div className={styles.overviewHeader}>
                   <div
-                    className={`${styles.status} ${firstTraceSucceeded ? styles.statusSuccess : styles.statusError}`}
+                    className={`${styles.status} ${traceSucceeded ? styles.statusSuccess : styles.statusError}`}
                   >
-                    {firstTraceSucceeded ? (
+                    {traceSucceeded ? (
                       <>
                         <CheckCircle2 size={18} /> {statusLabels.success}
                       </>
@@ -829,8 +912,21 @@ export function TransactionTraceView({
                       </>
                     )}
                   </div>
-                  <div className={styles.value}>
-                    {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
+                  <div className={styles.overviewMeta}>
+                    <div className={styles.value}>
+                      {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
+                    </div>
+                    {onToggleFavorite && (
+                      <InlineAction
+                        className={`${styles.favoriteAction} ${isFavorite ? styles.favoriteActionActive : ""}`}
+                        label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        icon={
+                          <Star className={isFavorite ? styles.favoriteIconActive : undefined} />
+                        }
+                        aria-pressed={isFavorite}
+                        onClick={onToggleFavorite}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -858,12 +954,14 @@ export function TransactionTraceView({
                     <ActionHistoryTable
                       actions={traceActions}
                       actionMetadata={traceActionMetadata}
+                      decodedMessageNamesByTransactionHash={decodedMessageNamesByTransactionHash}
                       ownerAddress={traceAddress}
                       client={client}
                       nowSeconds={nowSeconds}
                       emptyState="No actions found"
                       showTimeColumn={false}
                       interactiveRows={false}
+                      mobileCards
                       className={styles.valueFlowPanel}
                       onAddressClick={onContractClick}
                       onActionHoverChange={onActionHoverChange}

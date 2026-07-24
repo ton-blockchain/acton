@@ -1,9 +1,18 @@
-import {createContext, useContext, useEffect, useMemo, useState, type ReactNode} from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import {Checkbox, InlineAction, Input, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
 import {
+  abiValueToFormValue,
   formatNanoAsGram,
   parseGramAsNano,
   SAMPLE_ADDRESS,
@@ -19,6 +28,8 @@ export interface AbiValueEditorProps {
   readonly symbols: SymTable
   readonly tyIdx: number
   readonly value: unknown
+  /** A decoded ABI value to apply when the editor becomes available. */
+  readonly initialValue?: unknown
   readonly onChange: (value: unknown) => void
   readonly disabled?: boolean
   readonly invalid?: boolean
@@ -30,12 +41,24 @@ export function AbiValueEditor({
   symbols,
   tyIdx,
   value,
+  initialValue,
   onChange,
   disabled = false,
   invalid = false,
   label,
   addressSuggestions = [],
 }: AbiValueEditorProps) {
+  const appliedInitialValue = useRef<unknown>(undefined)
+
+  useEffect(() => {
+    if (initialValue === undefined || appliedInitialValue.current === initialValue) {
+      return
+    }
+
+    appliedInitialValue.current = initialValue
+    onChange(abiValueToFormValue(initialValue))
+  }, [initialValue, onChange])
+
   return (
     <AddressSuggestionsContext.Provider value={addressSuggestions}>
       <div

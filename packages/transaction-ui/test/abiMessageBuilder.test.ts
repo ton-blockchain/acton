@@ -5,6 +5,8 @@ import {
   SAMPLE_ADDRESS,
   abiValueToFormValue,
   buildAbiMessageBoc,
+  buildEmptyMessageBoc,
+  decodeAbiMessageBuilderDraft,
   decodeAbiValueFromCell,
   formatAbiMessageOptionSummary,
   listAbiMessageBuilderOptions,
@@ -32,7 +34,7 @@ const messageAbi = {
   get_methods: [],
   incoming_external: [{body_ty_idx: 12}],
   incoming_messages: [{body_ty_idx: 12}],
-  outgoing_messages: [],
+  outgoing_messages: [{body_ty_idx: 12}],
   storage: {},
   struct_instantiations: [],
   thrown_errors: [],
@@ -72,11 +74,13 @@ describe("ABI message builder", () => {
   test("lists internal and external message options with serializable defaults", () => {
     const internal = listAbiMessageBuilderOptions(messageAbi, "internal")
     const external = listAbiMessageBuilderOptions(messageAbi, "external")
+    const outgoing = listAbiMessageBuilderOptions(messageAbi, "internal", "outgoing")
     const union = listAbiMessageBuilderOptions(unionMessageAbi, "internal")
 
     expect({
       internal: internal.map(summarizeOption),
       external: external.map(summarizeOption),
+      outgoing: outgoing.map(summarizeOption),
       union: union.map(summarizeOption),
     }).toMatchSnapshot()
   })
@@ -130,6 +134,83 @@ describe("ABI message builder", () => {
     }).toMatchSnapshot()
   })
 
+  test("decodes ABI message bodies back into editable builder drafts", () => {
+    const internalOption = requireOption(listAbiMessageBuilderOptions(messageAbi, "internal"), 0)
+    const unionOption = requireOption(listAbiMessageBuilderOptions(unionMessageAbi, "external"), 1)
+    const internalBoc = buildAbiMessageBoc({
+      abi: messageAbi,
+      option: internalOption,
+      destination: DESTINATION_ADDRESS,
+      source: SAMPLE_ADDRESS,
+      value: "1.25",
+      bounce: false,
+      argsJson: '{"value":"7"}',
+    })
+    const unionBoc = buildAbiMessageBoc({
+      abi: unionMessageAbi,
+      option: unionOption,
+      destination: DESTINATION_ADDRESS,
+      argsJson: '{"value":"13"}',
+    })
+    const internalMessage = loadMessage(Cell.fromHex(internalBoc).beginParse())
+    const unionMessage = loadMessage(Cell.fromHex(unionBoc).beginParse())
+    const internalDraft = decodeAbiMessageBuilderDraft(messageAbi, "internal", internalMessage.body)
+    const outgoingDraft = decodeAbiMessageBuilderDraft(
+      messageAbi,
+      "internal",
+      internalMessage.body,
+      "outgoing",
+    )
+    const unionDraft = decodeAbiMessageBuilderDraft(unionMessageAbi, "external", unionMessage.body)
+
+    expect({
+      internal: internalDraft
+        ? {
+            option: summarizeOption(internalDraft.option),
+            args: JSON.parse(internalDraft.argsJson),
+          }
+        : undefined,
+      outgoing: outgoingDraft
+        ? {
+            option: summarizeOption(outgoingDraft.option),
+            args: JSON.parse(outgoingDraft.argsJson),
+          }
+        : undefined,
+      union: unionDraft
+        ? {
+            option: summarizeOption(unionDraft.option),
+            args: JSON.parse(unionDraft.argsJson),
+          }
+        : undefined,
+      emptyBody: decodeAbiMessageBuilderDraft(messageAbi, "internal", Cell.EMPTY),
+    }).toMatchSnapshot()
+  })
+
+  test("builds internal and external messages with empty bodies", () => {
+    const internalBoc = buildEmptyMessageBoc({
+      transport: "internal",
+      destination: DESTINATION_ADDRESS,
+      source: SAMPLE_ADDRESS,
+      value: "0.25",
+      bounce: false,
+    })
+    const externalBoc = buildEmptyMessageBoc({
+      transport: "external",
+      destination: DESTINATION_ADDRESS,
+    })
+
+    expect({
+      internal: {
+        boc: internalBoc,
+        message: summarizeEmptyMessage(loadMessage(Cell.fromHex(internalBoc).beginParse())),
+      },
+      external: {
+        boc: externalBoc,
+        message: summarizeEmptyMessage(loadMessage(Cell.fromHex(externalBoc).beginParse())),
+      },
+    }).toMatchSnapshot()
+  })
+
   test("rejects missing internal fields and malformed values", () => {
     const option = requireOption(listAbiMessageBuilderOptions(messageAbi, "internal"), 0)
     const base = {
@@ -176,6 +257,30 @@ function summarizeMessage(message: Message, abi: ContractABI, bodyTyIdx: number)
   return {
     info,
     body: abiValueToFormValue(decodeAbiValueFromCell(abi, bodyTyIdx, message.body)),
+  }
+}
+
+function summarizeEmptyMessage(message: Message) {
+  const info =
+    message.info.type === "internal"
+      ? {
+          type: message.info.type,
+          source: message.info.src.toString(),
+          destination: message.info.dest.toString(),
+          value: message.info.value.coins.toString(),
+          bounce: message.info.bounce,
+        }
+      : {
+          type: message.info.type,
+          destination: message.info.dest?.toString(),
+        }
+
+  return {
+    info,
+    body: {
+      bits: message.body.bits.length,
+      refs: message.body.refs.length,
+    },
   }
 }
 

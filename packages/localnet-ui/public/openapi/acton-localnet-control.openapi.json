@@ -53,6 +53,34 @@
         }
       }
     },
+    "/acton_fundJetton": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "fundJetton",
+        "summary": "Mint jettons to an account",
+        "description": "Finds the jetton master in localnet state, verifies that it is mintable and has an admin, converts the display amount using the decimals from jetton metadata, preflights the legacy 0x15 and current 0x642b7d07 mint layouts, and queues the uniquely accepted message for the next block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundJettonRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "jetton_master": "0:3333333333333333333333333333333333333333333333333333333333333333",
+                "amount": "12.5"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SendInternalMessageResponse"
+          }
+        }
+      }
+    },
     "/acton_getAddressName": {
       "get": {
         "tags": ["Localnet Control"],
@@ -160,7 +188,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getVerifiedSource",
         "summary": "Get verified contract source",
-        "description": "Proxies Acton verifier source lookup by address or code hash and returns verified source bundles when the contract is confirmed.",
+        "description": "Proxies Acton verifier source lookup by address or code hash and returns the verified source bundle when the contract is confirmed.",
         "parameters": [
           {
             "name": "address",
@@ -191,7 +219,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getRegisteredVerifiedSource",
         "summary": "Get registered contract source",
-        "description": "Returns source bundles registered directly in the localnet node by address or code hash.",
+        "description": "Returns the source bundle registered directly in the localnet node for an address or code hash.",
         "parameters": [
           {
             "name": "address",
@@ -222,7 +250,7 @@
         "tags": ["Localnet Control"],
         "operationId": "listVerifiedSources",
         "summary": "List registered contract sources",
-        "description": "Returns source bundles registered directly in the localnet node.",
+        "description": "Returns source bundles registered directly in the localnet node, one per code hash.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
@@ -315,7 +343,7 @@
                     "source": {
                       "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
                       "verified": true,
-                      "bundles": []
+                      "bundle": null
                     }
                   }
                 ]
@@ -331,27 +359,21 @@
       }
     },
     "/acton_dumpState": {
-      "post": {
+      "get": {
         "tags": ["Localnet Control"],
         "operationId": "dumpState",
-        "summary": "Dump local state",
-        "description": "Writes a JSON state snapshot without stopping the server.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StatePathRequest"
-              },
-              "example": {
-                "path": "snapshots/localnet.json"
-              }
-            }
-          }
-        },
+        "summary": "Download local state",
+        "description": "Returns the current live localnet state as a JSON document.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/NullResponse"
+            "description": "Current localnet state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateFile"
+                }
+              }
+            }
           }
         }
       }
@@ -361,16 +383,13 @@
         "tags": ["Localnet Control"],
         "operationId": "loadState",
         "summary": "Load local state",
-        "description": "Replaces the current node state with a JSON state snapshot.",
+        "description": "Replaces the current node state from the request body and clears all checkpoints.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StatePathRequest"
-              },
-              "example": {
-                "path": "snapshots/localnet.json"
+                "$ref": "#/components/schemas/StateFile"
               }
             }
           }
@@ -382,18 +401,18 @@
         }
       }
     },
-    "/acton_snapshot": {
+    "/acton_createCheckpoint": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "createRecoveryPoint",
-        "summary": "Create runtime recovery point",
-        "description": "Creates an in-memory recovery point for the current localnet state. Recovery points are process-local and are not persisted across restart.",
+        "operationId": "createCheckpoint",
+        "summary": "Create checkpoint",
+        "description": "Creates a named in-memory checkpoint for the current localnet state.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateRecoveryPointRequest"
+                "$ref": "#/components/schemas/CreateCheckpointRequest"
               },
               "example": {
                 "name": "before-upgrade",
@@ -404,36 +423,36 @@
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/RecoveryPointResponse"
+            "$ref": "#/components/responses/CheckpointResponse"
           }
         }
       }
     },
-    "/acton_listSnapshots": {
-      "post": {
+    "/acton_listCheckpoints": {
+      "get": {
         "tags": ["Localnet Control"],
-        "operationId": "listRecoveryPoints",
-        "summary": "List runtime recovery points",
-        "description": "Lists named in-memory recovery points available in the current localnet process.",
+        "operationId": "listCheckpoints",
+        "summary": "List checkpoints",
+        "description": "Lists named in-memory checkpoints in the current localnet process.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/RecoveryPointListResponse"
+            "$ref": "#/components/responses/CheckpointListResponse"
           }
         }
       }
     },
-    "/acton_revert": {
+    "/acton_restoreCheckpoint": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "revertRecoveryPoint",
-        "summary": "Revert runtime recovery point",
-        "description": "Restores a previously created recovery point and invalidates that point plus every newer recovery point.",
+        "operationId": "restoreCheckpoint",
+        "summary": "Restore checkpoint",
+        "description": "Restores a checkpoint without deleting it or checkpoints created after it.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RevertRecoveryPointRequest"
+                "$ref": "#/components/schemas/CheckpointRequest"
               },
               "example": {
                 "name": "before-upgrade"
@@ -443,62 +462,113 @@
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/RecoveryPointResponse"
+            "$ref": "#/components/responses/CheckpointResponse"
           }
         }
       }
     },
-    "/acton_exportSnapshot": {
+    "/acton_deleteCheckpoint": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "exportRecoveryPoint",
-        "summary": "Export runtime recovery point",
-        "description": "Writes a named in-memory recovery point to a JSON snapshot file on the localnet host.",
+        "operationId": "deleteCheckpoint",
+        "summary": "Delete checkpoint",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExportRecoveryPointRequest"
-              },
-              "example": {
-                "name": "before-upgrade",
-                "path": "snapshots/bug.json"
+                "$ref": "#/components/schemas/CheckpointRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/RecoveryPointResponse"
+            "$ref": "#/components/responses/CheckpointResponse"
           }
         }
       }
     },
-    "/acton_importSnapshot": {
+    "/acton_clearCheckpoints": {
       "post": {
         "tags": ["Localnet Control"],
-        "operationId": "importRecoveryPoint",
-        "summary": "Import runtime recovery point",
-        "description": "Reads a JSON snapshot file on the localnet host into the current process as a named recovery point.",
+        "operationId": "clearCheckpoints",
+        "summary": "Clear checkpoints",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ClearCheckpointsResponse"
+          }
+        }
+      }
+    },
+    "/acton_exportCheckpoint": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "exportCheckpoint",
+        "summary": "Download checkpoint",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checkpoint state file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateFile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/acton_importCheckpoint": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "importCheckpoint",
+        "summary": "Import checkpoint",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportRecoveryPointRequest"
-              },
-              "example": {
-                "name": "bug",
-                "path": "snapshots/bug.json",
-                "force": false
+                "$ref": "#/components/schemas/StateFile"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/RecoveryPointResponse"
+            "$ref": "#/components/responses/CheckpointResponse"
           }
         }
       }
@@ -935,7 +1005,7 @@
         }
       },
       "VerifiedSourceResponse": {
-        "description": "Successful wrapped response with source bundles returned by the Acton verifier.",
+        "description": "Successful wrapped response with the source bundle returned by the Acton verifier.",
         "content": {
           "application/json": {
             "schema": {
@@ -957,7 +1027,7 @@
         }
       },
       "RegisteredVerifiedSourcesResponse": {
-        "description": "Successful wrapped response with registered source bundles.",
+        "description": "Successful wrapped response with registered sources, one bundle per code hash.",
         "content": {
           "application/json": {
             "schema": {
@@ -1072,8 +1142,8 @@
           }
         }
       },
-      "RecoveryPointResponse": {
-        "description": "Successful runtime recovery point response.",
+      "CheckpointResponse": {
+        "description": "Successful checkpoint response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1085,7 +1155,7 @@
                   "type": "object",
                   "properties": {
                     "result": {
-                      "$ref": "#/components/schemas/RecoveryPointResult"
+                      "$ref": "#/components/schemas/CheckpointResult"
                     }
                   }
                 }
@@ -1094,8 +1164,8 @@
           }
         }
       },
-      "RecoveryPointListResponse": {
-        "description": "Successful runtime recovery point list response.",
+      "CheckpointListResponse": {
+        "description": "Successful checkpoint list response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1109,7 +1179,35 @@
                     "result": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/RecoveryPointResult"
+                        "$ref": "#/components/schemas/CheckpointResult"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ClearCheckpointsResponse": {
+        "description": "Successful checkpoint clear response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
                       }
                     }
                   }
@@ -1268,6 +1366,23 @@
           }
         }
       },
+      "FundJettonRequest": {
+        "type": "object",
+        "required": ["address", "jetton_master", "amount"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "jetton_master": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]+(?:\\.[0-9]*)?$",
+            "description": "Positive display-unit amount. The server reads decimals from the jetton master metadata and defaults to 9 when the metadata value is missing or invalid."
+          }
+        }
+      },
       "FundAccountResultWrapper": {
         "type": "object",
         "required": ["ok", "result"],
@@ -1383,7 +1498,7 @@
       },
       "VerificationSource": {
         "type": "object",
-        "required": ["code_hash", "verified", "bundles"],
+        "required": ["code_hash", "verified", "bundle"],
         "properties": {
           "code_hash": {
             "$ref": "#/components/schemas/Hash"
@@ -1391,11 +1506,13 @@
           "verified": {
             "type": "boolean"
           },
-          "bundles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceBundle"
-            }
+          "bundle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceBundle"
+              }
+            ],
+            "nullable": true
           }
         }
       },
@@ -1545,12 +1662,15 @@
           }
         }
       },
-      "StatePathRequest": {
+      "StateFile": {
         "type": "object",
-        "required": ["path"],
+        "required": ["globals"],
+        "additionalProperties": true,
         "properties": {
-          "path": {
-            "type": "string"
+          "globals": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Serialized localnet chain globals."
           }
         }
       },
@@ -1705,82 +1825,45 @@
           }
         }
       },
-      "CreateRecoveryPointRequest": {
+      "CreateCheckpointRequest": {
         "type": "object",
         "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
-            "description": "Recovery point name."
+            "description": "Checkpoint name."
           },
           "force": {
             "type": "boolean",
             "default": false,
-            "description": "Overwrite an existing recovery point with the same name."
+            "description": "Overwrite an existing checkpoint with the same name."
           }
         }
       },
-      "RevertRecoveryPointRequest": {
+      "CheckpointRequest": {
         "type": "object",
         "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
-            "description": "Recovery point name returned by /acton_snapshot or /acton_importSnapshot."
+            "description": "Checkpoint name."
           }
         }
       },
-      "ExportRecoveryPointRequest": {
-        "type": "object",
-        "required": ["name", "path"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Recovery point name."
-          },
-          "path": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Output path on the localnet host."
-          }
-        }
-      },
-      "ImportRecoveryPointRequest": {
-        "type": "object",
-        "required": ["name", "path"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Recovery point name to create."
-          },
-          "path": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Input path on the localnet host."
-          },
-          "force": {
-            "type": "boolean",
-            "default": false,
-            "description": "Overwrite an existing recovery point with the same name."
-          }
-        }
-      },
-      "RecoveryPointResult": {
+      "CheckpointResult": {
         "type": "object",
         "required": ["name", "block_seqno"],
         "properties": {
           "name": {
             "type": "string",
-            "description": "Recovery point name."
+            "description": "Checkpoint name."
           },
           "block_seqno": {
             "type": "integer",
             "minimum": 0,
-            "description": "Latest block seqno captured by the recovery point."
+            "description": "Latest block seqno captured by the checkpoint."
           }
         }
       },

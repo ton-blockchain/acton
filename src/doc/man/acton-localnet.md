@@ -66,11 +66,21 @@ Disable automatic block production. Mine blocks manually with
 {{/option}}
 
 {{#option "`--load-state` _path_" }}
-Load Localnet state from a JSON snapshot before startup.
+Load Localnet state from a JSON state file before startup.
 {{/option}}
 
 {{#option "`--dump-state` _path_" }}
-Dump Localnet state to a JSON snapshot on shutdown.
+Dump Localnet state to a JSON state file on shutdown.
+{{/option}}
+
+{{#option "`--liteapi`" }}
+Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+port. LiteAPI is disabled by default.
+{{/option}}
+
+{{#option "`--liteapi-port` _port_" }}
+Set the LiteAPI TCP port explicitly. Requires `--liteapi`; otherwise LiteAPI
+uses the Localnet HTTP port plus one.
 {{/option}}
 
 {{#option "`--require-auth`" }}
@@ -252,27 +262,44 @@ Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 
 {{/options}}
 
-### acton localnet snapshot
+### acton localnet state
 
-Manage named runtime state snapshots for a running localnet.
+Transfer the current state of a running localnet as a portable JSON file.
 
 #### Synopsis
 
-`acton localnet snapshot` [_options_] _command_
+`acton localnet state` [_options_] _command_
 
 #### Subcommands
 
-- `create <name>` stores the current localnet state as an in-memory snapshot
-- `list` prints named in-memory snapshots
-- `revert <name>` restores a named in-memory snapshot and invalidates that
-  snapshot plus newer snapshots
-- `export <name> --out <path>` writes a named in-memory snapshot to a JSON file
-- `import <path>` loads a JSON file as a named in-memory snapshot, using the
-  file stem as the snapshot name unless `--name` is passed
+- `dump <path>` downloads the current live state directly to a file
+- `load <path>` uploads a state file and replaces the current live state
 
-Relative export and import paths resolve from the Acton project root. Snapshot
-create, list, revert, export, and import all call the running localnet control
-API, so pass `--port` or `--auth-token` when the node does not use defaults.
+`dump` refuses to overwrite an existing file unless `--force` is passed. A
+successful `load` clears all in-memory checkpoints.
+
+### acton localnet checkpoint
+
+Manage named in-memory restore points for a running localnet.
+
+#### Synopsis
+
+`acton localnet checkpoint` [_options_] _command_
+
+#### Subcommands
+
+- `create <name>` stores the current localnet state as a checkpoint
+- `list` prints named checkpoints and their block seqnos
+- `restore <name>` restores a checkpoint without deleting any checkpoints
+- `delete <name>` deletes one checkpoint
+- `clear` deletes all checkpoints
+- `export <name> --out <path>` downloads a checkpoint as a JSON file
+- `import <path>` uploads a JSON file as a checkpoint, using the file stem as
+  the name unless `--name` is passed
+
+Relative paths resolve from the Acton project root. These commands call the
+running localnet control API, so pass `--port` or `--auth-token` when the node
+does not use defaults.
 
 ## Configuration
 
@@ -364,7 +391,7 @@ and prints a fresh token.
   the same frontend shell
 - the UI reads chain data from `/api/v2` and `/api/v3`, and uses `acton_*`
   control endpoints for local address aliases, registered compiler ABIs,
-  status, and snapshot tooling
+  status, state files, and checkpoint tooling
 - `--require-auth` protects read and write API routes, including read-only
   streaming endpoints
 - when `--port` and `[localnet].port` are both absent, the current runtime
@@ -375,7 +402,7 @@ and prints a fresh token.
   delayed
 - `POST /acton_setNetworkConditions` can change the response delay while the
   server is running, and `GET /acton_nodeInfo` reports the current value
-- `--dump-state` writes a snapshot during graceful shutdown
+- `--dump-state` writes a state file during graceful shutdown
 
 ## Control Endpoints
 
@@ -384,21 +411,20 @@ tooling:
 
 - `GET /acton_nodeInfo` returns uptime, latest block seqno, and the active state
   source
-- `POST /acton_dumpState` with `{"path":"snapshots/localnet.json"}` writes a
-  JSON state snapshot without stopping the server
-- `POST /acton_loadState` with `{"path":"snapshots/localnet.json"}` replaces
-  the current node state with a JSON state snapshot
-- `POST /acton_snapshot` with `{"name":"before-upgrade"}` creates a named
-  runtime in-memory recovery point
-- `POST /acton_listSnapshots` lists named runtime recovery points
-- `POST /acton_revert` with `{"name":"before-upgrade"}` restores a runtime
-  recovery point and invalidates that point plus every newer point
-- `POST /acton_exportSnapshot` with
-  `{"name":"before-upgrade","path":"snapshots/bug.json"}` writes a runtime
-  recovery point to a JSON state snapshot
-- `POST /acton_importSnapshot` with
-  `{"name":"bug","path":"snapshots/bug.json"}` imports a JSON state snapshot as
-  a named runtime recovery point
+- `GET /acton_dumpState` downloads the current live state as JSON bytes
+- `POST /acton_loadState` accepts JSON state bytes, replaces the current node
+  state, and clears all checkpoints
+- `POST /acton_createCheckpoint` with `{"name":"before-upgrade"}` creates a
+  named in-memory checkpoint
+- `GET /acton_listCheckpoints` lists checkpoints
+- `POST /acton_restoreCheckpoint` with `{"name":"before-upgrade"}` restores a
+  checkpoint without deleting it or newer checkpoints
+- `POST /acton_deleteCheckpoint` deletes one named checkpoint
+- `POST /acton_clearCheckpoints` deletes all checkpoints
+- `GET /acton_exportCheckpoint?name=before-upgrade` downloads a checkpoint as
+  JSON bytes
+- `POST /acton_importCheckpoint?name=bug` accepts JSON state bytes and imports
+  them as a named checkpoint
 - `POST /acton_setShardAccount` with
   `{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}` replaces the selected
   account state with a base64-encoded `ShardAccount` BOC
@@ -429,9 +455,9 @@ expose the localnet server publicly.
 
 - `--db-path` or `[localnet].db-path` enables persistent SQLite-backed node
   state across runs
-- `--load-state` initializes state from a JSON snapshot and cannot be combined
+- `--load-state` initializes state from a JSON state file and cannot be combined
   with a database path from either CLI or `Acton.toml`
-- `--dump-state` exports a JSON snapshot on shutdown
+- `--dump-state` exports a JSON state file on shutdown
 - when no database path is configured, node state is ephemeral unless loaded
   or dumped
 
@@ -465,10 +491,10 @@ expose the localnet server publicly.
    acton localnet start --fork-net testnet --fork-block-number 55000000
    ```
 
-3. Load and dump JSON state snapshots:
+3. Load and dump JSON state files:
 
    ```bash
-   acton localnet start --load-state snapshots/localnet.json --dump-state snapshots/localnet.json
+   acton localnet start --load-state states/localnet.json --dump-state states/localnet.json
    ```
 
 4. Airdrop local funds:
@@ -489,14 +515,15 @@ expose the localnet server publicly.
    acton localnet status --json
    ```
 
-7. Save, list, restore, export, and import runtime snapshots:
+7. Dump/load state files and manage runtime checkpoints:
 
    ```bash
-   acton localnet snapshot create before-upgrade
-   acton localnet snapshot list
-   acton localnet snapshot revert before-upgrade
-   acton localnet snapshot export before-upgrade --out snapshots/bug.json
-   acton localnet snapshot import snapshots/bug.json
+   acton localnet state dump states/localnet.json
+   acton localnet checkpoint create before-upgrade
+   acton localnet checkpoint list
+   acton localnet checkpoint restore before-upgrade
+   acton localnet checkpoint export before-upgrade --out states/before-upgrade.json
+   acton localnet checkpoint import states/before-upgrade.json
    ```
 
 ## See Also

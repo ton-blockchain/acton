@@ -5,6 +5,7 @@ import type {BackendExecutorAction} from "./backend"
 
 export interface ParsedTransactionBody {
   readonly name: string
+  readonly opcode?: number
   readonly value: ParsedValue
 }
 
@@ -65,7 +66,6 @@ export type ParsedValue =
       readonly entries: readonly ParsedValueMapEntry[]
     }
 
-// eslint-disable-next-line functional/type-declaration-immutability
 export interface TransactionInfo {
   readonly id: string
   readonly lt: string

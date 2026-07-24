@@ -1,10 +1,12 @@
 import {Buffer} from "node:buffer"
 
 import {Address} from "@ton/core"
+import {toUnicode} from "punycode/"
 
 const HEX_HASH_RE = /^[a-fA-F0-9]{64}$/
 const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/
 const BASE64_URL_RE = /^[A-Za-z0-9_-]+$/
+const TON_DNS_DOMAIN_RE = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+(?:ton|t\.me)$/i
 
 export function hashToHex(hash: string | null | undefined): string | undefined {
   const value = hash?.trim()
@@ -43,6 +45,35 @@ export function parseAddress(address: string): Address | undefined {
   } catch {
     return undefined
   }
+}
+
+export function parseTonDnsSearchQuery(value: string): string | undefined {
+  const domain = value.trim().toLowerCase()
+  return TON_DNS_DOMAIN_RE.test(domain) ? domain : undefined
+}
+
+export function formatDnsName(value: string): string {
+  const domain = value.trim()
+  try {
+    return toUnicode(domain) || domain
+  } catch {
+    return domain
+  }
+}
+
+export function mergeAccountDomains(
+  primaryDomain: string | undefined,
+  domains: readonly string[],
+): readonly string[] {
+  const uniqueDomains = new Map<string, string>()
+  for (const domain of [primaryDomain, ...domains]) {
+    const normalizedDomain = domain?.trim()
+    const domainKey = normalizedDomain?.toLowerCase()
+    if (normalizedDomain && domainKey && !uniqueDomains.has(domainKey)) {
+      uniqueDomains.set(domainKey, normalizedDomain)
+    }
+  }
+  return [...uniqueDomains.values()]
 }
 
 export interface AddressFormatOptions {
@@ -115,6 +146,22 @@ export function formatTimeAgo(
   return formatAbsoluteTime(utime, nowSeconds)
 }
 
+export function formatRelativeTime(
+  utime: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): string {
+  const diff = Math.max(0, nowSeconds - utime)
+
+  if (diff === 0) return "right now"
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`
+  if (diff < 2_629_800) return `${Math.floor(diff / 604_800)}w ago`
+  if (diff < 31_557_600) return `${Math.floor(diff / 2_629_800)}mo ago`
+  return `${Math.floor(diff / 31_557_600)}y ago`
+}
+
 export function formatAbsoluteTime(
   utime: number,
   nowSeconds: number = Math.floor(Date.now() / 1000),
@@ -139,8 +186,10 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 86_400)}d`
 }
 
-export function shortenIdentifier(value: string): string {
-  return value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-6)}` : value
+export function shortenIdentifier(value: string, edgeLength = 6): string {
+  return value.length > edgeLength * 2
+    ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`
+    : value
 }
 
 export function formatAddress(

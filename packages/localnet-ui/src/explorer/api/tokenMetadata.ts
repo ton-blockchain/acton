@@ -27,8 +27,13 @@ export function metadataTokenString(
 export function metadataTokenDecimals(
   tokenInfo: AccountStateTokenInfo | undefined,
 ): number | undefined {
-  const rawDecimals = metadataTokenString(tokenInfo, "decimals")
-  if (!rawDecimals) {
+  const directDecimals = tokenInfo?.decimals
+  const extra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : undefined
+  const rawDecimals =
+    typeof directDecimals === "number" || isNonEmptyString(directDecimals)
+      ? directDecimals
+      : extra?.decimals
+  if (typeof rawDecimals !== "number" && !isNonEmptyString(rawDecimals)) {
     return undefined
   }
 

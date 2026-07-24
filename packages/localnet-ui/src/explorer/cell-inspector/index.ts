@@ -4,9 +4,11 @@ export {
   type AbiInferenceResult,
 } from "./abiInference"
 export {
+  type BlockMetadata,
   type BlockTlbParseOptions,
   type BlockTlbParseResult,
   type CanonicalBlockTlbName,
+  parseBlockMetadata,
   parseBlockTlb,
   type SliceConsumption,
 } from "./blockParser"

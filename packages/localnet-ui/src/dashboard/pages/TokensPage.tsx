@@ -15,8 +15,9 @@ import type {FC} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {JettonMaster} from "../../explorer/api/types"
-import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {formatTokenSupply} from "../dashboardUtils"
 
@@ -34,6 +35,7 @@ interface TokensState {
 
 export const TokensPage: FC<TokensPageProps> = ({client}) => {
   const navigate = useNavigate()
+  const routes = useExplorerRoutePaths()
   const [tokensState, setTokensState] = useState<TokensState>({
     items: [],
     isLoading: true,
@@ -121,7 +123,7 @@ export const TokensPage: FC<TokensPageProps> = ({client}) => {
                   const symbol = token.jetton_content.symbol || "???"
                   const name = token.jetton_content.name || "Unknown Jetton"
                   const image = token.jetton_content.image || TOKEN_PLACEHOLDER_IMAGE
-                  const href = `/explorer/address/${encodeURIComponent(token.address)}`
+                  const href = routes.addressPath(token.address)
 
                   return (
                     <DataTableRow

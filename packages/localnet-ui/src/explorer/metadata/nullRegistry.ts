@@ -16,7 +16,7 @@ export function unverifiedSourceResponse(options: {
   return {
     code_hash: normalizeCodeHash(options.codeHash) ?? "",
     verified: false,
-    bundles: [],
+    bundle: null,
   }
 }
 

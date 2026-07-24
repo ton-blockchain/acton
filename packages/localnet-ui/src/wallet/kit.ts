@@ -12,7 +12,8 @@ import {
 import {createLocalnetWalletV4R2Adapter, createLocalnetWalletV5R1Adapter} from "./localnetAdapters"
 import type {StartupWalletRecord} from "./types"
 
-const TON_CONNECT_BRIDGE_URL = "https://bridge.tonapi.io/bridge"
+const TON_CONNECT_BRIDGE_URL =
+  import.meta.env.VITE_TON_CONNECT_BRIDGE_URL?.trim() || "https://bridge.tonapi.io/bridge"
 export const ACTON_TON_CONNECT_URL = "https://ton-blockchain.github.io/acton"
 const TONKEEPER_TON_CONNECT_URL = "https://tonkeeper.com"
 const TONKEEPER_TON_CONNECT_ICON_URL = "https://tonkeeper.com/assets/tonconnect-icon.png"

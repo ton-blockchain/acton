@@ -313,24 +313,20 @@ function normalizeRegisteredSource(
   return {
     ...source,
     code_hash: normalizeCodeHash(source.code_hash) ?? codeHash,
-    verified: source.verified || source.bundles.length > 0,
+    verified: source.verified || Boolean(source.bundle),
   }
 }
 
 function compilerAbiFromSource(
   source: VerificationSourceResponse,
 ): ExtendedContractABI["compiler_abi"] | undefined {
-  for (const bundle of source.bundles) {
-    const fromBundle = objectCompilerAbi(bundle)
-    if (fromBundle) {
-      return fromBundle
-    }
-    const fromFiles = bundle.files.map(file => objectCompilerAbi(file)).find(Boolean)
-    if (fromFiles) {
-      return fromFiles
-    }
+  const bundle = source.bundle
+  if (!bundle) {
+    return undefined
   }
-  return undefined
+  return (
+    objectCompilerAbi(bundle) ?? bundle.files.map(file => objectCompilerAbi(file)).find(Boolean)
+  )
 }
 
 function objectCompilerAbi(value: unknown): ExtendedContractABI["compiler_abi"] | undefined {

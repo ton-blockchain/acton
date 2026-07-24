@@ -14,7 +14,9 @@ import {useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../explorer/api/client"
 import type {JettonMaster, NftItem} from "../explorer/api/types"
+import {NftImage} from "../explorer/components/NftImage"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
+import {useExplorerRoutePaths} from "../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
@@ -53,7 +55,8 @@ interface SearchResult {
   readonly workspace?: boolean
   readonly image?: string
   readonly fallbackImage?: string
-  readonly isNsfw?: boolean
+  readonly collectionName?: string
+  readonly isScam?: boolean
 }
 
 interface LoadedSearchAssets {
@@ -115,8 +118,10 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   onClose,
   originStyle,
 }) => {
+  const [hiddenNftResultIds, setHiddenNftResultIds] = useState<ReadonlySet<string>>(() => new Set())
   const navigate = useNavigate()
   const addressFormat = useAddressFormat()
+  const routes = useExplorerRoutePaths()
   const [searchQuery, setSearchQuery] = useState("")
   const [searchAssetsState, setSearchAssetsState] = useState<SearchAssetsState>({
     tokens: [],
@@ -156,7 +161,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         id: `address-${address}`,
         title: "Open address",
         description: formatAddress(address, false, addressFormat),
-        href: `/explorer/address/${encodeURIComponent(address)}`,
+        href: routes.addressPath(address),
         icon: CircleUserRound,
       })
     }
@@ -196,7 +201,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         id: `token-${token.address}`,
         title: name,
         description: `Token · ${symbol}`,
-        href: `/explorer/address/${encodeURIComponent(token.address)}`,
+        href: routes.addressPath(token.address),
         icon: Boxes,
         image: token.jetton_content.image,
         fallbackImage: TOKEN_PLACEHOLDER_IMAGE,
@@ -219,11 +224,12 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           id: `nft-${item.address}`,
           title: name,
           description: collectionName ? `NFT · ${collectionName}` : `NFT · #${item.index}`,
-          href: `/explorer/address/${encodeURIComponent(item.address)}`,
+          href: routes.addressPath(item.address),
           icon: Image,
           image: contentString(item.content, "image"),
           fallbackImage: NFT_PLACEHOLDER_IMAGE,
-          isNsfw: item.is_nsfw,
+          collectionName,
+          isScam: item.is_scam === true,
         })
         if (results.length >= 12) {
           break
@@ -235,6 +241,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   }, [
     addressFormat,
     apiSearchState.entries,
+    routes,
     searchAssetsState.nfts,
     searchAssetsState.tokens,
     searchQuery,
@@ -402,49 +409,70 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         </div>
 
         <div className={styles.searchResultBody}>
-          {searchResults.length === 0 ? (
+          {searchResults.filter(result => !hiddenNftResultIds.has(result.id)).length === 0 ? (
             <div className={styles.searchEmpty}>
               No matches. Paste an address, a transaction hash, or search by API method, token/NFT
               metadata.
             </div>
           ) : (
             <div className={styles.searchResultList}>
-              {searchResults.map(result => {
-                const Icon = result.icon
+              {searchResults
+                .filter(result => !hiddenNftResultIds.has(result.id))
+                .map(result => {
+                  const Icon = result.icon
 
-                return (
-                  <button
-                    key={result.id}
-                    type="button"
-                    className={styles.searchResultItem}
-                    onClick={() => selectSearchResult(result)}
-                  >
-                    <span className={styles.searchResultIcon}>
-                      {result.workspace ? (
-                        <span className={styles.searchResultWorkspaceMark} />
-                      ) : result.image ? (
-                        <img
-                          src={result.image}
-                          alt=""
-                          className={result.isNsfw ? styles.nsfwImage : undefined}
-                          onError={event => {
-                            const fallbackImage = result.fallbackImage
-                            if (fallbackImage && !event.currentTarget.src.endsWith(fallbackImage)) {
-                              event.currentTarget.src = fallbackImage
-                            }
-                          }}
-                        />
-                      ) : (
-                        <Icon size={17} />
-                      )}
-                    </span>
-                    <span className={styles.searchResultText}>
-                      <span className={styles.searchResultTitle}>{result.title}</span>
-                      <span className={styles.searchResultDescription}>{result.description}</span>
-                    </span>
-                  </button>
-                )
-              })}
+                  return (
+                    <button
+                      key={result.id}
+                      type="button"
+                      className={styles.searchResultItem}
+                      onClick={() => selectSearchResult(result)}
+                    >
+                      <span className={styles.searchResultIcon}>
+                        {result.workspace ? (
+                          <span className={styles.searchResultWorkspaceMark} />
+                        ) : result.image ? (
+                          result.isScam === undefined ? (
+                            <img
+                              src={result.image}
+                              alt=""
+                              onError={event => {
+                                const fallbackImage = result.fallbackImage
+                                if (
+                                  fallbackImage &&
+                                  !event.currentTarget.src.endsWith(fallbackImage)
+                                ) {
+                                  event.currentTarget.src = fallbackImage
+                                }
+                              }}
+                            />
+                          ) : (
+                            <NftImage
+                              sources={
+                                result.fallbackImage
+                                  ? [result.image, result.fallbackImage]
+                                  : [result.image]
+                              }
+                              alt=""
+                              blurredClassName={styles.blurredAssetImage}
+                              collectionName={result.collectionName}
+                              blurred={result.isScam}
+                              onNsfw={() => {
+                                setHiddenNftResultIds(current => new Set(current).add(result.id))
+                              }}
+                            />
+                          )
+                        ) : (
+                          <Icon size={17} />
+                        )}
+                      </span>
+                      <span className={styles.searchResultText}>
+                        <span className={styles.searchResultTitle}>{result.title}</span>
+                        <span className={styles.searchResultDescription}>{result.description}</span>
+                      </span>
+                    </button>
+                  )
+                })}
             </div>
           )}
 

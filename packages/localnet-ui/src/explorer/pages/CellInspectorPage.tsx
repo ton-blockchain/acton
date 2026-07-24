@@ -1,7 +1,6 @@
 import {
   Checkbox,
   CopyInlineAction,
-  DisclosureToggle,
   HighlightedCode,
   Input,
   ParsedValueView,
@@ -64,7 +63,7 @@ interface CellInspectorDraft {
   readonly strict: boolean
   readonly maxDepth: number
   readonly customTlb: string
-  readonly customTlbVisible: boolean
+  readonly customTlbEnabled: boolean
 }
 
 const CODE_OUTPUT_TAB = {id: "code", label: "TVM code"} as const
@@ -86,7 +85,7 @@ const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
   strict: false,
   maxDepth: 8,
   customTlb: "",
-  customTlbVisible: false,
+  customTlbEnabled: false,
 }
 
 export const CellInspectorPage: FC = () => {
@@ -95,7 +94,7 @@ export const CellInspectorPage: FC = () => {
     async (codeHash: string): Promise<ContractVerifiedSource | undefined> => {
       try {
         const source = await metadataRegistry.getSource({codeHash})
-        return source.verified && source.bundles.length > 0 ? source : undefined
+        return source.verified && source.bundle ? source : undefined
       } catch {
         return undefined
       }
@@ -108,7 +107,7 @@ export const CellInspectorPage: FC = () => {
   const [strict, setStrict] = useState(initialDraft.strict)
   const [maxDepth, setMaxDepth] = useState(initialDraft.maxDepth)
   const [customTlb, setCustomTlb] = useState(initialDraft.customTlb)
-  const [customTlbVisible, setCustomTlbVisible] = useState(initialDraft.customTlbVisible)
+  const [customTlbEnabled, setCustomTlbEnabled] = useState(initialDraft.customTlbEnabled)
   const [abiCandidates, setAbiCandidates] = useState<readonly AbiCandidate[]>([])
   const [activeTab, setActiveTab] = useState<OutputTab>("parsed")
   const [inspection, setInspection] = useState<InspectionState>({
@@ -128,12 +127,12 @@ export const CellInspectorPage: FC = () => {
         strict,
         maxDepth,
         customTlb,
-        customTlbVisible,
+        customTlbEnabled,
       })
     }, 200)
 
     return () => globalThis.clearTimeout(timer)
-  }, [customTlb, customTlbVisible, input, maxDepth, rootIndex, strict])
+  }, [customTlb, customTlbEnabled, input, maxDepth, rootIndex, strict])
 
   useEffect(() => {
     let active = true
@@ -181,6 +180,7 @@ export const CellInspectorPage: FC = () => {
         strict,
         maxDepth,
         customTlb,
+        customTlbEnabled,
         metadataRegistry,
         abiCandidates,
       })
@@ -210,7 +210,16 @@ export const CellInspectorPage: FC = () => {
     }, 140)
 
     return () => globalThis.clearTimeout(timer)
-  }, [abiCandidates, customTlb, deferredInput, maxDepth, metadataRegistry, rootIndex, strict])
+  }, [
+    abiCandidates,
+    customTlb,
+    customTlbEnabled,
+    deferredInput,
+    maxDepth,
+    metadataRegistry,
+    rootIndex,
+    strict,
+  ])
 
   const result =
     inspection.status === "ready"
@@ -307,9 +316,9 @@ export const CellInspectorPage: FC = () => {
           maxDepth={maxDepth}
           onMaxDepthChange={setMaxDepth}
           customTlb={customTlb}
-          customTlbVisible={customTlbVisible}
+          customTlbEnabled={customTlbEnabled}
           onCustomTlbChange={setCustomTlb}
-          onCustomTlbVisibleChange={setCustomTlbVisible}
+          onCustomTlbEnabledChange={setCustomTlbEnabled}
         />
 
         <section className={styles.outputPanel} aria-live="polite">
@@ -344,9 +353,9 @@ interface CellInspectorInputPanelProps {
   readonly maxDepth: number
   readonly onMaxDepthChange: (value: number) => void
   readonly customTlb: string
-  readonly customTlbVisible: boolean
+  readonly customTlbEnabled: boolean
   readonly onCustomTlbChange: (value: string) => void
-  readonly onCustomTlbVisibleChange: (value: boolean) => void
+  readonly onCustomTlbEnabledChange: (value: boolean) => void
 }
 
 const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
@@ -360,22 +369,14 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
   maxDepth,
   onMaxDepthChange,
   customTlb,
-  customTlbVisible,
+  customTlbEnabled,
   onCustomTlbChange,
-  onCustomTlbVisibleChange,
+  onCustomTlbEnabledChange,
 }) => (
   <section className={styles.inputPanel}>
-    <header className={styles.panelHeader}>
-      <div>
-        <h2 className={styles.panelTitle}>Input</h2>
-        <p className={styles.panelDescription}>
-          Paste Base64, hex, a ton:// URL, or an explorer link
-        </p>
-      </div>
-    </header>
-
-    <label className={styles.textareaField} htmlFor="cell-inspector-input">
-      <span className={styles.fieldLabel}>Cell</span>
+    <label className={`${styles.textareaField} ${styles.cellField}`} htmlFor="cell-inspector-input">
+      <span className={`${styles.fieldLabel} ${styles.cellFieldLabel}`}>Cell</span>
+      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
       <textarea
         id="cell-inspector-input"
         className={styles.cellInput}
@@ -395,6 +396,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         type="number"
         min={0}
         max={rootCount === undefined ? undefined : Math.max(0, rootCount - 1)}
+        disabled={rootCount === 1}
         value={rootIndex}
         onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
         description={
@@ -402,7 +404,6 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
             ? "0-based index"
             : `${rootCount} ${rootCount === 1 ? "root" : "roots"} available`
         }
-        mono
       />
       <Input
         className={styles.numberInput}
@@ -425,16 +426,16 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
     />
 
     <div className={styles.customTlbSection}>
-      <DisclosureToggle
-        expanded={customTlbVisible}
-        showLabel="Custom TL-B"
-        hideLabel="Hide custom TL-B"
-        onClick={() => onCustomTlbVisibleChange(!customTlbVisible)}
+      <Checkbox
+        label="Use custom TL-B schema"
+        description="Ignore ABI and automatic detection"
+        checked={customTlbEnabled}
+        onChange={event => onCustomTlbEnabledChange(event.currentTarget.checked)}
       />
-      {customTlbVisible && (
+      {customTlbEnabled && (
         <label className={styles.textareaField} htmlFor="cell-inspector-custom-tlb">
           <span className={styles.fieldLabel}>Schema</span>
-          <span className={styles.fieldHint}>Use your own TL-B schema for the selected root</span>
+          <span className={styles.fieldHint}>Applied to the selected root</span>
           <textarea
             id="cell-inspector-custom-tlb"
             aria-label="Custom TL-B schema"
@@ -456,6 +457,7 @@ async function inspectCell({
   strict,
   maxDepth,
   customTlb,
+  customTlbEnabled,
   metadataRegistry,
   abiCandidates,
 }: {
@@ -464,6 +466,7 @@ async function inspectCell({
   readonly strict: boolean
   readonly maxDepth: number
   readonly customTlb: string
+  readonly customTlbEnabled: boolean
   readonly metadataRegistry: ReturnType<typeof useMetadataRegistry>
   readonly abiCandidates: readonly AbiCandidate[]
 }): Promise<CellInspectorParseResult> {
@@ -472,12 +475,16 @@ async function inspectCell({
     rootIndex,
     strict,
     maxDepth,
-    customTlb,
+    customTlb: customTlbEnabled ? customTlb : "",
+    customTlbAuthoritative: customTlbEnabled,
   } as const
   const preliminaryResult = parser.parseCell(input, parseOptions)
   if (preliminaryResult.status === "error") return preliminaryResult
 
-  if (preliminaryResult.parser === "standard-comment") {
+  if (
+    preliminaryResult.parser === "custom-tlb" ||
+    preliminaryResult.parser === "standard-comment"
+  ) {
     return preliminaryResult
   }
 
@@ -962,8 +969,12 @@ function readCellInspectorDraft(urlCell: string | null = null): CellInspectorDra
       strict: typeof value.strict === "boolean" ? value.strict : false,
       maxDepth: boundedInteger(String(value.maxDepth ?? ""), 8, 0, 128),
       customTlb: typeof value.customTlb === "string" ? value.customTlb : "",
-      customTlbVisible:
-        typeof value.customTlbVisible === "boolean" ? value.customTlbVisible : false,
+      customTlbEnabled:
+        typeof value.customTlbEnabled === "boolean"
+          ? value.customTlbEnabled
+          : typeof value.customTlbVisible === "boolean"
+            ? value.customTlbVisible
+            : false,
     }
   } catch {
     return urlCell === null

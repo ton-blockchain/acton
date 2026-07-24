@@ -9,6 +9,9 @@ describe("pageOgPreviewForPath", () => {
     ["/blocks/", "blocks"],
     ["/abi", "abi"],
     ["/sources", "sources"],
+    ["/faucet", "faucet"],
+    ["/verified", "verified"],
+    ["/verified/92bf1e3962a54b88", "verified-contract"],
     ["/cell", "cell"],
     ["/emulate", "emulate"],
     ["/favorites", "favorites"],
@@ -31,4 +34,30 @@ describe("pageOgPreviewForPath", () => {
 
 test("unknown image keys fall back to the home preview", () => {
   expect(pageOgPreviewForKey("unknown").key).toBe("home")
+})
+
+test("favorites preview describes every supported favorite type", () => {
+  expect(pageOgPreviewForKey("favorites")).toMatchObject({
+    title: "Favorites",
+    metadataTitle: "TON favorites · actonscan",
+    metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
+  })
+})
+
+test("faucet preview makes the Testnet scope explicit", () => {
+  expect(pageOgPreviewForKey("faucet")).toMatchObject({
+    title: "Testnet Faucet",
+    metadataTitle: "TON Testnet Faucet · actonscan",
+  })
+})
+
+test("verified routes use dedicated social metadata", () => {
+  expect(pageOgPreviewForKey("verified")).toMatchObject({
+    title: "Verified contracts",
+    metadataTitle: "Verified TON contracts · actonscan",
+  })
+  expect(pageOgPreviewForKey("verified-contract")).toMatchObject({
+    title: "Verified contract",
+    metadataTitle: "Verified TON contract · actonscan",
+  })
 })

@@ -2,7 +2,9 @@ import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
+import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -25,6 +27,7 @@ import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
+import {NftImage} from "../components/NftImage"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
@@ -33,7 +36,7 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {normalizeAddress, toRawAddress} from "../components/utils"
+import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -73,6 +76,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
+  const [accountDomains, setAccountDomains] = useState<readonly string[]>([])
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
   const [historySortOrder, setHistorySortOrder] = useState<AccountHistorySortOrder>(
     readAccountHistorySortOrder,
@@ -111,8 +115,11 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const [verifiedSource, setVerifiedSource] = useState<VerificationSourceResponse | undefined>()
   const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
+  const [additionalDataReadyKey, setAdditionalDataReadyKey] = useState<string | undefined>()
   const activeAccountKeyRef = useRef<string | undefined>(undefined)
   const activeHistoryRequestKeyRef = useRef<string | undefined>(undefined)
+  const loadedAccountKeyRef = useRef<string | undefined>(undefined)
+  const dnsRequestedAccountKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
 
   const formattedAddress = useMemo(
@@ -133,7 +140,15 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return isAccountTab(tab) ? tab : "history"
   }, [location.hash])
   const accountInterfaces = accountStateV3?.interfaces ?? []
-  const accountCodeHash = accountStateV3?.code_hash
+  const accountCodeLookupHash = useMemo(() => {
+    if (!accountState?.code) return accountStateV3?.code_hash
+
+    try {
+      return codeLookupHashHex(Cell.fromBase64(accountState.code))
+    } catch {
+      return accountStateV3?.code_hash
+    }
+  }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
   const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
   const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
@@ -155,9 +170,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       if (!formattedAddress) {
         activeAccountKeyRef.current = undefined
         activeHistoryRequestKeyRef.current = undefined
+        loadedAccountKeyRef.current = undefined
+        dnsRequestedAccountKeyRef.current = undefined
+        setAdditionalDataReadyKey(undefined)
         setAccountState(undefined)
         setAccountStateV3(undefined)
         setAccountDomain(undefined)
+        setAccountDomains([])
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -197,12 +216,16 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       activeHistoryRequestKeyRef.current = historyRequestKey
 
       if (isAddressChange) {
+        loadedAccountKeyRef.current = undefined
+        dnsRequestedAccountKeyRef.current = undefined
+        setAdditionalDataReadyKey(undefined)
         setAccountLoading(true)
         setTransactionsLoading(true)
         setActionsLoading(supportsAccountActions)
         setAccountState(undefined)
         setAccountStateV3(undefined)
         setAccountDomain(undefined)
+        setAccountDomains([])
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -255,16 +278,20 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
           const currentDomain = getAccountDomain(stateV3)
           if (!isActive) return
           if (stateV3) updateDomains(stateV3.address_book)
+          loadedAccountKeyRef.current = accountRequestKey
           setAccountState(state)
           setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
           setAccountDomain(currentDomain)
+          setAccountDomains(currentDomain ? [currentDomain] : [])
           setAccountTokenInfo(currentTokenInfo)
         } catch (error) {
           if (!isActive) return
+          loadedAccountKeyRef.current = undefined
           setAccountError(error instanceof Error ? error.message : "An error occurred")
           setAccountState(undefined)
           setAccountStateV3(undefined)
           setAccountDomain(undefined)
+          setAccountDomains([])
           setTransactions([])
           setActions([])
           setActionMetadata({})
@@ -378,6 +405,47 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     updateDomains,
   ])
 
+  useEffect(() => {
+    if (
+      !formattedAddress ||
+      loadedAccountKeyRef.current !== accountRequestKey ||
+      accountLoading ||
+      transactionsLoading ||
+      actionsLoading
+    ) {
+      return
+    }
+    setAdditionalDataReadyKey(accountRequestKey)
+  }, [accountLoading, accountRequestKey, actionsLoading, formattedAddress, transactionsLoading])
+
+  useEffect(() => {
+    if (
+      !formattedAddress ||
+      additionalDataReadyKey !== accountRequestKey ||
+      dnsRequestedAccountKeyRef.current === accountRequestKey
+    ) {
+      return
+    }
+
+    let isActive = true
+    dnsRequestedAccountKeyRef.current = accountRequestKey
+    void client
+      .getWalletDnsNames(formattedAddress)
+      .then(domains => {
+        if (!isActive) return
+        const nextDomains = mergeAccountDomains(accountDomain, domains)
+        setAccountDomain(nextDomains[0])
+        setAccountDomains(nextDomains)
+      })
+      .catch(() => {
+        // The singular domain from accountStates remains available as a fallback.
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [accountDomain, accountRequestKey, additionalDataReadyKey, client, formattedAddress])
+
   const loadMoreTransactions = async () => {
     if (
       !formattedAddress ||
@@ -451,7 +519,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     let isActive = true
 
     const loadCompilerAbi = async () => {
-      if (!accountCodeHash) {
+      if (!accountCodeLookupHash) {
         setExtendedContractAbi(undefined)
         setCompilerAbiLoading(false)
         setCompilerAbiError(undefined)
@@ -463,9 +531,9 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       setCompilerAbiError(undefined)
 
       try {
-        const abis = await metadataRegistry.getCompilerAbis([accountCodeHash])
+        const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
         if (!isActive) return
-        setExtendedContractAbi(abis[accountCodeHash] ?? undefined)
+        setExtendedContractAbi(abis[accountCodeLookupHash] ?? undefined)
         setCompilerAbiLoading(false)
       } catch (error) {
         if (!isActive) return
@@ -479,13 +547,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, metadataRegistry])
+  }, [accountCodeLookupHash, metadataRegistry])
 
   useEffect(() => {
     let isActive = true
 
     const loadVerifiedSource = async () => {
-      if (!accountCodeHash) {
+      if (!accountCodeLookupHash) {
         setVerifiedSource(undefined)
         setVerifiedSourceLoading(false)
         return
@@ -496,10 +564,10 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
 
       try {
         const source = await metadataRegistry.getSource({
-          codeHash: accountCodeHash,
+          codeHash: accountCodeLookupHash,
         })
         if (!isActive) return
-        setVerifiedSource(source.verified && source.bundles.length > 0 ? source : undefined)
+        setVerifiedSource(source.verified && source.bundle ? source : undefined)
       } catch (error) {
         if (!isActive) return
         console.debug("Failed to fetch verified source", error)
@@ -513,7 +581,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, metadataRegistry])
+  }, [accountCodeLookupHash, metadataRegistry])
 
   useEffect(() => {
     if (!formattedAddress) {
@@ -791,8 +859,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       (accountLoading || (isJettonMasterAccount && holdersLoadedAccountKey !== accountRequestKey)))
 
   const handleSearch = (addr: string, event?: ExplorerNavigationClickEvent) => {
-    const finalAddr = addr ? normalizeAddress(addr, addressFormat) : ""
-    openPath(finalAddr ? routes.addressPath(finalAddr) : routes.rootPath, event)
+    openPath(addr ? routes.addressPath(addr) : routes.rootPath, event)
   }
 
   const handleTabChange = (tab: string) => {
@@ -847,8 +914,10 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
     ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
   ]
-  const nftItemImage = nftItemImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
-  const nftItemIsNsfw = nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
+  const nftItemCollectionName =
+    tokenInfoString(nftItemTokenInfo, "collection_name") ||
+    contentString(currentNftItem?.content, "collection_name")
+  const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
         {
@@ -884,14 +953,16 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     ...getImageSources(nftCollectionTokenInfo, NFT_IMAGE_SOURCE_KEYS),
     ...getImageSources(collectionSample?.content, NFT_COLLECTION_IMAGE_SOURCE_KEYS),
   ]
-  const nftCollectionImage = nftCollectionImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
+  const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
     const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
+      address: item.address,
       image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
       imageSources,
-      isNsfw: item.is_nsfw,
+      blurred: item.is_scam === true,
+      collectionName: contentString(item.content, "collection_name"),
       name:
         contentString(item.content, "name") ||
         contentString(item.content, "collection_name") ||
@@ -943,6 +1014,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                 <AccountInfo
                   address={formattedAddress}
                   domain={accountDomain}
+                  domains={accountDomains}
                   state={accountState}
                   extendedContractAbi={extendedContractAbi}
                   contractInterfaces={
@@ -1076,21 +1148,20 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                           )}
                         </div>
                         <div className={styles.nftPanelMedia}>
-                          <img
-                            src={nftItemImage}
+                          <NftImage
+                            sources={nftItemImageSources}
                             alt={nftItemName}
-                            className={`${styles.nftPanelImage} ${
-                              nftItemIsNsfw ? styles.nsfwImage : ""
-                            }`}
-                            onError={event =>
-                              replaceBrokenImageWithFallback(event, nftItemImageSources)
-                            }
+                            className={styles.nftPanelImage}
+                            blurredClassName={styles.blurredImage}
+                            collectionName={nftItemCollectionName}
+                            blurred={nftItemIsScam}
+                            onNsfw={() => setCurrentNftItem(undefined)}
                           />
                         </div>
                       </div>
                     </div>
                   )}
-                  {accountState && nftCollectionName && !currentNftItem && (
+                  {accountState && nftCollectionName && !currentNftItem && !nftCollectionIsNsfw && (
                     <div className={styles.nftPanel}>
                       <div className={styles.nftPanelHeader}>
                         <div className={styles.nftPanelHeading}>
@@ -1120,15 +1191,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                           )}
                         </div>
                         <div className={styles.nftPanelMedia}>
-                          <img
-                            src={nftCollectionImage}
+                          <NftImage
+                            sources={nftCollectionImageSources}
                             alt={nftCollectionName}
-                            className={`${styles.nftPanelImage} ${
-                              nftCollectionIsNsfw ? styles.nsfwImage : ""
-                            }`}
-                            onError={event =>
-                              replaceBrokenImageWithFallback(event, nftCollectionImageSources)
-                            }
+                            className={styles.nftPanelImage}
+                            blurredClassName={styles.blurredImage}
+                            collectionName={nftCollectionName}
+                            blurred={nftCollectionIsScam}
                           />
                         </div>
                       </div>
@@ -1189,18 +1258,27 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
               contentClassName={styles.metadataDialogContent}
             >
               <div className={styles.metadataOverview}>
-                {activeMetadataImage && (
-                  <img
-                    src={activeMetadataImage}
-                    alt=""
-                    className={`${styles.metadataTokenImage} ${
-                      currentNftItem ? styles.metadataNftImage : ""
-                    } ${currentNftItem && nftItemIsNsfw ? styles.nsfwImage : ""}`}
-                    onError={event =>
-                      replaceBrokenImageWithFallback(event, activeMetadataImageSources)
-                    }
-                  />
-                )}
+                {activeMetadataImage &&
+                  (currentNftItem ? (
+                    <NftImage
+                      sources={activeMetadataImageSources}
+                      alt=""
+                      className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
+                      blurredClassName={styles.blurredImage}
+                      collectionName={nftItemCollectionName}
+                      blurred={nftItemIsScam}
+                      onNsfw={() => setCurrentNftItem(undefined)}
+                    />
+                  ) : (
+                    <img
+                      src={activeMetadataImage}
+                      alt=""
+                      className={styles.metadataTokenImage}
+                      onError={event =>
+                        replaceBrokenImageWithFallback(event, activeMetadataImageSources)
+                      }
+                    />
+                  ))}
                 <div className={styles.metadataIdentity}>
                   <h3 className={styles.metadataTokenTitle}>{activeMetadataTitle}</h3>
                   {(jettonMaster?.jetton_content.description || nftItemDescription) && (

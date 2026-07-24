@@ -109,6 +109,12 @@
   }
 }
 
+@media (width <= 520px) {
+  .header {
+    padding-left: 16px;
+  }
+}
+
 @supports (height: 100dvh) {
   .root {
     --retrace-panel-viewport-height: 100dvh;

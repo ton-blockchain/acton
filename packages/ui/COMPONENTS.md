@@ -14,12 +14,16 @@ Status: ready
 Import:
 
 ```tsx
-import { Button } from "@acton/ui"
+import { Button, CopyButton } from "@acton/ui"
 ```
 
 Use Button for explicit user-triggered commands: submit, confirm, start, stop,
 create, delete, or any action that changes application state. Do not use it for
 route navigation or passive status display.
+
+Use `CopyButton` when a copy command belongs in a regular button group. It uses
+the secondary variant by default and provides clipboard handling plus temporary
+copied feedback.
 
 ### Variants
 
@@ -537,9 +541,9 @@ Import:
 import { BlockChip } from "@acton/ui"
 ```
 
-Use BlockChip for a compact block seqno link or read-only value. It has one
-accent visual treatment shared with AddressChip and an optional coordinated
-highlight state.
+Use BlockChip for a compact block seqno or full block ID link/read-only value.
+It has one accent visual treatment shared with AddressChip and an optional
+coordinated highlight state.
 
 ### Composition
 
@@ -549,10 +553,12 @@ highlight state.
   shard={block.shard}
   seqno={block.seqno}
   href={blockPath(block)}
+  display="full"
 />
 ```
 
 - `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
+- `display="full"`: displays `(workchain,shard,seqno)` instead of only the seqno.
 - `href`: renders a native link; without it the chip is read-only.
 - `label`: optional display content when the caller needs more context than the
   raw seqno.
@@ -564,12 +570,15 @@ highlight state.
 
 - Read-only block
 - Linked block and hover highlight
+- Full block ID
 - Coordinated highlighted state
 - Keyboard focus
 
 ### Agent Guidance
 
 - Keep workchain, shard, route construction, and data fetching in the caller.
+- Use `display="full"` where a bare seqno would be ambiguous, such as previous
+  block references. Keep dense block tables on the default seqno display.
 - Preserve `href` when integrating a client router so modifier-click remains useful.
 - Do not add variants; BlockChip intentionally has one visual treatment.
 
@@ -659,6 +668,7 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Empty and populated arrays
 - Empty and populated objects
 - Empty and populated maps
+- Collapsed and expanded large arrays and maps
 - Nested structures on narrow screens
 
 ### Agent Guidance
@@ -674,6 +684,8 @@ address, boolean, null, void, array, object, and map nodes recursively.
   `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
   action. Keep BoC decoding, source lookup, and disassembly in domain code.
 - Reuse ContractChip metadata and `formatAddress` for address nodes.
+- Arrays and maps with more than eight entries start collapsed and use a bounded
+  component-owned scroll area when expanded. Objects keep their natural layout.
 - Do not duplicate the recursive array, object, or map layout in callers.
 
 ## ParsedValueDiffView
@@ -700,6 +712,7 @@ domain code.
 - Serialized cell-like values with raw copy actions
 - Nested object and array changes
 - Nested map additions, removals, and changed values
+- Large array and map diffs with hidden unchanged entries
 - Empty containers
 
 ### Agent Guidance
@@ -710,6 +723,8 @@ domain code.
 - Pass ContractChip metadata and `formatAddress` for address leaves.
 - Provide a `ParsedValueDiff` directly only when comparison already belongs to
   domain code.
+- Array and map diffs hide unchanged entries by default and expose them through
+  the component-owned toggle. Object fields remain visible and non-collapsible.
 - Do not pass ABI objects, cells, dictionaries, or parser contexts.
 - Do not duplicate ParsedValueView leaf formatting inside diff consumers.
 
@@ -1132,6 +1147,10 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `files`: minimal `{path, content}` records; domain-specific source metadata
   stays in the caller.
 - `entrypoint`: optional path selected initially and marked as `main`.
+- `defaultSelectedPath`: optional initial file path when the caller restores a
+  selection from navigation or persisted state.
+- `onSelectedPathChange`: optional callback for syncing file selection to URL
+  or application state.
 - `externalActionUrl` and `externalActionLabel`: optional navigation to a
   verifier, repository, artifact, or other source context.
 - `compact`: limits the source height for dense details panels.
@@ -1140,6 +1159,8 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `attachedToTabs`: removes the leading top corner radius when the viewer sits
   directly below a tab bar.
 - `emptyMessage`: caller-provided text for an empty source bundle.
+- Directories named `output` receive a generated-artifact accent in the file
+  tree so compiled files remain visually distinct from source directories.
 
 ### States To Review Visually
 

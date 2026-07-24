@@ -71,6 +71,21 @@ const mapValue: ParsedValue = {
   ],
 }
 
+const uint256MapValue: ParsedValue = {
+  kind: "map",
+  typeName: "map<uint256, string>",
+  entries: [
+    {
+      key: {
+        kind: "scalar",
+        value: "79361050166793331075214131622218060964406539857827620575770963283574719222885",
+        typeName: "uint256",
+      },
+      value: {kind: "scalar", value: '"uri"'},
+    },
+  ],
+}
+
 const nestedArrayValue: ParsedValue = {
   kind: "array",
   items: [
@@ -137,6 +152,29 @@ const nestedMapValue: ParsedValue = {
   ],
 }
 
+const largeArrayValue: ParsedValue = {
+  kind: "array",
+  items: Array.from({length: 32}, (_, index) => ({
+    kind: "scalar",
+    value: String((index + 1) * 1_000_000),
+  })),
+}
+
+const largeMapValue: ParsedValue = {
+  kind: "map",
+  typeName: "map<uint32, bool>",
+  entries: Array.from({length: 24}, (_, index) => ({
+    key: {kind: "scalar", value: String(index), typeName: "uint32"},
+    value: {kind: "boolean", value: index % 3 === 0},
+  })),
+}
+
+const nestedLargeCollectionValue: ParsedValue = {
+  kind: "object",
+  typeName: "CollectionOwner",
+  entries: [{key: "history", value: largeArrayValue}],
+}
+
 function formatFriendlyAddress(address: string): string {
   return address === WALLET_ADDRESS ? FRIENDLY_WALLET_ADDRESS : address
 }
@@ -161,7 +199,7 @@ export const parsedValueViewGallery = {
   title: "ParsedValueView",
   status: "ready",
   summary:
-    "ParsedValueView renders a small ABI-independent value tree with consistent scalars, addresses, objects, arrays, maps, and empty states.",
+    "ParsedValueView renders a small ABI-independent value tree with consistent scalars, enums, addresses, objects, arrays, maps, and empty states.",
   importStatement: 'import {ParsedValueView} from "@acton/ui"',
   agentSummary:
     "Use ParsedValueView after domain code has decoded ABI or storage data into the exported minimal ParsedValue union. Keep parsing, ABI selection, and address-network policy outside the component.",
@@ -202,6 +240,28 @@ export const parsedValueViewGallery = {
             kind: "scalar",
             value: "0x73656e64",
             rawValue: "b5ee9c7201010101000a00001073656e64",
+          })}
+        </div>
+      ),
+    },
+    {
+      id: "parsed-value-enums",
+      title: "Enum Values",
+      description:
+        "Known enum members include their symbolic name and encoded value; unknown members preserve the enum type and actual value.",
+      content: (
+        <div className={styles.valueGrid}>
+          {valueSample("known member", {
+            kind: "scalar",
+            value: "FeatureMode.Enabled (1)",
+            rawValue: "1",
+            typeName: "FeatureMode",
+          })}
+          {valueSample("unknown member", {
+            kind: "scalar",
+            value: "FeatureMode(7)",
+            rawValue: "7",
+            typeName: "FeatureMode",
           })}
         </div>
       ),
@@ -281,10 +341,24 @@ export const parsedValueViewGallery = {
       content: (
         <div className={styles.structureGrid}>
           {valueSample("map<int, address>", mapValue, {contracts})}
+          {valueSample("map<uint256, string>", uint256MapValue)}
           {valueSample("map → object / array / map", nestedMapValue, {
             contracts,
             formatAddress: formatFriendlyAddress,
           })}
+        </div>
+      ),
+    },
+    {
+      id: "parsed-value-large-collections",
+      title: "Large Collections",
+      description:
+        "Long arrays and maps start collapsed, then use a bounded internal scroll area when expanded.",
+      content: (
+        <div className={styles.structureGrid}>
+          {valueSample("32-item array", largeArrayValue)}
+          {valueSample("24-entry map", largeMapValue)}
+          {valueSample("object → 32-item array", nestedLargeCollectionValue)}
         </div>
       ),
     },

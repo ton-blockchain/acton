@@ -111,11 +111,9 @@ interface RetraceWorkspaceProps {
   readonly className?: string
 }
 
-function hasVisibleSourceBundles(result: RetraceResultAndCode): boolean {
-  return (
-    result.verifiedSource?.bundles.some(bundle => visibleSourceBundle(bundle).files.length > 0) ??
-    false
-  )
+function hasVisibleSourceBundle(result: RetraceResultAndCode): boolean {
+  const bundle = result.verifiedSource?.bundle
+  return Boolean(bundle && visibleSourceBundle(bundle).files.length > 0)
 }
 
 function normalizeSourcePath(path: string): string {
@@ -539,6 +537,7 @@ function SourceVariableRow({
       role="treeitem"
       aria-expanded={hasChildren ? expanded : undefined}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Pointer handlers manage selection and double-click; the nested button provides the accessible toggle. */}
       <div
         className={styles.sourceVariableRow}
         style={rowStyle}
@@ -940,7 +939,7 @@ function SourceDebugPanel({
 }
 
 function SourceFilesEditor({
-  bundles,
+  bundle,
   traceId,
   sourceTrace,
   sourceTraceBundleHash,
@@ -949,7 +948,7 @@ function SourceFilesEditor({
   contracts,
   onToolbarModelChange,
 }: {
-  readonly bundles: readonly SourceBundle[]
+  readonly bundle: SourceBundle
   readonly traceId: string
   readonly sourceTrace?: SourceTraceResponse
   readonly sourceTraceBundleHash?: string
@@ -958,18 +957,11 @@ function SourceFilesEditor({
   readonly contracts?: Map<string, ContractData>
   readonly onToolbarModelChange: (model: TraceStepToolbarModel | null) => void
 }) {
-  const [activeBundleHash, setActiveBundleHash] = useState(bundles[0]?.source_bundle_hash ?? "")
-  const activeBundle =
-    bundles.find(bundle => bundle.source_bundle_hash === activeBundleHash) ?? bundles[0]
-  const [activePath, setActivePath] = useState(activeBundle ? defaultSourcePath(activeBundle) : "")
-  const activeFile = activeBundle
-    ? (findSourceFile(activeBundle.files, activePath) ?? activeBundle.files[0])
-    : undefined
+  const [activePath, setActivePath] = useState(() => defaultSourcePath(bundle))
+  const activeFile = findSourceFile(bundle.files, activePath) ?? bundle.files[0]
   const code = activeFile ? decodeSourceFile(activeFile) : ""
   const activeSourceTrace =
-    activeBundle && sourceTraceBundleHash === activeBundle.source_bundle_hash
-      ? sourceTrace
-      : undefined
+    sourceTraceBundleHash === bundle.source_bundle_hash ? sourceTrace : undefined
   const sourceSteps = activeSourceTrace?.steps ?? []
   const [activeSourceStepIndex, setActiveSourceStepIndex] = useState(0)
   const [selectedCallFrameIndex, setSelectedCallFrameIndex] = useState<number | null>(null)
@@ -995,14 +987,12 @@ function SourceFilesEditor({
   const highlightedSourceLine =
     currentSourceStep &&
     activeFile &&
-    activeBundle &&
     normalizeSourcePath(currentSourceStep.location.file) === normalizeSourcePath(activeFile.path)
       ? currentSourceStep.location.line
       : undefined
   const selectedCallFrameLine =
     selectedCallFrameLocation &&
     activeFile &&
-    activeBundle &&
     normalizeSourcePath(selectedCallFrameLocation.file) === normalizeSourcePath(activeFile.path)
       ? selectedCallFrameLocation.line
       : undefined
@@ -1025,10 +1015,8 @@ function SourceFilesEditor({
   )
 
   useEffect(() => {
-    const nextBundle = bundles[0]
-    setActiveBundleHash(nextBundle?.source_bundle_hash ?? "")
-    setActivePath(nextBundle ? defaultSourcePath(nextBundle) : "")
-  }, [bundles])
+    setActivePath(defaultSourcePath(bundle))
+  }, [bundle])
 
   useEffect(() => {
     setActiveSourceStepIndex(0)
@@ -1046,19 +1034,14 @@ function SourceFilesEditor({
 
   useEffect(() => {
     const locationToShow = selectedCallFrameLocation ?? currentSourceStep?.location
-    if (!activeBundle || !locationToShow) {
+    if (!locationToShow) {
       return
     }
-    const sourceFile = findSourceFile(activeBundle.files, locationToShow.file)
+    const sourceFile = findSourceFile(bundle.files, locationToShow.file)
     if (sourceFile) {
       setActivePath(sourceFile.path)
     }
-  }, [activeBundle, currentSourceStep, selectedCallFrameLocation])
-
-  const selectBundle = (bundle: SourceBundle) => {
-    setActiveBundleHash(bundle.source_bundle_hash)
-    setActivePath(defaultSourcePath(bundle))
-  }
+  }, [bundle, currentSourceStep, selectedCallFrameLocation])
 
   const goToSourceStep = useCallback(
     (step: number) => {
@@ -1109,18 +1092,18 @@ function SourceFilesEditor({
   const handleCallFrameSelect = useCallback(
     (index: number) => {
       const frameLocation = currentSourceStep?.callStack[index]?.location
-      if (!activeBundle || !frameLocation) {
+      if (!frameLocation) {
         return
       }
 
-      const sourceFile = findSourceFile(activeBundle.files, frameLocation.file)
+      const sourceFile = findSourceFile(bundle.files, frameLocation.file)
       if (sourceFile) {
         setActivePath(sourceFile.path)
       }
       setSelectedCallFrameIndex(index)
       setShouldCenterSourceStep(true)
     },
-    [activeBundle, currentSourceStep],
+    [bundle, currentSourceStep],
   )
 
   const startSourceDebugPanelResize = useCallback(
@@ -1214,11 +1197,11 @@ function SourceFilesEditor({
     return () => globalThis.removeEventListener("keydown", handleKeyDown)
   }, [activeSourceTrace, currentSourceStepIndex, goToSourceStep, sourceSteps.length])
 
-  if (!activeBundle || !activeFile) {
+  if (!activeFile) {
     return <div className={styles.emptySourceState}>No verified source files</div>
   }
 
-  const editorModelPath = `retrace-source-${traceId}/${activeBundle.source_bundle_hash}/${normalizeSourcePath(activeFile.path)}`
+  const editorModelPath = `retrace-source-${traceId}/${bundle.source_bundle_hash}/${normalizeSourcePath(activeFile.path)}`
   const sourceDebugLayoutStyle = activeSourceTrace
     ? ({
         "--source-debug-panel-width": `${sourceDebugPanelWidth}px`,
@@ -1227,30 +1210,8 @@ function SourceFilesEditor({
 
   return (
     <section className={styles.sourceShell} aria-label="Verified source files">
-      {bundles.length > 1 && (
-        <div className={styles.sourceBundleTabs} role="tablist" aria-label="Source bundles">
-          {bundles.map(bundle => (
-            <button
-              key={bundle.source_bundle_hash}
-              type="button"
-              className={`${styles.sourceBundleTab} ${
-                bundle.source_bundle_hash === activeBundle.source_bundle_hash
-                  ? styles.sourceBundleTabActive
-                  : ""
-              }`}
-              onClick={() => selectBundle(bundle)}
-              title={bundle.source_bundle_hash}
-              role="tab"
-              aria-selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
-            >
-              {bundle.source_bundle_hash.slice(0, 10)}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className={styles.sourceFileTabs} role="tablist" aria-label="Source files">
-        {activeBundle.files.map(file => (
+        {bundle.files.map(file => (
           <button
             key={file.path}
             type="button"
@@ -1338,7 +1299,7 @@ function RetraceWorkspaceFc({
   } | null>(null)
   const [traceViewMode, setTraceViewMode] = useState<TraceViewMode>(() => getStoredTraceViewMode())
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>(() =>
-    hasVisibleSourceBundles(result) ? "sources" : "trace",
+    hasVisibleSourceBundle(result) ? "sources" : "trace",
   )
   const [sourceToolbarModel, setSourceToolbarModel] = useState<TraceStepToolbarModel | null>(null)
 
@@ -1368,14 +1329,15 @@ function RetraceWorkspaceFc({
     [result.trace, selectedStep],
   )
   const stateUpdateHashOk = result.result.stateUpdateHashOk
-  const sourceBundles = useMemo(
-    () =>
-      result.verifiedSource?.bundles
-        .map(visibleSourceBundle)
-        .filter(bundle => bundle.files.length > 0) ?? [],
-    [result.verifiedSource],
-  )
-  const hasSourceBundles = sourceBundles.length > 0
+  const sourceBundle = useMemo(() => {
+    const bundle = result.verifiedSource?.bundle
+    if (!bundle) {
+      return undefined
+    }
+    const visibleBundle = visibleSourceBundle(bundle)
+    return visibleBundle.files.length > 0 ? visibleBundle : undefined
+  }, [result.verifiedSource])
+  const hasSourceBundle = Boolean(sourceBundle)
 
   const handleTraceViewModeChange = useCallback((mode: TraceViewMode) => {
     setTraceViewMode(mode)
@@ -1408,10 +1370,10 @@ function RetraceWorkspaceFc({
   )
 
   useEffect(() => {
-    if (!hasSourceBundles && workspaceTab === "sources") {
+    if (!hasSourceBundle && workspaceTab === "sources") {
       setWorkspaceTab("trace")
     }
-  }, [hasSourceBundles, workspaceTab])
+  }, [hasSourceBundle, workspaceTab])
 
   const currentInstructionGas = instructionDetails[selectedStep]?.gasCost
   const traceToolbarModel: TraceStepToolbarModel = {
@@ -1434,7 +1396,7 @@ function RetraceWorkspaceFc({
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
           <div className={styles.primaryTabs} role="tablist" aria-label="Debug views">
-            {hasSourceBundles && (
+            {hasSourceBundle && (
               <button
                 type="button"
                 className={`${styles.primaryTab} ${
@@ -1493,9 +1455,9 @@ function RetraceWorkspaceFc({
               workspaceTab === "trace" && selectedStackItem ? styles.codeEditorHidden : ""
             }`}
           >
-            {workspaceTab === "sources" ? (
+            {workspaceTab === "sources" && sourceBundle ? (
               <SourceFilesEditor
-                bundles={sourceBundles}
+                bundle={sourceBundle}
                 traceId={result.result.emulatedTx.lt.toString()}
                 sourceTrace={result.sourceTrace}
                 sourceTraceBundleHash={result.sourceTraceBundleHash}

@@ -12,6 +12,7 @@ import {
 import type {BackendContractInfo, BackendTransaction} from "../model/backend"
 import type {
   ContractData,
+  ParsedTransactionBody,
   TransactionInfo,
   ValueFlowAsset,
   ValueFlowAssetChange,
@@ -52,17 +53,21 @@ function parseActions(actionsBase64?: string): {
   }
 }
 
-export function getTransactionOpcode(tx: Transaction): number | undefined {
+export function getTransactionOpcode(
+  tx: Transaction,
+  parsedBody?: ParsedTransactionBody,
+): number | undefined {
   const inMessage = tx.inMessage
-  return inMessage ? getMessageOpcode(inMessage) : undefined
+  return inMessage ? getMessageOpcode(inMessage, parsedBody) : undefined
 }
 
 export function resolveTransactionOpcodeName(
   tx: TransactionInfo,
   contracts: Map<string, ContractData>,
   allContracts: readonly BackendContractInfo[],
+  parsedBody: ParsedTransactionBody | undefined = tx.parsedBody,
 ): string | undefined {
-  const opcode = getTransactionOpcode(tx.transaction)
+  const opcode = getTransactionOpcode(tx.transaction, parsedBody)
   if (opcode === undefined) {
     return undefined
   }
@@ -239,7 +244,7 @@ function normalizeValueFlowAddress(address: string | undefined): string | undefi
   }
 }
 
-function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
+export function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
   return (
     tx.accountBalanceBefore ??
     getShardAccountBalance(tx.shardAccountBefore) ??
@@ -247,7 +252,7 @@ function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
   )
 }
 
-function getTransactionBalanceAfter(tx: TransactionInfo): bigint | undefined {
+export function getTransactionBalanceAfter(tx: TransactionInfo): bigint | undefined {
   return (
     tx.accountBalanceAfter ??
     getShardAccountBalance(tx.shardAccountAfter) ??
@@ -301,6 +306,21 @@ export function getTransactionActionPhase(tx: Transaction) {
   return
 }
 
+export function isTransactionSuccessful(tx: Transaction): boolean {
+  const description = tx.description
+  if (description.type !== "generic" && description.type !== "tick-tock") {
+    return false
+  }
+
+  const computePhase = description.computePhase
+  return (
+    !description.aborted &&
+    computePhase.type === "vm" &&
+    computePhase.success &&
+    (description.actionPhase?.success ?? true)
+  )
+}
+
 export function getTransactionTriggerLabel(tx: Transaction): string | undefined {
   const description = tx.description
   if (description.type === "tick-tock") {
@@ -309,10 +329,17 @@ export function getTransactionTriggerLabel(tx: Transaction): string | undefined 
   return undefined
 }
 
+export function isSystemSourceAddress(address: Address | null | undefined): boolean {
+  return address?.workChain === -1 && address.hash.every(byte => byte === 0)
+}
+
 export function getTransactionSourceLabel(tx: Transaction): string | undefined {
   const inMessage = tx.inMessage
   if (inMessage?.info.type === "external-in") {
     return "External In"
+  }
+  if (inMessage?.info.type === "internal" && isSystemSourceAddress(inMessage.info.src)) {
+    return "System"
   }
   return getTransactionTriggerLabel(tx)
 }

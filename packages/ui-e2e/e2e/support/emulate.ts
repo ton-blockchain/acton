@@ -4,6 +4,9 @@ import {prepareVisualPage} from "./visual"
 
 const EXTERNAL_MESSAGE_BOC =
   "te6cckEBAQEAJQAARYgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEuN2rAw=="
+const SOURCE_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+const TARGET_ADDRESS = "EQAREREREREREREREREREREREREREREREREREREREREREeYT"
+const SENT_TRANSACTION_HASH = "ab".repeat(32)
 
 interface EmulateSuiteOptions {
   readonly app: "explorer" | "localnet"
@@ -24,6 +27,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       const builderTab = page.getByRole("tab", {name: "Builder", exact: true})
       const rawTab = page.getByRole("tab", {name: "Raw", exact: true})
       const emulateButton = getEmulateButton(page)
+      const sendButton = getSendToLocalnetButton(page)
 
       await expect(builderTab).toHaveAttribute("aria-selected", "true")
       await expect(page.getByRole("combobox", {name: "From", exact: true})).toBeVisible()
@@ -35,6 +39,12 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       ).toBeVisible()
       await expect(page.getByText("ABI not loaded", {exact: true})).toBeHidden()
       await expect(emulateButton).toBeDisabled()
+      if (app === "localnet") {
+        await expect(sendButton).toBeVisible()
+        await expect(sendButton).toBeDisabled()
+      } else {
+        await expect(sendButton).toHaveCount(0)
+      }
 
       await rawTab.click()
       await expect(rawTab).toHaveAttribute("aria-selected", "true")
@@ -46,6 +56,9 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
 
       await page.getByRole("textbox", {name: "Message BOC", exact: true}).fill(EXTERNAL_MESSAGE_BOC)
       await expect(emulateButton).toBeEnabled()
+      if (app === "localnet") {
+        await expect(sendButton).toBeEnabled()
+      }
 
       const resetButton = page.getByRole("button", {name: "Reset transaction fields", exact: true})
       await expect(resetButton).toHaveAttribute(
@@ -158,6 +171,66 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       await expect(emulateButton).not.toHaveAttribute("aria-busy", "true")
       await expect(emulateButton).toBeEnabled()
     })
+
+    if (app === "localnet") {
+      test("sends a builder message through the localnet internal-message endpoint", async ({
+        page,
+      }) => {
+        let requestBody: unknown
+        await mockSentTransactionTrace(page)
+        await page.route("**/acton_sendInternalMessage", async interceptedRoute => {
+          requestBody = interceptedRoute.request().postDataJSON()
+          await interceptedRoute.fulfill({
+            json: {ok: true, result: {"@type": "ok", hash: "internal-message-hash"}},
+          })
+        })
+
+        await page.getByRole("combobox", {name: "From", exact: true}).fill(SOURCE_ADDRESS)
+        await page.getByRole("combobox", {name: "To", exact: true}).fill(TARGET_ADDRESS)
+
+        const sendButton = getSendToLocalnetButton(page)
+        await expect(sendButton).toBeEnabled()
+        await sendButton.click()
+
+        await expect.poll(() => requestBody).toMatchObject({boc: expect.any(String)})
+        await expect(page.getByText("Message sent to localnet", {exact: true})).toBeVisible()
+        await expect(
+          page.getByRole("link", {name: "View transaction", exact: true}),
+        ).toHaveAttribute("href", `/explorer/tx/${SENT_TRANSACTION_HASH}`)
+      })
+
+      test("requires confirmation before sending while account overrides are configured", async ({
+        page,
+      }) => {
+        let sendRequestCount = 0
+        await mockSentTransactionTrace(page)
+        await page.route("**/api/v2/sendBocReturnHash", async interceptedRoute => {
+          sendRequestCount += 1
+          await interceptedRoute.fulfill({
+            json: {
+              ok: true,
+              result: {"@type": "raw.extMessageInfo", hash: "external-message-hash"},
+            },
+          })
+        })
+
+        await selectRawMessage(page, EXTERNAL_MESSAGE_BOC)
+        await page.locator('summary[aria-label="State overrides"]').click()
+        await page.getByRole("button", {name: "Add account", exact: true}).click()
+
+        await getSendToLocalnetButton(page).click()
+
+        await expect(
+          page.getByRole("dialog", {name: "Send without account overrides?"}),
+        ).toBeVisible()
+        expect(sendRequestCount).toBe(0)
+        await expect(page.getByText(/current localnet state/)).toBeVisible()
+
+        await page.getByRole("button", {name: "Send without overrides", exact: true}).click()
+        await expect.poll(() => sendRequestCount).toBe(1)
+        await expect(page.getByText("Message sent to localnet", {exact: true})).toBeVisible()
+      })
+    }
   })
 }
 
@@ -176,4 +249,28 @@ function isTonApiRequest(url: URL): boolean {
 
 function getEmulateButton(page: Page) {
   return page.getByRole("tabpanel").getByRole("button", {name: "Emulate", exact: true})
+}
+
+function getSendToLocalnetButton(page: Page) {
+  return page.getByRole("tabpanel").getByRole("button", {
+    name: "Send to localnet",
+    exact: true,
+  })
+}
+
+async function mockSentTransactionTrace(page: Page): Promise<void> {
+  await page.route("**/api/v3/traces?*", async interceptedRoute => {
+    await interceptedRoute.fulfill({
+      json: {
+        address_book: {},
+        metadata: {},
+        traces: [
+          {
+            trace: {tx_hash: SENT_TRANSACTION_HASH},
+            transactions_order: [],
+          },
+        ],
+      },
+    })
+  })
 }

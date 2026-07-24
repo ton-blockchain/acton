@@ -4,6 +4,7 @@ import {
   DataTable,
   DataTableBody,
   DataTableCell,
+  DataTableEmpty,
   DataTableFooter,
   DataTableHead,
   DataTableHeaderCell,
@@ -20,6 +21,7 @@ export interface ValueFlowTableProps {
   readonly items: readonly ValueFlowItem[]
   readonly contracts: Map<string, ContractData>
   readonly onContractClick?: (address: string) => void
+  readonly emptyState?: string
   readonly className?: string
 }
 
@@ -27,6 +29,7 @@ export function ValueFlowTable({
   items,
   contracts,
   onContractClick,
+  emptyState = "No value flow data",
   className,
 }: ValueFlowTableProps): React.JSX.Element {
   const totalFee = items.reduce((sum, item) => sum + item.fee, 0n)
@@ -51,8 +54,11 @@ export function ValueFlowTable({
   })
 
   return (
-    <DataTable className={className} minWidth={`${20 + (assets.length + 2) * 12}rem`}>
-      <DataTableTable aria-label="Value flow" rowDividers={false}>
+    <DataTable
+      className={`${styles.root} ${className ?? ""}`}
+      minWidth={`var(--value-flow-table-min-width, ${20 + (assets.length + 2) * 12}rem)`}
+    >
+      <DataTableTable className={styles.table} aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell columnWidth="20rem">Account</DataTableHeaderCell>
@@ -75,41 +81,51 @@ export function ValueFlowTable({
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>
-          {sortedItems.map(item => (
-            <DataTableRow key={item.address}>
-              <DataTableCell>
-                <ContractChip
-                  address={item.address}
-                  contracts={contracts}
-                  onContractClick={onContractClick}
-                />
-              </DataTableCell>
-              <DataTableCell align="right">
-                <span className={item.change > 0n ? styles.positive : undefined}>
-                  {formatSignedCurrency(item.change)}
-                </span>
-              </DataTableCell>
-              {assets.map(asset => {
-                const assetChange = item.assetChanges.find(change => change.asset.id === asset.id)
-                return (
-                  <DataTableCell key={asset.id} align="right">
-                    {assetChange && (
-                      <span
-                        className={
-                          assetChange.change > 0n
-                            ? `${styles.assetValue} ${styles.positive}`
-                            : styles.assetValue
-                        }
-                      >
-                        {formatSignedAssetChange(assetChange.change, asset)}
-                      </span>
-                    )}
-                  </DataTableCell>
-                )
-              })}
-              <DataTableCell align="right">{formatCurrency(item.fee)}</DataTableCell>
-            </DataTableRow>
-          ))}
+          {sortedItems.length === 0 ? (
+            <DataTableEmpty colSpan={3 + assets.length}>{emptyState}</DataTableEmpty>
+          ) : (
+            sortedItems.map(item => (
+              <DataTableRow key={item.address}>
+                <DataTableCell className={styles.accountCell}>
+                  <ContractChip
+                    address={item.address}
+                    contracts={contracts}
+                    onContractClick={onContractClick}
+                  />
+                </DataTableCell>
+                <DataTableCell align="right" data-mobile-label="Balance change">
+                  <span className={item.change > 0n ? styles.positive : undefined}>
+                    {formatSignedCurrency(item.change)}
+                  </span>
+                </DataTableCell>
+                {assets.map(asset => {
+                  const assetChange = item.assetChanges.find(change => change.asset.id === asset.id)
+                  return (
+                    <DataTableCell
+                      key={asset.id}
+                      align="right"
+                      data-mobile-label={asset.symbol ?? formatAddress(asset.id)}
+                    >
+                      {assetChange && (
+                        <span
+                          className={
+                            assetChange.change > 0n
+                              ? `${styles.assetValue} ${styles.positive}`
+                              : styles.assetValue
+                          }
+                        >
+                          {formatSignedAssetChange(assetChange.change, asset)}
+                        </span>
+                      )}
+                    </DataTableCell>
+                  )
+                })}
+                <DataTableCell align="right" data-mobile-label="Network fee">
+                  {formatCurrency(item.fee)}
+                </DataTableCell>
+              </DataTableRow>
+            ))
+          )}
         </DataTableBody>
         {showTotal && (
           <DataTableFooter>

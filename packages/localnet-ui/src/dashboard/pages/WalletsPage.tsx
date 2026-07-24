@@ -17,6 +17,7 @@ import {
   type AddressFormatOptions,
 } from "../../explorer/components/utils"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {
   useOpenExplorerPath,
   type ExplorerNavigationClickEvent,
@@ -35,6 +36,7 @@ type WalletTokensById = Readonly<Record<string, readonly JettonWallet[]>>
 
 export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
   const addressFormat = useAddressFormat()
+  const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const [walletTokensById, setWalletTokensById] = useState<WalletTokensById>({})
   const [walletTokensLoading, setWalletTokensLoading] = useState(false)
@@ -203,7 +205,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                             copiedAddress={copiedAddress}
                             resolveName={false}
                             onAddressClick={(nextAddress, event) =>
-                              openPath(`/explorer/address/${nextAddress}`, event)
+                              openPath(routes.addressPath(nextAddress), event)
                             }
                             onCopyAddress={handleCopyAddress}
                           />
@@ -220,7 +222,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                             tokensLoading={walletTokensLoading}
                             balanceState={balanceState}
                             onOpenTokens={(address, event) =>
-                              openPath(`/explorer/address/${address}#tokens`, event)
+                              openPath(`${routes.addressPath(address)}#tokens`, event)
                             }
                           />
                         </td>
@@ -293,7 +295,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           copiedAddress={copiedAddress}
                           addressFormat={addressFormat}
                           onAddressClick={(nextAddress, event) =>
-                            openPath(`/explorer/address/${nextAddress}`, event)
+                            openPath(routes.addressPath(nextAddress), event)
                           }
                           onCopyAddress={handleCopyAddress}
                         />

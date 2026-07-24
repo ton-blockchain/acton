@@ -106,6 +106,7 @@
   margin: 0;
   color: var(--acton-color-text);
   text-align: end;
+  white-space: nowrap;
 }
 
 .edgeText {
@@ -121,6 +122,15 @@
 
 .rootNode {
   pointer-events: none;
+}
+
+.systemRootNode {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.systemRootNode * {
+  cursor: help;
 }
 
 .rootCircle {
@@ -192,6 +202,14 @@
   word-wrap: break-word;
   word-break: break-all;
   overflow-wrap: break-word;
+}
+
+.tooltipDescription {
+  word-break: normal;
+}
+
+.systemTooltip {
+  width: min(20rem, calc(100vw - 64px));
 }
 
 .tooltipAddressChip {

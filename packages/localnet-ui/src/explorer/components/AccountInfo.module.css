@@ -214,6 +214,11 @@
   flex: 0 1 auto;
 }
 
+.namePopover {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .addressFormats {
   display: grid;
   gap: 10px;
@@ -239,6 +244,12 @@
   gap: 4px;
   width: fit-content;
   max-width: 100%;
+  min-width: 0;
+}
+
+.nameDetailValues {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -274,6 +285,10 @@
   font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow-wrap: anywhere;
+}
+
+.nameWithDetails {
+  cursor: help;
 }
 
 .renamePanel {
@@ -415,6 +430,10 @@
   font: inherit;
 }
 
+.assetLink {
+  flex: 0 1 auto;
+}
+
 .assetLink:disabled,
 .collectiblesLink:disabled {
   cursor: default;
@@ -493,6 +512,8 @@
   font: inherit;
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-normal);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .moreLink:hover {
@@ -524,13 +545,22 @@
 }
 
 .collectibleThumb {
-  display: block;
-  object-fit: cover;
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 50%;
   background: var(--acton-color-surface-group);
 }
 
-.nsfwImage {
-  filter: blur(8px);
+.collectibleThumbImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blurredImage {
+  filter: blur(4px);
+  transform: scale(1.35);
 }
 
 .collectibleThumbPlaceholder {
@@ -763,6 +793,19 @@
     width: 100%;
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .assetRow,
+  .collectiblesRow {
+    width: 100%;
+  }
+
+  .assetLink {
+    align-items: flex-start;
+  }
+
+  .assetLink .primaryValue {
+    min-width: 0;
   }
 
   .addressInfoRow .rowValue {

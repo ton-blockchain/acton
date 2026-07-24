@@ -764,7 +764,7 @@ struct SignResponse {
 #[derive(Debug, Deserialize)]
 struct NewVerifyResponse {
     code_hash: String,
-    compiled_code_hash: String,
+    compiled_code_hash: Option<String>,
     verification_result: NewVerificationResult,
     #[serde(default)]
     source_bundle_hash: Option<String>,
@@ -775,6 +775,7 @@ struct NewVerifyResponse {
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum NewVerificationResult {
+    AlreadyVerified,
     Match,
     Mismatch,
 }
@@ -921,12 +922,38 @@ fn verify_with_new_verifier(
         .json()
         .context("Failed to parse new verifier response")?;
 
-    if verify_result.verification_result != NewVerificationResult::Match {
-        anyhow::bail!(
-            "Verification failed: compiled code hash {} does not match target code hash {}",
-            verify_result.compiled_code_hash,
-            verify_result.code_hash
-        );
+    match verify_result.verification_result {
+        NewVerificationResult::AlreadyVerified => {
+            println!("  {} Contract was already verified", "✓".green().bold());
+            if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
+                println!(
+                    "  {} Source bundle: {}",
+                    "→".blue().bold(),
+                    source_bundle_hash.dimmed()
+                );
+            }
+            if let Some(storage_revision) = &verify_result.storage_revision {
+                println!(
+                    "  {} Storage revision: {}",
+                    "→".blue().bold(),
+                    storage_revision.dimmed()
+                );
+            }
+            println!();
+            show_new_verifier_link(&backend, code_hash);
+            return Ok(());
+        }
+        NewVerificationResult::Mismatch => {
+            anyhow::bail!(
+                "Verification failed: compiled code hash {} does not match target code hash {}",
+                verify_result
+                    .compiled_code_hash
+                    .as_deref()
+                    .unwrap_or("<unknown>"),
+                verify_result.code_hash
+            );
+        }
+        NewVerificationResult::Match => {}
     }
 
     println!(

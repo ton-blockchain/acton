@@ -296,6 +296,24 @@ impl LocalnetHandle {
         json
     }
 
+    pub(crate) fn get_bytes(&self, path: &str) -> Vec<u8> {
+        let url = format!("{}{}", self.base_url(), normalize_path(path));
+        let response = self
+            .with_auth(self.client.get(&url))
+            .send()
+            .unwrap_or_else(|e| panic!("Failed GET {url}: {e}"));
+        let status = response.status();
+        let body = response
+            .bytes()
+            .unwrap_or_else(|e| panic!("Failed to read GET {url} response body: {e}"));
+        assert!(
+            status.is_success(),
+            "GET {url} failed with status {status}: {}",
+            String::from_utf8_lossy(&body)
+        );
+        body.to_vec()
+    }
+
     pub(crate) fn post_json<P>(&self, path: &str, payload: &P) -> Value
     where
         P: Serialize + ?Sized,
@@ -365,6 +383,36 @@ impl LocalnetHandle {
         let (status, json) = self.post_json_with_status(path, payload);
         assert!(status >= 400, "POST {path} unexpectedly succeeded: {json}");
         json
+    }
+
+    pub(crate) fn post_bytes(&self, path: &str, payload: Vec<u8>) -> Value {
+        let (status, json) = self.post_bytes_with_status_as(path, payload);
+        assert!(
+            (200..300).contains(&status),
+            "POST {path} failed with status {status}: {json}"
+        );
+        json
+    }
+
+    pub(crate) fn post_bytes_with_status_as<T>(&self, path: &str, payload: Vec<u8>) -> (u16, T)
+    where
+        T: DeserializeOwned,
+    {
+        let url = format!("{}{}", self.base_url(), normalize_path(path));
+        let response = self
+            .with_auth(
+                self.client
+                    .post(&url)
+                    .header(reqwest::header::CONTENT_TYPE, "application/json")
+                    .body(payload),
+            )
+            .send()
+            .unwrap_or_else(|e| panic!("Failed POST {url}: {e}"));
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .unwrap_or_else(|e| panic!("Failed to read POST {url} response body: {e}"));
+        (status, parse_json_body("POST", &url, &body))
     }
 
     pub(crate) fn post_v2_json_rpc<T, P>(
@@ -514,6 +562,94 @@ pub(crate) fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> St
         serde_json::to_string_pretty(value).expect("Failed to serialize JSON snapshot")
     );
     normalize_output_preserve_escapes(&response_json, project_path)
+}
+
+pub(crate) fn summarize_admin_response(response: &Value) -> Value {
+    let mut response = response.clone();
+    if let Some(extra) = response.get_mut("@extra") {
+        *extra = serde_json::json!("[EXTRA]");
+    }
+    if let Some(tx_hash) = response.pointer_mut("/result/result/tx_hash") {
+        *tx_hash = serde_json::json!("[HASH]");
+    }
+    if let Some(hash) = response.pointer_mut("/result/hash") {
+        *hash = serde_json::json!("[HASH]");
+    }
+    response
+}
+
+pub(crate) fn wait_for_ok_response(node: &LocalnetHandle, query: &str, timeout: Duration) -> Value {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json(query);
+        if is_success_response(&response) {
+            return response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for successful response from `{query}`:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
+pub(crate) fn latest_masterchain_seqno(node: &LocalnetHandle) -> i64 {
+    let response = wait_for_ok_response(node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
+    response["result"]["last"]["seqno"]
+        .as_i64()
+        .expect("masterchain seqno must be integer")
+}
+
+pub(crate) fn block_header_gen_utime(node: &LocalnetHandle, seqno: u32) -> u32 {
+    let response = wait_for_ok_response(
+        node,
+        &format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}"),
+        Duration::from_secs(5),
+    );
+    response_payload(&response)["gen_utime"]
+        .as_u64()
+        .expect("block header must expose gen_utime") as u32
+}
+
+pub(crate) fn wait_for_address_balance_at_least(
+    node: &LocalnetHandle,
+    address: &str,
+    expected_balance: u128,
+    timeout: Duration,
+) -> Value {
+    let query = format!("/api/v2/getAddressInformation?address={address}");
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json(&query);
+        if is_success_response(&response) && parse_address_balance(&response) >= expected_balance {
+            return response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for address `{address}` balance to reach {expected_balance}:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
+pub(crate) fn parse_address_balance(address_information: &Value) -> u128 {
+    address_information["result"]["balance"]
+        .as_str()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected string balance field in getAddressInformation response:\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
+        .parse::<u128>()
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to parse balance from getAddressInformation response: {e}\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
 }
 
 pub(crate) fn is_success_response(response: &Value) -> bool {

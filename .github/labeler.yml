@@ -122,3 +122,13 @@
   - changed-files:
       - any-glob-to-any-file:
           - "packages/**"
+
+"faucet":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/faucet/**"
+
+"verifier":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/verifier/**"

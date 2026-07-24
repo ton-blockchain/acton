@@ -155,7 +155,9 @@ export function describeCellInspector({app, route}: CellInspectorSuiteOptions): 
       const outputTabs = page.getByRole("group", {
         name: "Cell Inspector output",
       })
-      await expect(outputTabs).toHaveAttribute("data-tvm-code-status", "available")
+      await expect(outputTabs).toHaveAttribute("data-tvm-code-status", "available", {
+        timeout: 15_000,
+      })
       await expect(outputTabs.getByRole("button").first()).toHaveText("TVM code")
       await expect(outputTabs.getByRole("button", {name: "TVM code", exact: true})).toHaveAttribute(
         "aria-current",
@@ -269,25 +271,23 @@ async function installVerifiedSourceRoute(
   const source = {
     code_hash: TVM_CODE_HASH,
     verified: true,
-    bundles: [
-      {
-        source_bundle_hash: "cell-inspector-source",
-        verified_at: 1,
-        storage_revision: "test",
-        entrypoint: "main.tolk",
-        compiler: {language: "tolk", version: "1.2.0", params: {}},
-        files: [
-          {
-            path: "main.tolk",
-            content_hash: "main-source",
-            include_in_command: true,
-            is_stdlib: false,
-            has_include_directives: false,
-            content: "fun onInternalMessage() {}",
-          },
-        ],
-      },
-    ],
+    bundle: {
+      source_bundle_hash: "cell-inspector-source",
+      verified_at: 1,
+      storage_revision: "test",
+      entrypoint: "main.tolk",
+      compiler: {language: "tolk", version: "1.2.0", params: {}},
+      files: [
+        {
+          path: "main.tolk",
+          content_hash: "main-source",
+          include_in_command: true,
+          is_stdlib: false,
+          has_include_directives: false,
+          content: "fun onInternalMessage() {}",
+        },
+      ],
+    },
   }
 
   if (app === "localnet") {

@@ -28,7 +28,7 @@ fun WalletV5.fromLibraryStorage(
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-    return WalletV5 { address, stateInit };
+    return WalletV5 { address, stateInit, toShard };
 }
 
 fun WalletV5.getSeqno(self): int {

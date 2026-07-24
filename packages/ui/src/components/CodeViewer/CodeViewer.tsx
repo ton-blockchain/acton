@@ -27,6 +27,7 @@ export interface CodeViewerProps {
   readonly attachedToTabs?: boolean
   readonly className?: string
   readonly compact?: boolean
+  readonly defaultSelectedPath?: string
   readonly defaultFileTreeVisible?: boolean
   readonly emptyMessage?: string
   readonly entrypoint?: string
@@ -34,6 +35,7 @@ export interface CodeViewerProps {
   readonly externalActionLabel?: string
   readonly externalActionUrl?: string
   readonly files: readonly CodeViewerFile[]
+  readonly onSelectedPathChange?: (path: string) => void
 }
 
 interface FileTreeNode {
@@ -56,6 +58,7 @@ export function CodeViewer({
   attachedToTabs = false,
   className,
   compact = false,
+  defaultSelectedPath,
   defaultFileTreeVisible = true,
   emptyMessage = "No source files",
   entrypoint,
@@ -63,9 +66,10 @@ export function CodeViewer({
   externalActionLabel = "Open source",
   externalActionUrl,
   files,
+  onSelectedPathChange,
 }: CodeViewerProps) {
   const entrypointFile = useMemo(() => findEntrypointFile(files, entrypoint), [entrypoint, files])
-  const [selectedPath, setSelectedPath] = useState<string>()
+  const [selectedPath, setSelectedPath] = useState(defaultSelectedPath)
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set())
   const [isDesktopTreeVisible, setDesktopTreeVisible] = useState(defaultFileTreeVisible)
   const [isMobileTreeOpen, setMobileTreeOpen] = useState(false)
@@ -84,6 +88,7 @@ export function CodeViewer({
   const selectFile = (path: string) => {
     setSelectedPath(path)
     setMobileTreeOpen(false)
+    onSelectedPathChange?.(path)
   }
 
   const toggleFolder = (path: string) => {
@@ -232,7 +237,11 @@ function FileTreeRows({
             <li key={node.path} className={styles.treeItem}>
               <button
                 type="button"
-                className={cx(styles.treeRow, styles.folderRow)}
+                className={cx(
+                  styles.treeRow,
+                  styles.folderRow,
+                  node.name === "output" && styles.outputFolderRow,
+                )}
                 style={depthStyle}
                 aria-expanded={expanded}
                 onClick={() => onToggleFolder(node.path)}
@@ -375,6 +384,7 @@ function languageForPath(path: string): HighlightedCodeLanguage | undefined {
   const normalizedPath = path.toLowerCase()
   if (normalizedPath.endsWith(".tolk")) return "tolk"
   if (normalizedPath.endsWith(".fc") || normalizedPath.endsWith(".func")) return "func"
+  if (normalizedPath.endsWith(".tact")) return "tact"
   if (
     normalizedPath.endsWith(".json") ||
     normalizedPath.endsWith(".abi") ||

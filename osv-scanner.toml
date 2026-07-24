@@ -1,0 +1,7 @@
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0388"
+reason = "derivative via ton_liteapi -> ton"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0205"
+reason = "dependency `scc` does not use `Array`, only `HashSet`"

@@ -9,16 +9,15 @@ use anyhow::Context;
 use core::cmp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, Write};
 use std::path::Path;
-
-const NODE_STATE_SNAPSHOT_VERSION: u32 = 2;
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeStateSnapshot {
-    pub version: u32,
     pub globals: SnapshotGlobals,
     pub time_offset_seconds: i64,
     pub next_block_timestamp: Option<u32>,
@@ -65,9 +64,17 @@ impl Node {
         write_snapshot_to_path(&snapshot, path)
     }
 
+    pub fn dump_state_to_json(&self) -> anyhow::Result<Vec<u8>> {
+        snapshot_to_json(&self.build_snapshot()?)
+    }
+
     pub fn load_state_from_path<P: AsRef<Path>>(&mut self, path: P) -> anyhow::Result<()> {
         let snapshot = read_snapshot_from_path(path)?;
         self.apply_snapshot(snapshot)
+    }
+
+    pub fn load_state_from_json(&mut self, json: &[u8]) -> anyhow::Result<()> {
+        self.apply_snapshot(snapshot_from_json(json)?)
     }
 
     pub(crate) fn build_snapshot(&self) -> anyhow::Result<NodeStateSnapshot> {
@@ -158,8 +165,7 @@ impl Node {
 
         let cas_entries = self.export_cas_entries()?;
 
-        Ok(NodeStateSnapshot {
-            version: NODE_STATE_SNAPSHOT_VERSION,
+        let snapshot = NodeStateSnapshot {
             globals: SnapshotGlobals {
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
@@ -189,7 +195,9 @@ impl Node {
             pool_internal: self.pool.internal.clone(),
             pool_rr_turn: self.pool.rr_turn,
             pending_freeze_current: self.pending_freeze_current.clone(),
-        })
+        };
+        Self::validate_snapshot(&snapshot)?;
+        Ok(snapshot)
     }
 
     #[allow(clippy::significant_drop_tightening)]
@@ -209,10 +217,6 @@ impl Node {
     }
 
     pub(crate) fn apply_snapshot(&mut self, mut snapshot: NodeStateSnapshot) -> anyhow::Result<()> {
-        if snapshot.version != NODE_STATE_SNAPSHOT_VERSION {
-            anyhow::bail!("Unsupported snapshot version: {}", snapshot.version);
-        }
-
         for block in &mut snapshot.history_masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
                 block.config_boc_hash = snapshot.globals.config_boc_hash;
@@ -222,6 +226,13 @@ impl Node {
             if wallet.jetton_wallet_code_hash == Hash256::default() {
                 wallet.jetton_wallet_code_hash = wallet.code_hash;
             }
+        }
+
+        let config_cell = Self::validate_snapshot(&snapshot)?;
+        let mut clock =
+            VirtualClock::from_parts(snapshot.time_offset_seconds, snapshot.next_block_timestamp);
+        if let Some(latest_block) = snapshot.history_blocks.last() {
+            clock.bump_offset_to_at_least(latest_block.gen_utime)?;
         }
 
         if let Some(persistence) = &self.persistence {
@@ -268,17 +279,10 @@ impl Node {
             queue_policy: snapshot.globals.queue_policy,
             checkpoint_every: snapshot.globals.checkpoint_every,
         };
-        self.config_cell = self
-            .cas
-            .get_cell(&self.globals.config_boc_hash)
-            .context("Config missing")?;
+        self.config_cell = config_cell;
         self.latest_masterchain_state = None;
         self.latest_shard_state = None;
-        self.clock =
-            VirtualClock::from_parts(snapshot.time_offset_seconds, snapshot.next_block_timestamp);
-        if let Some(latest_block) = self.history.blocks.last() {
-            self.bump_offset_to_at_least(latest_block.gen_utime)?;
-        }
+        self.clock = clock;
 
         self.latest
             .accounts
@@ -298,6 +302,221 @@ impl Node {
         self.rebuild_indexes();
         self.rebuild_global_libraries_from_accounts()?;
         Ok(())
+    }
+
+    pub(crate) fn validate_snapshot(snapshot: &NodeStateSnapshot) -> anyhow::Result<Cell> {
+        anyhow::ensure!(
+            snapshot.history_blocks.len() == snapshot.globals.head_seqno as usize,
+            "Block history length {} does not match head seqno {}",
+            snapshot.history_blocks.len(),
+            snapshot.globals.head_seqno
+        );
+        anyhow::ensure!(
+            snapshot.history_deltas_by_seqno.len() == snapshot.globals.head_seqno as usize,
+            "Account delta history length {} does not match head seqno {}",
+            snapshot.history_deltas_by_seqno.len(),
+            snapshot.globals.head_seqno
+        );
+        for (index, block) in snapshot.history_blocks.iter().enumerate() {
+            let expected_seqno = index as Seqno + 1;
+            anyhow::ensure!(
+                block.seqno == expected_seqno,
+                "Block history is not contiguous at seqno {expected_seqno}"
+            );
+        }
+
+        let mut cas = HashMap::with_capacity(snapshot.cas_entries.len());
+        for (hash, boc) in &snapshot.cas_entries {
+            anyhow::ensure!(
+                !cas.contains_key(hash),
+                "Duplicate CAS entry {}",
+                hash.to_hex()
+            );
+            let cell =
+                Boc::decode(boc).with_context(|| format!("Invalid CAS entry {}", hash.to_hex()))?;
+            let actual_hash = Hash256::from(cell.repr_hash());
+            anyhow::ensure!(
+                actual_hash == *hash,
+                "CAS entry hash mismatch: expected {}, got {}",
+                hash.to_hex(),
+                actual_hash.to_hex()
+            );
+            Self::collect_library_refs(&cell)
+                .with_context(|| format!("Invalid cell tree in CAS entry {}", hash.to_hex()))?;
+            cas.insert(*hash, boc);
+        }
+
+        let config_boc = cas
+            .get(&snapshot.globals.config_boc_hash)
+            .context("Config missing from snapshot CAS")?;
+        let config_cell = Boc::decode(config_boc).context("Invalid config BOC in snapshot CAS")?;
+
+        let validate_account_meta = |address: &Addr, meta: &AccountMeta| -> anyhow::Result<()> {
+            if meta.account_hash.is_zero() && *address == GIVER_ADDR {
+                return Ok(());
+            }
+            let account_boc = cas.get(&meta.account_hash).with_context(|| {
+                format!(
+                    "Account {address} references missing CAS entry {}",
+                    meta.account_hash.to_hex()
+                )
+            })?;
+            Self::extract_public_libraries_from_shard_account(account_boc)
+                .with_context(|| format!("Invalid shard account BOC for {address}"))?;
+            Self::collect_code_library_refs_from_shard_account(account_boc)
+                .with_context(|| format!("Invalid account code for {address}"))?;
+            Ok(())
+        };
+
+        let mut account_addresses = HashSet::with_capacity(snapshot.latest_accounts.len());
+        for (address, meta) in &snapshot.latest_accounts {
+            anyhow::ensure!(
+                account_addresses.insert(*address),
+                "Duplicate latest account {address}"
+            );
+            validate_account_meta(address, meta)?;
+        }
+        for deltas in &snapshot.history_deltas_by_seqno {
+            for delta in deltas {
+                anyhow::ensure!(
+                    delta.old_hash == delta.old_meta.as_ref().map(|meta| meta.account_hash),
+                    "Account {} old delta hash does not match its metadata",
+                    delta.addr
+                );
+                anyhow::ensure!(
+                    delta.new_hash == delta.new_meta.as_ref().map(|meta| meta.account_hash),
+                    "Account {} new delta hash does not match its metadata",
+                    delta.addr
+                );
+                if let Some(meta) = &delta.old_meta {
+                    validate_account_meta(&delta.addr, meta)?;
+                }
+                if let Some(meta) = &delta.new_meta {
+                    validate_account_meta(&delta.addr, meta)?;
+                }
+            }
+        }
+
+        let mut transactions = HashMap::with_capacity(snapshot.history_tx_by_hash.len());
+        for (hash, meta) in &snapshot.history_tx_by_hash {
+            anyhow::ensure!(
+                *hash == meta.tx_hash,
+                "Transaction key does not match its hash"
+            );
+            anyhow::ensure!(
+                transactions.insert(*hash, meta).is_none(),
+                "Duplicate transaction {}",
+                hash.to_hex()
+            );
+        }
+        let mut listed_transactions = HashSet::with_capacity(transactions.len());
+        for block in &snapshot.history_blocks {
+            for tx_hash in &block.tx_hashes {
+                anyhow::ensure!(
+                    listed_transactions.insert(*tx_hash),
+                    "Transaction {} is listed in more than one block",
+                    tx_hash.to_hex()
+                );
+                let meta = transactions.get(tx_hash).with_context(|| {
+                    format!(
+                        "Block {} references missing transaction {}",
+                        block.seqno,
+                        tx_hash.to_hex()
+                    )
+                })?;
+                anyhow::ensure!(
+                    meta.block_seqno == block.seqno,
+                    "Transaction {} points to block {}, but is listed in block {}",
+                    tx_hash.to_hex(),
+                    meta.block_seqno,
+                    block.seqno
+                );
+            }
+        }
+        for tx_hash in transactions.keys() {
+            anyhow::ensure!(
+                listed_transactions.contains(tx_hash),
+                "Transaction {} is not listed in its block",
+                tx_hash.to_hex()
+            );
+        }
+
+        let mut messages = HashMap::with_capacity(snapshot.history_msg_by_hash.len());
+        for (hash, meta) in &snapshot.history_msg_by_hash {
+            anyhow::ensure!(
+                *hash == meta.msg_hash,
+                "Message key does not match its hash"
+            );
+            anyhow::ensure!(
+                messages.insert(*hash, meta).is_none(),
+                "Duplicate message {}",
+                hash.to_hex()
+            );
+            anyhow::ensure!(
+                cas.contains_key(&meta.msg_boc_hash),
+                "Message {} references missing CAS entry {}",
+                hash.to_hex(),
+                meta.msg_boc_hash.to_hex()
+            );
+        }
+        let mut mapped_messages = HashSet::with_capacity(snapshot.history_msg_to_tx.len());
+        for (message_hash, tx_hash) in &snapshot.history_msg_to_tx {
+            anyhow::ensure!(
+                mapped_messages.insert(*message_hash),
+                "Duplicate message-to-transaction mapping for {}",
+                message_hash.to_hex()
+            );
+            anyhow::ensure!(
+                messages.contains_key(message_hash),
+                "Message-to-transaction mapping references missing message {}",
+                message_hash.to_hex()
+            );
+            anyhow::ensure!(
+                transactions.contains_key(tx_hash),
+                "Message-to-transaction mapping references missing transaction {}",
+                tx_hash.to_hex()
+            );
+            anyhow::ensure!(
+                transactions[tx_hash].in_msg_hash == Some(*message_hash),
+                "Message-to-transaction mapping does not match transaction {} inbound message",
+                tx_hash.to_hex()
+            );
+        }
+        for (tx_hash, meta) in &transactions {
+            if let Some(message_hash) = meta.in_msg_hash {
+                anyhow::ensure!(
+                    mapped_messages.contains(&message_hash),
+                    "Transaction {} inbound message {} has no reverse mapping",
+                    tx_hash.to_hex(),
+                    message_hash.to_hex()
+                );
+            }
+            for message_hash in &meta.out_msg_hashes {
+                anyhow::ensure!(
+                    messages.contains_key(message_hash),
+                    "Transaction {} references missing outbound message {}",
+                    tx_hash.to_hex(),
+                    message_hash.to_hex()
+                );
+            }
+        }
+        for hash in snapshot
+            .pool_external
+            .iter()
+            .chain(snapshot.pool_internal.iter())
+        {
+            let meta = messages
+                .get(hash)
+                .with_context(|| format!("Queued message {} has no metadata", hash.to_hex()))?;
+            anyhow::ensure!(
+                cas.contains_key(&meta.msg_boc_hash),
+                "Queued message {} references missing CAS entry {}",
+                hash.to_hex(),
+                meta.msg_boc_hash.to_hex()
+            );
+        }
+
+        Ok(config_cell)
     }
 
     fn rebuild_indexes(&mut self) {
@@ -344,19 +563,29 @@ pub(crate) fn read_snapshot_from_path<P: AsRef<Path>>(
     Ok(snapshot)
 }
 
+pub(crate) fn snapshot_from_json(json: &[u8]) -> anyhow::Result<NodeStateSnapshot> {
+    Ok(serde_json::from_slice(json)?)
+}
+
+pub(crate) fn snapshot_to_json(snapshot: &NodeStateSnapshot) -> anyhow::Result<Vec<u8>> {
+    Ok(serde_json::to_vec(snapshot)?)
+}
+
 pub(crate) fn write_snapshot_to_path<P: AsRef<Path>>(
     snapshot: &NodeStateSnapshot,
     path: P,
 ) -> anyhow::Result<()> {
     let path = path.as_ref();
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)?;
-    }
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    std::fs::create_dir_all(parent)?;
 
-    let file = File::create(path)?;
-    let writer = BufWriter::new(file);
-    serde_json::to_writer(writer, snapshot)?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+    serde_json::to_writer(temp.as_file_mut(), snapshot)?;
+    temp.as_file_mut().flush()?;
+    temp.as_file().sync_all()?;
+    temp.persist(path).map_err(|error| error.error)?;
     Ok(())
 }

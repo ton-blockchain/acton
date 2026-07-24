@@ -162,7 +162,6 @@
   background: var(--acton-color-surface-raised);
 }
 
-.sourceBundleTabs,
 .sourceFileTabs {
   display: flex;
   flex: 0 0 auto;
@@ -174,20 +173,14 @@
   scrollbar-width: thin;
 }
 
-.sourceBundleTabs,
 .sourceFileTabs {
   border-bottom: 1px solid var(--acton-color-border);
-}
-
-.sourceBundleTabs {
-  min-height: 34px;
 }
 
 .sourceFileTabs {
   min-height: 38px;
 }
 
-.sourceBundleTab,
 .sourceFileTab {
   display: inline-flex;
   flex: 0 0 auto;
@@ -206,25 +199,17 @@
     color var(--acton-duration-fast);
 }
 
-.sourceBundleTab {
-  padding: 7px 14px;
-  font-size: 12.5px;
-  font-family: var(--acton-font-mono);
-}
-
 .sourceFileTab {
   max-width: 220px;
   padding: 9px 16px;
   font-size: 13px;
 }
 
-.sourceBundleTab:hover,
 .sourceFileTab:hover {
   color: var(--acton-color-text);
   background: var(--acton-color-surface-row);
 }
 
-.sourceBundleTabActive,
 .sourceFileTabActive {
   color: var(--acton-color-text);
   background: var(--acton-color-surface-raised);
@@ -934,5 +919,58 @@
   .sourceVariableRow,
   .sourceCallFrame {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (width <= 520px) {
+  .toolbar {
+    gap: 8px;
+    padding: 0 16px 8px;
+  }
+
+  .toolbarLeft {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .toolbarRight {
+    width: 100%;
+  }
+
+  .primaryTabs {
+    flex: 0 1 auto;
+  }
+
+  .primaryTab {
+    padding-inline: 8px;
+  }
+
+  .sourceDebugToolbar {
+    width: 100%;
+    min-height: 0;
+    gap: 6px;
+  }
+
+  .sourceDebugMeta {
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sourceDebugMeta::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sourceDebugControls {
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .sourceDebugGroupSeparator {
+    display: none;
   }
 }

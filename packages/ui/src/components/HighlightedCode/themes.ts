@@ -71,6 +71,14 @@ export const jetbrainsDarculaTheme: ThemeRegistration = {
       settings: {foreground: "#BCBEC4"},
     },
     {
+      scope: ["variable.language.this"],
+      settings: {foreground: "#CF8E6D"},
+    },
+    {
+      scope: ["entity.other.attribute-name"],
+      settings: {foreground: "#C77DBB"},
+    },
+    {
       scope: ["entity.name.tag", "entity.name.namespace"],
       settings: {foreground: "#D5B778"},
     },
@@ -152,6 +160,14 @@ export const jetbrainsLightTheme: ThemeRegistration = {
     {
       scope: ["variable.parameter", "variable", "identifier", "delimiter", "punctuation"],
       settings: {foreground: "#000000"},
+    },
+    {
+      scope: ["variable.language.this"],
+      settings: {foreground: "#0033B3"},
+    },
+    {
+      scope: ["entity.other.attribute-name"],
+      settings: {foreground: "#871094"},
     },
     {
       scope: ["entity.name.tag", "entity.name.namespace"],

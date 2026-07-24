@@ -1,0 +1,298 @@
+.appShell {
+  min-height: 100vh;
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+}
+
+.header {
+  position: relative;
+  z-index: 20;
+  min-height: 52px;
+  padding: 0 28px;
+  background: color-mix(in srgb, var(--acton-color-canvas) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  box-sizing: border-box;
+}
+
+.headerHome {
+  background: var(--acton-color-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.headerInner {
+  position: relative;
+  width: 100%;
+  max-width: 1136px;
+  min-height: 51px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+.headerPrimary {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.headerSearch {
+  flex: 1 1 430px;
+  max-width: 520px;
+  min-width: 220px;
+  margin-left: auto;
+}
+
+.headerHome .headerSearch {
+  display: none;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: 850;
+  line-height: 1;
+  text-decoration: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.brandIcon {
+  display: block;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 0;
+  padding: 2px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 58%, transparent);
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.githubButton,
+.headerIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.navLink:hover,
+.navLinkActive,
+.githubButton:hover,
+.headerIconButton:hover {
+  color: var(--acton-color-text);
+  background: color-mix(in srgb, var(--acton-color-surface-hover) 82%, transparent);
+}
+
+.headerActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 8px;
+}
+
+.mobileNavigationRoot,
+.mobileSearchRoot {
+  display: none;
+}
+
+.mobileSearchPanel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 14px;
+  background: var(--acton-color-surface-raised);
+  box-shadow: var(--acton-shadow-popover);
+}
+
+.mobileSearch {
+  width: 100%;
+}
+
+.mobileNavigation {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  right: 0;
+  box-sizing: border-box;
+  display: flex;
+  width: min(280px, calc(100vw - 32px));
+  max-height: min(560px, calc(100dvh - 104px));
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 14px;
+  background: var(--acton-color-surface-raised);
+  box-shadow: var(--acton-shadow-popover);
+  scrollbar-width: none;
+}
+
+.mobileNavigation::-webkit-scrollbar {
+  display: none;
+}
+
+.mobileNavigation > a,
+.mobileThemeRow {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  text-decoration: none;
+}
+
+.mobileNavigation > a:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.mobileThemeRow {
+  min-height: 0;
+  margin-top: 3px;
+  padding: 6px 12px 0;
+  border-top: 1px solid var(--acton-color-border);
+  border-radius: 0;
+  color: var(--acton-color-text-muted);
+}
+
+.headerActions [data-theme-toggle] {
+  margin-left: 0;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px;
+  border-color: var(--acton-color-border-control);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+  box-sizing: border-box;
+}
+
+.headerActions [data-theme-toggle] svg {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
+}
+
+.headerActions .mobileThemeRow [data-theme-toggle] {
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.githubButton,
+.headerIconButton {
+  width: 38px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.githubButton:focus-visible,
+.headerIconButton:focus-visible,
+.navLink:focus-visible,
+.brand:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.main {
+  min-height: calc(100vh - 52px);
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 0 16px;
+  }
+
+  .headerInner {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 8px 12px;
+    padding: 8px 0;
+  }
+
+  .headerPrimary {
+    flex: 1 1 auto;
+  }
+
+  .nav,
+  .desktopHeaderAction,
+  .headerSearch {
+    display: none;
+  }
+
+  .mobileNavigationRoot {
+    position: relative;
+    display: block;
+  }
+
+  .mobileSearchRoot {
+    display: block;
+  }
+
+  .headerActions {
+    gap: 6px;
+  }
+}

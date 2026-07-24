@@ -8,17 +8,19 @@ import {CopyInlineAction, InfoPopover, Input, Popover} from "@acton/ui"
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
-import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
+import {useAddressBook, useAddressName, useAddressNameSources} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
+import {NftImage} from "./NftImage"
 import {
   TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
+import {getAccountNameDetails} from "./accountNameDetails"
 import {formatAddress, formatNano, normalizeAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
@@ -26,6 +28,7 @@ const TOKEN_PREVIEW_LIMIT = 5
 interface AccountInfoProps {
   readonly address: string
   readonly domain?: string
+  readonly domains?: readonly string[]
   readonly state?: AddressInformation
   readonly extendedContractAbi?: ExtendedContractABI
   readonly contractInterfaces?: readonly string[]
@@ -44,15 +47,18 @@ interface AccountInfoProps {
 }
 
 interface CollectiblePreview {
+  readonly address: string
   readonly image?: string
   readonly imageSources?: readonly string[]
-  readonly isNsfw?: boolean
+  readonly blurred?: boolean
+  readonly collectionName?: string
   readonly name?: string
 }
 
 export const AccountInfo: FC<AccountInfoProps> = ({
   address,
   domain,
+  domains = [],
   state,
   extendedContractAbi,
   contractInterfaces,
@@ -78,6 +84,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const {setAddressName} = useAddressBook()
   const {isFavorite, toggleFavorite} = useFavoriteAccounts()
   const resolvedName = useAddressName(address)
+  const nameSources = useAddressNameSources(address)
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
   const displayAddress = normalizeAddress(address, addressFormat)
   const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
@@ -90,6 +97,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
   const [copied, setCopied] = useState(false)
+  const [hiddenCollectibleAddresses, setHiddenCollectibleAddresses] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   const favorite = isFavorite(address)
 
   useEffect(() => {
@@ -157,6 +167,15 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   }, [isEditing])
 
   const displayName = customName || domain
+  const {displayNameText, groups: nameDetailGroups} = getAccountNameDetails({
+    displayName,
+    domain,
+    domains,
+    customName: nameSources.customName,
+    tonAssetsName: nameSources.tonAssetsName,
+    tonDnsName: nameSources.tonDnsName,
+  })
+  const hasNameDetails = nameDetailGroups.length > 0
 
   const handleStartEdit = () => {
     setEditValue(displayName || "")
@@ -208,7 +227,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const canOpenTokens = Boolean(onMoreAssetsClick)
   const canOpenCollectibles = Boolean(onCollectiblesClick)
   const showCollectiblesRow = collectiblesLoading || collectiblesCount > 0
-  const visibleCollectibles = collectiblePreviews.slice(0, 8)
+  const visibleCollectibles = collectiblePreviews
+    .filter(item => !hiddenCollectibleAddresses.has(item.address))
+    .slice(0, 8)
   const firstMaster = firstWallet
     ? (firstWallet.master ?? tokenMastersByAddress.get(toRawAddress(firstWallet.jetton)))
     : undefined
@@ -293,6 +314,28 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       </div>
     </div>
   )
+  const nameDetailsContent = (
+    <div className={styles.addressFormats}>
+      {nameDetailGroups.map(group => (
+        <div key={group.key} className={styles.addressFormatRow}>
+          <span className={styles.addressFormatLabel}>{group.label}</span>
+          <div className={styles.nameDetailValues}>
+            {group.values.map(value => (
+              <div key={value.copyValue} className={styles.addressFormatValueRow}>
+                <code className={styles.addressFormatValue}>{value.displayValue}</code>
+                <CopyInlineAction
+                  size="compact"
+                  value={value.copyValue}
+                  label={`Copy ${group.label} name`}
+                  copiedLabel={`${group.label} name copied`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className={cardClassName}>
@@ -347,7 +390,23 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               <div className={styles.infoRow}>
                 <div className={styles.label}>Name</div>
                 <div className={styles.rowValue}>
-                  <span className={styles.customName}>{displayName}</span>
+                  {hasNameDetails ? (
+                    <Popover
+                      aria-label="Show name details"
+                      ariaLabel="Name details"
+                      className={styles.namePopover}
+                      content={nameDetailsContent}
+                      maxWidth="min(36rem, calc(100vw - 32px))"
+                      openDelay={150}
+                      placement="bottom"
+                    >
+                      <span className={`${styles.customName} ${styles.nameWithDetails}`}>
+                        {displayNameText}
+                      </span>
+                    </Popover>
+                  ) : (
+                    <span className={styles.customName}>{displayNameText}</span>
+                  )}
                   <button
                     type="button"
                     className={styles.iconButton}
@@ -370,6 +429,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   className={styles.addressPopover}
                   content={addressFormats}
                   maxWidth="min(36rem, calc(100vw - 32px))"
+                  openDelay={150}
                   placement="bottom"
                 >
                   <span className={styles.addressValue}>{addressRowText}</span>
@@ -541,20 +601,21 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                           <span className={styles.collectibleThumbs}>
                             {visibleCollectibles.map((item, index) =>
                               item.image ? (
-                                <img
-                                  key={`${item.image}-${index}`}
-                                  src={item.image}
-                                  alt={item.name || "NFT"}
-                                  className={`${styles.collectibleThumb} ${
-                                    item.isNsfw ? styles.nsfwImage : ""
-                                  }`}
-                                  onError={event =>
-                                    replaceBrokenImageWithFallback(
-                                      event,
-                                      item.imageSources ?? [item.image ?? ""],
-                                    )
-                                  }
-                                />
+                                <span key={item.address} className={styles.collectibleThumb}>
+                                  <NftImage
+                                    sources={item.imageSources ?? [item.image]}
+                                    alt={item.name || "NFT"}
+                                    className={styles.collectibleThumbImage}
+                                    blurredClassName={styles.blurredImage}
+                                    collectionName={item.collectionName}
+                                    blurred={item.blurred}
+                                    onNsfw={() => {
+                                      setHiddenCollectibleAddresses(current =>
+                                        new Set(current).add(item.address),
+                                      )
+                                    }}
+                                  />
+                                </span>
                               ) : (
                                 <span
                                   key={`collectible-placeholder-${index}`}
@@ -705,7 +766,23 @@ function getContractTypeLabels(
     .filter((value): value is string => value !== undefined)
 
   const labels = abiContractName ? [abiContractName, ...interfaceLabels] : interfaceLabels
-  return labels.length > 0 ? [...new Set(labels)] : ["Unknown"]
+  const seen = new Set<string>()
+  const uniqueLabels = labels.filter(label => {
+    const key = contractTypeLabelKey(label)
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+  return uniqueLabels.length > 0 ? uniqueLabels : ["Unknown"]
+}
+
+function contractTypeLabelKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/interface$/, "")
 }
 
 function getInterfaceLabel(value: string): string | undefined {

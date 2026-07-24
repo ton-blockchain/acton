@@ -6,13 +6,7 @@
   "author": "TON Core",
   "type": "module",
   "workspaces": [
-    "packages/explorer-ui",
-    "packages/localnet-ui",
-    "packages/ui",
-    "packages/ui-gallery",
-    "packages/transaction-ui",
-    "packages/test-ui",
-    "packages/ui-e2e"
+    "packages/*"
   ],
   "scripts": {
     "build": "bun --filter '*' build",
@@ -28,11 +22,14 @@
     "doctor": "CI=1 react-doctor"
   },
   "overrides": {
-    "postcss": ">=8.5.10",
-    "qs": ">=6.15.2",
+    "@ton/core": "^0.63.1",
+    "fast-uri": "^3.1.4",
+    "postcss": "^8.5.15",
+    "qs": "^6.15.2",
+    "sharp": "^0.35.3",
     "undici": "^7.28.0",
-    "uuid": ">=14.0.0",
-    "ws": ">=8.21.0"
+    "uuid": "^14.0.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",

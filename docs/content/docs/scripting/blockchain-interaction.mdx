@@ -104,6 +104,7 @@ import "@contracts/types"
 struct Counter {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): Counter {
@@ -112,7 +113,7 @@ fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = nul
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return Counter { address, stateInit };
+    return Counter { address, stateInit, toShard };
 }
 
 fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList {
@@ -125,7 +126,9 @@ fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList
         bounce: config.bounce,
         value: config.value,
         dest: {
+            workchain: self.address.getWorkchain(),
             stateInit: self.stateInit,
+            toShard: self.toShard,
         },
     });
     return net.send(from, msg);

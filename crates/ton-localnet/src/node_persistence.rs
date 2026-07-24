@@ -1,11 +1,11 @@
+use crate::node::GIVER_ADDR;
 use crate::node_snapshot::NodeStateSnapshot;
 use crate::storage::{
-    AccountMeta, BlockMeta, History, Indexes, LatestState, MasterchainBlockMeta, MsgMeta,
-    PendingCommit, ReverseLtKey, TxMeta,
+    AccountDelta, AccountMeta, BlockMeta, History, Indexes, LatestState, MasterchainBlockMeta,
+    MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Seqno};
 use core::cmp;
-use rusqlite::types::Type;
 use rusqlite::{Connection, params};
 use serde_json::Value;
 use std::path::Path;
@@ -59,6 +59,11 @@ impl NodePersistence {
         })?;
         for block in block_iter {
             let block = block?;
+            let expected_seqno = history.blocks.len() as Seqno + 1;
+            anyhow::ensure!(
+                block.seqno == expected_seqno,
+                "SQLite block history is not contiguous at seqno {expected_seqno}"
+            );
             head_seqno = block.seqno;
             history.blocks.push(block);
         }
@@ -75,9 +80,9 @@ impl NodePersistence {
 
         let mut stmt = conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
         let tx_iter = stmt.query_map([], |row| {
-            let hash = hash_from_db_bytes(row.get(0)?)?;
+            let hash: Hash256 = row.get(0)?;
             let data: Vec<u8> = row.get(1)?;
-            let account = addr_from_db_bytes(row.get(2)?)?;
+            let account: Addr = row.get(2)?;
             let lt: u64 = row.get(3)?;
             let seqno: u32 = row.get(4)?;
             let tx_meta = serde_json::from_slice::<TxMeta>(&data)
@@ -86,7 +91,18 @@ impl NodePersistence {
             Ok((hash, tx_meta, account, lt, seqno))
         })?;
         for tx in tx_iter {
-            let (hash, tx_meta, addr, lt, _seqno) = tx?;
+            let (hash, tx_meta, addr, lt, seqno) = tx?;
+            anyhow::ensure!(hash == tx_meta.tx_hash, "SQLite transaction hash mismatch");
+            anyhow::ensure!(
+                addr == tx_meta.account,
+                "SQLite transaction account mismatch for {}",
+                hash.to_hex()
+            );
+            anyhow::ensure!(
+                lt == tx_meta.lt && seqno == tx_meta.block_seqno,
+                "SQLite transaction position mismatch for {}",
+                hash.to_hex()
+            );
             if let Some(in_msg_hash) = tx_meta.in_msg_hash {
                 history.msg_to_tx.insert(in_msg_hash, hash);
             }
@@ -109,9 +125,33 @@ impl NodePersistence {
                 .insert(block.seqno, block.tx_hashes.clone());
         }
 
+        let mut stmt = conn.prepare("SELECT seqno, data FROM account_deltas ORDER BY seqno ASC")?;
+        let delta_iter = stmt.query_map([], |row| {
+            let seqno: Seqno = row.get(0)?;
+            let data: Vec<u8> = row.get(1)?;
+            let deltas = serde_json::from_slice::<Vec<AccountDelta>>(&data)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+            Ok((seqno, deltas))
+        })?;
+        for row in delta_iter {
+            let (seqno, deltas) = row?;
+            if seqno == 0 {
+                continue;
+            }
+            history.deltas_by_seqno.resize(seqno as usize, Vec::new());
+            for delta in &deltas {
+                indexes
+                    .account_deltas_by_addr
+                    .entry(delta.addr)
+                    .or_default()
+                    .insert(seqno, delta.clone());
+            }
+            history.deltas_by_seqno[seqno as usize - 1] = deltas;
+        }
+
         let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
         let acc_iter = stmt.query_map([], |row| {
-            let addr = addr_from_db_bytes(row.get(0)?)?;
+            let addr: Addr = row.get(0)?;
             let data: Vec<u8> = row.get(1)?;
             let meta = serde_json::from_slice::<AccountMeta>(&data)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
@@ -124,7 +164,7 @@ impl NodePersistence {
 
         let mut stmt = conn.prepare("SELECT hash, data FROM messages")?;
         let msg_iter = stmt.query_map([], |row| {
-            let hash = hash_from_db_bytes(row.get(0)?)?;
+            let hash: Hash256 = row.get(0)?;
             let data: Vec<u8> = row.get(1)?;
             let meta = serde_json::from_slice::<MsgMeta>(&data)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
@@ -132,12 +172,13 @@ impl NodePersistence {
         })?;
         for msg in msg_iter {
             let (hash, meta) = msg?;
+            anyhow::ensure!(hash == meta.msg_hash, "SQLite message hash mismatch");
             history.msg_by_hash.insert(hash, meta);
         }
 
         let mut stmt = conn.prepare("SELECT code_hash, data FROM compiler_abis")?;
         let abi_iter = stmt.query_map([], |row| {
-            let hash = hash_from_db_bytes(row.get(0)?)?;
+            let hash: Hash256 = row.get(0)?;
             let data: Vec<u8> = row.get(1)?;
             let compiler_abi = serde_json::from_slice::<Value>(&data)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
@@ -150,7 +191,7 @@ impl NodePersistence {
 
         let mut stmt = conn.prepare("SELECT code_hash, data FROM verified_sources")?;
         let source_iter = stmt.query_map([], |row| {
-            let hash = hash_from_db_bytes(row.get(0)?)?;
+            let hash: Hash256 = row.get(0)?;
             let data: Vec<u8> = row.get(1)?;
             let source = serde_json::from_slice::<Value>(&data)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
@@ -172,6 +213,7 @@ impl NodePersistence {
         &self,
         pending: &PendingCommit,
         history: &History,
+        latest: &LatestState,
     ) -> anyhow::Result<()> {
         let mut conn = self.conn.lock().expect("Failed to lock DB connection");
         let tx = conn.transaction()?;
@@ -194,23 +236,45 @@ impl NodePersistence {
             tx.execute(
                 "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
-                    tx_meta.tx_hash.0.to_vec(),
+                    tx_meta.tx_hash.to_bytes(),
                     tx_data,
-                    tx_meta.account.addr.to_vec(),
+                    tx_meta.account.to_bytes(),
                     tx_meta.lt,
                     pending.block_meta.seqno
                 ],
             )?;
         }
 
+        let deltas_data = serde_json::to_vec(&pending.deltas)?;
+        tx.execute(
+            "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
+            params![pending.block_meta.seqno, deltas_data],
+        )?;
+
         for delta in &pending.deltas {
             if let Some(new_meta) = &delta.new_meta {
                 let account_data = serde_json::to_vec(new_meta)?;
                 tx.execute(
                     "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                    params![delta.addr.addr.to_vec(), account_data],
+                    params![delta.addr.to_bytes(), account_data],
+                )?;
+            } else {
+                tx.execute(
+                    "DELETE FROM accounts WHERE address = ?1",
+                    params![delta.addr.to_bytes()],
                 )?;
             }
+        }
+
+        // Faucet debits are applied when the message is enqueued and are not represented by
+        // the destination transaction delta. Persist the resulting giver balance together with
+        // the block that consumes the queued transfer, not while the message is still pending.
+        if let Some(giver_meta) = latest.accounts.get(&GIVER_ADDR) {
+            let account_data = serde_json::to_vec(giver_meta)?;
+            tx.execute(
+                "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
+                params![GIVER_ADDR.to_bytes(), account_data],
+            )?;
         }
 
         for h in pending
@@ -222,7 +286,7 @@ impl NodePersistence {
                 let msg_data = serde_json::to_vec(msg_meta)?;
                 tx.execute(
                     "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
-                    params![h.0.to_vec(), msg_data],
+                    params![h.to_bytes(), msg_data],
                 )?;
             }
         }
@@ -243,7 +307,7 @@ impl NodePersistence {
             .expect("Failed to lock DB connection")
             .execute(
                 "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                params![addr.addr.to_vec(), account_data],
+                params![addr.to_bytes(), account_data],
             )?;
 
         Ok(())
@@ -261,12 +325,12 @@ impl NodePersistence {
         for stale_key in stale_keys {
             tx.execute(
                 "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![stale_key.0.to_vec()],
+                params![stale_key.to_bytes()],
             )?;
         }
         tx.execute(
             "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-            params![code_hash.0.to_vec(), data],
+            params![code_hash.to_bytes(), data],
         )?;
         tx.commit()?;
         drop(conn);
@@ -279,7 +343,7 @@ impl NodePersistence {
             .expect("Failed to lock DB connection")
             .execute(
                 "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![code_hash.0.to_vec()],
+                params![code_hash.to_bytes()],
             )?;
         Ok(())
     }
@@ -295,7 +359,7 @@ impl NodePersistence {
             .expect("Failed to lock DB connection")
             .execute(
                 "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.0.to_vec(), data],
+                params![code_hash.to_bytes(), data],
             )?;
         Ok(())
     }
@@ -306,7 +370,7 @@ impl NodePersistence {
             .expect("Failed to lock DB connection")
             .execute(
                 "DELETE FROM verified_sources WHERE code_hash = ?1",
-                params![code_hash.0.to_vec()],
+                params![code_hash.to_bytes()],
             )?;
         Ok(())
     }
@@ -316,7 +380,7 @@ impl NodePersistence {
         let conn = self.conn.lock().expect("Failed to lock DB connection");
         let mut stmt = conn.prepare("SELECT hash, boc FROM cas")?;
         let iter = stmt.query_map([], |row| {
-            let hash = hash_from_db_bytes(row.get(0)?)?;
+            let hash: Hash256 = row.get(0)?;
             let boc: BocBytes = row.get(1)?;
             Ok((hash, boc))
         })?;
@@ -337,6 +401,7 @@ impl NodePersistence {
         tx.execute("DELETE FROM cas", [])?;
         tx.execute("DELETE FROM blocks", [])?;
         tx.execute("DELETE FROM masterchain_blocks", [])?;
+        tx.execute("DELETE FROM account_deltas", [])?;
         tx.execute("DELETE FROM transactions", [])?;
         tx.execute("DELETE FROM messages", [])?;
         tx.execute("DELETE FROM accounts", [])?;
@@ -346,7 +411,7 @@ impl NodePersistence {
         for (hash, boc) in &snapshot.cas_entries {
             tx.execute(
                 "INSERT OR REPLACE INTO cas (hash, boc) VALUES (?1, ?2)",
-                params![hash.0.to_vec(), boc],
+                params![hash.to_bytes(), boc],
             )?;
         }
 
@@ -366,14 +431,23 @@ impl NodePersistence {
             )?;
         }
 
+        for (index, deltas) in snapshot.history_deltas_by_seqno.iter().enumerate() {
+            let seqno = index as Seqno + 1;
+            let data = serde_json::to_vec(deltas)?;
+            tx.execute(
+                "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
+                params![seqno, data],
+            )?;
+        }
+
         for (hash, tx_meta) in &snapshot.history_tx_by_hash {
             let tx_data = serde_json::to_vec(tx_meta)?;
             tx.execute(
                 "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
-                    hash.0.to_vec(),
+                    hash.to_bytes(),
                     tx_data,
-                    tx_meta.account.addr.to_vec(),
+                    tx_meta.account.to_bytes(),
                     tx_meta.lt,
                     tx_meta.block_seqno,
                 ],
@@ -384,7 +458,7 @@ impl NodePersistence {
             let msg_data = serde_json::to_vec(msg_meta)?;
             tx.execute(
                 "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
-                params![hash.0.to_vec(), msg_data],
+                params![hash.to_bytes(), msg_data],
             )?;
         }
 
@@ -392,7 +466,7 @@ impl NodePersistence {
             let account_data = serde_json::to_vec(account_meta)?;
             tx.execute(
                 "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                params![address.addr.to_vec(), account_data],
+                params![address.to_bytes(), account_data],
             )?;
         }
 
@@ -400,7 +474,7 @@ impl NodePersistence {
             let data = serde_json::to_vec(compiler_abi)?;
             tx.execute(
                 "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.0.to_vec(), data],
+                params![code_hash.to_bytes(), data],
             )?;
         }
 
@@ -408,7 +482,7 @@ impl NodePersistence {
             let data = serde_json::to_vec(source)?;
             tx.execute(
                 "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.0.to_vec(), data],
+                params![code_hash.to_bytes(), data],
             )?;
         }
 
@@ -428,6 +502,10 @@ fn init_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS masterchain_blocks (seqno INTEGER PRIMARY KEY, data BLOB)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS account_deltas (seqno INTEGER PRIMARY KEY, data BLOB)",
         [],
     )?;
     conn.execute(
@@ -451,29 +529,4 @@ fn init_schema(conn: &Connection) -> anyhow::Result<()> {
         [],
     )?;
     Ok(())
-}
-
-fn hash_from_db_bytes(bytes: Vec<u8>) -> rusqlite::Result<Hash256> {
-    let bytes = bytes.try_into().map_err(|bytes: Vec<u8>| {
-        invalid_blob_error(format!("expected 32-byte hash, got {}", bytes.len()))
-    })?;
-    Ok(Hash256(bytes))
-}
-
-fn addr_from_db_bytes(bytes: Vec<u8>) -> rusqlite::Result<Addr> {
-    let addr = bytes.try_into().map_err(|bytes: Vec<u8>| {
-        invalid_blob_error(format!("expected 32-byte address, got {}", bytes.len()))
-    })?;
-    Ok(Addr { workchain: 0, addr })
-}
-
-fn invalid_blob_error(message: String) -> rusqlite::Error {
-    rusqlite::Error::FromSqlConversionFailure(
-        0,
-        Type::Blob,
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            message,
-        )),
-    )
 }

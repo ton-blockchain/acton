@@ -28,6 +28,11 @@ export interface BlockId {
   readonly file_hash: string
 }
 
+export interface Shards {
+  readonly "@type": "blocks.shards"
+  readonly shards: readonly BlockId[]
+}
+
 export interface AddressInformation {
   readonly balance: string
   readonly code: string | null
@@ -989,6 +994,8 @@ export interface V3BlockId {
 export interface V3Block extends V3BlockId {
   readonly root_hash: string
   readonly file_hash: string
+  readonly created_by: string
+  readonly rand_seed: string
   readonly start_lt: string
   readonly end_lt: string
   readonly gen_utime: string | number
@@ -1010,6 +1017,11 @@ export interface V3Block extends V3BlockId {
   readonly vert_seqno_incr?: boolean
   readonly want_merge?: boolean
   readonly want_split?: boolean
+  readonly gen_software_version?: number
+  readonly gen_software_capabilities?: string | number
+  readonly fees_collected?: string
+  readonly in_msg_descr_length?: number
+  readonly out_msg_descr_length?: number
 }
 
 export interface V3BlocksResponse {
@@ -1112,6 +1124,11 @@ export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   readonly network_conditions?: {
     readonly response_delay_ms: number
   }
+}
+
+export interface LocalnetCheckpoint {
+  readonly name: string
+  readonly block_seqno: number
 }
 
 export type ApiCallStatus = "success" | "failed"
@@ -1303,7 +1320,7 @@ export interface JettonWalletData {
 export interface VerificationSourceResponse {
   readonly code_hash: string
   readonly verified: boolean
-  readonly bundles: readonly SourceBundle[]
+  readonly bundle: SourceBundle | null
 }
 
 export interface SourceBundle {
@@ -1429,6 +1446,7 @@ export interface NftItem {
   readonly index: string
   readonly init: boolean
   readonly is_nsfw?: boolean
+  readonly is_scam?: boolean
   readonly last_transaction_lt: string
   readonly on_sale: boolean
   readonly owner_address?: string

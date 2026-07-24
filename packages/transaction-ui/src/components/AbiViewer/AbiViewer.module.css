@@ -558,10 +558,14 @@
 }
 
 .errorName {
+  min-width: 0;
+  overflow: hidden;
   color: color-mix(in srgb, var(--acton-color-accent) 72%, var(--acton-color-text));
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .declaration {

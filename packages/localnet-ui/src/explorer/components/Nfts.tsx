@@ -4,14 +4,11 @@ import type {FC} from "react"
 
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
-import {
-  NFT_IMAGE_SOURCE_KEYS,
-  getImageSources,
-  getPrimaryImageSource,
-  replaceBrokenImageWithFallback,
-} from "./imageFallbacks"
+import {NftImage} from "./NftImage"
+import {NFT_IMAGE_SOURCE_KEYS, getImageSources} from "./imageFallbacks"
 import styles from "./Nfts.module.css"
 
 interface NftsProps {
@@ -38,11 +35,16 @@ function getNftDisplayName(item: NftItem): string {
 
 export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
   const [query, setQuery] = useState("")
+  const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const normalizedQuery = query.trim().toLowerCase()
+  const eligibleItems = useMemo(
+    () => items.filter(item => !hiddenAddresses.has(item.address) && !isNftItemNsfw(item)),
+    [hiddenAddresses, items],
+  )
   const visibleItems = useMemo(() => {
-    if (!normalizedQuery) return items
+    if (!normalizedQuery) return eligibleItems
 
-    return items.filter(item => {
+    return eligibleItems.filter(item => {
       const name = getNftDisplayName(item)
       const collectionName = getCollectionName(item) || item.collection_address || ""
       const searchable = [
@@ -59,9 +61,9 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
 
       return searchable.includes(normalizedQuery)
     })
-  }, [items, normalizedQuery])
+  }, [eligibleItems, normalizedQuery])
 
-  if (items.length === 0) {
+  if (eligibleItems.length === 0) {
     return <div className={styles.empty}>No NFTs found</div>
   }
 
@@ -81,7 +83,6 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
           const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
-          const image = getPrimaryImageSource(item.content, NFT_IMAGE_SOURCE_KEYS)
 
           return (
             <div
@@ -97,11 +98,16 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
               tabIndex={0}
             >
               <div className={styles.imageFrame}>
-                <img
-                  src={image}
+                <NftImage
+                  sources={imageSources}
                   alt={name}
-                  className={`${styles.nftImage} ${item.is_nsfw ? styles.nsfwImage : ""}`}
-                  onError={event => replaceBrokenImageWithFallback(event, imageSources)}
+                  className={styles.nftImage}
+                  blurredClassName={styles.blurredImage}
+                  collectionName={collectionName}
+                  blurred={item.is_scam === true}
+                  onNsfw={() => {
+                    setHiddenAddresses(current => new Set(current).add(item.address))
+                  }}
                 />
               </div>
               <div className={styles.nftInfo}>

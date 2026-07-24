@@ -1,5 +1,18 @@
-import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
-import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
+import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {createVerifierApi, VerifiedContractPage, VerifiedContractsPage} from "@acton/verifier-ui"
+import {
+  Check,
+  ChevronDown,
+  Edit2,
+  Github,
+  Menu,
+  Plus,
+  Search,
+  Share2,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -10,6 +23,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom"
 
 import {TonClient} from "../../localnet-ui/src/explorer/api/client"
@@ -44,6 +58,7 @@ import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
+import {FaucetPage} from "./faucet/FaucetPage"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -66,6 +81,9 @@ type NetworkFormMode =
 
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
+const ACTON_VERIFIER_API = createVerifierApi({
+  baseUrl: "https://verifier.acton.monster/api/v1",
+})
 const EXPLORER_NETWORK_QUERY_PARAM = "network"
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
@@ -267,10 +285,11 @@ const serializeCustomExplorerNetwork = (
 const readSelectedExplorerNetwork = (
   networks: readonly SelectableExplorerNetwork[],
 ): SelectableExplorerNetworkId => {
-  if (
-    new URLSearchParams(globalThis.location.search).get(EXPLORER_NETWORK_QUERY_PARAM) === "testnet"
-  ) {
-    return "testnet"
+  const requestedNetwork = new URLSearchParams(globalThis.location.search).get(
+    EXPLORER_NETWORK_QUERY_PARAM,
+  )
+  if (requestedNetwork === "mainnet" || requestedNetwork === "testnet") {
+    return requestedNetwork
   }
 
   const storedNetwork = localStorage.getItem(EXPLORER_NETWORK_STORAGE_KEY)
@@ -836,10 +855,236 @@ const ExplorerNetworkUrlSync: FC<{
   return null
 }
 
+const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigate}) => {
+  const location = useLocation()
+  const routeIdentity = `${location.pathname}${location.search}${location.hash}`
+
+  useEffect(() => {
+    if (routeIdentity.length > 0) {
+      onNavigate()
+    }
+  }, [onNavigate, routeIdentity])
+
+  return null
+}
+
+const DesktopMoreMenu: FC = () => {
+  const [open, setOpen] = useState(false)
+  const closeMenu = () => setOpen(false)
+
+  useEffect(() => {
+    const mobileHeaderQuery = globalThis.matchMedia("(max-width: 640px)")
+    const closeOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setOpen(false)
+      }
+    }
+
+    mobileHeaderQuery.addEventListener("change", closeOnMobile)
+    return () => mobileHeaderQuery.removeEventListener("change", closeOnMobile)
+  }, [])
+
+  return (
+    <Popover
+      interaction="click"
+      placement="bottom"
+      open={open}
+      onOpenChange={setOpen}
+      triggerAsChild
+      contentClassName={styles.desktopMorePopover}
+      content={
+        <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Faucet</span>
+              <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Inspect and decode TON cells
+              </span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Emulator</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Emulate transactions locally
+              </span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Browse verified on-chain source code
+              </span>
+            </span>
+          </Link>
+        </nav>
+      }
+    >
+      <button
+        type="button"
+        className={`${styles.navLink} ${styles.desktopMoreTrigger}`}
+        aria-label="Open more navigation"
+        aria-expanded={open}
+      >
+        <span aria-hidden="true">•••</span>
+      </button>
+    </Popover>
+  )
+}
+
+interface VerifiedContractsViewState {
+  readonly page: number
+  readonly scrollY: number
+}
+
+interface VerifiedContractsRouteState {
+  readonly verifiedContractsView?: VerifiedContractsViewState
+}
+
+function readVerifiedContractsViewState(value: unknown): VerifiedContractsViewState | undefined {
+  if (typeof value !== "object" || value === null || !("verifiedContractsView" in value)) {
+    return undefined
+  }
+
+  const view = (value as VerifiedContractsRouteState).verifiedContractsView
+  if (
+    !view ||
+    !Number.isFinite(view.page) ||
+    view.page < 0 ||
+    !Number.isFinite(view.scrollY) ||
+    view.scrollY < 0
+  ) {
+    return undefined
+  }
+
+  return {
+    page: Math.trunc(view.page),
+    scrollY: view.scrollY,
+  }
+}
+
+function readVerifiedContractsPage(search: string): number {
+  const value = new URLSearchParams(search).get("page")
+  if (value === null) {
+    return 0
+  }
+
+  const page = Number(value)
+  return Number.isInteger(page) && page > 0 ? page - 1 : 0
+}
+
+const VerifiedContractsRoute: FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const restoration = readVerifiedContractsViewState(location.state)
+  const initialPage = readVerifiedContractsPage(location.search)
+  const currentPageRef = useRef(initialPage)
+  const restoredScrollRef = useRef(false)
+
+  useEffect(() => {
+    currentPageRef.current = initialPage
+  }, [initialPage])
+
+  return (
+    <VerifiedContractsPage
+      api={ACTON_VERIFIER_API}
+      getContractHref={item => `/verified/${encodeURIComponent(item.code_hash)}`}
+      page={initialPage}
+      onPageChange={page => {
+        currentPageRef.current = page
+        const search = new URLSearchParams(location.search)
+        if (page === 0) {
+          search.delete("page")
+        } else {
+          search.set("page", String(page + 1))
+        }
+
+        const nextSearch = search.toString()
+        if (nextSearch !== location.search.slice(1)) {
+          void navigate(
+            {
+              pathname: location.pathname,
+              search: nextSearch ? `?${nextSearch}` : "",
+              hash: location.hash,
+            },
+            {replace: true},
+          )
+        }
+      }}
+      onContentReady={() => {
+        if (
+          restoredScrollRef.current ||
+          restoration === undefined ||
+          restoration.page !== initialPage
+        ) {
+          return
+        }
+
+        restoredScrollRef.current = true
+        globalThis.requestAnimationFrame(() => {
+          globalThis.scrollTo({top: restoration.scrollY, behavior: "auto"})
+        })
+      }}
+      onOpenContract={item => {
+        void navigate(
+          {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          {
+            replace: true,
+            state: {
+              verifiedContractsView: {
+                page: currentPageRef.current,
+                scrollY: globalThis.scrollY,
+              },
+            } satisfies VerifiedContractsRouteState,
+          },
+        )
+        void navigate(`/verified/${encodeURIComponent(item.code_hash)}`)
+      }}
+    />
+  )
+}
+
+const VerifiedContractRoute: FC = () => {
+  const {target = ""} = useParams<{target: string}>()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const selectedSourcePath = new URLSearchParams(location.search).get("file") ?? undefined
+
+  return (
+    <VerifiedContractPage
+      api={ACTON_VERIFIER_API}
+      target={target}
+      selectedSourcePath={selectedSourcePath}
+      onSelectedSourcePathChange={path => {
+        const params = new URLSearchParams(location.search)
+        params.set("file", path)
+        void navigate(`${location.pathname}?${params.toString()}`, {replace: true})
+      }}
+    />
+  )
+}
+
 export const ExplorerApp: FC = () => {
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
   )
+  const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
+  const mobileNavigationRef = useRef<HTMLDivElement>(null)
+  const mobileSearchRef = useRef<HTMLDivElement>(null)
+  const mobileNavigationOpen = mobileHeaderPanel === "navigation"
+  const mobileSearchOpen = mobileHeaderPanel === "search"
+  const closeMobileHeaderPanels = useCallback(() => setMobileHeaderPanel(undefined), [])
   const selectableNetworks = useMemo<readonly SelectableExplorerNetwork[]>(
     () => [...EXPLORER_NETWORKS, ...networkState.customNetworks],
     [networkState.customNetworks],
@@ -860,6 +1105,18 @@ export const ExplorerApp: FC = () => {
         toncenterApiKey: networkConfig.api.toncenterApiKey,
       }),
     [networkConfig],
+  )
+  const testnetClient = useMemo(
+    () =>
+      new TonClient({
+        v2BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v2BaseUrl,
+        v3BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v3BaseUrl,
+        addressNameBaseUrl: "",
+        localnetControlEnabled: false,
+        toncenterApiCompatible: true,
+        toncenterApiKey: EXPLORER_API_CONFIGS.testnet.api.toncenterApiKey,
+      }),
+    [],
   )
   const metadataRegistry = useMemo(
     () =>
@@ -937,9 +1194,37 @@ export const ExplorerApp: FC = () => {
     }
   }, [])
 
+  useEffect(() => {
+    if (!mobileHeaderPanel) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        (mobileNavigationRef.current?.contains(event.target) ||
+          mobileSearchRef.current?.contains(event.target))
+      ) {
+        return
+      }
+      closeMobileHeaderPanels()
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileHeaderPanels()
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [closeMobileHeaderPanels, mobileHeaderPanel])
+
   return (
     <BrowserRouter>
       <ExplorerNetworkUrlSync networkId={networkId} />
+      <MobileHeaderRouteSync onNavigate={closeMobileHeaderPanels} />
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
@@ -974,6 +1259,7 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/sources">
                             Sources
                           </Link>
+                          <DesktopMoreMenu />
                         </nav>
                       </div>
                       <ExplorerSearch
@@ -990,17 +1276,45 @@ export const ExplorerApp: FC = () => {
                           onEditNetwork={handleEditNetwork}
                           onDeleteNetwork={handleDeleteNetwork}
                         />
+                        <div className={styles.mobileSearchRoot} ref={mobileSearchRef}>
+                          <button
+                            type="button"
+                            className={styles.headerIconButton}
+                            aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+                            aria-controls="explorer-mobile-search"
+                            aria-expanded={mobileSearchOpen}
+                            onClick={() =>
+                              setMobileHeaderPanel(current =>
+                                current === "search" ? undefined : "search",
+                              )
+                            }
+                          >
+                            {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
+                          </button>
+                          {mobileSearchOpen && (
+                            <div id="explorer-mobile-search" className={styles.mobileSearchPanel}>
+                              <ExplorerSearch
+                                autoFocus
+                                className={styles.mobileSearch}
+                                client={client}
+                                variant="header"
+                              />
+                            </div>
+                          )}
+                        </div>
                         <Link
-                          className={styles.headerIconButton}
+                          className={`${styles.headerIconButton} ${styles.desktopHeaderAction}`}
                           to="/favorites"
-                          title="Favorite accounts"
-                          aria-label="Favorite accounts"
+                          title="Favorites"
+                          aria-label="Favorites"
                         >
                           <Star size={18} />
                         </Link>
-                        <ThemeSwitch />
+                        <span className={styles.desktopHeaderAction}>
+                          <ThemeSwitch />
+                        </span>
                         <a
-                          className={styles.headerIconButton}
+                          className={`${styles.headerIconButton} ${styles.desktopHeaderAction}`}
                           href="https://github.com/ton-blockchain/acton"
                           target="_blank"
                           rel="noreferrer"
@@ -1009,6 +1323,70 @@ export const ExplorerApp: FC = () => {
                         >
                           <Github size={18} />
                         </a>
+                        <div className={styles.mobileNavigationRoot} ref={mobileNavigationRef}>
+                          <button
+                            type="button"
+                            className={styles.headerIconButton}
+                            aria-label={
+                              mobileNavigationOpen ? "Close navigation" : "Open navigation"
+                            }
+                            aria-controls="explorer-mobile-navigation"
+                            aria-expanded={mobileNavigationOpen}
+                            onClick={() =>
+                              setMobileHeaderPanel(current =>
+                                current === "navigation" ? undefined : "navigation",
+                              )
+                            }
+                          >
+                            {mobileNavigationOpen ? <X size={18} /> : <Menu size={18} />}
+                          </button>
+                          {mobileNavigationOpen && (
+                            <nav
+                              id="explorer-mobile-navigation"
+                              className={styles.mobileNavigation}
+                              aria-label="Mobile explorer navigation"
+                            >
+                              <Link to="/blocks" onClick={closeMobileHeaderPanels}>
+                                Blocks
+                              </Link>
+                              <Link to="/abi" onClick={closeMobileHeaderPanels}>
+                                ABI
+                              </Link>
+                              <Link to="/sources" onClick={closeMobileHeaderPanels}>
+                                Sources
+                              </Link>
+                              <Link to="/faucet" onClick={closeMobileHeaderPanels}>
+                                Faucet
+                              </Link>
+                              <Link to="/verified" onClick={closeMobileHeaderPanels}>
+                                Verified contracts
+                              </Link>
+                              <Link to="/cell" onClick={closeMobileHeaderPanels}>
+                                Cell Inspector
+                              </Link>
+                              <Link to="/emulate" onClick={closeMobileHeaderPanels}>
+                                Emulator
+                              </Link>
+                              <Link to="/favorites" onClick={closeMobileHeaderPanels}>
+                                <span>Favorites</span>
+                                <Star size={17} aria-hidden="true" />
+                              </Link>
+                              <a
+                                href="https://github.com/ton-blockchain/acton"
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={closeMobileHeaderPanels}
+                              >
+                                <span>GitHub</span>
+                                <Github size={17} aria-hidden="true" />
+                              </a>
+                              <div className={styles.mobileThemeRow}>
+                                <span>Appearance</span>
+                                <ThemeSwitch />
+                              </div>
+                            </nav>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </ExplorerHeaderFrame>
@@ -1016,15 +1394,38 @@ export const ExplorerApp: FC = () => {
                     <Routes>
                       <Route
                         path="/"
-                        element={<ExplorerIndexPage client={client} fillAvailableHeight />}
+                        element={
+                          <ExplorerIndexPage
+                            client={client}
+                            faucetPath={networkId === "testnet" ? "/faucet" : undefined}
+                            fillAvailableHeight
+                          />
+                        }
                       />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route
+                        path="/faucet"
+                        element={
+                          <FaucetPage
+                            isTestnetSelected={networkId === "testnet"}
+                            selectedNetworkLabel={networkConfig.label}
+                            testnetClient={testnetClient}
+                            onSwitchToTestnet={() => handleNetworkChange("testnet")}
+                          />
+                        }
+                      />
+                      <Route path="/verified" element={<VerifiedContractsRoute />} />
+                      <Route path="/verified/:target" element={<VerifiedContractRoute />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
                       <Route path="/emulate" element={<EmulatePage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
+                      <Route
+                        path="/block/last"
+                        element={<BlockDetailsPage client={client} latest />}
+                      />
                       <Route
                         path="/block/:workchain/:shard/:seqno"
                         element={<BlockDetailsPage client={client} />}

@@ -1,0 +1,19 @@
+warning[E031]: unnecessary not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val asserted = nullable!!;
+  |                                         ^ this expression has non-null type `int`
+  |
+  = remove `!`; `int` cannot be `null` here
+
+help: remove the unnecessary `!`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val asserted = nullable!!;
+  |                                         ^
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E031

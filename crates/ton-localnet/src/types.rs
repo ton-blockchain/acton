@@ -137,6 +137,23 @@ impl FromSql for BocBytes {
 pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {
+    pub const BYTE_LEN: usize = 32;
+
+    #[must_use]
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            bytes.len() == Self::BYTE_LEN,
+            "expected {}-byte hash, got {}",
+            Self::BYTE_LEN,
+            bytes.len()
+        );
+        Ok(Self(bytes.try_into().expect("length checked above")))
+    }
+
     #[must_use]
     pub fn is_zero(&self) -> bool {
         self.0 == [0; 32]
@@ -201,6 +218,20 @@ impl FromStr for Hash256 {
     }
 }
 
+impl FromSql for Hash256 {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        match value {
+            ValueRef::Blob(bytes) => {
+                Self::from_bytes(bytes).map_err(|_| FromSqlError::InvalidBlobSize {
+                    expected_size: Self::BYTE_LEN,
+                    blob_size: bytes.len(),
+                })
+            }
+            _ => Err(FromSqlError::InvalidType),
+        }
+    }
+}
+
 impl From<HashBytes> for Hash256 {
     fn from(value: HashBytes) -> Self {
         Self(value.0)
@@ -239,6 +270,8 @@ pub struct Addr {
 }
 
 impl Addr {
+    pub const BYTE_LEN: usize = 36;
+
     pub fn parse(s: &str) -> anyhow::Result<Self> {
         let (address, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
             LocalnetError::invalid_request(
@@ -248,6 +281,27 @@ impl Addr {
         Ok(Self {
             workchain: i32::from(address.workchain),
             addr: address.address.0,
+        })
+    }
+
+    #[must_use]
+    pub fn to_bytes(self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(Self::BYTE_LEN);
+        bytes.extend_from_slice(&self.workchain.to_be_bytes());
+        bytes.extend_from_slice(&self.addr);
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            bytes.len() == Self::BYTE_LEN,
+            "expected {}-byte address, got {}",
+            Self::BYTE_LEN,
+            bytes.len()
+        );
+        Ok(Self {
+            workchain: i32::from_be_bytes(bytes[..4].try_into().expect("length checked above")),
+            addr: bytes[4..].try_into().expect("length checked above"),
         })
     }
 
@@ -303,6 +357,20 @@ impl FromStr for Addr {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
+    }
+}
+
+impl FromSql for Addr {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        match value {
+            ValueRef::Blob(bytes) => {
+                Self::from_bytes(bytes).map_err(|_| FromSqlError::InvalidBlobSize {
+                    expected_size: Self::BYTE_LEN,
+                    blob_size: bytes.len(),
+                })
+            }
+            _ => Err(FromSqlError::InvalidType),
+        }
     }
 }
 
@@ -385,6 +453,17 @@ mod tests {
             json,
             "\"abababababababababababababababababababababababababababababababab\""
         );
+    }
+
+    #[test]
+    fn hash256_bytes_roundtrip() {
+        let hash = Hash256([0xBC; 32]);
+
+        assert_eq!(
+            Hash256::from_bytes(&hash.to_bytes()).expect("hash bytes must parse"),
+            hash
+        );
+        assert!(Hash256::from_bytes(&[0; 31]).is_err());
     }
 
     #[test]
@@ -481,6 +560,20 @@ mod tests {
         let json = r#"{ "workchain": 0, "addr": [1, 2, 3] }"#;
         let parsed: Result<Addr, _> = serde_json::from_str(json);
         assert!(parsed.is_err(), "object JSON must be rejected");
+    }
+
+    #[test]
+    fn addr_bytes_roundtrip_preserves_workchain() {
+        let address = Addr {
+            workchain: -1,
+            addr: [0xDC; 32],
+        };
+
+        assert_eq!(
+            Addr::from_bytes(&address.to_bytes()).expect("address bytes must parse"),
+            address
+        );
+        assert!(Addr::from_bytes(&[0; 32]).is_err());
     }
 
     #[test]

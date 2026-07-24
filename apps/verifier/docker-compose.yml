@@ -1,0 +1,32 @@
+services:
+  verifier:
+    image: ${VERIFIER_IMAGE:-ghcr.io/i582/verifier:latest}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VERIFIER_NETWORK: ${VERIFIER_NETWORK:-mainnet}
+      VERIFIER_TONCENTER_BASE_URL: ${VERIFIER_TONCENTER_BASE_URL:-https://toncenter.com}
+      VERIFIER_TONCENTER_API_KEY: ${VERIFIER_TONCENTER_API_KEY:-}
+      SOURCE_REPOSITORY_URL: ${SOURCE_REPOSITORY_URL:?set source repository URL}
+      SOURCE_REPOSITORY_BRANCH: ${SOURCE_REPOSITORY_BRANCH:-main}
+      SOURCE_REPOSITORY_AUTHOR_NAME: ${SOURCE_REPOSITORY_AUTHOR_NAME:-ton-verifier}
+      SOURCE_REPOSITORY_AUTHOR_EMAIL: ${SOURCE_REPOSITORY_AUTHOR_EMAIL:-ton-verifier@example.invalid}
+      VERIFIER_REGISTRY_INDEX_PATH: ${VERIFIER_REGISTRY_INDEX_PATH:-/var/lib/verifier/registry-index/registry-index.sqlite3}
+      SOURCE_REPOSITORY_SSH_KEY_FILE: ${SOURCE_REPOSITORY_SSH_KEY_FILE:-}
+      SOURCE_REPOSITORY_SSH_STRICT_HOST_KEY_CHECKING: ${SOURCE_REPOSITORY_SSH_STRICT_HOST_KEY_CHECKING:-accept-new}
+    volumes:
+      - source-repo:/var/lib/verifier/source-repo
+      - registry-index:/var/lib/verifier/registry-index
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  source-repo:
+  registry-index:

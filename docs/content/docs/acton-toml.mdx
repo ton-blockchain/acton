@@ -475,7 +475,13 @@ Defines network settings used by `--net` and `--fork-net`.
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
 | `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
-| `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://127.0.0.1:<port>/explorer/tx/<hash>`. |
+| `explorer` | `string` | No                                      | Explicit base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). This network-specific value takes precedence over `--explorer`. For default `localnet`, the derived link is `http://127.0.0.1:<port>/explorer/tx/<hash>`. |
+
+When `explorer` is omitted for `custom:<name>` and both `api.v2` and `api.v3`
+are configured, the default Actonscan link carries the network name and API
+endpoints as shared-network query parameters. If `api.v3` is unavailable,
+Acton keeps the legacy fallback derived from `api.v2`:
+`<scheme>://<host>/explorer/tx/<hash>`.
 
 Example:
 

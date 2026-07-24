@@ -116,7 +116,12 @@ and keep using the same value for that project.
 .RS 4
 Explorer to use for transaction links.
 .sp
-Possible values: \fBtonscan\fR, \fBtoncx\fR, \fBdton\fR, \fBtonviewer\fR
+Possible values: \fBactonscan\fR, \fBtonscan\fR, \fBtoncx\fR, \fBdton\fR, \fBtonviewer\fR
+.sp
+Actonscan is the default. For \fBcustom:<name>\fR networks without an explicit
+\fBnetworks.<name>.explorer\fR, Acton embeds the configured \fBapi.v2\fR and \fBapi.v3\fR
+endpoints in an Actonscan shared\-network URL. An explicit network explorer
+still takes precedence.
 .RE
 .SS "Output Options"
 .sp

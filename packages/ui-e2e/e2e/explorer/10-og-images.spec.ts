@@ -8,6 +8,8 @@ const previews = [
   {key: "block", route: "/block/-1/8000000000000000/123"},
   {key: "abi", route: "/abi"},
   {key: "sources", route: "/sources"},
+  {key: "verified", route: "/verified"},
+  {key: "verified-contract", route: `/verified/${"0".repeat(64)}`},
   {key: "cell", route: "/cell"},
   {key: "emulate", route: "/emulate"},
   {key: "favorites", route: "/favorites"},
@@ -21,7 +23,7 @@ test.describe("Explorer Open Graph previews", () => {
       expect(response.ok(), preview.route).toBeTruthy()
 
       const html = await response.text()
-      expect(html).toContain(`/og/page.png?page=${preview.key}&amp;v=6`)
+      expect(html).toContain(`/og/page.png?page=${preview.key}&amp;v=7`)
     }
   })
 

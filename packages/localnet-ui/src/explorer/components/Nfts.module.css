@@ -90,7 +90,7 @@
   transition: transform 180ms ease;
 }
 
-.nsfwImage {
+.blurredImage {
   filter: blur(12px);
 }
 

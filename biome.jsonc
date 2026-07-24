@@ -6,10 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "packages/**",
-      "!!packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts"
-    ]
+    "includes": ["packages/**"]
   },
   "formatter": {
     "enabled": true,
@@ -45,101 +42,14 @@
     "enabled": true,
     "rules": {
       "preset": "all",
-      "a11y": {
-        "preset": "all",
-        "noNoninteractiveElementInteractions": "off",
-        "noStaticElementInteractions": "off",
-        "noSvgWithoutTitle": "off",
-        "useAriaPropsSupportedByRole": "off",
-        "useSemanticElements": "off"
-      },
-      "complexity": {
-        "preset": "all",
-        "noExcessiveCognitiveComplexity": "off",
-        "noExcessiveLinesPerFunction": "off",
-        "noImportantStyles": "off",
-        "noUselessContinue": "off",
-        "noUselessFragments": "off",
-        "noUselessReturn": "off",
-        "noUselessUndefined": "off",
-        "noVoid": "off",
-        "useMaxParams": "off",
-        "useSimpleNumberKeys": "off",
-        "useSimplifiedLogicExpression": "off"
-      },
       "correctness": {
-        "preset": "all",
-        "noNodejsModules": "off",
-        "noSolidDestructuredProps": "off",
-        "noUnresolvedImports": "off",
-        "useExhaustiveDependencies": "off",
-        "useImageSize": "off",
-        "useImportExtensions": "off",
-        "useJsonImportAttributes": "off",
-        "useQwikValidLexicalScope": "off",
-        "useUniqueElementIds": "off"
-      },
-      "performance": {
-        "preset": "all",
-        "noAwaitInLoops": "off",
-        "noBarrelFile": "off",
-        "noImgElement": "off",
-        "noJsxPropsBind": "off",
-        "noNamespaceImport": "off",
-        "noReExportAll": "off",
-        "useSolidForComponent": "off",
-        "useTopLevelRegex": "off"
+        "useImportExtensions": "off"
       },
       "style": {
-        "preset": "all",
         "noContinue": "off",
-        "noDefaultExport": "off",
-        "noDescendingSpecificity": "off",
-        "noEnum": "off",
         "noExcessiveLinesPerFile": "off",
-        "noHexColors": "off",
-        "noImplicitBoolean": "off",
-        "noIncrementDecrement": "off",
-        "noInferrableTypes": "off",
-        "noJsxLiterals": "off",
         "noMagicNumbers": "off",
-        "noNestedTernary": "off",
-        "noNonNullAssertion": "off",
-        "noParameterProperties": "off",
-        "noProcessEnv": "off",
-        "noTernary": "off",
-        "useBlockStatements": "off",
-        "useComponentExportOnlyModules": "off",
-        "useConsistentArrowReturn": "off",
-        "useConsistentCurlyBraces": "off",
-        "useConsistentMethodSignatures": "off",
-        "useConsistentObjectDefinitions": "off",
-        "useConsistentTypeDefinitions": "off",
-        "useDefaultSwitchClause": "off",
-        "useDestructuring": "off",
-        "useErrorCause": "off",
-        "useExportsLast": "off",
-        "useNamingConvention": "off",
-        "useSelfClosingElements": "off"
-      },
-      "security": {
-        "preset": "all",
-        "noDangerouslySetInnerHtml": "off",
-        "noSecrets": "off"
-      },
-      "suspicious": {
-        "preset": "all",
-        "noArrayIndexKey": "off",
-        "noBitwiseOperators": "off",
-        "noConfusingVoidType": "off",
-        "noConsole": "off",
-        "noEmptyBlockStatements": "off",
-        "noLeakedRender": "off",
-        "noReactSpecificProps": "off",
-        "noShadow": "off",
-        "noSkippedTests": "off",
-        "noUnnecessaryConditions": "off",
-        "useAwait": "off"
+        "noTernary": "off"
       }
     }
   }

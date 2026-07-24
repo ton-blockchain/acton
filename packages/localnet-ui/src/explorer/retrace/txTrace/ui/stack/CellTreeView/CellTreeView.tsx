@@ -117,6 +117,7 @@ const CellTreeView: React.FC<CellTreeViewProps> = ({cell, depth = 0, maxBitsLeng
 
   return (
     <div className={`${styles.cellNode}`} style={{marginLeft: depth * 5}}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: A click handler is present only when this element also has a button role, tab stop, and keyboard handler. */}
       <div
         className={`${cellInfoClassName} ${cellNodeColorClass}`}
         style={{width: cellWidth}}

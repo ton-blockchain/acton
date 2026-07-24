@@ -7,6 +7,9 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../..")
 const localnetNodePort = Number(process.env.ACTON_UI_E2E_NODE_PORT ?? 15_411)
 const localnetUiPort = Number(process.env.ACTON_UI_E2E_LOCALNET_UI_PORT ?? 14_306)
 const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_307)
+const tonConnectDappPort = Number(process.env.ACTON_UI_E2E_TONCONNECT_DAPP_PORT ?? 14_308)
+const tonConnectBridgePort = Number(process.env.ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT ?? 14_309)
+const tonConnectBridgeUrl = `http://127.0.0.1:${tonConnectBridgePort}/bridge`
 
 export default defineConfig({
   testDir: "./e2e",
@@ -60,7 +63,7 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
-      command: `VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} bunx vite build && VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} bunx vite preview --host 127.0.0.1 --port ${localnetUiPort}`,
+      command: `VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} VITE_TON_CONNECT_BRIDGE_URL=${tonConnectBridgeUrl} bunx vite build && VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} VITE_TON_CONNECT_BRIDGE_URL=${tonConnectBridgeUrl} bunx vite preview --host 127.0.0.1 --port ${localnetUiPort}`,
       cwd: path.join(repositoryRoot, "packages/localnet-ui"),
       port: localnetUiPort,
       reuseExistingServer: false,
@@ -72,6 +75,20 @@ export default defineConfig({
       port: explorerUiPort,
       reuseExistingServer: false,
       timeout: 60_000,
+    },
+    {
+      command: `ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT=${tonConnectBridgePort} bun run bridge-server.ts`,
+      cwd: path.join(repositoryRoot, "packages/ui-e2e/fixtures/tonconnect-dapp"),
+      url: `http://127.0.0.1:${tonConnectBridgePort}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      command: `VITE_TON_CONNECT_BRIDGE_URL=${tonConnectBridgeUrl} bunx vite --host 127.0.0.1 --port ${tonConnectDappPort}`,
+      cwd: path.join(repositoryRoot, "packages/ui-e2e/fixtures/tonconnect-dapp"),
+      port: tonConnectDappPort,
+      reuseExistingServer: false,
+      timeout: 30_000,
     },
   ],
 })

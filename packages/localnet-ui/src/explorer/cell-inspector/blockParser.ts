@@ -77,6 +77,12 @@ export interface BlockTlbParseOptions {
   readonly strict?: boolean
 }
 
+export interface BlockMetadata {
+  readonly genSoftwareVersion?: number
+  readonly genSoftwareCapabilities?: bigint
+  readonly feesCollected: bigint
+}
+
 interface CanonicalLoader {
   readonly name: CanonicalBlockTlbName
   readonly load: (slice: Slice) => unknown
@@ -122,6 +128,15 @@ function asSlice(input: Cell | Slice): Slice {
 
 function getBoc(input: Cell | Slice): string {
   return ("toBoc" in input ? input : input.asCell()).toBoc().toString("hex")
+}
+
+export function parseBlockMetadata(input: Cell | Slice): BlockMetadata {
+  const block = loadBlock(asSlice(input))
+  return {
+    genSoftwareVersion: block.info.gen_software?.version,
+    genSoftwareCapabilities: block.info.gen_software?.capabilities,
+    feesCollected: block.value_flow.fees_collected.grams,
+  }
 }
 
 function getCoverage(

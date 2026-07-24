@@ -53,8 +53,10 @@ pub struct ResolvedPathsDiagnostics {
     pub manifest_path_source: ResolutionSource,
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub enum Explorer {
+    #[default]
+    Actonscan,
     Tonscan,
     Toncx,
     Dton,
@@ -1432,6 +1434,11 @@ impl TestSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actonscan_is_the_default_explorer() {
+        assert_eq!(Explorer::default(), Explorer::Actonscan);
+    }
 
     fn test_settings_to_config(
         settings: &TestSettings,

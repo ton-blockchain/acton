@@ -11,3 +11,91 @@
   padding-bottom: var(--acton-space-3);
   white-space: nowrap;
 }
+
+@media (max-width: 620px) {
+  .root {
+    --value-flow-table-min-width: 0;
+
+    overflow: hidden;
+  }
+
+  .table,
+  .table tbody {
+    display: block;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody > tr {
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--acton-color-border);
+  }
+
+  .table tbody > tr:first-child {
+    border-top: 0;
+  }
+
+  .table tbody > tr > td {
+    box-sizing: border-box;
+    display: grid;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .table tbody > tr > td[data-mobile-label]::before {
+    color: var(--acton-color-text-muted);
+    content: attr(data-mobile-label);
+    font-size: var(--acton-font-size-xs);
+    font-weight: var(--acton-font-weight-utility);
+    text-align: left;
+  }
+
+  .table tbody > tr > .accountCell {
+    display: block;
+    margin-bottom: 3px;
+    text-align: left;
+  }
+
+  .table tbody > tr > td:only-child {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .table tfoot {
+    display: block;
+    border-top: 1px solid var(--acton-color-border);
+  }
+
+  .table tfoot tr {
+    display: block;
+  }
+
+  .table tfoot td {
+    display: none;
+  }
+
+  .table tfoot .totalCell {
+    display: block;
+    width: 100%;
+    height: auto;
+    padding: 12px 16px;
+    border: 0;
+    text-align: right;
+  }
+}

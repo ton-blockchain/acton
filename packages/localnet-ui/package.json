@@ -36,6 +36,7 @@
     "idb": "8.0.3",
     "lucide-react": "^0.474.0",
     "monaco-editor": "^0.52.2",
+    "punycode": "2.3.1",
     "qrcode.react": "^4.2.0",
     "react-d3-tree": "^3.6.6",
     "react-icons": "^5.5.0",
@@ -48,6 +49,7 @@
   "devDependencies": {
     "@ton-community/tlb-codegen": "2.0.0-beta.3",
     "@types/node": "^25.0.3",
+    "@types/punycode": "2.1.4",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",

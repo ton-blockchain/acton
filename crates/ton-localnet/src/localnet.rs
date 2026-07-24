@@ -1,7 +1,8 @@
 use crate::LocalnetError;
 use crate::executor::TvmEmulatorAdapter;
+use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
-use crate::node_snapshot::{NodeStateSnapshot, read_snapshot_from_path, write_snapshot_to_path};
+use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
 use crate::streaming::StreamingCommitEvent;
@@ -360,7 +361,7 @@ impl Default for LocalnetMiningMode {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LocalnetRecoveryPointResult {
+pub struct LocalnetCheckpointResult {
     pub name: String,
     pub block_seqno: Seqno,
 }
@@ -576,6 +577,12 @@ pub(crate) enum Request {
         amount: u128,
         resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
+    JettonFaucet {
+        recipient: Addr,
+        jetton_master: Addr,
+        amount: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
+    },
     GetTraces {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
@@ -659,36 +666,49 @@ pub(crate) enum Request {
         code_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    DumpState {
+    DumpStateToPath {
         path: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    LoadStateFromPath {
+        path: String,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    DumpState {
+        resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
     },
     LoadState {
-        path: String,
+        json: Vec<u8>,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    CreateRecoveryPoint {
+    CreateCheckpoint {
         name: String,
         force: bool,
-        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
     },
-    ListRecoveryPoints {
-        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetRecoveryPointResult>>>,
+    ListCheckpoints {
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetCheckpointResult>>>,
     },
-    RevertRecoveryPoint {
+    RestoreCheckpoint {
         name: String,
-        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
     },
-    ExportRecoveryPoint {
+    DeleteCheckpoint {
         name: String,
-        path: String,
-        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
     },
-    ImportRecoveryPoint {
+    ClearCheckpoints {
+        resp: oneshot::Sender<anyhow::Result<usize>>,
+    },
+    ExportCheckpoint {
         name: String,
-        path: String,
+        resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
+    },
+    ImportCheckpoint {
+        name: String,
+        json: Vec<u8>,
         force: bool,
-        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
     },
     MineBlocks {
         count: u32,
@@ -725,23 +745,23 @@ pub struct Localnet {
 }
 
 #[derive(Default)]
-struct RecoveryPoints {
-    points: Vec<RecoveryPoint>,
+struct Checkpoints {
+    points: Vec<Checkpoint>,
 }
 
-struct RecoveryPoint {
+struct Checkpoint {
     name: String,
     snapshot: NodeStateSnapshot,
 }
 
-impl RecoveryPoints {
+impl Checkpoints {
     fn create(
         &mut self,
         node: &Node,
         name: String,
         force: bool,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
-        let name = normalize_recovery_point_name(name)?;
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let name = normalize_checkpoint_name(name)?;
         let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = node.build_snapshot()?;
         Ok(self.store_snapshot(snapshot, name, replacement_index))
@@ -749,13 +769,14 @@ impl RecoveryPoints {
 
     fn import(
         &mut self,
-        path: String,
+        json: &[u8],
         name: String,
         force: bool,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
-        let name = normalize_recovery_point_name(name)?;
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let name = normalize_checkpoint_name(name)?;
         let replacement_index = self.replacement_index(&name, force)?;
-        let snapshot = read_snapshot_from_path(path)?;
+        let snapshot = snapshot_from_json(json)?;
+        Node::validate_snapshot(&snapshot)?;
         Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 
@@ -764,9 +785,9 @@ impl RecoveryPoints {
         snapshot: NodeStateSnapshot,
         name: String,
         replacement_index: Option<usize>,
-    ) -> LocalnetRecoveryPointResult {
+    ) -> LocalnetCheckpointResult {
         let block_seqno = snapshot.globals.head_seqno;
-        let point = RecoveryPoint {
+        let point = Checkpoint {
             name: name.clone(),
             snapshot,
         };
@@ -775,71 +796,74 @@ impl RecoveryPoints {
         } else {
             self.points.push(point);
         }
-        LocalnetRecoveryPointResult { name, block_seqno }
+        LocalnetCheckpointResult { name, block_seqno }
     }
 
-    fn list(&self) -> Vec<LocalnetRecoveryPointResult> {
+    fn list(&self) -> Vec<LocalnetCheckpointResult> {
         self.points
             .iter()
-            .map(|point| LocalnetRecoveryPointResult {
+            .map(|point| LocalnetCheckpointResult {
                 name: point.name.clone(),
                 block_seqno: point.snapshot.globals.head_seqno,
             })
             .collect()
     }
 
-    fn revert(
-        &mut self,
-        node: &mut Node,
-        name: String,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    fn restore(&self, node: &mut Node, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
         let index = self.find_index(&name)?;
         let snapshot = self.points[index].snapshot.clone();
         let result = self.result_at(index);
         node.apply_snapshot(snapshot)?;
-        self.points.truncate(index);
         Ok(result)
     }
 
-    fn export(&self, name: String, path: String) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    fn delete(&mut self, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
         let index = self.find_index(&name)?;
-        write_snapshot_to_path(&self.points[index].snapshot, path)?;
-        Ok(self.result_at(index))
+        let result = self.result_at(index);
+        self.points.remove(index);
+        Ok(result)
     }
 
-    fn clear(&mut self) {
+    fn export(&self, name: String) -> anyhow::Result<Vec<u8>> {
+        let index = self.find_index(&name)?;
+        snapshot_to_json(&self.points[index].snapshot)
+    }
+
+    fn clear(&mut self) -> usize {
+        let count = self.points.len();
         self.points.clear();
+        count
     }
 
     fn replacement_index(&self, name: &str, force: bool) -> anyhow::Result<Option<usize>> {
         let index = self.points.iter().position(|point| point.name == name);
         if index.is_some() && !force {
-            anyhow::bail!("Recovery point name {name} already exists");
+            anyhow::bail!("Checkpoint name {name} already exists");
         }
         Ok(index)
     }
 
     fn find_index(&self, name: &str) -> anyhow::Result<usize> {
-        let name = normalize_recovery_point_name(name.to_owned())?;
+        let name = normalize_checkpoint_name(name.to_owned())?;
         self.points
             .iter()
             .position(|point| point.name == name)
-            .with_context(|| format!("Recovery point name {name} not found"))
+            .with_context(|| format!("Checkpoint name {name} not found"))
     }
 
-    fn result_at(&self, index: usize) -> LocalnetRecoveryPointResult {
+    fn result_at(&self, index: usize) -> LocalnetCheckpointResult {
         let point = &self.points[index];
-        LocalnetRecoveryPointResult {
+        LocalnetCheckpointResult {
             name: point.name.clone(),
             block_seqno: point.snapshot.globals.head_seqno,
         }
     }
 }
 
-fn normalize_recovery_point_name(name: String) -> anyhow::Result<String> {
+fn normalize_checkpoint_name(name: String) -> anyhow::Result<String> {
     let name = name.trim();
     if name.is_empty() {
-        anyhow::bail!("Recovery point name cannot be empty");
+        anyhow::bail!("Checkpoint name cannot be empty");
     }
     Ok(name.to_owned())
 }
@@ -921,6 +945,13 @@ impl Localnet {
         boc_str: String,
     ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        self.enqueue_internal_boc(boc).await
+    }
+
+    async fn enqueue_internal_boc(
+        &self,
+        boc: BocBytes,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
@@ -1403,6 +1434,28 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn jetton_faucet(
+        &self,
+        address_str: String,
+        jetton_master_str: String,
+        amount_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let recipient = Addr::parse(&address_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid recipient address"))?;
+        let jetton_master = Addr::parse(&jetton_master_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid jetton master address"))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::JettonFaucet {
+                recipient,
+                jetton_master,
+                amount: amount_str,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_traces(&self, tx_hash: Hash256) -> anyhow::Result<storage::TraceNode> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
@@ -1699,70 +1752,99 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn dump_state(&self, path: String) -> anyhow::Result<()> {
+    pub async fn dump_state_to_path(&self, path: String) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::DumpState { path, resp }).await?;
+        self.tx
+            .send(Request::DumpStateToPath { path, resp })
+            .await?;
         rx.await?
     }
 
-    pub async fn load_state(&self, path: String) -> anyhow::Result<()> {
+    pub async fn load_state_from_path(&self, path: String) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::LoadState { path, resp }).await?;
+        self.tx
+            .send(Request::LoadStateFromPath { path, resp })
+            .await?;
         rx.await?
     }
 
-    pub async fn create_recovery_point(
+    pub async fn dump_state(&self) -> anyhow::Result<Vec<u8>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::DumpState { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn load_state(&self, json: Vec<u8>) -> anyhow::Result<()> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::LoadState { json, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn create_checkpoint(
         &self,
         name: String,
         force: bool,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::CreateRecoveryPoint { name, force, resp })
+            .send(Request::CreateCheckpoint { name, force, resp })
             .await?;
         rx.await?
     }
 
-    pub async fn list_recovery_points(&self) -> anyhow::Result<Vec<LocalnetRecoveryPointResult>> {
+    pub async fn list_checkpoints(&self) -> anyhow::Result<Vec<LocalnetCheckpointResult>> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::ListRecoveryPoints { resp }).await?;
+        self.tx.send(Request::ListCheckpoints { resp }).await?;
         rx.await?
     }
 
-    pub async fn revert_recovery_point(
+    pub async fn restore_checkpoint(
         &self,
         name: String,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::RevertRecoveryPoint { name, resp })
+            .send(Request::RestoreCheckpoint { name, resp })
             .await?;
         rx.await?
     }
 
-    pub async fn export_recovery_point(
+    pub async fn delete_checkpoint(
         &self,
         name: String,
-        path: String,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::ExportRecoveryPoint { name, path, resp })
+            .send(Request::DeleteCheckpoint { name, resp })
             .await?;
         rx.await?
     }
 
-    pub async fn import_recovery_point(
+    pub async fn clear_checkpoints(&self) -> anyhow::Result<usize> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ClearCheckpoints { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn export_checkpoint(&self, name: String) -> anyhow::Result<Vec<u8>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::ExportCheckpoint { name, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn import_checkpoint(
         &self,
         name: String,
-        path: String,
+        json: Vec<u8>,
         force: bool,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::ImportRecoveryPoint {
+            .send(Request::ImportCheckpoint {
                 name,
-                path,
+                json,
                 force,
                 resp,
             })
@@ -1837,7 +1919,7 @@ fn run_node_loop(
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
     let mut node = create_node(events_tx, state_source, db_path)?;
-    let mut recovery_points = RecoveryPoints::default();
+    let mut checkpoints = Checkpoints::default();
     tracing::info!(
         "TON localnet started, block interval: {}ms, auto mining: {}, skip empty blocks: {}",
         block_interval.as_millis(),
@@ -1847,7 +1929,7 @@ fn run_node_loop(
 
     if !auto_mining {
         while let Some(req) = rx.blocking_recv() {
-            process_loop_request(&mut node, &mut recovery_points, &mut mining_mode, req);
+            process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
         }
         return Ok(());
     }
@@ -1881,7 +1963,7 @@ async fn run_node_loop_async(
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
     let mut next_block_at = Instant::now() + block_interval;
-    let mut recovery_points = RecoveryPoints::default();
+    let mut checkpoints = Checkpoints::default();
 
     loop {
         if Instant::now() >= next_block_at {
@@ -1898,7 +1980,7 @@ async fn run_node_loop_async(
                 let Some(req) = req else {
                     return Ok(());
                 };
-                process_loop_request(&mut node, &mut recovery_points, &mut mining_mode, req);
+                process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
             }
         }
     }
@@ -1959,7 +2041,7 @@ fn handle_mine_blocks(
 
 fn process_loop_request(
     node: &mut Node,
-    recovery_points: &mut RecoveryPoints,
+    checkpoints: &mut Checkpoints,
     mining_mode: &mut LocalnetMiningMode,
     req: Request,
 ) {
@@ -2160,6 +2242,16 @@ fn process_loop_request(
                 .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
             let _ = resp.send(res);
         }
+        Request::JettonFaucet {
+            recipient,
+            jetton_master,
+            amount,
+            resp,
+        } => {
+            let res = jetton_faucet::mint(node, &jetton_master, &recipient, &amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
+            let _ = resp.send(res);
+        }
         Request::GetTraces { tx_hash, resp } => {
             let res = node.get_traces(&tx_hash);
             let _ = resp.send(res);
@@ -2291,40 +2383,59 @@ fn process_loop_request(
             let res = node.delete_verified_source(&code_hash);
             let _ = resp.send(res);
         }
-        Request::DumpState { path, resp } => {
+        Request::DumpStateToPath { path, resp } => {
             let res = node.dump_state_to_path(path);
             let _ = resp.send(res);
         }
-        Request::LoadState { path, resp } => {
+        Request::LoadStateFromPath { path, resp } => {
             let res = node.load_state_from_path(path);
             if res.is_ok() {
-                recovery_points.clear();
+                checkpoints.clear();
             }
             let _ = resp.send(res);
         }
-        Request::CreateRecoveryPoint { name, force, resp } => {
-            let res = recovery_points.create(node, name, force);
+        Request::DumpState { resp } => {
+            let res = node.dump_state_to_json();
             let _ = resp.send(res);
         }
-        Request::ListRecoveryPoints { resp } => {
-            let res = Ok(recovery_points.list());
+        Request::LoadState { json, resp } => {
+            let res = node.load_state_from_json(&json);
+            if res.is_ok() {
+                checkpoints.clear();
+            }
             let _ = resp.send(res);
         }
-        Request::RevertRecoveryPoint { name, resp } => {
-            let res = recovery_points.revert(node, name);
+        Request::CreateCheckpoint { name, force, resp } => {
+            let res = checkpoints.create(node, name, force);
             let _ = resp.send(res);
         }
-        Request::ExportRecoveryPoint { name, path, resp } => {
-            let res = recovery_points.export(name, path);
+        Request::ListCheckpoints { resp } => {
+            let res = Ok(checkpoints.list());
             let _ = resp.send(res);
         }
-        Request::ImportRecoveryPoint {
+        Request::RestoreCheckpoint { name, resp } => {
+            let res = checkpoints.restore(node, name);
+            let _ = resp.send(res);
+        }
+        Request::DeleteCheckpoint { name, resp } => {
+            let res = checkpoints.delete(name);
+            let _ = resp.send(res);
+        }
+        Request::ClearCheckpoints { resp } => {
+            let res = Ok(checkpoints.clear());
+            let _ = resp.send(res);
+        }
+        Request::ExportCheckpoint { name, resp } => {
+            let res = checkpoints.export(name);
+            let _ = resp.send(res);
+        }
+        Request::ImportCheckpoint {
             name,
-            path,
+            json,
             force,
             resp,
         } => {
-            let res = recovery_points.import(path, name, force);
+            let res = checkpoints.import(&json, name, force);
             let _ = resp.send(res);
         }
         Request::MineBlocks { count, resp } => {

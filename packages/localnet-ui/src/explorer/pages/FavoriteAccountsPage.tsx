@@ -10,10 +10,11 @@ import type {JettonWallet} from "../api/types"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
-import {normalizeAddress, toRawAddress} from "../components/utils"
+import {normalizeAddress, shortenIdentifier, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteAccounts, type FavoriteAccount} from "../hooks/useFavoriteAccounts"
+import {useFavoriteTransactions, type FavoriteTransaction} from "../hooks/useFavoriteTransactions"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 
@@ -31,6 +32,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   const addressFormat = useAddressFormat()
   const openPath = useOpenExplorerPath()
   const {favorites, setFavorite} = useFavoriteAccounts()
+  const {favorites: favoriteTransactions, setFavorite: setFavoriteTransaction} =
+    useFavoriteTransactions()
   const {prefetchNames} = useAddressBook()
   const {showToast} = useToast()
   const [balancesByAddress, setBalancesByAddress] = useState<BalancesByAddress>({})
@@ -140,7 +143,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     void loadFavoriteAccountData()
   }, [addressFormat, client, favorites])
 
-  const handleRemove = (favorite: FavoriteAccount) => {
+  const handleRemoveAccount = (favorite: FavoriteAccount) => {
     setFavorite(favorite.address, false)
     showToast({
       title: "Account removed from favorites",
@@ -148,29 +151,50 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     })
   }
 
+  const handleRemoveTransaction = (favorite: FavoriteTransaction) => {
+    setFavoriteTransaction(favorite, false)
+    showToast({
+      title: "Transaction removed from favorites",
+      variant: "success",
+    })
+  }
+
+  const hasFavorites = favorites.length > 0 || favoriteTransactions.length > 0
+
   return (
     <section className={styles.container}>
-      <ExplorerBreadcrumbs items={[{label: "Favorite accounts"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Favorites"}]} />
       <header className={styles.hero}>
         <div>
-          <h1 className={styles.title}>Favorite accounts</h1>
+          <h1 className={styles.title}>Favorites</h1>
         </div>
       </header>
 
-      <section className={styles.tableFrame}>
-        <header className={styles.tableTitle}>
-          <Star size={16} className={styles.titleIcon} />
-          <span>Favorites</span>
-        </header>
-        {favorites.length === 0 ? (
+      {!hasFavorites && (
+        <section className={styles.tableFrame}>
+          <header className={styles.tableTitle}>
+            <Star size={16} className={styles.titleIcon} />
+            <span>Favorites</span>
+          </header>
           <div className={styles.emptyState}>
             <Star size={26} className={styles.emptyIcon} />
-            <div className={styles.emptyText}>No favorite accounts yet</div>
+            <div className={styles.emptyText}>No favorites yet</div>
+            <div className={styles.emptyHint}>
+              Use the star on an account or transaction page to save it here.
+            </div>
             <Link className={styles.emptyLink} to={routes.rootPath}>
-              Explore accounts
+              Explore TON
             </Link>
           </div>
-        ) : (
+        </section>
+      )}
+
+      {favorites.length > 0 && (
+        <section className={styles.tableFrame} aria-label="Favorite accounts">
+          <header className={styles.tableTitle}>
+            <Star size={16} className={styles.titleIcon} />
+            <span>Accounts</span>
+          </header>
           <div className={styles.tableScroller}>
             <table className={styles.table}>
               <thead>
@@ -190,7 +214,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           <InlineAction
                             label="Remove from favorites"
                             icon={<Trash2 />}
-                            onClick={() => handleRemove(favorite)}
+                            onClick={() => handleRemoveAccount(favorite)}
                           />
                         }
                       >
@@ -227,8 +251,77 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      {favoriteTransactions.length > 0 && (
+        <section className={styles.tableFrame} aria-label="Favorite transactions">
+          <header className={styles.tableTitle}>
+            <Star size={16} className={styles.titleIcon} />
+            <span>Transactions</span>
+          </header>
+          <div className={styles.tableScroller}>
+            <table className={`${styles.table} ${styles.transactionTable}`}>
+              <thead>
+                <tr>
+                  <th className={styles.hashHeader}>Transaction</th>
+                  <th className={styles.transactionAccountHeader}>Account</th>
+                  <th className={styles.ltHeader}>Logical time</th>
+                  <th className={styles.savedAtHeader}>Saved at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {favoriteTransactions.map(favorite => (
+                  <tr key={favorite.hash} className={styles.tableRow}>
+                    <td className={styles.hashCell}>
+                      <InlineActions
+                        visibility="always"
+                        actions={
+                          <InlineAction
+                            label="Remove from favorites"
+                            icon={<Trash2 />}
+                            onClick={() => handleRemoveTransaction(favorite)}
+                          />
+                        }
+                      >
+                        <Link
+                          className={styles.transactionLink}
+                          to={routes.transactionPath(favorite.hash)}
+                          title={favorite.hash}
+                        >
+                          {shortenIdentifier(favorite.hash)}
+                        </Link>
+                      </InlineActions>
+                    </td>
+                    <td className={styles.transactionAccountCell}>
+                      {favorite.account ? (
+                        <ExplorerAddressChip
+                          address={favorite.account}
+                          fallback="Account"
+                          copyable={false}
+                          onAddressClick={(address, event) =>
+                            openPath(routes.addressPath(address), event)
+                          }
+                        />
+                      ) : (
+                        <span className={styles.missingValue}>Unknown</span>
+                      )}
+                    </td>
+                    <td className={styles.ltCell}>{favorite.lt ?? "—"}</td>
+                    <td
+                      className={styles.savedAtCell}
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
+                      {formatSavedAt(favorite.savedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </section>
   )
 }

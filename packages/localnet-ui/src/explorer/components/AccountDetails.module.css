@@ -124,6 +124,29 @@
   border-bottom: 1px solid var(--acton-color-border);
 }
 
+.primaryTabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-padding-inline: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.primaryTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .tab {
   min-height: 34px;
   padding: 0 10px;
@@ -209,6 +232,10 @@
 
 .filterSection + .filterSection {
   margin-top: 14px;
+}
+
+.filtersCloseButton {
+  display: none;
 }
 
 .filterSectionTitle {
@@ -669,8 +696,8 @@
 }
 
 .valueContainer {
-  width: 12rem;
-  min-width: 12rem;
+  width: 12.5rem;
+  min-width: 12.5rem;
   text-align: right;
   display: flex;
   flex-direction: column;
@@ -723,6 +750,7 @@ th.valueContainer {
 
 .historyValue {
   font-size: var(--acton-font-size-sm);
+  font-variant-numeric: tabular-nums;
   line-height: 1.35;
 }
 
@@ -855,14 +883,9 @@ th.valueContainer {
 }
 
 @media (max-width: 720px) {
-  .tabs {
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .tabs::-webkit-scrollbar {
-    display: none;
+  .primaryTabs {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
 
   .tab {
@@ -887,11 +910,224 @@ th.valueContainer {
   }
 
   .filtersPopover {
-    right: 12px;
-    left: 12px;
+    top: auto !important;
+    right: 8px;
+    bottom: 8px;
+    left: 8px !important;
     width: auto;
-    max-height: calc(100dvh - 24px);
+    max-height: min(620px, calc(100dvh - 16px));
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .filtersPopover::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filtersCloseButton {
+    box-sizing: border-box;
+    display: inline-flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 14px;
+    padding: 0 14px;
+    border: 1px solid var(--acton-color-border-control);
+    border-radius: 10px;
+    background: var(--acton-color-surface-active);
+    color: var(--acton-color-text);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--acton-font-size-sm);
+    font-weight: var(--acton-font-weight-utility);
+  }
+
+  .filtersCloseButton:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+  }
+}
+
+@media (min-width: 621px) and (max-width: 860px) {
+  .historyContent .table {
+    min-width: 0;
+  }
+
+  .historyContent .technicalColumn {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .calendarTab {
+    display: none;
+  }
+
+  .historyContent,
+  .historyContent .tableWrapper {
+    overflow: visible;
+  }
+
+  .historyContent .table {
+    display: block;
+    min-width: 0;
+  }
+
+  .historyContent .historyHeaderGroup {
+    display: none;
+  }
+
+  .historyContent tbody {
+    display: block;
+  }
+
+  .historyContent tbody > tr {
+    box-sizing: border-box;
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "action value"
+      "address address"
+      "technical time";
+    gap: 8px 12px;
+    padding: 14px 16px;
+  }
+
+  .historyContent tbody > tr > td {
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    padding: 0 !important;
+  }
+
+  .historyContent tbody > tr > .actionColumn {
+    grid-area: action;
+  }
+
+  .historyContent tbody > tr > td:nth-child(3) {
+    grid-area: address;
+  }
+
+  .historyContent tbody > tr > .technicalColumn {
+    grid-area: technical;
+    align-self: center;
+  }
+
+  .historyContent tbody > tr > .technicalColumn:empty {
+    display: none;
+  }
+
+  .historyContent tbody > tr > .timeColumn {
+    grid-area: time;
+    align-self: center;
+    justify-self: end;
+    font-size: var(--acton-font-size-xs);
+  }
+
+  .historyContent tbody > tr > .valueContainer {
+    grid-area: value;
+    align-self: center;
+    width: auto;
+    min-width: 0;
+  }
+
+  .historyContent .addressWrapper {
+    overflow: hidden;
+  }
+
+  .historyContent .technicalLabel {
+    max-width: min(100%, 19rem);
+  }
+
+  .historyContent .emptyRow,
+  .historyContent .skeletonRow {
+    grid-template-areas: none;
+  }
+
+  .historyContent .emptyCell {
+    grid-column: 1 / -1;
+  }
+
+  .mobileCardTable {
+    --acton-data-table-min-width: 0 !important;
+
+    overflow: hidden;
+  }
+
+  .mobileCardTable table,
+  .mobileCardTable tbody {
+    display: block;
+  }
+
+  .mobileCardTable thead {
+    display: none;
+  }
+
+  .mobileCardTable tbody > tr {
+    box-sizing: border-box;
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "action value"
+      "address address"
+      "technical time";
+    gap: 8px 12px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--acton-color-border);
+  }
+
+  .mobileCardTable tbody > tr:first-child {
+    border-top: 0;
+  }
+
+  .mobileCardTable tbody > tr > td {
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    padding: 0 !important;
+    border: 0;
+  }
+
+  .mobileCardTable [data-mobile-area="action"] {
+    grid-area: action;
+  }
+
+  .mobileCardTable [data-mobile-area="value"] {
+    grid-area: value;
+    align-self: center;
+    width: auto;
+    min-width: 0;
+  }
+
+  .mobileCardTable [data-mobile-area="address"] {
+    grid-area: address;
+  }
+
+  .mobileCardTable [data-mobile-area="technical"] {
+    grid-area: technical;
+    align-self: center;
+  }
+
+  .mobileCardTable [data-mobile-area="technical"]:empty {
+    display: none;
+  }
+
+  .mobileCardTable [data-mobile-area="time"] {
+    grid-area: time;
+    align-self: center;
+    justify-self: end;
+    font-size: var(--acton-font-size-xs);
+  }
+
+  .mobileCardTable tbody > tr > td:only-child {
+    grid-column: 1 / -1;
+    min-height: 72px;
   }
 }
 
@@ -915,7 +1151,6 @@ th.valueContainer {
     height: 18px;
   }
 
-  .historyContent table,
   .tokensContent table {
     min-width: 580px;
   }

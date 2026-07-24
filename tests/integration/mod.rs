@@ -23,6 +23,8 @@ mod hooks_tests;
 mod incremental_tests;
 mod init_tests;
 mod library_tests;
+mod localnet_checkpoints;
+mod localnet_state_files;
 mod localnet_streaming_tests;
 mod localnet_tests;
 mod logging_tests;

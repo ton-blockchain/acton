@@ -1,7 +1,8 @@
-import {useState, type ReactNode} from "react"
+import {useId, useState, type ReactNode} from "react"
 import {Check, Copy, FileCode2} from "lucide-react"
 
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
+import {DisclosureToggle} from "../DisclosureToggle/DisclosureToggle"
 import {CopyInlineAction, InlineAction, InlineActions} from "../InlineActions/InlineActions"
 import {Popover} from "../Popover/Popover"
 import {VisuallyGroupedNumber} from "../VisuallyGroupedNumber/VisuallyGroupedNumber"
@@ -25,6 +26,62 @@ export interface ParsedValueViewProps extends ContractReferenceOptions {
 type ParsedValueContext = ContractReferenceOptions &
   Pick<ParsedValueViewProps, "renderCodeCellDetails">
 
+const LARGE_COLLECTION_THRESHOLD = 8
+
+function ParsedCollection({
+  label,
+  itemCount,
+  contentClassName,
+  children,
+}: {
+  readonly label: string
+  readonly itemCount: number
+  readonly contentClassName?: string
+  readonly children: ReactNode
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const contentId = useId()
+  const isLarge = itemCount > LARGE_COLLECTION_THRESHOLD
+  const content = (
+    <div
+      id={isLarge ? contentId : undefined}
+      className={`${styles.parsedNested} ${contentClassName ?? ""} ${isLarge ? styles.parsedCollectionViewport : ""}`}
+    >
+      {children}
+    </div>
+  )
+
+  if (!isLarge) {
+    return (
+      <>
+        <span className={styles.parsedBadge}>{label}</span>
+        {content}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className={styles.parsedCollectionHeader}>
+        <span className={styles.parsedBadge}>{label}</span>
+        <span className={styles.parsedCollectionCount}>
+          {itemCount} {itemCount === 1 ? "item" : "items"}
+        </span>
+        <DisclosureToggle
+          className={styles.parsedCollectionToggle}
+          expanded={isExpanded}
+          showLabel="Expand"
+          hideLabel="Collapse"
+          contextLabel={`${label} collection`}
+          aria-controls={contentId}
+          onClick={() => setIsExpanded(expanded => !expanded)}
+        />
+      </div>
+      {isExpanded && content}
+    </>
+  )
+}
+
 function ParsedTypeLabel({typeName}: {readonly typeName: string}) {
   return <span className={styles.parsedTypeLabel}>{typeName}</span>
 }
@@ -37,10 +94,16 @@ function ParsedValueRow({
   onContractClick,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
+  const isLargeCollection =
+    (value.kind === "array" && value.items.length > LARGE_COLLECTION_THRESHOLD) ||
+    (value.kind === "map" && value.entries.length > LARGE_COLLECTION_THRESHOLD)
+
   return (
     <>
       <div className={styles.parsedEntryKey}>{label}:</div>
-      <div className={styles.parsedEntryValue}>
+      <div
+        className={`${styles.parsedEntryValue} ${isLargeCollection ? styles.parsedLargeCollectionValue : ""}`}
+      >
         <ParsedValueView
           value={value}
           contracts={contracts}
@@ -72,6 +135,9 @@ function ParsedMapEntry({
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             renderCodeCellDetails={renderCodeCellDetails}
+            fieldName={
+              entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
+            }
           />
         </div>
       </div>
@@ -208,8 +274,7 @@ export function ParsedValueView({
 
       return (
         <div className={styles.parsedContainer}>
-          <span className={styles.parsedBadge}>array</span>
-          <div className={styles.parsedNested}>
+          <ParsedCollection label="array" itemCount={value.items.length}>
             {value.items.map((item, index) => (
               <ParsedValueRow
                 key={`array-item-${index}`}
@@ -218,7 +283,7 @@ export function ParsedValueView({
                 {...context}
               />
             ))}
-          </div>
+          </ParsedCollection>
         </div>
       )
     case "object": {
@@ -247,15 +312,21 @@ export function ParsedValueView({
     case "map":
       return (
         <div className={styles.parsedContainer}>
-          <span className={styles.parsedBadge}>{value.typeName ?? "map"}</span>
           {value.entries.length === 0 ? (
-            <span className={styles.parsedEmpty}>{"{}"}</span>
+            <>
+              <span className={styles.parsedBadge}>{value.typeName ?? "map"}</span>
+              <span className={styles.parsedEmpty}>{"{}"}</span>
+            </>
           ) : (
-            <div className={`${styles.parsedNested} ${styles.parsedNestedMap}`}>
+            <ParsedCollection
+              label={value.typeName ?? "map"}
+              itemCount={value.entries.length}
+              contentClassName={styles.parsedNestedMap}
+            >
               {value.entries.map(entry => (
                 <ParsedMapEntry key={JSON.stringify(entry.key)} entry={entry} {...context} />
               ))}
-            </div>
+            </ParsedCollection>
           )}
         </div>
       )

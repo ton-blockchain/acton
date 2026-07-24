@@ -39,6 +39,13 @@
   white-space: nowrap;
 }
 
+.initialValueActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
 .roundTrip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.8fr);

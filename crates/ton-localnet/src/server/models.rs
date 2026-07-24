@@ -19,8 +19,10 @@ pub struct FaucetRequest {
 }
 
 #[derive(Deserialize)]
-pub struct StatePathRequest {
-    pub path: String,
+pub struct JettonFaucetRequest {
+    pub address: String,
+    pub jetton_master: String,
+    pub amount: String,
 }
 
 #[derive(Deserialize)]
@@ -78,27 +80,20 @@ pub struct SetMiningModeRequest {
 }
 
 #[derive(Deserialize)]
-pub struct CreateRecoveryPointRequest {
+pub struct CreateCheckpointRequest {
     pub name: String,
     #[serde(default)]
     pub force: bool,
 }
 
 #[derive(Deserialize)]
-pub struct RevertRecoveryPointRequest {
+pub struct CheckpointRequest {
     pub name: String,
 }
 
 #[derive(Deserialize)]
-pub struct ExportRecoveryPointRequest {
+pub struct ImportCheckpointQuery {
     pub name: String,
-    pub path: String,
-}
-
-#[derive(Deserialize)]
-pub struct ImportRecoveryPointRequest {
-    pub name: String,
-    pub path: String,
     #[serde(default)]
     pub force: bool,
 }

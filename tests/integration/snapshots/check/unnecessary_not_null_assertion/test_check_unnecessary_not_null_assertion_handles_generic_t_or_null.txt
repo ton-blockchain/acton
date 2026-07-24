@@ -1,0 +1,19 @@
+warning[E031]: unnecessary not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |                     return value!;
+  |                                 ^ this expression has non-null type `T`
+  |
+  = remove `!`; `T` cannot be `null` here
+
+help: remove the unnecessary `!`
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |                     return value!;
+  |                                 ^
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E031

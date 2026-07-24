@@ -18,6 +18,7 @@ import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
+import {ExplorerRoutesProvider} from "./explorer/hooks/useExplorerRoutes"
 import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
 import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
 import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
@@ -150,27 +151,29 @@ export const App: FC = () => {
     <BrowserRouter>
       <ToastProvider>
         <NetworkInfoProvider client={client} api={explorerApi}>
-          <MetadataRegistryProvider registry={metadataRegistry}>
-            <AddressBookProvider>
-              <WalletRuntimeProvider
-                client={client}
-                host={HOST}
-                localnetApiToken={localnetApiToken}
-              >
-                <AppContent
+          <ExplorerRoutesProvider>
+            <MetadataRegistryProvider registry={metadataRegistry}>
+              <AddressBookProvider>
+                <WalletRuntimeProvider
                   client={client}
-                  isAuthOverlayOpen={isAuthOverlayOpen}
-                  isAuthOverlayRequired={isAuthOverlayRequired}
+                  host={HOST}
                   localnetApiToken={localnetApiToken}
-                  onClearAuthToken={clearAuthToken}
-                  onCloseAuthOverlay={closeAuthOverlay}
-                  onOpenAuthOverlay={openAuthOverlay}
-                  onRequireAuthToken={handleUnauthorized}
-                  onSaveAuthToken={saveAuthToken}
-                />
-              </WalletRuntimeProvider>
-            </AddressBookProvider>
-          </MetadataRegistryProvider>
+                >
+                  <AppContent
+                    client={client}
+                    isAuthOverlayOpen={isAuthOverlayOpen}
+                    isAuthOverlayRequired={isAuthOverlayRequired}
+                    localnetApiToken={localnetApiToken}
+                    onClearAuthToken={clearAuthToken}
+                    onCloseAuthOverlay={closeAuthOverlay}
+                    onOpenAuthOverlay={openAuthOverlay}
+                    onRequireAuthToken={handleUnauthorized}
+                    onSaveAuthToken={saveAuthToken}
+                  />
+                </WalletRuntimeProvider>
+              </AddressBookProvider>
+            </MetadataRegistryProvider>
+          </ExplorerRoutesProvider>
         </NetworkInfoProvider>
       </ToastProvider>
     </BrowserRouter>
@@ -237,6 +240,14 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <BlocksPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/block/last"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <BlockDetailsPage client={client} latest />
                 </DashboardPage>
               }
             />

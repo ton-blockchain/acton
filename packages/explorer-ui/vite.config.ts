@@ -19,6 +19,7 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    dedupe: ["@acton/ui", "react", "react-dom"],
     alias: {
       "@acton/transaction-ui": path.resolve(import.meta.dirname, "../transaction-ui/src"),
       "@tasm-spec": path.resolve(import.meta.dirname, "../../crates/tasm-core/spec"),

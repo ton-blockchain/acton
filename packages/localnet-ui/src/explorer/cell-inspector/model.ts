@@ -23,6 +23,7 @@ export type CellInputErrorCode =
   | "invalid-format"
   | "invalid-boc"
   | "inspection-failed"
+  | "custom-tlb-failed"
   | "too-many-roots"
   | "root-out-of-range"
 

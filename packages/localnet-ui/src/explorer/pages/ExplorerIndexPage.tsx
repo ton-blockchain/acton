@@ -1,4 +1,4 @@
-import {Binary, Play} from "lucide-react"
+import {Binary, Droplets, Play} from "lucide-react"
 import {Link} from "react-router-dom"
 import type {FC} from "react"
 
@@ -10,11 +10,13 @@ import styles from "./ExplorerIndexPage.module.css"
 
 interface ExplorerIndexPageProps {
   readonly client: TonClient
+  readonly faucetPath?: string
   readonly fillAvailableHeight?: boolean
 }
 
 export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
   client,
+  faucetPath,
   fillAvailableHeight = false,
 }) => {
   const routes = useExplorerRoutePaths()
@@ -36,7 +38,12 @@ export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
           <ExplorerSearch autoFocus client={client} />
         </div>
 
-        <nav className={styles.toolCards} aria-label="Developer tools">
+        <nav
+          className={
+            faucetPath ? `${styles.toolCards} ${styles.toolCardsWithFaucet}` : styles.toolCards
+          }
+          aria-label="Developer tools"
+        >
           <Link className={styles.toolCard} to={routes.emulatePath}>
             <span className={`${styles.toolCardIcon} ${styles.emulateIcon}`}>
               <Play aria-hidden="true" />
@@ -60,6 +67,20 @@ export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
               custom TL-B schemas.
             </span>
           </Link>
+
+          {faucetPath && (
+            <Link className={styles.toolCard} to={faucetPath}>
+              <span className={`${styles.toolCardIcon} ${styles.faucetIcon}`}>
+                <Droplets aria-hidden="true" />
+              </span>
+              <span className={styles.toolCardBadge}>Testnet</span>
+              <span className={styles.toolCardTitle}>Testnet Faucet</span>
+              <span className={styles.toolCardDescription}>
+                Request Testnet GRAM for development, testing, contract deployment, and experiments
+                on TON.
+              </span>
+            </Link>
+          )}
         </nav>
       </div>
 

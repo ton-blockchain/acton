@@ -527,6 +527,77 @@
   gap: 16px;
 }
 
+.cellSignDialog {
+  height: min(46rem, calc(100dvh - var(--acton-space-6) - var(--acton-space-6)));
+}
+
+.cellSignDialogContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.signRequestPreview {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.signRequestPreview > * {
+  max-height: 100%;
+}
+
+.signValuePreview {
+  min-width: 0;
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.signValueSummary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.signValueSummary > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+}
+
+.signValueTitle {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.25em;
+  line-height: 1.35;
+}
+
+.signValueType {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.signValueMetadata {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.signTextContent {
+  padding: var(--acton-space-4);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.cellSignDialogContent .modalActions {
+  flex: 0 0 auto;
+}
+
 .permissionItem,
 .messageItem {
   display: flex;
@@ -612,160 +683,6 @@
   margin-top: 6px;
 }
 
-.signPreviewPanel,
-.signPreviewDetails {
-  min-width: 0;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 12px;
-  background: var(--acton-color-surface-raised);
-}
-
-.signPreviewPanel {
-  overflow: hidden;
-}
-
-.signPreviewHeader {
-  min-height: 38px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--acton-color-border);
-  color: var(--acton-color-text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1;
-  list-style: none;
-  text-transform: uppercase;
-}
-
-.signPreviewHeader::-webkit-details-marker {
-  display: none;
-}
-
-.signPreviewHeader::before,
-.signPreviewDetails summary::before {
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid var(--acton-color-text-muted);
-  border-bottom: 1.5px solid var(--acton-color-text-muted);
-  content: "";
-  flex: 0 0 auto;
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-
-.signPreviewPanel[open] .signPreviewHeader::before,
-.signPreviewDetails[open] summary::before {
-  transform: rotate(45deg);
-}
-
-.signPreviewHash {
-  min-width: 0;
-  margin-left: auto;
-  color: var(--acton-color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  font-size: 0.72rem;
-  text-transform: none;
-}
-
-.signPreviewNotice {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--acton-color-border);
-  color: var(--acton-color-text-muted);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.signPreviewNoticeError {
-  color: var(--acton-color-status-failed-text);
-}
-
-.signPreviewRows {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.signPreviewRow {
-  --sign-preview-depth: 0;
-
-  min-width: 0;
-  min-height: 34px;
-  padding: 7px 12px 7px calc(12px + var(--sign-preview-depth) * 14px);
-  border-top: 1px solid var(--acton-color-border);
-  display: grid;
-  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
-  gap: 10px;
-  align-items: baseline;
-}
-
-.signPreviewRows .signPreviewRow:first-child {
-  border-top: 0;
-}
-
-.signPreviewRowError .signPreviewValue {
-  color: var(--acton-color-status-failed-text);
-}
-
-.signPreviewLabel {
-  min-width: 0;
-  color: var(--acton-color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.75rem;
-  font-weight: 650;
-  line-height: 1.35;
-}
-
-.signPreviewValue {
-  min-width: 0;
-  color: var(--acton-color-text);
-  overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-
-.signPreviewDetails {
-  padding: 0;
-}
-
-.signPreviewDetails summary {
-  min-height: 38px;
-  padding: 0 12px;
-  color: var(--acton-color-text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1;
-  list-style: none;
-  text-transform: uppercase;
-}
-
-.signPreviewDetails summary::-webkit-details-marker {
-  display: none;
-}
-
-.tlbHighlightedCode {
-  --acton-highlighted-code-font-size: 0.74rem;
-  --acton-highlighted-code-line-height: 1.45;
-  --acton-highlighted-code-max-height: 240px;
-  --acton-highlighted-code-padding: 12px;
-
-  margin: 0;
-  border-top: 1px solid var(--acton-color-border);
-}
-
 .spinning {
   animation: spin 900ms linear infinite;
 }
@@ -787,6 +704,10 @@
 }
 
 @media (max-width: 720px) {
+  .cellSignDialog {
+    height: calc(100dvh - var(--acton-space-3) - var(--acton-space-3));
+  }
+
   .modalActions {
     align-items: stretch;
     flex-direction: column;

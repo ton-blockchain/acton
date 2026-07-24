@@ -20,5 +20,5 @@
     },
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "functions", "../localnet-ui/src/explorer"]
+  "include": ["src", "functions", "../localnet-ui/src/explorer", "../verifier-ui/src"]
 }

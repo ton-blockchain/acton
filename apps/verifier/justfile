@@ -1,0 +1,45 @@
+all: precommit
+
+build: build-ui
+    cargo build --release --locked
+
+build-dev:
+    cargo build --locked
+
+install: install-ui install-compiler-worker
+
+install-ui:
+    cd ../.. && bun ci
+
+install-compiler-worker:
+    cd compiler-worker && npm ci
+
+build-ui: install-ui
+    cd ../../packages/verifier-ui && bun run build
+
+generate-registry:
+    cd compiler-worker && npm run generate-registry
+
+test: install-compiler-worker
+    cd compiler-worker && npm test
+    cargo test --locked
+
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all --check
+
+clippy:
+    cargo clippy --all-targets --locked -- -D warnings
+
+check: fmt-check clippy test
+
+precommit: fmt build check
+
+run: build-ui
+    cargo run --locked
+
+clean:
+    cargo clean
+    rm -rf ../../packages/verifier-ui/dist

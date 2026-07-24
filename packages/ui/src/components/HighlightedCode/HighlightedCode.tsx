@@ -75,6 +75,7 @@ export function HighlightedCode({
       aria-label={ariaLabel}
     >
       {html ? (
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki generates this HTML from escaped source code.
         <div className={styles.highlighted} dangerouslySetInnerHTML={{__html: html}} />
       ) : (
         <pre className={styles.fallback}>

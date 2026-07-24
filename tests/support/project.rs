@@ -1352,6 +1352,17 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        for arg in args {
+            self.cmd = self.cmd.arg(arg);
+        }
+        self
+    }
+
     pub(crate) fn env(mut self, key: &str, value: &str) -> Self {
         self.cmd = self.cmd.env(key, value);
         self

@@ -168,7 +168,7 @@ async function loadVerifiedSourcesByCodeHash({
       async (codeHash): Promise<readonly [string, ContractVerifiedSource] | undefined> => {
         try {
           const source = await metadataRegistry.getSource({codeHash})
-          if (!source.verified || source.bundles.length === 0) {
+          if (!source.verified || !source.bundle) {
             return undefined
           }
           return [codeHash, source] as const

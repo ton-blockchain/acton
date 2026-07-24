@@ -12,6 +12,7 @@ import "@contracts/types"
 struct Counter {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
@@ -25,7 +26,7 @@ fun Counter.fromStorage(
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-    return Counter { address, stateInit };
+    return Counter { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -41,7 +42,11 @@ fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }

@@ -170,16 +170,26 @@ const changedMapValueDiff = requiredStorageDiff(
     name: "Permissions",
     value: {
       kind: "map",
-      typeName: "map<int, bool>",
-      entries: [{key: {kind: "scalar", value: "1"}, value: {kind: "boolean", value: true}}],
+      typeName: "map<uint256, bool>",
+      entries: [
+        {
+          key: {kind: "scalar", value: "255", typeName: "uint256"},
+          value: {kind: "boolean", value: true},
+        },
+      ],
     },
   },
   {
     name: "Permissions",
     value: {
       kind: "map",
-      typeName: "map<int, bool>",
-      entries: [{key: {kind: "scalar", value: "1"}, value: {kind: "boolean", value: false}}],
+      typeName: "map<uint256, bool>",
+      entries: [
+        {
+          key: {kind: "scalar", value: "255", typeName: "uint256"},
+          value: {kind: "boolean", value: false},
+        },
+      ],
     },
   },
 )
@@ -223,6 +233,54 @@ const lastArrayItemRemovedDiff = requiredStorageDiff(
   {
     name: "RecentValues",
     value: {kind: "array", items: []},
+  },
+)
+
+const largeArrayDiff = requiredStorageDiff(
+  {
+    name: "RecentValues",
+    value: {
+      kind: "array",
+      items: Array.from({length: 32}, (_, index) => ({
+        kind: "scalar" as const,
+        value: String(index),
+      })),
+    },
+  },
+  {
+    name: "RecentValues",
+    value: {
+      kind: "array",
+      items: Array.from({length: 32}, (_, index) => ({
+        kind: "scalar" as const,
+        value: String(index % 2 === 0 ? index + 100 : index),
+      })),
+    },
+  },
+)
+
+const largeMapDiff = requiredStorageDiff(
+  {
+    name: "Permissions",
+    value: {
+      kind: "map",
+      typeName: "map<uint32, bool>",
+      entries: Array.from({length: 24}, (_, index) => ({
+        key: {kind: "scalar" as const, value: String(index), typeName: "uint32"},
+        value: {kind: "boolean" as const, value: index % 2 === 0},
+      })),
+    },
+  },
+  {
+    name: "Permissions",
+    value: {
+      kind: "map",
+      typeName: "map<uint32, bool>",
+      entries: Array.from({length: 24}, (_, index) => ({
+        key: {kind: "scalar" as const, value: String(index), typeName: "uint32"},
+        value: {kind: "boolean" as const, value: index % 3 === 0},
+      })),
+    },
   },
 )
 
@@ -290,7 +348,7 @@ export const parsedValueDiffViewGallery = {
         "A stable key changes only its value, while replacing a key renders one removed pair and one added pair.",
       content: (
         <div className={styles.grid}>
-          {diffSample("value changed", changedMapValueDiff)}
+          {diffSample("uint256 value changed", changedMapValueDiff)}
           {diffSample("key replaced", changedMapKeyDiff)}
           {diffSample("last map entry removed", lastMapEntryRemovedDiff)}
           {diffSample("last array item removed", lastArrayItemRemovedDiff)}
@@ -305,6 +363,18 @@ export const parsedValueDiffViewGallery = {
       content: (
         <div className={styles.structure}>
           <ParsedValueDiffView diff={nestedStorageDiff} contracts={contracts} />
+        </div>
+      ),
+    },
+    {
+      id: "parsed-value-diff-large-collections",
+      title: "Large Collection Diffs",
+      description:
+        "Unchanged collection entries stay hidden by default; long visible sets scroll inside a bounded area.",
+      content: (
+        <div className={styles.structure}>
+          {diffSample("32-item array", largeArrayDiff)}
+          {diffSample("24-entry map", largeMapDiff)}
         </div>
       ),
     },

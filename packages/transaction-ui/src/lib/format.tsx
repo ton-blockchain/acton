@@ -14,6 +14,18 @@ export function formatAddress(address: string): string {
   }
 }
 
+export function truncateMiddle(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value
+  if (maxLength <= 0) return ""
+  if (maxLength === 1) return "…"
+
+  const visibleLength = maxLength - 1
+  const startLength = Math.ceil(visibleLength / 2)
+  const endLength = Math.floor(visibleLength / 2)
+  const end = endLength === 0 ? "" : value.slice(-endLength)
+  return `${value.slice(0, startLength)}…${end}`
+}
+
 export function formatDecimalAmount(value: string, decimals: number): string {
   if (!/^[0-9]+$/.test(value)) {
     return value

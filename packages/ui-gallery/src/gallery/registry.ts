@@ -33,6 +33,7 @@ import {searchInputGallery} from "./searchInputGallery"
 import {selectGallery} from "./selectGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
+import {tlbCellViewerGallery} from "./tlbCellViewerGallery"
 import {toastGallery} from "./toastGallery"
 import {tokensGallery} from "./tokensGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
@@ -62,6 +63,7 @@ export const galleries = [
   parsedValueViewGallery,
   parsedValueDiffViewGallery,
   parsedBodySectionGallery,
+  tlbCellViewerGallery,
   highlightedCodeGallery,
   ideSelectorGallery,
   contentTabsGallery,

@@ -22,8 +22,10 @@ import {
 } from "../../explorer/components/DeveloperTransactionList"
 import {formatDuration} from "../../explorer/components/utils"
 import {useAddressBook} from "../../explorer/hooks/useAddressBook"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
+import {NodeStateControls} from "../components/NodeStateControls"
 import {collectRecentAccounts} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
@@ -84,6 +86,7 @@ interface NodeInfoRow {
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
   const navigate = useNavigate()
+  const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {showToast} = useToast()
   const {prefetchNames, updateDomains} = useAddressBook()
@@ -383,6 +386,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
             <header className={styles.dashboardCardHeader}>
               <h2 className={styles.dashboardCardTitle}>Node info</h2>
+              <NodeStateControls
+                client={client}
+                latestBlockSeqno={nodeInfo?.last_block_seqno}
+                onStateChanged={() => setNodeInfo(undefined)}
+              />
             </header>
             <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
               {nodeInfoRows.map(row => {
@@ -514,7 +522,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               openPath(`/explorer/tx/${encodeURIComponent(hashHex)}`, event)
             }}
             onAddressClick={(address, event) => {
-              openPath(`/explorer/address/${encodeURIComponent(address)}`, event)
+              openPath(routes.addressPath(address), event)
             }}
           />
         )}
@@ -529,7 +537,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               title="Recent accounts"
               accounts={recentAccountItems}
               onAddressClick={(address, event) => {
-                openPath(`/explorer/address/${encodeURIComponent(address)}`, event)
+                openPath(routes.addressPath(address), event)
               }}
             />
           )}
@@ -696,12 +704,18 @@ function formatReadableDuration(totalSeconds: number): string {
 }
 
 function formatTimeOffset(offsetSeconds: number): string {
-  return formatDurationWithTimeUnits(offsetSeconds, {style: "compact", maxParts: 4})
+  return formatDurationWithTimeUnits(offsetSeconds, {
+    style: "compact",
+    maxParts: 4,
+  })
 }
 
 function formatDurationWithTimeUnits(
   totalSeconds: number,
-  options: {readonly style: "compact" | "readable"; readonly maxParts?: number},
+  options: {
+    readonly style: "compact" | "readable"
+    readonly maxParts?: number
+  },
 ): string {
   const sign = totalSeconds < 0 ? "-" : "+"
   let remainingSeconds = Math.abs(totalSeconds)

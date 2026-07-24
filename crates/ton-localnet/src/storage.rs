@@ -53,7 +53,7 @@ impl CellStore {
             let conn = conn.lock().expect("Failed to lock DB connection");
             let _ = conn.execute(
                 "INSERT OR IGNORE INTO cas (hash, boc) VALUES (?1, ?2)",
-                params![hash.0.to_vec(), boc],
+                params![hash.to_bytes(), boc],
             );
         } else {
             self.boc_by_hash.insert(hash, boc);
@@ -82,7 +82,7 @@ impl CellStore {
             let conn = conn.lock().expect("Failed to lock DB connection");
             conn.query_row(
                 "SELECT boc FROM cas WHERE hash = ?1",
-                params![hash.0.to_vec()],
+                params![hash.to_bytes()],
                 |row| row.get(0),
             )
             .ok()

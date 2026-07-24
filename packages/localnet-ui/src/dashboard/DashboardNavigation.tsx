@@ -324,8 +324,8 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                     void navigate("/explorer/favorites")
                     closeMobileMenu()
                   }}
-                  title="Favorite accounts"
-                  aria-label="Favorite accounts"
+                  title="Favorites"
+                  aria-label="Favorites"
                 >
                   <Star size={18} />
                 </button>

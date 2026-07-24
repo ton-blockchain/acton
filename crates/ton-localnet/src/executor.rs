@@ -35,6 +35,14 @@ pub enum FeeEstimationExecution {
 
 impl ExecResult {
     #[must_use]
+    pub fn is_aborted(&self) -> bool {
+        matches!(
+            self.tx.info.load().ok(),
+            Some(TxInfo::Ordinary(info)) if info.aborted
+        )
+    }
+
+    #[must_use]
     pub fn compute_exit_code(&self) -> Option<i32> {
         let info = self.tx.info.load().ok()?;
         let TxInfo::Ordinary(info) = info else {

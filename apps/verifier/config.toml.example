@@ -1,0 +1,31 @@
+[server]
+bind_addr = "127.0.0.1:3000"
+
+[logging]
+# Supported values: trace, debug, info, warn, error.
+level = "info"
+
+[network]
+# Supported values: mainnet, testnet, localnet.
+name = "mainnet"
+
+[toncenter]
+# base_url = "https://toncenter.com"
+# api_key = "your-api-key"
+
+[source_repository]
+# path = "source-repo"
+remote = "origin"
+# branch = "main"
+commit_enabled = true
+push_enabled = true
+author_name = "ton-verifier"
+author_email = "ton-verifier@example.invalid"
+
+[registry_index]
+path = "verifier-index.sqlite3"
+
+[compiler]
+node_bin = "node"
+worker_path = "compiler-worker/compile.mjs"
+timeout_ms = 5000

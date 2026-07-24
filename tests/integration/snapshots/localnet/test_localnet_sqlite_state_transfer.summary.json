@@ -1,0 +1,47 @@
+{
+  "clean_node_load": {
+    "giver_balance_preserved": true,
+    "head_seqno_preserved": true,
+    "historical_state_preserved": true,
+    "latest_state_preserved": true,
+    "output": "Loaded localnet state from [ROOT]/state-from-sqlite.json",
+    "transactions_preserved": true
+  },
+  "dump": {
+    "delta_block_slots": 3,
+    "head_seqno": 3,
+    "message_count": 2,
+    "message_to_transaction_count": 2,
+    "non_empty_delta_blocks": 2,
+    "output": "Dumped localnet state to [ROOT]/state-from-sqlite.json",
+    "transaction_count": 2
+  },
+  "setup": {
+    "first_fund_ok": true,
+    "historical_state_differs_from_latest": true,
+    "second_fund_ok": true,
+    "transaction_count": 2
+  },
+  "sqlite_load": {
+    "giver_balance_preserved": true,
+    "head_seqno_preserved": true,
+    "historical_state_preserved": true,
+    "latest_state_preserved": true,
+    "output": "Loaded localnet state from [ROOT]/state-from-sqlite.json",
+    "transactions_preserved": true
+  },
+  "sqlite_load_after_reopen": {
+    "giver_balance_preserved": true,
+    "head_seqno_preserved": true,
+    "historical_state_preserved": true,
+    "latest_state_preserved": true,
+    "transactions_preserved": true
+  },
+  "sqlite_reopen": {
+    "giver_balance_preserved": true,
+    "head_seqno_preserved": true,
+    "historical_state_preserved": true,
+    "latest_state_preserved": true,
+    "transactions_preserved": true
+  }
+}

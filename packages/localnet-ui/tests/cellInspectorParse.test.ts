@@ -94,6 +94,40 @@ describe("Cell Inspector parser pipeline", () => {
     })
   })
 
+  test("uses only custom TL-B when it is explicitly preferred", () => {
+    const cell = beginCell().storeUint(1, 32).storeUint(7, 32).endCell()
+    const input = cell.toBoc().toString("base64")
+    const customTlb = "_ opcode:# value:# = CustomValue;"
+
+    expect(parseCell(input, {...defaultOptions, customTlb}).parser).toBe("abi-registry")
+    expect(
+      parseCell(input, {...defaultOptions, customTlb, customTlbAuthoritative: true}),
+    ).toMatchObject({
+      status: "partial",
+      parser: "custom-tlb",
+      data: {kind: "CustomValue", opcode: 1, value: 7},
+      provenance: {source: "user-schema"},
+    })
+  })
+
+  test("reports a preferred custom TL-B failure without falling back to ABI", () => {
+    const cell = beginCell().storeUint(1, 32).storeUint(7, 32).endCell()
+    const result = parseCell(cell.toBoc().toString("base64"), {
+      ...defaultOptions,
+      customTlb: "_ value:^Cell = CustomValue;",
+      customTlbAuthoritative: true,
+    })
+
+    expect(result).toMatchObject({
+      status: "error",
+      error: {
+        code: "custom-tlb-failed",
+        message: "Custom TL-B could not decode this root",
+      },
+      warnings: [{code: "custom-tlb-error"}],
+    })
+  })
+
   test("keeps built-in comment provenance even when an ABI is selected", () => {
     const cell = beginCell().storeUint(0, 32).storeStringTail("hello TON").endCell()
     const result = parseCell(cell.toBoc().toString("base64"), defaultOptions)

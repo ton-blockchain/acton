@@ -1,0 +1,69 @@
+[package]
+name = "verifier"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.95.0"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+
+assigning_clones = "deny"
+doc_markdown = "deny"
+elidable_lifetime_names = "deny"
+format_push_string = "deny"
+manual_let_else = "deny"
+map_unwrap_or = "deny"
+match_same_arms = "deny"
+match_wildcard_for_single_variants = "deny"
+multiple_crate_versions = "allow"
+must_use_candidate = "deny"
+needless_raw_string_hashes = "deny"
+redundant_closure_for_method_calls = "deny"
+ref_option = "deny"
+return_self_not_must_use = "deny"
+trivially_copy_pass_by_ref = "deny"
+uninlined_format_args = "deny"
+unwrap_used = "deny"
+wildcard_imports = "deny"
+
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+similar_names = "allow"
+cognitive_complexity = "allow"
+too_many_lines = "allow"
+
+[dependencies]
+async-trait = "0.1"
+axum = { version = "0.8", features = ["multipart"] }
+base64 = "0.22"
+dunce = "1.0.5"
+hex = "0.4"
+include_dir = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "time"] }
+toml = "0.9"
+tower-http = { version = "0.6", features = ["compression-br", "compression-gzip", "cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+[build-dependencies]
+chrono = "0.4"

@@ -1,0 +1,11 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/boc.test.tolk (2 tests)
+  ✓ boc encode cell typed cell and crc [TIME]
+  ✓ boc encode uses unread slice remainder [TIME]
+
+ ✓ 2 passed in 1 file

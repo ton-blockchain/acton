@@ -7,7 +7,7 @@ const DISMISSED_STORAGE_KEY = "actonExplorerDeveloperBannerDismissed"
 
 const isDismissed = (): boolean => {
   try {
-    return sessionStorage.getItem(DISMISSED_STORAGE_KEY) === "true"
+    return localStorage.getItem(DISMISSED_STORAGE_KEY) === "true"
   } catch {
     return false
   }
@@ -22,7 +22,7 @@ export function DeveloperExplorerBanner() {
 
   const dismiss = () => {
     try {
-      sessionStorage.setItem(DISMISSED_STORAGE_KEY, "true")
+      localStorage.setItem(DISMISSED_STORAGE_KEY, "true")
     } catch {
       // The banner can still be dismissed when storage is unavailable.
     }
@@ -34,11 +34,16 @@ export function DeveloperExplorerBanner() {
       <div className={styles.inner}>
         <p className={styles.message}>
           <Code2 className={styles.developerIcon} size={16} aria-hidden="true" />
-          <strong>Acton Explorer is made for smart-contract developers</strong>
+          <strong>
+            <span className={styles.desktopHeadline}>
+              Acton Explorer is made for smart-contract developers
+            </span>
+            <span className={styles.mobileHeadline}>Acton Explorer is made for developers</span>
+          </strong>
           <span className={styles.separator} aria-hidden="true">
             ·
           </span>
-          <span>Looking for a public TON explorer?</span>
+          <span className={styles.publicExplorerPrompt}>Looking for a public TON explorer?</span>
           <a className={styles.link} href="https://tonscan.org" target="_blank" rel="noreferrer">
             Visit Tonscan
             <ExternalLink size={13} aria-hidden="true" />

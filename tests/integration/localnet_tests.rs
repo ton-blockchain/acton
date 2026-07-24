@@ -1,7 +1,9 @@
 use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::localnet::{
-    assert_v3_bad_request, is_success_response, pretty_json_for_snapshot, response_payload,
+    assert_v3_bad_request, block_header_gen_utime, is_success_response, latest_masterchain_seqno,
+    parse_address_balance, pretty_json_for_snapshot, response_payload, summarize_admin_response,
+    wait_for_address_balance_at_least, wait_for_ok_response,
 };
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
@@ -18,7 +20,7 @@ use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -521,6 +523,71 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
 }
 
 #[test]
+fn localnet_liteapi_is_opt_in() {
+    let default_project = ProjectBuilder::new("localnet-liteapi-default-off").build();
+    let default_node = default_project.localnet().start();
+    let default_liteapi_port = default_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let default_liteapi = match TcpListener::bind(("127.0.0.1", default_liteapi_port)) {
+        Ok(_listener) => "available",
+        Err(_) => "occupied",
+    };
+    default_node.stop();
+
+    let enabled_project = ProjectBuilder::new("localnet-liteapi-enabled").build();
+    let enabled_node = enabled_project.localnet().arg("--liteapi").start();
+    let enabled_liteapi_port = enabled_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let enabled_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", enabled_liteapi_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    enabled_node.stop();
+
+    let explicit_project = ProjectBuilder::new("localnet-liteapi-explicit-port").build();
+    let explicit_builder = explicit_project.localnet();
+    let explicit_port_probe =
+        TcpListener::bind(("127.0.0.1", 0)).expect("failed to reserve explicit LiteAPI test port");
+    let explicit_port = explicit_port_probe
+        .local_addr()
+        .expect("failed to read explicit LiteAPI test port")
+        .port();
+    drop(explicit_port_probe);
+    let explicit_port_arg = explicit_port.to_string();
+    let explicit_node = explicit_builder
+        .args(["--liteapi", "--liteapi-port", explicit_port_arg.as_str()])
+        .start();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let explicit_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", explicit_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    explicit_node.stop();
+
+    assertion().eq(
+        format!(
+            "without --liteapi: {default_liteapi}\nwith --liteapi: {enabled_liteapi}\nwith --liteapi-port: {explicit_liteapi}\n"
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_liteapi_opt_in.txt"),
+    );
+}
+
+#[test]
 fn localnet_starts_and_serves_masterchain_info() {
     let project = ProjectBuilder::new("localnet-smoke-masterchain-info").build();
     let node = project.localnet().start();
@@ -880,155 +947,6 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
     );
 
     node.stop();
-}
-
-#[test]
-fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
-    let project = ProjectBuilder::new("localnet-recovery-points").build();
-    let db_path = project.path().join("localnet.sqlite");
-    let db_path_arg = db_path.display().to_string();
-
-    let node = project
-        .localnet()
-        .args([
-            "--no-mining",
-            "--mine-empty-blocks",
-            "--db-path",
-            db_path_arg.as_str(),
-        ])
-        .start();
-
-    let first_mine = node.post_json("/acton_mine", &json!({}));
-    let first_seqno = response_payload(&first_mine)["last_block_seqno"]
-        .as_u64()
-        .expect("mine response must expose last_block_seqno") as u32;
-    let first_gen_utime = block_header_gen_utime(&node, first_seqno);
-
-    let older_snapshot = node.post_json("/acton_snapshot", &json!({ "name": "older" }));
-
-    let next_block_timestamp = first_gen_utime + 300;
-    let set_next = node.post_json(
-        "/acton_setNextBlockTimestamp",
-        &json!({ "timestamp": next_block_timestamp }),
-    );
-    let snapshot = node.post_json("/acton_snapshot", &json!({ "name": "current" }));
-
-    let target = "0:4444444444444444444444444444444444444444444444444444444444444444";
-    let fund = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": target,
-            "amount": 1_000_000_000u128,
-        }),
-    );
-    let mine_faucet = node.post_json("/acton_mine", &json!({}));
-    let faucet_block_seqno = response_payload(&mine_faucet)["last_block_seqno"]
-        .as_u64()
-        .expect("mine response must expose last_block_seqno") as u32;
-    let faucet_block_gen_utime = block_header_gen_utime(&node, faucet_block_seqno);
-    let target_after_mine =
-        wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
-
-    let newer_snapshot = node.post_json("/acton_snapshot", &json!({ "name": "newer" }));
-    let list_before_revert = node.post_json("/acton_listSnapshots", &json!({}));
-    let increase_later = node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
-    let status_after_later_change = node.get_json("/acton_nodeInfo");
-
-    let reverted = node.post_json("/acton_revert", &json!({ "name": "current" }));
-    let seqno_after_revert = latest_masterchain_seqno(&node);
-    let target_after_revert =
-        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-    let status_after_revert = node.get_json("/acton_nodeInfo");
-
-    let mine_after_revert = node.post_json("/acton_mine", &json!({}));
-    let replayed_seqno = response_payload(&mine_after_revert)["last_block_seqno"]
-        .as_u64()
-        .expect("mine response must expose last_block_seqno") as u32;
-    let replayed_gen_utime = block_header_gen_utime(&node, replayed_seqno);
-    let target_after_empty_mine =
-        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-
-    let mut invalid_revert_same =
-        node.post_json_error("/acton_revert", &json!({ "name": "current" }));
-    normalize_extra_for_snapshot(&mut invalid_revert_same);
-    let mut invalid_revert_newer =
-        node.post_json_error("/acton_revert", &json!({ "name": "newer" }));
-    normalize_extra_for_snapshot(&mut invalid_revert_newer);
-
-    let list_after_revert = node.post_json("/acton_listSnapshots", &json!({}));
-    let reverted_older = node.post_json("/acton_revert", &json!({ "name": "older" }));
-    let seqno_after_revert_older = latest_masterchain_seqno(&node);
-    let status_after_revert_older = node.get_json("/acton_nodeInfo");
-    let target_after_revert_older =
-        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-
-    node.stop();
-
-    let restarted = project
-        .localnet()
-        .args([
-            "--no-mining",
-            "--mine-empty-blocks",
-            "--db-path",
-            db_path_arg.as_str(),
-        ])
-        .start();
-    let restarted_seqno = latest_masterchain_seqno(&restarted);
-    let restarted_target =
-        restarted.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-    let restarted_block_2 = restarted
-        .get_json_error("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno=2");
-
-    let snapshot = json!({
-        "create": {
-            "older": summarize_admin_response(&older_snapshot),
-            "current": summarize_admin_response(&snapshot),
-            "newer": summarize_admin_response(&newer_snapshot),
-            "list": summarize_admin_response(&list_before_revert),
-        },
-        "mutate_after_snapshot": {
-            "set_next_ok": set_next["ok"].as_bool(),
-            "fund_ok": fund["ok"].as_bool(),
-            "mine_ok": mine_faucet["ok"].as_bool(),
-            "faucet_block_used_pending_timestamp": faucet_block_gen_utime == next_block_timestamp,
-            "balance_after_mine": parse_address_balance(&target_after_mine).to_string(),
-            "increase_later_ok": increase_later["ok"].as_bool(),
-        },
-        "revert_current": {
-            "response": summarize_admin_response(&reverted),
-            "seqno_after_revert": seqno_after_revert,
-            "balance_after_revert": parse_address_balance(&target_after_revert).to_string(),
-            "pending_timestamp_restored": status_after_revert["result"]["next_block_timestamp"]
-                .as_u64()
-                == Some(u64::from(next_block_timestamp)),
-            "time_offset_rolled_back": status_after_later_change["result"]["time_offset_seconds"]
-                .as_i64()
-                > status_after_revert["result"]["time_offset_seconds"].as_i64(),
-            "empty_mine_used_restored_timestamp": replayed_gen_utime == next_block_timestamp,
-            "balance_after_empty_mine": parse_address_balance(&target_after_empty_mine).to_string(),
-        },
-        "recovery_point_invalidation": {
-            "same": summarize_admin_response(&invalid_revert_same),
-            "newer": summarize_admin_response(&invalid_revert_newer),
-            "list_after_current_revert": summarize_admin_response(&list_after_revert),
-            "older_still_reverts": summarize_admin_response(&reverted_older),
-            "seqno_after_revert_older": seqno_after_revert_older,
-            "pending_timestamp_after_revert_older": status_after_revert_older["result"]["next_block_timestamp"].clone(),
-            "balance_after_revert_older": parse_address_balance(&target_after_revert_older).to_string(),
-        },
-        "persistent_db_after_restart": {
-            "seqno": restarted_seqno,
-            "balance": parse_address_balance(&restarted_target).to_string(),
-            "block_2_removed": restarted_block_2["ok"].as_bool() == Some(false),
-        }
-    });
-
-    assertion().eq(
-        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
-        snapbox::file!("snapshots/localnet/test_localnet_recovery_points.summary.json"),
-    );
-
-    restarted.stop();
 }
 
 #[test]
@@ -1918,244 +1836,6 @@ fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
             "snapshots/localnet/test_localnet_status_json_non_localnet_http.response.json"
         ),
     );
-}
-
-#[test]
-fn localnet_admin_dump_and_load_state_roundtrip() {
-    let project = ProjectBuilder::new("localnet-admin-state-roundtrip").build();
-    let node = project.localnet().start();
-    let snapshot_path = project.path().join("localnet-state.json");
-    let address_before = "0:1111111111111111111111111111111111111111111111111111111111111111";
-    let address_after = "0:2222222222222222222222222222222222222222222222222222222222222222";
-
-    let funded_before = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": address_before,
-            "amount": 1_000_000_000u128,
-        }),
-    );
-
-    let before_info = wait_for_address_balance_at_least(
-        &node,
-        address_before,
-        1_000_000_000,
-        Duration::from_secs(5),
-    );
-    let before_balance = parse_address_balance(&before_info);
-
-    let dumped = node.post_json(
-        "/acton_dumpState",
-        &json!({
-            "path": snapshot_path.display().to_string(),
-        }),
-    );
-
-    let funded_after = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": address_after,
-            "amount": 2_000_000_000u128,
-        }),
-    );
-
-    let after_info = wait_for_address_balance_at_least(
-        &node,
-        address_after,
-        2_000_000_000,
-        Duration::from_secs(5),
-    );
-    let after_balance_before_load = parse_address_balance(&after_info);
-
-    let loaded = node.post_json(
-        "/acton_loadState",
-        &json!({
-            "path": snapshot_path.display().to_string(),
-        }),
-    );
-
-    let before_info_reloaded = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_before}"),
-        Duration::from_secs(5),
-    );
-    let before_balance_after_load = parse_address_balance(&before_info_reloaded);
-
-    let after_info_reloaded = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_after}"),
-        Duration::from_secs(5),
-    );
-    let after_balance_after_load = parse_address_balance(&after_info_reloaded);
-
-    let snapshot = json!({
-        "fund_before": summarize_admin_response(&funded_before),
-        "dump": summarize_admin_response(&dumped),
-        "snapshot_file_created": snapshot_path.is_file(),
-        "fund_after": summarize_admin_response(&funded_after),
-        "load": summarize_admin_response(&loaded),
-        "balances": {
-            "before_after_fund": before_balance.to_string(),
-            "after_after_fund": after_balance_before_load.to_string(),
-            "before_after_load": before_balance_after_load.to_string(),
-            "after_after_load": after_balance_after_load.to_string(),
-        }
-    });
-
-    assertion().eq(
-        pretty_json_for_snapshot(&snapshot, project.path()),
-        snapbox::file!(
-            "snapshots/localnet/test_localnet_admin_dump_and_load_state_roundtrip.summary.json"
-        ),
-    );
-
-    node.stop();
-}
-
-#[test]
-fn localnet_cli_snapshot_commands_roundtrip_state() {
-    let project = ProjectBuilder::new("localnet-cli-snapshot-roundtrip").build();
-    let node = project.localnet().start();
-    let port = node.port().to_string();
-    let project_root = project.path().display().to_string();
-    let run_snapshot = |args: &[&str]| {
-        let mut command = project
-            .acton()
-            .arg("--project-root")
-            .arg(&project_root)
-            .arg("localnet")
-            .arg("snapshot");
-        for arg in args {
-            command = command.arg(arg);
-        }
-        command.run().success()
-    };
-    let address_before = "0:1111111111111111111111111111111111111111111111111111111111111111";
-    let address_after = "0:2222222222222222222222222222222222222222222222222222222222222222";
-
-    let fund_before = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": address_before,
-            "amount": 1_000_000_000u128,
-        }),
-    );
-    let before_info = wait_for_address_balance_at_least(
-        &node,
-        address_before,
-        1_000_000_000,
-        Duration::from_secs(5),
-    );
-    let before_balance = parse_address_balance(&before_info);
-
-    let create = run_snapshot(&["create", "before-upgrade", "--port", port.as_str()]);
-    let list_before_export = run_snapshot(&["list", "--port", port.as_str()]);
-    let export = run_snapshot(&[
-        "export",
-        "before-upgrade",
-        "--out",
-        "snapshots/bug.json",
-        "--port",
-        port.as_str(),
-    ]);
-
-    let fund_after = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": address_after,
-            "amount": 2_000_000_000u128,
-        }),
-    );
-    let after_info_before_revert = wait_for_address_balance_at_least(
-        &node,
-        address_after,
-        2_000_000_000,
-        Duration::from_secs(5),
-    );
-    let after_balance_before_revert = parse_address_balance(&after_info_before_revert);
-
-    let revert_before_upgrade =
-        run_snapshot(&["revert", "before-upgrade", "--port", port.as_str()]);
-    let before_info_after_named_revert = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_before}"),
-        Duration::from_secs(5),
-    );
-    let after_info_after_named_revert = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_after}"),
-        Duration::from_secs(5),
-    );
-
-    let import = run_snapshot(&["import", "snapshots/bug.json", "--port", port.as_str()]);
-    let list_after_import = run_snapshot(&["list", "--port", port.as_str()]);
-
-    let fund_after_import = node.post_json(
-        "/acton_fundAccount",
-        &json!({
-            "address": address_after,
-            "amount": 3_000_000_000u128,
-        }),
-    );
-    let after_info_before_imported_revert = wait_for_address_balance_at_least(
-        &node,
-        address_after,
-        3_000_000_000,
-        Duration::from_secs(5),
-    );
-    let revert_imported = run_snapshot(&["revert", "bug", "--port", port.as_str()]);
-    let before_info_after_imported_revert = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_before}"),
-        Duration::from_secs(5),
-    );
-    let after_info_after_imported_revert = wait_for_ok_response(
-        &node,
-        &format!("/api/v2/getAddressInformation?address={address_after}"),
-        Duration::from_secs(5),
-    );
-
-    let exported_snapshot_path = project.path().join("snapshots/bug.json");
-    let exported_snapshot = fs::read(&exported_snapshot_path).unwrap_or_default();
-
-    let snapshot = json!({
-        "fund_before": summarize_admin_response(&fund_before),
-        "create": strip_ansi(&create.get_stdout()),
-        "list_before_export": strip_ansi(&list_before_export.get_stdout()),
-        "fund_after": summarize_admin_response(&fund_after),
-        "balances_before_revert": {
-            "before": before_balance.to_string(),
-            "after": after_balance_before_revert.to_string(),
-        },
-        "revert_before_upgrade": {
-            "stdout": strip_ansi(&revert_before_upgrade.get_stdout()),
-            "before_balance": parse_address_balance(&before_info_after_named_revert).to_string(),
-            "after_balance": parse_address_balance(&after_info_after_named_revert).to_string(),
-        },
-        "export_import": {
-            "export_stdout": strip_ansi(&export.get_stdout()),
-            "import_stdout": strip_ansi(&import.get_stdout()),
-            "list_after_import": strip_ansi(&list_after_import.get_stdout()),
-            "exported_snapshot_exists": exported_snapshot_path.is_file(),
-            "exported_snapshot_non_empty": !exported_snapshot.is_empty(),
-        },
-        "revert_imported": {
-            "fund_after_import": summarize_admin_response(&fund_after_import),
-            "after_balance_before_revert": parse_address_balance(&after_info_before_imported_revert).to_string(),
-            "stdout": strip_ansi(&revert_imported.get_stdout()),
-            "before_balance": parse_address_balance(&before_info_after_imported_revert).to_string(),
-            "after_balance": parse_address_balance(&after_info_after_imported_revert).to_string(),
-        }
-    });
-
-    assertion().eq(
-        pretty_json_for_snapshot(&snapshot, project.path()),
-        snapbox::file!(
-            "snapshots/localnet/test_localnet_cli_snapshot_commands_roundtrip_state.summary.json"
-        ),
-    );
-
-    node.stop();
 }
 
 #[test]
@@ -4398,6 +4078,77 @@ fn localnet_v3_indexes_real_jetton_actions() {
     assertion().eq(
         format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
         snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_jetton_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_jetton_faucet_detects_legacy_v1_mint_layout() {
+    let project = jetton_v1_action_project("localnet-legacy-jetton-faucet");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/jetton.tolk");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
+    let recipient_wallet =
+        extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
+
+    let faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": recipient,
+            "jetton_master": jetton_master,
+            "amount": "7",
+        }),
+    );
+    let message_hash = faucet["result"]["hash"]
+        .as_str()
+        .expect("legacy jetton faucet must return a message hash");
+    let transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("legacy mint transaction must be indexed");
+    let master_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={jetton_master}"),
+        Duration::from_secs(12),
+    );
+    let wallet_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={recipient_wallet}"),
+        Duration::from_secs(12),
+    );
+    let master = response_payload(&master_response);
+    let wallet = response_payload(&wallet_response);
+
+    let snapshot = json!({
+        "faucet": {
+            "ok": faucet["ok"],
+            "message_hash_present": !message_hash.is_empty(),
+        },
+        "mint_transaction": {
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+        },
+        "master_total_supply": master["total_supply"],
+        "recipient_wallet_balance": wallet["balance"],
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_jetton_faucet_detects_legacy_v1_mint_layout.summary.json"
+        ),
     );
 
     node.stop();
@@ -6656,15 +6407,36 @@ fn localnet_supports_v3_account_states_endpoint() {
     let owner_address = extract_prefixed_line_value(&script_stdout, "JETTON_ADMIN OWNER_ADDRESS=");
     wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
 
-    let mint_result = project
-        .acton()
-        .script("scripts/mint.tolk")
-        .verify_network("localnet")
-        .env("JETTON_ADMIN", "deployer")
-        .env("JETTON_MINTER_ADDRESS", &minter_address)
-        .run();
-    let mint_status = mint_result.output.get_output().status.code().unwrap_or(1);
-    assert_eq!(mint_status, 0, "Mint script failed");
+    let jetton_faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "100",
+        }),
+    );
+    let (invalid_amount_status, invalid_amount_response) = node.post_json_with_status(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "0",
+        }),
+    );
+    let mint_message_hash = jetton_faucet["result"]["hash"]
+        .as_str()
+        .expect("jetton faucet must return the queued message hash");
+    let mint_transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(mint_message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = mint_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("jetton faucet transaction must be indexed");
 
     let wallets_response = wait_for_ok_response(
         &node,
@@ -6891,13 +6663,30 @@ fn localnet_supports_v3_account_states_endpoint() {
     let master_token = response_payload(&master_token_data);
     let wallet_token = response_payload(&wallet_token_data);
     let token_data_summary = json!({
+        "faucet": {
+            "ok": jetton_faucet["ok"],
+            "result_type": jetton_faucet["result"]["@type"],
+            "message_hash_present": jetton_faucet["result"]["hash"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+            "invalid_amount": {
+                "status": invalid_amount_status,
+                "ok": invalid_amount_response["ok"],
+                "code": invalid_amount_response["code"],
+                "error": invalid_amount_response["error"],
+            },
+        },
         "master": {
             "type": master_token["@type"],
             "contract_type": master_token["contract_type"],
             "address_present": master_token["address"].as_str().is_some_and(|value| !value.is_empty()),
-            "total_supply_positive": master_token["total_supply"].as_str()
-                .and_then(|value| value.parse::<u128>().ok())
-                .is_some_and(|value| value > 0),
+            "total_supply": master_token["total_supply"],
             "wallet_code_present": master_token["jetton_wallet_code"].as_str()
                 .is_some_and(|value| !value.is_empty()),
             "content_type": master_token["jetton_content"]["type"],
@@ -6908,9 +6697,7 @@ fn localnet_supports_v3_account_states_endpoint() {
             "address_present": wallet_token["address"].as_str().is_some_and(|value| !value.is_empty()),
             "owner_present": wallet_token["owner"].as_str().is_some_and(|value| !value.is_empty()),
             "master_present": wallet_token["jetton"].as_str().is_some_and(|value| !value.is_empty()),
-            "balance_positive": wallet_token["balance"].as_str()
-                .and_then(|value| value.parse::<u128>().ok())
-                .is_some_and(|value| value > 0),
+            "balance": wallet_token["balance"],
             "wallet_code_present": wallet_token["jetton_wallet_code"].as_str()
                 .is_some_and(|value| !value.is_empty()),
         },
@@ -6921,7 +6708,10 @@ fn localnet_supports_v3_account_states_endpoint() {
         }
     });
     assertion().eq(
-        pretty_json_for_snapshot(&token_data_summary, project.path()),
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&token_data_summary, project.path())
+        ),
         snapbox::file!("snapshots/localnet/test_localnet_v2_token_data.summary.json"),
     );
 
@@ -7570,18 +7360,6 @@ fn normalize_localnet_status_stdout(stdout: &str, port: u16) -> String {
     lines
 }
 
-fn summarize_admin_response(response: &Value) -> Value {
-    let mut response = response.clone();
-    normalize_extra_for_snapshot(&mut response);
-    if let Some(tx_hash) = response.pointer_mut("/result/result/tx_hash") {
-        *tx_hash = json!("[HASH]");
-    }
-    if let Some(hash) = response.pointer_mut("/result/hash") {
-        *hash = json!("[HASH]");
-    }
-    response
-}
-
 fn summarize_admin_freeze_transaction(tx: &Value, expected_destination: &str) -> Value {
     let source = tx.pointer("/in_msg/source").and_then(Value::as_str);
     let destination = tx.pointer("/in_msg/destination").and_then(Value::as_str);
@@ -7618,26 +7396,6 @@ fn summarize_mine_response(response: &Value) -> Value {
     })
 }
 
-fn wait_for_ok_response(
-    node: &crate::support::localnet::LocalnetHandle,
-    query: &str,
-    timeout: Duration,
-) -> Value {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let response = node.get_json(query);
-        if is_success_response(&response) {
-            return response;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Timed out waiting for successful response from `{query}`:\n{}",
-            serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-        thread::sleep(Duration::from_millis(200));
-    }
-}
-
 fn wait_for_non_empty_v3_traces_response(
     node: &crate::support::localnet::LocalnetHandle,
     query: &str,
@@ -7661,24 +7419,6 @@ fn wait_for_non_empty_v3_traces_response(
         );
         thread::sleep(Duration::from_millis(200));
     }
-}
-
-fn latest_masterchain_seqno(node: &crate::support::localnet::LocalnetHandle) -> i64 {
-    let response = wait_for_ok_response(node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
-    response["result"]["last"]["seqno"]
-        .as_i64()
-        .expect("masterchain seqno must be integer")
-}
-
-fn block_header_gen_utime(node: &crate::support::localnet::LocalnetHandle, seqno: u32) -> u32 {
-    let response = wait_for_ok_response(
-        node,
-        &format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}"),
-        Duration::from_secs(5),
-    );
-    response_payload(&response)["gen_utime"]
-        .as_u64()
-        .expect("block header must expose gen_utime") as u32
 }
 
 fn wait_for_masterchain_seqno_at_least(
@@ -7722,46 +7462,6 @@ fn wait_until_address_state_active(
         );
         thread::sleep(Duration::from_millis(200));
     }
-}
-
-fn wait_for_address_balance_at_least(
-    node: &crate::support::localnet::LocalnetHandle,
-    address: &str,
-    expected_balance: u128,
-    timeout: Duration,
-) -> Value {
-    let query = format!("/api/v2/getAddressInformation?address={address}");
-    let deadline = Instant::now() + timeout;
-    loop {
-        let response = node.get_json(&query);
-        if is_success_response(&response) && parse_address_balance(&response) >= expected_balance {
-            return response;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Timed out waiting for address `{address}` balance to reach {expected_balance}:\n{}",
-            serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-        thread::sleep(Duration::from_millis(200));
-    }
-}
-
-fn parse_address_balance(address_information: &Value) -> u128 {
-    address_information["result"]["balance"]
-        .as_str()
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected string balance field in getAddressInformation response:\n{}",
-                serde_json::to_string_pretty(address_information).unwrap_or_default()
-            )
-        })
-        .parse::<u128>()
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to parse balance from getAddressInformation response: {e}\n{}",
-                serde_json::to_string_pretty(address_information).unwrap_or_default()
-            )
-        })
 }
 
 fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str) -> String {

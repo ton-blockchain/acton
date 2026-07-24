@@ -1,6 +1,6 @@
 import {Buffer} from "node:buffer"
 
-import type {TransactionInfo} from "@acton/transaction-ui"
+import {isTransactionSuccessful, type TransactionInfo} from "@acton/transaction-ui"
 import {
   Address,
   Cell,
@@ -19,7 +19,22 @@ import {
 
 import {hashToHex} from "../components/utils"
 
-import type {V3TraceNode, V3Transaction} from "./types"
+import type {V3Action, V3TraceNode, V3Transaction} from "./types"
+
+export const isTraceSuccessful = (
+  transactions: readonly TransactionInfo[],
+  actions: readonly V3Action[],
+): boolean => {
+  if (actions.length > 0) {
+    return actions.every(action => action.success !== false)
+  }
+
+  const rootTransaction = transactions
+    .filter(transaction => !transaction.parent)
+    .sort((left, right) => compareLt(left.lt, right.lt))[0]
+
+  return rootTransaction ? isTransactionSuccessful(rootTransaction.transaction) : false
+}
 
 export const buildTraceTransactionInfos = (
   transactionsMap: Record<string, V3Transaction>,
@@ -85,6 +100,12 @@ export const buildTraceTransactionInfos = (
   }
 
   return txInfos
+}
+
+const compareLt = (left: string, right: string): number => {
+  const leftLt = parseOptionalBigInt(left) ?? 0n
+  const rightLt = parseOptionalBigInt(right) ?? 0n
+  return leftLt < rightLt ? -1 : leftLt > rightLt ? 1 : 0
 }
 
 const buildTransactionIdsByHash = (

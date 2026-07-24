@@ -376,6 +376,7 @@ fn execute_script(
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
         network: net.cloned(),
+        execution_started_at: params.unixtime,
     };
 
     let stack_b64 = Boc::encode_base64(serialize_tuple(&stack)?);

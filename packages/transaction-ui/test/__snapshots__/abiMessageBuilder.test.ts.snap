@@ -30,6 +30,20 @@ exports[`ABI message builder lists internal and external message options with se
       "valueTyIdx": 12,
     },
   ],
+  "outgoing": [
+    {
+      "bodyTyIdx": 12,
+      "id": "outgoing:internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  ],
   "union": [
     {
       "bodyTyIdx": 15,
@@ -102,6 +116,102 @@ exports[`ABI message builder builds external and union messages 1`] = `
     "info": {
       "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
       "type": "external-in",
+    },
+  },
+}
+`;
+
+exports[`ABI message builder decodes ABI message bodies back into editable builder drafts 1`] = `
+{
+  "emptyBody": undefined,
+  "internal": {
+    "args": {
+      "$": "Increment",
+      "value": "7",
+    },
+    "option": {
+      "bodyTyIdx": 12,
+      "id": "internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  },
+  "outgoing": {
+    "args": {
+      "$": "Increment",
+      "value": "7",
+    },
+    "option": {
+      "bodyTyIdx": 12,
+      "id": "outgoing:internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  },
+  "union": {
+    "args": {
+      "value": "13",
+    },
+    "option": {
+      "bodyTyIdx": 15,
+      "id": "external:0:1",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment / Increment",
+      "transport": "external",
+      "union": {
+        "hasValueField": false,
+        "label": "Increment",
+      },
+      "valueTyIdx": 12,
+    },
+  },
+}
+`;
+
+exports[`ABI message builder builds internal and external messages with empty bodies 1`] = `
+{
+  "external": {
+    "boc": "b5ee9c7241010101002500004588002222222222222222222222222222222222222222222222222222222222222222040d8cd5c9",
+    "message": {
+      "body": {
+        "bits": 0,
+        "refs": 0,
+      },
+      "info": {
+        "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+        "type": "external-in",
+      },
+    },
+  },
+  "internal": {
+    "boc": "b5ee9c724101010100580000ab48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444503b9aca000000000000000000000000000040b70eefbe",
+    "message": {
+      "body": {
+        "bits": 0,
+        "refs": 0,
+      },
+      "info": {
+        "bounce": false,
+        "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+        "source": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+        "type": "internal",
+        "value": "250000000",
+      },
     },
   },
 }

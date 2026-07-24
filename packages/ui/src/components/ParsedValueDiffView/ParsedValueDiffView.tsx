@@ -1,7 +1,9 @@
+import {useState} from "react"
 import type React from "react"
 import {ArrowRight} from "lucide-react"
 
 import type {ContractReferenceOptions} from "../ContractChip/ContractChip"
+import {InlineButton} from "../InlineButton/InlineButton"
 import {ParsedValueView, type ParsedValueViewProps} from "../ParsedValueView/ParsedValueView"
 import type {ParsedValueLeaf} from "../ParsedValueView/types"
 
@@ -16,6 +18,8 @@ export interface ParsedValueDiffViewProps extends ContractReferenceOptions {
 
 type ParsedValueDiffContext = ContractReferenceOptions &
   Pick<ParsedValueViewProps, "renderCodeCellDetails">
+
+const LARGE_COLLECTION_THRESHOLD = 8
 
 function getEntryStatusClassName(status: ParsedValueDiffStatus): string | undefined {
   switch (status) {
@@ -165,6 +169,7 @@ export function ParsedValueDiffView({
   onContractClick,
   renderCodeCellDetails,
 }: ParsedValueDiffViewProps): React.JSX.Element {
+  const [showUnchanged, setShowUnchanged] = useState(false)
   const context = {contracts, formatAddress, onContractClick, renderCodeCellDetails}
 
   if (diff.kind === "leaf") {
@@ -191,15 +196,47 @@ export function ParsedValueDiffView({
 
   const statusClassName = getEntryStatusClassName(diff.status)
   const emptyValue = diff.objectKind === "array" ? "[]" : "{}"
+  const isCollection = diff.objectKind === "array" || diff.objectKind === "map"
+  const unchangedCount = isCollection
+    ? diff.entries.filter(entry => entry.value.status === "unchanged").length
+    : 0
+  const visibleEntries =
+    isCollection && !showUnchanged
+      ? diff.entries.filter(entry => entry.value.status !== "unchanged")
+      : diff.entries
+  const isScrollableCollection = isCollection && visibleEntries.length > LARGE_COLLECTION_THRESHOLD
+  const collectionLabel = diff.typeName ?? diff.objectKind
+  const showCollectionControls =
+    isCollection && (diff.entries.length > LARGE_COLLECTION_THRESHOLD || unchangedCount > 0)
 
   return (
     <div className={styles.root}>
-      {diff.typeName && <span className={styles.typeLabel}>{diff.typeName}</span>}
+      {showCollectionControls ? (
+        <div className={styles.collectionHeader}>
+          <span className={styles.typeLabel}>{collectionLabel}</span>
+          <span className={styles.collectionCount}>
+            {diff.entries.length} {diff.entries.length === 1 ? "item" : "items"}
+          </span>
+          {unchangedCount > 0 && (
+            <div className={styles.collectionActions}>
+              <InlineButton variant="utility" onClick={() => setShowUnchanged(current => !current)}>
+                {showUnchanged ? "Hide" : "Show"} {unchangedCount} unchanged
+              </InlineButton>
+            </div>
+          )}
+        </div>
+      ) : (
+        diff.typeName && <span className={styles.typeLabel}>{diff.typeName}</span>
+      )}
       {diff.entries.length === 0 ? (
         <span className={`${styles.emptyValue} ${statusClassName ?? ""}`}>{emptyValue}</span>
+      ) : visibleEntries.length === 0 ? (
+        <span className={styles.noChangedEntries}>No changed items</span>
       ) : diff.objectKind === "map" ? (
-        <div className={styles.nestedMap}>
-          {diff.entries.map(entry => (
+        <div
+          className={`${styles.nestedMap} ${isScrollableCollection ? styles.collectionViewport : ""}`}
+        >
+          {visibleEntries.map(entry => (
             <ParsedValueDiffMapRow
               key={entry.key}
               label={entry.key}
@@ -209,8 +246,10 @@ export function ParsedValueDiffView({
           ))}
         </div>
       ) : (
-        <div className={styles.nested}>
-          {diff.entries.map(entry => (
+        <div
+          className={`${styles.nested} ${isScrollableCollection ? styles.collectionViewport : ""}`}
+        >
+          {visibleEntries.map(entry => (
             <ParsedValueDiffRow
               key={entry.key}
               label={entry.key}

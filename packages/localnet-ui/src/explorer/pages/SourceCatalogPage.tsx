@@ -264,13 +264,7 @@ function isVerificationSourceResponse(value: unknown): value is VerificationSour
   }
   const codeHash =
     typeof value.code_hash === "string" ? normalizeCodeHash(value.code_hash) : undefined
-  return (
-    Boolean(codeHash) &&
-    typeof value.verified === "boolean" &&
-    Array.isArray(value.bundles) &&
-    value.bundles.length > 0 &&
-    value.bundles.every(isSourceBundle)
-  )
+  return Boolean(codeHash) && typeof value.verified === "boolean" && isSourceBundle(value.bundle)
 }
 
 function isSourceBundle(value: unknown): value is SourceBundle {
@@ -317,13 +311,12 @@ function isNullableBool(value: unknown): value is boolean | null {
 }
 
 function sourceToTableEntry(source: RegisteredSource): SourceTableEntry {
-  const firstBundle = source.source.bundles[0]
-  const files = source.source.bundles.reduce((count, bundle) => count + bundle.files.length, 0)
+  const bundle = source.source.bundle
   return {
     codeHash: source.codeHash,
-    entrypoint: firstBundle?.entrypoint ?? "unknown",
-    compiler: firstBundle ? formatCompiler(firstBundle.compiler) : "unknown",
-    files,
+    entrypoint: bundle?.entrypoint ?? "unknown",
+    compiler: bundle ? formatCompiler(bundle.compiler) : "unknown",
+    files: bundle?.files.length ?? 0,
     savedAt: source.savedAt,
   }
 }

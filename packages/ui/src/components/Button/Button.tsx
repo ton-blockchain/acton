@@ -1,6 +1,8 @@
-import type {ComponentPropsWithRef, ReactNode} from "react"
+import {Check, Copy} from "lucide-react"
+import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {useCopyValue} from "../../lib/useCopyValue"
 import styles from "./Button.module.css"
 import type {ACTON_BUTTON_VARIANTS} from "./constants"
 
@@ -14,6 +16,20 @@ export type ButtonProps = Readonly<
     readonly leadingIcon?: ReactNode
     readonly trailingIcon?: ReactNode
     readonly loading?: boolean
+  }
+>
+
+export type CopyButtonProps = Readonly<
+  Omit<ButtonProps, "aria-label" | "children" | "leadingIcon" | "onClick" | "title" | "type"> & {
+    readonly children: ReactNode
+    readonly copiedChildren?: ReactNode
+    readonly copiedLabel?: string
+    readonly label?: string
+    readonly onCopy?: (value: string) => Promise<void> | void
+    readonly onCopyError?: (error: unknown) => void
+    readonly resetDelay?: number
+    readonly stopPropagation?: boolean
+    readonly value: string
   }
 >
 
@@ -74,5 +90,40 @@ export function Button({
         ) : undefined}
       </span>
     </button>
+  )
+}
+
+export function CopyButton({
+  children,
+  copiedChildren = "Copied",
+  copiedLabel = "Copied",
+  label = "Copy",
+  onCopy,
+  onCopyError,
+  resetDelay = 2000,
+  stopPropagation = true,
+  value,
+  variant = "secondary",
+  ...props
+}: CopyButtonProps) {
+  const {copy, isCopied} = useCopyValue({onCopy, onCopyError, resetDelay, value})
+  const currentLabel = isCopied ? copiedLabel : label
+
+  const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (stopPropagation) event.stopPropagation()
+    await copy()
+  }
+
+  return (
+    <Button
+      {...props}
+      variant={variant}
+      aria-label={currentLabel}
+      title={currentLabel}
+      leadingIcon={isCopied ? <Check size={16} /> : <Copy size={16} />}
+      onClick={event => void handleClick(event)}
+    >
+      {isCopied ? copiedChildren : children}
+    </Button>
   )
 }

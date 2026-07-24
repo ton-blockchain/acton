@@ -1,5 +1,5 @@
-import type {DictionaryKey, DictionaryValue, Message, MessageRelaxed} from "@ton/core"
-import {Address, BitString, Builder, Cell, Dictionary, loadShardAccount, Slice} from "@ton/core"
+import type {Message, MessageRelaxed} from "@ton/core"
+import {Cell, loadShardAccount, type Slice} from "@ton/core"
 import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {
   DynamicCtx,
@@ -16,6 +16,8 @@ import type {
   ParsedValue,
   TransactionInfo,
 } from "../model/transaction"
+import {unpackStorageValue} from "./decodeStorageValue"
+import {toParsedValue, type ParsedValueTypeContext} from "./toParsedValue"
 
 interface MessageCandidate {
   readonly body_ty_idx: number
@@ -29,6 +31,13 @@ interface DeclarationCandidate {
 interface ParsableMessage {
   readonly info: Message["info"] | MessageRelaxed["info"]
   readonly body: Cell
+}
+
+type MessageAbiDirection = "incoming" | "outgoing"
+
+interface MessageAbiDecodeAttempt {
+  readonly abi: ContractABI
+  readonly direction: MessageAbiDirection
 }
 
 /** Compiler ABI together with the registry metadata that identified it. */
@@ -314,55 +323,6 @@ const getOutgoingCandidates = (
   return [...deduped.values()]
 }
 
-const isCellWrapperObject = (value: Record<string, unknown>): value is {ref: unknown} => {
-  const keys = Object.keys(value)
-  return (
-    (keys.length === 1 && keys[0] === "ref") ||
-    (value.$ === "Cell" && keys.length === 2 && keys.includes("$") && keys.includes("ref"))
-  )
-}
-
-const HEX_PREVIEW_HEAD_LENGTH = 24
-const HEX_PREVIEW_TAIL_LENGTH = 8
-
-const formatHexPreview = (hex: string): string => {
-  if (hex.length <= HEX_PREVIEW_HEAD_LENGTH + HEX_PREVIEW_TAIL_LENGTH) {
-    return hex
-  }
-
-  return `${hex.slice(0, HEX_PREVIEW_HEAD_LENGTH)}…${hex.slice(-HEX_PREVIEW_TAIL_LENGTH)}`
-}
-
-const formatSerializedCellPreview = (
-  typeName: "Cell" | "Slice" | "Builder",
-  cell: Cell,
-): string => {
-  if (cell.bits.length === 0 && cell.refs.length === 0) {
-    return `<empty ${typeName.toLowerCase()}>`
-  }
-
-  const hex = cell.toBoc({idx: false, crc32: false}).toString("hex")
-  return `${typeName}(${formatHexPreview(hex)})`
-}
-
-const toSerializedCellScalar = (
-  typeName: "Cell" | "Slice" | "Builder",
-  cell: Cell,
-): ParsedValue => ({
-  kind: "scalar",
-  value: formatSerializedCellPreview(typeName, cell),
-  rawValue: cell.toBoc({idx: false, crc32: false}).toString("hex"),
-  typeName,
-})
-
-interface ParsedValueTypeContext {
-  readonly symbols: SymTable
-  readonly tyIdx: number
-  readonly abi?: ContractABI
-  readonly abiCandidates?: readonly ContractABI[]
-  readonly nestedPayloadDepth?: number
-}
-
 interface NestedPayloadSliceCandidate {
   readonly slice: Slice
   readonly wrapper?: "inline" | "ref"
@@ -370,36 +330,12 @@ interface NestedPayloadSliceCandidate {
 
 const MAX_NESTED_PAYLOAD_DEPTH = 4
 
-function withTypeIndex(context: ParsedValueTypeContext, tyIdx: number): ParsedValueTypeContext {
-  return {...context, tyIdx}
-}
-
 function withNestedPayloadDepth(
   context: ParsedValueTypeContext,
   tyIdx: number,
   nestedPayloadDepth: number,
 ): ParsedValueTypeContext {
   return {...context, tyIdx, nestedPayloadDepth}
-}
-
-function renderTypeName(context: ParsedValueTypeContext | undefined): string | undefined {
-  if (!context) {
-    return undefined
-  }
-
-  try {
-    return renderTy(context.symbols, context.tyIdx)
-  } catch {
-    return undefined
-  }
-}
-
-function tryGetTy(symbols: SymTable, tyIdx: number): Ty | undefined {
-  try {
-    return symbols.tyByIdx(tyIdx)
-  } catch {
-    return undefined
-  }
 }
 
 const getNestedPayloadCandidates = (
@@ -426,18 +362,6 @@ const getNestedPayloadCandidates = (
   }
 
   return [...deduped.values()]
-}
-
-function sliceFromRemainingValue(value: unknown): Slice | undefined {
-  if (value instanceof Slice) {
-    return value
-  }
-
-  if (value instanceof Cell) {
-    return value.beginParse()
-  }
-
-  return undefined
 }
 
 function getNestedPayloadSliceCandidates(slice: Slice): readonly NestedPayloadSliceCandidate[] {
@@ -483,7 +407,7 @@ function toUndecodedNestedPayloadValue(
     typeName: candidate.wrapper === "inline" ? "PayloadInline" : "PayloadInRef",
     entries: [
       ...(opcode ? [{key: "opcode", value: opcode}] : []),
-      {key: "payload", value: toSerializedCellScalar("Slice", candidate.slice.asCell())},
+      {key: "payload", value: toParsedValue(candidate.slice)},
     ],
   }
 }
@@ -570,233 +494,6 @@ function tryDecodeNestedPayloadContent(
   return undefined
 }
 
-function valueToBitString(value: unknown, length: number): BitString | undefined {
-  if (BitString.isBitString(value)) {
-    return value.length === length ? value : undefined
-  }
-
-  if (!(value instanceof Slice) || value.remainingRefs !== 0 || value.remainingBits !== length) {
-    return undefined
-  }
-
-  return value.clone().loadBits(length)
-}
-
-function toParsedValueWithType(
-  value: unknown,
-  context: ParsedValueTypeContext,
-): ParsedValue | undefined {
-  const ty = tryGetTy(context.symbols, context.tyIdx)
-  if (!ty) {
-    return undefined
-  }
-
-  switch (ty.kind) {
-    case "remaining": {
-      const remainingSlice = sliceFromRemainingValue(value)
-      if (!remainingSlice) {
-        return undefined
-      }
-
-      return tryDecodeNestedPayloadSlice(remainingSlice, context)
-    }
-    case "bitsN": {
-      const bitString = valueToBitString(value, ty.n)
-      if (!bitString) {
-        return undefined
-      }
-
-      return {
-        kind: "scalar",
-        value: bitString.toString(),
-        typeName: renderTy(context.symbols, context.tyIdx),
-      }
-    }
-    case "nullable": {
-      return value === null
-        ? {kind: "null"}
-        : toParsedValue(value, withTypeIndex(context, ty.inner_ty_idx))
-    }
-    case "cellOf": {
-      if (typeof value !== "object" || value === null || !("ref" in value)) {
-        return undefined
-      }
-
-      return toParsedValue(
-        (value as {readonly ref: unknown}).ref,
-        withTypeIndex(context, ty.inner_ty_idx),
-      )
-    }
-    case "arrayOf":
-    case "lispListOf": {
-      if (!Array.isArray(value)) {
-        return undefined
-      }
-
-      return {
-        kind: "array",
-        items: value.map(item => toParsedValue(item, withTypeIndex(context, ty.inner_ty_idx))),
-      }
-    }
-    case "tensor":
-    case "shapedTuple": {
-      if (!Array.isArray(value)) {
-        return undefined
-      }
-
-      return {
-        kind: "array",
-        items: value.map((item, index) =>
-          toParsedValue(item, withTypeIndex(context, ty.items_ty_idx[index] ?? context.tyIdx)),
-        ),
-      }
-    }
-    case "mapKV": {
-      if (!(value instanceof Dictionary)) {
-        return undefined
-      }
-
-      return {
-        kind: "map",
-        typeName: renderTy(context.symbols, context.tyIdx),
-        entries: [...value].map(([key, itemValue]) => ({
-          key: toParsedValue(key, withTypeIndex(context, ty.key_ty_idx)),
-          value: toParsedValue(itemValue, withTypeIndex(context, ty.value_ty_idx)),
-        })),
-      }
-    }
-    case "StructRef": {
-      const structRef = context.symbols.getStruct(ty.struct_name)
-      if (structRef.custom_pack_unpack?.unpack_from_slice) {
-        return undefined
-      }
-
-      if (typeof value !== "object" || value === null) {
-        return undefined
-      }
-
-      const objectValue = value as Record<string, unknown>
-      return {
-        kind: "object",
-        typeName: renderTy(context.symbols, context.tyIdx),
-        entries: context.symbols.structFieldsOf(context.tyIdx, false).map(field => ({
-          key: field.name,
-          value: toParsedValue(objectValue[field.name], withTypeIndex(context, field.ty_idx)),
-        })),
-      }
-    }
-    case "AliasRef": {
-      const aliasRef = context.symbols.getAlias(ty.alias_name)
-      if (aliasRef.custom_pack_unpack?.unpack_from_slice) {
-        return undefined
-      }
-
-      const target = context.symbols.aliasTargetOf(context.tyIdx)
-      return toParsedValue(value, withTypeIndex(context, target.ty_idx))
-    }
-    default: {
-      return undefined
-    }
-  }
-}
-
-const toParsedValue = (value: unknown, typeContext?: ParsedValueTypeContext): ParsedValue => {
-  let typedValue: ParsedValue | undefined
-  if (typeContext) {
-    try {
-      typedValue = toParsedValueWithType(value, typeContext)
-    } catch {
-      typedValue = undefined
-    }
-  }
-
-  if (typedValue) {
-    return typedValue
-  }
-
-  if (value === null) {
-    return {kind: "null"}
-  }
-
-  if (value === undefined) {
-    return {kind: "void"}
-  }
-
-  if (typeof value === "boolean") {
-    return {kind: "boolean", value}
-  }
-
-  if (typeof value === "bigint" || typeof value === "number" || typeof value === "string") {
-    return {kind: "scalar", value: value.toString(), typeName: renderTypeName(typeContext)}
-  }
-
-  if (value instanceof Address) {
-    return {kind: "address", value: value.toString()}
-  }
-
-  if (value instanceof Cell) {
-    return toSerializedCellScalar("Cell", value)
-  }
-
-  if (value instanceof Slice) {
-    return toSerializedCellScalar("Slice", value.asCell())
-  }
-
-  if (BitString.isBitString(value)) {
-    return {kind: "scalar", value: value.toString()}
-  }
-
-  if (value instanceof Builder) {
-    return toSerializedCellScalar("Builder", value.asCell())
-  }
-
-  if (value instanceof Dictionary) {
-    return {
-      kind: "map",
-      entries: [...value].map(([key, itemValue]) => ({
-        key: toParsedValue(key),
-        value: toParsedValue(itemValue),
-      })),
-    }
-  }
-
-  if (Array.isArray(value)) {
-    return {
-      kind: "array",
-      items: value.map(item => toParsedValue(item)),
-    }
-  }
-
-  if (typeof value === "object") {
-    const objectValue = value as Record<string, unknown>
-    if (isCellWrapperObject(objectValue)) {
-      return toParsedValue(objectValue.ref)
-    }
-
-    const typeName = typeof objectValue.$ === "string" ? objectValue.$ : undefined
-    if (
-      typeName === "void" &&
-      Object.hasOwn(objectValue, "value") &&
-      objectValue.value === undefined
-    ) {
-      return {kind: "void"}
-    }
-
-    return {
-      kind: "object",
-      typeName,
-      entries: Object.entries(objectValue)
-        .filter(([key]) => key !== "$")
-        .map(([key, itemValue]) => ({
-          key,
-          value: toParsedValue(itemValue),
-        })),
-    }
-  }
-
-  return {kind: "scalar", value: Object.prototype.toString.call(value)}
-}
-
 const createBodyParser = (message: ParsableMessage): Slice | undefined => {
   const parser = message.body.asSlice()
   if (message.info.type !== "internal" || !message.info.bounced) {
@@ -804,7 +501,9 @@ const createBodyParser = (message: ParsableMessage): Slice | undefined => {
   }
 
   if (parser.remainingBits < 32) {
-    return undefined
+    // There are not enough bits for a standard bounce prefix, but the body can
+    // still be a valid short prefixless message declared by the contract ABI.
+    return parser
   }
 
   const prefix = Number(parser.preloadUint(32))
@@ -837,7 +536,16 @@ const getOpcodeAfterBouncePrefix = (message: ParsableMessage): number | undefine
   return Number(opcodeSlice.preloadUint(32))
 }
 
-export const getMessageOpcode = (message: ParsableMessage): number | undefined => {
+export const getMessageOpcode = (
+  message: ParsableMessage,
+  parsedBody?: ParsedTransactionBody,
+): number | undefined => {
+  if (parsedBody) {
+    // Once ABI decoding succeeds, its schema is authoritative: a prefixless
+    // body has no opcode even if its first field happens to be at least 32 bits.
+    return parsedBody.opcode
+  }
+
   const slice = createBodyParser(message)
   if (!slice || slice.remainingBits < 32) {
     return undefined
@@ -862,7 +570,7 @@ const textCommentTailValue = (slice: Slice): ParsedValue => {
     return {kind: "scalar", value: text}
   }
 
-  return toSerializedCellScalar("Slice", slice.asCell())
+  return toParsedValue(slice)
 }
 
 const tryDecodeTextCommentSlice = (baseSlice: Slice): ParsedTransactionBody | undefined => {
@@ -877,6 +585,7 @@ const tryDecodeTextCommentSlice = (baseSlice: Slice): ParsedTransactionBody | un
 
   return {
     name: "Text Comment",
+    opcode: 0,
     value: {
       kind: "object",
       typeName: "Text Comment",
@@ -903,12 +612,17 @@ const resolveCandidateOpcodeName = (
   return resolveOpcodeNameFromBodyType(abi, symbols, candidate.body_ty_idx, opcode)
 }
 
-const createBouncedOpcodeBody = (name: string, body: Slice): ParsedTransactionBody => ({
+const createBouncedOpcodeBody = (
+  name: string,
+  opcode: number,
+  body: Slice,
+): ParsedTransactionBody => ({
   name,
+  opcode,
   value: {
     kind: "object",
     typeName: name,
-    entries: [{key: "body", value: toSerializedCellScalar("Slice", body.asCell())}],
+    entries: [{key: "body", value: toParsedValue(body)}],
   },
 })
 
@@ -939,9 +653,12 @@ const tryDecodeSliceWithCandidates = (
 
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
-    const candidateOpcodeName = options.requireOpcodeMatch
-      ? resolveCandidateOpcodeName(abi, ctx.symbols, candidate, options.opcode)
-      : undefined
+    const candidateOpcodeName = resolveCandidateOpcodeName(
+      abi,
+      ctx.symbols,
+      candidate,
+      options.opcode,
+    )
     try {
       const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty_idx, parser) as unknown
       if (!hasAcceptableMessageDecodeRemainder(baseSlice, parser)) {
@@ -950,11 +667,15 @@ const tryDecodeSliceWithCandidates = (
 
       const parsedBody = {
         name: getBodyTypeName(ctx.symbols, candidate.body_ty_idx),
+        ...(candidateOpcodeName !== undefined && options.opcode !== undefined
+          ? {opcode: options.opcode}
+          : {}),
         value: toParsedValue(decoded, {
           symbols: ctx.symbols,
           tyIdx: candidate.body_ty_idx,
           abi,
           abiCandidates: nestedPayloadAbis,
+          decodeRemaining: tryDecodeNestedPayloadSlice,
           nestedPayloadDepth: 0,
         }),
       }
@@ -970,8 +691,8 @@ const tryDecodeSliceWithCandidates = (
     }
   }
 
-  if (options.preserveUndecodedBody && matchedOpcodeName) {
-    return createBouncedOpcodeBody(matchedOpcodeName, baseSlice)
+  if (options.preserveUndecodedBody && matchedOpcodeName && options.opcode !== undefined) {
+    return createBouncedOpcodeBody(matchedOpcodeName, options.opcode, baseSlice)
   }
 
   return undefined
@@ -989,12 +710,32 @@ const tryDecodeMessageWithCandidates = (
   }
 
   const bouncedInternal = isBouncedInternalMessage(message)
-  const opcode = bouncedInternal ? getOpcodeAfterBouncePrefix(message) : undefined
+  const opcode = getOpcodeAfterBouncePrefix(message)
   return tryDecodeSliceWithCandidates(baseSlice, abi, candidates, nestedPayloadAbis, {
     opcode,
-    requireOpcodeMatch: bouncedInternal && opcode !== undefined,
+    // A single direction-specific ABI entry is unambiguous even when the body
+    // has no opcode (for example, a signed Wallet V4 external message). With
+    // multiple entries, require an opcode match instead of guessing whichever
+    // prefixless type happens to decode first.
+    requireOpcodeMatch: candidates.length > 1,
     preserveUndecodedBody: bouncedInternal,
   })
+}
+
+const tryDecodeDeclaredMessageWithAbi = (
+  message: ParsableMessage,
+  abi: ContractABI,
+  direction: MessageAbiDirection,
+  nestedPayloadAbis?: readonly ContractABI[],
+): ParsedTransactionBody | undefined => {
+  const candidates =
+    direction === "outgoing"
+      ? abi.outgoing_messages
+      : message.info.type === "external-in"
+        ? abi.incoming_external
+        : abi.incoming_messages
+
+  return tryDecodeMessageWithCandidates(message, abi, candidates, nestedPayloadAbis)
 }
 
 const tryDecodeIncomingMessageWithAbi = (
@@ -1039,230 +780,6 @@ const parseShardAccount = (shardAccountBase64: string) => {
   }
 }
 
-const getStorageDataSlice = (shardAccountBase64: string): Slice | undefined => {
-  const shard = parseShardAccount(shardAccountBase64)
-  const state = shard?.account?.storage.state
-  if (state?.type !== "active" || !state.state.data) {
-    return undefined
-  }
-
-  return state.state.data.beginParse()
-}
-
-type FallbackDictionaryKey = Address | bigint | BitString
-
-// TODO: remove once @ton/tolk-abi-to-typescript support bits keys
-const createFallbackDictionaryKey = (
-  ctx: DynamicCtx,
-  tyIdx: number,
-): DictionaryKey<FallbackDictionaryKey> => {
-  const ty = ctx.symbols.tyByIdx(tyIdx)
-
-  switch (ty.kind) {
-    case "intN": {
-      return Dictionary.Keys.BigInt(ty.n)
-    }
-    case "uintN": {
-      return Dictionary.Keys.BigUint(ty.n)
-    }
-    case "bitsN": {
-      return Dictionary.Keys.BitString(ty.n)
-    }
-    case "address": {
-      return Dictionary.Keys.Address()
-    }
-    case "AliasRef": {
-      const aliasRef = ctx.symbols.getAlias(ty.alias_name)
-      if (aliasRef.custom_pack_unpack?.unpack_from_slice) {
-        throw new Error(`Unsupported dictionary key alias: ${ty.alias_name}`)
-      }
-
-      return createFallbackDictionaryKey(ctx, ctx.symbols.aliasTargetOf(tyIdx).ty_idx)
-    }
-    default: {
-      throw new Error(`Unsupported dictionary key type: ${renderTy(ctx.symbols, tyIdx)}`)
-    }
-  }
-}
-
-const createFallbackDictionaryValue = (
-  ctx: DynamicCtx,
-  tyIdx: number,
-): DictionaryValue<unknown> => ({
-  serialize() {
-    throw new Error("Storage dictionary fallback is read-only.")
-  },
-  parse(parser) {
-    const value = unpackStorageValueWithDictionaryFallback(ctx, tyIdx, parser)
-    parser.endParse()
-    return value
-  },
-})
-
-function unpackStorageValueWithDictionaryFallback(
-  ctx: DynamicCtx,
-  tyIdx: number,
-  parser: Slice,
-): unknown {
-  const ty = ctx.symbols.tyByIdx(tyIdx)
-
-  switch (ty.kind) {
-    case "void": {
-      return undefined
-    }
-    case "intN": {
-      return parser.loadIntBig(ty.n)
-    }
-    case "uintN": {
-      return parser.loadUintBig(ty.n)
-    }
-    case "varintN": {
-      return parser.loadVarIntBig(Math.log2(ty.n))
-    }
-    case "varuintN": {
-      return parser.loadVarUintBig(Math.log2(ty.n))
-    }
-    case "coins": {
-      return parser.loadCoins()
-    }
-    case "bool": {
-      return parser.loadBoolean()
-    }
-    case "cell": {
-      return parser.loadRef()
-    }
-    case "string": {
-      return parser.loadStringRefTail()
-    }
-    case "remaining": {
-      const rest = parser.clone()
-      parser.loadBits(parser.remainingBits)
-      while (parser.remainingRefs > 0) {
-        parser.loadRef()
-      }
-      return rest
-    }
-    case "address": {
-      return parser.loadAddress()
-    }
-    case "addressOpt": {
-      return parser.loadMaybeAddress()
-    }
-    case "addressExt": {
-      return parser.loadExternalAddress()
-    }
-    case "addressAny": {
-      const address = parser.loadAddressAny()
-      return address === null ? "none" : address
-    }
-    case "bitsN": {
-      return parser.loadBits(ty.n)
-    }
-    case "nullLiteral": {
-      return null
-    }
-    case "nullable": {
-      return parser.loadBoolean()
-        ? unpackStorageValueWithDictionaryFallback(ctx, ty.inner_ty_idx, parser)
-        : null
-    }
-    case "cellOf": {
-      const refParser = parser.loadRef().beginParse()
-      const value = unpackStorageValueWithDictionaryFallback(ctx, ty.inner_ty_idx, refParser)
-      refParser.endParse()
-      return {ref: value}
-    }
-    case "arrayOf": {
-      const length = parser.loadUint(8)
-      let head = parser.loadMaybeRef()
-      const values: unknown[] = []
-
-      while (head) {
-        const chunk = head.beginParse()
-        head = chunk.loadMaybeRef()
-        while (chunk.remainingBits > 0 || chunk.remainingRefs > 0) {
-          values.push(unpackStorageValueWithDictionaryFallback(ctx, ty.inner_ty_idx, chunk))
-        }
-      }
-
-      if (values.length !== length) {
-        throw new Error(`Array length mismatch: expected ${length}, got ${values.length}`)
-      }
-
-      return values
-    }
-    case "lispListOf": {
-      const values: unknown[] = []
-      let head = parser.loadRef().beginParse()
-
-      while (head.remainingRefs > 0) {
-        const tail = head.loadRef()
-        const value = unpackStorageValueWithDictionaryFallback(ctx, ty.inner_ty_idx, head)
-        head.endParse()
-        values.unshift(value)
-        head = tail.beginParse()
-      }
-
-      return values
-    }
-    case "tensor":
-    case "shapedTuple": {
-      return ty.items_ty_idx.map(itemTyIdx =>
-        unpackStorageValueWithDictionaryFallback(ctx, itemTyIdx, parser),
-      )
-    }
-    case "mapKV": {
-      return parser.loadDict(
-        createFallbackDictionaryKey(ctx, ty.key_ty_idx),
-        createFallbackDictionaryValue(ctx, ty.value_ty_idx),
-      )
-    }
-    case "EnumRef": {
-      const enumRef = ctx.symbols.getEnum(ty.enum_name)
-      if (enumRef.custom_pack_unpack?.unpack_from_slice) {
-        throw new Error(`Unsupported enum: ${ty.enum_name}`)
-      }
-
-      return unpackStorageValueWithDictionaryFallback(ctx, enumRef.encoded_as_ty_idx, parser)
-    }
-    case "StructRef": {
-      const structRef = ctx.symbols.getStruct(ty.struct_name)
-      if (structRef.custom_pack_unpack?.unpack_from_slice) {
-        throw new Error(`Unsupported struct: ${ty.struct_name}`)
-      }
-
-      const value: Record<string, unknown> = {$: ty.struct_name}
-      if (structRef.prefix) {
-        const prefix = parser.loadUint(structRef.prefix.prefix_len)
-        if (prefix !== structRef.prefix.prefix_num) {
-          throw new Error(`Incorrect prefix for ${ty.struct_name}`)
-        }
-      }
-
-      for (const field of ctx.symbols.structFieldsOf(tyIdx, false)) {
-        value[field.name] = unpackStorageValueWithDictionaryFallback(ctx, field.ty_idx, parser)
-      }
-
-      return value
-    }
-    case "AliasRef": {
-      const aliasRef = ctx.symbols.getAlias(ty.alias_name)
-      if (aliasRef.custom_pack_unpack?.unpack_from_slice) {
-        throw new Error(`Unsupported alias: ${ty.alias_name}`)
-      }
-
-      return unpackStorageValueWithDictionaryFallback(
-        ctx,
-        ctx.symbols.aliasTargetOf(tyIdx).ty_idx,
-        parser,
-      )
-    }
-    default: {
-      throw new Error(`Unsupported storage type: ${renderTy(ctx.symbols, tyIdx)}`)
-    }
-  }
-}
-
 export const getShardAccountBalance = (shardAccountBase64: string): bigint | undefined => {
   const shard = parseShardAccount(shardAccountBase64)
   if (!shard) return
@@ -1282,35 +799,19 @@ const tryDecodeStorageSliceWithAbi = (
   const ctx = new DynamicCtx(abi)
 
   for (const candidate of candidates) {
-    const parser = baseSlice.clone()
     try {
-      const decoded: unknown = unpackFromSliceDynamic(ctx, candidate, parser) as unknown
-      if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
-        continue
-      }
+      const decoded = unpackStorageValue(ctx, candidate, baseSlice)
 
       return {
         name: getBodyTypeName(ctx.symbols, candidate),
-        value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate}),
+        value: toParsedValue(decoded, {
+          symbols: ctx.symbols,
+          tyIdx: candidate,
+          decodeRemaining: tryDecodeNestedPayloadSlice,
+        }),
       }
     } catch {
-      // Fall back to local dictionary decoding for ABI shapes not handled by the
-      // current @ton/tolk-abi-to-typescript runtime, such as mapKV<bitsN, void>.
-    }
-
-    const fallbackParser = baseSlice.clone()
-    try {
-      const decoded = unpackStorageValueWithDictionaryFallback(ctx, candidate, fallbackParser)
-      if (fallbackParser.remainingBits !== 0 || fallbackParser.remainingRefs !== 0) {
-        continue
-      }
-
-      return {
-        name: getBodyTypeName(ctx.symbols, candidate),
-        value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate}),
-      }
-    } catch {
-      continue
+      // Try the next storage candidate.
     }
   }
 
@@ -1321,12 +822,12 @@ const tryDecodeStorageWithAbi = (
   shardAccountBase64: string,
   abi: ContractABI,
 ): ParsedContractStorage | undefined => {
-  const baseSlice = getStorageDataSlice(shardAccountBase64)
-  if (!baseSlice) {
+  const state = parseShardAccount(shardAccountBase64)?.account?.storage.state
+  if (state?.type !== "active" || !state.state.data) {
     return undefined
   }
 
-  return tryDecodeStorageSliceWithAbi(baseSlice, abi)
+  return tryDecodeStorageSliceWithAbi(state.state.data.beginParse(), abi)
 }
 
 const tryDecodeStorageCellWithAbi = (
@@ -1497,8 +998,9 @@ export const resolveMessageOpcodeName = (
   message: ParsableMessage,
   contracts: Map<string, ContractData>,
   sourceAddress?: string,
+  parsedBody?: ParsedTransactionBody,
 ): string | undefined => {
-  const opcode = getMessageOpcode(message)
+  const opcode = getMessageOpcode(message, parsedBody)
   if (opcode === undefined) {
     return undefined
   }
@@ -1507,8 +1009,14 @@ export const resolveMessageOpcodeName = (
   }
 
   const destinationContract =
-    message.info.type === "internal" ? contracts.get(message.info.dest.toString()) : undefined
-  const sourceContract = sourceAddress ? contracts.get(sourceAddress) : undefined
+    message.info.type === "internal" || message.info.type === "external-in"
+      ? contracts.get(message.info.dest.toString())
+      : undefined
+  const messageSourceAddress =
+    message.info.type !== "external-in" && message.info.src
+      ? message.info.src.toString()
+      : sourceAddress
+  const sourceContract = messageSourceAddress ? contracts.get(messageSourceAddress) : undefined
   const isBouncedInternal = message.info.type === "internal" && message.info.bounced
 
   if (isBouncedInternal) {
@@ -1536,15 +1044,20 @@ export const decodeMessageBody = (
   sourceAddress?: string,
   additionalAbis: readonly ContractABI[] = [],
 ): ParsedTransactionBody | undefined => {
-  const textCommentBody = tryDecodeTextCommentBody(message)
-  if (textCommentBody) {
-    return textCommentBody
-  }
+  const messageSourceAddress =
+    message.info.type !== "external-in" && message.info.src
+      ? message.info.src.toString()
+      : sourceAddress
 
-  const sourceContract = sourceAddress ? contracts.get(sourceAddress) : undefined
+  const sourceContract = messageSourceAddress ? contracts.get(messageSourceAddress) : undefined
+
   const destinationContract =
-    message.info.type === "internal" ? contracts.get(message.info.dest.toString()) : undefined
+    message.info.type === "internal" || message.info.type === "external-in"
+      ? contracts.get(message.info.dest.toString())
+      : undefined
+
   const allContracts = [...contracts.values()]
+
   const nestedPayloadAbis = [
     destinationContract?.abi,
     sourceContract?.abi,
@@ -1552,91 +1065,115 @@ export const decodeMessageBody = (
     ...additionalAbis,
   ].filter((abi): abi is ContractABI => abi !== undefined)
 
+  const endpointAttempts: MessageAbiDecodeAttempt[] = []
+  const fallbackAttempts: MessageAbiDecodeAttempt[] = []
+
+  const appendAttempts = (
+    target: MessageAbiDecodeAttempt[],
+    direction: MessageAbiDirection,
+    candidates: readonly (ContractData | undefined)[],
+  ) => {
+    for (const contract of candidates) {
+      if (contract?.abi) {
+        target.push({abi: contract.abi, direction})
+      }
+    }
+  }
+
   if (message.info.type === "internal") {
     if (message.info.bounced) {
-      for (const contract of [destinationContract, sourceContract, ...allContracts]) {
-        const abi = contract?.abi
-        if (!abi) {
-          continue
-        }
-
-        const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
-        if (parsedBody) {
-          return parsedBody
-        }
-      }
-
-      for (const contract of [sourceContract, destinationContract, ...allContracts]) {
-        const abi = contract?.abi
-        if (!abi) {
-          continue
-        }
-
-        const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
-        if (parsedBody) {
-          return parsedBody
-        }
-      }
-
-      return undefined
+      // First interpret a bounced body as an original outgoing message of either endpoint.
+      appendAttempts(endpointAttempts, "outgoing", [destinationContract, sourceContract])
+      // If that fails, interpret it as an incoming message, checking the source endpoint first.
+      appendAttempts(endpointAttempts, "incoming", [sourceContract, destinationContract])
+      // Then add outgoing ABI fallbacks from every known contract for the bounced body.
+      appendAttempts(fallbackAttempts, "outgoing", [
+        destinationContract,
+        sourceContract,
+        ...allContracts,
+      ])
+      // Finally add incoming ABI fallbacks from every known contract for the bounced body.
+      appendAttempts(fallbackAttempts, "incoming", [
+        sourceContract,
+        destinationContract,
+        ...allContracts,
+      ])
+    } else {
+      // A regular internal message is first decoded by the receiver's incoming ABI.
+      appendAttempts(endpointAttempts, "incoming", [destinationContract])
+      // If the receiver does not match, decode it by the sender's outgoing ABI.
+      appendAttempts(endpointAttempts, "outgoing", [sourceContract])
+      // Add incoming schemas from other known contracts as a lower-priority fallback.
+      appendAttempts(fallbackAttempts, "incoming", [destinationContract, ...allContracts])
+      // Add outgoing schemas from other known contracts after all incoming fallbacks.
+      appendAttempts(fallbackAttempts, "outgoing", [sourceContract, ...allContracts])
     }
-
-    for (const contract of [destinationContract, ...allContracts]) {
-      const abi = contract?.abi
-      if (!abi) {
-        continue
-      }
-
-      const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
-      if (parsedBody) {
-        return parsedBody
-      }
-    }
-
-    for (const contract of [sourceContract, ...allContracts]) {
-      const abi = contract?.abi
-      if (!abi) {
-        continue
-      }
-
-      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
-      if (parsedBody) {
-        return parsedBody
-      }
-    }
-
-    return undefined
+  } else if (message.info.type === "external-out") {
+    // An external-out message is first decoded by the source contract's outgoing ABI.
+    appendAttempts(endpointAttempts, "outgoing", [sourceContract])
+    // If the source does not match, try outgoing schemas from every known contract.
+    appendAttempts(fallbackAttempts, "outgoing", [sourceContract, ...allContracts])
+  } else {
+    // An external-in message is first decoded by the destination contract's external ABI.
+    appendAttempts(endpointAttempts, "incoming", [destinationContract])
+    // If the destination does not match, try external-in schemas from every known contract.
+    appendAttempts(fallbackAttempts, "incoming", [destinationContract, ...allContracts])
   }
 
-  if (message.info.type === "external-out") {
-    for (const contract of [sourceContract, ...allContracts]) {
-      const abi = contract?.abi
-      if (!abi) {
-        continue
-      }
-
-      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
+  // Prefer the message lists explicitly declared by the endpoint ABIs, then
+  // the same lists from other known contracts. This lets a single prefixless
+  // schema decode before text-comment heuristics and ensures receiver incoming
+  // messages win over sender outgoing messages.
+  for (const attempts of [endpointAttempts, fallbackAttempts]) {
+    for (const attempt of attempts) {
+      const parsedBody = tryDecodeDeclaredMessageWithAbi(
+        message,
+        attempt.abi,
+        attempt.direction,
+        nestedPayloadAbis,
+      )
       if (parsedBody) {
         return parsedBody
       }
     }
-
-    return undefined
   }
 
-  for (const contract of allContracts) {
-    const abi = contract.abi
-    if (!abi) {
-      continue
-    }
-
-    const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
+  // Only after all explicitly declared messages fail, try declaration-based
+  // fallbacks in the same direction order.
+  for (const attempt of fallbackAttempts) {
+    const parsedBody =
+      attempt.direction === "incoming"
+        ? tryDecodeIncomingMessageWithAbi(message, attempt.abi, nestedPayloadAbis)
+        : tryDecodeOutgoingMessageWithAbi(message, attempt.abi, nestedPayloadAbis)
     if (parsedBody) {
       return parsedBody
     }
   }
 
-  return undefined
+  return tryDecodeTextCommentBody(message)
+}
+
+export const decodeTransactionMessageBody = (
+  tx: TransactionInfo,
+  contracts: Map<string, ContractData>,
+  allContracts: readonly BackendContractInfo[],
+  compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>,
+): ParsedTransactionBody | undefined => {
+  if (tx.parsedBody) {
+    return tx.parsedBody
+  }
+
+  const inMessage = tx.transaction.inMessage
+  if (!inMessage) {
+    return undefined
+  }
+
+  const additionalAbis = [
+    ...allContracts.map(contract => contract.abi),
+    ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
+  ].filter((abi): abi is ContractABI => abi !== undefined)
+
+  return decodeMessageBody(inMessage, contracts, tx.address?.toString(), additionalAbis)
 }
 
 const tryDecodeTransactionBodyWithAbi = (
@@ -1649,19 +1186,21 @@ const tryDecodeTransactionBodyWithAbi = (
     return undefined
   }
 
-  const textCommentBody = tryDecodeTextCommentBody(inMessage)
-  if (textCommentBody) {
-    return textCommentBody
-  }
-
   if (inMessage.info.type === "internal" && inMessage.info.bounced) {
     return (
+      tryDecodeDeclaredMessageWithAbi(inMessage, abi, "outgoing", nestedPayloadAbis) ??
+      tryDecodeDeclaredMessageWithAbi(inMessage, abi, "incoming", nestedPayloadAbis) ??
       tryDecodeOutgoingMessageWithAbi(inMessage, abi, nestedPayloadAbis) ??
-      tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis)
+      tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis) ??
+      tryDecodeTextCommentBody(inMessage)
     )
   }
 
-  return tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis)
+  return (
+    tryDecodeDeclaredMessageWithAbi(inMessage, abi, "incoming", nestedPayloadAbis) ??
+    tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis) ??
+    tryDecodeTextCommentBody(inMessage)
+  )
 }
 
 export const decodeStateInitData = (

@@ -16,6 +16,49 @@
   line-height: 1.4;
 }
 
+.collectionHeader {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.collectionCount,
+.noChangedEntries {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.noChangedEntries {
+  margin-block-start: calc(-1 * var(--acton-space-1));
+  margin-block-end: var(--acton-space-2);
+}
+
+.collectionActions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--acton-space-2);
+  margin-inline-start: var(--acton-space-4);
+}
+
+.collectionViewport {
+  max-height: min(24rem, 50dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: var(--acton-space-2);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.collectionViewport::-webkit-scrollbar {
+  display: none;
+}
+
 .nested {
   display: grid;
   min-width: 0;

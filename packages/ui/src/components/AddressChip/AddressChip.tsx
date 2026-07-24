@@ -103,6 +103,7 @@ export function AddressChip({
   ) : null
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Hover handlers only synchronize optional highlighting and do not perform an action.
     <span
       className={cx(
         styles.addressCluster,

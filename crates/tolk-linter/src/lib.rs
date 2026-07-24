@@ -8,6 +8,7 @@ use crate::ast::{
     identical_conditional_branches, missing_contract_header, negated_is_type_can_use_not_is,
     no_bounce_handler, no_global_variables, several_not_null_assertions,
     throw_requires_documented_error_value, throw_requires_errors_enum,
+    unnecessary_not_null_assertion,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -756,6 +757,16 @@ impl<'file> Walker<'file> for CheckerWalker<'_, '_> {
             self.checker,
             Rule::SeveralNotNullAssertions,
             several_not_null_assertions::check_not_null(self.checker, self.file_id, node)
+        );
+        run_rule!(
+            self.checker,
+            Rule::UnnecessaryNotNullAssertion,
+            unnecessary_not_null_assertion::check_not_null(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference,
+            )
         );
 
         if let Some(inner) = node.inner() {

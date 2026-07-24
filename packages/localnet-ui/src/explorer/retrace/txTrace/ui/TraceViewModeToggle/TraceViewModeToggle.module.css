@@ -79,3 +79,19 @@
     padding: 3px 7px;
   }
 }
+
+@media (width <= 520px) {
+  .root {
+    flex: 0 1 auto;
+    min-height: 34px;
+    margin-left: 0;
+  }
+
+  .label {
+    display: none;
+  }
+
+  .button {
+    padding-inline: 4px;
+  }
+}

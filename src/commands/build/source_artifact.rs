@@ -122,7 +122,7 @@ pub(super) fn save_source_artifact(
     let artifact = SourceRegistrationArtifact {
         code_hash: code_hash.to_owned(),
         verified: true,
-        bundles: vec![SourceRegistrationBundle {
+        bundle: SourceRegistrationBundle {
             source_bundle_hash: bundle_hash,
             verified_at: 0,
             storage_revision: "local".to_owned(),
@@ -153,7 +153,7 @@ pub(super) fn save_source_artifact(
                     content: file.content,
                 })
                 .collect(),
-        }],
+        },
     };
 
     let path = contract_artifact_path(output_sources_dir, contract_key, "source.json");
@@ -509,7 +509,7 @@ impl From<&Value> for CanonicalJson {
 struct SourceRegistrationArtifact {
     code_hash: String,
     verified: bool,
-    bundles: Vec<SourceRegistrationBundle>,
+    bundle: SourceRegistrationBundle,
 }
 
 #[derive(Serialize)]

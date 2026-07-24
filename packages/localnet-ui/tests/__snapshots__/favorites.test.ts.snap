@@ -1,0 +1,41 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`favorites persistence keeps the existing account favorites format compatible 1`] = `
+[
+  {
+    "address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+    "savedAt": 1700000000000,
+  },
+  {
+    "address": "invalid but preserved account identifier",
+    "savedAt": 0,
+  },
+]
+`;
+
+exports[`favorites persistence normalizes and validates saved transaction metadata 1`] = `
+[
+  {
+    "account": undefined,
+    "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "lt": undefined,
+    "savedAt": 1800000000000,
+    "timestamp": undefined,
+  },
+  {
+    "account": "0:2222222222222222222222222222222222222222222222222222222222222222",
+    "hash": "abababababababababababababababababababababababababababababababab",
+    "lt": "123456",
+    "savedAt": 1700000000000,
+    "timestamp": 1700000000,
+  },
+]
+`;
+
+exports[`favorites persistence ignores malformed storage values 1`] = `
+{
+  "empty": [],
+  "invalidJson": [],
+  "object": [],
+}
+`;

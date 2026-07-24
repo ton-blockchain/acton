@@ -1,4 +1,5 @@
 .opcodeChip {
+  align-items: flex-start;
   color: var(--acton-color-text);
   font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-sm);
@@ -7,22 +8,46 @@
   line-height: 1.5;
 }
 
-.value {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: var(--acton-space-2);
+.opcodeChip > :nth-child(2) {
+  margin-top: calc((1.5em - 1rem) / 2);
 }
 
-.opcodeText,
-.opcodeSubText {
-  white-space: nowrap;
+.value {
+  display: inline-flex;
+  align-items: baseline;
+  flex-direction: row;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  column-gap: var(--acton-space-1);
 }
 
 .opcodeText {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--acton-color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .opcodeSubText {
+  flex: 0 0 auto;
   color: var(--acton-color-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .value {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .opcodeText {
+    width: 100%;
+    max-width: min(100%, 26ch);
+  }
 }

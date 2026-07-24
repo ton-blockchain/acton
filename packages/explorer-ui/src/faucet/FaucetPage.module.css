@@ -1,0 +1,423 @@
+.page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 40px) 72px;
+  box-sizing: border-box;
+}
+
+.networkNotice {
+  display: flex;
+  width: min(100%, 760px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto 16px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 32%, var(--acton-color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--acton-color-warning) 8%, var(--acton-color-surface-raised));
+}
+
+.networkNoticeCopy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.networkNoticeCopy strong {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: var(--acton-radius-round);
+  background: color-mix(in srgb, var(--acton-color-warning) 14%, transparent);
+  color: var(--acton-color-warning-text);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.networkNoticeCopy span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.networkNotice button {
+  flex: 0 0 auto;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--acton-color-warning) 10%, transparent);
+  color: var(--acton-color-warning-text);
+}
+
+.networkNotice button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--acton-color-warning) 17%, transparent);
+  color: var(--acton-color-warning-text);
+}
+
+.contentGrid {
+  display: grid;
+  width: min(100%, 760px);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 auto;
+}
+
+.requestCard,
+.processCard {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: clamp(10px, 1.5vw, 14px);
+  border-radius: 18px;
+  background: var(--acton-color-surface);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--acton-color-text-muted);
+}
+
+.cardHeader h1 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: clamp(1.75rem, 4vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.cardHeader h2 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.limitCopy {
+  margin: 10px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.form .addressInput {
+  height: 4.5rem;
+  padding-inline: 1.75rem;
+  font-size: 1.5rem;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.formActions > button:first-child {
+  flex: 1 1 320px;
+}
+
+.githubCard {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 18px;
+  background: var(--acton-color-surface);
+}
+
+.githubCopy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.githubIcon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+}
+
+.githubCopy h2 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.3;
+}
+
+.githubCopy p {
+  margin: 4px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.githubCard > button {
+  flex: 0 0 auto;
+}
+
+.steps {
+  display: flex;
+  margin: 28px 0 0;
+  padding: 0;
+  flex-direction: column;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 70px;
+}
+
+.step:not(:last-child)::after {
+  position: absolute;
+  top: 24px;
+  bottom: 2px;
+  left: 12px;
+  width: 1px;
+  background: var(--acton-color-border);
+  content: "";
+}
+
+.stepIcon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 50%;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+}
+
+.stepActive .stepIcon {
+  border-color: var(--acton-color-accent);
+  color: var(--acton-color-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acton-color-accent) 10%, transparent);
+}
+
+.stepComplete {
+  border-color: var(--acton-color-success);
+  background: var(--acton-color-success);
+  color: var(--acton-color-canvas);
+}
+
+.stepCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.stepCopy strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+}
+
+.stepCopy span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.privacyNote {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.privacyNote svg {
+  color: var(--acton-color-success);
+}
+
+.cliGuide {
+  width: 100%;
+  margin-top: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 18px;
+  background: var(--acton-color-surface);
+}
+
+.cliGuide summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px 20px;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cliGuide summary::-webkit-details-marker {
+  display: none;
+}
+
+.cliGuide summary svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+  transition: transform 160ms ease;
+}
+
+.cliGuide[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.cliGuideBody {
+  display: flex;
+  padding: 0 24px 24px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cliGuideBody p {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.cliGuideBody code {
+  display: block;
+  overflow-x: auto;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.cliCommand {
+  color: color-mix(in srgb, var(--acton-color-accent) 68%, var(--acton-color-text-muted));
+}
+
+.cliArgument {
+  color: color-mix(in srgb, var(--acton-color-warning-text) 68%, var(--acton-color-text-muted));
+}
+
+.cliDocsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-emphasis);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--acton-color-accent) 45%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--acton-duration-fast);
+}
+
+.cliDocsLink:hover {
+  text-decoration-color: currentcolor;
+}
+
+.cliDocsLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding-top: 24px;
+  }
+
+  .networkNotice {
+    align-items: stretch;
+    padding: 12px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .networkNotice button {
+    width: 100%;
+  }
+
+  .networkNoticeCopy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .requestCard,
+  .processCard {
+    padding: 10px;
+    border-radius: 15px;
+  }
+
+  .formActions > button {
+    width: 100%;
+  }
+
+  .githubCard {
+    align-items: stretch;
+    padding: 12px;
+    flex-direction: column;
+  }
+
+  .githubCard > button {
+    width: 100%;
+  }
+
+  .cliGuide {
+    border-radius: 15px;
+  }
+
+  .cliGuide summary {
+    padding: 18px 20px;
+  }
+
+  .cliGuideBody {
+    padding: 0 20px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepActive .stepIcon {
+    box-shadow: none;
+  }
+}

@@ -106,7 +106,7 @@ export class CompositeMetadataRegistry implements ExplorerMetadataRegistry {
   }): Promise<VerificationSourceResponse> {
     for (const registry of this.registries) {
       const source = await registry.getSource(options).catch(() => undefined)
-      if (source?.verified && source.bundles.length > 0) {
+      if (source?.verified && source.bundle) {
         return source
       }
     }

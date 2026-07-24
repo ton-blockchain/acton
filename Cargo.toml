@@ -17,6 +17,7 @@ dist = true
 members = ["crates/*", "xtask"]
 
 exclude = [
+  "apps/verifier",
   "crates/ton-language-server-core",
   "crates/ton-language-server-native",
   "crates/ton-language-server-wasm",

@@ -1,4 +1,4 @@
-export type HighlightedCodeLanguage = "func" | "json" | "tasm" | "tlb" | "tolk"
+export type HighlightedCodeLanguage = "func" | "json" | "tact" | "tasm" | "tlb" | "tolk"
 export type HighlightedCodeTheme = "dark" | "light"
 
 export interface HighlightedCodeToken {

@@ -3,7 +3,7 @@ import abiCatalogData from "../../../crates/acton-abi-catalog/data/data-abis.jso
 import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
 import {PageOgImage, pageOgPreviewForKey, pageOgPreviewForPath} from "../src/og/PageOgImage"
 
-const OG_IMAGE_VERSION = "6"
+const OG_IMAGE_VERSION = "7"
 const OG_IMAGE_WIDTH = 1200
 const OG_IMAGE_HEIGHT = 630
 

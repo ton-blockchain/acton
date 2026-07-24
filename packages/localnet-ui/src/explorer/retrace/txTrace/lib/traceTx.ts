@@ -111,10 +111,8 @@ async function loadVerifiedTolkSource(
     const source = await metadataRegistry.getSource({
       codeHash,
     })
-    const bundles = source.verified ? source.bundles.filter(isSupportedTolkBundle) : []
-
-    if (bundles.length > 0) {
-      return {...source, bundles}
+    if (source.verified && source.bundle && isSupportedTolkBundle(source.bundle)) {
+      return source
     }
   } catch (error) {
     console.debug("Failed to fetch verified source for retrace", error)
@@ -126,7 +124,7 @@ async function loadVerifiedTolkSource(
 function verifiedSourceTraceOptions(
   verifiedSource: VerificationSourceResponse | undefined,
 ): VerifiedSourceTraceOptions | undefined {
-  const sourceBundle = verifiedSource?.bundles[0]
+  const sourceBundle = verifiedSource?.bundle
   if (!sourceBundle?.source_map) {
     return undefined
   }
@@ -176,7 +174,6 @@ function mapRetraceError(error: unknown): TxTraceError {
   if (error instanceof Error) {
     message = error.message
   } else if (error !== null && error !== undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     message = String(error)
   }
 
