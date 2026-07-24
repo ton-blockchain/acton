@@ -1,7 +1,10 @@
 use crate::commands::test::TestRunner;
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::GasProfileFormat;
-use acton_debug::replayer::{CallFrameInfo, StepMode, Tick, TolkReplayer};
+use acton_source_trace::gas_profile::{
+    GasProfileFrame as ProfileFrameSpec, GasProfileSample as ProfileSample,
+    collect_gas_profile_samples,
+};
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use serde::{Deserialize, Serialize};
@@ -14,7 +17,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use ton_emulator::emulator::SendMessageResultSuccess;
 use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
-use ton_retrace::trace::{Trace, TraceStep};
 use tycho_types::boc::Boc;
 use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
@@ -914,7 +916,7 @@ fn build_collapsed_profile(execution_samples: &[ProfileExecutionSamples]) -> Str
                 .collect::<Vec<_>>();
 
             *samples_by_stack
-                .entry((sample.thread_name.clone(), stack))
+                .entry(("acton".to_string(), stack))
                 .or_insert(0) += sample.weight;
         }
     }
@@ -1181,131 +1183,12 @@ fn collect_profile_execution_samples(
 }
 
 fn collect_execution_samples(execution: &ProfileExecutionInput) -> Vec<ProfileSample> {
-    let trace = Trace::new(
+    collect_gas_profile_samples(
         &execution.vm_log,
-        execution
-            .initial_gas
-            .and_then(|gas| usize::try_from(gas).ok()),
-    );
-    let execute_steps = trace
-        .steps
-        .iter()
-        .filter_map(|step| match step {
-            TraceStep::Execute { instr, gas, .. } => Some(InstructionGasStep {
-                instr_name: instr.clone(),
-                gas: *gas as u64,
-            }),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-
-    if execute_steps.is_empty() {
-        return Vec::new();
-    }
-
-    let Ok(mut replayer) = TolkReplayer::new(execution.source_map.as_ref(), &execution.vm_log)
-    else {
-        return Vec::new();
-    };
-    let mut samples = Vec::new();
-    let mut execute_idx = 0usize;
-
-    replayer.step_with_callback(StepMode::RunUntilBreakpoint, |tick, state| match tick {
-        Tick::TvmImplicitJmpRef => {
-            if let Some(sample) = record_execution_sample(
-                execution,
-                &execute_steps,
-                &mut execute_idx,
-                state,
-                Some("implicit JMPREF"),
-            ) {
-                samples.push(sample);
-            }
-        }
-        Tick::TvmBeforeExecute => {
-            while execute_steps
-                .get(execute_idx)
-                .is_some_and(|step| step.instr_name == "implicit JMPREF")
-            {
-                if let Some(sample) = record_execution_sample(
-                    execution,
-                    &execute_steps,
-                    &mut execute_idx,
-                    state,
-                    Some("implicit JMPREF"),
-                ) {
-                    samples.push(sample);
-                }
-            }
-
-            if let Some(sample) =
-                record_execution_sample(execution, &execute_steps, &mut execute_idx, state, None)
-            {
-                samples.push(sample);
-            }
-        }
-        _ => {}
-    });
-
-    samples
-}
-
-fn record_execution_sample(
-    execution: &ProfileExecutionInput,
-    execute_steps: &[InstructionGasStep],
-    execute_idx: &mut usize,
-    replayer: &TolkReplayer,
-    expected_instr: Option<&str>,
-) -> Option<ProfileSample> {
-    let step = execute_steps.get(*execute_idx)?;
-
-    if let Some(expected_instr) = expected_instr
-        && step.instr_name != expected_instr
-    {
-        return None;
-    }
-
-    *execute_idx += 1;
-
-    if step.gas == 0 {
-        return None;
-    }
-
-    let frames = build_profile_frames(execution.contract_display_name.as_deref(), replayer);
-
-    if frames.is_empty() {
-        return None;
-    }
-
-    Some(ProfileSample {
-        thread_name: "acton".to_string(),
-        instruction_name: profile_instruction_name(&step.instr_name),
-        frames,
-        weight: step.gas,
-    })
-}
-
-fn profile_instruction_name(instr_name: &str) -> String {
-    if instr_name.starts_with("implicit ") {
-        return instr_name.to_string();
-    }
-
-    instr_name
-        .split_whitespace()
-        .next()
-        .unwrap_or(instr_name)
-        .to_string()
-}
-
-fn build_profile_frames(
-    contract_display_name: Option<&str>,
-    replayer: &TolkReplayer,
-) -> Vec<ProfileFrameSpec> {
-    replayer
-        .call_stack()
-        .iter()
-        .map(|frame| ProfileFrameSpec::from_call_frame(frame, contract_display_name, replayer))
-        .collect()
+        execution.initial_gas,
+        execution.source_map.as_ref(),
+        execution.contract_display_name.as_deref(),
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -1322,28 +1205,6 @@ struct ProfileExecutionSamples {
     test_name: String,
     contract_display_name: Option<String>,
     samples: Vec<ProfileSample>,
-}
-
-#[derive(Debug, Clone)]
-struct InstructionGasStep {
-    instr_name: String,
-    gas: u64,
-}
-
-#[derive(Debug, Clone)]
-struct ProfileSample {
-    thread_name: String,
-    instruction_name: String,
-    frames: Vec<ProfileFrameSpec>,
-    weight: u64,
-}
-
-#[derive(Debug, Clone)]
-struct ProfileFrameSpec {
-    function_name: String,
-    url: String,
-    line_number: i64,
-    column_number: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1384,61 +1245,6 @@ pub(crate) struct UiGasProfileFrame {
     pub column_number: i64,
 }
 
-impl ProfileFrameSpec {
-    fn from_call_frame(
-        frame: &CallFrameInfo,
-        contract_display_name: Option<&str>,
-        replayer: &TolkReplayer,
-    ) -> Self {
-        let location = frame
-            .definition_loc
-            .as_ref()
-            .or(frame.call_site_loc.as_ref());
-        let (url, line_number, column_number) = location.map_or_else(
-            || (String::new(), -1, -1),
-            |loc| frame_location(replayer, loc),
-        );
-
-        Self {
-            function_name: format_profile_function_name(
-                frame.f_name.as_str(),
-                contract_display_name,
-            ),
-            url,
-            line_number,
-            column_number,
-        }
-    }
-}
-
-fn format_profile_function_name(
-    function_name: &str,
-    contract_display_name: Option<&str>,
-) -> String {
-    if matches!(
-        function_name,
-        "onInternalMessage" | "onExternalMessage" | "onBouncedMessage" | "onRunTickTock"
-    ) && let Some(contract_display_name) = contract_display_name
-    {
-        return format!("{contract_display_name}:{function_name}");
-    }
-
-    function_name.to_string()
-}
-
-fn frame_location(
-    replayer: &TolkReplayer,
-    range: &tolk_compiler::source_map::SrcRange,
-) -> (String, i64, i64) {
-    let url = replayer.file_full_path(range.file_id()).unwrap_or_default();
-
-    (
-        url.to_string(),
-        zero_based_line(range.start_line()),
-        zero_based_column(range.start_col()),
-    )
-}
-
 fn sanitize_collapsed_name(name: &str) -> String {
     name.chars()
         .map(|ch| match ch {
@@ -1447,14 +1253,6 @@ fn sanitize_collapsed_name(name: &str) -> String {
             _ => ch,
         })
         .collect()
-}
-
-fn zero_based_line(line: usize) -> i64 {
-    line.checked_sub(1).map_or(-1, |line| line as i64)
-}
-
-fn zero_based_column(column: usize) -> i64 {
-    column.checked_sub(1).map_or(-1, |column| column as i64)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

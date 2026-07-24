@@ -11,6 +11,8 @@ use tolk_source_map::debug_marks_dict::parse_debug_marks;
 use tolk_source_map::source_map::{DebugMark, SrcRange, SymbolTypesJson};
 use tycho_types::boc::Boc;
 
+pub mod gas_profile;
+
 const MAX_SOURCE_TRACE_STEPS: usize = 10_000;
 const MAX_RENDERED_VALUE_DEPTH: usize = 2;
 const MAX_RENDERED_CHILDREN: usize = 64;
@@ -197,22 +199,7 @@ pub fn validate_bundle(bundle: &SourceTraceBundleRequest) -> anyhow::Result<()> 
 pub fn build_compiled_source_trace_response(
     payload: BuildCompiledSourceTraceRequest,
 ) -> anyhow::Result<SourceTraceResponse> {
-    if payload.compiled.debug_marks_json.is_empty() {
-        anyhow::bail!("Compiler did not return debug marks JSON");
-    }
-    if payload.compiled.debug_marks_base64.trim().is_empty() {
-        anyhow::bail!("Compiler did not return debug marks dictionary");
-    }
-
-    let marks_dict = parse_debug_marks(
-        Some(payload.compiled.debug_marks_base64.as_str()),
-        &payload.compiled.code_boc64,
-    )?;
-    let source_map = SourceMap::from_parts(
-        payload.compiled.symbol_types_json,
-        payload.compiled.debug_marks_json,
-        marks_dict,
-    );
+    let source_map = source_map_from_compiled(&payload.compiled)?;
 
     build_source_trace_response(
         &payload.vm_logs,
@@ -224,6 +211,19 @@ pub fn build_compiled_source_trace_response(
     )
 }
 
+pub fn build_compiled_gas_profile_response(
+    payload: gas_profile::BuildCompiledGasProfileRequest,
+) -> anyhow::Result<gas_profile::GasProfileResponse> {
+    let source_map = source_map_from_compiled(&payload.compiled)?;
+    let code_hash = validate_compiled_code_hash(&payload.code_hash, &payload.compiled.code_boc64)?;
+
+    Ok(gas_profile::build_gas_profile_response(
+        code_hash,
+        &source_map,
+        payload.executions,
+    ))
+}
+
 pub fn build_source_trace_response(
     vm_logs: &str,
     code_hash: &str,
@@ -232,16 +232,7 @@ pub fn build_source_trace_response(
     source_map: &SourceMap,
     path_roots: Option<&SourceTracePathRoots>,
 ) -> anyhow::Result<SourceTraceResponse> {
-    let expected_code_hash = parse_hash_any(code_hash)?;
-    let code_cell = Boc::decode_base64(code_boc64).context("Failed to decode compiled code BoC")?;
-    let compiled_hash = code_cell.repr_hash().as_array().to_owned();
-    if compiled_hash != expected_code_hash {
-        anyhow::bail!(
-            "Verified source bundle code hash mismatch: expected {}, compiled {}",
-            hash_to_hex(&expected_code_hash),
-            hash_to_hex(&compiled_hash)
-        );
-    }
+    let expected_code_hash = validate_compiled_code_hash_bytes(code_hash, code_boc64)?;
 
     if source_map.debug_marks_count() == 0 {
         anyhow::bail!("Compiler did not return debug marks JSON");
@@ -314,6 +305,46 @@ pub fn build_source_trace_response(
         steps,
         truncated,
     })
+}
+
+fn source_map_from_compiled(compiled: &CompiledTolkSourceTrace) -> anyhow::Result<SourceMap> {
+    if compiled.debug_marks_json.is_empty() {
+        anyhow::bail!("Compiler did not return debug marks JSON");
+    }
+    if compiled.debug_marks_base64.trim().is_empty() {
+        anyhow::bail!("Compiler did not return debug marks dictionary");
+    }
+
+    let marks_dict = parse_debug_marks(
+        Some(compiled.debug_marks_base64.as_str()),
+        &compiled.code_boc64,
+    )?;
+    Ok(SourceMap::from_parts(
+        compiled.symbol_types_json.clone(),
+        compiled.debug_marks_json.clone(),
+        marks_dict,
+    ))
+}
+
+fn validate_compiled_code_hash(code_hash: &str, code_boc64: &str) -> anyhow::Result<String> {
+    validate_compiled_code_hash_bytes(code_hash, code_boc64).map(|hash| hash_to_hex(&hash))
+}
+
+fn validate_compiled_code_hash_bytes(
+    code_hash: &str,
+    code_boc64: &str,
+) -> anyhow::Result<[u8; 32]> {
+    let expected_code_hash = parse_hash_any(code_hash)?;
+    let code_cell = Boc::decode_base64(code_boc64).context("Failed to decode compiled code BoC")?;
+    let compiled_hash = code_cell.repr_hash().as_array().to_owned();
+    if compiled_hash != expected_code_hash {
+        anyhow::bail!(
+            "Verified source bundle code hash mismatch: expected {}, compiled {}",
+            hash_to_hex(&expected_code_hash),
+            hash_to_hex(&compiled_hash)
+        );
+    }
+    Ok(expected_code_hash)
 }
 
 fn inject_context_variables(

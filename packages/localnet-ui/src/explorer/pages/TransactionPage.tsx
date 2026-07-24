@@ -3,6 +3,8 @@ import type {ComponentProps, CSSProperties, FC, JSX} from "react"
 import {
   type ContractVerifiedSource,
   type ContractData,
+  GasProfile,
+  type GasProfileData,
   type LoadedTransactionActions,
   type ResolveVerifiedSourceByCodeHash,
   type TransactionBlockRef,
@@ -22,6 +24,7 @@ import {
   CheckCircle2,
   CircleDotDashed,
   Database,
+  Flame,
   FlaskConical,
   GitBranch,
   Info,
@@ -69,6 +72,7 @@ export type TransactionTraceTabType =
   | "transactions"
   | "value-flow"
   | "event-overview"
+  | "gas-profile"
   | "state-changes"
   | "details"
 
@@ -79,7 +83,7 @@ export const parseTransactionTraceTabType = (
   if (tab === "details" || tab === "overview") {
     return "details"
   }
-  if (tab === "state-changes" || tab === "transactions") {
+  if (tab === "state-changes" || tab === "transactions" || tab === "gas-profile") {
     return tab
   }
   if (supportsActions && (tab === null || tab === "" || tab === "event-overview")) {
@@ -315,11 +319,24 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     readonly isLoading: boolean
     readonly error?: string
   }>({isLoading: false})
+  const [gasProfileStatus, setGasProfileStatus] = useState<{
+    readonly traceHash?: string
+    readonly isLoading: boolean
+    readonly error?: string
+    readonly profile?: GasProfileData
+    readonly profiledTransactions?: number
+    readonly totalTransactions?: number
+  }>({isLoading: false})
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
   const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
+  const gasProfileRequestedHashRef = useRef<string | undefined>(undefined)
+  const traceReplayRef = useRef<{
+    readonly traceHash: string
+    readonly promise: Promise<RetraceTraceResult>
+  }>()
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const selectedTraceTransaction = useMemo(() => {
     const requestedHash = hash.toLowerCase()
@@ -463,6 +480,25 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setTraces(currentTraces => withRetracedStorage(currentTraces, txHash, result))
   }, [])
 
+  const loadTraceReplay = useCallback((): Promise<RetraceTraceResult> => {
+    const requestedHash = traceLookupHash.toLowerCase()
+    const cached = traceReplayRef.current
+    if (cached?.traceHash === requestedHash) {
+      return cached.promise
+    }
+
+    const promise = import("../retrace/txTrace/lib/traceTx").then(({traceTransactionTree}) =>
+      traceTransactionTree(traceLookupHash, network),
+    )
+    traceReplayRef.current = {traceHash: requestedHash, promise}
+    void promise.catch(() => {
+      if (traceReplayRef.current?.promise === promise) {
+        traceReplayRef.current = undefined
+      }
+    })
+    return promise
+  }, [network, traceLookupHash])
+
   useEffect(() => {
     setActiveTab(parseTransactionTraceTabType(searchParams.get("tab"), supportsTraceActions))
   }, [searchParams, supportsTraceActions])
@@ -492,6 +528,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setRetraceAttempt(0)
     setHoveredAction(undefined)
     stateChangesRequestedHashRef.current = undefined
+    gasProfileRequestedHashRef.current = undefined
+    traceReplayRef.current = undefined
+    setGasProfileStatus({isLoading: false})
     loadedActionsByHashRef.current.clear()
   }, [traceLookupHash])
 
@@ -586,8 +625,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
     const loadTraceStateChanges = async () => {
       try {
-        const {traceTransactionTree} = await import("../retrace/txTrace/lib/traceTx")
-        const replayedTrace = await traceTransactionTree(traceLookupHash, network)
+        const replayedTrace = await loadTraceReplay()
         if (!isActive) return
 
         if (!replayedTrace.result.stateUpdateHashOk) {
@@ -623,7 +661,66 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         stateChangesRequestedHashRef.current = undefined
       }
     }
-  }, [activeTab, network, traceLookupHash, traces.length])
+  }, [activeTab, loadTraceReplay, traceLookupHash, traces.length])
+
+  useEffect(() => {
+    const requestedHash = traceLookupHash.toLowerCase()
+    if (activeTab !== "gas-profile" || traces.length === 0) {
+      return
+    }
+    if (gasProfileRequestedHashRef.current === requestedHash) {
+      return
+    }
+
+    let isActive = true
+    let completed = false
+    gasProfileRequestedHashRef.current = requestedHash
+    setGasProfileStatus({traceHash: requestedHash, isLoading: true})
+
+    const loadGasProfile = async () => {
+      try {
+        const replayedTrace = await loadTraceReplay()
+        const {profileTraceGas} = await import(
+          "../retrace/txTrace/lib/profileTraceGas"
+        )
+        const result = await profileTraceGas(replayedTrace.result, metadataRegistry)
+        if (!isActive) return
+
+        setGasProfileStatus({
+          traceHash: requestedHash,
+          isLoading: false,
+          profile: result.profile,
+          profiledTransactions: result.profiledTransactions,
+          totalTransactions: result.totalTransactions,
+        })
+        completed = true
+      } catch (error) {
+        console.error("Failed to profile transaction trace:", error)
+        if (!isActive) return
+
+        setGasProfileStatus({
+          traceHash: requestedHash,
+          isLoading: false,
+          error: error instanceof Error ? error.message : "Failed to profile transaction trace",
+        })
+        completed = true
+      }
+    }
+
+    void loadGasProfile()
+    return () => {
+      isActive = false
+      if (!completed && gasProfileRequestedHashRef.current === requestedHash) {
+        gasProfileRequestedHashRef.current = undefined
+      }
+    }
+  }, [
+    activeTab,
+    loadTraceReplay,
+    metadataRegistry,
+    traceLookupHash,
+    traces.length,
+  ])
 
   if (loading) {
     return showLoadingSkeleton ? (
@@ -736,6 +833,11 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       isFavorite={favorite}
       stateChangesLoading={currentStateChangesStatus?.isLoading ?? false}
       stateChangesError={currentStateChangesStatus?.error}
+      gasProfile={gasProfileStatus.profile}
+      gasProfileLoading={gasProfileStatus.isLoading}
+      gasProfileError={gasProfileStatus.error}
+      gasProfiledTransactions={gasProfileStatus.profiledTransactions}
+      gasProfileTotalTransactions={gasProfileStatus.totalTransactions}
       onTabChange={handleActiveTabChange}
       onActionHoverChange={setHoveredAction}
       onContractClick={handleContractClick}
@@ -773,6 +875,11 @@ export interface TransactionTraceViewProps {
   readonly isFavorite?: boolean
   readonly stateChangesLoading?: boolean
   readonly stateChangesError?: string
+  readonly gasProfile?: GasProfileData
+  readonly gasProfileLoading?: boolean
+  readonly gasProfileError?: string
+  readonly gasProfiledTransactions?: number
+  readonly gasProfileTotalTransactions?: number
   readonly onTabChange: (tab: TransactionTraceTabType) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
@@ -815,6 +922,11 @@ export function TransactionTraceView({
   isFavorite = false,
   stateChangesLoading = false,
   stateChangesError,
+  gasProfile,
+  gasProfileLoading = false,
+  gasProfileError,
+  gasProfiledTransactions,
+  gasProfileTotalTransactions,
   onTabChange,
   onActionHoverChange,
   onContractClick,
@@ -980,6 +1092,33 @@ export function TransactionTraceView({
                     />
                   )}
 
+                  {activeTab === "gas-profile" && (
+                    <div className={styles.gasProfilePanel}>
+                      {gasProfileLoading ? (
+                        <div className={styles.tabState}>Profiling the transaction trace…</div>
+                      ) : gasProfileError ? (
+                        <div className={styles.tabState}>
+                          Failed to build gas profile: {gasProfileError}
+                        </div>
+                      ) : gasProfile && gasProfile.contracts.length > 0 ? (
+                        <>
+                          {gasProfiledTransactions !== undefined &&
+                            gasProfileTotalTransactions !== undefined && (
+                              <div className={styles.gasProfileCoverage}>
+                                Profiled {gasProfiledTransactions} of {gasProfileTotalTransactions}{" "}
+                                transactions with verified Tolk source maps
+                              </div>
+                            )}
+                          <GasProfile profile={gasProfile} />
+                        </>
+                      ) : (
+                        <div className={styles.tabState}>
+                          No verified Tolk source maps were found for this trace
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {activeTab === "transactions" && (
                     <div className={styles.detailsList}>
                       {rootTraceTransactions.map(tx => (
@@ -1107,6 +1246,16 @@ function TraceTabs({
         tabIndex={disabled ? -1 : undefined}
       >
         <Database size={16} /> State Changes
+      </button>
+      <button
+        type="button"
+        ref={activeTab === "gas-profile" ? activeTabRef : undefined}
+        className={`${styles.tab} ${activeTab === "gas-profile" ? styles.tabActive : ""}`}
+        onClick={() => onTabChange?.("gas-profile")}
+        disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+      >
+        <Flame size={16} /> Gas Profile
       </button>
       <button
         type="button"

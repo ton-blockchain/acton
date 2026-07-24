@@ -422,10 +422,8 @@ impl Trace {
         lines: impl IntoIterator<Item = Result<VmLine<'a>, String>>,
         start_gas: Option<usize>,
     ) -> Trace {
-        let start_gas = start_gas.unwrap_or(1_000_000);
-        let mut gas_base = start_gas;
-        let mut gas_consumed = 0usize;
-        let mut gas_remaining = start_gas;
+        let start_gas = start_gas.unwrap_or(tvm_logs::gas::DEFAULT_INITIAL_GAS);
+        let mut gas_tracker = tvm_logs::gas::GasTracker::new(start_gas);
 
         let mut steps = Vec::<TraceStep>::new();
         let mut current_hash: Option<String> = None;
@@ -451,13 +449,8 @@ impl Trace {
                 VmLine::VmStack { stack } => {
                     current_stack = Some(stack.raw().to_owned());
                 }
-                VmLine::VmGasRemaining { gas } => {
-                    let new_gas = gas.parse::<usize>().unwrap_or(gas_remaining);
-                    let new_gas_consumed = gas_base.saturating_sub(new_gas);
-                    let gas_cost = new_gas_consumed.saturating_sub(gas_consumed);
-                    gas_consumed = new_gas_consumed;
-                    gas_remaining = new_gas;
-
+                VmLine::VmGasRemaining { .. } => {
+                    let gas_cost = gas_tracker.update(&line).unwrap_or_default();
                     let instr = current_instr.take().unwrap_or_default();
 
                     if let (Some(hash), Some(offset_str), Some(stack)) = (
@@ -502,11 +495,8 @@ impl Trace {
                     };
                     steps.push(TraceStep::FinalC5 { cell });
                 }
-                VmLine::VmLimitChanged { limit } => {
-                    if let Ok(new_limit) = limit.parse::<usize>() {
-                        gas_base = new_limit;
-                        gas_remaining = gas_base.saturating_sub(gas_consumed);
-                    }
+                VmLine::VmLimitChanged { .. } => {
+                    let _ = gas_tracker.update(&line);
                 }
                 VmLine::VmUnknown { .. } => {}
             }

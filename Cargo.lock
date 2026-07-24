@@ -184,6 +184,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tolk-source-map",
+ "tvm-logs",
  "tycho-types",
 ]
 

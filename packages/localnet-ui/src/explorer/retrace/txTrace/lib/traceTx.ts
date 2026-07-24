@@ -32,7 +32,7 @@ interface TraceTxOptions {
   readonly codeHash?: string
 }
 
-interface VerifiedSourceTraceOptions {
+export interface VerifiedSourceTraceOptions {
   readonly sourceMap: TolkSourceMapData
   readonly sourceTraceBundleHash: string
 }
@@ -99,7 +99,7 @@ function isSupportedTolkBundle(bundle: SourceBundle): boolean {
   )
 }
 
-async function loadVerifiedTolkSource(
+export async function loadVerifiedTolkSource(
   metadataRegistry: ExplorerMetadataRegistry | undefined,
   codeHash?: string,
 ): Promise<VerificationSourceResponse | undefined> {
@@ -121,7 +121,7 @@ async function loadVerifiedTolkSource(
   return undefined
 }
 
-function verifiedSourceTraceOptions(
+export function verifiedSourceTraceOptions(
   verifiedSource: VerificationSourceResponse | undefined,
 ): VerifiedSourceTraceOptions | undefined {
   const sourceBundle = verifiedSource?.bundle
