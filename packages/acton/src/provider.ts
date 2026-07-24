@@ -1,8 +1,8 @@
-import {Buffer} from "node:buffer"
+import type {Buffer} from "node:buffer"
 
 import {
-  Address,
-  Cell,
+  type Address,
+  type Cell,
   comment,
   type Contract,
   type ContractGetMethodResult,

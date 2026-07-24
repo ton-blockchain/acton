@@ -1,0 +1,77 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**", "!!dist", "!!examples/counter/build", "!!examples/counter/wrappers-ts"]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noUselessContinue": "off",
+        "noUselessReturn": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useMaxParams": "off",
+        "useOptionalChain": "off",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "noUnresolvedImports": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noNamespaceImport": "off",
+        "noReExportAll": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noExcessiveClassesPerFile": "off",
+        "noIncrementDecrement": "off",
+        "noNestedTernary": "off",
+        "noParameterProperties": "off",
+        "noProcessEnv": "off",
+        "useBlockStatements": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentCurlyBraces": "off",
+        "useConsistentMethodSignatures": "off",
+        "useConsistentObjectDefinitions": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useDefaultSwitchClause": "off",
+        "useDestructuring": "off",
+        "useErrorCause": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off"
+      },
+      "suspicious": {
+        "noBitwiseOperators": "off",
+        "noConsole": "off",
+        "noConfusingVoidType": "off",
+        "noShadow": "off",
+        "noUnnecessaryConditions": "off",
+        "useAwait": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["examples/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredDependencies": "off"
+          }
+        }
+      }
+    }
+  ]
+}

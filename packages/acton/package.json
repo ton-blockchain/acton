@@ -5,12 +5,6 @@
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,15 +15,21 @@
       "import": "./dist/test.js"
     }
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
     "acton-test-worker": "./dist/test-worker.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "fmt": "prettier --write -l --cache .",
-    "fmt:check": "prettier --check --cache .",
-    "lint": "eslint --max-warnings 0 . --cache",
-    "lint:fix": "eslint --fix . --cache"
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write ."
   },
   "dependencies": {
     "@ton/core": "0.62.0"

@@ -10,6 +10,20 @@
         "react-doctor": "^0.8.1",
       },
     },
+    "packages/acton": {
+      "name": "@ton/acton",
+      "version": "0.0.0",
+      "bin": {
+        "acton-test-worker": "./dist/test-worker.js",
+      },
+      "dependencies": {
+        "@ton/core": "0.62.0",
+      },
+      "devDependencies": {
+        "@types/node": "^25.0.3",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/explorer-ui": {
       "name": "@acton/explorer-ui",
       "version": "1.0.0",
@@ -902,6 +916,8 @@
     "@ton-community/tlb-parser": ["@ton-community/tlb-parser@0.1.5", "", { "dependencies": { "ohm-js": "^16.6.0" }, "bin": { "tlb-parser": "dist/cli.js" } }, "sha512-gHCy+5h8UwVQ2gCEd0LfS6cAisZtsbX4BXlq71JYUxHstPT6yTlB0Nv5UTOx0b5ua+pSpwsRqY6TE3II/VH6Sw=="],
 
     "@ton-community/tlb-runtime": ["@ton-community/tlb-runtime@1.0.0-alpha.3", "", { "dependencies": { "@ton-community/tlb-codegen": "^2.0.0-beta.3", "@ton-community/tlb-parser": "^0.1.5", "@ton/core": "^0.61.0", "@ton/crypto": "^3.3.0" } }, "sha512-raqtvG5j/vTSQySMitmVXN3jIdmUtjxTlIZjsj9Rp4EXDw8W81Kn8CelUq11gKyPTrSnGWTIehMr73jMA/je/g=="],
+
+    "@ton/acton": ["@ton/acton@workspace:packages/acton"],
 
     "@ton/core": ["@ton/core@0.63.1", "", { "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-hDWMjlKzc18W2E4OeV3hUP8ohRJNHPD4Wd1+AQJj8zshZyCRT0usrvnExgbNUTo/vntDqCGMzgYWbXxyaA+L4g=="],
 
@@ -2366,6 +2382,8 @@
     "@scure/bip39/@noble/hashes": ["@noble/hashes@2.2.0", "", {}, "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="],
 
     "@ston-fi/omniston-sdk/type-fest": ["type-fest@5.0.1", "", { "dependencies": { "tagged-tag": "^1.0.0" } }, "sha512-9MpwAI52m8H6ssA542UxSLnSiSD2dsC3/L85g6hVubLSXd82wdI80eZwTWhdOfN67NlA+D+oipAs1MlcTcu3KA=="],
+
+    "@ton/acton/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@ton/sandbox/@ton/tasm": ["@ton/tasm@0.6.1", "", { "dependencies": { "@tonstudio/parser-runtime": "^0.0.1", "cac": "^6.7.14", "ton-source-map": "^0.2.2" }, "peerDependencies": { "@ton/core": ">=0.61.0" }, "bin": { "tasm": "dist/cli/assembler.js", "tfift": "dist/cli/fift-compiler.js", "tdisasm": "dist/cli/disassembler.js" } }, "sha512-0W+zs1uOsVOBKPOZzHPhpky3gTiD79GpRu+VIksIaY2ADIqQI7xuVJPTACT8Ej4R9kX1pA4jeLScR63vQ/in0g=="],
 

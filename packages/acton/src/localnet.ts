@@ -6,7 +6,7 @@ import path from "node:path"
 import process from "node:process"
 
 import {
-  Address,
+  type Address,
   beginCell,
   Cell,
   type Contract,
@@ -378,9 +378,7 @@ export class Localnet {
     )
   }
 
-  async registerCompilerAbis(
-    entries: readonly LocalnetCompilerAbiRegistration[],
-  ): Promise<void> {
+  async registerCompilerAbis(entries: readonly LocalnetCompilerAbiRegistration[]): Promise<void> {
     await this.http.postJson<unknown>("/acton_registerCompilerAbis", {
       entries: entries.map(entry => ({
         code_hash: entry.codeHash,
@@ -557,7 +555,7 @@ function serializeAccountStateChange(state: LocalnetAccountStateChange): unknown
     case "uninit":
       return {
         type: "uninit",
-        ...(state.balance !== undefined ? {balance: String(state.balance)} : {}),
+        ...(state.balance === undefined ? {} : {balance: String(state.balance)}),
       }
     case "frozen":
       if ("source" in state) {
@@ -568,7 +566,7 @@ function serializeAccountStateChange(state: LocalnetAccountStateChange): unknown
         frozen_hash: Buffer.isBuffer(state.frozenHash)
           ? state.frozenHash.toString("base64")
           : state.frozenHash,
-        ...(state.balance !== undefined ? {balance: String(state.balance)} : {}),
+        ...(state.balance === undefined ? {} : {balance: String(state.balance)}),
       }
   }
 }

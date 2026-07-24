@@ -1,5 +1,5 @@
 import {
-  Address,
+  type Address,
   Cell,
   packExtraCurrencyDict,
   type Message,

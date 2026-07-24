@@ -5,7 +5,7 @@ import path from "node:path"
 import {performance} from "node:perf_hooks"
 import {pathToFileURL} from "node:url"
 
-import {Address, type Transaction} from "@ton/core"
+import type {Address, Transaction} from "@ton/core"
 
 import {Localnet} from "./localnet.js"
 import {
@@ -16,6 +16,7 @@ import {
   type RegisteredTest,
 } from "./test.js"
 import type {TransactionMatch} from "./transactions.js"
+import process from "node:process"
 
 const EVENT_PREFIX = "__ACTON_NODE_EVENT__"
 

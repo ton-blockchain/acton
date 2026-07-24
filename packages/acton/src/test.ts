@@ -67,12 +67,7 @@ export function expect<T>(actual: T): {
   return {
     toBe(expected: T): void {
       if (!Object.is(actual, expected)) {
-        throw new ActonAssertionError(
-          "toBe",
-          actual,
-          expected,
-          `expect(<actual>).toBe(<expected>)`,
-        )
+        throw new ActonAssertionError("toBe", actual, expected, "expect(<actual>).toBe(<expected>)")
       }
     },
     toEqual(expected: T): void {
@@ -81,7 +76,7 @@ export function expect<T>(actual: T): {
           "toEqual",
           actual,
           expected,
-          `expect(<actual>).toEqual(<expected>)`,
+          "expect(<actual>).toEqual(<expected>)",
         )
       }
     },

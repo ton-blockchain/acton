@@ -160,6 +160,7 @@ coverage-clean:
 
 build-ui:
     bun ci
+    cd packages/acton && bun run build
     cd packages/test-ui && bun ci && bun run build
     cd packages/localnet-ui && bun ci && bun run build
 
