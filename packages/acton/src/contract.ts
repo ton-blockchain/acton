@@ -37,7 +37,7 @@ export function createContractHandle<T extends Contract>(
       }
 
       const method = value as ProviderMethod<T>
-      const bound = (...args: unknown[]): unknown => method.call(target, provider, ...args)
+      const bound = method.bind(target, provider)
       boundMethods.set(property, bound)
       return bound
     },

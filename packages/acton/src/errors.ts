@@ -1,6 +1,6 @@
 export class ActonError extends Error {
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
     this.name = "ActonError"
   }
 }
@@ -9,8 +9,15 @@ export class LocalnetApiError extends ActonError {
   readonly status?: number
   readonly code?: number
 
-  constructor(message: string, options: {readonly status?: number; readonly code?: number} = {}) {
-    super(message)
+  constructor(
+    message: string,
+    options: {
+      readonly status?: number
+      readonly code?: number
+      readonly cause?: unknown
+    } = {},
+  ) {
+    super(message, {cause: options.cause})
     this.name = "LocalnetApiError"
     this.status = options.status
     this.code = options.code

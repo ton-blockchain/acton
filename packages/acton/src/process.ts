@@ -8,7 +8,7 @@ import process from "node:process"
 import {ActonError} from "./errors.js"
 import type {StartLocalnetOptions} from "./types.js"
 
-export type StartedLocalnetProcess = {
+export interface StartedLocalnetProcess {
   readonly endpoint: string
   readonly child: ChildProcess
 }

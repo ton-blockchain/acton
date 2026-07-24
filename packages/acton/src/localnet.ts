@@ -459,6 +459,8 @@ function serializeAccountStateChange(state: LocalnetAccountStateChange): unknown
           : state.frozenHash,
         ...(state.balance === undefined ? {} : {balance: String(state.balance)}),
       }
+    default:
+      throw new ActonError("Unsupported account state change")
   }
 }
 
@@ -466,13 +468,13 @@ function registerAutoClose(child: ChildProcess): () => void {
   child.unref()
   let registered = true
 
-  const killChild = (): void => {
+  function killChild(): void {
     if (child.exitCode === null && !child.killed) {
       child.kill("SIGTERM")
     }
   }
 
-  const unregister = (): void => {
+  function unregister(): void {
     if (!registered) {
       return
     }
@@ -505,7 +507,7 @@ function terminateChild(
       finish()
     }, timeoutMs)
 
-    const finish = (): void => {
+    function finish(): void {
       if (settled) {
         return
       }

@@ -3,60 +3,45 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**", "!!dist", "!!examples/counter/build", "!!examples/counter/wrappers-ts"]
+    "includes": ["**", "!!dist"]
   },
   "linter": {
     "rules": {
-      "complexity": {
-        "noExcessiveCognitiveComplexity": "off",
-        "noExcessiveLinesPerFunction": "off",
-        "noUselessContinue": "off",
-        "noUselessReturn": "off",
-        "noUselessUndefined": "off",
-        "noVoid": "off",
-        "useMaxParams": "off",
-        "useOptionalChain": "off",
-        "useSimplifiedLogicExpression": "off"
-      },
       "correctness": {
-        "noNodejsModules": "off",
-        "noUnresolvedImports": "off",
-        "useQwikValidLexicalScope": "off"
+        "noNodejsModules": "off"
       },
       "performance": {
         "noAwaitInLoops": "off",
-        "noBarrelFile": "off",
-        "noNamespaceImport": "off",
-        "noReExportAll": "off",
-        "useTopLevelRegex": "off"
-      },
-      "security": {
-        "noSecrets": "off"
+        "noBarrelFile": "off"
       },
       "style": {
-        "noDefaultExport": "off",
         "noExcessiveClassesPerFile": "off",
-        "noIncrementDecrement": "off",
         "noNestedTernary": "off",
         "noParameterProperties": "off",
         "noProcessEnv": "off",
-        "useBlockStatements": "off",
-        "useConsistentArrowReturn": "off",
-        "useConsistentCurlyBraces": "off",
-        "useConsistentMethodSignatures": "off",
-        "useConsistentObjectDefinitions": "off",
-        "useConsistentTypeDefinitions": "off",
-        "useDefaultSwitchClause": "off",
+        "useNamingConvention": {
+          "level": "on",
+          "options": {
+            "conventions": [
+              {
+                "selector": {
+                  "kind": "objectLiteralProperty"
+                },
+                "formats": ["camelCase", "CONSTANT_CASE", "PascalCase", "snake_case"]
+              },
+              {
+                "selector": {
+                  "kind": "typeProperty"
+                },
+                "formats": ["camelCase", "CONSTANT_CASE", "snake_case"]
+              }
+            ]
+          }
+        },
         "useDestructuring": "off",
-        "useErrorCause": "off",
-        "useExportsLast": "off",
-        "useNamingConvention": "off"
+        "useExportsLast": "off"
       },
       "suspicious": {
-        "noBitwiseOperators": "off",
-        "noConsole": "off",
-        "noConfusingVoidType": "off",
-        "noShadow": "off",
         "noUnnecessaryConditions": "off",
         "useAwait": "off"
       }

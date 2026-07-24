@@ -39,9 +39,9 @@ export class LocalnetContractProvider implements ContractProvider {
     const state = await this.getState()
     const init = this.initForState(state)
 
-    return (await this.localnet.trackTransactions(this.address, async () => {
+    await this.localnet.trackTransactions(this.address, async () => {
       await this.localnet.sendMessage(external({to: this.address, init, body: message}))
-    })) as unknown as void
+    })
   }
 
   async internal(via: Sender, args: Parameters<ContractProvider["internal"]>[1]): Promise<void> {
@@ -50,7 +50,7 @@ export class LocalnetContractProvider implements ContractProvider {
     const state = await this.getState()
     const init = this.initForState(state)
 
-    return (await this.localnet.trackTransactions(this.address, async () => {
+    await this.localnet.trackTransactions(this.address, async () => {
       await via.send({
         body,
         bounce: args.bounce ?? true,
@@ -60,7 +60,7 @@ export class LocalnetContractProvider implements ContractProvider {
         to: this.address,
         value,
       })
-    })) as unknown as void
+    })
   }
 
   open<T extends Contract>(contract: T): OpenedContract<T> {

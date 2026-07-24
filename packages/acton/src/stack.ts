@@ -26,6 +26,9 @@ export function tupleItemToLegacyJson(item: TupleItem): unknown {
     case "nan": {
       throw new ActonError("NaN tuple items are not supported by localnet JSON stack")
     }
+    default: {
+      throw new ActonError("Unsupported tuple item")
+    }
   }
 }
 
@@ -34,9 +37,7 @@ export function legacyJsonToTupleItem(value: unknown): TupleItem {
     throw new ActonError("Invalid localnet legacy stack item")
   }
 
-  const entry = value as unknown as readonly [string, unknown]
-  const kind = entry[0]
-  const payload = entry[1]
+  const [kind, payload] = value as unknown as readonly [string, unknown]
   switch (kind) {
     case "null": {
       return {type: "null"}
@@ -87,7 +88,7 @@ function cellFromBytesPayload(payload: unknown, kind: string): Cell {
 }
 
 function tupleItemsFromPayload(payload: unknown): TupleItem[] {
-  if (!isRecord(payload) || !Array.isArray(payload.elements)) {
+  if (!(isRecord(payload) && Array.isArray(payload.elements))) {
     throw new ActonError("Stack tuple item must contain elements")
   }
   return payload.elements.map(item => legacyJsonToTupleItem(item))
