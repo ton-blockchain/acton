@@ -1,0 +1,646 @@
+import {Buffer} from "node:buffer"
+import type {ChildProcess} from "node:child_process"
+import {mkdtempSync, rmSync} from "node:fs"
+import {tmpdir} from "node:os"
+import path from "node:path"
+import process from "node:process"
+
+import {
+  Address,
+  beginCell,
+  Cell,
+  type Contract,
+  type ContractGetMethodResult,
+  type ContractProvider,
+  type ContractState,
+  loadTransaction,
+  type Message,
+  type StateInit,
+  storeMessage,
+  toNano,
+  type Transaction,
+  type TupleItem,
+  TupleReader,
+} from "@ton/core"
+
+import {addressFromSeed, formatAddress, isContract, parseAddress} from "./address.js"
+import {createContractHandle, type ContractHandle} from "./contract.js"
+import {ActonError, LocalnetApiError, errorMessage} from "./errors.js"
+import {LocalnetHttpClient} from "./http.js"
+import {startLocalnetProcess} from "./process.js"
+import {LocalnetContractProvider} from "./provider.js"
+import {LocalnetSender} from "./sender.js"
+import {toContractState} from "./state.js"
+import {legacyJsonToTupleItem, tupleItemToLegacyJson} from "./stack.js"
+import {registerAfterAll, registerAfterEach} from "./test-lifecycle.js"
+import type {
+  AccountInfoResult,
+  CloseLocalnetOptions,
+  EmulateTraceResult,
+  LocalnetAccountStateChange,
+  LocalnetApiCallLog,
+  LocalnetClockInfo,
+  LocalnetCompilerAbiRegistration,
+  LocalnetCoverageRecord,
+  LocalnetExtendedContractAbi,
+  LocalnetMineResult,
+  LocalnetNodeInfo,
+  LocalnetNetworkConditions,
+  LocalnetNetworkConditionsOptions,
+  LocalnetTraceRecord,
+  LocalnetTreasuryRecord,
+  LocalnetOptions,
+  LocalnetRecoveryPointResult,
+  LocalnetStartupWallet,
+  LocalnetVerifiedSourceRequest,
+  RawTransaction,
+  RunGetMethodResult,
+  SendBocResult,
+  StartLocalnetOptions,
+  TrackTransactionsOptions,
+  TransactionsOptions,
+  WaitUntilReadyOptions,
+} from "./types.js"
+import {delay, normalizeEndpoint} from "./utils.js"
+
+const DEFAULT_STARTUP_TIMEOUT_MS = 10 * 1000
+const DEFAULT_POLL_INTERVAL_MS = 100
+const DEFAULT_CLOSE_TIMEOUT_MS = 5 * 1000
+const DEFAULT_TRACKED_TRANSACTIONS_LIMIT = 32
+const DEFAULT_TRACKED_TRANSACTIONS_TIMEOUT_MS = 10 * 1000
+
+export class Localnet {
+  readonly endpoint: string
+
+  private readonly child?: ChildProcess
+  private readonly coverageRecords: LocalnetCoverageRecord[] = []
+  private readonly traceRecords: LocalnetTraceRecord[] = []
+  private readonly treasuryRecords = new Map<string, LocalnetTreasuryRecord>()
+  private readonly http: LocalnetHttpClient
+  private unregisterAutoClose?: () => void
+  private unregisterAutoReset?: () => void
+
+  constructor(options: LocalnetOptions = {}, child?: ChildProcess, autoClose = false) {
+    this.endpoint = normalizeEndpoint(options.endpoint ?? "http://127.0.0.1:5411")
+    this.child = child
+    this.http = new LocalnetHttpClient(this.endpoint, options.authToken)
+    if (child && autoClose) {
+      this.unregisterAutoClose = registerAutoClose(child)
+    }
+  }
+
+  static connect(options: LocalnetOptions = {}): Localnet {
+    return new Localnet(options)
+  }
+
+  static async start(options: StartLocalnetOptions = {}): Promise<Localnet> {
+    const started = await startLocalnetProcess(options)
+    const localnet = new Localnet(
+      {authToken: options.authToken, endpoint: started.endpoint},
+      started.child,
+      options.autoClose ?? true,
+    )
+    await localnet.waitUntilReady({
+      timeoutMs: options.startupTimeoutMs,
+      pollIntervalMs: options.pollIntervalMs,
+    })
+    if (options.autoClose ?? true) {
+      await localnet.enableTestAutoClose()
+    }
+    if (options.autoReset ?? true) {
+      await localnet.enableAutoReset()
+    }
+    return localnet
+  }
+
+  provider(contract: Contract): ContractProvider
+  provider(address: Address | string, init?: StateInit | null): ContractProvider
+  provider(target: Contract | Address | string, init?: StateInit | null): ContractProvider {
+    if (isContract(target)) {
+      return new LocalnetContractProvider(this, target.address, target.init ?? null)
+    }
+    return new LocalnetContractProvider(this, parseAddress(target), init ?? null)
+  }
+
+  contract<T extends Contract>(contract: T): ContractHandle<T> {
+    return createContractHandle(contract, this.provider(contract))
+  }
+
+  sender(address: Address | string): LocalnetSender {
+    return new LocalnetSender(this, parseAddress(address))
+  }
+
+  treasury(name: string, workchain = 0): LocalnetSender {
+    const address = addressFromSeed(name, workchain)
+    this.treasuryRecords.set(`${workchain}:${name}`, {
+      address: formatAddress(address),
+      name,
+    })
+    return this.sender(address)
+  }
+
+  async nodeInfo(): Promise<LocalnetNodeInfo> {
+    return this.http.getJson<LocalnetNodeInfo>("/acton_nodeInfo")
+  }
+
+  async waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<void> {
+    const timeoutMs = options.timeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
+    const deadline = Date.now() + timeoutMs
+    let lastError: unknown
+
+    while (Date.now() <= deadline) {
+      if (this.child?.exitCode !== null && this.child?.exitCode !== undefined) {
+        throw new ActonError("acton localnet exited before it became ready")
+      }
+
+      try {
+        await this.nodeInfo()
+        return
+      } catch (error) {
+        lastError = error
+        await delay(pollIntervalMs)
+      }
+    }
+
+    throw new ActonError(
+      `Timed out waiting for localnet at ${this.endpoint}: ${errorMessage(lastError)}`,
+    )
+  }
+
+  async close(options: CloseLocalnetOptions = {}): Promise<void> {
+    this.unregisterAutoReset?.()
+    this.unregisterAutoReset = undefined
+    this.unregisterAutoClose?.()
+    this.unregisterAutoClose = undefined
+
+    const child = this.child
+    if (!child || child.exitCode !== null) {
+      return
+    }
+
+    const timeoutMs = options.timeoutMs ?? DEFAULT_CLOSE_TIMEOUT_MS
+    await terminateChild(child, options.signal ?? "SIGTERM", timeoutMs)
+  }
+
+  async sendBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
+    const encoded = encodeBoc(boc)
+
+    if (this.collectCoverage() || this.collectTraces()) {
+      await this.captureMessageDiagnostics(encoded)
+    }
+
+    return this.http.postJson<SendBocResult>("/api/v2/sendBocReturnHash", {boc: encoded})
+  }
+
+  async sendMessage(message: Message): Promise<SendBocResult> {
+    return this.sendBoc(beginCell().store(storeMessage(message)).endCell())
+  }
+
+  async sendInternalMessage(message: Message): Promise<SendBocResult> {
+    return this.sendInternalBoc(beginCell().store(storeMessage(message)).endCell())
+  }
+
+  async transactions(
+    address: Address | string,
+    options: TransactionsOptions = {},
+  ): Promise<Transaction[]> {
+    const query = new URLSearchParams({
+      address: formatAddress(parseAddress(address)),
+      limit: String(options.limit ?? 10),
+    })
+
+    if (options.lt !== undefined) {
+      query.set("lt", options.lt.toString())
+    }
+    if (options.hash !== undefined) {
+      query.set("hash", Buffer.isBuffer(options.hash) ? options.hash.toString("hex") : options.hash)
+    }
+    if (options.toLt !== undefined) {
+      query.set("to_lt", options.toLt.toString())
+    }
+
+    const rows = await this.http.getJson<readonly RawTransaction[]>(
+      `/api/v2/getTransactions?${query}`,
+    )
+    return rows.map(row => loadTransaction(Cell.fromBase64(row.data).beginParse()))
+  }
+
+  async trackTransactions(
+    address: Address | string,
+    action: () => unknown,
+    options: TrackTransactionsOptions = {},
+  ): Promise<Transaction[]> {
+    const parsedAddress = parseAddress(address)
+    const state = await this.getAccountState(parsedAddress)
+    const previousLt = state.last?.lt ?? 0n
+
+    await action()
+
+    const limit = options.limit ?? DEFAULT_TRACKED_TRANSACTIONS_LIMIT
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TRACKED_TRANSACTIONS_TIMEOUT_MS
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
+    const deadline = Date.now() + timeoutMs
+
+    while (true) {
+      const transactions = await this.transactions(parsedAddress, {limit})
+      const tracked = transactions.filter(transaction => transaction.lt > previousLt).reverse()
+      if (tracked.length > 0 || Date.now() >= deadline) {
+        return tracked
+      }
+      await delay(Math.min(pollIntervalMs, Math.max(deadline - Date.now(), 0)))
+    }
+  }
+
+  async airdrop(address: Address | string, amount: bigint | string = toNano("100")): Promise<void> {
+    const amountNanotons = typeof amount === "string" ? toNano(amount) : amount
+    if (amountNanotons > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new ActonError(
+        "airdrop amount must fit into a JSON-safe integer for the localnet faucet",
+      )
+    }
+
+    await this.http.postJson<unknown>("/acton_fundAccount", {
+      address: formatAddress(parseAddress(address)),
+      amount: Number(amountNanotons),
+    })
+  }
+
+  async sendInternalBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
+    return this.http.postJson<SendBocResult>("/acton_sendInternalMessage", {boc: encodeBoc(boc)})
+  }
+
+  async setShardAccount(
+    address: Address | string,
+    shardAccount: string | Cell | Buffer,
+  ): Promise<void> {
+    await this.http.postJson<unknown>("/acton_setShardAccount", {
+      address: formatAddress(parseAddress(address)),
+      shard_account: encodeBoc(shardAccount),
+    })
+  }
+
+  async changeAccountState(
+    address: Address | string,
+    state: LocalnetAccountStateChange,
+  ): Promise<void> {
+    await this.http.postJson<unknown>("/acton_changeAccountState", {
+      address: formatAddress(parseAddress(address)),
+      state: serializeAccountStateChange(state),
+    })
+  }
+
+  async dumpState(path: string): Promise<void> {
+    await this.http.postJson<unknown>("/acton_dumpState", {path})
+  }
+
+  async loadState(path: string): Promise<void> {
+    await this.http.postJson<unknown>("/acton_loadState", {path})
+  }
+
+  async snapshot(): Promise<LocalnetRecoveryPointResult> {
+    return this.http.postJson<LocalnetRecoveryPointResult>("/acton_snapshot", {})
+  }
+
+  async revert(id: number | LocalnetRecoveryPointResult): Promise<LocalnetRecoveryPointResult> {
+    return this.http.postJson<LocalnetRecoveryPointResult>("/acton_revert", {
+      id: typeof id === "number" ? id : id.id,
+    })
+  }
+
+  async mine(blocks = 1): Promise<LocalnetMineResult> {
+    return this.http.postJson<LocalnetMineResult>("/acton_mine", {blocks})
+  }
+
+  async increaseTime(seconds: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_increaseTime", {seconds})
+  }
+
+  async setTime(timestamp: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_setTime", {timestamp})
+  }
+
+  async setNextBlockTimestamp(timestamp: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_setNextBlockTimestamp", {timestamp})
+  }
+
+  async setNetworkConditions(
+    options: LocalnetNetworkConditionsOptions,
+  ): Promise<LocalnetNetworkConditions> {
+    return this.http.postJson<LocalnetNetworkConditions>("/acton_setNetworkConditions", {
+      response_delay_ms: options.responseDelayMs,
+    })
+  }
+
+  async getApiCalls(limit?: number): Promise<LocalnetApiCallLog> {
+    const query = new URLSearchParams()
+    if (limit !== undefined) {
+      query.set("limit", String(limit))
+    }
+    const queryString = query.toString()
+    const suffix = queryString ? `?${queryString}` : ""
+    return this.http.getJson<LocalnetApiCallLog>(`/acton_getApiCalls${suffix}`)
+  }
+
+  async getStartupWallets(): Promise<readonly LocalnetStartupWallet[]> {
+    return this.http.getJson<readonly LocalnetStartupWallet[]>("/acton_getStartupWallets")
+  }
+
+  async setAddressName(address: Address | string, name: string): Promise<void> {
+    await this.http.postJson<unknown>("/acton_setAddressName", {
+      address: formatAddress(parseAddress(address)),
+      name,
+    })
+  }
+
+  async getAddressName(address: Address | string): Promise<string | undefined> {
+    const formattedAddress = formatAddress(parseAddress(address))
+    const names = await this.getAddressNames([formattedAddress])
+    return names[formattedAddress]
+  }
+
+  async getAddressNames(
+    addresses: readonly (Address | string)[],
+  ): Promise<Record<string, string | undefined>> {
+    if (addresses.length === 0) {
+      return {}
+    }
+
+    const query = new URLSearchParams()
+    for (const address of addresses) {
+      query.append("address", formatAddress(parseAddress(address)))
+    }
+    const rows = await this.http.getJson<Record<string, string | null>>(
+      `/acton_getAddressName?${query}`,
+    )
+    return Object.fromEntries(
+      Object.entries(rows).map(([address, name]) => [address, name ?? undefined]),
+    )
+  }
+
+  async registerCompilerAbis(
+    entries: readonly LocalnetCompilerAbiRegistration[],
+  ): Promise<void> {
+    await this.http.postJson<unknown>("/acton_registerCompilerAbis", {
+      entries: entries.map(entry => ({
+        code_hash: entry.codeHash,
+        compiler_abi: entry.compilerAbi,
+      })),
+    })
+  }
+
+  async getCompilerAbis(
+    codeHashes: readonly string[],
+  ): Promise<Record<string, LocalnetExtendedContractAbi | null>> {
+    if (codeHashes.length === 0) {
+      return {}
+    }
+
+    const query = new URLSearchParams()
+    for (const codeHash of codeHashes) {
+      query.append("code_hash", codeHash)
+    }
+    return this.http.getJson<Record<string, LocalnetExtendedContractAbi | null>>(
+      `/acton_getCompilerAbi?${query}`,
+    )
+  }
+
+  async getVerifiedSource(request: LocalnetVerifiedSourceRequest): Promise<unknown> {
+    const query = new URLSearchParams()
+    if (request.address) {
+      query.set("address", request.address)
+    }
+    if (request.codeHash) {
+      query.set("code_hash", request.codeHash)
+    }
+    return this.http.getJson<unknown>(`/acton_getVerifiedSource?${query}`)
+  }
+
+  async getAccountState(address: Address): Promise<ContractState> {
+    const query = new URLSearchParams({address: formatAddress(address)})
+    try {
+      const info = await this.http.getJson<AccountInfoResult>(
+        `/api/v2/getAddressInformation?${query}`,
+      )
+      return toContractState(info)
+    } catch (error) {
+      if (isPreGenesisStateError(error)) {
+        return {
+          balance: 0n,
+          extracurrency: null,
+          last: null,
+          state: {type: "uninit"},
+        }
+      }
+      throw error
+    }
+  }
+
+  async runGetMethod(
+    address: Address,
+    name: string | number,
+    args: readonly TupleItem[],
+  ): Promise<ContractGetMethodResult> {
+    const coverageState = this.collectCoverage() ? await this.getAccountState(address) : undefined
+    const result = await this.http.postJson<RunGetMethodResult>("/api/v2/runGetMethod", {
+      address: formatAddress(address),
+      method: name,
+      stack: args.map(item => tupleItemToLegacyJson(item)),
+    })
+
+    if (result.exit_code !== 0) {
+      throw new ActonError(`Get method ${String(name)} failed with exit code ${result.exit_code}`)
+    }
+
+    if (coverageState?.state.type === "active" && coverageState.state.code && result.vm_log) {
+      this.coverageRecords.push({
+        code: coverageState.state.code.toString("base64"),
+        vmLog: result.vm_log,
+      })
+    }
+
+    return {
+      stack: new TupleReader(result.stack.map(item => legacyJsonToTupleItem(item))),
+      gasUsed: result.gas_used === undefined ? undefined : BigInt(result.gas_used),
+      logs: result.vm_log,
+    }
+  }
+
+  consumeCoverageRecords(): readonly LocalnetCoverageRecord[] {
+    const records = [...this.coverageRecords]
+    this.coverageRecords.length = 0
+    return records
+  }
+
+  consumeTraceRecords(): readonly LocalnetTraceRecord[] {
+    const records = [...this.traceRecords]
+    this.traceRecords.length = 0
+    return records
+  }
+
+  consumeTreasuryRecords(): readonly LocalnetTreasuryRecord[] {
+    const records = [...this.treasuryRecords.values()]
+    this.treasuryRecords.clear()
+    return records
+  }
+
+  private collectCoverage(): boolean {
+    return process.env.ACTON_NODE_COVERAGE === "1"
+  }
+
+  private collectTraces(): boolean {
+    return process.env.ACTON_NODE_TRACE === "1"
+  }
+
+  private async captureMessageDiagnostics(boc: string): Promise<void> {
+    const result = await this.http.postRawJson<EmulateTraceResult>("/api/emulate/v1/emulateTrace", {
+      boc,
+      include_code_data: true,
+    })
+
+    if (this.collectTraces()) {
+      this.traceRecords.push(...(result.acton_trace_records ?? []))
+    }
+
+    if (this.collectCoverage() && result.vm_log) {
+      for (const code of Object.values(result.code_cells ?? {})) {
+        this.coverageRecords.push({code, vmLog: result.vm_log})
+      }
+    }
+  }
+
+  private async enableAutoReset(): Promise<void> {
+    const snapshot = createStateSnapshotPath()
+    let active = true
+
+    const registered = await registerAfterEach(async () => {
+      if (active) {
+        await this.loadState(snapshot.path)
+      }
+    })
+
+    if (!registered) {
+      snapshot.cleanup()
+      return
+    }
+
+    await this.dumpState(snapshot.path)
+    this.unregisterAutoReset = () => {
+      active = false
+      snapshot.cleanup()
+    }
+  }
+
+  private async enableTestAutoClose(): Promise<void> {
+    await registerAfterAll(async () => {
+      await this.close()
+    })
+  }
+}
+
+function isPreGenesisStateError(error: unknown): boolean {
+  return error instanceof LocalnetApiError && error.message === "Block 0 not found"
+}
+
+function encodeBoc(boc: string | Cell | Buffer): string {
+  return typeof boc === "string"
+    ? boc
+    : Buffer.isBuffer(boc)
+      ? boc.toString("base64")
+      : boc.toBoc().toString("base64")
+}
+
+function serializeAccountStateChange(state: LocalnetAccountStateChange): unknown {
+  switch (state.type) {
+    case "nonexist":
+      return {type: "nonexist"}
+    case "uninit":
+      return {
+        type: "uninit",
+        ...(state.balance !== undefined ? {balance: String(state.balance)} : {}),
+      }
+    case "frozen":
+      if ("source" in state) {
+        return {type: "frozen", source: state.source}
+      }
+      return {
+        type: "frozen",
+        frozen_hash: Buffer.isBuffer(state.frozenHash)
+          ? state.frozenHash.toString("base64")
+          : state.frozenHash,
+        ...(state.balance !== undefined ? {balance: String(state.balance)} : {}),
+      }
+  }
+}
+
+function registerAutoClose(child: ChildProcess): () => void {
+  child.unref()
+  let registered = true
+
+  const killChild = (): void => {
+    if (child.exitCode === null && !child.killed) {
+      child.kill("SIGTERM")
+    }
+  }
+
+  const unregister = (): void => {
+    if (!registered) {
+      return
+    }
+    registered = false
+    process.off("beforeExit", killChild)
+    process.off("exit", killChild)
+  }
+
+  child.once("exit", unregister)
+  process.once("beforeExit", killChild)
+  process.once("exit", killChild)
+  return unregister
+}
+
+function terminateChild(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  timeoutMs: number,
+): Promise<void> {
+  if (child.exitCode !== null) {
+    return Promise.resolve()
+  }
+
+  return new Promise(resolve => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (child.exitCode === null) {
+        child.kill("SIGKILL")
+      }
+      finish()
+    }, timeoutMs)
+
+    const finish = (): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      child.off("exit", finish)
+      resolve()
+    }
+
+    timeout.unref()
+    child.once("exit", finish)
+    child.kill(signal)
+    if (child.exitCode !== null) {
+      finish()
+    }
+  })
+}
+
+function createStateSnapshotPath(): {readonly path: string; readonly cleanup: () => void} {
+  const directory = mkdtempSync(path.join(tmpdir(), "acton-localnet-state-"))
+  return {
+    path: path.join(directory, "initial-state.json"),
+    cleanup: () => {
+      rmSync(directory, {force: true, recursive: true})
+    },
+  }
+}
