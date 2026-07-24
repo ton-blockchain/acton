@@ -59,6 +59,7 @@ import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import {FaucetPage} from "./faucet/FaucetPage"
+import {LandingPage} from "./landing/LandingPage"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -894,6 +895,14 @@ const DesktopMoreMenu: FC = () => {
       contentClassName={styles.desktopMorePopover}
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/landing" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Why actonscan</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Explore the developer workflow
+              </span>
+            </span>
+          </Link>
           <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Faucet</span>
@@ -1355,6 +1364,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/sources" onClick={closeMobileHeaderPanels}>
                                 Sources
                               </Link>
+                              <Link to="/landing" onClick={closeMobileHeaderPanels}>
+                                Why actonscan
+                              </Link>
                               <Link to="/faucet" onClick={closeMobileHeaderPanels}>
                                 Faucet
                               </Link>
@@ -1403,6 +1415,7 @@ export const ExplorerApp: FC = () => {
                         }
                       />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route path="/landing" element={<LandingPage />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
