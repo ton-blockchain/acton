@@ -1,3 +1,5 @@
+/// <reference path="../../types/d3-flame-graph.d.ts" />
+
 import type React from "react"
 import {Checkbox} from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"

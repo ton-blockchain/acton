@@ -336,7 +336,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const traceReplayRef = useRef<{
     readonly traceHash: string
     readonly promise: Promise<RetraceTraceResult>
-  }>()
+  } | undefined>(undefined)
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const selectedTraceTransaction = useMemo(() => {
     const requestedHash = hash.toLowerCase()
