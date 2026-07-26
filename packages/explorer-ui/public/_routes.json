@@ -1,5 +1,14 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/assets/*", "/favicon.svg"]
+  "exclude": [
+    "/assets/*",
+    "/apple-touch-icon.png",
+    "/favicon-96x96.png",
+    "/favicon.ico",
+    "/favicon.svg",
+    "/site.webmanifest",
+    "/web-app-manifest-192x192.png",
+    "/web-app-manifest-512x512.png"
+  ]
 }
