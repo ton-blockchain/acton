@@ -2,7 +2,7 @@ use crate::common::assertion;
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tycho_types::boc::Boc;
 use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
@@ -1190,6 +1190,72 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
         !trace_dir.exists(),
         "Trace dir should not exist without --save-test-trace: {}",
         trace_dir.display()
+    );
+}
+
+#[test]
+fn manual_run_with_studio_endpoint_saves_trace_for_history() {
+    let project = trace_project(
+        "h-manual-studio-trace",
+        r"
+        get fun `test studio history trace`() {
+            deployCounter();
+        }
+        ",
+    );
+
+    project
+        .acton()
+        .env("ACTON_STUDIO_URL", "http://127.0.0.1:1")
+        .env("ACTON_STUDIO_RUN_ID", "manual-studio-trace")
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let run = read_json_from_project(&project, ".studio/tests/runs/manual-studio-trace.json");
+    let report = &run["reports"][0];
+    let trace_path = report["trace_path"]
+        .as_str()
+        .expect("Studio history report should reference its transaction trace");
+    let trace_relative_path =
+        PathBuf::from(".studio/tests/traces/manual-studio-trace").join(trace_path);
+    let trace = read_json_from_project(
+        &project,
+        trace_relative_path
+            .to_str()
+            .expect("Trace path should be valid UTF-8"),
+    );
+    let transaction_count = trace["traces"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|chain| chain["transactions"].as_array())
+        .map(Vec::len)
+        .sum::<usize>();
+    let project_root =
+        dunce::canonicalize(project.path()).unwrap_or_else(|_| project.path().to_path_buf());
+    let trace_dir = run["traceDir"]
+        .as_str()
+        .and_then(|path| Path::new(path).strip_prefix(&project_root).ok())
+        .map_or_else(
+            || "<outside-project>".to_owned(),
+            |path| path.display().to_string(),
+        );
+
+    assert_trace_summary_snapshot(
+        format!(
+            "run_source: {}\ntrace_dir: {trace_dir}\ntrace_path: {trace_path}\ntransactions: {transaction_count}\n",
+            run["source"].as_str().unwrap_or("<missing>"),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/manual_run_with_studio_endpoint_saves_trace_for_history.txt",
+    );
+    assert_trace_json_contract(
+        &project,
+        trace_relative_path
+            .to_str()
+            .expect("Trace path should be valid UTF-8"),
+        "test studio history trace",
     );
 }
 

@@ -9,6 +9,7 @@ use acton_studio::{
     StudioTestExecutionLogs, StudioTestReport, TestDescriptorSummary, TestIdentity, TestRunEvent,
     TestRunEventEnvelope, TestRunRecord, TestRunSource, TestRunStats, TestRunStatus,
     is_valid_test_run_id, load_studio_daemon_descriptor, new_test_run_id, persist_test_run,
+    test_trace_dir,
 };
 use chrono::Utc;
 use crossbeam_channel::{Sender, TrySendError};
@@ -39,7 +40,7 @@ struct StudioEventWorker {
 }
 
 impl StudioReporter {
-    pub(crate) fn new(project_root: &Path, config: &TestConfig) -> Self {
+    pub(crate) fn prepare(project_root: &Path, config: &mut TestConfig) -> Self {
         let run_id = std::env::var("ACTON_STUDIO_RUN_ID")
             .ok()
             .filter(|value| is_valid_test_run_id(value))
@@ -50,14 +51,6 @@ impl StudioReporter {
         };
         let project_root =
             dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
-        let trace_dir = config.save_test_trace.as_deref().map(PathBuf::from);
-        let run = TestRunRecord::new(
-            run_id.clone(),
-            project_root.clone(),
-            source,
-            std::env::args().collect(),
-            trace_dir,
-        );
         let disabled = std::env::var(INTERNAL_DISABLE_STUDIO_REPORTER_ENV)
             .is_ok_and(|value| value.trim() == "1");
         let dropped_events = Arc::new(AtomicUsize::new(0));
@@ -65,9 +58,27 @@ impl StudioReporter {
             None
         } else {
             studio_url(&project_root).and_then(|studio_url| {
-                start_event_worker(studio_url, run_id, Arc::clone(&dropped_events))
+                start_event_worker(studio_url, run_id.clone(), Arc::clone(&dropped_events))
             })
         };
+        if source == TestRunSource::Manual
+            && event_worker.is_some()
+            && config.save_test_trace.is_none()
+        {
+            config.save_test_trace = Some(
+                test_trace_dir(&project_root, &run_id)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+        let trace_dir = config.save_test_trace.as_deref().map(PathBuf::from);
+        let run = TestRunRecord::new(
+            run_id,
+            project_root.clone(),
+            source,
+            std::env::args().collect(),
+            trace_dir,
+        );
 
         Self {
             project_root,

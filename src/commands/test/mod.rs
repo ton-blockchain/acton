@@ -562,7 +562,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let project_root = configured_project_root();
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
-    let studio_reporter = StudioReporter::new(project_root, &config);
+    let studio_reporter = StudioReporter::prepare(project_root, &mut config);
 
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
