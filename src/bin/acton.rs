@@ -38,6 +38,7 @@ use acton_config::test::{
     BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
     TestConfig,
 };
+use acton_studio::DEFAULT_STUDIO_PORT;
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
@@ -52,6 +53,7 @@ use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
@@ -946,6 +948,11 @@ enum Commands {
         #[command(subcommand)]
         command: LocalnetCommand,
     },
+    #[command(about = "Manage Acton Studio")]
+    Studio {
+        #[command(subcommand)]
+        command: StudioCommand,
+    },
     #[command(
         about = "Format project Tolk source files",
         after_help = detailed_help_pointer("fmt")
@@ -1297,6 +1304,30 @@ pub enum LocalnetCommand {
     Checkpoint {
         #[command(subcommand)]
         command: LocalnetCheckpointCommand,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum StudioCommand {
+    #[command(about = "Start Acton Studio")]
+    Start {
+        #[arg(
+            long,
+            value_name = "IP",
+            default_value = "127.0.0.1",
+            help = "Address for the Studio server to listen on"
+        )]
+        host: IpAddr,
+        #[arg(
+            long,
+            value_name = "PORT",
+            default_value_t = DEFAULT_STUDIO_PORT,
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "Studio server port"
+        )]
+        port: u16,
+        #[arg(long, help = "Do not open Studio in the default browser")]
+        no_open: bool,
     },
 }
 
@@ -1733,7 +1764,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("init", "")];
+    let core_commands = vec![("new", "[PATH]"), ("init", ""), ("studio", "<COMMAND>")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -2638,6 +2669,19 @@ fn main() {
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Studio { command } => match command {
+            StudioCommand::Start {
+                host,
+                port,
+                no_open,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to initialize tokio runtime for Studio");
+                rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
+            }
+        },
         Commands::Localnet { command } => match command {
             LocalnetCommand::Start {
                 port,
@@ -2931,7 +2975,10 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
     command_configures_project_roots(command)
         && !matches!(
             command,
-            Commands::Up { .. } | Commands::Completions { .. } | Commands::Doctor
+            Commands::Up { .. }
+                | Commands::Completions { .. }
+                | Commands::Doctor
+                | Commands::Studio { .. }
         )
 }
 

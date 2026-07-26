@@ -20,6 +20,7 @@ dependencies = [
  "acton-config",
  "acton-debug",
  "acton-mdman",
+ "acton-studio",
  "anyhow",
  "axum",
  "base64",
@@ -196,6 +197,20 @@ dependencies = [
  "getrandom 0.3.4",
  "serde-wasm-bindgen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "acton-studio"
+version = "1.1.0"
+dependencies = [
+ "axum",
+ "expect-test",
+ "include_dir",
+ "serde",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.5.2",
+ "tower-http",
 ]
 
 [[package]]

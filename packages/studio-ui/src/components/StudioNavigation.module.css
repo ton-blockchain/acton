@@ -177,27 +177,6 @@
   white-space: nowrap;
 }
 
-.workspaceForkBadge {
-  display: inline-flex;
-  max-width: 116px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  flex: 0 1 auto;
-  box-sizing: border-box;
-  padding: 0 7px;
-  overflow: hidden;
-  color: var(--acton-color-text-muted);
-  font-size: 0.66rem;
-  font-weight: 650;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: var(--acton-color-surface-raised);
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: 999px;
-}
-
 .workspaceMeta {
   overflow: hidden;
   color: var(--acton-color-text-muted);
@@ -951,10 +930,6 @@
     display: none;
   }
 
-  .workspaceForkBadge {
-    max-width: 140px;
-  }
-
   .topControls {
     gap: 0;
   }
@@ -1072,10 +1047,6 @@
 
   .workspaceName {
     font-size: 0.88rem;
-  }
-
-  .workspaceForkBadge {
-    max-width: 116px;
   }
 
   .navScroll {

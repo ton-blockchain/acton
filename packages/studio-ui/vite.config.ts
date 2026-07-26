@@ -9,6 +9,9 @@ export default defineConfig({
   },
   server: {
     port: 3015,
+    proxy: {
+      "/api": "http://127.0.0.1:3016",
+    },
   },
   preview: {
     port: 3015,

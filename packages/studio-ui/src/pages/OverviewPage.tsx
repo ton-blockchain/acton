@@ -1,19 +1,54 @@
 import {ArrowRight, Radio, Sparkles} from "lucide-react"
 import type {MouseEvent} from "react"
 
+import type {StudioConnectionState} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 
 import styles from "./OverviewPage.module.css"
 
 interface OverviewPageProps {
+  readonly connectionState: StudioConnectionState
   readonly pages: readonly StudioPage[]
   readonly projectName?: string
   readonly projectPath?: string
   readonly onNavigate: (path: StudioPath) => void
 }
 
-export function OverviewPage({pages, projectName, projectPath, onNavigate}: OverviewPageProps) {
+export function OverviewPage({
+  connectionState,
+  pages,
+  projectName,
+  projectPath,
+  onNavigate,
+}: OverviewPageProps) {
   const featurePages = pages.filter(page => page.path !== "/")
+  const connectionLabel =
+    connectionState === "connected"
+      ? "Connected"
+      : connectionState === "connecting"
+        ? "Connecting"
+        : "Not connected"
+  const connectionDescription =
+    connectionState === "connected"
+      ? "Studio server is available"
+      : connectionState === "connecting"
+        ? "Looking for Studio server"
+        : "Start Studio with acton studio start"
+  const connectionDotClass =
+    connectionState === "connected"
+      ? styles.statusDotConnected
+      : connectionState === "disconnected"
+        ? styles.statusDotDisconnected
+        : ""
+  const workspaceDescription =
+    projectPath ??
+    (connectionState === "connected"
+      ? projectName
+        ? "Project open"
+        : "No project selected"
+      : connectionState === "connecting"
+        ? "Connecting to Studio server"
+        : "Waiting for Studio server")
 
   const navigateFromAnchor = (event: MouseEvent<HTMLAnchorElement>, path: StudioPath) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -30,15 +65,15 @@ export function OverviewPage({pages, projectName, projectPath, onNavigate}: Over
         <div className={styles.signal}>
           <strong>{projectName || "No project open"}</strong>
           <small className={projectPath ? styles.technicalValue : undefined}>
-            {projectPath || "Waiting for Studio daemon"}
+            {workspaceDescription}
           </small>
         </div>
         <div className={styles.signal}>
           <strong className={styles.signalValue}>
-            <span className={styles.neutralDot} />
-            Not connected
+            <span className={`${styles.statusDot} ${connectionDotClass}`} />
+            {connectionLabel}
           </strong>
-          <small>UI foundation is running locally</small>
+          <small>{connectionDescription}</small>
         </div>
         <div className={styles.signal}>
           <strong className={styles.signalValue}>
@@ -98,7 +133,7 @@ export function OverviewPage({pages, projectName, projectPath, onNavigate}: Over
             </span>
             <div>
               <strong>Your activity will appear here</strong>
-              <p>Runs, simulations and environment events will share one local timeline</p>
+              <p>Runs, simulations and environment events will share one timeline</p>
             </div>
           </div>
         </section>

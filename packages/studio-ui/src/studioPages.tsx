@@ -50,7 +50,7 @@ export const studioFeaturePages: Readonly<Record<Exclude<StudioPath, "/">, Studi
     actionLabel: "Create environment",
     emptyTitle: "No virtual environments yet",
     emptyDescription:
-      "Your local environments will appear here after Studio is connected to the Acton runtime",
+      "Your environments will appear here after Studio is connected to the Acton runtime",
   },
   "/simulator": {
     ...studioPages[2],

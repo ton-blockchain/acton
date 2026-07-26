@@ -12,8 +12,6 @@ interface StudioNavigationProps {
   readonly className?: string
   readonly isSidebarCollapsed?: boolean
   readonly pages: readonly StudioPage[]
-  readonly projectName?: string
-  readonly projectPath?: string
   readonly onNavigate: (path: StudioPath) => void
   readonly onToggleSidebar?: () => void
 }
@@ -23,8 +21,6 @@ export function StudioNavigation({
   className,
   isSidebarCollapsed = false,
   pages,
-  projectName,
-  projectPath,
   onNavigate,
   onToggleSidebar,
 }: StudioNavigationProps) {
@@ -54,10 +50,9 @@ export function StudioNavigation({
       <span className={styles.workspaceMark} />
       <span className={styles.workspaceBody}>
         <span className={styles.workspaceTitleRow}>
-          <span className={styles.workspaceName}>{projectName || "Acton Studio"}</span>
-          {projectName && <span className={styles.workspaceForkBadge}>local</span>}
+          <span className={styles.workspaceName}>Acton Studio</span>
         </span>
-        <span className={styles.workspaceMeta}>{projectPath || "by Acton"}</span>
+        <span className={styles.workspaceMeta}>by Acton</span>
       </span>
     </div>
   )

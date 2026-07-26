@@ -48,12 +48,20 @@
   gap: var(--acton-space-2);
 }
 
-.neutralDot {
+.statusDot {
   width: 0.45rem;
   height: 0.45rem;
   flex: 0 0 auto;
   background: var(--acton-color-text-subtle);
   border-radius: var(--acton-radius-round);
+}
+
+.statusDotConnected {
+  background: var(--acton-color-success);
+}
+
+.statusDotDisconnected {
+  background: var(--acton-color-danger-text);
 }
 
 .technicalValue {

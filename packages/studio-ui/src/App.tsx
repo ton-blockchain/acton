@@ -5,6 +5,11 @@ import {Button, ToastProvider, useToast} from "@acton/ui"
 import {StudioShell} from "./components/StudioShell"
 import {FeaturePage} from "./pages/FeaturePage"
 import {OverviewPage} from "./pages/OverviewPage"
+import {
+  fetchStudioInfo,
+  type StudioConnectionState,
+  type StudioInfo,
+} from "./studioApi"
 import {isStudioPath, studioFeaturePages, studioPages, type StudioPath} from "./studioPages"
 
 const configuredProjectName = import.meta.env.VITE_STUDIO_PROJECT_NAME?.trim() || undefined
@@ -23,6 +28,25 @@ function readPath(): StudioPath {
 function StudioApp() {
   const {showToast} = useToast()
   const [activePath, setActivePath] = useState<StudioPath>(readPath)
+  const [studioInfo, setStudioInfo] = useState<StudioInfo>()
+  const [connectionState, setConnectionState] =
+    useState<StudioConnectionState>("connecting")
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetchStudioInfo(controller.signal)
+      .then(info => {
+        setStudioInfo(info)
+        setConnectionState("connected")
+      })
+      .catch(error => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setConnectionState("disconnected")
+      })
+
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const updatePath = () => setActivePath(readPath())
@@ -54,6 +78,7 @@ function StudioApp() {
 
   const activeFeaturePage = activePath === "/" ? undefined : studioFeaturePages[activePath]
   const ActiveFeatureIcon = activeFeaturePage?.icon
+  const projectName = studioInfo?.workspace?.name ?? configuredProjectName
 
   return (
     <StudioShell
@@ -85,14 +110,13 @@ function StudioApp() {
         ) : undefined
       }
       pages={studioPages}
-      projectName={configuredProjectName}
-      projectPath={configuredProjectPath}
       onNavigate={navigate}
     >
       {activePath === "/" ? (
         <OverviewPage
+          connectionState={connectionState}
           pages={studioPages}
-          projectName={configuredProjectName}
+          projectName={projectName}
           projectPath={configuredProjectPath}
           onNavigate={navigate}
         />

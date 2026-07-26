@@ -16,8 +16,6 @@ interface StudioShellProps {
   readonly children: ReactNode
   readonly headerActions?: ReactNode
   readonly pages: readonly StudioPage[]
-  readonly projectName?: string
-  readonly projectPath?: string
   readonly onNavigate: (path: StudioPath) => void
 }
 
@@ -26,8 +24,6 @@ export function StudioShell({
   children,
   headerActions,
   pages,
-  projectName,
-  projectPath,
   onNavigate,
 }: StudioShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -166,8 +162,6 @@ export function StudioShell({
             className={styles.floatingSidebar}
             isSidebarCollapsed={isSidebarCollapsed}
             pages={pages}
-            projectName={projectName}
-            projectPath={projectPath}
             onNavigate={onNavigate}
             onToggleSidebar={toggleSidebar}
           />

@@ -279,6 +279,26 @@ fn test_acton_rpc_help() {
 }
 
 #[test]
+fn test_acton_studio_help() {
+    snapbox::cmd::Command::acton_ui()
+        .args(["studio", "--help"])
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/studio/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
+fn test_acton_studio_start_help() {
+    snapbox::cmd::Command::acton_ui()
+        .args(["studio", "start", "--help"])
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/studio_start/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
 fn test_acton_rpc_info_help() {
     snapbox::cmd::Command::acton_ui()
         .args(["rpc", "info", "--help"])
