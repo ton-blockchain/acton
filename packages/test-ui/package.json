@@ -5,7 +5,9 @@
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
-  "main": "index.js",
+  "exports": {
+    "./embed": "./src/embed.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",

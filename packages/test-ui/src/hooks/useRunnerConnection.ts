@@ -1,10 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from "react"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {isAbortError} from "./request"
 
 const RUNNER_HEALTH_POLL_INTERVAL_MS = 1500
 
 export function useRunnerConnection() {
+  const {url} = useTestUiApi()
   const [connectionLost, setConnectionLost] = useState(false)
   const hasConnected = useRef(false)
 
@@ -22,7 +24,7 @@ export function useRunnerConnection() {
       const controller = new AbortController()
       activeController = controller
       try {
-        const response = await fetch("/api/health", {
+        const response = await fetch(url("/health"), {
           cache: "no-store",
           signal: controller.signal,
         })
@@ -51,7 +53,7 @@ export function useRunnerConnection() {
       activeController?.abort()
       globalThis.clearInterval(intervalId)
     }
-  }, [markConnected])
+  }, [markConnected, url])
 
   return {connectionLost, markConnected}
 }

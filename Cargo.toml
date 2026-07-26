@@ -81,6 +81,7 @@ tree-sitter-toml-ng = "0.7.0"
 handlebars = { version = "6.4.0", features = ["dir_source"] }
 pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
 url = "2.5.7"
+uuid = { version = "1.18", features = ["serde", "v4"] }
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -290,6 +291,7 @@ quick-junit = { workspace = true } # junit format for tests
 
 # disasm for blockchain addresses
 reqwest = { workspace = true }
+urlencoding = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
 machine-uid = { workspace = true }

@@ -97,6 +97,7 @@
       "name": "@acton/studio-ui",
       "version": "0.1.0",
       "dependencies": {
+        "@acton/test-ui": "workspace:*",
         "@acton/transaction-ui": "workspace:*",
         "@acton/ui": "workspace:*",
         "@monaco-editor/react": "^4.7.0",

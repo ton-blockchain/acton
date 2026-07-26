@@ -1,0 +1,17 @@
+:root {
+  --acton-test-color-status-skipped: #f59e0b;
+  --acton-test-color-status-skipped-surface: #fffbeb;
+  --acton-test-color-status-skipped-text: #92400e;
+  --acton-test-color-status-todo: #3b82f6;
+  --acton-test-color-status-todo-surface: #eff6ff;
+  --acton-test-color-status-todo-text: #1e40af;
+}
+
+:root.dark-theme {
+  --acton-test-color-status-skipped: #f59e0b;
+  --acton-test-color-status-skipped-surface: rgb(120 53 15 / 32%);
+  --acton-test-color-status-skipped-text: #fcd34d;
+  --acton-test-color-status-todo: #3b82f6;
+  --acton-test-color-status-todo-surface: rgb(30 64 175 / 32%);
+  --acton-test-color-status-todo-text: #93c5fd;
+}

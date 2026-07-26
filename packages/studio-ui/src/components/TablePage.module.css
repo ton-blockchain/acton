@@ -1,0 +1,43 @@
+.page {
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.errorPanel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  color: var(--acton-color-danger-text);
+  background: color-mix(in srgb, var(--acton-color-danger) 7%, var(--acton-color-surface));
+  border: 1px solid color-mix(in srgb, var(--acton-color-danger) 38%, var(--acton-color-border));
+  border-radius: var(--acton-radius-panel);
+}
+
+.errorPanel div {
+  display: grid;
+  gap: 2px;
+}
+
+.errorPanel strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.errorPanel span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+@media (max-width: 680px) {
+  .errorPanel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .errorPanel > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

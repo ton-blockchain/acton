@@ -1,15 +1,24 @@
 import {useEffect, useRef, useState} from "react"
 import type {BackendContractInfo} from "@acton/transaction-ui"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {isAbortError} from "./request"
 
 export function useContracts(contractNames: string[]) {
+  const {baseUrl, url} = useTestUiApi()
   const [contracts, setContracts] = useState<Record<string, BackendContractInfo>>({})
   const [loading, setLoading] = useState(false)
   const fetchedNames = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const namesToFetch = contractNames.filter(name => !fetchedNames.current.has(name))
+    fetchedNames.current.clear()
+    setContracts({})
+  }, [baseUrl])
+
+  useEffect(() => {
+    const namesToFetch = contractNames.filter(
+      name => !fetchedNames.current.has(`${baseUrl}:${name}`),
+    )
 
     if (namesToFetch.length === 0) return
 
@@ -21,7 +30,7 @@ export function useContracts(contractNames: string[]) {
         const results = await Promise.all(
           namesToFetch.map(async name => {
             try {
-              const response = await fetch(`/api/contract/${encodeURIComponent(name)}`, {
+              const response = await fetch(url(`/contract/${encodeURIComponent(name)}`), {
                 signal: controller.signal,
               })
               if (!response.ok) throw new Error(`Failed to fetch contract ${name}`)
@@ -40,7 +49,7 @@ export function useContracts(contractNames: string[]) {
           const next = {...previous}
           for (const {name, data} of results) {
             if (data) next[name] = data
-            fetchedNames.current.add(name)
+            fetchedNames.current.add(`${baseUrl}:${name}`)
           }
           return next
         })
@@ -55,7 +64,7 @@ export function useContracts(contractNames: string[]) {
 
     void loadContracts()
     return () => controller.abort()
-  }, [contractNames])
+  }, [baseUrl, contractNames, url])
 
   return {contracts, loading}
 }

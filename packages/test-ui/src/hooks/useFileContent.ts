@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {getErrorMessage, isAbortError} from "./request"
 
 interface FileContentState {
@@ -17,6 +18,7 @@ const EMPTY_FILE_CONTENT: FileContentState = {
 }
 
 export function useFileContent(filePath: string | undefined) {
+  const {url} = useTestUiApi()
   const [state, setState] = useState<FileContentState>(EMPTY_FILE_CONTENT)
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useFileContent(filePath: string | undefined) {
 
     const loadContent = async () => {
       try {
-        const response = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`, {
+        const response = await fetch(url(`/file?path=${encodeURIComponent(filePath)}`), {
           signal: controller.signal,
         })
         if (!response.ok) {
@@ -49,7 +51,7 @@ export function useFileContent(filePath: string | undefined) {
 
     void loadContent()
     return () => controller.abort()
-  }, [filePath])
+  }, [filePath, url])
 
   if (filePath === undefined) return EMPTY_FILE_CONTENT
   if (state.filePath === filePath) return state

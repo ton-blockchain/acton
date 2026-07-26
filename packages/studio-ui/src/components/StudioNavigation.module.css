@@ -871,6 +871,110 @@
   background: var(--acton-color-danger-text);
 }
 
+.testRunNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px 0 1px 8px;
+  margin: 2px 0 6px 17px;
+  list-style: none;
+  border-left: 1px solid var(--acton-color-border);
+}
+
+.testRunNavItem {
+  display: grid;
+  width: 100%;
+  min-height: 50px;
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 7px 9px;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.testRunNavItem:hover,
+.testRunNavItemActive {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.testRunNavItem:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 0;
+}
+
+.testRunNavItem > svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  color: var(--acton-color-text-subtle);
+}
+
+.testRunNavItem > svg[data-run-status="passed"] {
+  color: var(--acton-color-success);
+}
+
+.testRunNavItem > svg[data-run-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.testRunNavBody {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.testRunNavTop {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.testRunNavTop strong {
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.testRunNavTop time,
+.testRunNavMeta {
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-2xs);
+  white-space: nowrap;
+}
+
+.testRunNavMeta {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.testRunNavSpinner {
+  animation: test-run-navigation-spin 900ms linear infinite;
+}
+
+@keyframes test-run-navigation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .contentArea {
   display: flex;
   height: 100%;
@@ -971,15 +1075,22 @@
   margin-inline: 0;
 }
 
+.contentWorkspace {
+  max-width: none;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  margin-inline: 0;
+  overflow: hidden;
+}
+
 @media (max-width: 920px) {
   .page {
     display: flex;
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
   }
 
   .sidebarSlot,
@@ -1234,8 +1345,10 @@
   .contentArea {
     height: auto;
     min-height: 0;
-    flex: 0 0 auto;
-    overflow: visible;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .pageHeader {
@@ -1254,6 +1367,28 @@
     gap: 18px;
     padding: 18px 16px 48px;
     overflow: visible;
+  }
+
+  .contentFull {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: calc(100% - 48px);
+    gap: 0;
+    padding: 0;
+    margin-inline: 0;
+  }
+
+  .contentWorkspace {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    gap: 0;
+    padding: 0;
+    margin-inline: 0;
+    overflow: hidden;
   }
 }
 
@@ -1283,6 +1418,11 @@
 
   .content {
     padding: 16px 12px 40px;
+  }
+
+  .contentFull,
+  .contentWorkspace {
+    padding: 0;
   }
 
   .pageHeaderInner {

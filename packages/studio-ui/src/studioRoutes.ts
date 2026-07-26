@@ -1,7 +1,7 @@
 import {isStudioPath, type StudioPath} from "./studioPages"
 
-const trailingSlashesPattern = /\/+$/
 const environmentPathPattern = /^\/virtual-environments\/([^/]+)(?:\/.*)?$/
+const testRunPathPattern = /^\/tests\/([^/]+)$/
 
 export type StudioRoute =
   | {
@@ -13,10 +13,13 @@ export type StudioRoute =
       readonly environmentId: string
       readonly kind: "environment"
     }
+  | {
+      readonly kind: "test-run"
+      readonly runId: string
+    }
 
 export function readStudioRoute(pathname = globalThis.location.pathname): StudioRoute {
-  const normalizedPath =
-    pathname.length > 1 ? pathname.replace(trailingSlashesPattern, "") : pathname
+  const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname
   const environmentMatch = environmentPathPattern.exec(normalizedPath)
 
   if (environmentMatch) {
@@ -32,6 +35,18 @@ export function readStudioRoute(pathname = globalThis.location.pathname): Studio
     }
   }
 
+  const testRunMatch = testRunPathPattern.exec(normalizedPath)
+  if (testRunMatch) {
+    try {
+      return {
+        kind: "test-run",
+        runId: decodeURIComponent(testRunMatch[1]),
+      }
+    } catch {
+      return {kind: "page", path: "/tests"}
+    }
+  }
+
   return {
     kind: "page",
     path: isStudioPath(normalizedPath) ? normalizedPath : "/",
@@ -40,4 +55,8 @@ export function readStudioRoute(pathname = globalThis.location.pathname): Studio
 
 export function environmentStudioPath(environmentId: string) {
   return `/virtual-environments/${encodeURIComponent(environmentId)}`
+}
+
+export function testRunStudioPath(runId: string) {
+  return `/tests/${encodeURIComponent(runId)}`
 }

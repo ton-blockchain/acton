@@ -17,6 +17,7 @@
     "preview": "vite preview --port 3015"
   },
   "dependencies": {
+    "@acton/test-ui": "workspace:*",
     "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",

@@ -10,7 +10,10 @@ use crate::commands::test::mutation::session::{
     MutationRecord, MutationSessionEvent, MutationStatus, append_mutation_session_event,
     load_or_create_mutation_session, mutation_summary,
 };
-use crate::commands::test::{INTERNAL_REQUIRE_TESTS_ENV, INTERNAL_SKIP_BUILD_ENV, TestConfig};
+use crate::commands::test::{
+    INTERNAL_DISABLE_STUDIO_REPORTER_ENV, INTERNAL_REQUIRE_TESTS_ENV, INTERNAL_SKIP_BUILD_ENV,
+    TestConfig,
+};
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::{
     ActonConfig, ContractConfig, manifest_path as configured_manifest_path,
@@ -542,6 +545,7 @@ fn run_single_mutation(
         append_mutation_test_command_args(&mut cmd, context.paths, context.config);
         cmd.arg("--mutate-overrides")
             .arg(format_mutation_overrides_arg(&mutation_overrides));
+        cmd.env(INTERNAL_DISABLE_STUDIO_REPORTER_ENV, "1");
 
         if context.skip_build_for_child_tests {
             cmd.env(INTERNAL_SKIP_BUILD_ENV, "1");
@@ -976,6 +980,7 @@ fn run_mutation_baseline_tests(paths: &[String], config: &TestConfig) -> anyhow:
     append_mutation_test_command_args(&mut cmd, paths, config);
     cmd.env(INTERNAL_SKIP_BUILD_ENV, "1");
     cmd.env(INTERNAL_REQUIRE_TESTS_ENV, "1");
+    cmd.env(INTERNAL_DISABLE_STUDIO_REPORTER_ENV, "1");
 
     let output = match run_command_output_interruptible(&mut cmd)? {
         InterruptibleOutput::Completed(output) => output,

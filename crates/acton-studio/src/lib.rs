@@ -20,12 +20,28 @@ use tower_http::services::{ServeDir, ServeFile};
 
 mod environment;
 mod local_process;
+mod local_test_process;
+mod test_api;
+mod test_run;
+mod test_runtime;
 
 pub use environment::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment,
 };
 pub use local_process::LocalProcessEnvironmentRuntime;
+pub use local_test_process::LocalProcessTestRunRuntime;
+pub use test_run::{
+    STUDIO_TEST_RUN_FORMAT_VERSION, STUDIO_TEST_RUNS_PATH, StartTestRunRequest,
+    StudioDaemonDescriptor, StudioTestDuration, StudioTestExecutionLogs, StudioTestReport,
+    TestDescriptorSummary, TestIdentity, TestOutputStream, TestRunEvent, TestRunEventEnvelope,
+    TestRunOutput, TestRunRecord, TestRunSource, TestRunStats, TestRunStatus, TestRunStreamEvent,
+    TestRunSummary, is_valid_test_run_id, load_studio_daemon_descriptor, load_test_runs,
+    new_test_run_id, persist_studio_daemon_descriptor, persist_test_run,
+    remove_studio_daemon_descriptor, studio_daemon_descriptor_path,
+    test_contract_artifact_file_name, test_history_dir, test_output_paths, test_trace_dir,
+};
+pub use test_runtime::{TestRunRuntime, TestRunRuntimeError, TestRunRuntimeFuture};
 
 pub const DEFAULT_STUDIO_PORT: u16 = 3015;
 pub const STUDIO_API_VERSION: u32 = 1;
@@ -99,6 +115,7 @@ impl StudioServerConfig {
 pub struct StudioServer {
     config: StudioServerConfig,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
+    test_run_runtime: Arc<dyn TestRunRuntime>,
 }
 
 impl StudioServer {
@@ -107,7 +124,17 @@ impl StudioServer {
         Self {
             config,
             environment_runtime: Arc::new(environment::EmptyEnvironmentRuntime),
+            test_run_runtime: Arc::new(test_runtime::EmptyTestRunRuntime::new()),
         }
+    }
+
+    #[must_use]
+    pub fn with_test_run_runtime<R>(mut self, test_run_runtime: R) -> Self
+    where
+        R: TestRunRuntime + 'static,
+    {
+        self.test_run_runtime = Arc::new(test_run_runtime);
+        self
     }
 
     #[must_use]
@@ -139,6 +166,7 @@ impl StudioServer {
                     }),
             },
             environment_runtime: Arc::clone(&self.environment_runtime),
+            test_run_runtime: Arc::clone(&self.test_run_runtime),
             http_client: reqwest::Client::new(),
         };
         let api = Router::new()
@@ -164,6 +192,7 @@ impl StudioServer {
                 "/environments/{environment_id}/rpc/{*path}",
                 any(proxy_environment_rpc),
             )
+            .merge(test_api::router())
             .fallback(api_not_found);
         let app = Router::new()
             .nest("/api/v1", api)
@@ -201,16 +230,19 @@ impl StudioServer {
             .await
             .map_err(|source| StudioServerError::Serve { source });
         let shutdown_result = self.environment_runtime.shutdown().await;
+        let test_shutdown_result = self.test_run_runtime.shutdown().await;
 
         serve_result?;
-        shutdown_result.map_err(|source| StudioServerError::EnvironmentShutdown { source })
+        shutdown_result.map_err(|source| StudioServerError::EnvironmentShutdown { source })?;
+        test_shutdown_result.map_err(|source| StudioServerError::TestRunShutdown { source })
     }
 }
 
 #[derive(Clone)]
-struct StudioState {
+pub(crate) struct StudioState {
     info: StudioInfo,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
+    test_run_runtime: Arc<dyn TestRunRuntime>,
     http_client: reqwest::Client,
 }
 
@@ -236,6 +268,8 @@ pub enum StudioServerError {
     Serve { source: io::Error },
     #[error("Studio environments failed to stop")]
     EnvironmentShutdown { source: EnvironmentRuntimeError },
+    #[error("Studio test runs failed to stop")]
+    TestRunShutdown { source: TestRunRuntimeError },
 }
 
 async fn health() -> StatusCode {

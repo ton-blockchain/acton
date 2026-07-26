@@ -2,6 +2,7 @@ import {useEffect, useState} from "react"
 
 import type {TestReport} from "../types/test"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {isAbortError} from "./request"
 
 interface TestUiBootstrapState {
@@ -23,6 +24,7 @@ const INITIAL_STATE: TestUiBootstrapState = {
 }
 
 export function useTestUiBootstrap(onConnected: () => void) {
+  const {url} = useTestUiApi()
   const [state, setState] = useState<TestUiBootstrapState>(INITIAL_STATE)
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useTestUiBootstrap(onConnected: () => void) {
 
     const loadConfig = async () => {
       try {
-        const response = await fetch("/api/config", {signal: controller.signal})
+        const response = await fetch(url("/config"), {signal: controller.signal})
         if (!response.ok) throw new Error(`Failed to fetch config: ${response.status}`)
 
         const config = (await response.json()) as {
@@ -56,7 +58,7 @@ export function useTestUiBootstrap(onConnected: () => void) {
 
     const loadReports = async () => {
       try {
-        const response = await fetch("/api/reports", {signal: controller.signal})
+        const response = await fetch(url("/reports"), {signal: controller.signal})
         if (!response.ok) throw new Error(`Failed to fetch reports: ${response.status}`)
 
         const reports = (await response.json()) as TestReport[]
@@ -74,7 +76,7 @@ export function useTestUiBootstrap(onConnected: () => void) {
     void loadReports()
 
     return () => controller.abort()
-  }, [onConnected])
+  }, [onConnected, url])
 
   return state
 }

@@ -1,3 +1,5 @@
+import type {TestReport} from "@acton/test-ui/embed"
+
 export const STUDIO_API_VERSION = 1
 
 export interface StudioInfo {
@@ -46,6 +48,75 @@ export interface CreateEnvironmentRequest {
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
 }
+
+export type TestRunSource = "manual" | "studio"
+export type TestRunStatus = "queued" | "running" | "passed" | "failed" | "cancelled"
+
+export interface TestRunStats {
+  readonly total: number
+  readonly passed: number
+  readonly failed: number
+  readonly skipped: number
+  readonly todo: number
+  readonly durationMs: number
+}
+
+export interface TestRunSummary {
+  readonly formatVersion: number
+  readonly id: string
+  readonly source: TestRunSource
+  readonly status: TestRunStatus
+  readonly command: readonly string[]
+  readonly startedAt: string
+  readonly finishedAt?: string
+  readonly exitCode?: number
+  readonly stats: TestRunStats
+  readonly error?: string
+}
+
+export interface TestRunRecord extends TestRunSummary {
+  readonly projectRoot: string
+  readonly reports: readonly TestReport[]
+  readonly traceDir?: string
+}
+
+export interface StartTestRunRequest {
+  readonly paths: readonly string[]
+  readonly filter?: string
+  readonly include: readonly string[]
+  readonly exclude: readonly string[]
+  readonly failFast: boolean
+  readonly saveTraces: boolean
+}
+
+export interface TestRunOutput {
+  readonly stdout: string
+  readonly stderr: string
+}
+
+export type TestRunStreamEvent =
+  | {
+      readonly type: "runChanged"
+      readonly data: {readonly run: TestRunSummary}
+    }
+  | {
+      readonly type: "output"
+      readonly data: {
+        readonly runId: string
+        readonly stream: "stdout" | "stderr"
+        readonly chunk: string
+      }
+    }
+  | {
+      readonly type: "reporterEvent"
+      readonly data: {
+        readonly event: {
+          readonly runId: string
+          readonly sequence: number
+          readonly event: {readonly type: string; readonly data: unknown}
+        }
+      }
+    }
 
 export async function fetchStudioInfo(signal: AbortSignal): Promise<StudioInfo> {
   const info = await requestJson<StudioInfo>("/api/v1/info", {
@@ -100,7 +171,71 @@ export function restartStudioEnvironment(environmentId: string): Promise<StudioE
   )
 }
 
-async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+export function fetchStudioTestRuns(signal?: AbortSignal): Promise<TestRunSummary[]> {
+  return requestJson<TestRunSummary[]>("/api/v1/test-runs", {
+    headers: {accept: "application/json"},
+    signal,
+  })
+}
+
+export function fetchStudioTestRun(runId: string, signal?: AbortSignal): Promise<TestRunRecord> {
+  return requestJson<TestRunRecord>(`/api/v1/test-runs/${encodeURIComponent(runId)}`, {
+    headers: {accept: "application/json"},
+    signal,
+  })
+}
+
+export function startStudioTestRun(request: StartTestRunRequest): Promise<TestRunRecord> {
+  return requestJson<TestRunRecord>("/api/v1/test-runs", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(request),
+  })
+}
+
+export function cancelStudioTestRun(runId: string): Promise<TestRunRecord> {
+  return requestJson<TestRunRecord>(`/api/v1/test-runs/${encodeURIComponent(runId)}/cancel`, {
+    method: "POST",
+    headers: {accept: "application/json"},
+  })
+}
+
+export function fetchStudioTestRunOutput(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<TestRunOutput> {
+  return requestJson<TestRunOutput>(`/api/v1/test-runs/${encodeURIComponent(runId)}/output`, {
+    headers: {accept: "application/json"},
+    signal,
+  })
+}
+
+export function studioTestRunArtifactsUrl(runId: string) {
+  return `/api/v1/test-runs/${encodeURIComponent(runId)}/artifacts`
+}
+
+export function subscribeToStudioTestRuns(
+  onEvent: (event: TestRunStreamEvent) => void,
+  onError?: () => void,
+  onOpen?: () => void,
+) {
+  const source = new EventSource("/api/v1/test-runs/events")
+  source.addEventListener("test-run", event => {
+    try {
+      onEvent(JSON.parse(event.data) as TestRunStreamEvent)
+    } catch {
+      // A malformed live event must not break history polling.
+    }
+  })
+  if (onError) source.addEventListener("error", onError)
+  if (onOpen) source.addEventListener("open", onOpen)
+  return () => source.close()
+}
+
+export async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init)
   if (response.ok) {
     return (await response.json()) as T

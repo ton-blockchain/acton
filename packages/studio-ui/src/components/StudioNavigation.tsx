@@ -12,13 +12,14 @@ import {Fragment, useCallback, useEffect, useState} from "react"
 import type {ReactNode} from "react"
 import {ThemeSwitch, Tooltip} from "@acton/ui"
 
-import type {StudioEnvironment} from "../studioApi"
+import type {StudioEnvironment, TestRunSummary} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 import {StudioSearch} from "./StudioSearch"
+import {TestRunsNavigationList} from "./TestRunsNavigationList"
 
 import styles from "./StudioNavigation.module.css"
 
-const ENVIRONMENT_NAVIGATION_LIMIT = 5
+const NESTED_NAVIGATION_LIMIT = 5
 
 interface StudioNavigationProps {
   readonly activePath: StudioPath
@@ -34,9 +35,12 @@ interface StudioNavigationProps {
   readonly navigationKey?: string
   readonly pages: readonly StudioPage[]
   readonly searchContent?: ReactNode
+  readonly selectedTestRunId?: string
+  readonly testRuns?: readonly TestRunSummary[]
   readonly utilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
   readonly onOpenEnvironment?: (environment: StudioEnvironment) => void
+  readonly onSelectTestRun?: (runId: string) => void
   readonly onToggleSidebar?: () => void
 }
 
@@ -51,9 +55,12 @@ export function StudioNavigation({
   navigationKey = "studio",
   pages,
   searchContent,
+  selectedTestRunId,
+  testRuns = [],
   utilityActions,
   onNavigate,
   onOpenEnvironment,
+  onSelectTestRun,
   onToggleSidebar,
 }: StudioNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -72,7 +79,15 @@ export function StudioNavigation({
     },
     [closeMobileMenu, onOpenEnvironment],
   )
-  const navigationEnvironments = environments.slice(0, ENVIRONMENT_NAVIGATION_LIMIT)
+  const selectTestRunAndClose = useCallback(
+    (runId: string) => {
+      onSelectTestRun?.(runId)
+      closeMobileMenu()
+    },
+    [closeMobileMenu, onSelectTestRun],
+  )
+  const navigationEnvironments = environments.slice(0, NESTED_NAVIGATION_LIMIT)
+  const navigationTestRuns = testRuns.slice(0, NESTED_NAVIGATION_LIMIT)
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -167,6 +182,10 @@ export function StudioNavigation({
                           page.path === "/virtual-environments" &&
                           activePath === "/virtual-environments" &&
                           navigationEnvironments.length > 0
+                        const showTestRuns =
+                          page.path === "/tests" &&
+                          activePath === "/tests" &&
+                          navigationTestRuns.length > 0
 
                         return (
                           <Fragment key={page.path}>
@@ -225,6 +244,22 @@ export function StudioNavigation({
                                       </li>
                                     ))}
                                   </ul>
+                                </div>
+                              </div>
+                            ) : undefined}
+                            {page.path === "/tests" && navigationTestRuns.length > 0 ? (
+                              <div
+                                className={`${styles.environmentNavDisclosure} ${
+                                  showTestRuns ? styles.environmentNavDisclosureOpen : ""
+                                }`}
+                                aria-hidden={!showTestRuns}
+                              >
+                                <div className={styles.environmentNavClip}>
+                                  <TestRunsNavigationList
+                                    runs={navigationTestRuns}
+                                    selectedRunId={selectedTestRunId}
+                                    onSelect={selectTestRunAndClose}
+                                  />
                                 </div>
                               </div>
                             ) : undefined}

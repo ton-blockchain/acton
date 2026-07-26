@@ -14,9 +14,10 @@ import {
   InlineButton,
   useToast,
 } from "@acton/ui"
-import {Boxes, CircleAlert, Plus, RotateCcw, Square} from "lucide-react"
+import {Boxes, Plus, RotateCcw, Square} from "lucide-react"
 import {useState} from "react"
 
+import {TablePage} from "../components/TablePage"
 import {
   type EnvironmentStatus,
   type StudioEnvironment,
@@ -121,19 +122,13 @@ export function VirtualEnvironmentsPage({
   }
 
   return (
-    <div className={styles.page}>
-      {loadError && environments.length === 0 ? (
-        <section className={styles.errorPanel} aria-live="polite">
-          <CircleAlert size={18} aria-hidden="true" />
-          <div>
-            <strong>Unable to load environments</strong>
-            <span>{loadError}</span>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => void onRefresh()}>
-            Retry
-          </Button>
-        </section>
-      ) : (
+    <>
+      <TablePage
+        error={loadError}
+        errorTitle="Unable to load environments"
+        hasContent={environments.length > 0}
+        onRetry={onRefresh}
+      >
         <DataTable minWidth="50rem">
           <DataTableTable aria-label="Virtual environments">
             <DataTableHead>
@@ -261,7 +256,7 @@ export function VirtualEnvironmentsPage({
             </DataTableBody>
           </DataTableTable>
         </DataTable>
-      )}
+      </TablePage>
 
       <CreateEnvironmentDialog
         environmentCount={environments.length}
@@ -276,7 +271,7 @@ export function VirtualEnvironmentsPage({
         onConfirm={() => void handleStop()}
         onOpenChange={() => setStopTarget(undefined)}
       />
-    </div>
+    </>
   )
 }
 

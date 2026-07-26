@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react"
 
 import type {TestExecutionLogs, TestReport} from "../types/test"
+import {useTestUiApi} from "../testUiApiContext"
 
 import {isAbortError} from "./request"
 
@@ -13,6 +14,7 @@ interface TestExecutionLogsState {
 export function useTestExecutionLogs(
   test: Pick<TestReport, "file_path" | "name" | "row" | "column">,
 ) {
+  const {url} = useTestUiApi()
   const key = `${test.file_path}:${test.row}:${test.column}:${test.name}`
   const [state, setState] = useState<TestExecutionLogsState>({
     key,
@@ -33,7 +35,7 @@ export function useTestExecutionLogs(
 
     const loadLogs = async () => {
       try {
-        const response = await fetch(`/api/test-logs?${params.toString()}`, {
+        const response = await fetch(url(`/test-logs?${params.toString()}`), {
           signal: controller.signal,
         })
         if (!response.ok) {
@@ -52,7 +54,7 @@ export function useTestExecutionLogs(
 
     void loadLogs()
     return () => controller.abort()
-  }, [key, test.column, test.file_path, test.name, test.row])
+  }, [key, test.column, test.file_path, test.name, test.row, url])
 
   if (state.key === key) {
     return {executionLogs: state.logs, isLoadingExecutionLogs: state.loading}

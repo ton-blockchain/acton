@@ -3,7 +3,7 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {ReactNode} from "react"
 import {Tooltip} from "@acton/ui"
 
-import type {StudioEnvironment} from "../studioApi"
+import type {StudioEnvironment, TestRunSummary} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 import {StudioNavigation} from "./StudioNavigation"
 
@@ -15,7 +15,8 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "studioSidebarCollapsed"
 interface StudioShellProps {
   readonly activePath: StudioPath
   readonly children: ReactNode
-  readonly contentMode?: "default" | "full"
+  readonly contentMode?: "default" | "full" | "workspace"
+  readonly headerMode?: "visible" | "hidden"
   readonly headerActions?: ReactNode
   readonly pageDescription?: string
   readonly pageTitle?: string
@@ -29,15 +30,19 @@ interface StudioShellProps {
   readonly sidebarNavigation?: ReactNode
   readonly sidebarNavigationKey?: string
   readonly sidebarSearch?: ReactNode
+  readonly sidebarSelectedTestRunId?: string
+  readonly sidebarTestRuns?: readonly TestRunSummary[]
   readonly sidebarUtilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
   readonly onOpenEnvironment?: (environment: StudioEnvironment) => void
+  readonly onSelectTestRun?: (runId: string) => void
 }
 
 export function StudioShell({
   activePath,
   children,
   contentMode = "default",
+  headerMode = "visible",
   headerActions,
   pageDescription,
   pageTitle,
@@ -48,9 +53,12 @@ export function StudioShell({
   sidebarNavigation,
   sidebarNavigationKey,
   sidebarSearch,
+  sidebarSelectedTestRunId,
+  sidebarTestRuns,
   sidebarUtilityActions,
   onNavigate,
   onOpenEnvironment,
+  onSelectTestRun,
 }: StudioShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
@@ -196,9 +204,12 @@ export function StudioShell({
             navigationKey={sidebarNavigationKey}
             pages={pages}
             searchContent={sidebarSearch}
+            selectedTestRunId={sidebarSelectedTestRunId}
+            testRuns={sidebarTestRuns}
             utilityActions={sidebarUtilityActions}
             onNavigate={onNavigate}
             onOpenEnvironment={onOpenEnvironment}
+            onSelectTestRun={onSelectTestRun}
             onToggleSidebar={toggleSidebar}
           />
         </div>
@@ -218,24 +229,32 @@ export function StudioShell({
       )}
 
       <section className={styles.contentArea}>
-        <header className={styles.pageHeader}>
-          <div className={styles.pageHeaderInner}>
-            <div className={styles.pageHeaderTitleGroup}>
-              <span className={styles.pageHeaderTitle}>{activePageTitle}</span>
-              <Tooltip content={activePageDescription}>
-                <button
-                  type="button"
-                  className={styles.pageHeaderHelp}
-                  aria-label={`About ${activePageTitle}`}
-                >
-                  <CircleHelp size={15} />
-                </button>
-              </Tooltip>
+        {headerMode === "visible" ? (
+          <header className={styles.pageHeader}>
+            <div className={styles.pageHeaderInner}>
+              <div className={styles.pageHeaderTitleGroup}>
+                <span className={styles.pageHeaderTitle}>{activePageTitle}</span>
+                <Tooltip content={activePageDescription}>
+                  <button
+                    type="button"
+                    className={styles.pageHeaderHelp}
+                    aria-label={`About ${activePageTitle}`}
+                  >
+                    <CircleHelp size={15} />
+                  </button>
+                </Tooltip>
+              </div>
+              {headerActions && <div className={styles.pageHeaderActions}>{headerActions}</div>}
             </div>
-            {headerActions && <div className={styles.pageHeaderActions}>{headerActions}</div>}
-          </div>
-        </header>
-        <main className={`${styles.content} ${contentMode === "full" ? styles.contentFull : ""}`}>
+          </header>
+        ) : null}
+        <main
+          className={[
+            styles.content,
+            contentMode === "full" ? styles.contentFull : "",
+            contentMode === "workspace" ? styles.contentWorkspace : "",
+          ].join(" ")}
+        >
           {children}
         </main>
       </section>
