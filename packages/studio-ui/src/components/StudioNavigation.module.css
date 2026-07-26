@@ -770,6 +770,31 @@
   background: var(--acton-color-surface-active);
 }
 
+.environmentNavDisclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 260ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 260ms cubic-bezier(0.33, 1, 0.68, 1),
+    visibility 0s linear 260ms;
+}
+
+.environmentNavDisclosureOpen {
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+.environmentNavClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .environmentNavList {
   display: flex;
   flex-direction: column;
@@ -1282,7 +1307,8 @@
   .searchInput,
   .searchEscButton,
   .searchResultBody,
-  .navigationPanel {
+  .navigationPanel,
+  .environmentNavDisclosure {
     animation: none;
     transition: none;
   }

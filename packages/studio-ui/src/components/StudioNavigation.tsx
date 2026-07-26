@@ -165,6 +165,7 @@ export function StudioNavigation({
                           !(page.path === "/virtual-environments" && activeEnvironmentId)
                         const showEnvironments =
                           page.path === "/virtual-environments" &&
+                          activePath === "/virtual-environments" &&
                           navigationEnvironments.length > 0
 
                         return (
@@ -180,39 +181,52 @@ export function StudioNavigation({
                                 <span>{page.label}</span>
                               </span>
                             </button>
-                            {showEnvironments ? (
-                              <ul
-                                className={styles.environmentNavList}
-                                aria-label="Virtual environments"
+                            {page.path === "/virtual-environments" &&
+                            navigationEnvironments.length > 0 ? (
+                              <div
+                                className={`${styles.environmentNavDisclosure} ${
+                                  showEnvironments ? styles.environmentNavDisclosureOpen : ""
+                                }`}
+                                aria-hidden={!showEnvironments}
                               >
-                                {navigationEnvironments.map(environment => (
-                                  <li key={environment.id}>
-                                    <button
-                                      type="button"
-                                      className={`${styles.environmentNavItem} ${
-                                        activeEnvironmentId === environment.id
-                                          ? styles.environmentNavItemActive
-                                          : ""
-                                      }`}
-                                      aria-current={
-                                        activeEnvironmentId === environment.id ? "page" : undefined
-                                      }
-                                      onClick={() => openEnvironmentAndClose(environment)}
-                                    >
-                                      <span className={styles.environmentNavName}>
-                                        {environment.name}
-                                      </span>
-                                      <span
-                                        className={styles.environmentStatusDot}
-                                        data-status={environment.status}
-                                        role="img"
-                                        aria-label={`Status: ${environment.status}`}
-                                        title={environment.status}
-                                      />
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
+                                <div className={styles.environmentNavClip}>
+                                  <ul
+                                    className={styles.environmentNavList}
+                                    aria-label="Virtual environments"
+                                  >
+                                    {navigationEnvironments.map(environment => (
+                                      <li key={environment.id}>
+                                        <button
+                                          type="button"
+                                          className={`${styles.environmentNavItem} ${
+                                            activeEnvironmentId === environment.id
+                                              ? styles.environmentNavItemActive
+                                              : ""
+                                          }`}
+                                          aria-current={
+                                            activeEnvironmentId === environment.id
+                                              ? "page"
+                                              : undefined
+                                          }
+                                          tabIndex={showEnvironments ? 0 : -1}
+                                          onClick={() => openEnvironmentAndClose(environment)}
+                                        >
+                                          <span className={styles.environmentNavName}>
+                                            {environment.name}
+                                          </span>
+                                          <span
+                                            className={styles.environmentStatusDot}
+                                            data-status={environment.status}
+                                            role="img"
+                                            aria-label={`Status: ${environment.status}`}
+                                            title={environment.status}
+                                          />
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
                             ) : undefined}
                           </Fragment>
                         )
