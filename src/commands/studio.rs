@@ -4,7 +4,9 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, manifest_path as configured_manifest_path, project_root as configured_project_root,
 };
-use acton_studio::{StudioServer, StudioServerConfig, StudioWorkspace};
+use acton_studio::{
+    LocalProcessEnvironmentRuntime, StudioServer, StudioServerConfig, StudioWorkspace,
+};
 use anyhow::Context;
 
 pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> anyhow::Result<()> {
@@ -21,7 +23,11 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
     if let Some(workspace) = configured_workspace()? {
         config = config.with_workspace(workspace);
     }
-    let server = StudioServer::new(config);
+    let acton_executable =
+        std::env::current_exe().context("Failed to locate the Acton executable")?;
+    let environment_runtime =
+        LocalProcessEnvironmentRuntime::new(acton_executable, configured_project_root());
+    let server = StudioServer::new(config).with_environment_runtime(environment_runtime);
 
     println!("    {} Acton Studio at {}", "Starting".green().bold(), url);
 
@@ -42,10 +48,11 @@ fn configured_workspace() -> anyhow::Result<Option<StudioWorkspace>> {
     }
 
     let config = ActonConfig::load_manifest()?;
-    Ok(Some(StudioWorkspace::new(
-        config.package.name,
-        configured_project_root(),
-    )))
+    let wallet_names = ActonConfig::load_wallets()?.wallets.into_keys().collect();
+    Ok(Some(
+        StudioWorkspace::new(config.package.name, configured_project_root())
+            .with_wallet_names(wallet_names),
+    ))
 }
 
 async fn shutdown_signal() {

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
-    "dev": "vite --port 3008",
+    "dev": "vite --port 3020",
     "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",

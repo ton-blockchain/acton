@@ -38,6 +38,7 @@
   align-items: center;
   min-width: 0;
   gap: var(--acton-space-1-5);
+  pointer-events: none;
 }
 
 .label {

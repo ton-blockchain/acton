@@ -8,10 +8,10 @@ use tower::ServiceExt;
 
 fn server() -> StudioServer {
     StudioServer::new(
-        StudioServerConfig::new("test-version").with_workspace(StudioWorkspace::new(
-            "counter",
-            "/private/workspaces/counter",
-        )),
+        StudioServerConfig::new("test-version").with_workspace(
+            StudioWorkspace::new("counter", "/private/workspaces/counter")
+                .with_wallet_names(vec!["deployer".to_owned(), "treasury".to_owned()]),
+        ),
     )
 }
 
@@ -33,7 +33,7 @@ async fn info_contract_does_not_expose_host_paths_or_deployment_mode() {
     let actual = format!("status: {status}\nbody: {}", String::from_utf8_lossy(&body));
 
     expect![[r#"status: 200 OK
-body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter"}}"#]]
+body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter","walletNames":["deployer","treasury"]}}"#]]
     .assert_eq(&actual);
 }
 

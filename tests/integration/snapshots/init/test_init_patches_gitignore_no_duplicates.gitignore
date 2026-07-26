@@ -2,6 +2,7 @@
 wallets.toml
 
 # Acton related files
+.studio/
 gen/
 build/
 lcov.info

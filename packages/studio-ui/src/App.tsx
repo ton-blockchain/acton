@@ -5,11 +5,8 @@ import {Button, ToastProvider, useToast} from "@acton/ui"
 import {StudioShell} from "./components/StudioShell"
 import {FeaturePage} from "./pages/FeaturePage"
 import {OverviewPage} from "./pages/OverviewPage"
-import {
-  fetchStudioInfo,
-  type StudioConnectionState,
-  type StudioInfo,
-} from "./studioApi"
+import {VirtualEnvironmentsPage} from "./pages/VirtualEnvironmentsPage"
+import {fetchStudioInfo, type StudioConnectionState, type StudioInfo} from "./studioApi"
 import {isStudioPath, studioFeaturePages, studioPages, type StudioPath} from "./studioPages"
 
 const configuredProjectName = import.meta.env.VITE_STUDIO_PROJECT_NAME?.trim() || undefined
@@ -29,8 +26,8 @@ function StudioApp() {
   const {showToast} = useToast()
   const [activePath, setActivePath] = useState<StudioPath>(readPath)
   const [studioInfo, setStudioInfo] = useState<StudioInfo>()
-  const [connectionState, setConnectionState] =
-    useState<StudioConnectionState>("connecting")
+  const [connectionState, setConnectionState] = useState<StudioConnectionState>("connecting")
+  const [isEnvironmentCreateOpen, setIsEnvironmentCreateOpen] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -63,6 +60,7 @@ function StudioApp() {
     if (globalThis.location.pathname !== path) {
       globalThis.history.pushState(null, "", path)
     }
+    if (path !== "/virtual-environments") setIsEnvironmentCreateOpen(false)
     setActivePath(path)
     globalThis.scrollTo({top: 0})
   }, [])
@@ -103,7 +101,13 @@ function StudioApp() {
             variant="primary"
             size="sm"
             leadingIcon={<ActiveFeatureIcon size={16} aria-hidden="true" />}
-            onClick={() => showIntegrationToast(activeFeaturePage.actionLabel)}
+            onClick={() => {
+              if (activePath === "/virtual-environments") {
+                setIsEnvironmentCreateOpen(true)
+              } else {
+                showIntegrationToast(activeFeaturePage.actionLabel)
+              }
+            }}
           >
             {activeFeaturePage.actionLabel}
           </Button>
@@ -119,6 +123,12 @@ function StudioApp() {
           projectName={projectName}
           projectPath={configuredProjectPath}
           onNavigate={navigate}
+        />
+      ) : activePath === "/virtual-environments" ? (
+        <VirtualEnvironmentsPage
+          createOpen={isEnvironmentCreateOpen}
+          walletNames={studioInfo?.workspace?.walletNames ?? []}
+          onCreateOpenChange={setIsEnvironmentCreateOpen}
         />
       ) : (
         <FeaturePage page={studioFeaturePages[activePath]} onAction={showIntegrationToast} />

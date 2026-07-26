@@ -1,0 +1,153 @@
+.page {
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.errorPanel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  color: var(--acton-color-danger-text);
+  background: color-mix(in srgb, var(--acton-color-danger) 7%, var(--acton-color-surface));
+  border: 1px solid color-mix(in srgb, var(--acton-color-danger) 38%, var(--acton-color-border));
+  border-radius: var(--acton-radius-panel);
+}
+
+.errorPanel div {
+  display: grid;
+  gap: 2px;
+}
+
+.errorPanel strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.errorPanel span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-10) var(--acton-space-4);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  margin-bottom: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+}
+
+.emptyState strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.emptyState > span:not(.emptyIcon) {
+  margin-bottom: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.environmentName {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.environmentName strong {
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environmentName span {
+  overflow: hidden;
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  background: var(--acton-color-text-subtle);
+  border-radius: 999px;
+}
+
+.status[data-status="running"] {
+  color: var(--acton-color-success);
+}
+
+.status[data-status="running"] .statusDot {
+  background: var(--acton-color-success);
+}
+
+.status[data-status="starting"],
+.status[data-status="stopping"] {
+  color: var(--acton-color-warning-text);
+}
+
+.status[data-status="starting"] .statusDot,
+.status[data-status="stopping"] .statusDot {
+  background: var(--acton-color-warning);
+}
+
+.status[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.status[data-status="failed"] .statusDot {
+  background: var(--acton-color-danger-text);
+}
+
+.rpcUrl {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .errorPanel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .errorPanel > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

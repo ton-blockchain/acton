@@ -17,6 +17,7 @@ const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
         "# Acton related files",
         &[
             ".acton/",
+            ".studio/",
             "gen/",
             "build/",
             "lcov.info",
