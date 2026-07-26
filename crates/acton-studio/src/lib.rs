@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::Router;
-use axum::extract::{Path as AxumPath, State};
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::extract::{Path as AxumPath, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
+use axum::http::{HeaderName, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
 #[cfg(not(debug_assertions))]
@@ -138,6 +139,7 @@ impl StudioServer {
                     }),
             },
             environment_runtime: Arc::clone(&self.environment_runtime),
+            http_client: reqwest::Client::new(),
         };
         let api = Router::new()
             .route("/health", get(health))
@@ -153,6 +155,14 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route(
+                "/environments/{environment_id}/rpc",
+                any(proxy_environment_rpc_root),
+            )
+            .route(
+                "/environments/{environment_id}/rpc/{*path}",
+                any(proxy_environment_rpc),
             )
             .fallback(api_not_found);
         let app = Router::new()
@@ -201,6 +211,7 @@ impl StudioServer {
 struct StudioState {
     info: StudioInfo,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
+    http_client: reqwest::Client,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -242,7 +253,7 @@ async fn list_environments(
         .environment_runtime
         .list()
         .await
-        .map(Json)
+        .map(|environments| Json(environments.into_iter().map(public_environment).collect()))
         .map_err(StudioApiError)
 }
 
@@ -254,7 +265,7 @@ async fn create_environment(
         .environment_runtime
         .create(request)
         .await
-        .map(|environment| (StatusCode::CREATED, Json(environment)))
+        .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
         .map_err(StudioApiError)
 }
 
@@ -266,7 +277,7 @@ async fn stop_environment(
         .environment_runtime
         .stop(&environment_id)
         .await
-        .map(Json)
+        .map(|environment| Json(public_environment(environment)))
         .map_err(StudioApiError)
 }
 
@@ -278,8 +289,113 @@ async fn restart_environment(
         .environment_runtime
         .restart(&environment_id)
         .await
-        .map(Json)
+        .map(|environment| Json(public_environment(environment)))
         .map_err(StudioApiError)
+}
+
+fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
+    environment.rpc_url = format!(
+        "{STUDIO_ENVIRONMENTS_PATH}/{}/rpc",
+        urlencoding::encode(&environment.id)
+    );
+    environment
+}
+
+async fn proxy_environment_rpc_root(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    request: Request,
+) -> Result<Response, StudioApiError> {
+    proxy_environment_request(state, environment_id, String::new(), request).await
+}
+
+async fn proxy_environment_rpc(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, path)): AxumPath<(String, String)>,
+    request: Request,
+) -> Result<Response, StudioApiError> {
+    proxy_environment_request(state, environment_id, path, request).await
+}
+
+async fn proxy_environment_request(
+    state: StudioState,
+    environment_id: String,
+    path: String,
+    request: Request,
+) -> Result<Response, StudioApiError> {
+    let environment = state
+        .environment_runtime
+        .get(&environment_id)
+        .await
+        .map_err(StudioApiError)?;
+    if environment.status != EnvironmentStatus::Running {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "environment_not_running",
+            message: format!("Environment {} is not running", environment.name),
+        }));
+    }
+
+    let (parts, body) = request.into_parts();
+    let mut upstream_url = format!(
+        "{}/{}",
+        environment.rpc_url.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    );
+    if let Some(query) = parts.uri.query() {
+        upstream_url.push('?');
+        upstream_url.push_str(query);
+    }
+
+    let mut upstream_request = state.http_client.request(parts.method, upstream_url);
+    for (name, value) in &parts.headers {
+        if !is_hop_by_hop_header(name) && name != axum::http::header::HOST {
+            upstream_request = upstream_request.header(name, value);
+        }
+    }
+
+    let upstream_response = upstream_request
+        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
+        .send()
+        .await
+        .map_err(proxy_error)?;
+    let status = upstream_response.status();
+    let headers = upstream_response.headers().clone();
+    let mut response = Response::builder().status(status);
+    for (name, value) in &headers {
+        if !is_hop_by_hop_header(name) {
+            response = response.header(name, value);
+        }
+    }
+
+    response
+        .body(Body::from_stream(upstream_response.bytes_stream()))
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Internal {
+                code: "environment_proxy_response_failed",
+                message: format!("Failed to build the environment response: {error}"),
+            })
+        })
+}
+
+fn is_hop_by_hop_header(name: &HeaderName) -> bool {
+    matches!(
+        name.as_str(),
+        "connection"
+            | "keep-alive"
+            | "proxy-authenticate"
+            | "proxy-authorization"
+            | "te"
+            | "trailer"
+            | "transfer-encoding"
+            | "upgrade"
+    )
+}
+
+fn proxy_error(error: reqwest::Error) -> StudioApiError {
+    StudioApiError(EnvironmentRuntimeError::Internal {
+        code: "environment_proxy_failed",
+        message: format!("Failed to reach the virtual environment: {error}"),
+    })
 }
 
 async fn api_not_found() -> StatusCode {

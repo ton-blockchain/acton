@@ -14,16 +14,35 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "studioSidebarCollapsed"
 interface StudioShellProps {
   readonly activePath: StudioPath
   readonly children: ReactNode
+  readonly contentMode?: "default" | "full"
   readonly headerActions?: ReactNode
+  readonly pageDescription?: string
+  readonly pageTitle?: string
   readonly pages: readonly StudioPage[]
+  readonly sidebarContextAction?: {
+    readonly label: string
+    readonly onSelect: () => void
+  }
+  readonly sidebarNavigation?: ReactNode
+  readonly sidebarNavigationKey?: string
+  readonly sidebarSearch?: ReactNode
+  readonly sidebarUtilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
 }
 
 export function StudioShell({
   activePath,
   children,
+  contentMode = "default",
   headerActions,
+  pageDescription,
+  pageTitle,
   pages,
+  sidebarContextAction,
+  sidebarNavigation,
+  sidebarNavigationKey,
+  sidebarSearch,
+  sidebarUtilityActions,
   onNavigate,
 }: StudioShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -137,6 +156,8 @@ export function StudioShell({
 
   const isSidebarFloating = isSidebarCollapsed && isSidebarPreviewOpen
   const activePage = pages.find(page => page.path === activePath) ?? pages[0]
+  const activePageDescription = pageDescription ?? activePage.shortDescription
+  const activePageTitle = pageTitle ?? activePage.label
 
   return (
     <div className={styles.page}>
@@ -160,8 +181,13 @@ export function StudioShell({
           <StudioNavigation
             activePath={activePath}
             className={styles.floatingSidebar}
+            contextAction={sidebarContextAction}
             isSidebarCollapsed={isSidebarCollapsed}
+            navigationContent={sidebarNavigation}
+            navigationKey={sidebarNavigationKey}
             pages={pages}
+            searchContent={sidebarSearch}
+            utilityActions={sidebarUtilityActions}
             onNavigate={onNavigate}
             onToggleSidebar={toggleSidebar}
           />
@@ -185,12 +211,12 @@ export function StudioShell({
         <header className={styles.pageHeader}>
           <div className={styles.pageHeaderInner}>
             <div className={styles.pageHeaderTitleGroup}>
-              <span className={styles.pageHeaderTitle}>{activePage.label}</span>
-              <Tooltip content={activePage.shortDescription}>
+              <span className={styles.pageHeaderTitle}>{activePageTitle}</span>
+              <Tooltip content={activePageDescription}>
                 <button
                   type="button"
                   className={styles.pageHeaderHelp}
-                  aria-label={`About ${activePage.label}`}
+                  aria-label={`About ${activePageTitle}`}
                 >
                   <CircleHelp size={15} />
                 </button>
@@ -199,7 +225,9 @@ export function StudioShell({
             {headerActions && <div className={styles.pageHeaderActions}>{headerActions}</div>}
           </div>
         </header>
-        <main className={styles.content}>{children}</main>
+        <main className={`${styles.content} ${contentMode === "full" ? styles.contentFull : ""}`}>
+          {children}
+        </main>
       </section>
     </div>
   )

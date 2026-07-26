@@ -1,0 +1,53 @@
+.statePage {
+  min-height: 100%;
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+}
+
+.stateContent {
+  min-height: 100%;
+  padding: var(--acton-space-8) var(--acton-space-5);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--acton-space-2);
+  text-align: center;
+}
+
+.stateIcon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: var(--acton-space-1);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  display: grid;
+  place-items: center;
+}
+
+.stateIcon[data-error="true"] {
+  color: var(--acton-color-danger-text);
+}
+
+.loadingIcon {
+  animation: environment-spin 900ms linear infinite;
+}
+
+.stateContent strong {
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.stateContent > span:not(.stateIcon) {
+  max-width: 30rem;
+  margin-bottom: var(--acton-space-3);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+@keyframes environment-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

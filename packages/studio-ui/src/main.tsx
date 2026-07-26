@@ -1,5 +1,6 @@
 import {StrictMode} from "react"
 import {createRoot} from "react-dom/client"
+import {BrowserRouter} from "react-router"
 import {ThemeProvider} from "@acton/ui"
 
 import "@acton/ui/styles/tokens.css"
@@ -15,7 +16,9 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider storageKey="acton-studio-theme">
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </ThemeProvider>
   </StrictMode>,
 )

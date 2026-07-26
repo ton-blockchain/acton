@@ -35,6 +35,7 @@ interface VirtualEnvironmentsPageProps {
   readonly createOpen: boolean
   readonly walletNames: readonly string[]
   readonly onCreateOpenChange: (open: boolean) => void
+  readonly onOpenEnvironment: (environment: StudioEnvironment) => void
 }
 
 const statusLabels = {
@@ -49,6 +50,7 @@ export function VirtualEnvironmentsPage({
   createOpen,
   walletNames,
   onCreateOpenChange,
+  onOpenEnvironment,
 }: VirtualEnvironmentsPageProps) {
   const {showToast} = useToast()
   const [environments, setEnvironments] = useState<StudioEnvironment[]>([])
@@ -216,10 +218,30 @@ export function VirtualEnvironmentsPage({
                   const isRestarting = restartingIds.has(environment.id)
 
                   return (
-                    <DataTableRow key={environment.id} hover>
+                    <DataTableRow
+                      key={environment.id}
+                      hover
+                      interactive
+                      onClick={event => {
+                        const target = event.target
+                        if (
+                          target instanceof Element &&
+                          target.closest("button, a, input, select, textarea")
+                        ) {
+                          return
+                        }
+                        onOpenEnvironment(environment)
+                      }}
+                    >
                       <DataTableCell>
                         <div className={styles.environmentName}>
-                          <strong>{environment.name}</strong>
+                          <button
+                            type="button"
+                            className={styles.environmentLink}
+                            onClick={() => onOpenEnvironment(environment)}
+                          >
+                            {environment.name}
+                          </button>
                           {environment.error ? (
                             <span title={environment.error}>{environment.error}</span>
                           ) : null}

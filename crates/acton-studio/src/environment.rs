@@ -75,6 +75,8 @@ pub type EnvironmentRuntimeFuture<'a, T> =
 pub trait EnvironmentRuntime: Send + Sync {
     fn list(&self) -> EnvironmentRuntimeFuture<'_, Vec<StudioEnvironment>>;
 
+    fn get(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
+
     fn create(
         &self,
         request: CreateEnvironmentRequest,
@@ -106,6 +108,11 @@ impl EnvironmentRuntime for EmptyEnvironmentRuntime {
                 message: "Environment runtime is not configured".to_owned(),
             })
         })
+    }
+
+    fn get(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move { Err(EnvironmentRuntimeError::NotFound { environment_id }) })
     }
 
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {

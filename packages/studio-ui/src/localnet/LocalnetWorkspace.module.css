@@ -1,0 +1,127 @@
+.app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+  overflow: hidden;
+}
+
+.main {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pageContent {
+  max-width: none;
+  margin-inline: 0;
+}
+
+.routeLoading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-canvas);
+  font-size: 0.92rem;
+}
+
+.authDialog {
+  background: var(--acton-color-surface);
+}
+
+.authIcon {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--litenode-inset-highlight);
+}
+
+.authForm {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.authInput {
+  height: 42px;
+  border-radius: 12px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  font-size: 0.9rem;
+}
+
+.authActions {
+  margin-top: 5px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.authActionButton {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 10px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.authActionButton:hover:not(:disabled) {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.authActionButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.authActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.authPrimaryButton {
+  border-color: var(--acton-color-primary);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
+}
+
+.authPrimaryButton:hover:not(:disabled) {
+  border-color: var(--acton-color-primary-hover);
+  background: var(--acton-color-primary-hover);
+  color: var(--acton-color-primary-foreground);
+}
+
+@media (max-width: 520px) {
+  .authActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,5 +1,15 @@
-import {ArrowUpRight, BookOpen, Github, Menu, PanelLeftClose, PanelLeftOpen, X} from "lucide-react"
+import {
+  ArrowUpRight,
+  BookOpen,
+  ChevronRight,
+  Github,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
+} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
+import type {ReactNode} from "react"
 import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {StudioPage, StudioPath} from "../studioPages"
@@ -10,8 +20,16 @@ import styles from "./StudioNavigation.module.css"
 interface StudioNavigationProps {
   readonly activePath: StudioPath
   readonly className?: string
+  readonly contextAction?: {
+    readonly label: string
+    readonly onSelect: () => void
+  }
   readonly isSidebarCollapsed?: boolean
+  readonly navigationContent?: ReactNode
+  readonly navigationKey?: string
   readonly pages: readonly StudioPage[]
+  readonly searchContent?: ReactNode
+  readonly utilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
   readonly onToggleSidebar?: () => void
 }
@@ -19,8 +37,13 @@ interface StudioNavigationProps {
 export function StudioNavigation({
   activePath,
   className,
+  contextAction,
   isSidebarCollapsed = false,
+  navigationContent,
+  navigationKey = "studio",
   pages,
+  searchContent,
+  utilityActions,
   onNavigate,
   onToggleSidebar,
 }: StudioNavigationProps) {
@@ -97,66 +120,85 @@ export function StudioNavigation({
         </div>
 
         <div className={styles.topControls}>
-          <StudioSearch onNavigate={navigateAndClose} />
+          {searchContent ?? <StudioSearch onNavigate={navigateAndClose} />}
         </div>
 
-        <div className={styles.navScroll}>
-          <nav className={styles.nav}>
-            <div className={styles.navSection}>
-              {pages.map(page => {
-                const Icon = page.icon
-                const isActive = page.path === activePath
+        <div className={styles.navigationFrame}>
+          <div className={styles.navScroll}>
+            <div key={navigationKey} className={styles.navigationPanel}>
+              {navigationContent ?? (
+                <nav className={styles.nav}>
+                  {contextAction ? (
+                    <button
+                      type="button"
+                      className={styles.navigationContextButton}
+                      onClick={contextAction.onSelect}
+                    >
+                      <span>{contextAction.label}</span>
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                  ) : undefined}
 
-                return (
-                  <button
-                    key={page.path}
-                    type="button"
-                    className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                    aria-current={isActive ? "page" : undefined}
-                    onClick={() => navigateAndClose(page.path)}
-                  >
-                    <span className={styles.navItemMain}>
-                      <Icon size={18} />
-                      <span>{page.label}</span>
-                    </span>
-                  </button>
-                )
-              })}
+                  <div className={styles.navBody}>
+                    <div className={styles.navSection}>
+                      {pages.map(page => {
+                        const Icon = page.icon
+                        const isActive = page.path === activePath
+
+                        return (
+                          <button
+                            key={page.path}
+                            type="button"
+                            className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                            aria-current={isActive ? "page" : undefined}
+                            onClick={() => navigateAndClose(page.path)}
+                          >
+                            <span className={styles.navItemMain}>
+                              <Icon size={18} />
+                              <span>{page.label}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </nav>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.navFooter}>
+            <div className={styles.navSection}>
+              <a
+                className={styles.navItem}
+                href="https://ton-blockchain.github.io/acton/docs/welcome"
+                target="_blank"
+                rel="noreferrer"
+                onClick={closeMobileMenu}
+              >
+                <span className={styles.navItemMain}>
+                  <BookOpen size={18} />
+                  <span>Documentation</span>
+                </span>
+                <ArrowUpRight size={14} />
+              </a>
+              <a
+                className={styles.navItem}
+                href="https://github.com/ton-blockchain/acton"
+                target="_blank"
+                rel="noreferrer"
+                onClick={closeMobileMenu}
+              >
+                <span className={styles.navItemMain}>
+                  <Github size={18} />
+                  <span>GitHub</span>
+                </span>
+                <ArrowUpRight size={14} />
+              </a>
             </div>
 
-            <div className={styles.navDivider} />
-
-            <div className={styles.navFooter}>
-              <div className={styles.navSection}>
-                <a
-                  className={styles.navItem}
-                  href="https://ton-blockchain.github.io/acton/docs/welcome"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={closeMobileMenu}
-                >
-                  <span className={styles.navItemMain}>
-                    <BookOpen size={18} />
-                    <span>Documentation</span>
-                  </span>
-                  <ArrowUpRight size={14} />
-                </a>
-                <a
-                  className={styles.navItem}
-                  href="https://github.com/ton-blockchain/acton"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={closeMobileMenu}
-                >
-                  <span className={styles.navItemMain}>
-                    <Github size={18} />
-                    <span>GitHub</span>
-                  </span>
-                  <ArrowUpRight size={14} />
-                </a>
-              </div>
-
-              <div className={styles.navUtilityRow}>
+            <div className={styles.navUtilityRow}>
+              <div className={styles.navUtilityStart}>
                 {onToggleSidebar && (
                   <Tooltip content={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}>
                     <button
@@ -173,10 +215,11 @@ export function StudioNavigation({
                     </button>
                   </Tooltip>
                 )}
-                <ThemeSwitch />
+                {utilityActions}
               </div>
+              <ThemeSwitch />
             </div>
-          </nav>
+          </div>
         </div>
       </aside>
     </>

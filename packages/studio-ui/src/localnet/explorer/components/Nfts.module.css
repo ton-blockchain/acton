@@ -1,0 +1,161 @@
+.container {
+  padding: 20px 24px 24px;
+}
+
+.searchBox {
+  width: min(360px, 100%);
+  min-height: 44px;
+  margin-bottom: 24px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 96%, var(--acton-color-text));
+  color: var(--acton-color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  transition:
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast);
+}
+
+.searchBox:focus-within {
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-raised);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.searchBox input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+}
+
+.searchBox input::placeholder {
+  color: var(--acton-color-text-muted);
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(154px, 1fr));
+  gap: 16px;
+}
+
+.nftItem {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: var(--acton-color-surface-raised);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.nftItem:hover .nftImage {
+  transform: scale(1.04);
+}
+
+.nftItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.imageFrame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background:
+    linear-gradient(135deg, rgb(228 232 238 / 85%), rgb(244 246 248 / 88%)),
+    var(--acton-color-surface-raised);
+  overflow: hidden;
+}
+
+.nftImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background-color: var(--acton-color-surface-raised);
+  transition: transform 180ms ease;
+}
+
+.blurredImage {
+  filter: blur(12px);
+}
+
+.nftInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px 11px;
+  background: var(--acton-color-surface-raised);
+}
+
+.collectionName,
+.nftMetaLine {
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.collectionName,
+.nftName,
+.nftAddress {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nftName {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.nftMetaLine {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nftAddress {
+  min-width: 0;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+@media (max-width: 720px) {
+  .container {
+    padding: 16px;
+  }
+
+  .searchBox {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .list {
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    gap: 12px;
+  }
+}

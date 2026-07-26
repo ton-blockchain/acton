@@ -132,6 +132,14 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn get(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            Ok(environment.details.read().await.clone())
+        })
+    }
+
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
