@@ -7,6 +7,37 @@ which primitives exist or when to use each visual variant.
 This is not prop documentation. Prefer the TypeScript source for exact API
 details.
 
+## Product Visual Direction
+
+Acton products use a calm, compact application hierarchy similar to Vercel
+Dashboard and Cloudflare Dashboard. Pages should feel like working tools, not
+marketing landing pages.
+
+- Do not use oversized display headings or hero typography in product UI.
+- Do not use landing-page hero composition inside product screens: avoid an
+  eyebrow followed by a marketing sentence as the title and a broad promotional
+  subtitle. Start pages with a compact functional title, a short description,
+  and nearby actions when needed.
+- Do not end headings or subheadings with a period.
+- Avoid decorative eyebrow or overline labels above headings, such as
+  `WORKSPACE`, `TIMELINE`, or `PROJECT`. Use an overline only when it is
+  critical to disambiguate hierarchy or domain and that context cannot be
+  inferred from the heading or surrounding UI.
+- Prefer restrained page titles, compact descriptions, and dense but readable
+  spacing.
+- Let navigation, data, state, and the primary action establish hierarchy
+  instead of decorative scale.
+- Keep surfaces neutral and quiet so technical content remains the visual focus.
+- Do not use box shadows on application headers, panels, cards, or persistent
+  sections. Separate surfaces with borders, spacing, and restrained background
+  contrast. Reserve shadow only for transient overlays or popovers when depth
+  must be communicated.
+- Use the sans-serif product typeface for interface text. Monospace is reserved
+  for content whose shape carries technical meaning, such as code, paths,
+  addresses, hashes, or fixed-width data.
+- Never use monospace for navigation, buttons, labels, status text, metadata
+  captions, headings, or decorative terminal styling.
+
 ## Button
 
 Status: ready
