@@ -464,7 +464,9 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   <div key={endpoint.label} className={styles.endpointRow}>
                     <span className={styles.endpointLabel}>{endpoint.label}</span>
                     <span className={styles.endpointValueRow}>
-                      <span className={styles.endpointValue}>{endpoint.value}</span>
+                      <Tooltip content={endpoint.value}>
+                        <span className={styles.endpointValue}>{endpoint.value}</span>
+                      </Tooltip>
                       <span className={styles.endpointActions}>
                         <Tooltip content={isCopied ? "Copied" : "Copy endpoint"}>
                           <button

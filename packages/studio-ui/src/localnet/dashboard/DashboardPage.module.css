@@ -668,7 +668,10 @@
 }
 
 .navDivider {
+  width: 100%;
   height: 1px;
+  min-height: 1px;
+  flex: 0 0 1px;
   background: var(--acton-color-border);
 }
 
@@ -1594,30 +1597,6 @@
   margin-left: auto;
   color: var(--acton-color-text-muted);
   flex: 0 0 auto;
-}
-
-.hero {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 4px 0 2px;
-}
-
-.title {
-  margin: 0;
-  color: var(--acton-color-text);
-  font-size: 32px;
-  font-weight: 500;
-  letter-spacing: -0.79px;
-  line-height: 40px;
-}
-
-.subtitle {
-  max-width: 620px;
-  margin: 14px 0 0;
-  color: var(--acton-color-text-muted);
-  font-size: 1rem;
-  line-height: 1.6;
 }
 
 .faucetLayout {

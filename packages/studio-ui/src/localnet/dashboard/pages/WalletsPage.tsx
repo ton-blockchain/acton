@@ -130,15 +130,6 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
 
   return (
     <>
-      <section className={dashboardStyles.hero}>
-        <div>
-          <h1 className={dashboardStyles.title}>Wallets</h1>
-          <p className={dashboardStyles.subtitle}>
-            Startup wallets from this localnet, ready for TON Connect
-          </p>
-        </div>
-      </section>
-
       <section className={styles.walletLayout}>
         <div className={styles.mainColumn}>
           <section

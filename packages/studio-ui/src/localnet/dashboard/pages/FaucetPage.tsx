@@ -526,12 +526,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
   return (
     <>
-      <section className={styles.hero}>
-        <div>
-          <h1 className={styles.title}>Faucet</h1>
-        </div>
-      </section>
-
       <section className={styles.faucetLayout}>
         <form className={styles.formCard} onSubmit={event => void handleSubmit(event)}>
           <div className={styles.fieldBlock}>

@@ -8,22 +8,27 @@ import {
   PanelLeftOpen,
   X,
 } from "lucide-react"
-import {useCallback, useEffect, useState} from "react"
+import {Fragment, useCallback, useEffect, useState} from "react"
 import type {ReactNode} from "react"
 import {ThemeSwitch, Tooltip} from "@acton/ui"
 
+import type {StudioEnvironment} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 import {StudioSearch} from "./StudioSearch"
 
 import styles from "./StudioNavigation.module.css"
 
+const ENVIRONMENT_NAVIGATION_LIMIT = 5
+
 interface StudioNavigationProps {
   readonly activePath: StudioPath
+  readonly activeEnvironmentId?: string
   readonly className?: string
   readonly contextAction?: {
     readonly label: string
     readonly onSelect: () => void
   }
+  readonly environments?: readonly StudioEnvironment[]
   readonly isSidebarCollapsed?: boolean
   readonly navigationContent?: ReactNode
   readonly navigationKey?: string
@@ -31,13 +36,16 @@ interface StudioNavigationProps {
   readonly searchContent?: ReactNode
   readonly utilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
+  readonly onOpenEnvironment?: (environment: StudioEnvironment) => void
   readonly onToggleSidebar?: () => void
 }
 
 export function StudioNavigation({
   activePath,
+  activeEnvironmentId,
   className,
   contextAction,
+  environments = [],
   isSidebarCollapsed = false,
   navigationContent,
   navigationKey = "studio",
@@ -45,6 +53,7 @@ export function StudioNavigation({
   searchContent,
   utilityActions,
   onNavigate,
+  onOpenEnvironment,
   onToggleSidebar,
 }: StudioNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -56,6 +65,14 @@ export function StudioNavigation({
     },
     [closeMobileMenu, onNavigate],
   )
+  const openEnvironmentAndClose = useCallback(
+    (environment: StudioEnvironment) => {
+      onOpenEnvironment?.(environment)
+      closeMobileMenu()
+    },
+    [closeMobileMenu, onOpenEnvironment],
+  )
+  const navigationEnvironments = environments.slice(0, ENVIRONMENT_NAVIGATION_LIMIT)
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -143,21 +160,61 @@ export function StudioNavigation({
                     <div className={styles.navSection}>
                       {pages.map(page => {
                         const Icon = page.icon
-                        const isActive = page.path === activePath
+                        const isActive =
+                          page.path === activePath &&
+                          !(page.path === "/virtual-environments" && activeEnvironmentId)
+                        const showEnvironments =
+                          page.path === "/virtual-environments" &&
+                          navigationEnvironments.length > 0
 
                         return (
-                          <button
-                            key={page.path}
-                            type="button"
-                            className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                            aria-current={isActive ? "page" : undefined}
-                            onClick={() => navigateAndClose(page.path)}
-                          >
-                            <span className={styles.navItemMain}>
-                              <Icon size={18} />
-                              <span>{page.label}</span>
-                            </span>
-                          </button>
+                          <Fragment key={page.path}>
+                            <button
+                              type="button"
+                              className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                              aria-current={isActive ? "page" : undefined}
+                              onClick={() => navigateAndClose(page.path)}
+                            >
+                              <span className={styles.navItemMain}>
+                                <Icon size={18} />
+                                <span>{page.label}</span>
+                              </span>
+                            </button>
+                            {showEnvironments ? (
+                              <ul
+                                className={styles.environmentNavList}
+                                aria-label="Virtual environments"
+                              >
+                                {navigationEnvironments.map(environment => (
+                                  <li key={environment.id}>
+                                    <button
+                                      type="button"
+                                      className={`${styles.environmentNavItem} ${
+                                        activeEnvironmentId === environment.id
+                                          ? styles.environmentNavItemActive
+                                          : ""
+                                      }`}
+                                      aria-current={
+                                        activeEnvironmentId === environment.id ? "page" : undefined
+                                      }
+                                      onClick={() => openEnvironmentAndClose(environment)}
+                                    >
+                                      <span className={styles.environmentNavName}>
+                                        {environment.name}
+                                      </span>
+                                      <span
+                                        className={styles.environmentStatusDot}
+                                        data-status={environment.status}
+                                        role="img"
+                                        aria-label={`Status: ${environment.status}`}
+                                        title={environment.status}
+                                      />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : undefined}
+                          </Fragment>
                         )
                       })}
                     </div>

@@ -79,13 +79,6 @@ export const TokensPage: FC<TokensPageProps> = ({client}) => {
 
   return (
     <>
-      <section className={styles.hero}>
-        <div>
-          <h1 className={styles.title}>Tokens</h1>
-          <p className={styles.subtitle}>Jettons detected on the local network</p>
-        </div>
-      </section>
-
       <section
         className={styles.resourceTableLayout}
         aria-busy={tokensState.isLoading}

@@ -86,13 +86,6 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
 
   return (
     <>
-      <section className={styles.hero}>
-        <div>
-          <h1 className={styles.title}>NFTs</h1>
-          <p className={styles.subtitle}>NFT items indexed from the local network</p>
-        </div>
-      </section>
-
       <section
         className={styles.resourceTableLayout}
         aria-busy={nftsState.isLoading}

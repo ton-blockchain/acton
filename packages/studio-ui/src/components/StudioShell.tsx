@@ -3,6 +3,7 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {ReactNode} from "react"
 import {Tooltip} from "@acton/ui"
 
+import type {StudioEnvironment} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
 import {StudioNavigation} from "./StudioNavigation"
 
@@ -19,15 +20,18 @@ interface StudioShellProps {
   readonly pageDescription?: string
   readonly pageTitle?: string
   readonly pages: readonly StudioPage[]
+  readonly sidebarActiveEnvironmentId?: string
   readonly sidebarContextAction?: {
     readonly label: string
     readonly onSelect: () => void
   }
+  readonly sidebarEnvironments?: readonly StudioEnvironment[]
   readonly sidebarNavigation?: ReactNode
   readonly sidebarNavigationKey?: string
   readonly sidebarSearch?: ReactNode
   readonly sidebarUtilityActions?: ReactNode
   readonly onNavigate: (path: StudioPath) => void
+  readonly onOpenEnvironment?: (environment: StudioEnvironment) => void
 }
 
 export function StudioShell({
@@ -38,12 +42,15 @@ export function StudioShell({
   pageDescription,
   pageTitle,
   pages,
+  sidebarActiveEnvironmentId,
   sidebarContextAction,
+  sidebarEnvironments,
   sidebarNavigation,
   sidebarNavigationKey,
   sidebarSearch,
   sidebarUtilityActions,
   onNavigate,
+  onOpenEnvironment,
 }: StudioShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
@@ -180,8 +187,10 @@ export function StudioShell({
         <div className={styles.sidebarViewport} onPointerLeave={hideSidebarPreview}>
           <StudioNavigation
             activePath={activePath}
+            activeEnvironmentId={sidebarActiveEnvironmentId}
             className={styles.floatingSidebar}
             contextAction={sidebarContextAction}
+            environments={sidebarEnvironments}
             isSidebarCollapsed={isSidebarCollapsed}
             navigationContent={sidebarNavigation}
             navigationKey={sidebarNavigationKey}
@@ -189,6 +198,7 @@ export function StudioShell({
             searchContent={sidebarSearch}
             utilityActions={sidebarUtilityActions}
             onNavigate={onNavigate}
+            onOpenEnvironment={onOpenEnvironment}
             onToggleSidebar={toggleSidebar}
           />
         </div>

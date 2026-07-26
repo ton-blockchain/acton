@@ -15,8 +15,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "paths": {
-      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"],
-      "@tasm-spec/*": ["../../crates/tasm-core/spec/*"]
+      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"]
     },
     "types": ["vite/client", "node"]
   },

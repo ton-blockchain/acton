@@ -4,7 +4,10 @@ import {useLocation, useNavigate} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
 
 import {StudioShell} from "./components/StudioShell"
-import {useStudioEnvironment} from "./hooks/useStudioEnvironment"
+import {
+  useStudioEnvironments,
+  type StudioEnvironmentsState,
+} from "./hooks/useStudioEnvironments"
 import {EnvironmentNavigation} from "./localnet/dashboard/EnvironmentNavigation"
 import {EnvironmentNavigationActions} from "./localnet/dashboard/EnvironmentNavigationActions"
 import {DashboardSearch} from "./localnet/dashboard/DashboardSearch"
@@ -30,11 +33,10 @@ function StudioApp() {
   const location = useLocation()
   const routerNavigate = useNavigate()
   const route = readStudioRoute(location.pathname)
-  const [selectedEnvironment, setSelectedEnvironment] = useState<StudioEnvironment>()
+  const environmentsState = useStudioEnvironments()
   const environmentRoute = route.kind === "environment" ? route : undefined
-  const environmentState = useStudioEnvironment(
-    environmentRoute?.environmentId,
-    selectedEnvironment,
+  const environment = environmentsState.environments.find(
+    candidate => candidate.id === environmentRoute?.environmentId,
   )
 
   const navigate = useCallback(
@@ -47,20 +49,18 @@ function StudioApp() {
 
   const openEnvironment = useCallback(
     (environment: StudioEnvironment) => {
-      setSelectedEnvironment(environment)
+      environmentsState.setEnvironment(environment)
       void routerNavigate(environmentStudioPath(environment.id))
       globalThis.scrollTo({top: 0})
     },
-    [routerNavigate],
+    [environmentsState.setEnvironment, routerNavigate],
   )
 
   return (
-    <LocalnetRuntimeProvider
-      basePath={environmentRoute?.basePath}
-      environment={environmentState.environment}
-    >
+    <LocalnetRuntimeProvider basePath={environmentRoute?.basePath} environment={environment}>
       <StudioWorkspace
-        environmentState={environmentState}
+        environment={environment}
+        environmentsState={environmentsState}
         route={route}
         onNavigate={navigate}
         onOpenEnvironment={openEnvironment}
@@ -70,14 +70,16 @@ function StudioApp() {
 }
 
 interface StudioWorkspaceProps {
-  readonly environmentState: ReturnType<typeof useStudioEnvironment>
+  readonly environment?: StudioEnvironment
+  readonly environmentsState: StudioEnvironmentsState
   readonly route: StudioRoute
   readonly onNavigate: (path: StudioPath) => void
   readonly onOpenEnvironment: (environment: StudioEnvironment) => void
 }
 
 function StudioWorkspace({
-  environmentState,
+  environment,
+  environmentsState,
   route,
   onNavigate,
   onOpenEnvironment,
@@ -173,7 +175,11 @@ function StudioWorkspace({
   }
 
   const environmentRoute = route.kind === "environment" ? route : undefined
-  const environment = environmentState.environment
+  const environmentLoadError =
+    environmentsState.error ??
+    (environmentRoute && !environmentsState.isLoading && !environment
+      ? "Virtual environment not found"
+      : undefined)
   const activePath: StudioPath = route.kind === "page" ? route.path : "/virtual-environments"
   const activeFeaturePage =
     route.kind === "page" && activePath !== "/" ? studioFeaturePages[activePath] : undefined
@@ -244,6 +250,7 @@ function StudioWorkspace({
           : undefined
       }
       pages={studioPages}
+      sidebarActiveEnvironmentId={environmentRoute?.environmentId}
       sidebarContextAction={
         environmentRoute && environment && !showEnvironmentNavigation
           ? {
@@ -260,6 +267,7 @@ function StudioWorkspace({
           />
         ) : undefined
       }
+      sidebarEnvironments={environmentsState.environments}
       sidebarNavigationKey={
         showEnvironmentNavigation && environment ? `environment:${environment.id}` : "studio"
       }
@@ -275,15 +283,16 @@ function StudioWorkspace({
         ) : undefined
       }
       onNavigate={navigate}
+      onOpenEnvironment={openEnvironment}
     >
       {environmentRoute ? (
         <EnvironmentWorkspacePage
           basePath={environmentRoute.basePath}
           environment={environment}
-          isLoading={environmentState.isLoading}
-          loadError={environmentState.error}
-          onEnvironmentChange={environmentState.setEnvironment}
-          onRetry={environmentState.refresh}
+          isLoading={environmentsState.isLoading}
+          loadError={environmentLoadError}
+          onEnvironmentChange={environmentsState.setEnvironment}
+          onRetry={environmentsState.refresh}
           onShellChange={handleEnvironmentShellChange}
         />
       ) : activePath === "/" ? (
@@ -297,9 +306,14 @@ function StudioWorkspace({
       ) : activePath === "/virtual-environments" ? (
         <VirtualEnvironmentsPage
           createOpen={isEnvironmentCreateOpen}
+          environments={environmentsState.environments}
+          isLoading={environmentsState.isLoading}
+          loadError={environmentsState.error}
           walletNames={studioInfo?.workspace?.walletNames ?? []}
           onCreateOpenChange={setIsEnvironmentCreateOpen}
+          onEnvironmentChange={environmentsState.setEnvironment}
           onOpenEnvironment={openEnvironment}
+          onRefresh={environmentsState.refresh}
         />
       ) : (
         <FeaturePage page={studioFeaturePages[activePath]} onAction={showIntegrationToast} />

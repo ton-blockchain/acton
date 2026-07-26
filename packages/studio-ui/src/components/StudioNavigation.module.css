@@ -770,6 +770,82 @@
   background: var(--acton-color-surface-active);
 }
 
+.environmentNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px 0 1px 8px;
+  margin: 2px 0 6px 17px;
+  list-style: none;
+  border-left: 1px solid var(--acton-color-border);
+}
+
+.environmentNavItem {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.environmentNavItem:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.environmentNavItem:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 0;
+}
+
+.environmentNavItemActive {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.environmentNavName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environmentStatusDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  background: var(--acton-color-text-subtle);
+  border-radius: 999px;
+}
+
+.environmentStatusDot[data-status="running"] {
+  background: var(--acton-color-success);
+}
+
+.environmentStatusDot[data-status="starting"],
+.environmentStatusDot[data-status="stopping"] {
+  background: var(--acton-color-warning);
+}
+
+.environmentStatusDot[data-status="failed"] {
+  background: var(--acton-color-danger-text);
+}
+
 .contentArea {
   display: flex;
   height: 100%;

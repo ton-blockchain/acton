@@ -81,12 +81,6 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
 
   return (
     <>
-      <section className={styles.hero}>
-        <div>
-          <h1 className={styles.title}>API Calls</h1>
-        </div>
-      </section>
-
       <section className={styles.rpcCallsLayout}>
         <div className={styles.rpcCallsToolbar}>
           <div className={styles.rpcCallsFilters}>

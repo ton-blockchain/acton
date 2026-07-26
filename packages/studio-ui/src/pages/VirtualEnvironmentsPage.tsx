@@ -15,12 +15,11 @@ import {
   useToast,
 } from "@acton/ui"
 import {Boxes, CircleAlert, Plus, RotateCcw, Square} from "lucide-react"
-import {useCallback, useEffect, useState} from "react"
+import {useState} from "react"
 
 import {
   type EnvironmentStatus,
   type StudioEnvironment,
-  fetchStudioEnvironments,
   restartStudioEnvironment,
   stopStudioEnvironment,
 } from "../studioApi"
@@ -29,13 +28,16 @@ import {StopEnvironmentDialog} from "./StopEnvironmentDialog"
 
 import styles from "./VirtualEnvironmentsPage.module.css"
 
-const ENVIRONMENT_POLL_INTERVAL_MS = 1500
-
 interface VirtualEnvironmentsPageProps {
   readonly createOpen: boolean
+  readonly environments: readonly StudioEnvironment[]
+  readonly isLoading: boolean
+  readonly loadError?: string
   readonly walletNames: readonly string[]
   readonly onCreateOpenChange: (open: boolean) => void
+  readonly onEnvironmentChange: (environment: StudioEnvironment) => void
   readonly onOpenEnvironment: (environment: StudioEnvironment) => void
+  readonly onRefresh: () => Promise<void>
 }
 
 const statusLabels = {
@@ -48,54 +50,22 @@ const statusLabels = {
 
 export function VirtualEnvironmentsPage({
   createOpen,
+  environments,
+  isLoading,
+  loadError,
   walletNames,
   onCreateOpenChange,
+  onEnvironmentChange,
   onOpenEnvironment,
+  onRefresh,
 }: VirtualEnvironmentsPageProps) {
   const {showToast} = useToast()
-  const [environments, setEnvironments] = useState<StudioEnvironment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string>()
   const [stoppingIds, setStoppingIds] = useState<ReadonlySet<string>>(new Set())
   const [restartingIds, setRestartingIds] = useState<ReadonlySet<string>>(new Set())
   const [stopTarget, setStopTarget] = useState<StudioEnvironment>()
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    const nextEnvironments = await fetchStudioEnvironments(signal)
-    setEnvironments(nextEnvironments)
-    setLoadError(undefined)
-    setIsLoading(false)
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let pollTimer: ReturnType<typeof globalThis.setTimeout> | undefined
-
-    const poll = async () => {
-      try {
-        await refresh(controller.signal)
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setLoadError(getErrorMessage(error))
-        setIsLoading(false)
-      }
-      if (!controller.signal.aborted) {
-        pollTimer = globalThis.setTimeout(() => void poll(), ENVIRONMENT_POLL_INTERVAL_MS)
-      }
-    }
-
-    void poll()
-    return () => {
-      controller.abort()
-      if (pollTimer !== undefined) globalThis.clearTimeout(pollTimer)
-    }
-  }, [refresh])
-
   const handleCreated = (environment: StudioEnvironment) => {
-    setEnvironments(current => [
-      environment,
-      ...current.filter(candidate => candidate.id !== environment.id),
-    ])
+    onEnvironmentChange(environment)
   }
 
   const handleStop = async () => {
@@ -105,9 +75,7 @@ export function VirtualEnvironmentsPage({
     setStoppingIds(current => new Set(current).add(environment.id))
     try {
       const stopped = await stopStudioEnvironment(environment.id)
-      setEnvironments(current =>
-        current.map(candidate => (candidate.id === stopped.id ? stopped : candidate)),
-      )
+      onEnvironmentChange(stopped)
       showToast({
         title: `${environment.name} stopped`,
         variant: "success",
@@ -132,9 +100,7 @@ export function VirtualEnvironmentsPage({
     setRestartingIds(current => new Set(current).add(environment.id))
     try {
       const restarted = await restartStudioEnvironment(environment.id)
-      setEnvironments(current =>
-        current.map(candidate => (candidate.id === restarted.id ? restarted : candidate)),
-      )
+      onEnvironmentChange(restarted)
       showToast({
         title: `${environment.name} is restarting`,
         variant: "success",
@@ -163,7 +129,7 @@ export function VirtualEnvironmentsPage({
             <strong>Unable to load environments</strong>
             <span>{loadError}</span>
           </div>
-          <Button size="sm" variant="outline" onClick={() => void refresh()}>
+          <Button size="sm" variant="outline" onClick={() => void onRefresh()}>
             Retry
           </Button>
         </section>

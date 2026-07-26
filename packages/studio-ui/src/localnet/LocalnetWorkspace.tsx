@@ -53,9 +53,9 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Localnet status, network activity and runtime controls",
   "/faucet": "Fund accounts in this virtual environment",
-  "/wallets": "Manage wallets available in this virtual environment",
-  "/tokens": "Inspect token contracts and balances",
-  "/nfts": "Inspect NFT collections and items",
+  "/wallets": "Startup wallets from this environment, ready for TON Connect",
+  "/tokens": "Jettons detected in this virtual environment",
+  "/nfts": "NFT items indexed from this virtual environment",
   "/api-reference/v2": "Explore the localnet v2 API",
   "/api-reference/v3": "Explore the localnet v3 API",
   "/api-reference/control": "Explore localnet management methods",
