@@ -45,6 +45,18 @@ describe("source parsing", () => {
     ).toEqual([{address: "0:abc", name: "@wallet in Telegram"}])
   })
 
+  test("does not apply address-book recovery to ton-assets", () => {
+    expect(() =>
+      parseTonAssets(
+        `
+- address: "0:abc"
+  name: @wallet in Telegram
+`,
+        "example.yaml",
+      ),
+    ).toThrow("Failed to parse YAML from example.yaml")
+  })
+
   test("matches upstream convention for disabled indented entries", () => {
     expect(
       parseAddressBook(

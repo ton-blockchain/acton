@@ -1,5 +1,3 @@
-import {parseAllDocuments} from "yaml"
-
 export type AddressSourceId = "ton-assets" | "address-book"
 
 export interface SourceAddress {
@@ -45,21 +43,6 @@ export const parseSourceAddresses = (
       name: requireNonEmptyString(row.name, `${path}.name`),
     }
   })
-}
-
-export const parseYamlAddresses = (text: string, sourcePath: string): readonly SourceAddress[] => {
-  try {
-    const entries = parseAllDocuments(text, {logLevel: "silent"}).flatMap(document =>
-      document.toJS(),
-    )
-    return parseSourceAddresses(entries, sourcePath)
-  } catch (error) {
-    if (error instanceof TypeError) {
-      throw error
-    }
-
-    throw new SyntaxError(`Failed to parse YAML from ${sourcePath}`, {cause: error})
-  }
 }
 
 export const readText = async (url: string): Promise<string> => {
