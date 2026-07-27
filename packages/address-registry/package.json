@@ -17,6 +17,9 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "js-yaml": "5.2.1"
+  },
   "devDependencies": {
     "typescript": "^7.0.2"
   }
