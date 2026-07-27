@@ -1,0 +1,26 @@
+{
+  "get_block_header": {
+    "fork_boundary_matches_remote": true,
+    "post_fork_stays_local": true,
+    "pre_fork_matches_remote": true
+  },
+  "get_block_transactions": {
+    "fork_boundary_matches_remote": true,
+    "post_fork_stays_local": true,
+    "pre_fork_matches_remote": true
+  },
+  "get_block_transactions_ext": {
+    "fork_boundary_matches_remote": true,
+    "post_fork_stays_local": true,
+    "pre_fork_matches_remote": true
+  },
+  "lookup_block": {
+    "fork_boundary_matches_remote": true,
+    "post_fork_lt_stays_local": true,
+    "post_fork_stays_local": true,
+    "post_fork_time_stays_local": true,
+    "pre_fork_lt_matches_remote": true,
+    "pre_fork_seqno_matches_remote": true,
+    "pre_fork_time_matches_remote": true
+  }
+}

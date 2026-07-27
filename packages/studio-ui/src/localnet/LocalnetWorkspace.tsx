@@ -1,7 +1,16 @@
 import {Navigate, Route, Routes, useLocation} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, Input} from "@acton/ui"
-import {Suspense, lazy, useEffect, useLayoutEffect, useRef, useState} from "react"
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type {FC, ReactNode} from "react"
 
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
@@ -20,6 +29,7 @@ import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProv
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {IntegratePage} from "./dashboard/pages/IntegratePage"
+import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
@@ -47,6 +57,9 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/wallets": "Wallets",
   "/simulator": "Simulator",
   "/cell-inspector": "Cell Inspector",
+  "/contracts": "Contracts",
+  "/contracts/sources": "Sources",
+  "/contracts/abi": "ABI",
   "/explorer/tokens": "Tokens",
   "/explorer/nfts": "NFTs",
   "/settings": "Settings",
@@ -63,6 +76,9 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/wallets": "Startup wallets from this environment, ready for TON Connect",
   "/simulator": "Build and replay messages against this virtual environment",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
+  "/contracts": "Track deployed contracts and match them with Acton build artifacts",
+  "/contracts/sources": "Manage source artifacts available to contracts in this environment",
+  "/contracts/abi": "Manage ABI used to decode contract state and messages",
   "/explorer/tokens": "Jettons detected in this virtual environment",
   "/explorer/nfts": "NFT items indexed from this virtual environment",
   "/settings": "Manage environment identity, network behavior and mining",
@@ -83,7 +99,14 @@ interface LocalnetWorkspaceProps {
 export interface LocalnetWorkspaceShellState {
   readonly pageDescription: string
   readonly pageTitle: string
+  readonly primaryAction?: LocalnetWorkspaceShellAction
   readonly rpcUrl?: string
+}
+
+export interface LocalnetWorkspaceShellAction {
+  readonly icon: "plus"
+  readonly label: string
+  readonly onClick: () => void
 }
 
 export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
@@ -130,18 +153,35 @@ const AppContent: FC<AppContentProps> = ({
   const runtime = useLocalnetRuntime()
   const client = runtime.client
   const {pathname} = useLocation()
+  const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const explorerPageTitle = useExplorerPageTitle()
   const localPathname = pathname.slice(basePath.length) || "/"
   const pageTitle =
-    explorerPageTitle ?? LOCALNET_PAGE_TITLES[localPathname] ?? "Virtual Environment"
+    explorerPageTitle ??
+    LOCALNET_PAGE_TITLES[localPathname] ??
+    contractDetailsPageTitle(localPathname) ??
+    "Virtual Environment"
   const pageDescription =
     LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
+    contractDetailsPageDescription(localPathname) ??
     "Inspect blocks, accounts, transactions and contract activity"
   const path = (value: string) => localnetPath(basePath, value)
+  const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
+  const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(
+    () =>
+      localPathname === "/contracts"
+        ? {icon: "plus", label: "Add contract", onClick: openAddContract}
+        : undefined,
+    [localPathname, openAddContract],
+  )
 
   useLayoutEffect(() => {
-    onShellChange({pageDescription, pageTitle, rpcUrl: runtime.rpcBaseUrl})
-  }, [onShellChange, pageDescription, pageTitle, runtime.rpcBaseUrl])
+    onShellChange({pageDescription, pageTitle, primaryAction, rpcUrl: runtime.rpcBaseUrl})
+  }, [onShellChange, pageDescription, pageTitle, primaryAction, runtime.rpcBaseUrl])
+
+  useEffect(() => {
+    if (localPathname !== "/contracts") setIsAddContractOpen(false)
+  }, [localPathname])
 
   return (
     <>
@@ -244,6 +284,42 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
+              path={path("/contracts")}
+              element={
+                <DashboardPage>
+                  <ContractsPage
+                    addOpen={isAddContractOpen}
+                    client={client}
+                    onAddOpenChange={setIsAddContractOpen}
+                  />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/contracts/abi")}
+              element={
+                <DashboardPage>
+                  <AbiCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/contracts/abi/:slug")}
+              element={
+                <DashboardPage>
+                  <AbiDetailsPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/contracts/sources")}
+              element={
+                <DashboardPage>
+                  <SourceCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
               path={path("/api-reference")}
               element={<Navigate to={path("/api-reference/v2")} replace />}
             />
@@ -327,30 +403,6 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage embedded>
                   <ExplorerIndexPage client={client} />
-                </DashboardPage>
-              }
-            />
-            <Route
-              path={path("/explorer/abi")}
-              element={
-                <DashboardPage embedded>
-                  <AbiCatalogPage />
-                </DashboardPage>
-              }
-            />
-            <Route
-              path={path("/explorer/abi/:slug")}
-              element={
-                <DashboardPage embedded>
-                  <AbiDetailsPage />
-                </DashboardPage>
-              }
-            />
-            <Route
-              path={path("/explorer/sources")}
-              element={
-                <DashboardPage embedded>
-                  <SourceCatalogPage />
                 </DashboardPage>
               }
             />
@@ -443,6 +495,23 @@ const LocalnetDocumentTitle: FC<{
 const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
   <Suspense fallback={<div className={styles.routeLoading}>Loading…</div>}>{children}</Suspense>
 )
+
+function contractDetailsPageTitle(localPathname: string): string | undefined {
+  const match = localPathname.match(/^\/contracts\/abi\/([^/]+)$/)
+  if (!match?.[1]) return undefined
+
+  try {
+    return `${decodeURIComponent(match[1])} ABI`
+  } catch {
+    return `${match[1]} ABI`
+  }
+}
+
+function contractDetailsPageDescription(localPathname: string): string | undefined {
+  return /^\/contracts\/abi\/[^/]+$/.test(localPathname)
+    ? "Inspect contract declarations, messages, getters and errors"
+    : undefined
+}
 
 interface LocalnetAuthOverlayProps {
   readonly localnetApiToken?: string

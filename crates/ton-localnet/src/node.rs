@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 use ton_emulator::Emulator;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
@@ -1525,18 +1526,25 @@ impl Node {
     }
 
     pub fn get_address_information(&mut self, addr: &Addr) -> Option<AccountMeta> {
+        self.hydrate_address_information(addr).ok().flatten()
+    }
+
+    pub(crate) fn hydrate_address_information(
+        &mut self,
+        addr: &Addr,
+    ) -> anyhow::Result<Option<AccountMeta>> {
         if let Some(meta) = self.latest.accounts.get(addr) {
-            return Some(meta.clone());
+            return Ok(Some(meta.clone()));
         }
 
         if let StateSource::Remote(provider) = &self.state_source {
             let provider = provider.clone();
-            if let Ok(Some(_)) = self.fetch_remote_shard_account(addr, &provider) {
-                return self.latest.accounts.get(addr).cloned();
+            if self.fetch_remote_shard_account(addr, &provider)?.is_some() {
+                return Ok(self.latest.accounts.get(addr).cloned());
             }
         }
 
-        None
+        Ok(None)
     }
 
     pub fn get_address_information_at_block(
@@ -2351,8 +2359,28 @@ impl Node {
         &self.history
     }
 
-    pub fn set_address_name(&mut self, address: Addr, name: String) {
-        self.history.address_names.insert(address, name);
+    pub fn set_address_name(&mut self, address: Addr, name: String) -> anyhow::Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            if let Some(persistence) = &self.persistence {
+                persistence.delete_address_name(address)?;
+            }
+            self.history.address_names.remove(&address);
+        } else {
+            if let Some(persistence) = &self.persistence {
+                persistence.set_address_name(address, name)?;
+            }
+            self.history.address_names.insert(address, name.to_owned());
+        }
+        Ok(())
+    }
+
+    pub fn register_contract(&mut self, address: Addr) -> anyhow::Result<()> {
+        if let Some(persistence) = &self.persistence {
+            persistence.register_contract(address)?;
+        }
+        self.history.registered_contracts.insert(address);
+        Ok(())
     }
 
     #[must_use]
@@ -2386,10 +2414,77 @@ impl Node {
     }
 
     pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
-        if let Some(persistence) = &self.persistence {
-            persistence.set_verified_source(code_hash, &source)?;
+        let saved_at = verified_source_saved_at()?;
+        let artifact = storage::VerifiedSourceArtifact::new(code_hash, source, saved_at);
+        if let Some(existing) = self
+            .history
+            .verified_source_artifacts
+            .get(&artifact.artifact_id)
+        {
+            anyhow::ensure!(
+                existing.code_hash == artifact.code_hash && existing.source == artifact.source,
+                "Verified source artifact {} is immutable",
+                artifact.artifact_id
+            );
         }
-        self.history.set_verified_source(code_hash, source);
+        if let Some(persistence) = &self.persistence {
+            persistence.set_verified_source(&artifact)?;
+        }
+        self.history.set_verified_source(artifact);
+        Ok(())
+    }
+
+    pub fn register_verified_sources(
+        &mut self,
+        sources: Vec<(Hash256, Value)>,
+        compiler_abis: Vec<(Hash256, Value)>,
+    ) -> anyhow::Result<()> {
+        let saved_at = verified_source_saved_at()?;
+        let artifacts = sources
+            .into_iter()
+            .map(|(code_hash, source)| {
+                storage::VerifiedSourceArtifact::new(code_hash, source, saved_at)
+            })
+            .collect::<Vec<_>>();
+
+        let mut staged_sources = self.history.verified_sources.clone();
+        let mut staged_artifacts = self.history.verified_source_artifacts.clone();
+        for artifact in &artifacts {
+            if let Some(existing) = staged_artifacts.get(&artifact.artifact_id) {
+                anyhow::ensure!(
+                    existing.code_hash == artifact.code_hash && existing.source == artifact.source,
+                    "Verified source artifact {} is immutable",
+                    artifact.artifact_id
+                );
+            }
+            staged_artifacts
+                .entry(artifact.artifact_id.clone())
+                .or_insert_with(|| artifact.clone());
+            staged_sources.insert(artifact.code_hash, artifact.source.clone());
+        }
+
+        let mut staged_history = History::new();
+        staged_history
+            .compiler_abis
+            .clone_from(&self.history.compiler_abis);
+        let mut compiler_abi_updates = Vec::with_capacity(compiler_abis.len());
+        for (code_hash, compiler_abi) in compiler_abis {
+            let stale_keys = staged_history.compiler_abi_stale_keys(code_hash, &compiler_abi);
+            staged_history.set_compiler_abi_with_stale_keys(
+                code_hash,
+                compiler_abi.clone(),
+                &stale_keys,
+            );
+            compiler_abi_updates.push((code_hash, compiler_abi, stale_keys));
+        }
+
+        if let Some(persistence) = &self.persistence {
+            persistence.register_verified_sources(&artifacts, &compiler_abi_updates)?;
+        }
+
+        self.history.verified_sources = staged_sources;
+        self.history.verified_source_artifacts = staged_artifacts;
+        self.history.compiler_abis = staged_history.compiler_abis;
         Ok(())
     }
 
@@ -2398,6 +2493,41 @@ impl Node {
             persistence.delete_verified_source(*code_hash)?;
         }
         self.history.delete_verified_source(code_hash);
+        Ok(())
+    }
+
+    pub fn delete_verified_source_artifact(&mut self, artifact_id: &str) -> anyhow::Result<()> {
+        let Some(deleted) = self
+            .history
+            .verified_source_artifacts
+            .get(artifact_id)
+            .cloned()
+        else {
+            return Ok(());
+        };
+        let was_selected =
+            self.history.verified_sources.get(&deleted.code_hash) == Some(&deleted.source);
+        let replacement = self
+            .history
+            .verified_source_artifacts
+            .values()
+            .filter(|artifact| {
+                artifact.artifact_id != artifact_id && artifact.code_hash == deleted.code_hash
+            })
+            .max_by(|left, right| {
+                left.saved_at
+                    .cmp(&right.saved_at)
+                    .then_with(|| left.artifact_id.cmp(&right.artifact_id))
+            });
+        if let Some(persistence) = &self.persistence {
+            persistence.delete_verified_source_artifact(
+                artifact_id,
+                deleted.code_hash,
+                was_selected,
+                was_selected.then_some(replacement).flatten(),
+            )?;
+        }
+        self.history.delete_verified_source_artifact(artifact_id);
         Ok(())
     }
 
@@ -2847,6 +2977,15 @@ impl Node {
 
         self.send_internal_boc(BocRepr::encode(message)?.into())
     }
+}
+
+fn verified_source_saved_at() -> anyhow::Result<u64> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("System clock is before the Unix epoch")?
+        .as_millis()
+        .try_into()
+        .context("Verified source timestamp does not fit into u64")
 }
 
 fn estimate_storage_fee(
@@ -3621,11 +3760,11 @@ mod tests {
         .expect("must create sqlite-backed test node");
 
         let code_hash = Hash256([0x24; 32]);
-        let source = json!({
+        let first_source = json!({
             "code_hash": code_hash.to_hex(),
             "verified": true,
             "bundle": {
-                "source_bundle_hash": "source-bundle",
+                "source_bundle_hash": "source-bundle-a",
                 "verified_at": 0,
                 "storage_revision": "local",
                 "entrypoint": "contracts/main.tolk",
@@ -3637,9 +3776,147 @@ mod tests {
                 "files": []
             }
         });
+        let second_source = json!({
+            "code_hash": code_hash.to_hex(),
+            "verified": true,
+            "bundle": {
+                "source_bundle_hash": "source-bundle-b",
+                "verified_at": 1,
+                "storage_revision": "local",
+                "entrypoint": "contracts/main.tolk",
+                "compiler": {
+                    "language": "tolk",
+                    "version": "1.5.0",
+                    "params": {}
+                },
+                "files": []
+            }
+        });
 
-        node.set_verified_source(code_hash, source.clone())
-            .expect("must persist verified source");
+        node.set_verified_source(code_hash, first_source.clone())
+            .expect("must persist first verified source");
+        node.set_verified_source(code_hash, second_source.clone())
+            .expect("must persist second verified source");
+        drop(node);
+
+        let mut reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(
+            reopened.history.get_verified_source(&code_hash),
+            Some(second_source),
+            "the selected verified source must survive node restart"
+        );
+        assert_eq!(
+            reopened
+                .history
+                .verified_source_artifacts
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            std::collections::BTreeSet::from([
+                "source-bundle-a".to_owned(),
+                "source-bundle-b".to_owned()
+            ]),
+            "all immutable source artifacts must survive node restart"
+        );
+
+        reopened
+            .delete_verified_source_artifact("source-bundle-b")
+            .expect("must delete selected source artifact");
+        drop(reopened);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node after artifact deletion");
+        assert_eq!(
+            reopened.history.get_verified_source(&code_hash),
+            Some(first_source),
+            "deleting the selected artifact must select the newest remaining artifact"
+        );
+        assert_eq!(
+            reopened
+                .history
+                .verified_source_artifacts
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            ["source-bundle-a"],
+            "artifact deletion must survive node restart"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn verified_source_batch_rolls_back_sources_and_abis_on_persistence_failure() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-source-batch-rollback-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let code_hash = Hash256([0x2a; 32]);
+        let source = json!({
+            "bundle": {
+                "source_bundle_hash": "atomic-source-bundle",
+                "entrypoint": "contracts/main.tolk"
+            }
+        });
+        let compiler_abi = json!({
+            "compiler_abi": {
+                "contract_name": "Atomic source"
+            },
+            "code_hashes": [code_hash.to_hex()]
+        });
+        node.persistence
+            .as_ref()
+            .expect("test node must use persistence")
+            .connection()
+            .lock()
+            .expect("persistence connection mutex poisoned")
+            .execute_batch(
+                "CREATE TRIGGER fail_compiler_abi_insert
+                 BEFORE INSERT ON compiler_abis
+                 BEGIN
+                     SELECT RAISE(FAIL, 'forced compiler ABI failure');
+                 END;",
+            )
+            .expect("failure trigger must be installed");
+
+        let error = node
+            .register_verified_sources(vec![(code_hash, source)], vec![(code_hash, compiler_abi)])
+            .expect_err("compiler ABI failure must reject the complete batch");
+
+        assert!(
+            error.to_string().contains("forced compiler ABI failure"),
+            "persistence error must be returned to the caller"
+        );
+        assert_eq!(node.history.get_verified_source(&code_hash), None);
+        assert_eq!(node.history.get_compiler_abi(&code_hash), None);
+        assert!(node.history.verified_source_artifacts.is_empty());
         drop(node);
 
         let reopened = Node::with_db_path(
@@ -3649,11 +3926,50 @@ mod tests {
             Some(&db_path),
         )
         .expect("must reopen sqlite-backed test node");
+        assert_eq!(reopened.history.get_verified_source(&code_hash), None);
+        assert_eq!(reopened.history.get_compiler_abi(&code_hash), None);
+        assert!(reopened.history.verified_source_artifacts.is_empty());
 
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn address_name_registry_persists_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-address-name-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+        let address = test_addr(0x25);
+
+        node.set_address_name(address, "Counter".to_owned())
+            .expect("must persist address name");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
         assert_eq!(
-            reopened.history.get_verified_source(&code_hash),
-            Some(source),
-            "verified source registry must survive node restart"
+            reopened.get_address_name(&address).as_deref(),
+            Some("Counter"),
+            "address name registry must survive node restart"
         );
 
         drop(reopened);
@@ -4570,6 +4886,89 @@ mod tests {
 
         assert_eq!(seqnos, vec![2, 1, 0]);
         assert_eq!(calls[0].prev_key_block.seqno, 2);
+    }
+
+    #[test]
+    fn snapshot_preserves_address_names_and_all_verified_source_artifacts() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let address = test_addr(0x26);
+        let code_hash = Hash256([0x27; 32]);
+        let first_source = json!({
+            "bundle": {
+                "source_bundle_hash": "snapshot-bundle-a",
+                "entrypoint": "contracts/a.tolk"
+            }
+        });
+        let second_source = json!({
+            "bundle": {
+                "source_bundle_hash": "snapshot-bundle-b",
+                "entrypoint": "contracts/b.tolk"
+            }
+        });
+        node.set_address_name(address, "Snapshot contract".to_owned())
+            .expect("address name must be stored");
+        node.set_verified_source(code_hash, first_source)
+            .expect("first source must be stored");
+        node.set_verified_source(code_hash, second_source.clone())
+            .expect("second source must be stored");
+
+        let snapshot = node.build_snapshot().expect("snapshot must build");
+        let mut restored = make_test_node(Box::new(NoopExecutor));
+        restored
+            .apply_snapshot(snapshot)
+            .expect("snapshot must restore");
+
+        assert_eq!(
+            restored.get_address_name(&address).as_deref(),
+            Some("Snapshot contract")
+        );
+        assert_eq!(
+            restored.history.get_verified_source(&code_hash),
+            Some(second_source)
+        );
+        assert_eq!(
+            restored
+                .history
+                .verified_source_artifacts
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>(),
+            std::collections::BTreeSet::from([
+                "snapshot-bundle-a".to_owned(),
+                "snapshot-bundle-b".to_owned()
+            ])
+        );
+    }
+
+    #[test]
+    fn verified_source_artifact_id_is_immutable() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let code_hash = Hash256([0x28; 32]);
+        let original = json!({
+            "bundle": {
+                "source_bundle_hash": "immutable-bundle",
+                "entrypoint": "contracts/original.tolk"
+            }
+        });
+        let changed = json!({
+            "bundle": {
+                "source_bundle_hash": "immutable-bundle",
+                "entrypoint": "contracts/changed.tolk"
+            }
+        });
+        node.set_verified_source(code_hash, original.clone())
+            .expect("original source must be stored");
+
+        let error = node
+            .set_verified_source(code_hash, changed)
+            .expect_err("same artifact ID must not accept changed contents");
+
+        assert!(
+            error.to_string().contains("immutable"),
+            "immutability error must explain the conflict"
+        );
+        assert_eq!(node.history.get_verified_source(&code_hash), Some(original));
+        assert_eq!(node.history.verified_source_artifacts.len(), 1);
     }
 
     #[test]

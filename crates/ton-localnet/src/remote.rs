@@ -3,13 +3,22 @@ use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use acton_config::config;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 use ton_api::TonApiClient;
 use ton_api::toncenter::{v2, v3};
 use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-use tycho_types::models::{AccountState, ShardAccount};
+use tycho_types::models::{AccountState, ShardAccount, ShardIdent};
 use tycho_types::prelude::HashBytes;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RemoteShardBoundary {
+    workchain: i32,
+    shard: u64,
+    seqno: u64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteProvider {
@@ -36,6 +45,136 @@ impl RemoteProvider {
             fork_block_number: Some(fork_block_number),
         })
     }
+
+    pub async fn contains_historical_block(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u64,
+    ) -> anyhow::Result<bool> {
+        if workchain == ShardIdent::MASTERCHAIN.workchain() {
+            return Ok(shard as u64 == ShardIdent::MASTERCHAIN.prefix()
+                && self
+                    .fork_block_number
+                    .is_some_and(|fork_seqno| seqno <= fork_seqno));
+        }
+
+        let Some(requested_shard) = ShardIdent::new(workchain, shard as u64) else {
+            return Ok(false);
+        };
+        Ok(contains_historical_shard_block(
+            &self.fork_shards().await?,
+            requested_shard,
+            seqno,
+        ))
+    }
+
+    pub async fn contains_historical_block_id(
+        &self,
+        block: &v2::TonBlockIdExt,
+    ) -> anyhow::Result<bool> {
+        let shard = parse_remote_shard(&block.shard)?;
+        self.contains_historical_block(block.workchain, shard as i64, block.seqno)
+            .await
+    }
+
+    async fn fork_shards(&self) -> anyhow::Result<Arc<Vec<RemoteShardBoundary>>> {
+        let fork_seqno = self
+            .fork_block_number
+            .context("Historical provider must be pinned")?;
+        let key = (self.network.as_str(), fork_seqno);
+        let cached = {
+            let cache = fork_shard_cache()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            cache.get(&key).cloned()
+        };
+        if let Some(shards) = cached {
+            return Ok(shards);
+        }
+
+        let fork_seqno = u32::try_from(fork_seqno)
+            .context("Fork block seqno does not fit TonCenter v2 request")?;
+        let shards = Arc::new(
+            fetch_remote_shards_v2(self, fork_seqno)
+                .await?
+                .shards
+                .into_iter()
+                .map(RemoteShardBoundary::try_from)
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        );
+        fork_shard_cache()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(key, Arc::clone(&shards));
+        Ok(shards)
+    }
+}
+
+type RemoteForkKey = (String, u64);
+type RemoteForkShardCache = HashMap<RemoteForkKey, Arc<Vec<RemoteShardBoundary>>>;
+
+fn fork_shard_cache() -> &'static Mutex<RemoteForkShardCache> {
+    static CACHE: OnceLock<Mutex<RemoteForkShardCache>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn contains_historical_shard_block(
+    fork_shards: &[RemoteShardBoundary],
+    requested_shard: ShardIdent,
+    requested_seqno: u64,
+) -> bool {
+    let mut matching_boundaries = fork_shards
+        .iter()
+        .filter_map(RemoteShardBoundary::shard_ident)
+        .filter(|(fork_shard, _)| fork_shard.intersects(&requested_shard));
+    let Some((_, fork_seqno)) = matching_boundaries.next() else {
+        return false;
+    };
+    // An ancestor can intersect several active shards after a split. Without the
+    // full shard history there is no single safe cutoff, so keep the request local.
+    matching_boundaries.next().is_none() && requested_seqno <= fork_seqno
+}
+
+impl RemoteShardBoundary {
+    fn shard_ident(&self) -> Option<(ShardIdent, u64)> {
+        ShardIdent::new(self.workchain, self.shard).map(|shard| (shard, self.seqno))
+    }
+}
+
+impl TryFrom<v2::TonBlockIdExt> for RemoteShardBoundary {
+    type Error = anyhow::Error;
+
+    fn try_from(block: v2::TonBlockIdExt) -> Result<Self, Self::Error> {
+        let shard = parse_remote_shard(&block.shard)?;
+        anyhow::ensure!(
+            ShardIdent::new(block.workchain, shard).is_some(),
+            "Remote fork returned invalid shard {}:{}",
+            block.workchain,
+            block.shard
+        );
+        Ok(Self {
+            workchain: block.workchain,
+            shard,
+            seqno: block.seqno,
+        })
+    }
+}
+
+fn parse_remote_shard(shard: &str) -> anyhow::Result<u64> {
+    let shard = shard.trim();
+    if let Some(negative) = shard.strip_prefix('-') {
+        let value = negative
+            .parse::<u64>()
+            .with_context(|| format!("Invalid remote shard `{shard}`"))?;
+        return Ok((value as i64).wrapping_neg() as u64);
+    }
+
+    let hex = shard
+        .strip_prefix("0x")
+        .or_else(|| shard.strip_prefix("0X"))
+        .unwrap_or(shard);
+    u64::from_str_radix(hex, 16).with_context(|| format!("Invalid remote shard `{shard}`"))
 }
 
 fn create_api_client(network: Network) -> anyhow::Result<TonApiClient> {
@@ -98,6 +237,46 @@ pub(crate) async fn fetch_remote_shards_v2(
     seqno: u32,
 ) -> anyhow::Result<v2::Shards> {
     with_api_client_async(provider, move |api_client| api_client.get_shards(seqno)).await
+}
+
+pub(crate) async fn fetch_remote_block_header_v2(
+    provider: &RemoteProvider,
+    request: v2::BlockHeaderRequest,
+) -> anyhow::Result<v2::BlockHeader> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_block_header_v2(&request)
+    })
+    .await
+}
+
+pub(crate) async fn fetch_remote_block_transactions_v2(
+    provider: &RemoteProvider,
+    request: v2::BlockTransactionsRequest,
+) -> anyhow::Result<v2::BlockTransactions> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_block_transactions_v2(&request)
+    })
+    .await
+}
+
+pub(crate) async fn fetch_remote_block_transactions_ext_v2(
+    provider: &RemoteProvider,
+    request: v2::BlockTransactionsRequest,
+) -> anyhow::Result<v2::BlockTransactionsExt> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_block_transactions_ext_v2(&request)
+    })
+    .await
+}
+
+pub(crate) async fn fetch_remote_lookup_block_v2(
+    provider: &RemoteProvider,
+    request: v2::LookupBlockRequest,
+) -> anyhow::Result<v2::TonBlockIdExt> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.lookup_block_v2(&request)
+    })
+    .await
 }
 
 pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {
@@ -209,5 +388,47 @@ mod tests {
         };
 
         with_api_client(&provider, |_| Ok(())).unwrap();
+    }
+
+    #[test]
+    fn shard_history_uses_the_matching_fork_frontier_instead_of_masterchain_seqno() {
+        let boundaries = [
+            RemoteShardBoundary {
+                workchain: 0,
+                shard: 0x4000_0000_0000_0000,
+                seqno: 70,
+            },
+            RemoteShardBoundary {
+                workchain: 0,
+                shard: 0xc000_0000_0000_0000,
+                seqno: 75,
+            },
+        ];
+        let full = ShardIdent::BASECHAIN;
+        let left = ShardIdent::new(0, 0x4000_0000_0000_0000).expect("left shard must be valid");
+        let left_child =
+            ShardIdent::new(0, 0x2000_0000_0000_0000).expect("left child must be valid");
+
+        assert!(!contains_historical_shard_block(&boundaries, full, 75));
+        assert!(!contains_historical_shard_block(&boundaries, full, 76));
+        assert!(contains_historical_shard_block(&boundaries, left, 70));
+        assert!(!contains_historical_shard_block(&boundaries, left, 71));
+        assert!(!contains_historical_shard_block(
+            &boundaries,
+            left_child,
+            71
+        ));
+    }
+
+    #[test]
+    fn remote_shard_parser_accepts_toncenter_hex_and_signed_formats() {
+        assert_eq!(
+            parse_remote_shard("8000000000000000").unwrap(),
+            ShardIdent::PREFIX_FULL
+        );
+        assert_eq!(
+            parse_remote_shard("-9223372036854775808").unwrap(),
+            ShardIdent::PREFIX_FULL
+        );
     }
 }

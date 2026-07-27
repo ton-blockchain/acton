@@ -1141,6 +1141,31 @@ export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   readonly network_conditions?: LocalnetNetworkConditions
 }
 
+export type LocalnetContractStatus = "active" | "frozen" | "uninitialized" | "nonexist"
+export type LocalnetContractSourceKind = "local" | "fork"
+
+export interface LocalnetContractArtifact {
+  readonly artifactId: string
+  readonly entrypoint?: string
+  readonly compilerLanguage?: string
+  readonly compilerVersion?: string
+}
+
+export interface LocalnetContract {
+  readonly address: string
+  readonly status: LocalnetContractStatus
+  readonly balance: string
+  readonly codeHash: string
+  readonly dataHash?: string
+  readonly name?: string
+  readonly abiName?: string
+  readonly lastTransactionHash?: string
+  readonly lastTransactionLt?: string
+  readonly lastActivityAt?: number
+  readonly sourceKind: LocalnetContractSourceKind
+  readonly artifact?: LocalnetContractArtifact
+}
+
 export interface LocalnetMineResult {
   readonly blocks_mined: number
   readonly skipped_empty_blocks: number

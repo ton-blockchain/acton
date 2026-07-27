@@ -18,13 +18,19 @@ use tokio::net::TcpListener;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
+mod contract_source_artifact;
 mod environment;
+mod local_artifacts;
 mod local_process;
 mod local_test_process;
 mod test_api;
 mod test_run;
 mod test_runtime;
 
+pub use contract_source_artifact::{
+    CONTRACT_SOURCE_HISTORY_PATH, ContractSourceArtifact, ContractSourceArtifactError,
+    ContractSourceArtifactStore,
+};
 pub use environment::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,

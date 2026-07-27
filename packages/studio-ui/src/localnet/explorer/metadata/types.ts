@@ -17,6 +17,7 @@ export interface RegisteredCompilerAbi {
 }
 
 export interface RegisteredSource {
+  readonly artifactId?: string
   readonly codeHash: string
   readonly source: VerificationSourceResponse
   readonly savedAt: number

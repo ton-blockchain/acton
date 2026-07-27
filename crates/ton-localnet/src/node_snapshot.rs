@@ -1,7 +1,7 @@
 use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node, StateSource};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
-    MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
+    MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta, VerifiedSourceArtifact,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
@@ -40,6 +40,10 @@ pub(crate) struct NodeStateSnapshot {
     pub history_compiler_abis: Vec<(Hash256, Value)>,
     #[serde(default)]
     pub history_verified_sources: Vec<(Hash256, Value)>,
+    #[serde(default)]
+    pub history_verified_source_artifacts: Vec<VerifiedSourceArtifact>,
+    #[serde(default)]
+    pub history_registered_contracts: Vec<Addr>,
     pub cas_entries: Vec<(Hash256, BocBytes)>,
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
@@ -164,6 +168,23 @@ impl Node {
             .collect::<Vec<_>>();
         history_verified_sources.sort_by_key(|(hash, _)| *hash);
 
+        let mut history_verified_source_artifacts = self
+            .history
+            .verified_source_artifacts
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        history_verified_source_artifacts
+            .sort_by(|left, right| left.artifact_id.cmp(&right.artifact_id));
+
+        let mut history_registered_contracts = self
+            .history
+            .registered_contracts
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        history_registered_contracts.sort_unstable();
+
         let cas_entries = self.export_cas_entries()?;
 
         let snapshot = NodeStateSnapshot {
@@ -192,6 +213,8 @@ impl Node {
             history_asset_detection_checked,
             history_compiler_abis,
             history_verified_sources,
+            history_verified_source_artifacts,
+            history_registered_contracts,
             cas_entries,
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
@@ -267,6 +290,20 @@ impl Node {
             .collect();
         self.history.compiler_abis = snapshot.history_compiler_abis.into_iter().collect();
         self.history.verified_sources = snapshot.history_verified_sources.into_iter().collect();
+        self.history.verified_source_artifacts = snapshot
+            .history_verified_source_artifacts
+            .into_iter()
+            .map(|artifact| (artifact.artifact_id.clone(), artifact))
+            .collect();
+        for (code_hash, source) in &self.history.verified_sources {
+            let artifact = VerifiedSourceArtifact::new(*code_hash, source.clone(), 0);
+            self.history
+                .verified_source_artifacts
+                .entry(artifact.artifact_id.clone())
+                .or_insert(artifact);
+        }
+        self.history.registered_contracts =
+            snapshot.history_registered_contracts.into_iter().collect();
 
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;

@@ -134,6 +134,17 @@ pub struct CodeHashRequest {
 }
 
 #[derive(Deserialize)]
+pub struct ArtifactIdRequest {
+    pub artifact_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct RegisterContractRequest {
+    pub address: String,
+    pub name: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct VerifiedSourceRegistration {
     pub code_hash: String,
     pub source: Value,

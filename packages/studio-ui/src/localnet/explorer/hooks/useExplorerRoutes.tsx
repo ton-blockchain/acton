@@ -15,20 +15,35 @@ interface ExplorerRoutesProviderProps extends ExplorerRouteOverrides {
 }
 
 export const ExplorerRoutesProvider: FC<ExplorerRoutesProviderProps> = ({
+  abiPath,
   basePath = "/explorer",
   cellPath,
   children,
+  contractsPath,
   emulatePath,
   localnetBasePath,
+  sourcesPath,
 }) => {
   const addressFormat = useAddressFormat()
   const routes = useMemo(
     () =>
       createExplorerRoutes(basePath, addressFormat, localnetBasePath, {
+        abiPath,
         cellPath,
+        contractsPath,
         emulatePath,
+        sourcesPath,
       }),
-    [addressFormat, basePath, cellPath, emulatePath, localnetBasePath],
+    [
+      abiPath,
+      addressFormat,
+      basePath,
+      cellPath,
+      contractsPath,
+      emulatePath,
+      localnetBasePath,
+      sourcesPath,
+    ],
   )
 
   return <ExplorerRoutesContext.Provider value={routes}>{children}</ExplorerRoutesContext.Provider>

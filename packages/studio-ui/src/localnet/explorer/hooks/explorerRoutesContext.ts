@@ -6,6 +6,7 @@ export interface ExplorerRoutes {
   readonly rootPath: string
   readonly blocksPath: string
   readonly abiPath: string
+  readonly contractsPath?: string
   readonly cellPath: string
   readonly emulatePath: string
   readonly sourcesPath: string
@@ -18,8 +19,11 @@ export interface ExplorerRoutes {
 }
 
 export interface ExplorerRouteOverrides {
+  readonly abiPath?: string
   readonly cellPath?: string
+  readonly contractsPath?: string
   readonly emulatePath?: string
+  readonly sourcesPath?: string
 }
 
 export const createExplorerRoutes = (
@@ -32,16 +36,18 @@ export const createExplorerRoutes = (
   const localnetBase = localnetBasePath.replace(/\/$/, "")
   const path = (suffix = "") => `${base}${suffix}` || "/"
   const localnetPath = (suffix: string) => `${localnetBase}${suffix}` || "/"
+  const abiPath = overrides.abiPath ?? path("/abi")
 
   return {
     rootPath: path(),
     blocksPath: path("/blocks"),
-    abiPath: path("/abi"),
+    abiPath,
+    contractsPath: overrides.contractsPath,
     cellPath: overrides.cellPath ?? path("/cell"),
     emulatePath: overrides.emulatePath ?? path("/emulate"),
-    sourcesPath: path("/sources"),
+    sourcesPath: overrides.sourcesPath ?? path("/sources"),
     favoritesPath: path("/favorites"),
-    abiDetailsPath: slug => path(`/abi/${encodeURIComponent(slug)}`),
+    abiDetailsPath: slug => `${abiPath}/${encodeURIComponent(slug)}`,
     addressPath: address =>
       path(`/address/${encodeURIComponent(normalizeAddress(address, addressFormat))}`),
     blockPath: (workchain, shard, seqno) =>

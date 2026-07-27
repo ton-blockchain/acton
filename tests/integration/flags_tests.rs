@@ -1414,9 +1414,15 @@ fn test_project_root_build_works_from_nested_directory() {
         .arg("--project-root")
         .arg("..")
         .build()
+        .arg("--output-sources")
+        .arg("../.studio/sources")
         .current_dir(&nested_dir)
         .run()
-        .success();
+        .success()
+        .assert_file_snapshot_matches(
+            ".studio/sources/simple.source.json",
+            "integration/snapshots/flags/test_project_root_build_from_nested_directory.source.json",
+        );
 
     assert!(
         project.path().join("build/simple.json").exists(),

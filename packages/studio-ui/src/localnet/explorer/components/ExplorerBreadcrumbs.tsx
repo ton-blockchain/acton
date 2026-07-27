@@ -20,7 +20,10 @@ export interface ExplorerBreadcrumbItem {
 }
 
 interface ExplorerBreadcrumbsProps {
+  readonly ariaLabel?: string
   readonly items: ExplorerBreadcrumbItem[]
+  readonly rootLabel?: string
+  readonly rootPath?: string
 }
 
 type BreadcrumbLink = NonNullable<BreadcrumbsItem["link"]>
@@ -67,14 +70,19 @@ function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
   return label
 }
 
-export const ExplorerBreadcrumbs: FC<ExplorerBreadcrumbsProps> = ({items}) => {
+export const ExplorerBreadcrumbs: FC<ExplorerBreadcrumbsProps> = ({
+  ariaLabel = "Explorer breadcrumb",
+  items,
+  rootLabel = "Explore",
+  rootPath,
+}) => {
   const routes = useExplorerRoutePaths()
   const breadcrumbItems: BreadcrumbsItem[] = [
     {
-      id: "explore",
-      label: "Explore",
+      id: "root",
+      label: rootLabel,
       truncate: false,
-      link: createBreadcrumbLink(routes.rootPath),
+      link: createBreadcrumbLink(rootPath ?? routes.rootPath),
     },
     ...items.map((item, index) => {
       const path = item.path
@@ -87,10 +95,6 @@ export const ExplorerBreadcrumbs: FC<ExplorerBreadcrumbsProps> = ({items}) => {
   ]
 
   return (
-    <Breadcrumbs
-      ariaLabel="Explorer breadcrumb"
-      className={styles.breadcrumbs}
-      items={breadcrumbItems}
-    />
+    <Breadcrumbs ariaLabel={ariaLabel} className={styles.breadcrumbs} items={breadcrumbItems} />
   )
 }

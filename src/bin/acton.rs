@@ -2089,6 +2089,13 @@ fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<Resolve
                 resolved_project_root.display()
             );
         }
+        let resolved_project_root =
+            dunce::canonicalize(&resolved_project_root).map_err(|error| {
+                anyhow::anyhow!(
+                    "Failed to resolve project root {}: {error}",
+                    resolved_project_root.display()
+                )
+            })?;
 
         return Ok(ResolvedProjectRoot {
             path: resolved_project_root,

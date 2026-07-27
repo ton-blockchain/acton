@@ -2,17 +2,19 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
-    ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest, CodeHashRequest,
-    CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest,
-    ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest,
-    RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest, SetAddressNameRequest,
-    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
-    SetShardAccountRequest, SetTimeRequest,
+    ArtifactIdRequest, ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
+    CodeHashRequest, CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest,
+    GetVerifiedSourceRequest, ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest,
+    MineBlocksRequest, RegisterCompilerAbisRequest, RegisterContractRequest,
+    RegisterVerifiedSourcesRequest, SetAddressNameRequest, SetMiningModeRequest,
+    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
+    SetTimeRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupWallet,
     StateSourceInfo,
 };
+use crate::storage::compiler_abi_contract_name;
 use crate::types::Hash256;
 use anyhow::Context;
 use axum::{
@@ -472,8 +474,7 @@ pub async fn register_verified_sources(
                     (code_hash, source)
                 })
                 .collect();
-            node.register_verified_sources(sources).await?;
-            node.register_compiler_abis(compiler_abis).await
+            node.register_verified_sources(sources, compiler_abis).await
         },
         |()| Value::Null,
     )
@@ -501,17 +502,47 @@ pub async fn list_verified_sources(State(node): State<Arc<Localnet>>) -> Respons
         serde_json::to_value(
             entries
                 .iter()
-                .map(|(code_hash, source)| {
+                .map(|artifact| {
                     serde_json::json!({
-                        "codeHash": code_hash,
-                        "source": source,
-                        "savedAt": 0_u64,
+                        "artifactId": artifact.artifact_id,
+                        "codeHash": artifact.code_hash.to_hex(),
+                        "source": artifact.source,
+                        "savedAt": artifact.saved_at,
                     })
                 })
                 .collect::<Vec<_>>(),
         )
         .unwrap_or(Value::Null)
     })
+    .await
+}
+
+pub async fn delete_verified_source_artifact(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<ArtifactIdRequest>,
+) -> Response {
+    handle_result(
+        node.delete_verified_source_artifact(payload.artifact_id),
+        |()| Value::Null,
+    )
+    .await
+}
+
+pub async fn list_contracts(State(node): State<Arc<Localnet>>) -> Response {
+    handle_result(node.list_contracts(), |contracts| {
+        serde_json::to_value(contracts).unwrap_or(Value::Null)
+    })
+    .await
+}
+
+pub async fn register_contract(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<RegisterContractRequest>,
+) -> Response {
+    handle_result(
+        node.register_contract(payload.address, payload.name),
+        Clone::clone,
+    )
     .await
 }
 
@@ -689,12 +720,7 @@ fn compiler_abis_from_registered_source(
 }
 
 fn compiler_abi_payload_value(code_hash: &Hash256, compiler_abi: Value) -> Value {
-    let display_name = compiler_abi
-        .get("contract_name")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map(ToOwned::to_owned);
+    let display_name = compiler_abi_contract_name(&compiler_abi);
 
     serde_json::json!({
         "compiler_abi": compiler_abi,

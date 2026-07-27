@@ -1,4 +1,4 @@
-import {FolderOpen} from "lucide-react"
+import {FolderOpen, Plus} from "lucide-react"
 import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
@@ -205,6 +205,7 @@ function StudioWorkspace({
           current?.environmentId === route.environmentId &&
           current.pageDescription === state.pageDescription &&
           current.pageTitle === state.pageTitle &&
+          current.primaryAction === state.primaryAction &&
           current.rpcUrl === state.rpcUrl
         ) {
           return current
@@ -230,8 +231,7 @@ function StudioWorkspace({
 
   const environmentRoute = route.kind === "environment" ? route : undefined
   const isEnvironmentDashboard =
-    environmentRoute !== undefined &&
-    location.pathname === `${environmentRoute.basePath}/dashboard`
+    environmentRoute !== undefined && location.pathname === `${environmentRoute.basePath}/dashboard`
   const environmentLoadError =
     environmentsState.error ??
     (environmentRoute && !environmentsState.isLoading && !environment
@@ -263,7 +263,20 @@ function StudioWorkspace({
       headerMode={hasSelectedTestRun ? "hidden" : "visible"}
       headerActions={
         environmentRoute ? (
-          activeEnvironmentShell?.rpcUrl ? (
+          activeEnvironmentShell?.primaryAction ? (
+            <Button
+              variant="primary"
+              size="sm"
+              leadingIcon={
+                activeEnvironmentShell.primaryAction.icon === "plus" ? (
+                  <Plus size={16} aria-hidden="true" />
+                ) : undefined
+              }
+              onClick={activeEnvironmentShell.primaryAction.onClick}
+            >
+              {activeEnvironmentShell.primaryAction.label}
+            </Button>
+          ) : activeEnvironmentShell?.rpcUrl ? (
             <CopyButton
               value={activeEnvironmentShell.rpcUrl}
               label="Copy RPC endpoint"

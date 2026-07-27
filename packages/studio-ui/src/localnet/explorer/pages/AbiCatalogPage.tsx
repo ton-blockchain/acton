@@ -160,13 +160,7 @@ export const AbiCatalogPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <ExplorerBreadcrumbs items={[{label: "ABI"}]} />
-      <div className={styles.hero}>
-        <h1 className={styles.title}>ABI</h1>
-      </div>
-
       <section className={styles.tableFrame}>
-        <header className={styles.tableTitle}>Registered ABI</header>
         {tableLoading ? (
           <AbiCatalogSkeleton />
         ) : (
@@ -257,10 +251,7 @@ export const AbiCatalogPage: FC = () => {
                         </div>
                         <p className={styles.localNote}>
                           <CircleAlert size={15} />
-                          <span>
-                            Registered ABI is stored locally for this explorer and is not uploaded
-                            to a remote server.
-                          </span>
+                          <span>Registered ABI remains in this virtual environment</span>
                         </p>
                         <button
                           type="submit"
@@ -379,7 +370,12 @@ export const AbiDetailsPage: FC = () => {
   if (state.loading) {
     return (
       <section className={styles.container}>
-        <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Loading"}]} />
+        <ExplorerBreadcrumbs
+          ariaLabel="Contract breadcrumb"
+          rootLabel="Contracts"
+          rootPath={routes.contractsPath ?? routes.rootPath}
+          items={[{label: "ABI", path: routes.abiPath}, {label: "Loading"}]}
+        />
         <AbiDetailsSkeleton />
       </section>
     )
@@ -388,24 +384,27 @@ export const AbiDetailsPage: FC = () => {
   if (!entry) {
     return (
       <section className={styles.container}>
-        <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Not found"}]} />
+        <ExplorerBreadcrumbs
+          ariaLabel="Contract breadcrumb"
+          rootLabel="Contracts"
+          rootPath={routes.contractsPath ?? routes.rootPath}
+          items={[{label: "ABI", path: routes.abiPath}, {label: "Not found"}]}
+        />
         <div className={styles.emptyPage}>ABI not found</div>
       </section>
     )
   }
 
   const title = abiTitle(entry.abi)
-  const contractName = entry.abi.compiler_abi.contract_name
 
   return (
     <section className={styles.container}>
-      <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: title}]} />
-      <section className={styles.detailsHeader}>
-        <div className={styles.detailsMain}>
-          <h1 className={styles.title}>{title}</h1>
-          {title !== contractName && <p className={styles.subtitle}>{contractName}</p>}
-        </div>
-      </section>
+      <ExplorerBreadcrumbs
+        ariaLabel="Contract breadcrumb"
+        rootLabel="Contracts"
+        rootPath={routes.contractsPath ?? routes.rootPath}
+        items={[{label: "ABI", path: routes.abiPath}, {label: title}]}
+      />
 
       {entry.abi.links.length > 0 && (
         <div className={styles.links}>

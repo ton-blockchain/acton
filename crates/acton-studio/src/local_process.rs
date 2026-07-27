@@ -1,24 +1,29 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::{Instant, sleep, timeout};
 
 use crate::environment::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
 };
+use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint, SourceRegistration};
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
+const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
+const PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct LocalProcessEnvironmentRuntime {
@@ -31,6 +36,10 @@ struct LocalProcessRuntimeInner {
     next_id: AtomicU64,
     create_lock: Mutex<()>,
     environments: RwLock<Vec<Arc<LocalEnvironment>>>,
+    artifact_synchronizer: ProjectArtifactSynchronizer,
+    artifact_coordinator_started: AtomicBool,
+    artifact_coordinator_wakeup: Notify,
+    shutting_down: AtomicBool,
 }
 
 struct LocalEnvironment {
@@ -40,16 +49,107 @@ struct LocalEnvironment {
     generation: AtomicU64,
 }
 
+struct ArtifactRevision {
+    id: u64,
+    fingerprint: Option<ProjectFingerprint>,
+    artifacts: Vec<SourceRegistration>,
+}
+
+#[derive(Default)]
+struct ArtifactCoordinatorState {
+    next_revision: u64,
+    current: Option<ArtifactRevision>,
+    published_revisions: HashMap<String, (u64, u64)>,
+}
+
+impl ArtifactCoordinatorState {
+    fn is_current_fingerprint(&self, fingerprint: &ProjectFingerprint) -> bool {
+        self.current
+            .as_ref()
+            .and_then(|revision| revision.fingerprint.as_ref())
+            == Some(fingerprint)
+    }
+
+    fn commit_if_stable(
+        &mut self,
+        before_build: ProjectFingerprint,
+        after_build: &ProjectFingerprint,
+        artifacts: Vec<SourceRegistration>,
+    ) -> bool {
+        if before_build != *after_build {
+            return false;
+        }
+        if self
+            .current
+            .as_ref()
+            .is_none_or(|revision| revision.artifacts != artifacts)
+        {
+            self.next_revision += 1;
+            self.current = Some(ArtifactRevision {
+                id: self.next_revision,
+                fingerprint: Some(before_build),
+                artifacts,
+            });
+        } else if let Some(revision) = self.current.as_mut() {
+            revision.fingerprint = Some(before_build);
+        }
+        true
+    }
+
+    fn refresh_history(&mut self, artifacts: Vec<SourceRegistration>) {
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|revision| revision.artifacts == artifacts)
+        {
+            return;
+        }
+        self.next_revision += 1;
+        let fingerprint = self
+            .current
+            .as_ref()
+            .and_then(|revision| revision.fingerprint.clone());
+        self.current = Some(ArtifactRevision {
+            id: self.next_revision,
+            fingerprint,
+            artifacts,
+        });
+    }
+
+    fn needs_publish(&self, environment_id: &str, generation: u64) -> bool {
+        let Some(revision) = &self.current else {
+            return false;
+        };
+        self.published_revisions
+            .get(environment_id)
+            .is_none_or(|published| *published < (generation, revision.id))
+    }
+
+    fn mark_published(&mut self, environment_id: String, generation: u64, revision: u64) {
+        self.published_revisions
+            .insert(environment_id, (generation, revision));
+    }
+}
+
 impl LocalProcessEnvironmentRuntime {
     #[must_use]
     pub fn new(acton_executable: impl Into<PathBuf>, workspace_root: impl Into<PathBuf>) -> Self {
+        let acton_executable = acton_executable.into();
+        let workspace_root = workspace_root.into();
         Self {
             inner: Arc::new(LocalProcessRuntimeInner {
-                acton_executable: acton_executable.into(),
-                workspace_root: workspace_root.into(),
+                artifact_synchronizer: ProjectArtifactSynchronizer::new(
+                    acton_executable.clone(),
+                    workspace_root.clone(),
+                ),
+                acton_executable,
+                workspace_root,
                 next_id: AtomicU64::new(1),
                 create_lock: Mutex::new(()),
                 environments: RwLock::new(Vec::new()),
+                artifact_coordinator_started: AtomicBool::new(false),
+                artifact_coordinator_wakeup: Notify::new(),
+                shutting_down: AtomicBool::new(false),
             }),
         }
     }
@@ -127,7 +227,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 .write()
                 .await
                 .push(Arc::clone(&environment));
-            tokio::spawn(monitor_localnet(environment, 1));
+            tokio::spawn(monitor_localnet(Arc::clone(&self.inner), environment, 1));
             Ok(result)
         })
     }
@@ -202,6 +302,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
 
     fn shutdown(&self) -> EnvironmentRuntimeFuture<'_, ()> {
         Box::pin(async move {
+            self.inner.shutting_down.store(true, Ordering::Release);
+            self.inner.artifact_coordinator_wakeup.notify_one();
             let environments = self.inner.environments.read().await.clone();
             for environment in environments {
                 stop_environment(&environment).await;
@@ -385,7 +487,11 @@ async fn find_environment(
     })
 }
 
-async fn monitor_localnet(environment: Arc<LocalEnvironment>, generation: u64) {
+async fn monitor_localnet(
+    runtime: Arc<LocalProcessRuntimeInner>,
+    environment: Arc<LocalEnvironment>,
+    generation: u64,
+) {
     let port = environment.details.read().await.config.port;
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let ready_deadline = Instant::now() + LOCALNET_READY_TIMEOUT;
@@ -422,6 +528,7 @@ async fn monitor_localnet(environment: Arc<LocalEnvironment>, generation: u64) {
                 None,
             )
             .await;
+            schedule_project_artifact_sync(&runtime);
             break;
         }
 
@@ -464,6 +571,204 @@ async fn monitor_localnet(environment: Arc<LocalEnvironment>, generation: u64) {
     }
 }
 
+fn schedule_project_artifact_sync(runtime: &Arc<LocalProcessRuntimeInner>) {
+    if runtime.shutting_down.load(Ordering::Acquire) {
+        return;
+    }
+
+    if runtime
+        .artifact_coordinator_started
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
+    {
+        let coordinator_runtime = Arc::clone(runtime);
+        tokio::spawn(async move {
+            run_project_artifact_coordinator(&coordinator_runtime).await;
+            coordinator_runtime
+                .artifact_coordinator_started
+                .store(false, Ordering::Release);
+        });
+    }
+    runtime.artifact_coordinator_wakeup.notify_one();
+}
+
+async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner>) {
+    let mut state = ArtifactCoordinatorState::default();
+    let mut observed_fingerprint = None;
+    let mut changed_at = None;
+    let mut failed_build_fingerprint = None;
+    let mut next_register_retry = Instant::now();
+
+    loop {
+        if runtime.shutting_down.load(Ordering::Acquire) {
+            return;
+        }
+        if !has_running_environment(runtime).await {
+            runtime.artifact_coordinator_wakeup.notified().await;
+            failed_build_fingerprint = None;
+            next_register_retry = Instant::now();
+            continue;
+        }
+
+        let fingerprint = match runtime.artifact_synchronizer.fingerprint().await {
+            Ok(fingerprint) => fingerprint,
+            Err(error) => {
+                tracing::warn!(%error, "Failed to inspect Acton project artifacts");
+                wait_for_project_artifact_event(runtime, &mut failed_build_fingerprint).await;
+                continue;
+            }
+        };
+        match runtime.artifact_synchronizer.load_history().await {
+            Ok(artifacts) => state.refresh_history(artifacts),
+            Err(error) => {
+                tracing::warn!(%error, "Failed to restore Acton source artifact history");
+                wait_for_project_artifact_event(runtime, &mut failed_build_fingerprint).await;
+                continue;
+            }
+        }
+        if observed_fingerprint.as_ref() != Some(&fingerprint) {
+            observed_fingerprint = Some(fingerprint.clone());
+            changed_at = Some(Instant::now());
+        }
+
+        let fingerprint_is_stable =
+            changed_at.is_some_and(|changed_at| changed_at.elapsed() >= PROJECT_ARTIFACT_DEBOUNCE);
+        if fingerprint_is_stable
+            && !state.is_current_fingerprint(&fingerprint)
+            && failed_build_fingerprint.as_ref() != Some(&fingerprint)
+            && has_running_environment(runtime).await
+        {
+            match runtime.artifact_synchronizer.build_and_store().await {
+                Ok(_) => match runtime.artifact_synchronizer.fingerprint().await {
+                    Ok(after_build) => {
+                        let history = match runtime.artifact_synchronizer.load_history().await {
+                            Ok(history) => history,
+                            Err(error) => {
+                                tracing::warn!(
+                                    %error,
+                                    "Failed to restore Acton source artifact history after build"
+                                );
+                                wait_for_project_artifact_event(
+                                    runtime,
+                                    &mut failed_build_fingerprint,
+                                )
+                                .await;
+                                continue;
+                            }
+                        };
+                        if state.commit_if_stable(fingerprint.clone(), &after_build, history) {
+                            failed_build_fingerprint = None;
+                            next_register_retry = Instant::now();
+                        } else {
+                            observed_fingerprint = Some(after_build);
+                            changed_at = Some(Instant::now());
+                            continue;
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            %error,
+                            "Failed to verify Acton project inputs after building artifacts"
+                        );
+                        observed_fingerprint = None;
+                        changed_at = None;
+                        wait_for_project_artifact_event(runtime, &mut failed_build_fingerprint)
+                            .await;
+                        continue;
+                    }
+                },
+                Err(error) => {
+                    tracing::warn!(%error, "Failed to build Acton project artifacts");
+                    failed_build_fingerprint = Some(fingerprint.clone());
+                }
+            }
+        }
+
+        if state.current.is_some() && Instant::now() >= next_register_retry {
+            let had_failures = publish_current_artifact_revision(runtime, &mut state).await;
+            next_register_retry = if had_failures {
+                Instant::now() + PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL
+            } else {
+                Instant::now()
+            };
+        }
+
+        wait_for_project_artifact_event(runtime, &mut failed_build_fingerprint).await;
+    }
+}
+
+async fn wait_for_project_artifact_event(
+    runtime: &Arc<LocalProcessRuntimeInner>,
+    failed_build_fingerprint: &mut Option<ProjectFingerprint>,
+) {
+    tokio::select! {
+        () = runtime.artifact_coordinator_wakeup.notified() => {
+            *failed_build_fingerprint = None;
+        }
+        () = sleep(PROJECT_ARTIFACT_POLL_INTERVAL) => {}
+    }
+}
+
+async fn publish_current_artifact_revision(
+    runtime: &Arc<LocalProcessRuntimeInner>,
+    state: &mut ArtifactCoordinatorState,
+) -> bool {
+    let Some(revision_id) = state.current.as_ref().map(|revision| revision.id) else {
+        return false;
+    };
+    let mut had_failures = false;
+    let environments = runtime.environments.read().await.clone();
+    for environment in environments {
+        let details = environment.details.read().await.clone();
+        let generation = environment.generation.load(Ordering::Acquire);
+        if details.status != EnvironmentStatus::Running
+            || !state.needs_publish(&details.id, generation)
+        {
+            continue;
+        }
+        let result = {
+            let revision = state.current.as_ref().expect("revision exists");
+            runtime
+                .artifact_synchronizer
+                .register(&details.rpc_url, &revision.artifacts)
+                .await
+        };
+        match result {
+            Ok(()) => {
+                state.mark_published(details.id.clone(), generation, revision_id);
+                tracing::debug!(
+                    environment_id = %details.id,
+                    artifact_count = state
+                        .current
+                        .as_ref()
+                        .map_or(0, |revision| revision.artifacts.len()),
+                    revision = revision_id,
+                    "Synchronized Acton project artifacts"
+                );
+            }
+            Err(error) => {
+                had_failures = true;
+                tracing::warn!(
+                    environment_id = %details.id,
+                    %error,
+                    "Failed to register Acton project artifacts"
+                );
+            }
+        }
+    }
+    had_failures
+}
+
+async fn has_running_environment(runtime: &LocalProcessRuntimeInner) -> bool {
+    let environments = runtime.environments.read().await.clone();
+    for environment in environments {
+        if environment.details.read().await.status == EnvironmentStatus::Running {
+            return true;
+        }
+    }
+    false
+}
+
 async fn child_exit_status(environment: &LocalEnvironment) -> std::io::Result<Option<ExitStatus>> {
     let mut child = environment.child.lock().await;
     let Some(process) = child.as_mut() else {
@@ -501,7 +806,7 @@ async fn stop_environment(environment: &LocalEnvironment) {
 }
 
 async fn restart_environment(
-    runtime: &LocalProcessRuntimeInner,
+    runtime: &Arc<LocalProcessRuntimeInner>,
     environment: &Arc<LocalEnvironment>,
 ) -> Result<StudioEnvironment, EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
@@ -531,7 +836,11 @@ async fn restart_environment(
     *environment.child.lock().await = Some(child);
     let generation = environment.generation.load(Ordering::Acquire);
     set_environment_status(environment, EnvironmentStatus::Starting, None).await;
-    tokio::spawn(monitor_localnet(Arc::clone(environment), generation));
+    tokio::spawn(monitor_localnet(
+        Arc::clone(runtime),
+        Arc::clone(environment),
+        generation,
+    ));
     Ok(environment.details.read().await.clone())
 }
 
@@ -584,4 +893,92 @@ async fn set_environment_status(
     let mut details = environment.details.write().await;
     details.status = status;
     details.error = error;
+}
+
+#[cfg(test)]
+mod artifact_coordinator_tests {
+    use std::fs;
+
+    use serde_json::json;
+    use tempfile::tempdir;
+
+    use super::{ArtifactCoordinatorState, ProjectArtifactSynchronizer, SourceRegistration};
+
+    #[tokio::test]
+    async fn unstable_builds_are_discarded_and_publish_revisions_never_move_backwards() {
+        let temp = tempdir().expect("temp directory");
+        fs::write(temp.path().join("Acton.toml"), "[contracts]\n").expect("manifest");
+        let contract_path = temp.path().join("counter.tolk");
+        fs::write(&contract_path, "fun main() {}\n").expect("initial source");
+        let synchronizer = ProjectArtifactSynchronizer::new("acton", temp.path());
+        let before_build = synchronizer.fingerprint().await.expect("before build");
+        fs::write(&contract_path, "fun noop() {}\n").expect("changed source");
+        let after_build = synchronizer.fingerprint().await.expect("after build");
+
+        let mut state = ArtifactCoordinatorState::default();
+        assert!(!state.commit_if_stable(
+            before_build,
+            &after_build,
+            vec![SourceRegistration {
+                code_hash: "stale".to_owned(),
+                source: json!({"revision": "stale"}),
+            }],
+        ));
+        assert!(state.current.is_none());
+
+        assert!(state.commit_if_stable(
+            after_build.clone(),
+            &after_build,
+            vec![SourceRegistration {
+                code_hash: "revision-1".to_owned(),
+                source: json!({"revision": 1}),
+            }],
+        ));
+        let revision_1 = state.current.as_ref().expect("first revision").id;
+        state.mark_published("environment-1".to_owned(), 1, revision_1);
+        assert!(!state.needs_publish("environment-1", 1));
+        assert!(state.needs_publish("environment-1", 2));
+
+        fs::write(&contract_path, "fun next() {}\n").expect("next source");
+        let next_fingerprint = synchronizer.fingerprint().await.expect("next fingerprint");
+        assert!(state.commit_if_stable(
+            next_fingerprint.clone(),
+            &next_fingerprint,
+            vec![SourceRegistration {
+                code_hash: "revision-2".to_owned(),
+                source: json!({"revision": 2}),
+            }],
+        ));
+        let revision_2 = state.current.as_ref().expect("second revision").id;
+        state.mark_published("environment-1".to_owned(), 1, revision_1);
+        assert!(state.needs_publish("environment-1", 1));
+        state.mark_published("environment-1".to_owned(), 1, revision_2);
+        assert!(!state.needs_publish("environment-1", 1));
+    }
+
+    #[test]
+    fn restored_history_is_published_before_a_workspace_rebuild() {
+        let mut state = ArtifactCoordinatorState::default();
+        state.refresh_history(vec![
+            SourceRegistration {
+                code_hash: "old-code".to_owned(),
+                source: json!({"bundle": "old"}),
+            },
+            SourceRegistration {
+                code_hash: "new-code".to_owned(),
+                source: json!({"bundle": "new"}),
+            },
+        ]);
+
+        assert!(state.current.is_some());
+        assert!(state.needs_publish("environment-1", 1));
+        assert!(
+            state
+                .current
+                .as_ref()
+                .expect("history revision")
+                .fingerprint
+                .is_none()
+        );
+    }
 }

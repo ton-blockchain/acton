@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
-use serde::de::DeserializeOwned;
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
@@ -163,6 +163,28 @@ impl TonApiClient {
             anyhow::bail!("TonCenter API returned status: {}", response.status());
         }
         response.json().context(response_error_context.to_owned())
+    }
+
+    fn get_v2_result<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &impl Serialize,
+    ) -> anyhow::Result<T> {
+        let url = format!(
+            "{}{path}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(query),
+            "Failed to send TonCenter v2 request",
+        )?;
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+        let response: v2::TonlibResponse<T> = response
+            .json()
+            .context("Failed to parse TonCenter v2 response")?;
+        Ok(response.result)
     }
 
     fn send_with_retry<F>(
@@ -495,6 +517,34 @@ impl TonApiClient {
             "Failed to parse getShards response",
         )?;
         Ok(response.result)
+    }
+
+    pub fn get_block_header_v2(
+        &self,
+        request: &v2::BlockHeaderRequest,
+    ) -> anyhow::Result<v2::BlockHeader> {
+        self.get_v2_result("/getBlockHeader", request)
+    }
+
+    pub fn get_block_transactions_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactions> {
+        self.get_v2_result("/getBlockTransactions", request)
+    }
+
+    pub fn get_block_transactions_ext_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactionsExt> {
+        self.get_v2_result("/getBlockTransactionsExt", request)
+    }
+
+    pub fn lookup_block_v2(
+        &self,
+        request: &v2::LookupBlockRequest,
+    ) -> anyhow::Result<v2::TonBlockIdExt> {
+        self.get_v2_result("/lookupBlock", request)
     }
 
     pub fn get_account_info(

@@ -1159,6 +1159,174 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
 }
 
 #[test]
+fn localnet_v2_block_history_stays_on_the_correct_side_of_the_fork() {
+    let project = ProjectBuilder::new("localnet-v2-fork-history-routing").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    source_node.post_json("/acton_increaseTime", &json!({ "seconds": 10 }));
+    source_node.post_json("/acton_mine", &json!({}));
+    let fork_seqno = u32::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    assert!(fork_seqno > 0, "fork must have a historical predecessor");
+    let historical_seqno = fork_seqno - 1;
+
+    append_custom_localnet_network(project.path(), "v2-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:v2-fork-source")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .start();
+    forked_node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
+    forked_node.post_json("/acton_mine", &json!({}));
+    source_node.post_json("/acton_mine", &json!({}));
+    let local_seqno = fork_seqno + 1;
+    assert_eq!(latest_masterchain_seqno(&forked_node), local_seqno as i64);
+    assert_eq!(latest_masterchain_seqno(&source_node), local_seqno as i64);
+
+    let header_path = |seqno| {
+        format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}")
+    };
+    let transactions_path = |seqno, extended| {
+        format!(
+            "/api/v2/getBlockTransactions{}?workchain=0&shard=-9223372036854775808&seqno={seqno}&count=100",
+            if extended { "Ext" } else { "" }
+        )
+    };
+    let lookup_seqno_path =
+        |seqno| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&seqno={seqno}");
+
+    let source_historical_header = source_node.get_json(&header_path(historical_seqno));
+    let forked_historical_header = forked_node.get_json(&header_path(historical_seqno));
+    let source_boundary_header = source_node.get_json(&header_path(fork_seqno));
+    let forked_boundary_header = forked_node.get_json(&header_path(fork_seqno));
+    let source_local_seqno_header = source_node.get_json(&header_path(local_seqno));
+    let forked_local_header = forked_node.get_json(&header_path(local_seqno));
+
+    let source_historical_transactions =
+        source_node.get_json(&transactions_path(historical_seqno, false));
+    let forked_historical_transactions =
+        forked_node.get_json(&transactions_path(historical_seqno, false));
+    let source_boundary_transactions = source_node.get_json(&transactions_path(fork_seqno, false));
+    let forked_boundary_transactions = forked_node.get_json(&transactions_path(fork_seqno, false));
+    let source_local_seqno_transactions =
+        source_node.get_json(&transactions_path(local_seqno, false));
+    let forked_local_transactions = forked_node.get_json(&transactions_path(local_seqno, false));
+    let source_historical_transactions_ext =
+        source_node.get_json(&transactions_path(historical_seqno, true));
+    let forked_historical_transactions_ext =
+        forked_node.get_json(&transactions_path(historical_seqno, true));
+    let source_boundary_transactions_ext =
+        source_node.get_json(&transactions_path(fork_seqno, true));
+    let forked_boundary_transactions_ext =
+        forked_node.get_json(&transactions_path(fork_seqno, true));
+    let source_local_seqno_transactions_ext =
+        source_node.get_json(&transactions_path(local_seqno, true));
+    let forked_local_transactions_ext = forked_node.get_json(&transactions_path(local_seqno, true));
+
+    let source_historical_lookup = source_node.get_json(&lookup_seqno_path(historical_seqno));
+    let forked_historical_lookup = forked_node.get_json(&lookup_seqno_path(historical_seqno));
+    let source_boundary_lookup = source_node.get_json(&lookup_seqno_path(fork_seqno));
+    let forked_boundary_lookup = forked_node.get_json(&lookup_seqno_path(fork_seqno));
+    let source_local_seqno_lookup = source_node.get_json(&lookup_seqno_path(local_seqno));
+    let forked_local_lookup = forked_node.get_json(&lookup_seqno_path(local_seqno));
+
+    let historical_lt = source_historical_header["result"]["start_lt"]
+        .as_str()
+        .expect("historical header must expose start_lt");
+    let historical_time = source_historical_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("historical header must expose gen_utime");
+    let local_lt = forked_local_header["result"]["start_lt"]
+        .as_str()
+        .expect("local header must expose start_lt");
+    let local_time = forked_local_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("local header must expose gen_utime");
+    let lookup_lt_path =
+        |lt: &str| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&lt={lt}");
+    let lookup_time_path = |time| {
+        format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&unixtime={time}")
+    };
+    let source_historical_lt_lookup = source_node.get_json(&lookup_lt_path(historical_lt));
+    let forked_historical_lt_lookup = forked_node.get_json(&lookup_lt_path(historical_lt));
+    let source_historical_time_lookup = source_node.get_json(&lookup_time_path(historical_time));
+    let forked_historical_time_lookup = forked_node.get_json(&lookup_time_path(historical_time));
+    let forked_local_lt_lookup = forked_node.get_json(&lookup_lt_path(local_lt));
+    let forked_local_time_lookup = forked_node.get_json(&lookup_time_path(local_time));
+
+    let snapshot = json!({
+        "get_block_header": {
+            "pre_fork_matches_remote":
+                forked_historical_header["result"] == source_historical_header["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_header["result"] == source_boundary_header["result"],
+            "post_fork_stays_local":
+                forked_local_header["result"]["id"] != source_local_seqno_header["result"]["id"],
+        },
+        "get_block_transactions": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions["result"]
+                    == source_historical_transactions["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions["result"] == source_boundary_transactions["result"],
+            "post_fork_stays_local":
+                forked_local_transactions["result"]["id"]
+                    != source_local_seqno_transactions["result"]["id"],
+        },
+        "get_block_transactions_ext": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions_ext["result"]
+                    == source_historical_transactions_ext["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions_ext["result"]
+                    == source_boundary_transactions_ext["result"],
+            "post_fork_stays_local":
+                forked_local_transactions_ext["result"]["id"]
+                    != source_local_seqno_transactions_ext["result"]["id"],
+        },
+        "lookup_block": {
+            "pre_fork_seqno_matches_remote":
+                forked_historical_lookup["result"] == source_historical_lookup["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_lookup["result"] == source_boundary_lookup["result"],
+            "post_fork_stays_local":
+                forked_local_lookup["result"] == forked_local_header["result"]["id"]
+                    && forked_local_lookup["result"] != source_local_seqno_lookup["result"],
+            "pre_fork_lt_matches_remote":
+                forked_historical_lt_lookup["result"] == source_historical_lt_lookup["result"],
+            "pre_fork_time_matches_remote":
+                forked_historical_time_lookup["result"] == source_historical_time_lookup["result"],
+            "post_fork_lt_stays_local":
+                forked_local_lt_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+            "post_fork_time_stays_local":
+                forked_local_time_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_fork_history_routing.summary.json"),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
 fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
     let project = ProjectBuilder::new("localnet-auto-mining-fork-remote-account").build();
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
@@ -1617,6 +1785,7 @@ fn localnet_batches_address_name_lookup() {
     let node = project.localnet().start();
     let named_address = "0:2222222222222222222222222222222222222222222222222222222222222222";
     let unnamed_address = "0:3333333333333333333333333333333333333333333333333333333333333333";
+    let cleared_address = "0:4444444444444444444444444444444444444444444444444444444444444444";
 
     node.post_json(
         "/acton_setAddressName",
@@ -1625,11 +1794,26 @@ fn localnet_batches_address_name_lookup() {
             "name": "treasury"
         }),
     );
+    node.post_json(
+        "/acton_setAddressName",
+        &json!({
+            "address": cleared_address,
+            "name": "temporary"
+        }),
+    );
+    node.post_json(
+        "/acton_setAddressName",
+        &json!({
+            "address": cleared_address,
+            "name": " "
+        }),
+    );
 
     let mut response = node.get_json(&format!(
-        "/acton_getAddressName?address={}&address={}",
+        "/acton_getAddressName?address={}&address={}&address={}",
         encode_query_component(named_address),
-        encode_query_component(unnamed_address)
+        encode_query_component(unnamed_address),
+        encode_query_component(cleared_address)
     ));
     normalize_extra_for_snapshot(&mut response);
     let response_json = format!(

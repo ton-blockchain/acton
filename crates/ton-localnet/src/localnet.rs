@@ -4,7 +4,9 @@ use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
 use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
 use crate::remote::{
-    RemoteProvider, fetch_remote_blocks_v3, fetch_remote_shards_v2, fetch_remote_transactions_v3,
+    RemoteProvider, fetch_remote_block_header_v2, fetch_remote_block_transactions_ext_v2,
+    fetch_remote_block_transactions_v2, fetch_remote_blocks_v3, fetch_remote_lookup_block_v2,
+    fetch_remote_shards_v2, fetch_remote_transactions_v3,
 };
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
@@ -146,6 +148,49 @@ impl LocalnetAddressInfo {
 pub struct LocalnetAccountStateWithInfo {
     pub state: LocalnetAccountState,
     pub info: LocalnetAddressInfo,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalnetContractArtifact {
+    pub artifact_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entrypoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compiler_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compiler_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LocalnetContractSourceKind {
+    Local,
+    Fork,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalnetContract {
+    pub address: String,
+    pub status: String,
+    pub balance: String,
+    pub code_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abi_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_transaction_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_transaction_lt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_at: Option<u64>,
+    pub source_kind: LocalnetContractSourceKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<LocalnetContractArtifact>,
 }
 
 #[derive(Debug, Clone)]
@@ -649,6 +694,14 @@ pub(crate) enum Request {
         addresses: Vec<Addr>,
         resp: oneshot::Sender<anyhow::Result<Vec<Option<String>>>>,
     },
+    ListContracts {
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetContract>>>,
+    },
+    RegisterContract {
+        address: Addr,
+        name: Option<String>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetContract>>,
+    },
     RegisterCompilerAbis {
         entries: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
@@ -665,7 +718,8 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Vec<Option<Value>>>>,
     },
     RegisterVerifiedSources {
-        entries: Vec<(Hash256, Value)>,
+        sources: Vec<(Hash256, Value)>,
+        compiler_abis: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
     GetRegisteredVerifiedSource {
@@ -674,7 +728,11 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Option<Value>>>,
     },
     ListVerifiedSources {
-        resp: oneshot::Sender<anyhow::Result<Vec<(Hash256, Value)>>>,
+        resp: oneshot::Sender<anyhow::Result<Vec<storage::VerifiedSourceArtifact>>>,
+    },
+    DeleteVerifiedSourceArtifact {
+        artifact_id: String,
+        resp: oneshot::Sender<anyhow::Result<()>>,
     },
     DeleteVerifiedSource {
         code_hash: Hash256,
@@ -1454,6 +1512,60 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_historical_block_header_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockHeaderRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockHeader>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_header_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_historical_block_transactions_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockTransactions>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_transactions_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_historical_block_transactions_ext_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockTransactionsExt>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_transactions_ext_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
     pub async fn get_historical_shards_v2(
         &self,
         seqno: u32,
@@ -1475,10 +1587,57 @@ impl Localnet {
         let StateSource::Remote(provider) = self.state_source().await? else {
             return Ok(None);
         };
+        // The fork block is the remote parent of the first locally mined block.
         Ok(provider
             .fork_block_number
             .is_some_and(|fork_seqno| requested_seqno <= fork_seqno)
             .then_some(provider))
+    }
+
+    async fn historical_block_provider(
+        &self,
+        workchain: i32,
+        shard: i64,
+        requested_seqno: u32,
+    ) -> anyhow::Result<Option<RemoteProvider>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        let is_historical = provider
+            .contains_historical_block(workchain, shard, u64::from(requested_seqno))
+            .await?;
+        Ok(is_historical.then_some(provider))
+    }
+
+    pub async fn get_historical_lookup_block_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        requested_seqno: Option<u32>,
+        request: ton_api::toncenter::v2::LookupBlockRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::TonBlockIdExt>> {
+        let provider = if let Some(seqno) = requested_seqno {
+            let Some(provider) = self
+                .historical_block_provider(workchain, shard, seqno)
+                .await?
+            else {
+                return Ok(None);
+            };
+            provider
+        } else {
+            let StateSource::Remote(provider) = self.state_source().await? else {
+                return Ok(None);
+            };
+            if provider.fork_block_number.is_none() {
+                return Ok(None);
+            }
+            provider
+        };
+        let block = fetch_remote_lookup_block_v2(&provider, request).await?;
+        Ok(provider
+            .contains_historical_block_id(&block)
+            .await?
+            .then_some(block))
     }
 
     pub async fn lookup_block(
@@ -1724,6 +1883,29 @@ impl Localnet {
         Ok(address_strs.into_iter().zip(names).collect())
     }
 
+    pub async fn list_contracts(&self) -> anyhow::Result<Vec<LocalnetContract>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ListContracts { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn register_contract(
+        &self,
+        address: String,
+        name: Option<String>,
+    ) -> anyhow::Result<LocalnetContract> {
+        let address = Addr::parse(&address)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::RegisterContract {
+                address,
+                name,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn register_compiler_abis(
         &self,
         entries: Vec<(Hash256, Value)>,
@@ -1781,15 +1963,20 @@ impl Localnet {
 
     pub async fn register_verified_sources(
         &self,
-        entries: Vec<(Hash256, Value)>,
+        sources: Vec<(Hash256, Value)>,
+        compiler_abis: Vec<(Hash256, Value)>,
     ) -> anyhow::Result<()> {
-        if entries.is_empty() {
+        if sources.is_empty() && compiler_abis.is_empty() {
             return Ok(());
         }
 
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::RegisterVerifiedSources { entries, resp })
+            .send(Request::RegisterVerifiedSources {
+                sources,
+                compiler_abis,
+                resp,
+            })
             .await?;
         rx.await?
     }
@@ -1817,15 +2004,12 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn list_verified_sources(&self) -> anyhow::Result<Vec<(String, Value)>> {
+    pub async fn list_verified_sources(
+        &self,
+    ) -> anyhow::Result<Vec<storage::VerifiedSourceArtifact>> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::ListVerifiedSources { resp }).await?;
-        let entries = rx.await??;
-
-        Ok(entries
-            .into_iter()
-            .map(|(code_hash, source)| (code_hash.to_hex(), source))
-            .collect())
+        rx.await?
     }
 
     pub async fn delete_verified_source(&self, code_hash_str: String) -> anyhow::Result<()> {
@@ -1834,6 +2018,14 @@ impl Localnet {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::DeleteVerifiedSource { code_hash, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn delete_verified_source_artifact(&self, artifact_id: String) -> anyhow::Result<()> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::DeleteVerifiedSourceArtifact { artifact_id, resp })
             .await?;
         rx.await?
     }
@@ -2401,8 +2593,8 @@ fn process_loop_request(
             name,
             resp,
         } => {
-            node.set_address_name(address, name);
-            let _ = resp.send(Ok(()));
+            let res = node.set_address_name(address, name);
+            let _ = resp.send(res);
         }
         Request::GetAddressNames { addresses, resp } => {
             let res = addresses
@@ -2410,6 +2602,18 @@ fn process_loop_request(
                 .map(|address| node.get_address_name(address))
                 .collect();
             let _ = resp.send(Ok(res));
+        }
+        Request::ListContracts { resp } => {
+            let res = handle_list_contracts(node);
+            let _ = resp.send(res);
+        }
+        Request::RegisterContract {
+            address,
+            name,
+            resp,
+        } => {
+            let res = handle_register_contract(node, address, name);
+            let _ = resp.send(res);
         }
         Request::RegisterCompilerAbis { entries, resp } => {
             let res = entries
@@ -2444,10 +2648,12 @@ fn process_loop_request(
                 .collect();
             let _ = resp.send(Ok(res));
         }
-        Request::RegisterVerifiedSources { entries, resp } => {
-            let res = entries
-                .into_iter()
-                .try_for_each(|(code_hash, source)| node.set_verified_source(code_hash, source));
+        Request::RegisterVerifiedSources {
+            sources,
+            compiler_abis,
+            resp,
+        } => {
+            let res = node.register_verified_sources(sources, compiler_abis);
             let _ = resp.send(res);
         }
         Request::GetRegisteredVerifiedSource {
@@ -2461,12 +2667,16 @@ fn process_loop_request(
         Request::ListVerifiedSources { resp } => {
             let mut entries = node
                 .history
-                .verified_sources
-                .iter()
-                .map(|(code_hash, source)| (*code_hash, source.clone()))
+                .verified_source_artifacts
+                .values()
+                .cloned()
                 .collect::<Vec<_>>();
-            entries.sort_by_key(|(code_hash, _)| *code_hash);
+            entries.sort_by(|left, right| left.artifact_id.cmp(&right.artifact_id));
             let _ = resp.send(Ok(entries));
+        }
+        Request::DeleteVerifiedSourceArtifact { artifact_id, resp } => {
+            let res = node.delete_verified_source_artifact(&artifact_id);
+            let _ = resp.send(res);
         }
         Request::DeleteVerifiedSource { code_hash, resp } => {
             let res = node.delete_verified_source(&code_hash);
@@ -2577,6 +2787,169 @@ fn registered_verified_source_for_query(
     Ok(code_hash.and_then(|code_hash| node.history.get_verified_source(&code_hash)))
 }
 
+fn handle_list_contracts(node: &mut Node) -> anyhow::Result<Vec<LocalnetContract>> {
+    let mut registered = node
+        .history
+        .registered_contracts
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    registered.sort_unstable();
+    for address in registered {
+        node.hydrate_address_information(&address)
+            .with_context(|| {
+                format!(
+                    "Failed to hydrate registered contract {}",
+                    address.as_user_friendly()
+                )
+            })?;
+    }
+
+    let mut contracts = node
+        .latest
+        .accounts
+        .iter()
+        .filter_map(|(address, account)| {
+            contract_from_account(node, address, account)
+                .map(|contract| (*address, account.last_trans_lt, contract))
+        })
+        .collect::<Vec<_>>();
+
+    contracts.sort_by(|(left_address, left_lt, _), (right_address, right_lt, _)| {
+        right_lt
+            .cmp(left_lt)
+            .then_with(|| left_address.cmp(right_address))
+    });
+    Ok(contracts
+        .into_iter()
+        .map(|(_, _, contract)| contract)
+        .collect())
+}
+
+fn handle_register_contract(
+    node: &mut Node,
+    address: Addr,
+    name: Option<String>,
+) -> anyhow::Result<LocalnetContract> {
+    let display_address = address.as_user_friendly();
+    let account = node
+        .hydrate_address_information(&address)
+        .with_context(|| format!("Failed to hydrate contract {display_address}"))?
+        .ok_or_else(|| {
+            LocalnetError::invalid_request(format!(
+                "Account {display_address} is not an active deployed contract"
+            ))
+        })?;
+    if account.status != AccountStatus::Active || account.code_hash.is_none() {
+        return Err(LocalnetError::invalid_request(format!(
+            "Account {display_address} is not an active deployed contract"
+        ))
+        .into());
+    }
+
+    node.register_contract(address)?;
+    if let Some(name) = name {
+        node.set_address_name(address, name)?;
+    }
+
+    contract_from_account(node, &address, &account)
+        .context("Validated contract must remain available in the catalog")
+}
+
+fn contract_from_account(
+    node: &Node,
+    address: &Addr,
+    account: &storage::AccountMeta,
+) -> Option<LocalnetContract> {
+    let code_hash = account
+        .code_hash
+        .filter(|_| account.status == AccountStatus::Active)?;
+    let source_kind = contract_source_kind(node, address);
+    let selected_artifact = node
+        .history
+        .verified_source_artifacts
+        .values()
+        .find(|artifact| {
+            artifact.code_hash == code_hash
+                && node.history.verified_sources.get(&code_hash) == Some(&artifact.source)
+        });
+    let abi_name = node
+        .history
+        .get_compiler_abi(&code_hash)
+        .as_ref()
+        .and_then(storage::compiler_abi_contract_name)
+        .or_else(|| {
+            selected_artifact
+                .and_then(|artifact| artifact.source.pointer("/bundle/compiler_abi"))
+                .and_then(storage::compiler_abi_contract_name)
+        });
+    let last_activity_at = account
+        .last_trans_hash
+        .and_then(|hash| node.history.tx_by_hash.get(&hash))
+        .map(|transaction| u64::from(transaction.now));
+    let artifact = selected_artifact.map(contract_artifact_summary);
+    Some(LocalnetContract {
+        address: (*address).as_user_friendly(),
+        status: account.status.to_string(),
+        balance: account.balance.to_string(),
+        code_hash: code_hash.to_hex(),
+        data_hash: account.data_hash.map(|hash| hash.to_hex()),
+        name: node.history.address_names.get(address).cloned(),
+        abi_name,
+        last_transaction_hash: account.last_trans_hash.map(|hash| hash.to_hex()),
+        last_transaction_lt: account.last_trans_lt.map(|lt| lt.to_string()),
+        last_activity_at,
+        source_kind,
+        artifact,
+    })
+}
+
+fn contract_source_kind(node: &Node, address: &Addr) -> LocalnetContractSourceKind {
+    if matches!(node.state_source, StateSource::Local) {
+        return LocalnetContractSourceKind::Local;
+    }
+
+    let existed_at_fork = node
+        .indexes
+        .account_deltas_by_addr
+        .get(address)
+        .and_then(|deltas| deltas.values().next())
+        .is_none_or(|delta| {
+            delta.old_meta.as_ref().is_some_and(|account| {
+                matches!(
+                    account.status,
+                    AccountStatus::Active | AccountStatus::Frozen
+                )
+            })
+        });
+    if existed_at_fork {
+        LocalnetContractSourceKind::Fork
+    } else {
+        LocalnetContractSourceKind::Local
+    }
+}
+
+fn contract_artifact_summary(
+    artifact: &storage::VerifiedSourceArtifact,
+) -> LocalnetContractArtifact {
+    let source = &artifact.source;
+    LocalnetContractArtifact {
+        artifact_id: artifact.artifact_id.clone(),
+        entrypoint: source
+            .pointer("/bundle/entrypoint")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        compiler_language: source
+            .pointer("/bundle/compiler/language")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        compiler_version: source
+            .pointer("/bundle/compiler/version")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+    }
+}
+
 fn catalog_compiler_abi_payload(code_hash: &Hash256) -> Option<Value> {
     let contract = acton_abi_catalog::find_contract_by_code_hash(&code_hash.to_hex())?;
     serde_json::to_value(contract.extended_abi()).ok()
@@ -2610,13 +2983,14 @@ fn handle_get_address_info(
 ) -> anyhow::Result<LocalnetAccountState> {
     let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-    let (block_id, sync_utime) = if seqno == 0 {
-        (LocalnetBlockId::first(), u64::from(node.now_unix()?))
+    let block_id = block_id_for_query_seqno(node, seqno)?;
+    let sync_utime = if seqno == node.globals.origin_seqno {
+        u64::from(node.now_unix()?)
     } else {
         let block = node
             .get_block_header(seqno)
             .ok_or(LocalnetError::BlockNotFound { seqno })?;
-        (block.block_id(), u64::from(block.gen_utime))
+        u64::from(block.gen_utime)
     };
 
     let Some(meta) = meta else {
@@ -3812,6 +4186,10 @@ fn handle_lookup_block(
 mod tests {
     use super::*;
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
+    use crate::remote::RemoteProvider;
+    use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use ton_networks::Network;
     use tycho_types::boc::BocRepr;
     use tycho_types::cell::{CellSliceParts, HashBytes};
     use tycho_types::models::config::BlockchainConfigParams;
@@ -3950,6 +4328,391 @@ mod tests {
         let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
         Node::new(Box::new(NoopExecutor), config_boc, StateSource::Local)
             .expect("must create test node")
+    }
+
+    #[test]
+    fn contract_catalog_lists_active_code_accounts_with_selected_artifacts() {
+        let mut node = make_test_node();
+        let older_address = test_addr(1);
+        let newer_address = test_addr(2);
+        let uninitialized_address = test_addr(3);
+        let older_code_hash = Hash256([0x11; 32]);
+        let newer_code_hash = Hash256([0x22; 32]);
+        node.latest.accounts.insert(
+            older_address,
+            test_contract_account(older_code_hash, AccountStatus::Active, 10),
+        );
+        node.latest.accounts.insert(
+            newer_address,
+            test_contract_account(newer_code_hash, AccountStatus::Active, 20),
+        );
+        node.latest.accounts.insert(
+            uninitialized_address,
+            test_contract_account(Hash256([0x33; 32]), AccountStatus::Uninit, 30),
+        );
+        node.set_address_name(older_address, "Custom counter".to_owned())
+            .expect("address name must be stored");
+        node.set_compiler_abi(
+            newer_code_hash,
+            json!({
+                "compiler_abi": {
+                    "contract_name": "New counter"
+                }
+            }),
+        )
+        .expect("compiler ABI must be stored");
+        node.set_verified_source(
+            older_code_hash,
+            json!({
+                "bundle": {
+                    "source_bundle_hash": "counter-bundle",
+                    "entrypoint": "contracts/counter.tolk",
+                    "compiler_abi": {
+                        "contract_name": "Counter"
+                    },
+                    "compiler": {
+                        "language": "tolk",
+                        "version": "1.4.0"
+                    }
+                }
+            }),
+        )
+        .expect("verified source must be stored");
+        let older_transaction_hash = node
+            .latest
+            .accounts
+            .get(&older_address)
+            .and_then(|account| account.last_trans_hash)
+            .expect("test contract must have a transaction hash");
+        node.history.tx_by_hash.insert(
+            older_transaction_hash,
+            storage::TxMeta {
+                tx_hash: older_transaction_hash,
+                account: older_address,
+                lt: 10,
+                now: 1_700_000_010,
+                aborted: false,
+                compute_exit_code: Some(0),
+                action_result_code: Some(0),
+                total_fees: 0,
+                storage_fees: 0,
+                other_fees: 0,
+                in_msg_hash: None,
+                out_msg_hashes: Vec::new(),
+                block_seqno: 1,
+            },
+        );
+
+        assert_eq!(
+            serde_json::to_value(
+                handle_list_contracts(&mut node).expect("contract catalog must build")
+            )
+            .expect("contract catalog must serialize"),
+            json!([
+                {
+                    "address": newer_address.as_user_friendly(),
+                    "status": "active",
+                    "balance": "1020",
+                    "codeHash": newer_code_hash.to_hex(),
+                    "dataHash": Hash256([0x23; 32]).to_hex(),
+                    "abiName": "New counter",
+                    "lastTransactionHash": Hash256([0x24; 32]).to_hex(),
+                    "lastTransactionLt": "20",
+                    "sourceKind": "local"
+                },
+                {
+                    "address": older_address.as_user_friendly(),
+                    "status": "active",
+                    "balance": "1010",
+                    "codeHash": older_code_hash.to_hex(),
+                    "dataHash": Hash256([0x12; 32]).to_hex(),
+                    "name": "Custom counter",
+                    "abiName": "Counter",
+                    "lastTransactionHash": Hash256([0x13; 32]).to_hex(),
+                    "lastTransactionLt": "10",
+                    "lastActivityAt": 1_700_000_010,
+                    "sourceKind": "local",
+                    "artifact": {
+                        "artifactId": "counter-bundle",
+                        "entrypoint": "contracts/counter.tolk",
+                        "compilerLanguage": "tolk",
+                        "compilerVersion": "1.4.0"
+                    }
+                }
+            ])
+        );
+    }
+
+    #[test]
+    fn contract_source_kind_distinguishes_fork_accounts_from_local_deployments() {
+        let mut node = make_test_node();
+        node.state_source = StateSource::Remote(RemoteProvider {
+            network: Network::Mainnet,
+            fork_block_number: Some(80_000_000),
+        });
+        let hydrated_remote = test_addr(1);
+        let changed_remote = test_addr(2);
+        let local_deployment = test_addr(3);
+        let frozen_remote = test_addr(4);
+        let remote_meta = test_contract_account(Hash256([0x41; 32]), AccountStatus::Active, 1);
+        node.indexes
+            .account_deltas_by_addr
+            .entry(changed_remote)
+            .or_default()
+            .insert(
+                80_000_001,
+                storage::AccountDelta {
+                    addr: changed_remote,
+                    old_hash: Some(remote_meta.account_hash),
+                    new_hash: Some(Hash256([0x42; 32])),
+                    old_meta: Some(remote_meta),
+                    new_meta: None,
+                },
+            );
+        node.indexes
+            .account_deltas_by_addr
+            .entry(local_deployment)
+            .or_default()
+            .insert(
+                80_000_001,
+                storage::AccountDelta {
+                    addr: local_deployment,
+                    old_hash: Some(Hash256([0x51; 32])),
+                    new_hash: Some(Hash256([0x52; 32])),
+                    old_meta: Some(test_contract_account(
+                        Hash256([0x53; 32]),
+                        AccountStatus::Nonexist,
+                        0,
+                    )),
+                    new_meta: None,
+                },
+            );
+        node.indexes
+            .account_deltas_by_addr
+            .entry(frozen_remote)
+            .or_default()
+            .insert(
+                80_000_001,
+                storage::AccountDelta {
+                    addr: frozen_remote,
+                    old_hash: Some(Hash256([0x61; 32])),
+                    new_hash: Some(Hash256([0x62; 32])),
+                    old_meta: Some(test_contract_account(
+                        Hash256([0x63; 32]),
+                        AccountStatus::Frozen,
+                        1,
+                    )),
+                    new_meta: None,
+                },
+            );
+
+        assert_eq!(
+            contract_source_kind(&node, &hydrated_remote),
+            LocalnetContractSourceKind::Fork
+        );
+        assert_eq!(
+            contract_source_kind(&node, &changed_remote),
+            LocalnetContractSourceKind::Fork
+        );
+        assert_eq!(
+            contract_source_kind(&node, &local_deployment),
+            LocalnetContractSourceKind::Local
+        );
+        assert_eq!(
+            contract_source_kind(&node, &frozen_remote),
+            LocalnetContractSourceKind::Fork
+        );
+    }
+
+    #[test]
+    fn address_queries_accept_nonzero_fork_origin_as_default_head() {
+        const ORIGIN_SEQNO: Seqno = 82_400_780;
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::new(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+            }),
+        )
+        .expect("must create forked test node");
+        let address = test_addr(0x71);
+        node.latest.accounts.insert(
+            address,
+            test_contract_account(Hash256([0x72; 32]), AccountStatus::Active, 1),
+        );
+
+        let information = handle_get_address_info(&mut node, address, None)
+            .expect("default getAddressInformation query must accept fork origin");
+        assert_eq!(information.block_id.seqno, ORIGIN_SEQNO);
+        assert_eq!(information.state, AccountStatus::Active);
+        assert_eq!(
+            handle_get_address_info(&mut node, address, Some(0))
+                .expect("default getAddressState query must accept fork origin")
+                .state,
+            AccountStatus::Active
+        );
+    }
+
+    #[test]
+    fn registered_fork_contract_and_name_survive_sqlite_and_snapshot_restore() {
+        const ORIGIN_SEQNO: Seqno = 82_400_780;
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-contract-registry-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let state_source = || {
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+            })
+        };
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            state_source(),
+            Some(&db_path),
+        )
+        .expect("must create persistent forked node");
+        let address = test_addr(0x73);
+        node.latest.accounts.insert(
+            address,
+            test_contract_account(Hash256([0x74; 32]), AccountStatus::Active, 1),
+        );
+
+        let registered = handle_register_contract(&mut node, address, Some("Counter".to_owned()))
+            .expect("hydrated fork contract must register");
+        assert_eq!(registered.name.as_deref(), Some("Counter"));
+        assert_eq!(registered.source_kind, LocalnetContractSourceKind::Fork);
+        assert_eq!(
+            handle_list_contracts(&mut node)
+                .expect("registered contract catalog must build")
+                .len(),
+            1
+        );
+
+        node.latest.accounts.remove(&address);
+        let snapshot = node.build_snapshot().expect("snapshot must build");
+        let mut restored = make_test_node();
+        restored
+            .apply_snapshot(snapshot)
+            .expect("snapshot must restore");
+        assert!(restored.history.registered_contracts.contains(&address));
+        assert_eq!(
+            restored.get_address_name(&address).as_deref(),
+            Some("Counter")
+        );
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            state_source(),
+            Some(&db_path),
+        )
+        .expect("must reopen persistent forked node");
+        assert!(reopened.history.registered_contracts.contains(&address));
+        assert_eq!(
+            reopened.get_address_name(&address).as_deref(),
+            Some("Counter")
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn contract_registration_rejects_missing_and_inactive_accounts() {
+        let mut node = make_test_node();
+        let missing = test_addr(0x75);
+        let inactive = test_addr(0x76);
+        node.latest.accounts.insert(
+            inactive,
+            test_contract_account(Hash256([0x77; 32]), AccountStatus::Uninit, 1),
+        );
+
+        for address in [missing, inactive] {
+            let error = handle_register_contract(&mut node, address, None)
+                .expect_err("undeployed account must not register");
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "Account {} is not an active deployed contract",
+                    address.as_user_friendly()
+                )
+            );
+        }
+        assert!(node.history.registered_contracts.is_empty());
+    }
+
+    #[test]
+    fn blank_address_name_removes_the_custom_override_from_memory_and_sqlite() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-address-name-removal-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let address = test_addr(0x78);
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create persistent local node");
+
+        node.set_address_name(address, "  Custom counter  ".to_owned())
+            .expect("non-empty name must be stored");
+        assert_eq!(
+            node.get_address_name(&address).as_deref(),
+            Some("Custom counter")
+        );
+        node.set_address_name(address, " \t ".to_owned())
+            .expect("blank name must remove the override");
+        assert_eq!(node.get_address_name(&address), None);
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen persistent local node");
+        assert_eq!(reopened.get_address_name(&address), None);
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    fn test_contract_account(
+        code_hash: Hash256,
+        status: AccountStatus,
+        last_transaction_lt: u64,
+    ) -> storage::AccountMeta {
+        storage::AccountMeta {
+            account_hash: Hash256([code_hash.0[0].wrapping_add(4); 32]),
+            status,
+            balance: 1000 + u128::from(last_transaction_lt),
+            extra_currencies: Vec::new(),
+            last_trans_lt: Some(last_transaction_lt),
+            last_trans_hash: Some(Hash256([code_hash.0[0].wrapping_add(2); 32])),
+            code_hash: Some(code_hash),
+            data_hash: Some(Hash256([code_hash.0[0].wrapping_add(1); 32])),
+            frozen_hash: None,
+        }
     }
 
     #[test]

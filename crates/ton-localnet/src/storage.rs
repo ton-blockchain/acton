@@ -6,6 +6,7 @@ use rusqlite::{Connection, params};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
@@ -606,6 +607,48 @@ pub struct AccountDelta {
     pub new_meta: Option<AccountMeta>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedSourceArtifact {
+    pub artifact_id: String,
+    pub code_hash: Hash256,
+    pub source: Value,
+    pub saved_at: u64,
+}
+
+impl VerifiedSourceArtifact {
+    #[must_use]
+    pub fn new(code_hash: Hash256, source: Value, saved_at: u64) -> Self {
+        let artifact_id = source
+            .pointer("/bundle/source_bundle_hash")
+            .and_then(Value::as_str)
+            .filter(|artifact_id| !artifact_id.is_empty())
+            .map_or_else(
+                || {
+                    hex::encode(Sha256::digest(
+                        serde_json::to_vec(&source).expect("JSON value must serialize"),
+                    ))
+                },
+                ToOwned::to_owned,
+            );
+        Self {
+            artifact_id,
+            code_hash,
+            source,
+            saved_at,
+        }
+    }
+}
+
+pub(crate) fn compiler_abi_contract_name(abi: &Value) -> Option<String> {
+    abi.get("compiler_abi")
+        .unwrap_or(abi)
+        .get("contract_name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(ToOwned::to_owned)
+}
+
 pub struct History {
     pub blocks: Vec<BlockMeta>,
     pub masterchain_blocks: Vec<MasterchainBlockMeta>,
@@ -620,6 +663,8 @@ pub struct History {
     pub asset_detection_checked: HashSet<Addr>,
     pub compiler_abis: HashMap<Hash256, Value>,
     pub verified_sources: HashMap<Hash256, Value>,
+    pub verified_source_artifacts: HashMap<String, VerifiedSourceArtifact>,
+    pub registered_contracts: HashSet<Addr>,
 }
 
 impl Default for History {
@@ -647,6 +692,8 @@ impl History {
             asset_detection_checked: HashSet::new(),
             compiler_abis: HashMap::new(),
             verified_sources: HashMap::new(),
+            verified_source_artifacts: HashMap::new(),
+            registered_contracts: HashSet::new(),
         }
     }
 
@@ -718,8 +765,12 @@ impl History {
         self.compiler_abis = compiler_abis;
     }
 
-    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) {
-        self.verified_sources.insert(code_hash, source);
+    pub fn set_verified_source(&mut self, artifact: VerifiedSourceArtifact) {
+        self.verified_source_artifacts
+            .entry(artifact.artifact_id.clone())
+            .or_insert_with(|| artifact.clone());
+        self.verified_sources
+            .insert(artifact.code_hash, artifact.source);
     }
 
     #[must_use]
@@ -750,6 +801,33 @@ impl History {
 
     pub fn delete_verified_source(&mut self, code_hash: &Hash256) {
         self.verified_sources.remove(code_hash);
+        self.verified_source_artifacts
+            .retain(|_, artifact| artifact.code_hash != *code_hash);
+    }
+
+    pub fn delete_verified_source_artifact(&mut self, artifact_id: &str) {
+        let Some(deleted) = self.verified_source_artifacts.remove(artifact_id) else {
+            return;
+        };
+        if self.verified_sources.get(&deleted.code_hash) != Some(&deleted.source) {
+            return;
+        }
+
+        if let Some(replacement) = self
+            .verified_source_artifacts
+            .values()
+            .filter(|artifact| artifact.code_hash == deleted.code_hash)
+            .max_by(|left, right| {
+                left.saved_at
+                    .cmp(&right.saved_at)
+                    .then_with(|| left.artifact_id.cmp(&right.artifact_id))
+            })
+        {
+            self.verified_sources
+                .insert(deleted.code_hash, replacement.source.clone());
+        } else {
+            self.verified_sources.remove(&deleted.code_hash);
+        }
     }
 }
 
@@ -918,6 +996,18 @@ mod tests {
             workchain: 0,
             addr: [byte; 32],
         }
+    }
+
+    #[test]
+    fn source_artifact_fallback_ids_are_content_addressed() {
+        let code_hash = Hash256([1; 32]);
+        let first = VerifiedSourceArtifact::new(code_hash, serde_json::json!({"source": "a"}), 1);
+        let same = VerifiedSourceArtifact::new(code_hash, serde_json::json!({"source": "a"}), 2);
+        let second = VerifiedSourceArtifact::new(code_hash, serde_json::json!({"source": "b"}), 3);
+
+        assert_eq!(first.artifact_id, same.artifact_id);
+        assert_ne!(first.artifact_id, code_hash.to_hex());
+        assert_ne!(first.artifact_id, second.artifact_id);
     }
 
     #[test]

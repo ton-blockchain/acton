@@ -186,10 +186,13 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
         enabled={environment?.status === "running"}
       >
         <ExplorerRoutesProvider
+          abiPath={localnetPath(basePath, "/contracts/abi")}
           basePath={localnetPath(basePath, "/explorer")}
           cellPath={localnetPath(basePath, "/cell-inspector")}
+          contractsPath={localnetPath(basePath, "/contracts")}
           emulatePath={localnetPath(basePath, "/simulator")}
           localnetBasePath={basePath}
+          sourcesPath={localnetPath(basePath, "/contracts/sources")}
         >
           <LocalnetRoutesProvider basePath={basePath}>{children}</LocalnetRoutesProvider>
         </ExplorerRoutesProvider>

@@ -14,6 +14,7 @@ license = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
+fs2 = { workspace = true }
 include_dir = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 serde = { workspace = true }
@@ -21,6 +22,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tower-http = { workspace = true, features = ["fs"] }
+tracing = { workspace = true }
 urlencoding = { workspace = true }
 uuid = { workspace = true }
 xxhash-rust = { workspace = true }

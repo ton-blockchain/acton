@@ -3,6 +3,7 @@ import type {FC} from "react"
 import {
   Activity,
   Binary,
+  Box,
   Brackets,
   Cable,
   ChevronLeft,
@@ -59,17 +60,19 @@ interface NavigationDisclosureProps {
   readonly open: boolean
 }
 
-const primaryItems: SidebarItem[] = [
-  {label: "Home", icon: LayoutGrid, path: "/dashboard"},
-]
+const primaryItems: SidebarItem[] = [{label: "Home", icon: LayoutGrid, path: "/dashboard"}]
 
 const explorerItems: NestedSidebarItem[] = [
   {label: "Overview", path: "/explorer"},
   {label: "Blocks", path: "/explorer/blocks"},
-  {label: "Sources", path: "/explorer/sources"},
-  {label: "ABI", path: "/explorer/abi"},
   {label: "Tokens", path: "/explorer/tokens"},
   {label: "NFTs", path: "/explorer/nfts"},
+]
+
+const contractItems: NestedSidebarItem[] = [
+  {label: "Overview", path: "/contracts"},
+  {label: "Sources", path: "/contracts/sources"},
+  {label: "ABI", path: "/contracts/abi"},
 ]
 
 const standaloneItems: SidebarItem[] = [
@@ -132,9 +135,7 @@ const NavigationDisclosure: FC<NavigationDisclosureProps> = ({
   open,
 }) => (
   <div className={styles.nestedNavGroup}>
-    <div
-      className={`${styles.nestedNavRow} ${active ? styles.nestedNavRowActive : ""}`}
-    >
+    <div className={`${styles.nestedNavRow} ${active ? styles.nestedNavRowActive : ""}`}>
       <button type="button" className={styles.navItem} onClick={onParentSelect}>
         <span className={styles.navItemMain}>
           <Icon size={18} aria-hidden="true" />
@@ -159,9 +160,7 @@ const NavigationDisclosure: FC<NavigationDisclosureProps> = ({
 
     <div
       id={controlsId}
-      className={`${styles.nestedNavDisclosure} ${
-        open ? styles.nestedNavDisclosureOpen : ""
-      }`}
+      className={`${styles.nestedNavDisclosure} ${open ? styles.nestedNavDisclosureOpen : ""}`}
       aria-hidden={!open}
     >
       <div className={styles.nestedNavClip}>
@@ -207,18 +206,22 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const isExplorerOverviewActive =
     localPathname.startsWith("/explorer") &&
     localPathname !== "/explorer/blocks" &&
-    localPathname !== "/explorer/sources" &&
-    !localPathname.startsWith("/explorer/abi") &&
     localPathname !== "/explorer/tokens" &&
     localPathname !== "/explorer/nfts" &&
     localPathname !== "/explorer/favorites"
   const [isExplorerOpen, setIsExplorerOpen] = useState(isExplorerActive)
+  const isContractsActive = localPathname.startsWith("/contracts")
+  const [isContractsOpen, setIsContractsOpen] = useState(isContractsActive)
   const isApiReferenceActive = localPathname.startsWith("/api-reference/")
   const [isApiReferenceOpen, setIsApiReferenceOpen] = useState(isApiReferenceActive)
 
   useEffect(() => {
     if (isExplorerActive) setIsExplorerOpen(true)
   }, [isExplorerActive])
+
+  useEffect(() => {
+    if (isContractsActive) setIsContractsOpen(true)
+  }, [isContractsActive])
 
   useEffect(() => {
     if (isApiReferenceActive) setIsApiReferenceOpen(true)
@@ -228,8 +231,6 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     if (
       !localPathname.startsWith("/explorer") ||
       localPathname === "/explorer/blocks" ||
-      localPathname === "/explorer/sources" ||
-      localPathname.startsWith("/explorer/abi") ||
       localPathname === "/explorer/tokens" ||
       localPathname === "/explorer/nfts" ||
       localPathname === "/explorer/favorites"
@@ -282,9 +283,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
                 ? isExplorerOverviewActive
                 : item.path === "/explorer/blocks"
                   ? localPathname === item.path || localPathname.startsWith("/block/")
-                  : item.path === "/explorer/abi"
-                    ? localPathname.startsWith(item.path)
-                    : localPathname === item.path
+                  : localPathname === item.path
             }
             items={explorerItems}
             label="Explorer"
@@ -292,6 +291,26 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
             onParentSelect={() => void navigate(routes.path(explorerPath))}
             onToggle={() => setIsExplorerOpen(open => !open)}
             open={isExplorerOpen}
+          />
+
+          <NavigationDisclosure
+            active={isContractsActive}
+            ariaLabel="Contract pages"
+            controlsId="environment-contract-navigation"
+            icon={Box}
+            isItemActive={item =>
+              item.path === "/contracts"
+                ? localPathname === item.path
+                : item.path === "/contracts/abi"
+                  ? localPathname.startsWith(item.path)
+                  : localPathname === item.path
+            }
+            items={contractItems}
+            label="Contracts"
+            onItemSelect={path => void navigate(routes.path(path))}
+            onParentSelect={() => void navigate(routes.path("/contracts"))}
+            onToggle={() => setIsContractsOpen(open => !open)}
+            open={isContractsOpen}
           />
 
           {standaloneItems.map(item => (

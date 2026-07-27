@@ -13,6 +13,7 @@ import type {
   JettonWallet,
   JettonWalletData,
   LocalnetCheckpoint,
+  LocalnetContract,
   LocalnetMineResult,
   LocalnetMiningMode,
   LocalnetNetworkConditions,
@@ -837,6 +838,7 @@ export class TonClient {
 
   async listRegisteredVerifiedSources(): Promise<
     readonly {
+      readonly artifactId: string
       readonly codeHash: string
       readonly source: VerificationSourceResponse
       readonly savedAt: number
@@ -852,6 +854,15 @@ export class TonClient {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({code_hash: codeHash}),
+    })
+  }
+
+  async deleteRegisteredVerifiedSourceArtifact(artifactId: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteVerifiedSourceArtifact")
+    await this.request<null>(url, "Failed to delete source artifact", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({artifact_id: artifactId}),
     })
   }
 
@@ -985,6 +996,20 @@ export class TonClient {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({seconds}),
+    })
+  }
+
+  async listContracts(): Promise<readonly LocalnetContract[]> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listContracts")
+    return this.request(url, "Failed to fetch contracts")
+  }
+
+  async registerContract(address: string, name?: string): Promise<LocalnetContract> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_registerContract")
+    return this.request(url, "Failed to add contract", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address, ...(name ? {name} : {})}),
     })
   }
 
