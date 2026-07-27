@@ -950,14 +950,6 @@
   box-shadow: var(--acton-shadow-surface);
 }
 
-.homeCard {
-  overflow: hidden;
-  border-color: var(--acton-color-border);
-  border-radius: 12px;
-  background: var(--acton-color-surface-raised);
-  box-shadow: none;
-}
-
 .dashboardCardHeader {
   padding: 24px 24px 0;
 }
@@ -968,18 +960,6 @@
 
 .dashboardCardHeader .cardTitleRow {
   margin-bottom: 10px;
-}
-
-.homeCard .dashboardCardHeader {
-  min-height: 52px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--acton-color-border);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  text-align: left;
 }
 
 .environmentActions {
@@ -1222,18 +1202,6 @@
   white-space: nowrap;
 }
 
-.homeCard .dashboardCardContent {
-  padding: 0;
-}
-
-.homeCard .dashboardCardTitle {
-  margin: 0;
-  font-size: 0.86rem;
-  font-weight: 750;
-  line-height: 1;
-  text-align: left;
-}
-
 .dashboardCardTitle {
   margin: 1px 0 0;
   color: var(--acton-color-text);
@@ -1319,117 +1287,38 @@
   color: var(--acton-color-text-muted);
 }
 
-.nodeInfoList,
 .accountList {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.homeCard .nodeInfoList {
-  gap: 0;
-}
-
-.homeCard .nodeInfoList {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.nodeInfoRow {
-  min-height: 46px;
-  padding: 0 18px;
-  border-top: 1px solid var(--acton-color-border);
-  display: grid;
-  grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
-  box-sizing: border-box;
-}
-
-.nodeInfoRow:first-child {
-  border-top: 0;
-}
-
-.homeCard .nodeInfoRow:nth-child(-n + 2) {
-  border-top: 0;
-}
-
-.homeCard .nodeInfoRow:nth-child(2n) {
-  border-left: 1px solid var(--acton-color-border);
-}
-
-.nodeInfoWideRow {
-  grid-column: 1 / -1;
-}
-
-.homeCard .nodeInfoWideRow.nodeInfoRow {
-  border-left: 0;
-}
-
-.nodeInfoLabel {
-  min-width: 0;
-  color: var(--acton-color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.nodeInfoValue {
-  min-width: 0;
-  color: var(--acton-color-text);
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 6px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  line-height: 1.35;
-  text-align: right;
-}
-
-.nodeInfoValueText {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .nodeInfoValueMeta {
   flex: 0 0 auto;
   color: var(--acton-color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--acton-font-size-xs);
   font-weight: 500;
   white-space: nowrap;
 }
 
-.nodeInfoValueLink {
-  min-width: 0;
-  color: var(--acton-color-accent);
-  font-size: 0.82rem;
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: right;
-  justify-self: end;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.nodeInfoTime {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
   white-space: nowrap;
-  text-decoration: none;
 }
 
-.nodeInfoValueLink:hover {
-  text-decoration: underline;
+.nodeInfoStateSource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-.nodeInfoValueLink:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.nodeInfoValueSkeleton {
-  width: min(92px, 72%);
-  justify-self: end;
+.nodeInfoStateSource svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
 }
 
 .rowSecondary {
@@ -3005,35 +2894,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-}
-
-@media (max-width: 680px) {
-  .homeCard .dashboardCardHeader {
-    min-height: auto;
-    padding-top: 8px;
-    padding-bottom: 8px;
-    flex-wrap: wrap;
-  }
-
-  .homeCard .nodeInfoList {
-    grid-template-columns: 1fr;
-  }
-
-  .homeCard .nodeInfoRow:nth-child(-n + 2) {
-    border-top: 1px solid var(--acton-color-border);
-  }
-
-  .homeCard .nodeInfoRow:first-child {
-    border-top: 0;
-  }
-
-  .homeCard .nodeInfoRow:nth-child(2n) {
-    border-left: 0;
-  }
-
-  .nodeInfoWideRow {
-    grid-column: 1 / -1;
   }
 }
 

@@ -1,6 +1,20 @@
-import {FastForward} from "lucide-react"
-import {Button, Dialog, Input, useToast} from "@acton/ui"
-import {Link, useNavigate} from "react-router"
+import {CircleDot, FastForward, GitBranch} from "lucide-react"
+import {
+  BlockChip,
+  Button,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  Dialog,
+  Input,
+  useToast,
+} from "@acton/ui"
+import {useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
 
@@ -76,17 +90,6 @@ interface HomeState {
   readonly error?: string
 }
 
-interface NodeInfoRow {
-  readonly label: string
-  readonly value?: string
-  readonly secondaryValue?: string
-  readonly to?: string
-  readonly isLoading?: boolean
-  readonly title?: string
-  readonly variant?: "wide"
-  readonly visualPlaceholder?: string
-}
-
 export const HomePage: FC<HomePageProps> = ({client}) => {
   const runtime = useLocalnetRuntime()
   const navigate = useNavigate()
@@ -117,49 +120,17 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     nodeInfo === undefined
       ? runtime.environment?.config.forkBlockNumber
       : nodeInfo.fork_block_number
+  const hasFork = Boolean(forkNetwork?.trim())
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
   const forkBadgeLabel = formatForkNetworkLabel(forkNetwork) ?? "clean network"
   const endpoints = useMemo(() => client.getEndpoints(), [client])
-  const nodeInfoRows = useMemo<readonly NodeInfoRow[]>(() => {
-    const isLoading = nodeInfo === undefined
-    const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
-    const nodeTimeOffset =
-      nodeInfo && nodeInfo.time_offset_seconds !== 0
-        ? formatTimeOffset(nodeInfo.time_offset_seconds)
-        : undefined
-
-    return [
-      {
-        label: "Latest block",
-        value: nodeInfo?.last_block_seqno.toString(),
-        to: nodeInfo
-          ? localnetRoutes.path(getMasterchainBlockPath(nodeInfo.last_block_seqno))
-          : undefined,
-        isLoading,
-      },
-      {
-        label: "Uptime",
-        value: nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : undefined,
-        isLoading,
-        visualPlaceholder: "<uptime>",
-      },
-      {
-        label: "State source",
-        value: nodeInfo ? formatNodeInfoValue(nodeInfo.state_source) : undefined,
-        isLoading,
-        variant: "wide",
-      },
-      {
-        label: "Node time",
-        value: nodeTime,
-        secondaryValue: nodeTimeOffset,
-        title: nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime,
-        isLoading,
-        variant: "wide",
-        visualPlaceholder: "<time>",
-      },
-    ]
-  }, [localnetRoutes, nodeInfo])
+  const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
+  const nodeTimeOffset =
+    nodeInfo && nodeInfo.time_offset_seconds !== 0
+      ? formatTimeOffset(nodeInfo.time_offset_seconds)
+      : undefined
+  const nodeTimeTitle = nodeTime && nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime
+  const forkBlockExplorerUrl = getActonscanForkBlockUrl(forkNetwork, forkBlockNumber)
   const recentAccounts = useMemo(
     () => collectRecentAccounts(homeState.transactions),
     [homeState.transactions],
@@ -365,48 +336,116 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               settingsPath={localnetRoutes.path("/settings")}
             />
 
-            <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
-              <header className={styles.dashboardCardHeader}>
-                <h2 className={styles.dashboardCardTitle}>Node info</h2>
-              </header>
-              <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
-                {nodeInfoRows.map(row => {
-                  const value = row.value ?? "—"
-                  const title = row.title ?? value
-                  const rowClassName = `${styles.nodeInfoRow} ${
-                    row.variant === "wide" ? styles.nodeInfoWideRow : ""
-                  }`
-
-                  return (
-                    <div key={row.label} className={rowClassName}>
-                      <span className={styles.nodeInfoLabel}>{row.label}</span>
-                      {row.isLoading ? (
-                        <span
-                          className={`${styles.skeletonLine} ${styles.nodeInfoValueSkeleton}`}
-                          aria-label={`Loading ${row.label}`}
+            <DataTable title="Node info" minWidth="42rem">
+              <DataTableTable aria-label="Node info">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth={hasFork ? "15%" : "25%"}>
+                      Latest block
+                    </DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth={hasFork ? "18%" : "27%"}>
+                      State source
+                    </DataTableHeaderCell>
+                    {hasFork && (
+                      <DataTableHeaderCell columnWidth="27%">Fork block</DataTableHeaderCell>
+                    )}
+                    <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
+                      Uptime
+                    </DataTableHeaderCell>
+                    <DataTableHeaderCell align="right">Node time</DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
+                  {nodeInfo ? (
+                    <DataTableRow>
+                      <DataTableCell>
+                        <BlockChip
+                          workchain={-1}
+                          shard={MASTERCHAIN_BLOCK_SHARD}
+                          seqno={nodeInfo.last_block_seqno}
+                          href={localnetRoutes.path(
+                            getMasterchainBlockPath(nodeInfo.last_block_seqno),
+                          )}
+                          onClick={event => {
+                            event.preventDefault()
+                            openPath(
+                              localnetRoutes.path(
+                                getMasterchainBlockPath(nodeInfo.last_block_seqno),
+                              ),
+                              event,
+                            )
+                          }}
                         />
-                      ) : row.to ? (
-                        <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
-                          {value}
-                        </Link>
-                      ) : (
-                        <span
-                          className={styles.nodeInfoValue}
-                          title={title}
-                          data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
-                          data-visual-placeholder={row.visualPlaceholder}
-                        >
-                          <span className={styles.nodeInfoValueText}>{value}</span>
-                          {row.secondaryValue && (
-                            <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                      </DataTableCell>
+                      <DataTableCell>
+                        <span className={styles.nodeInfoStateSource}>
+                          {nodeInfo.fork_network ? (
+                            <>
+                              <GitBranch size={15} aria-hidden="true" />
+                              <span>Fork</span>
+                            </>
+                          ) : (
+                            <>
+                              <CircleDot size={15} aria-hidden="true" />
+                              <span>Local genesis</span>
+                            </>
                           )}
                         </span>
+                      </DataTableCell>
+                      {hasFork && (
+                        <DataTableCell>
+                          {forkBlockNumber !== undefined && forkBlockNumber !== null ? (
+                            <BlockChip
+                              workchain={-1}
+                              shard={MASTERCHAIN_BLOCK_SHARD}
+                              seqno={forkBlockNumber}
+                              href={forkBlockExplorerUrl}
+                              title={
+                                forkBlockExplorerUrl
+                                  ? `Open fork block ${forkBlockNumber} in Actonscan`
+                                  : `Fork block ${forkBlockNumber}`
+                              }
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </DataTableCell>
                       )}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
+                      <DataTableCell data-visual-dynamic="time" data-visual-placeholder="<uptime>">
+                        {formatDuration(nodeInfo.uptime_seconds)}
+                      </DataTableCell>
+                      <DataTableCell align="right" title={nodeTimeTitle}>
+                        <span
+                          className={styles.nodeInfoTime}
+                          data-visual-dynamic="time"
+                          data-visual-placeholder="<time>"
+                        >
+                          <span>{nodeTime}</span>
+                          {nodeTimeOffset && (
+                            <span className={styles.nodeInfoValueMeta}>{nodeTimeOffset}</span>
+                          )}
+                        </span>
+                      </DataTableCell>
+                    </DataTableRow>
+                  ) : (
+                    <DataTableSkeletonRows
+                      alignments={
+                        hasFork
+                          ? ["left", "left", "left", "left", "right"]
+                          : ["left", "left", "left", "right"]
+                      }
+                      columns={hasFork ? 5 : 4}
+                      rows={1}
+                      widths={
+                        hasFork
+                          ? ["3rem", "5rem", "5rem", "4rem", "8rem"]
+                          : ["3rem", "5rem", "4rem", "8rem"]
+                      }
+                    />
+                  )}
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
 
             {homeState.error ? (
               <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
@@ -576,6 +615,23 @@ function formatForkSummary(
 
   const blockLabel = `Block ${block.toLocaleString()}`
   return networkLabel ? `${networkLabel} · ${blockLabel}` : `Fork · ${blockLabel}`
+}
+
+function getActonscanForkBlockUrl(
+  network: string | null | undefined,
+  block: number | null | undefined,
+): string | undefined {
+  if (block === undefined || block === null) {
+    return undefined
+  }
+
+  const networkId = network?.trim().toLocaleLowerCase()
+  if (networkId !== "mainnet" && networkId !== "testnet") {
+    return undefined
+  }
+
+  const blockUrl = `https://actonscan.com${getMasterchainBlockPath(block)}`
+  return networkId === "testnet" ? `${blockUrl}?network=testnet` : blockUrl
 }
 
 function formatNodeDateTime(unixSeconds: number): string {
