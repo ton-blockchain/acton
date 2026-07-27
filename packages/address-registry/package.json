@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@ton/core": "0.63.1",
-    "yaml": "2.3.2"
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
