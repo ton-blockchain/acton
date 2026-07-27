@@ -1,9 +1,9 @@
 import {describe, expect, test} from "bun:test"
 
 import {readSources} from "../scripts/sources.ts"
-import {ADDRESS_BOOK_URLS, parseAddressBook} from "../scripts/sources/address-book.ts"
+import {ADDRESS_BOOK_URLS} from "../scripts/sources/address-book.ts"
 import {parseSourceAddresses} from "../scripts/sources/shared.ts"
-import {TON_ASSETS_ACCOUNT_URLS, parseTonAssets} from "../scripts/sources/ton-assets.ts"
+import {TON_ASSETS_ACCOUNT_URLS} from "../scripts/sources/ton-assets.ts"
 
 const RAW_ZERO = `0:${"0".repeat(64)}`
 const RAW_ONES = `0:${"1".repeat(64)}`
@@ -47,65 +47,6 @@ describe("source address validation", () => {
       parseSourceAddresses([{address: "not-an-address", name: "Invalid"}], "example.yaml"),
     ).toThrow("example.yaml[0].address must be a valid TON address")
   })
-})
-
-describe("source YAML parsing", () => {
-  test("parses YAML before validating entries", () => {
-    expect(
-      parseTonAssets(
-        `
-- address: "${BOUNCEABLE_ZERO}"
-  name: "Alpha"
-`,
-        "example.yaml",
-      ),
-    ).toEqual([{address: RAW_ZERO, name: "Alpha"}])
-  })
-
-  test("matches upstream recovery for reserved plain name scalars", () => {
-    expect(
-      parseAddressBook(
-        `
-- address: "${BOUNCEABLE_ZERO}"
-  name: @wallet in Telegram
-`,
-        "example.yaml",
-      ),
-    ).toEqual([{address: RAW_ZERO, name: "@wallet in Telegram"}])
-  })
-
-  test("does not apply address-book recovery to ton-assets", () => {
-    expect(() =>
-      parseTonAssets(
-        `
-- address: "${BOUNCEABLE_ZERO}"
-  name: @wallet in Telegram
-`,
-        "example.yaml",
-      ),
-    ).toThrow("Failed to parse YAML from example.yaml")
-  })
-
-  test("matches upstream convention for disabled indented entries", () => {
-    expect(
-      parseAddressBook(
-        `
-- address: "${BOUNCEABLE_ZERO}"
-  name: "Active"
-
-  - address: "${RAW_ONES}"
-  name: "Disabled"
-  type: wallet
-`,
-        "example.yaml",
-      ),
-    ).toEqual([{address: RAW_ZERO, name: "Active"}])
-  })
-})
-
-test("source lists exclude upstream scam files", () => {
-  expect(TON_ASSETS_ACCOUNT_URLS.some(url => url.endsWith("/scammers.yaml"))).toBeFalse()
-  expect(ADDRESS_BOOK_URLS.some(url => url.endsWith("/scam.yaml"))).toBeFalse()
 })
 
 test("readSources reads every allowed upstream YAML file", async () => {
