@@ -7,6 +7,13 @@
   },
   "linter": {
     "rules": {
+      "correctness": {
+        "noUnresolvedImports": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "style": {
+        "useExportsLast": "off"
+      },
       "suspicious": {
         "noConsole": "off"
       }

@@ -11,8 +11,10 @@
   "scripts": {
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
+    "generate": "bun scripts/generate.ts",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
