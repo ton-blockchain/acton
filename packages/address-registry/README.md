@@ -16,6 +16,3 @@ binding lives in `src/addresses.ts`:
 ```sh
 bun run generate
 ```
-
-The upstream `accounts/scammers.yaml` and `source/scam.yaml` files are
-intentionally excluded.
