@@ -1,2 +1,2 @@
-export {addresses} from "./addresses.ts"
-export type {AddressRegistryEntry} from "./addresses.ts"
+export {addresses} from "./addresses"
+export type {AddressRegistryEntry} from "./addresses"
