@@ -17,10 +17,16 @@ export interface ExplorerRoutes {
   readonly transactionTracePath: (hash: string) => string
 }
 
+export interface ExplorerRouteOverrides {
+  readonly cellPath?: string
+  readonly emulatePath?: string
+}
+
 export const createExplorerRoutes = (
   basePath: string,
   addressFormat: AddressFormatOptions = {testOnly: false},
   localnetBasePath = "",
+  overrides: ExplorerRouteOverrides = {},
 ): ExplorerRoutes => {
   const base = basePath.replace(/\/$/, "")
   const localnetBase = localnetBasePath.replace(/\/$/, "")
@@ -31,8 +37,8 @@ export const createExplorerRoutes = (
     rootPath: path(),
     blocksPath: path("/blocks"),
     abiPath: path("/abi"),
-    cellPath: path("/cell"),
-    emulatePath: path("/emulate"),
+    cellPath: overrides.cellPath ?? path("/cell"),
+    emulatePath: overrides.emulatePath ?? path("/emulate"),
     sourcesPath: path("/sources"),
     favoritesPath: path("/favorites"),
     abiDetailsPath: slug => path(`/abi/${encodeURIComponent(slug)}`),

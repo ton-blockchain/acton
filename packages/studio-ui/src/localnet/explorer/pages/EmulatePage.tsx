@@ -74,7 +74,6 @@ import type {TonClient} from "../api/client"
 import {waitForTraceTransactionHash} from "../api/waitForTraceTransactionHash"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
-import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {
   emulateRawMessageBoc,
@@ -1972,19 +1971,6 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     </form>
   )
 
-  const simulationHeader = (
-    <header className={styles.header}>
-      <div>
-        <h1 className={styles.title}>Emulate Transaction</h1>
-        {state.type === "ready" && state.mcSeqno !== undefined && (
-          <div className={styles.metaLine}>
-            <span>{`Block ${state.mcSeqno}`}</span>
-          </div>
-        )}
-      </div>
-    </header>
-  )
-
   const sendConfirmationDialog = (
     <Dialog
       open={sendConfirmationOpen}
@@ -2037,10 +2023,6 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
               success: "Emulated transaction",
               error: "Emulation failed",
             }}
-            breadcrumbs={[
-              {label: "Emulate", path: routes.emulatePath},
-              {label: selectedTraceHash || state.result.result.rootTxHash, isHash: true},
-            ]}
             onTabChange={setActiveTab}
             onContractClick={handleContractClick}
             onBlockClick={handleBlockClick}
@@ -2052,7 +2034,6 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
         </section>
 
         <section className={styles.secondaryControls} aria-label="Simulation input">
-          {simulationHeader}
           {simulationForm}
         </section>
         {sendConfirmationDialog}
@@ -2062,8 +2043,6 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
 
   return (
     <div className={styles.page}>
-      <ExplorerBreadcrumbs items={[{label: "Emulate"}]} />
-      {simulationHeader}
       {simulationForm}
       {sendConfirmationDialog}
     </div>

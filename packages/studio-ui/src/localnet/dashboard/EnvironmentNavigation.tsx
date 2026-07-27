@@ -1,16 +1,13 @@
-import {Fragment, useEffect, useMemo, useState} from "react"
+import {useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 import {
   Activity,
   Binary,
-  Boxes,
   Brackets,
   ChevronLeft,
-  Coins,
-  FileCode2,
+  ChevronRight,
   FileJson,
   HandCoins,
-  Image,
   LayoutGrid,
   Search as SearchIcon,
   Settings2,
@@ -35,25 +32,35 @@ interface EnvironmentNavigationProps {
 interface SidebarItem {
   readonly label: string
   readonly icon: LucideIcon
-  readonly path?: string
-  readonly href?: string
+  readonly path: string
 }
 
-const mainItems: SidebarItem[] = [
+interface NestedSidebarItem {
+  readonly label: string
+  readonly path: string
+}
+
+const primaryItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
-  {label: "Explorer", icon: SearchIcon, path: "/explorer"},
-  {label: "Simulator", icon: Waypoints, path: "/explorer/emulate"},
-  {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
-  {label: "Wallets", icon: Wallet, path: "/wallets"},
-  {label: "Faucet", icon: HandCoins, path: "/faucet"},
-  {label: "Tokens", icon: Coins, path: "/tokens"},
-  {label: "NFTs", icon: Image, path: "/nfts"},
 ]
 
-const sourceItems: SidebarItem[] = [
-  {label: "Sources", icon: FileCode2, path: "/explorer/sources"},
-  {label: "ABI", icon: FileJson, path: "/explorer/abi"},
-  {label: "Cell Inspector", icon: Binary, path: "/explorer/cell"},
+const explorerItems: NestedSidebarItem[] = [
+  {label: "Overview", path: "/explorer"},
+  {label: "Blocks", path: "/explorer/blocks"},
+  {label: "Sources", path: "/explorer/sources"},
+  {label: "ABI", path: "/explorer/abi"},
+  {label: "Tokens", path: "/explorer/tokens"},
+  {label: "NFTs", path: "/explorer/nfts"},
+]
+
+const standaloneItems: SidebarItem[] = [
+  {label: "Simulator", icon: Waypoints, path: "/simulator"},
+  {label: "Cell Inspector", icon: Binary, path: "/cell-inspector"},
+]
+
+const environmentItems: SidebarItem[] = [
+  {label: "Wallets", icon: Wallet, path: "/wallets"},
+  {label: "Faucet", icon: HandCoins, path: "/faucet"},
 ]
 
 const apiItems: SidebarItem[] = [
@@ -64,8 +71,7 @@ const apiItems: SidebarItem[] = [
 ]
 
 const navigationSections: Array<{readonly id: string; readonly items: readonly SidebarItem[]}> = [
-  {id: "main", items: mainItems},
-  {id: "sources", items: sourceItems},
+  {id: "environment", items: environmentItems},
   {id: "api", items: apiItems},
 ]
 
@@ -80,6 +86,21 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
   const forkBadgeLabel = useMemo(() => formatForkNetworkLabel(forkNetwork), [forkNetwork])
   const localPathname = location.pathname.slice(routes.basePath.length) || "/"
+  const isExplorerActive =
+    localPathname.startsWith("/explorer") || localPathname.startsWith("/block/")
+  const isExplorerOverviewActive =
+    localPathname.startsWith("/explorer") &&
+    localPathname !== "/explorer/blocks" &&
+    localPathname !== "/explorer/sources" &&
+    !localPathname.startsWith("/explorer/abi") &&
+    localPathname !== "/explorer/tokens" &&
+    localPathname !== "/explorer/nfts" &&
+    localPathname !== "/explorer/favorites"
+  const [isExplorerOpen, setIsExplorerOpen] = useState(isExplorerActive)
+
+  useEffect(() => {
+    if (isExplorerActive) setIsExplorerOpen(true)
+  }, [isExplorerActive])
 
   useEffect(() => {
     if (
@@ -87,8 +108,8 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
       localPathname === "/explorer/blocks" ||
       localPathname === "/explorer/sources" ||
       localPathname.startsWith("/explorer/abi") ||
-      localPathname === "/explorer/cell" ||
-      localPathname === "/explorer/emulate" ||
+      localPathname === "/explorer/tokens" ||
+      localPathname === "/explorer/nfts" ||
       localPathname === "/explorer/favorites"
     ) {
       return
@@ -119,38 +140,132 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
       </button>
 
       <div className={styles.environmentNavBody}>
-        {navigationSections.map((section, index) => (
-          <Fragment key={section.id}>
-            {index > 0 && <div className={styles.navDivider} />}
+        <div className={styles.navSection}>
+          {primaryItems.map(item => {
+            const Icon = item.icon
+            const isActive = item.path === localPathname
+
+            return (
+              <button
+                type="button"
+                key={item.label}
+                className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                onClick={() => void navigate(routes.path(item.path))}
+              >
+                <span className={styles.navItemMain}>
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </span>
+              </button>
+            )
+          })}
+
+          <div className={styles.explorerNavGroup}>
+            <div
+              className={`${styles.explorerNavRow} ${
+                isExplorerActive ? styles.explorerNavRowActive : ""
+              }`}
+            >
+              <button
+                type="button"
+                className={styles.navItem}
+                onClick={() => void navigate(routes.path(explorerPath))}
+              >
+                <span className={styles.navItemMain}>
+                  <SearchIcon size={18} />
+                  <span>Explorer</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={styles.explorerNavToggle}
+                aria-controls="environment-explorer-navigation"
+                aria-expanded={isExplorerOpen}
+                aria-label={`${isExplorerOpen ? "Collapse" : "Expand"} Explorer pages`}
+                onClick={() => setIsExplorerOpen(open => !open)}
+              >
+                <ChevronRight
+                  className={isExplorerOpen ? styles.explorerNavChevronOpen : undefined}
+                  size={17}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            <div
+              id="environment-explorer-navigation"
+              className={`${styles.explorerNavDisclosure} ${
+                isExplorerOpen ? styles.explorerNavDisclosureOpen : ""
+              }`}
+              aria-hidden={!isExplorerOpen}
+            >
+              <div className={styles.explorerNavClip}>
+                <ul className={styles.explorerNavList} aria-label="Explorer pages">
+                  {explorerItems.map(item => {
+                    const isActive =
+                      item.path === "/explorer"
+                        ? isExplorerOverviewActive
+                        : item.path === "/explorer/blocks"
+                        ? localPathname === item.path || localPathname.startsWith("/block/")
+                        : item.path === "/explorer/abi"
+                          ? localPathname.startsWith(item.path)
+                          : localPathname === item.path
+
+                    return (
+                      <li key={item.label}>
+                        <button
+                          type="button"
+                          className={`${styles.explorerNavItem} ${
+                            isActive ? styles.explorerNavItemActive : ""
+                          }`}
+                          aria-current={isActive ? "page" : undefined}
+                          tabIndex={isExplorerOpen ? 0 : -1}
+                          onClick={() => void navigate(routes.path(item.path))}
+                        >
+                          {item.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {standaloneItems.map(item => {
+            const Icon = item.icon
+            const isActive = item.path === localPathname
+
+            return (
+              <button
+                type="button"
+                key={item.label}
+                className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                onClick={() => void navigate(routes.path(item.path))}
+              >
+                <span className={styles.navItemMain}>
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {navigationSections.map(section => (
+          <div className={styles.navigationSectionGroup} key={section.id}>
+            <div className={styles.navDivider} />
             <div className={styles.navSection}>
               {section.items.map(item => {
                 const Icon = item.icon
-                const targetPath = item.path === "/explorer" ? explorerPath : item.path
-                const isActive =
-                  item.path === "/explorer"
-                    ? localPathname.startsWith("/explorer") &&
-                      localPathname !== "/explorer/blocks" &&
-                      localPathname !== "/explorer/sources" &&
-                      !localPathname.startsWith("/explorer/abi") &&
-                      localPathname !== "/explorer/cell" &&
-                      localPathname !== "/explorer/emulate" &&
-                      localPathname !== "/explorer/favorites"
-                    : item.path === "/explorer/blocks"
-                      ? localPathname === "/explorer/blocks" ||
-                        localPathname === "/blocks" ||
-                        localPathname.startsWith("/block/")
-                      : item.path === "/explorer/abi"
-                        ? localPathname.startsWith("/explorer/abi")
-                        : item.path === localPathname
+                const isActive = item.path === localPathname
 
                 return (
                   <button
                     type="button"
                     key={item.label}
                     className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                    onClick={() => {
-                      if (targetPath) void navigate(routes.path(targetPath))
-                    }}
+                    onClick={() => void navigate(routes.path(item.path))}
                   >
                     <span className={styles.navItemMain}>
                       <Icon size={18} />
@@ -160,7 +275,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
                 )
               })}
             </div>
-          </Fragment>
+          </div>
         ))}
       </div>
     </nav>

@@ -213,6 +213,7 @@ impl ApiCallLog {
         }
     }
 
+    #[must_use]
     pub fn record(&self, input: ApiCallInput, start: ApiCallStart) -> u64 {
         let sequence = self.next_sequence.fetch_add(1, Ordering::Relaxed);
         let status = if input.status_code < 400 {
@@ -579,7 +580,7 @@ mod tests {
                 ApiCallSource::StudioUi => MAX_STUDIO_UI_API_CALLS,
             };
             for _ in 0..entries {
-                log.record(
+                let _ = log.record(
                     ApiCallInput {
                         source,
                         call_type: ApiCallType::Read,

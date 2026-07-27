@@ -499,6 +499,7 @@
 .searchResultBody {
   padding: 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   opacity: 0;
   transition: opacity 140ms ease;
 }
@@ -620,6 +621,7 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
   padding-bottom: 4px;
   background: var(--acton-color-surface);
@@ -646,6 +648,7 @@
   padding-bottom: 12px;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scroll-padding-bottom: 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -825,6 +828,149 @@
   color: var(--acton-color-text);
 }
 
+.navigationSectionGroup,
+.explorerNavGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.navigationSectionGroup {
+  gap: 8px;
+}
+
+.explorerNavRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 2px;
+  border-radius: 10px;
+  transition: background-color 120ms ease;
+}
+
+.explorerNavRow:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.explorerNavRowActive,
+.explorerNavRowActive:hover {
+  background: var(--acton-color-surface-active);
+}
+
+.explorerNavRow .navItem:hover,
+.explorerNavRow .explorerNavToggle:hover {
+  background: transparent;
+}
+
+.explorerNavRowActive .navItem,
+.explorerNavRowActive .explorerNavToggle {
+  color: var(--acton-color-text);
+}
+
+.explorerNavToggle {
+  display: inline-flex;
+  width: 34px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.explorerNavToggle:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.explorerNavToggle:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 0;
+}
+
+.explorerNavToggle svg {
+  transition: transform 220ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.explorerNavChevronOpen {
+  transform: rotate(90deg);
+}
+
+.explorerNavDisclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 260ms cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 220ms cubic-bezier(0.33, 1, 0.68, 1),
+    visibility 0s linear 260ms;
+}
+
+.explorerNavDisclosureOpen {
+  grid-template-rows: 1fr;
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+.explorerNavClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.explorerNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px 0 1px 8px;
+  margin: 2px 0 6px 17px;
+  list-style: none;
+  border-left: 1px solid var(--acton-color-border);
+}
+
+.explorerNavItem {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 10px;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.explorerNavItem:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.explorerNavItem:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 0;
+}
+
+.explorerNavItemActive {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
 .contentArea {
   flex: 1 1 auto;
   height: 100%;
@@ -915,6 +1061,7 @@
   flex: 1 1 auto;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .environmentHomeContent {
@@ -1830,6 +1977,7 @@
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .faucetDropdownState {
@@ -1994,6 +2142,7 @@
   border-radius: 10px;
   background: var(--acton-color-surface-raised);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .checkpointRow {

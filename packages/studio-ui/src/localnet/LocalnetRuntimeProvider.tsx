@@ -187,6 +187,8 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       >
         <ExplorerRoutesProvider
           basePath={localnetPath(basePath, "/explorer")}
+          cellPath={localnetPath(basePath, "/cell-inspector")}
+          emulatePath={localnetPath(basePath, "/simulator")}
           localnetBasePath={basePath}
         >
           <LocalnetRoutesProvider basePath={basePath}>{children}</LocalnetRoutesProvider>

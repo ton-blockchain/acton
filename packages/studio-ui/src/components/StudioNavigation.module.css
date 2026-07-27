@@ -5,6 +5,7 @@
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: contain;
   color: var(--acton-color-text);
   background: var(--acton-color-canvas);
 }
@@ -483,6 +484,7 @@
 .searchResultBody {
   padding: 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   opacity: 0;
   transition: opacity 140ms ease;
 }
@@ -622,6 +624,7 @@
   padding-bottom: 12px;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scroll-padding-bottom: 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -979,20 +982,30 @@
   display: flex;
   height: 100%;
   min-width: 0;
+  min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .pageHeader {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 30;
   width: 100%;
   flex: 0 0 auto;
   background: var(--acton-color-surface);
   border-bottom: 1px solid var(--acton-color-border);
+}
+
+.contentViewport {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .pageHeaderInner {
@@ -1058,7 +1071,7 @@
   display: flex;
   width: 100%;
   max-width: 1200px;
-  min-height: calc(100% - 56px);
+  min-height: 100%;
   flex: 0 0 auto;
   flex-direction: column;
   gap: 24px;
@@ -1070,15 +1083,16 @@
 
 .contentFull {
   max-width: none;
-  min-height: calc(100% - 56px);
+  min-height: 100%;
   padding: 0;
   margin-inline: 0;
 }
 
 .contentWorkspace {
   max-width: none;
+  height: 100%;
   min-height: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   padding: 0;
   margin-inline: 0;
   overflow: hidden;
@@ -1346,8 +1360,13 @@
     height: auto;
     min-height: 0;
     flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .contentViewport {
     overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1363,7 +1382,7 @@
 
   .content {
     height: auto;
-    min-height: 0;
+    min-height: 100%;
     gap: 18px;
     padding: 18px 16px 48px;
     overflow: visible;
@@ -1373,7 +1392,7 @@
     width: 100%;
     max-width: none;
     height: auto;
-    min-height: calc(100% - 48px);
+    min-height: 100%;
     gap: 0;
     padding: 0;
     margin-inline: 0;

@@ -248,15 +248,17 @@ export function StudioShell({
             </div>
           </header>
         ) : null}
-        <main
-          className={[
-            styles.content,
-            contentMode === "full" ? styles.contentFull : "",
-            contentMode === "workspace" ? styles.contentWorkspace : "",
-          ].join(" ")}
-        >
-          {children}
-        </main>
+        <div className={styles.contentViewport}>
+          <main
+            className={[
+              styles.content,
+              contentMode === "full" ? styles.contentFull : "",
+              contentMode === "workspace" ? styles.contentWorkspace : "",
+            ].join(" ")}
+          >
+            {children}
+          </main>
+        </div>
       </section>
     </div>
   )

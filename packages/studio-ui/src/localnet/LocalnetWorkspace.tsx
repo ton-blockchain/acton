@@ -44,8 +44,10 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/faucet": "Faucet",
   "/wallets": "Wallets",
-  "/tokens": "Tokens",
-  "/nfts": "NFTs",
+  "/simulator": "Simulator",
+  "/cell-inspector": "Cell Inspector",
+  "/explorer/tokens": "Tokens",
+  "/explorer/nfts": "NFTs",
   "/settings": "Settings",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
@@ -57,8 +59,10 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Localnet status, network activity and runtime controls",
   "/faucet": "Fund accounts in this virtual environment",
   "/wallets": "Startup wallets from this environment, ready for TON Connect",
-  "/tokens": "Jettons detected in this virtual environment",
-  "/nfts": "NFT items indexed from this virtual environment",
+  "/simulator": "Build and replay messages against this virtual environment",
+  "/cell-inspector": "Decode cells and inspect serialized TON data",
+  "/explorer/tokens": "Jettons detected in this virtual environment",
+  "/explorer/nfts": "NFT items indexed from this virtual environment",
   "/settings": "Manage environment identity, network behavior and mining",
   "/api-reference/v2": "Explore the localnet v2 API",
   "/api-reference/v3": "Explore the localnet v3 API",
@@ -201,7 +205,7 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
-              path={path("/tokens")}
+              path={path("/explorer/tokens")}
               element={
                 <DashboardPage>
                   <TokensPage client={client} />
@@ -209,7 +213,7 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
-              path={path("/nfts")}
+              path={path("/explorer/nfts")}
               element={
                 <DashboardPage>
                   <NftsPage client={client} />
@@ -286,14 +290,6 @@ const AppContent: FC<AppContentProps> = ({
               element={<Navigate to={path("/wallets")} replace />}
             />
             <Route
-              path={path("/dashboard/tokens")}
-              element={<Navigate to={path("/tokens")} replace />}
-            />
-            <Route
-              path={path("/dashboard/nfts")}
-              element={<Navigate to={path("/nfts")} replace />}
-            />
-            <Route
               path={path("/dashboard/json-rpc-calls")}
               element={<Navigate to={path("/api-calls")} replace />}
             />
@@ -348,7 +344,7 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
-              path={path("/explorer/cell")}
+              path={path("/cell-inspector")}
               element={
                 <DashboardPage embedded>
                   <CellInspectorPage />
@@ -356,7 +352,7 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
-              path={path("/explorer/emulate")}
+              path={path("/simulator")}
               element={
                 <DashboardPage embedded>
                   <EmulatePage client={client} />

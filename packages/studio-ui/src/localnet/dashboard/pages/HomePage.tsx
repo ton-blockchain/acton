@@ -322,7 +322,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           onAdvanceTime={openTimeAdvanceModal}
           onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}
-          onSend={() => void navigate(localnetRoutes.path("/explorer/emulate"))}
+          onSend={() => void navigate(localnetRoutes.path("/simulator"))}
           onStateChanged={() => setNodeInfo(undefined)}
         />
       </header>

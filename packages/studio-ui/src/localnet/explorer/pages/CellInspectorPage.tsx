@@ -19,7 +19,6 @@ import {useCallback, useDeferredValue, useEffect, useRef, useState, type FC} fro
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
-import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {type ExplorerNavigationClickEvent, useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -289,13 +288,6 @@ export const CellInspectorPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <ExplorerBreadcrumbs items={[{label: "Cell Inspector"}]} />
-      <header className={styles.hero}>
-        <div>
-          <h1 className={styles.title}>Cell Inspector</h1>
-        </div>
-      </header>
-
       <div className={styles.workspace}>
         <CellInspectorInputPanel
           input={input}

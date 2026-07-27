@@ -9,24 +9,8 @@
   padding: 24px 32px 48px;
 }
 
-.hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 4px 0 2px;
-}
-
-.title,
 .emptyOutput p {
   margin: 0;
-}
-
-.title {
-  color: var(--acton-color-text);
-  font-size: 32px;
-  font-weight: 500;
-  line-height: 40px;
 }
 
 .workspace {

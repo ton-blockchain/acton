@@ -101,14 +101,14 @@ const quickSearchResults: readonly SearchResult[] = [
     id: "quick-tokens",
     title: "Tokens",
     description: "Jettons indexed from the local network",
-    href: "/tokens",
+    href: "/explorer/tokens",
     icon: Boxes,
   },
   {
     id: "quick-nfts",
     title: "NFTs",
     description: "NFT items indexed from the local network",
-    href: "/nfts",
+    href: "/explorer/nfts",
     icon: Image,
   },
 ]
