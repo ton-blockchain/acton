@@ -12,7 +12,7 @@ use tokio::time::{Instant, sleep, timeout};
 
 use crate::environment::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment,
+    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
 };
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
@@ -140,6 +140,49 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn update(
+        &self,
+        environment_id: &str,
+        request: UpdateEnvironmentRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let name = validate_environment_name(&request.name)?;
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            let mut details = environment.details.write().await;
+            details.name = name;
+            Ok(details.clone())
+        })
+    }
+
+    fn delete(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, ()> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            stop_environment(&environment).await;
+
+            let data_dir = environment_data_dir(&self.inner.workspace_root, &environment_id);
+            if let Err(error) = tokio::fs::remove_dir_all(&data_dir).await
+                && error.kind() != std::io::ErrorKind::NotFound
+            {
+                return Err(EnvironmentRuntimeError::Internal {
+                    code: "environment_storage_delete_failed",
+                    message: format!(
+                        "Failed to delete environment storage at {}: {error}",
+                        data_dir.display()
+                    ),
+                });
+            }
+
+            self.inner
+                .environments
+                .write()
+                .await
+                .retain(|candidate| !Arc::ptr_eq(candidate, &environment));
+            Ok(())
+        })
+    }
+
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
@@ -171,19 +214,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
 fn validate_request(
     mut request: CreateEnvironmentRequest,
 ) -> Result<CreateEnvironmentRequest, EnvironmentRuntimeError> {
-    request.name = request.name.trim().to_owned();
-    if request.name.is_empty() {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_name_required",
-            message: "Environment name is required".to_owned(),
-        });
-    }
-    if request.name.chars().count() > 80 {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_name_too_long",
-            message: "Environment name must contain at most 80 characters".to_owned(),
-        });
-    }
+    request.name = validate_environment_name(&request.name)?;
     if request.port == Some(0) {
         return Err(EnvironmentRuntimeError::InvalidRequest {
             code: "environment_port_invalid",
@@ -225,6 +256,23 @@ fn validate_request(
         .filter(|account| !account.is_empty())
         .collect();
     Ok(request)
+}
+
+fn validate_environment_name(name: &str) -> Result<String, EnvironmentRuntimeError> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(EnvironmentRuntimeError::InvalidRequest {
+            code: "environment_name_required",
+            message: "Environment name is required".to_owned(),
+        });
+    }
+    if name.chars().count() > 80 {
+        return Err(EnvironmentRuntimeError::InvalidRequest {
+            code: "environment_name_too_long",
+            message: "Environment name must contain at most 80 characters".to_owned(),
+        });
+    }
+    Ok(name.to_owned())
 }
 
 fn select_port(requested: Option<u16>) -> Result<u16, EnvironmentRuntimeError> {

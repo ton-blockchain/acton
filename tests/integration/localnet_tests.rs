@@ -1002,6 +1002,11 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
             "fork_network": node_info["result"]["fork_network"].as_str(),
             "fork_block_number": node_info["result"]["fork_block_number"].as_u64(),
         },
+        "runtime": {
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "block_interval_ms": node_info["result"]["block_interval_ms"].as_u64(),
+            "rate_limit_rps": node_info["result"]["rate_limit_rps"].as_u64(),
+        },
         "manual_mining": {
             "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
             "mine_ok": mine_response["ok"].as_bool(),

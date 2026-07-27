@@ -49,6 +49,10 @@ export interface CreateEnvironmentRequest {
   readonly mineEmptyBlocks: boolean
 }
 
+export interface UpdateEnvironmentRequest {
+  readonly name: string
+}
+
 export type TestRunSource = "manual" | "studio"
 export type TestRunStatus = "queued" | "running" | "passed" | "failed" | "cancelled"
 
@@ -171,6 +175,30 @@ export function restartStudioEnvironment(environmentId: string): Promise<StudioE
   )
 }
 
+export function updateStudioEnvironment(
+  environmentId: string,
+  request: UpdateEnvironmentRequest,
+): Promise<StudioEnvironment> {
+  return requestJson<StudioEnvironment>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  )
+}
+
+export async function deleteStudioEnvironment(environmentId: string): Promise<void> {
+  await request(`/api/v1/environments/${encodeURIComponent(environmentId)}`, {
+    method: "DELETE",
+    headers: {accept: "application/json"},
+  })
+}
+
 export function fetchStudioTestRuns(signal?: AbortSignal): Promise<TestRunSummary[]> {
   return requestJson<TestRunSummary[]>("/api/v1/test-runs", {
     headers: {accept: "application/json"},
@@ -236,10 +264,13 @@ export function subscribeToStudioTestRuns(
 }
 
 export async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await request(input, init)
+  return (await response.json()) as T
+}
+
+async function request(input: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(input, init)
-  if (response.ok) {
-    return (await response.json()) as T
-  }
+  if (response.ok) return response
 
   const fallbackMessage = `Studio server returned ${response.status}`
   let body: {readonly error?: {readonly message?: string}}

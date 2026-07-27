@@ -1120,15 +1120,31 @@ export interface LocalnetTimeInfo {
   readonly next_block_timestamp?: number | null
 }
 
+export interface LocalnetMiningMode {
+  readonly skip_empty_blocks: boolean
+}
+
+export interface LocalnetNetworkConditions {
+  readonly response_delay_ms: number
+}
+
 export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   readonly uptime_seconds: number
   readonly last_block_seqno: number
+  readonly auto_mining: boolean
+  readonly block_interval_ms: number
+  readonly rate_limit_rps: number | null
   readonly state_source: string
   readonly fork_network?: string | null
   readonly fork_block_number?: number | null
-  readonly network_conditions?: {
-    readonly response_delay_ms: number
-  }
+  readonly mining_mode: LocalnetMiningMode
+  readonly network_conditions?: LocalnetNetworkConditions
+}
+
+export interface LocalnetMineResult {
+  readonly blocks_mined: number
+  readonly skipped_empty_blocks: number
+  readonly last_block_seqno: number
 }
 
 export interface LocalnetCheckpoint {

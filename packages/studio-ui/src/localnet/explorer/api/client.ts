@@ -13,6 +13,9 @@ import type {
   JettonWallet,
   JettonWalletData,
   LocalnetCheckpoint,
+  LocalnetMineResult,
+  LocalnetMiningMode,
+  LocalnetNetworkConditions,
   LocalnetNodeInfo,
   LocalnetTimeInfo,
   NftItem,
@@ -943,6 +946,33 @@ export class TonClient {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: state,
+    })
+  }
+
+  async mineBlocks(blocks = 1): Promise<LocalnetMineResult> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_mine")
+    return this.request(url, "Failed to mine localnet block", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({blocks}),
+    })
+  }
+
+  async setMiningMode(skipEmptyBlocks: boolean): Promise<LocalnetMiningMode> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setMiningMode")
+    return this.request(url, "Failed to update localnet mining settings", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({skip_empty_blocks: skipEmptyBlocks}),
+    })
+  }
+
+  async setNetworkConditions(responseDelayMs: number): Promise<LocalnetNetworkConditions> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setNetworkConditions")
+    return this.request(url, "Failed to update localnet network conditions", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({response_delay_ms: responseDelayMs}),
     })
   }
 

@@ -1,4 +1,4 @@
-import {Check, KeyRound, Star} from "lucide-react"
+import {Check, KeyRound, Settings, Star} from "lucide-react"
 import type {FC} from "react"
 import {useLocation, useNavigate} from "react-router"
 import {Tooltip} from "@acton/ui"
@@ -47,6 +47,19 @@ export const EnvironmentNavigationActions: FC<EnvironmentNavigationActionsProps>
           aria-label="Favorites"
         >
           <Star size={18} />
+        </button>
+      </Tooltip>
+
+      <Tooltip content="Environment settings">
+        <button
+          type="button"
+          className={`${styles.sidebarUtilityButton} ${
+            localPathname === "/settings" ? styles.sidebarUtilityButtonActive : ""
+          }`}
+          onClick={() => void navigate(routes.path("/settings"))}
+          aria-label="Environment settings"
+        >
+          <Settings size={18} />
         </button>
       </Tooltip>
     </>

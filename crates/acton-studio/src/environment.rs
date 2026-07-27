@@ -23,6 +23,12 @@ pub struct CreateEnvironmentRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateEnvironmentRequest {
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EnvironmentConfig {
     pub port: u16,
     pub fork_network: Option<String>,
@@ -82,6 +88,14 @@ pub trait EnvironmentRuntime: Send + Sync {
         request: CreateEnvironmentRequest,
     ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
 
+    fn update(
+        &self,
+        environment_id: &str,
+        request: UpdateEnvironmentRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
+
+    fn delete(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, ()>;
+
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
 
     fn restart(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
@@ -111,6 +125,20 @@ impl EnvironmentRuntime for EmptyEnvironmentRuntime {
     }
 
     fn get(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move { Err(EnvironmentRuntimeError::NotFound { environment_id }) })
+    }
+
+    fn update(
+        &self,
+        environment_id: &str,
+        _request: UpdateEnvironmentRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move { Err(EnvironmentRuntimeError::NotFound { environment_id }) })
+    }
+
+    fn delete(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, ()> {
         let environment_id = environment_id.to_owned();
         Box::pin(async move { Err(EnvironmentRuntimeError::NotFound { environment_id }) })
     }

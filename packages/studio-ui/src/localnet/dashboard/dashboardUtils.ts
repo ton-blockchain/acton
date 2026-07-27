@@ -54,6 +54,15 @@ export function collectRecentAccounts(transactions: readonly V3TransactionListIt
   return accounts
 }
 
+export function formatForkNetworkLabel(forkNetwork?: string | null): string | undefined {
+  const normalizedForkNetwork = forkNetwork?.trim()
+  if (!normalizedForkNetwork) {
+    return undefined
+  }
+
+  return `${normalizedForkNetwork.toLocaleLowerCase()} fork`
+}
+
 export function isTextEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false

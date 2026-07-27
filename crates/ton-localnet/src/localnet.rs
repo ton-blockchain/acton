@@ -742,6 +742,8 @@ pub struct Localnet {
     tx: mpsc::Sender<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
     started_at: SystemTime,
+    block_interval_ms: u64,
+    auto_mining: bool,
 }
 
 #[derive(Default)]
@@ -883,6 +885,7 @@ impl Localnet {
         let (events_tx, _) = broadcast::channel(1024);
         let started_at = SystemTime::now();
         let node_events_tx = events_tx.clone();
+        let block_interval_ms = u64::try_from(block_interval.as_millis()).unwrap_or(u64::MAX);
 
         std::thread::spawn(move || {
             if let Err(e) = run_node_loop(
@@ -902,6 +905,8 @@ impl Localnet {
             tx,
             events_tx,
             started_at,
+            block_interval_ms,
+            auto_mining,
         }
     }
 
@@ -910,6 +915,16 @@ impl Localnet {
         self.started_at
             .elapsed()
             .map_or(0, |duration| duration.as_secs())
+    }
+
+    #[must_use]
+    pub const fn block_interval_ms(&self) -> u64 {
+        self.block_interval_ms
+    }
+
+    #[must_use]
+    pub const fn auto_mining(&self) -> bool {
+        self.auto_mining
     }
 
     #[must_use]

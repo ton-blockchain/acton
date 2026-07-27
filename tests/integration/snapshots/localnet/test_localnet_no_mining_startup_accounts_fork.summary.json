@@ -4,6 +4,11 @@
     "seqno_delta": 0,
     "seqno_stable_after_start": true
   },
+  "runtime": {
+    "auto_mining": false,
+    "block_interval_ms": 50,
+    "rate_limit_rps": null
+  },
   "startup_wallet": {
     "address_present": true,
     "count": 1,

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use acton_studio::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentStatus, STUDIO_ENVIRONMENTS_PATH, StudioEnvironment,
-    StudioServer, StudioServerConfig,
+    StudioServer, StudioServerConfig, UpdateEnvironmentRequest,
 };
 use axum::Router;
 use axum::body::{Body, to_bytes};
@@ -78,6 +78,30 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
         })
     }
 
+    fn update(
+        &self,
+        environment_id: &str,
+        request: UpdateEnvironmentRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let mut environments = self
+                .environments
+                .lock()
+                .expect("environment lock must not be poisoned");
+            let environment = environments
+                .iter_mut()
+                .find(|environment| environment.id == environment_id)
+                .ok_or_else(|| EnvironmentRuntimeError::NotFound {
+                    environment_id: environment_id.clone(),
+                })?;
+            environment.name = request.name;
+            let result = environment.clone();
+            drop(environments);
+            Ok(result)
+        })
+    }
+
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
@@ -95,6 +119,23 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
             let result = environment.clone();
             drop(environments);
             Ok(result)
+        })
+    }
+
+    fn delete(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, ()> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let mut environments = self
+                .environments
+                .lock()
+                .expect("environment lock must not be poisoned");
+            let previous_len = environments.len();
+            environments.retain(|environment| environment.id != environment_id);
+            if environments.len() == previous_len {
+                return Err(EnvironmentRuntimeError::NotFound { environment_id });
+            }
+            drop(environments);
+            Ok(())
         })
     }
 
@@ -130,7 +171,9 @@ async fn response_snapshot(response: Response<Body>) -> String {
     let body = to_bytes(response.into_body(), usize::MAX)
         .await
         .expect("response body must be readable");
-    format!("status: {status}\nbody: {}", String::from_utf8_lossy(&body))
+    let body = String::from_utf8_lossy(&body);
+    let separator = if body.is_empty() { "" } else { " " };
+    format!("status: {status}\nbody:{separator}{body}")
 }
 
 async fn proxy_target(request: Request<Body>) -> (StatusCode, String) {
@@ -188,6 +231,16 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
         )
         .await
         .expect("list request must succeed");
+    let update = app
+        .clone()
+        .oneshot(
+            Request::patch("/api/v1/environments/test-environment-1")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"Renamed environment"}"#))
+                .expect("update request must be valid"),
+        )
+        .await
+        .expect("update request must succeed");
     let stop = app
         .clone()
         .oneshot(
@@ -198,6 +251,7 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
         .await
         .expect("stop request must succeed");
     let restart = app
+        .clone()
         .oneshot(
             Request::post("/api/v1/environments/test-environment-1/restart")
                 .body(Body::empty())
@@ -205,12 +259,32 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
         )
         .await
         .expect("restart request must succeed");
+    let delete = app
+        .clone()
+        .oneshot(
+            Request::delete("/api/v1/environments/test-environment-1")
+                .body(Body::empty())
+                .expect("delete request must be valid"),
+        )
+        .await
+        .expect("delete request must succeed");
+    let list_after_delete = app
+        .oneshot(
+            Request::get(STUDIO_ENVIRONMENTS_PATH)
+                .body(Body::empty())
+                .expect("list request must be valid"),
+        )
+        .await
+        .expect("list request after delete must succeed");
     let actual = format!(
-        "CREATE\n{}\n\nLIST\n{}\n\nSTOP\n{}\n\nRESTART\n{}",
+        "CREATE\n{}\n\nLIST\n{}\n\nUPDATE\n{}\n\nSTOP\n{}\n\nRESTART\n{}\n\nDELETE\n{}\n\nLIST AFTER DELETE\n{}",
         response_snapshot(create).await,
         response_snapshot(list).await,
+        response_snapshot(update).await,
         response_snapshot(stop).await,
-        response_snapshot(restart).await
+        response_snapshot(restart).await,
+        response_snapshot(delete).await,
+        response_snapshot(list_after_delete).await
     );
 
     expect![[r#"CREATE
@@ -221,13 +295,25 @@ LIST
 status: 200 OK
 body: [{"id":"test-environment-1","name":"Forked mainnet","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}]
 
+UPDATE
+status: 200 OK
+body: {"id":"test-environment-1","name":"Renamed environment","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+
 STOP
 status: 200 OK
-body: {"id":"test-environment-1","name":"Forked mainnet","status":"stopped","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+body: {"id":"test-environment-1","name":"Renamed environment","status":"stopped","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
 
 RESTART
 status: 200 OK
-body: {"id":"test-environment-1","name":"Forked mainnet","status":"starting","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}"#]]
+body: {"id":"test-environment-1","name":"Renamed environment","status":"starting","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+
+DELETE
+status: 204 No Content
+body:
+
+LIST AFTER DELETE
+status: 200 OK
+body: []"#]]
     .assert_eq(&actual);
 }
 

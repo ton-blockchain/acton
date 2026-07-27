@@ -10,7 +10,8 @@ use crate::server::models::{
     SetShardAccountRequest, SetTimeRequest,
 };
 use crate::server::{
-    ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
+    ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupWallet,
+    StateSourceInfo,
 };
 use crate::types::Hash256;
 use anyhow::Context;
@@ -73,17 +74,23 @@ struct LocalnetAdminStatus {
     current_unix_time: u32,
     time_offset_seconds: i64,
     next_block_timestamp: Option<u32>,
+    auto_mining: bool,
+    block_interval_ms: u64,
+    rate_limit_rps: Option<u32>,
     mining_mode: LocalnetMiningMode,
     #[serde(flatten)]
     state_source: StateSourceInfo,
     network_conditions: NetworkConditionsInfo,
 }
 
-pub async fn get_status(
-    State(node): State<Arc<Localnet>>,
-    State(state_source): State<Arc<StateSourceInfo>>,
-    State(network_conditions): State<NetworkConditions>,
-) -> Response {
+pub async fn get_status(State(state): State<ServerState>) -> Response {
+    let ServerState {
+        node,
+        state_source,
+        network_conditions,
+        rate_limit_rps,
+        ..
+    } = state;
     handle_result(
         async move {
             let masterchain_info = node.get_masterchain_info().await?;
@@ -96,6 +103,9 @@ pub async fn get_status(
                 current_unix_time: clock_info.current_unix_time,
                 time_offset_seconds: clock_info.time_offset_seconds,
                 next_block_timestamp: clock_info.next_block_timestamp,
+                auto_mining: node.auto_mining(),
+                block_interval_ms: node.block_interval_ms(),
+                rate_limit_rps,
                 mining_mode,
                 state_source: state_source.as_ref().clone(),
                 network_conditions: network_conditions.info(),

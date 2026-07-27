@@ -63,6 +63,15 @@ function StudioApp() {
     [environmentsState.setEnvironment, routerNavigate],
   )
 
+  const deleteEnvironment = useCallback(
+    (environmentId: string) => {
+      environmentsState.removeEnvironment(environmentId)
+      void routerNavigate("/virtual-environments")
+      globalThis.scrollTo({top: 0})
+    },
+    [environmentsState.removeEnvironment, routerNavigate],
+  )
+
   const selectTestRun = useCallback(
     (runId: string | undefined, replace: boolean) => {
       void routerNavigate(runId ? testRunStudioPath(runId) : "/tests", {replace})
@@ -77,6 +86,7 @@ function StudioApp() {
         environmentsState={environmentsState}
         route={route}
         onNavigate={navigate}
+        onDeleteEnvironment={deleteEnvironment}
         onOpenEnvironment={openEnvironment}
         onSelectTestRun={selectTestRun}
       />
@@ -89,6 +99,7 @@ interface StudioWorkspaceProps {
   readonly environmentsState: StudioEnvironmentsState
   readonly route: StudioRoute
   readonly onNavigate: (path: StudioPath) => void
+  readonly onDeleteEnvironment: (environmentId: string) => void
   readonly onOpenEnvironment: (environment: StudioEnvironment) => void
   readonly onSelectTestRun: (runId: string | undefined, replace: boolean) => void
 }
@@ -98,6 +109,7 @@ function StudioWorkspace({
   environmentsState,
   route,
   onNavigate,
+  onDeleteEnvironment,
   onOpenEnvironment,
   onSelectTestRun,
 }: StudioWorkspaceProps) {
@@ -339,6 +351,7 @@ function StudioWorkspace({
             isLoading={environmentsState.isLoading}
             loadError={environmentLoadError}
             onEnvironmentChange={environmentsState.setEnvironment}
+            onEnvironmentDelete={onDeleteEnvironment}
             onRetry={environmentsState.refresh}
             onShellChange={handleEnvironmentShellChange}
           />

@@ -27,7 +27,7 @@ mod test_runtime;
 
 pub use environment::{
     CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment,
+    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use local_process::LocalProcessEnvironmentRuntime;
 pub use local_test_process::LocalProcessTestRunRuntime;
@@ -177,6 +177,12 @@ impl StudioServer {
                 get(list_environments).post(create_environment),
             )
             .route(
+                "/environments/{environment_id}",
+                get(get_environment)
+                    .patch(update_environment)
+                    .delete(delete_environment),
+            )
+            .route(
                 "/environments/{environment_id}/stop",
                 post(stop_environment),
             )
@@ -300,6 +306,43 @@ async fn create_environment(
         .create(request)
         .await
         .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
+        .map_err(StudioApiError)
+}
+
+async fn get_environment(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<StudioEnvironment>, StudioApiError> {
+    state
+        .environment_runtime
+        .get(&environment_id)
+        .await
+        .map(|environment| Json(public_environment(environment)))
+        .map_err(StudioApiError)
+}
+
+async fn update_environment(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(request): Json<UpdateEnvironmentRequest>,
+) -> Result<Json<StudioEnvironment>, StudioApiError> {
+    state
+        .environment_runtime
+        .update(&environment_id, request)
+        .await
+        .map(|environment| Json(public_environment(environment)))
+        .map_err(StudioApiError)
+}
+
+async fn delete_environment(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<StatusCode, StudioApiError> {
+    state
+        .environment_runtime
+        .delete(&environment_id)
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
         .map_err(StudioApiError)
 }
 

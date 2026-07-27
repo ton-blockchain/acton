@@ -20,11 +20,13 @@ import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProv
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
+import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
 import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {useLocalnetRuntime} from "./LocalnetRuntimeProvider"
 import {localnetPath} from "./routes"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
+import type {StudioEnvironment} from "../studioApi"
 import "@acton/ui/styles/tokens.css"
 import "./index.css"
 import styles from "./LocalnetWorkspace.module.css"
@@ -44,6 +46,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/wallets": "Wallets",
   "/tokens": "Tokens",
   "/nfts": "NFTs",
+  "/settings": "Settings",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
   "/api-reference/control": "Control API Reference",
@@ -56,6 +59,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/wallets": "Startup wallets from this environment, ready for TON Connect",
   "/tokens": "Jettons detected in this virtual environment",
   "/nfts": "NFT items indexed from this virtual environment",
+  "/settings": "Manage environment identity, network behavior and mining",
   "/api-reference/v2": "Explore the localnet v2 API",
   "/api-reference/v3": "Explore the localnet v3 API",
   "/api-reference/control": "Explore localnet management methods",
@@ -64,6 +68,8 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
 
 interface LocalnetWorkspaceProps {
   readonly basePath: string
+  readonly onEnvironmentChange: (environment: StudioEnvironment) => void
+  readonly onEnvironmentDelete: (environmentId: string) => void
   readonly onShellChange: (state: LocalnetWorkspaceShellState) => void
 }
 
@@ -73,7 +79,12 @@ export interface LocalnetWorkspaceShellState {
   readonly rpcUrl?: string
 }
 
-export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({basePath, onShellChange}) => {
+export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
+  basePath,
+  onEnvironmentChange,
+  onEnvironmentDelete,
+  onShellChange,
+}) => {
   const runtime = useLocalnetRuntime()
 
   return (
@@ -84,7 +95,12 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({basePath, onShell
           client={runtime.client}
           localnetApiToken={runtime.localnetApiToken}
         >
-          <AppContent basePath={basePath} onShellChange={onShellChange} />
+          <AppContent
+            basePath={basePath}
+            onEnvironmentChange={onEnvironmentChange}
+            onEnvironmentDelete={onEnvironmentDelete}
+            onShellChange={onShellChange}
+          />
         </WalletRuntimeProvider>
       </AddressBookProvider>
     </MetadataRegistryProvider>
@@ -93,10 +109,17 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({basePath, onShell
 
 interface AppContentProps {
   readonly basePath: string
+  readonly onEnvironmentChange: (environment: StudioEnvironment) => void
+  readonly onEnvironmentDelete: (environmentId: string) => void
   readonly onShellChange: (state: LocalnetWorkspaceShellState) => void
 }
 
-const AppContent: FC<AppContentProps> = ({basePath, onShellChange}) => {
+const AppContent: FC<AppContentProps> = ({
+  basePath,
+  onEnvironmentChange,
+  onEnvironmentDelete,
+  onShellChange,
+}) => {
   const runtime = useLocalnetRuntime()
   const client = runtime.client
   const {pathname} = useLocation()
@@ -126,7 +149,7 @@ const AppContent: FC<AppContentProps> = ({basePath, onShellChange}) => {
             <Route
               path={path("/dashboard")}
               element={
-                <DashboardPage>
+                <DashboardPage embedded>
                   <RouteSuspense>
                     <HomePage client={client} />
                   </RouteSuspense>
@@ -190,6 +213,18 @@ const AppContent: FC<AppContentProps> = ({basePath, onShellChange}) => {
               element={
                 <DashboardPage>
                   <NftsPage client={client} />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/settings")}
+              element={
+                <DashboardPage>
+                  <SettingsPage
+                    client={client}
+                    onEnvironmentChange={onEnvironmentChange}
+                    onEnvironmentDelete={onEnvironmentDelete}
+                  />
                 </DashboardPage>
               }
             />

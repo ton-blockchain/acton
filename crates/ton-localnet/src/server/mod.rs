@@ -36,6 +36,7 @@ pub struct ServerState {
     pub state_source: Arc<StateSourceInfo>,
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
+    pub rate_limit_rps: Option<u32>,
     pub api_calls: ApiCallLog,
     pub auth_token: Option<Arc<str>>,
 }
@@ -351,18 +352,16 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         fork_block_number,
     };
     let shutdown = ShutdownSignal::new();
-    let app = router::create_router(
-        ServerState {
-            node: Arc::clone(&node),
-            startup_wallets: Arc::new(startup_wallets),
-            state_source: Arc::new(state_source),
-            shutdown: shutdown.clone(),
-            network_conditions: network_conditions.clone(),
-            api_calls,
-            auth_token: auth_token.clone(),
-        },
+    let app = router::create_router(ServerState {
+        node: Arc::clone(&node),
+        startup_wallets: Arc::new(startup_wallets),
+        state_source: Arc::new(state_source),
+        shutdown: shutdown.clone(),
+        network_conditions: network_conditions.clone(),
         rate_limit_rps,
-    );
+        api_calls,
+        auth_token: auth_token.clone(),
+    });
 
     let address = format!("127.0.0.1:{port}");
     let listener = tokio::net::TcpListener::bind(&address)

@@ -65,7 +65,8 @@ fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
     Duration::from_nanos(nanoseconds)
 }
 
-pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
+pub fn create_router(state: ServerState) -> Router {
+    let rate_limit_rps = state.rate_limit_rps;
     let mut api_v2_router = Router::new()
         .route("/v2", post(json_rpc))
         .route("/v2/jsonRPC", post(json_rpc))

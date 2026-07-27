@@ -13,6 +13,7 @@ interface EnvironmentWorkspacePageProps {
   readonly isLoading: boolean
   readonly loadError?: string
   readonly onEnvironmentChange: (environment: StudioEnvironment) => void
+  readonly onEnvironmentDelete: (environmentId: string) => void
   readonly onRetry: () => Promise<void>
   readonly onShellChange: (state: LocalnetWorkspaceShellState) => void
 }
@@ -23,6 +24,7 @@ export function EnvironmentWorkspacePage({
   isLoading,
   loadError,
   onEnvironmentChange,
+  onEnvironmentDelete,
   onRetry,
   onShellChange,
 }: EnvironmentWorkspacePageProps) {
@@ -64,7 +66,14 @@ export function EnvironmentWorkspacePage({
   }
 
   if (environment?.status === "running") {
-    return <LocalnetWorkspace basePath={basePath} onShellChange={onShellChange} />
+    return (
+      <LocalnetWorkspace
+        basePath={basePath}
+        onEnvironmentChange={onEnvironmentChange}
+        onEnvironmentDelete={onEnvironmentDelete}
+        onShellChange={onShellChange}
+      />
+    )
   }
 
   const canRestart = environment?.status === "stopped" || environment?.status === "failed"

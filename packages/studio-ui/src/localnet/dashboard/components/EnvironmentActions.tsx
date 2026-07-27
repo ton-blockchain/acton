@@ -1,4 +1,16 @@
-import {ArchiveRestore, Download, FileJson, Plus, RotateCcw, Trash2, Upload} from "lucide-react"
+import {
+  ArchiveRestore,
+  Download,
+  FastForward,
+  FileJson,
+  HandCoins,
+  Pickaxe,
+  Plus,
+  RotateCcw,
+  Send,
+  Trash2,
+  Upload,
+} from "lucide-react"
 import {Button, Dialog, InlineButton, Input, useToast} from "@acton/ui"
 import {useCallback, useRef, useState} from "react"
 import type {ChangeEvent, FC, FormEvent} from "react"
@@ -8,9 +20,14 @@ import type {LocalnetCheckpoint} from "../../explorer/api/types"
 
 import styles from "../DashboardPage.module.css"
 
-interface NodeStateControlsProps {
+interface EnvironmentActionsProps {
   readonly client: TonClient
+  readonly isAdvanceTimeOpen: boolean
   readonly latestBlockSeqno?: number
+  readonly onAdvanceTime: () => void
+  readonly onOpenMiningSettings: () => void
+  readonly onFund: () => void
+  readonly onSend: () => void
   readonly onStateChanged: () => void
 }
 
@@ -21,9 +38,14 @@ interface StateFileDetails {
   readonly error?: string
 }
 
-export const NodeStateControls: FC<NodeStateControlsProps> = ({
+export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   client,
+  isAdvanceTimeOpen,
   latestBlockSeqno,
+  onAdvanceTime,
+  onOpenMiningSettings,
+  onFund,
+  onSend,
   onStateChanged,
 }) => {
   const {showToast} = useToast()
@@ -54,6 +76,43 @@ export const NodeStateControls: FC<NodeStateControlsProps> = ({
     setIsCheckpointsOpen(true)
     void loadCheckpoints()
   }, [loadCheckpoints])
+
+  const mineBlock = useCallback(async () => {
+    setBusyAction("mine-block")
+    try {
+      const result = await client.mineBlocks()
+      if (result.blocks_mined > 0) {
+        onStateChanged()
+        showToast({
+          variant: "success",
+          title: "Block mined",
+          description: `Block ${result.last_block_seqno.toLocaleString()} is now the latest block`,
+        })
+      } else {
+        showToast({
+          variant: "info",
+          title: "No block mined",
+          description: (
+            <span className={styles.toastDescriptionWithAction}>
+              <span>There are no pending messages and empty block mining is disabled</span>
+              <InlineButton variant="accent" onClick={onOpenMiningSettings}>
+                Mining settings
+              </InlineButton>
+            </span>
+          ),
+          durationMs: 8000,
+        })
+      }
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Block not mined",
+        description: errorMessage(error, "Failed to mine localnet block"),
+      })
+    } finally {
+      setBusyAction(undefined)
+    }
+  }, [client, onOpenMiningSettings, onStateChanged, showToast])
 
   const downloadState = useCallback(async () => {
     setBusyAction("download-state")
@@ -231,31 +290,60 @@ export const NodeStateControls: FC<NodeStateControlsProps> = ({
 
   return (
     <>
-      <div className={styles.nodeStateActions}>
-        <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
-          Checkpoints
-        </InlineButton>
-        <InlineButton
-          leadingIcon={<Upload size={15} />}
-          onClick={() => stateFileInputRef.current?.click()}
-        >
-          Load state
-        </InlineButton>
-        <InlineButton
-          leadingIcon={<Download size={15} />}
-          disabled={busyAction === "download-state"}
-          onClick={() => void downloadState()}
-        >
-          {busyAction === "download-state" ? "Downloading" : "Download state"}
-        </InlineButton>
-        <input
-          ref={stateFileInputRef}
-          className={styles.visuallyHiddenInput}
-          type="file"
-          accept="application/json,.json"
-          tabIndex={-1}
-          onChange={selectStateFile}
-        />
+      <div className={styles.environmentActions}>
+        <div className={styles.environmentActionGroup} aria-label="Account actions">
+          <InlineButton leadingIcon={<HandCoins size={15} />} onClick={onFund}>
+            Fund
+          </InlineButton>
+          <InlineButton leadingIcon={<Send size={15} />} onClick={onSend}>
+            Send
+          </InlineButton>
+        </div>
+
+        <div className={styles.environmentActionGroup} aria-label="Runtime actions">
+          <InlineButton
+            leadingIcon={<Pickaxe size={15} />}
+            disabled={busyAction === "mine-block"}
+            onClick={() => void mineBlock()}
+          >
+            {busyAction === "mine-block" ? "Mining" : "Mine block"}
+          </InlineButton>
+          <InlineButton
+            aria-haspopup="dialog"
+            aria-expanded={isAdvanceTimeOpen}
+            leadingIcon={<FastForward size={15} />}
+            onClick={onAdvanceTime}
+          >
+            Advance time
+          </InlineButton>
+        </div>
+
+        <div className={styles.environmentActionGroup} aria-label="State actions">
+          <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
+            Checkpoints
+          </InlineButton>
+          <InlineButton
+            leadingIcon={<Upload size={15} />}
+            onClick={() => stateFileInputRef.current?.click()}
+          >
+            Load state
+          </InlineButton>
+          <InlineButton
+            leadingIcon={<Download size={15} />}
+            disabled={busyAction === "download-state"}
+            onClick={() => void downloadState()}
+          >
+            {busyAction === "download-state" ? "Downloading" : "Download state"}
+          </InlineButton>
+          <input
+            ref={stateFileInputRef}
+            className={styles.visuallyHiddenInput}
+            type="file"
+            accept="application/json,.json"
+            tabIndex={-1}
+            onChange={selectStateFile}
+          />
+        </div>
       </div>
 
       <Dialog

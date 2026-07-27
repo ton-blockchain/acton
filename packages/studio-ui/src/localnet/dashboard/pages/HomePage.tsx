@@ -4,6 +4,7 @@ import {Link, useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
 
+import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "../../explorer/api/client"
 import {addressKey} from "../../explorer/api/compilerAbi"
 import type {
@@ -26,8 +27,8 @@ import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
 import {useLocalnetRoutes} from "../../routes"
-import {NodeStateControls} from "../components/NodeStateControls"
-import {collectRecentAccounts} from "../dashboardUtils"
+import {EnvironmentActions} from "../components/EnvironmentActions"
+import {collectRecentAccounts, formatForkNetworkLabel} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
 
@@ -81,11 +82,12 @@ interface NodeInfoRow {
   readonly to?: string
   readonly isLoading?: boolean
   readonly title?: string
-  readonly variant?: "time"
+  readonly variant?: "wide"
   readonly visualPlaceholder?: string
 }
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
+  const runtime = useLocalnetRuntime()
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
@@ -109,6 +111,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const timeAdvanceTargetValue = nodeInfo
     ? formatNodeDateTime(nodeInfo.current_unix_time + (parsedTimeAdvanceSeconds ?? 0))
     : "—"
+  const forkNetwork =
+    nodeInfo === undefined ? runtime.environment?.config.forkNetwork : nodeInfo.fork_network
+  const forkBlockNumber =
+    nodeInfo === undefined
+      ? runtime.environment?.config.forkBlockNumber
+      : nodeInfo.fork_block_number
+  const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
+  const forkBadgeLabel = formatForkNetworkLabel(forkNetwork) ?? "clean network"
   const endpoints = useMemo(() => client.getEndpoints(), [client])
   const endpointRows = useMemo(
     () =>
@@ -158,13 +168,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         label: "State source",
         value: nodeInfo ? formatNodeInfoValue(nodeInfo.state_source) : undefined,
         isLoading,
-      },
-      {
-        label: "Fork",
-        value: nodeInfo
-          ? formatForkInfo(nodeInfo.fork_network, nodeInfo.fork_block_number)
-          : undefined,
-        isLoading,
+        variant: "wide",
       },
       {
         label: "Node time",
@@ -172,7 +176,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         secondaryValue: nodeTimeOffset,
         title: nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime,
         isLoading,
-        variant: "time",
+        variant: "wide",
         visualPlaceholder: "<time>",
       },
     ]
@@ -375,176 +379,170 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   )
 
   return (
-    <>
-      <section className={styles.homeLayout}>
-        <div className={styles.homeTopRow}>
-          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <header className={styles.dashboardCardHeader}>
-              <h2 className={styles.dashboardCardTitle}>Node info</h2>
-              <NodeStateControls
-                client={client}
-                latestBlockSeqno={nodeInfo?.last_block_seqno}
-                onStateChanged={() => setNodeInfo(undefined)}
-              />
-            </header>
-            <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
-              {nodeInfoRows.map(row => {
-                const value = row.value ?? "—"
-                const title = row.title ?? value
-                const rowClassName = `${styles.nodeInfoRow} ${
-                  row.variant === "time" ? styles.nodeInfoTimeRow : ""
-                }`
+    <div className={styles.environmentHomePage}>
+      <header className={styles.environmentHomeHeader}>
+        <div className={styles.environmentHomeIdentity}>
+          <h1 className={styles.environmentHomeName}>
+            {runtime.environment?.name ?? "Virtual environment"}
+          </h1>
+          <span className={styles.workspaceForkBadge} title={forkSummary}>
+            {forkBadgeLabel}
+          </span>
+        </div>
+        <EnvironmentActions
+          client={client}
+          isAdvanceTimeOpen={isTimeModalOpen}
+          latestBlockSeqno={nodeInfo?.last_block_seqno}
+          onAdvanceTime={openTimeAdvanceModal}
+          onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
+          onFund={() => void navigate(localnetRoutes.path("/faucet"))}
+          onSend={() => void navigate(localnetRoutes.path("/explorer/emulate"))}
+          onStateChanged={() => setNodeInfo(undefined)}
+        />
+      </header>
 
-                return (
-                  <div key={row.label} className={rowClassName}>
-                    <span className={styles.nodeInfoLabel}>{row.label}</span>
-                    {row.isLoading ? (
-                      <span
-                        className={`${styles.skeletonLine} ${styles.nodeInfoValueSkeleton}`}
-                        aria-label={`Loading ${row.label}`}
-                      />
-                    ) : row.to ? (
-                      <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
-                        {value}
-                      </Link>
-                    ) : row.variant === "time" ? (
-                      <div className={styles.nodeInfoTimeControl} title={title}>
-                        <span
-                          className={styles.nodeInfoTimeText}
-                          data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
-                          data-visual-placeholder={row.visualPlaceholder}
-                        >
-                          <span className={styles.nodeInfoValueText}>{value}</span>
-                          {row.secondaryValue && (
-                            <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
-                          )}
-                        </span>
-                        <Tooltip content="Advance time">
-                          <button
-                            type="button"
-                            className={styles.nodeInfoTimeButton}
-                            aria-label="Advance node time"
-                            aria-haspopup="dialog"
-                            aria-expanded={isTimeModalOpen}
-                            onClick={openTimeAdvanceModal}
+      <div className={styles.environmentHomeScroll}>
+        <section className={styles.environmentHomeContent}>
+          <div className={styles.homeLayout}>
+            <div className={styles.homeTopRow}>
+              <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+                <header className={styles.dashboardCardHeader}>
+                  <h2 className={styles.dashboardCardTitle}>Node info</h2>
+                </header>
+                <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
+                  {nodeInfoRows.map(row => {
+                    const value = row.value ?? "—"
+                    const title = row.title ?? value
+                    const rowClassName = `${styles.nodeInfoRow} ${
+                      row.variant === "wide" ? styles.nodeInfoWideRow : ""
+                    }`
+
+                    return (
+                      <div key={row.label} className={rowClassName}>
+                        <span className={styles.nodeInfoLabel}>{row.label}</span>
+                        {row.isLoading ? (
+                          <span
+                            className={`${styles.skeletonLine} ${styles.nodeInfoValueSkeleton}`}
+                            aria-label={`Loading ${row.label}`}
+                          />
+                        ) : row.to ? (
+                          <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
+                            {value}
+                          </Link>
+                        ) : (
+                          <span
+                            className={styles.nodeInfoValue}
+                            title={title}
+                            data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                            data-visual-placeholder={row.visualPlaceholder}
                           >
-                            <FastForward size={14} />
-                            <span>Advance</span>
-                          </button>
-                        </Tooltip>
-                      </div>
-                    ) : (
-                      <span
-                        className={styles.nodeInfoValue}
-                        title={title}
-                        data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
-                        data-visual-placeholder={row.visualPlaceholder}
-                      >
-                        <span className={styles.nodeInfoValueText}>{value}</span>
-                        {row.secondaryValue && (
-                          <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                            <span className={styles.nodeInfoValueText}>{value}</span>
+                            {row.secondaryValue && (
+                              <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                            )}
+                          </span>
                         )}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+                <header className={styles.dashboardCardHeader}>
+                  <h2 className={styles.dashboardCardTitle}>Endpoints</h2>
+                </header>
+                <div className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
+                  {endpointRows.map(endpoint => {
+                    const isCopied = copiedEndpoint === endpoint.value
+
+                    return (
+                      <div key={endpoint.label} className={styles.endpointRow}>
+                        <span className={styles.endpointLabel}>{endpoint.label}</span>
+                        <span className={styles.endpointValueRow}>
+                          <Tooltip content={endpoint.value}>
+                            <span className={styles.endpointValue}>{endpoint.value}</span>
+                          </Tooltip>
+                          <span className={styles.endpointActions}>
+                            <Tooltip content={isCopied ? "Copied" : "Copy endpoint"}>
+                              <button
+                                type="button"
+                                className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
+                                aria-label={
+                                  isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
+                                }
+                                onClick={() => void copyEndpoint(endpoint.value)}
+                              >
+                                {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Open API reference">
+                              <button
+                                type="button"
+                                className={styles.endpointButton}
+                                aria-label={`Open ${endpoint.label} reference`}
+                                onClick={() =>
+                                  void navigate(localnetRoutes.path(endpoint.referencePath))
+                                }
+                              >
+                                <BookOpen size={14} />
+                              </button>
+                            </Tooltip>
+                          </span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
             </div>
-          </section>
 
-          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <header className={styles.dashboardCardHeader}>
-              <h2 className={styles.dashboardCardTitle}>Endpoints</h2>
-            </header>
-            <div className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
-              {endpointRows.map(endpoint => {
-                const isCopied = copiedEndpoint === endpoint.value
+            {homeState.error ? (
+              <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
+                {homeState.error}
+              </div>
+            ) : homeState.isLoading ? (
+              <DeveloperTransactionListSkeleton
+                className={styles.homeTransactionsCard}
+                title="Recent transactions"
+              />
+            ) : homeState.transactions.length === 0 ? (
+              <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
+                No transactions yet
+              </div>
+            ) : (
+              <DeveloperTransactionList
+                className={styles.homeTransactionsCard}
+                title="Recent transactions"
+                transactions={homeState.transactions}
+                messageNamesByAddress={messageNamesByAddress}
+                onTransactionClick={(hashHex, _transaction, event) => {
+                  openPath(routes.transactionPath(hashHex), event)
+                }}
+                onAddressClick={(address, event) => {
+                  openPath(routes.addressPath(address), event)
+                }}
+              />
+            )}
 
-                return (
-                  <div key={endpoint.label} className={styles.endpointRow}>
-                    <span className={styles.endpointLabel}>{endpoint.label}</span>
-                    <span className={styles.endpointValueRow}>
-                      <Tooltip content={endpoint.value}>
-                        <span className={styles.endpointValue}>{endpoint.value}</span>
-                      </Tooltip>
-                      <span className={styles.endpointActions}>
-                        <Tooltip content={isCopied ? "Copied" : "Copy endpoint"}>
-                          <button
-                            type="button"
-                            className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
-                            aria-label={
-                              isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
-                            }
-                            onClick={() => void copyEndpoint(endpoint.value)}
-                          >
-                            {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Open API reference">
-                          <button
-                            type="button"
-                            className={styles.endpointButton}
-                            aria-label={`Open ${endpoint.label} reference`}
-                            onClick={() =>
-                              void navigate(localnetRoutes.path(endpoint.referencePath))
-                            }
-                          >
-                            <BookOpen size={14} />
-                          </button>
-                        </Tooltip>
-                      </span>
-                    </span>
-                  </div>
-                )
-              })}
+            <div className={styles.homeMainColumn}>
+              {homeState.error ? (
+                <div className={styles.emptyState}>{homeState.error}</div>
+              ) : homeState.isLoading ? (
+                <DeveloperAccountListSkeleton title="Recent accounts" />
+              ) : (
+                <DeveloperAccountList
+                  title="Recent accounts"
+                  accounts={recentAccountItems}
+                  onAddressClick={(address, event) => {
+                    openPath(routes.addressPath(address), event)
+                  }}
+                />
+              )}
             </div>
-          </section>
-        </div>
-
-        {homeState.error ? (
-          <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
-            {homeState.error}
           </div>
-        ) : homeState.isLoading ? (
-          <DeveloperTransactionListSkeleton
-            className={styles.homeTransactionsCard}
-            title="Recent transactions"
-          />
-        ) : homeState.transactions.length === 0 ? (
-          <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
-            No transactions yet
-          </div>
-        ) : (
-          <DeveloperTransactionList
-            className={styles.homeTransactionsCard}
-            title="Recent transactions"
-            transactions={homeState.transactions}
-            messageNamesByAddress={messageNamesByAddress}
-            onTransactionClick={(hashHex, _transaction, event) => {
-              openPath(routes.transactionPath(hashHex), event)
-            }}
-            onAddressClick={(address, event) => {
-              openPath(routes.addressPath(address), event)
-            }}
-          />
-        )}
-
-        <div className={styles.homeMainColumn}>
-          {homeState.error ? (
-            <div className={styles.emptyState}>{homeState.error}</div>
-          ) : homeState.isLoading ? (
-            <DeveloperAccountListSkeleton title="Recent accounts" />
-          ) : (
-            <DeveloperAccountList
-              title="Recent accounts"
-              accounts={recentAccountItems}
-              onAddressClick={(address, event) => {
-                openPath(routes.addressPath(address), event)
-              }}
-            />
-          )}
-        </div>
-      </section>
+        </section>
+      </div>
 
       <Dialog
         open={isTimeModalOpen}
@@ -639,7 +637,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           </div>
         </form>
       </Dialog>
-    </>
+    </div>
   )
 }
 
@@ -652,25 +650,21 @@ function formatNodeInfoValue(value: string): string {
   return normalized.replace(/_/g, " ")
 }
 
-function formatOptionalNodeInfoValue(value: string | null | undefined): string {
-  if (value === undefined || value === null) {
-    return "—"
-  }
-
-  return formatNodeInfoValue(value)
-}
-
-function formatForkInfo(
+function formatForkSummary(
   network: string | null | undefined,
   block: number | null | undefined,
 ): string {
-  const networkValue = formatOptionalNodeInfoValue(network)
+  const networkValue = network?.trim()
+  const networkLabel = networkValue
+    ? `${networkValue.charAt(0).toUpperCase()}${formatNodeInfoValue(networkValue).slice(1)} fork`
+    : undefined
+
   if (block === undefined || block === null) {
-    return networkValue
+    return networkLabel ?? "Clean network"
   }
 
-  const blockValue = block.toLocaleString()
-  return networkValue === "—" ? blockValue : `${networkValue} · ${blockValue}`
+  const blockLabel = `Block ${block.toLocaleString()}`
+  return networkLabel ? `${networkLabel} · ${blockLabel}` : `Fork · ${blockLabel}`
 }
 
 function formatNodeDateTime(unixSeconds: number): string {

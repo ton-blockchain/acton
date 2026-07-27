@@ -8,6 +8,7 @@ export interface StudioEnvironmentsState {
   readonly environments: readonly StudioEnvironment[]
   readonly error?: string
   readonly isLoading: boolean
+  readonly removeEnvironment: (environmentId: string) => void
   readonly refresh: () => Promise<void>
   readonly setEnvironment: (environment: StudioEnvironment) => void
 }
@@ -51,9 +52,7 @@ export function useStudioEnvironments(): StudioEnvironmentsState {
 
   const setEnvironment = useCallback((nextEnvironment: StudioEnvironment) => {
     setEnvironments(current => {
-      const existingIndex = current.findIndex(
-        environment => environment.id === nextEnvironment.id,
-      )
+      const existingIndex = current.findIndex(environment => environment.id === nextEnvironment.id)
       if (existingIndex === -1) return [nextEnvironment, ...current]
 
       const next = [...current]
@@ -64,10 +63,15 @@ export function useStudioEnvironments(): StudioEnvironmentsState {
     setIsLoading(false)
   }, [])
 
+  const removeEnvironment = useCallback((environmentId: string) => {
+    setEnvironments(current => current.filter(environment => environment.id !== environmentId))
+  }, [])
+
   return {
     environments,
     error,
     isLoading,
+    removeEnvironment,
     refresh: () => refresh(),
     setEnvironment,
   }

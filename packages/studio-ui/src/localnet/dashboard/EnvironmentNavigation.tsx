@@ -23,6 +23,7 @@ import {useLocation, useNavigate} from "react-router"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
 import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
 import {useLocalnetRoutes} from "../routes"
+import {formatForkNetworkLabel} from "./dashboardUtils"
 
 import styles from "./DashboardPage.module.css"
 
@@ -164,13 +165,4 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
       </div>
     </nav>
   )
-}
-
-function formatForkNetworkLabel(forkNetwork?: string): string | undefined {
-  const normalizedForkNetwork = forkNetwork?.trim()
-  if (!normalizedForkNetwork) {
-    return undefined
-  }
-
-  return `${normalizedForkNetwork.toLocaleLowerCase()} fork`
 }
