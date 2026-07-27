@@ -29,6 +29,7 @@ import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProv
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {IntegratePage} from "./dashboard/pages/IntegratePage"
+import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
@@ -320,6 +321,30 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
+              path={path("/contracts/:address")}
+              element={
+                <DashboardPage>
+                  <ContractPage client={client} section="source" />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/contracts/:address/abi")}
+              element={
+                <DashboardPage>
+                  <ContractPage client={client} section="abi" />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/contracts/:address/raw-abi")}
+              element={
+                <DashboardPage>
+                  <ContractPage client={client} section="raw-abi" />
+                </DashboardPage>
+              }
+            />
+            <Route
               path={path("/api-reference")}
               element={<Navigate to={path("/api-reference/v2")} replace />}
             />
@@ -497,19 +522,25 @@ const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
 )
 
 function contractDetailsPageTitle(localPathname: string): string | undefined {
-  const match = localPathname.match(/^\/contracts\/abi\/([^/]+)$/)
-  if (!match?.[1]) return undefined
-
-  try {
-    return `${decodeURIComponent(match[1])} ABI`
-  } catch {
-    return `${match[1]} ABI`
+  const abiMatch = localPathname.match(/^\/contracts\/abi\/([^/]+)$/)
+  if (abiMatch?.[1]) {
+    try {
+      return `${decodeURIComponent(abiMatch[1])} ABI`
+    } catch {
+      return `${abiMatch[1]} ABI`
+    }
   }
+
+  return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname) ? "Contract" : undefined
 }
 
 function contractDetailsPageDescription(localPathname: string): string | undefined {
-  return /^\/contracts\/abi\/[^/]+$/.test(localPathname)
-    ? "Inspect contract declarations, messages, getters and errors"
+  if (/^\/contracts\/abi\/[^/]+$/.test(localPathname)) {
+    return "Inspect contract declarations, messages, getters and errors"
+  }
+
+  return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname)
+    ? "Inspect deployed code, ABI and project artifacts"
     : undefined
 }
 

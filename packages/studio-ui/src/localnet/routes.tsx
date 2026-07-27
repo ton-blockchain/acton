@@ -39,3 +39,12 @@ export function localnetPath(basePath: string, path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
   return `${normalizedBasePath}${normalizedPath}` || "/"
 }
+
+export function localnetContractPath(
+  basePath: string,
+  address: string,
+  section?: "abi" | "raw-abi",
+): string {
+  const root = localnetPath(basePath, `/contracts/${encodeURIComponent(address)}`)
+  return section ? `${root}/${encodeURIComponent(section)}` : root
+}

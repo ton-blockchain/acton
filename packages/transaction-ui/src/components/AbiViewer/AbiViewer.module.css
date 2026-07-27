@@ -78,6 +78,24 @@
   border-radius: 0 8px 8px;
 }
 
+.shellWithoutTabs .panel,
+.shellWithoutTabs .rawBlock {
+  border-radius: 8px;
+}
+
+.attachedToTabs .panel,
+.attachedToTabs .rawBlock,
+.attachedToTabs.shellWithoutTabs .panel,
+.attachedToTabs.shellWithoutTabs .rawBlock {
+  border: 0;
+  border-radius: 0;
+  background: var(--acton-color-surface-raised);
+}
+
+.attachedToTabs .view {
+  background: var(--acton-color-surface-raised);
+}
+
 .rawBlock > div {
   border-radius: inherit;
 }

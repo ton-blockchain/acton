@@ -18,7 +18,9 @@ export interface AbiPanelProps {
   readonly activeTab: AbiTab
   readonly onTabChange: (tab: AbiTab) => void
   readonly abi: ContractABI
+  readonly attachedToTabs?: boolean
   readonly heightMode?: "contained" | "content"
+  readonly showTabs?: boolean
   readonly showSymbolAnchors?: boolean
 }
 
@@ -26,11 +28,18 @@ export function AbiPanel({
   activeTab,
   onTabChange,
   abi,
+  attachedToTabs = false,
   heightMode = "contained",
+  showTabs = true,
   showSymbolAnchors = false,
 }: AbiPanelProps) {
   const abiJson = useMemo(() => JSON.stringify(abi, undefined, 2), [abi])
-  const rootClassName = [styles.shell, heightMode === "content" ? styles.shellContent : ""]
+  const rootClassName = [
+    styles.shell,
+    attachedToTabs ? styles.attachedToTabs : "",
+    heightMode === "content" ? styles.shellContent : "",
+    showTabs ? "" : styles.shellWithoutTabs,
+  ]
     .filter(Boolean)
     .join(" ")
 
@@ -58,30 +67,32 @@ export function AbiPanel({
 
   return (
     <section className={rootClassName}>
-      <div className={styles.tabBar}>
-        {(
-          [
-            {tab: "view", label: "Rendered"},
-            {tab: "raw", label: "Raw JSON"},
-          ] as const
-        ).map(item => (
-          <button
-            key={item.tab}
-            type="button"
-            className={`${styles.tab} ${activeTab === item.tab ? styles.tabActive : ""}`}
-            onClick={() => onTabChange(item.tab)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {showTabs ? (
+        <div className={styles.tabBar}>
+          {(
+            [
+              {tab: "view", label: "Rendered"},
+              {tab: "raw", label: "Raw JSON"},
+            ] as const
+          ).map(item => (
+            <button
+              key={item.tab}
+              type="button"
+              className={`${styles.tab} ${activeTab === item.tab ? styles.tabActive : ""}`}
+              onClick={() => onTabChange(item.tab)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {activeTab === "view" ? (
         <AbiView abi={abi} showSymbolAnchors={showSymbolAnchors} />
       ) : (
         <RawDataBlock
           className={styles.rawBlock}
           contentClassName={heightMode === "content" ? styles.rawBlockContent : undefined}
-          variant="standalone"
+          variant={attachedToTabs ? "embedded" : "standalone"}
           value={abiJson}
           copyLabel="ABI"
           customContent={

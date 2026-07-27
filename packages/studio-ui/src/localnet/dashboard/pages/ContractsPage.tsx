@@ -17,13 +17,16 @@ import {useNavigate} from "react-router"
 
 import {TablePage} from "../../../components/TablePage"
 import type {TonClient} from "../../explorer/api/client"
-import type {LocalnetContract, LocalnetContractStatus} from "../../explorer/api/types"
+import type {LocalnetContract} from "../../explorer/api/types"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {formatAddress, formatRelativeTime} from "../../explorer/components/utils"
 import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
+import {localnetContractPath, useLocalnetRoutes} from "../../routes"
 import {AddContractDialog} from "../components/AddContractDialog"
 import {EditContractNameDialog} from "../components/EditContractNameDialog"
+import {getContractIdentity} from "../contracts/contractPresentation"
+import {ContractStatus} from "../contracts/ContractStatus"
 
 import styles from "./ContractsPage.module.css"
 
@@ -33,16 +36,10 @@ interface ContractsPageProps {
   readonly onAddOpenChange: (open: boolean) => void
 }
 
-const statusLabels = {
-  active: "Active",
-  frozen: "Frozen",
-  uninitialized: "Uninitialized",
-  nonexist: "Not deployed",
-} satisfies Record<LocalnetContractStatus, string>
-
 export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageProps) {
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
+  const localnetRoutes = useLocalnetRoutes()
   const addressFormat = useAddressFormat()
   const [contracts, setContracts] = useState<readonly LocalnetContract[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,8 +94,17 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
     }
   }, [loadContracts])
 
-  const openContract = (address: string) => {
-    void navigate(routes.addressPath(address))
+  const openContractDetails = (address: string) => {
+    void navigate(
+      localnetContractPath(
+        localnetRoutes.basePath,
+        formatAddress(address, false, addressFormat),
+      ),
+    )
+  }
+
+  const openExplorer = (address: string) => {
+    void navigate(routes.addressPath(formatAddress(address, false, addressFormat)))
   }
 
   const openSimulator = (address: string) => {
@@ -172,7 +178,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                       ) {
                         return
                       }
-                      openContract(contract.address)
+                      openContractDetails(contract.address)
                     }}
                   >
                     <DataTableCell>
@@ -182,7 +188,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                       <ExplorerAddressChip
                         address={contract.address}
                         resolveName={false}
-                        onAddressClick={openContract}
+                        onAddressClick={openExplorer}
                       />
                     </DataTableCell>
                     <DataTableCell>
@@ -204,7 +210,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                         <InlineAction
                           label="Open in Explorer"
                           icon={<ExternalLink />}
-                          onClick={() => openContract(contract.address)}
+                          onClick={() => openExplorer(contract.address)}
                         />
                         <InlineAction
                           label="Open in Simulator"
@@ -240,28 +246,11 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
 }
 
 function ContractIdentity({contract}: {readonly contract: LocalnetContract}) {
-  const artifactName = contract.artifact?.entrypoint
-    ?.split("/")
-    .at(-1)
-    ?.replace(/\.(?:tolk|func?|fc)$/i, "")
-  const sourceName = contract.abiName?.trim() || artifactName
-  const customName = contract.name?.trim()
-  const title = customName || sourceName || "Unnamed contract"
-  const detail = customName && sourceName && sourceName !== customName ? sourceName : undefined
+  const {title} = getContractIdentity(contract)
 
   return (
     <span className={styles.identity}>
       <span className={styles.identityName}>{title}</span>
-      {detail ? <span className={styles.identityDetail}>{detail}</span> : null}
-    </span>
-  )
-}
-
-function ContractStatus({status}: {readonly status: LocalnetContractStatus}) {
-  return (
-    <span className={styles.status} data-status={status}>
-      <span className={styles.statusDot} aria-hidden="true" />
-      {statusLabels[status]}
     </span>
   )
 }
