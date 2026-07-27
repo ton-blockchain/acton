@@ -9,12 +9,12 @@ This package will aggregate and normalize data from:
 
 The generator downloads the account YAML files from both upstream repositories,
 validates their shapes, normalizes addresses to raw form, merges equal entries,
-and reports name conflicts:
+applies manual conflict resolutions, and saves unresolved name conflicts to
+`conflicts.json`:
 
 ```sh
 bun run generate
 ```
 
 The upstream `accounts/scammers.yaml` and `source/scam.yaml` files are
-intentionally excluded. The generator does not resolve name conflicts or write
-a generated registry yet.
+intentionally excluded. The generator does not write a generated registry yet.
