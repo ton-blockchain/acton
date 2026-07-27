@@ -1,0 +1,21 @@
+{
+  "name": "@acton/address-registry",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

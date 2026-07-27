@@ -10,6 +10,13 @@
         "react-doctor": "^0.9.1",
       },
     },
+    "packages/address-registry": {
+      "name": "@acton/address-registry",
+      "version": "0.0.0",
+      "devDependencies": {
+        "typescript": "^7.0.2",
+      },
+    },
     "packages/explorer-ui": {
       "name": "@acton/explorer-ui",
       "version": "1.0.0",
@@ -230,6 +237,8 @@
     "ws": "^8.21.0",
   },
   "packages": {
+    "@acton/address-registry": ["@acton/address-registry@workspace:packages/address-registry"],
+
     "@acton/explorer-ui": ["@acton/explorer-ui@workspace:packages/explorer-ui"],
 
     "@acton/localnet-ui": ["@acton/localnet-ui@workspace:packages/localnet-ui"],
