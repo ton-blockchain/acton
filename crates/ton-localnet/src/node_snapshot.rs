@@ -295,13 +295,6 @@ impl Node {
             .into_iter()
             .map(|artifact| (artifact.artifact_id.clone(), artifact))
             .collect();
-        for (code_hash, source) in &self.history.verified_sources {
-            let artifact = VerifiedSourceArtifact::new(*code_hash, source.clone(), 0);
-            self.history
-                .verified_source_artifacts
-                .entry(artifact.artifact_id.clone())
-                .or_insert(artifact);
-        }
         self.history.registered_contracts =
             snapshot.history_registered_contracts.into_iter().collect();
 
@@ -401,6 +394,57 @@ impl Node {
             snapshot.globals.origin_seqno,
             snapshot.history_blocks.len()
         );
+
+        let mut verified_source_artifacts =
+            HashMap::with_capacity(snapshot.history_verified_source_artifacts.len());
+        for artifact in &snapshot.history_verified_source_artifacts {
+            anyhow::ensure!(
+                verified_source_artifacts
+                    .insert(artifact.artifact_id.as_str(), artifact)
+                    .is_none(),
+                "Duplicate verified source artifact {}",
+                artifact.artifact_id
+            );
+            let expected_artifact = VerifiedSourceArtifact::new(
+                artifact.code_hash,
+                artifact.source.clone(),
+                artifact.saved_at,
+            );
+            anyhow::ensure!(
+                artifact.artifact_id == expected_artifact.artifact_id,
+                "Verified source artifact {} does not match its immutable content and code hash; \
+                 expected artifact ID {}",
+                artifact.artifact_id,
+                expected_artifact.artifact_id
+            );
+        }
+
+        let mut selected_verified_sources =
+            HashSet::with_capacity(snapshot.history_verified_sources.len());
+        for (code_hash, source) in &snapshot.history_verified_sources {
+            anyhow::ensure!(
+                selected_verified_sources.insert(*code_hash),
+                "Duplicate selected verified source for code hash {}",
+                code_hash.to_hex()
+            );
+            let selected_artifact = VerifiedSourceArtifact::new(*code_hash, source.clone(), 0);
+            let immutable_artifact = verified_source_artifacts
+                .get(selected_artifact.artifact_id.as_str())
+                .with_context(|| {
+                    format!(
+                        "Selected verified source for code hash {} has no matching immutable \
+                         artifact {}",
+                        code_hash.to_hex(),
+                        selected_artifact.artifact_id
+                    )
+                })?;
+            anyhow::ensure!(
+                immutable_artifact.code_hash == *code_hash && immutable_artifact.source == *source,
+                "Selected verified source for code hash {} conflicts with immutable artifact {}",
+                code_hash.to_hex(),
+                selected_artifact.artifact_id
+            );
+        }
 
         let mut cas = HashMap::with_capacity(snapshot.cas_entries.len());
         for (hash, boc) in &snapshot.cas_entries {

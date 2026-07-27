@@ -163,11 +163,11 @@ impl TryFrom<v2::TonBlockIdExt> for RemoteShardBoundary {
 
 fn parse_remote_shard(shard: &str) -> anyhow::Result<u64> {
     let shard = shard.trim();
-    if let Some(negative) = shard.strip_prefix('-') {
-        let value = negative
-            .parse::<u64>()
-            .with_context(|| format!("Invalid remote shard `{shard}`"))?;
-        return Ok((value as i64).wrapping_neg() as u64);
+    if shard.starts_with('-') {
+        return shard
+            .parse::<i64>()
+            .map(|value| value as u64)
+            .with_context(|| format!("Invalid remote shard `{shard}`"));
     }
 
     let hex = shard

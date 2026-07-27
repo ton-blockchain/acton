@@ -4941,6 +4941,79 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_rejects_invalid_verified_source_registry_before_apply() {
+        let code_hash = Hash256([0x29; 32]);
+        let source = json!({
+            "bundle": {
+                "source_bundle_hash": "snapshot-validation-bundle",
+                "entrypoint": "contracts/main.tolk"
+            }
+        });
+        let mut source_node = make_test_node(Box::new(NoopExecutor));
+        source_node
+            .set_verified_source(code_hash, source)
+            .expect("verified source must be stored");
+        let snapshot = source_node.build_snapshot().expect("snapshot must build");
+
+        let mut duplicate_artifact = snapshot.clone();
+        duplicate_artifact
+            .history_verified_source_artifacts
+            .push(snapshot.history_verified_source_artifacts[0].clone());
+
+        let mut inconsistent_artifact = snapshot.clone();
+        inconsistent_artifact.history_verified_source_artifacts[0].artifact_id =
+            "different-artifact-id".to_owned();
+
+        let mut missing_artifact = snapshot.clone();
+        missing_artifact.history_verified_source_artifacts.clear();
+
+        let mut conflicting_selection = snapshot;
+        conflicting_selection.history_verified_sources[0].0 = Hash256([0x2a; 32]);
+
+        let invalid_snapshots = [
+            (
+                duplicate_artifact,
+                "Duplicate verified source artifact",
+                "duplicate artifact ID",
+            ),
+            (
+                inconsistent_artifact,
+                "does not match its immutable content and code hash",
+                "artifact ID inconsistent with immutable contents",
+            ),
+            (
+                missing_artifact,
+                "has no matching immutable artifact",
+                "selected source without an artifact",
+            ),
+            (
+                conflicting_selection,
+                "conflicts with immutable artifact",
+                "selected source conflicting with its artifact",
+            ),
+        ];
+
+        let mut target = make_test_node(Box::new(NoopExecutor));
+        let before = target.dump_state_to_json().expect("target state must dump");
+        for (invalid_snapshot, expected_error, case) in invalid_snapshots {
+            let error = target
+                .apply_snapshot(invalid_snapshot)
+                .expect_err("invalid verified source registry must be rejected");
+            assert!(
+                error.to_string().contains(expected_error),
+                "{case} returned unexpected error: {error:#}"
+            );
+            assert_eq!(
+                target
+                    .dump_state_to_json()
+                    .expect("target state must still dump"),
+                before,
+                "{case} mutated the target before validation completed"
+            );
+        }
+    }
+
+    #[test]
     fn verified_source_artifact_id_is_immutable() {
         let mut node = make_test_node(Box::new(NoopExecutor));
         let code_hash = Hash256([0x28; 32]);
