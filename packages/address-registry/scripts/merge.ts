@@ -21,9 +21,11 @@ export const mergeSources = (sources: readonly AddressSource[]): MergeResult => 
   for (const source of sources) {
     for (const {address, name} of source.addresses) {
       const candidates = groups.get(address) ?? []
-      if (
-        !candidates.some(candidate => candidate.source === source.id && candidate.name === name)
-      ) {
+      const hasCandidate = candidates.some(
+        candidate => candidate.source === source.id && candidate.name === name,
+      )
+
+      if (!hasCandidate) {
         candidates.push({source: source.id, name})
         groups.set(address, candidates)
       }
