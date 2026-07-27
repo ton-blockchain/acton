@@ -829,7 +829,7 @@
 }
 
 .navigationSectionGroup,
-.explorerNavGroup {
+.nestedNavGroup {
   display: flex;
   flex-direction: column;
 }
@@ -838,7 +838,7 @@
   gap: 8px;
 }
 
-.explorerNavRow {
+.nestedNavRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
   gap: 2px;
@@ -846,26 +846,26 @@
   transition: background-color 120ms ease;
 }
 
-.explorerNavRow:hover {
+.nestedNavRow:hover {
   background: var(--acton-color-surface-hover);
 }
 
-.explorerNavRowActive,
-.explorerNavRowActive:hover {
+.nestedNavRowActive,
+.nestedNavRowActive:hover {
   background: var(--acton-color-surface-active);
 }
 
-.explorerNavRow .navItem:hover,
-.explorerNavRow .explorerNavToggle:hover {
+.nestedNavRow .navItem:hover,
+.nestedNavRow .nestedNavToggle:hover {
   background: transparent;
 }
 
-.explorerNavRowActive .navItem,
-.explorerNavRowActive .explorerNavToggle {
+.nestedNavRowActive .navItem,
+.nestedNavRowActive .nestedNavToggle {
   color: var(--acton-color-text);
 }
 
-.explorerNavToggle {
+.nestedNavToggle {
   display: inline-flex;
   width: 34px;
   height: 36px;
@@ -882,25 +882,25 @@
     background-color 120ms ease;
 }
 
-.explorerNavToggle:hover {
+.nestedNavToggle:hover {
   color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
 
-.explorerNavToggle:focus-visible {
+.nestedNavToggle:focus-visible {
   outline: 2px solid var(--acton-color-focus-ring);
   outline-offset: 0;
 }
 
-.explorerNavToggle svg {
+.nestedNavToggle svg {
   transition: transform 220ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-.explorerNavChevronOpen {
+.nestedNavChevronOpen {
   transform: rotate(90deg);
 }
 
-.explorerNavDisclosure {
+.nestedNavDisclosure {
   display: grid;
   grid-template-rows: 0fr;
   pointer-events: none;
@@ -912,7 +912,7 @@
     visibility 0s linear 260ms;
 }
 
-.explorerNavDisclosureOpen {
+.nestedNavDisclosureOpen {
   grid-template-rows: 1fr;
   pointer-events: auto;
   visibility: visible;
@@ -920,12 +920,12 @@
   transition-delay: 0s;
 }
 
-.explorerNavClip {
+.nestedNavClip {
   min-height: 0;
   overflow: hidden;
 }
 
-.explorerNavList {
+.nestedNavList {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -935,7 +935,7 @@
   border-left: 1px solid var(--acton-color-border);
 }
 
-.explorerNavItem {
+.nestedNavItem {
   display: flex;
   width: 100%;
   min-height: 34px;
@@ -956,17 +956,17 @@
     background-color 120ms ease;
 }
 
-.explorerNavItem:hover {
+.nestedNavItem:hover {
   color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
 
-.explorerNavItem:focus-visible {
+.nestedNavItem:focus-visible {
   outline: 2px solid var(--acton-color-focus-ring);
   outline-offset: 0;
 }
 
-.explorerNavItemActive {
+.nestedNavItemActive {
   color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
