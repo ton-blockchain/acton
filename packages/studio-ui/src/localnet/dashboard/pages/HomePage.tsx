@@ -457,24 +457,19 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               </DataTableTable>
             </DataTable>
 
-            {homeState.error ? (
-              <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
-                {homeState.error}
-              </div>
-            ) : homeState.isLoading ? (
+            {homeState.isLoading ? (
               <DeveloperTransactionListSkeleton
                 className={styles.homeTransactionsCard}
                 title="Recent transactions"
               />
-            ) : homeState.transactions.length === 0 ? (
-              <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
-                No transactions yet
-              </div>
             ) : (
               <DeveloperTransactionList
                 className={styles.homeTransactionsCard}
                 title="Recent transactions"
                 transactions={homeState.transactions}
+                emptyState={
+                  homeState.error ? "Recent transactions are unavailable" : "No transactions yet"
+                }
                 messageNamesByAddress={messageNamesByAddress}
                 onTransactionClick={(hashHex, _transaction, event) => {
                   openPath(routes.transactionPath(hashHex), event)
@@ -486,14 +481,15 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
             )}
 
             <div className={styles.homeMainColumn}>
-              {homeState.error ? (
-                <div className={styles.emptyState}>{homeState.error}</div>
-              ) : homeState.isLoading ? (
+              {homeState.isLoading ? (
                 <DeveloperAccountListSkeleton title="Recent accounts" />
               ) : (
                 <DeveloperAccountList
                   title="Recent accounts"
                   accounts={recentAccountItems}
+                  emptyState={
+                    homeState.error ? "Recent accounts are unavailable" : "No accounts yet"
+                  }
                   onAddressClick={(address, event) => {
                     openPath(routes.addressPath(address), event)
                   }}

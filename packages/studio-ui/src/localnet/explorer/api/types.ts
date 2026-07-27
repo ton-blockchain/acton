@@ -1154,18 +1154,23 @@ export interface LocalnetCheckpoint {
 
 export type ApiCallStatus = "success" | "failed"
 export type ApiCallType = "read" | "write"
+export type ApiCallSource = "external" | "studio_ui"
 export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
 
 export interface ApiCallRecord {
   readonly sequence: number
   readonly status: ApiCallStatus
   readonly status_code: number
+  readonly source: ApiCallSource
   readonly call_type: ApiCallType
   readonly api_family: ApiCallFamily
   readonly http_method: string
   readonly path: string
   readonly method: string
   readonly request_id: unknown
+  readonly query_params: unknown | null
+  readonly request_body: unknown | null
+  readonly request_body_truncated: boolean
   readonly timestamp_ms: number
   readonly duration_ns: number
 }

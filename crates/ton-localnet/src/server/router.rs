@@ -27,11 +27,12 @@ use super::handlers::{
     try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::{
-    ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
-    NetworkConditions, ServerState,
+    ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallSource, ApiCallType, NetworkConditions,
+    ServerState,
 };
 use axum::{
     Json, Router,
+    body::{Body, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Request, State},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
@@ -59,6 +60,11 @@ use tower_http::trace::TraceLayer;
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/localnet-ui/dist");
+
+const MAX_BUFFERED_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
+const MAX_STORED_REQUEST_BODY_BYTES: usize = 64 * 1024;
+const REQUEST_SOURCE_HEADER: &str = "x-acton-request-source";
+const STUDIO_UI_REQUEST_SOURCE: &str = "studio-ui";
 
 fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
     let nanoseconds = 1_000_000_000u64.div_ceil(u64::from(requests_per_second.get()));
@@ -388,28 +394,110 @@ async fn record_api_call(request: Request, next: Next, api_calls: ApiCallLog) ->
     let start = ApiCallLog::start();
     let http_method = request.method().as_str().to_owned();
     let path = request.uri().path().to_owned();
+    let query_params = query_params_value(request.uri().query());
+    let source = request
+        .headers()
+        .get(REQUEST_SOURCE_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| value.eq_ignore_ascii_case(STUDIO_UI_REQUEST_SOURCE))
+        .map_or(ApiCallSource::External, |_| ApiCallSource::StudioUi);
+    let (request, request_body, request_body_truncated) = match capture_request_body(request).await
+    {
+        Ok(captured) => captured,
+        Err(response) => return response,
+    };
+    let mut input = api_call_input(
+        &http_method,
+        &path,
+        source,
+        query_params,
+        request_body,
+        request_body_truncated,
+    );
     let response = next.run(request).await;
 
-    if response
-        .extensions()
-        .get::<ApiCallAlreadyRecorded>()
-        .is_some()
-    {
-        return response;
-    }
-
     let status_code = response.status().as_u16();
-    if let Some(mut input) = api_call_input(&http_method, &path) {
+    if let Some(input) = input.as_mut() {
         input.status_code = status_code;
+    }
+    if let Some(input) = input {
         api_calls.record(input, start);
     }
 
     response
 }
 
-fn api_call_input(http_method: &str, path: &str) -> Option<ApiCallInput> {
+async fn capture_request_body(
+    request: Request,
+) -> Result<(Request, Option<Value>, bool), Response> {
+    let (parts, body) = request.into_parts();
+    let bytes = to_bytes(body, MAX_BUFFERED_REQUEST_BODY_BYTES)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                Json(json!({
+                    "ok": false,
+                    "error": "Request body exceeds the localnet limit",
+                })),
+            )
+                .into_response()
+        })?;
+    let (request_body, request_body_truncated) = request_body_value(&bytes);
+    let request = Request::from_parts(parts, Body::from(bytes));
+
+    Ok((request, request_body, request_body_truncated))
+}
+
+fn request_body_value(bytes: &Bytes) -> (Option<Value>, bool) {
+    if bytes.is_empty() {
+        return (None, false);
+    }
+
+    let truncated = bytes.len() > MAX_STORED_REQUEST_BODY_BYTES;
+    let visible_bytes = &bytes[..bytes.len().min(MAX_STORED_REQUEST_BODY_BYTES)];
+    let value = if truncated {
+        Value::String(String::from_utf8_lossy(visible_bytes).into_owned())
+    } else {
+        serde_json::from_slice(visible_bytes)
+            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(visible_bytes).into_owned()))
+    };
+
+    (Some(value), truncated)
+}
+
+fn query_params_value(query: Option<&str>) -> Option<Value> {
+    let query = query?;
+    let mut params = serde_json::Map::new();
+
+    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+        let value = Value::String(value.into_owned());
+        match params.entry(key.into_owned()) {
+            serde_json::map::Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+            serde_json::map::Entry::Occupied(mut entry) => match entry.get_mut() {
+                Value::Array(values) => values.push(value),
+                previous => {
+                    *previous = Value::Array(vec![std::mem::take(previous), value]);
+                }
+            },
+        }
+    }
+
+    Some(Value::Object(params))
+}
+
+fn api_call_input(
+    http_method: &str,
+    path: &str,
+    source: ApiCallSource,
+    query_params: Option<Value>,
+    request_body: Option<Value>,
+    request_body_truncated: bool,
+) -> Option<ApiCallInput> {
     let normalized_api_path = path.strip_prefix("/api").unwrap_or(path);
-    let (api_family, method) = if path.starts_with("/acton_") {
+    let (api_family, mut method) = if path.starts_with("/acton_") {
         if matches!(path, "/acton_getApiCalls" | "/acton_nodeInfo") {
             return None;
         }
@@ -460,35 +548,57 @@ fn api_call_input(http_method: &str, path: &str) -> Option<ApiCallInput> {
     } else {
         return None;
     };
+    let request_id = if matches!(api_family, ApiCallFamily::JsonRpc)
+        && let Some(body) = request_body.as_ref().and_then(Value::as_object)
+    {
+        if let Some(json_rpc_method) = body.get("method").and_then(Value::as_str) {
+            json_rpc_method.clone_into(&mut method);
+        }
+        body.get("id").cloned().unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
 
     Some(ApiCallInput {
-        call_type: classify_http_call_type(http_method, &method, normalized_api_path),
+        source,
+        call_type: classify_http_call_type(http_method, api_family, &method),
         api_family,
         http_method: http_method.to_owned(),
         path: path.to_owned(),
         method,
-        request_id: Value::Null,
+        request_id,
+        query_params,
+        request_body,
+        request_body_truncated,
         status_code: 0,
     })
 }
 
-fn classify_http_call_type(http_method: &str, method: &str, path: &str) -> ApiCallType {
+fn classify_http_call_type(
+    http_method: &str,
+    api_family: ApiCallFamily,
+    method: &str,
+) -> ApiCallType {
     if matches!(http_method, "GET" | "HEAD" | "OPTIONS") {
         return ApiCallType::Read;
     }
 
-    let method = method.to_ascii_lowercase();
-    let path = path.to_ascii_lowercase();
-    if method.contains("rungetmethod")
-        || method.starts_with("get")
-        || method.starts_with("detect")
-        || method.contains("packaddress")
-        || path.starts_with("/streaming/")
-        || path.starts_with("/emulate/")
-    {
-        ApiCallType::Read
-    } else {
-        ApiCallType::Write
+    match api_family {
+        ApiCallFamily::JsonRpc => classify_json_rpc_call(method),
+        ApiCallFamily::Emulate | ApiCallFamily::Streaming => ApiCallType::Read,
+        ApiCallFamily::V2 if matches!(method, "runGetMethod" | "runGetMethodStd") => {
+            ApiCallType::Read
+        }
+        ApiCallFamily::V3 if matches!(method, "estimateFee" | "runGetMethod") => ApiCallType::Read,
+        ApiCallFamily::Control if method == "acton_buildSourceTrace" => ApiCallType::Read,
+        _ => ApiCallType::Write,
+    }
+}
+
+fn classify_json_rpc_call(method: &str) -> ApiCallType {
+    match method {
+        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
+        _ => ApiCallType::Read,
     }
 }
 

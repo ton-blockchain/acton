@@ -752,6 +752,7 @@
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .content {
@@ -2646,6 +2647,7 @@
     min-height: 0;
     flex: 0 0 auto;
     overflow: visible;
+    overscroll-behavior: contain;
   }
 
   .content {

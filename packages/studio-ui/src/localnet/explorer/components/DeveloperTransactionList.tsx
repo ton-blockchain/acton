@@ -1,3 +1,4 @@
+import {DataTableEmpty} from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
 import {addressKey} from "../api/compilerAbi"
@@ -115,10 +116,6 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
   )
   const rows = maxRows === undefined ? allRows : allRows.slice(0, maxRows)
 
-  if (rows.length === 0) {
-    return <div className={`${styles.emptyState} ${className ?? ""}`}>{emptyState}</div>
-  }
-
   return (
     <div className={`${styles.tableWrap} ${className ?? ""}`}>
       {title ? <div className={styles.tableTitle}>{title}</div> : null}
@@ -134,65 +131,69 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
           </tr>
         </thead>
         <tbody>
-          {rows.map(row => {
-            const hashHex = hashToHex(getTransactionHash(row.transaction))
-            const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
-            const timeTitle = formatAbsoluteTime(row.time)
+          {rows.length === 0 ? (
+            <DataTableEmpty colSpan={6}>{emptyState}</DataTableEmpty>
+          ) : (
+            rows.map(row => {
+              const hashHex = hashToHex(getTransactionHash(row.transaction))
+              const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
+              const timeTitle = formatAbsoluteTime(row.time)
 
-            return (
-              <tr
-                key={row.key}
-                className={`${styles.row} ${canOpenTransaction ? styles.rowInteractive : ""}`}
-                onClick={event => {
-                  if (hashHex) {
-                    onTransactionClick?.(hashHex, row.transaction, event)
-                  }
-                }}
-                title={row.statusLabel}
-              >
-                <td className={styles.timeCell}>
-                  <span
-                    title={timeTitle}
-                    data-visual-dynamic="time"
-                    data-visual-placeholder="<time>"
-                  >
-                    {formatTimeAgo(row.time)}
-                  </span>
-                </td>
-                <td className={`${styles.addressCell} ${styles.fromCell}`}>
-                  <EndpointCell
-                    endpoint={row.from}
-                    copyPlacement="left"
-                    onAddressClick={onAddressClick}
-                  />
-                </td>
-                <td className={styles.directionCell}>
-                  <span
-                    className={`${styles.directionBadge} ${
-                      row.direction === "IN" ? styles.directionIn : styles.directionOut
-                    }`}
-                  >
-                    {row.direction}
-                  </span>
-                </td>
-                <td className={styles.addressCell}>
-                  <EndpointCell endpoint={row.to} onAddressClick={onAddressClick} />
-                </td>
-                <td className={styles.opcodeCell}>
-                  <span className={styles.opcodeValue}>{row.messageName ?? "—"}</span>
-                </td>
-                <td className={styles.valueCell}>
-                  <span
-                    className={`${styles.valueText} ${
-                      row.valueKind === "empty" ? styles.valueEmpty : ""
-                    }`}
-                  >
-                    {row.valueLabel}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
+              return (
+                <tr
+                  key={row.key}
+                  className={`${styles.row} ${canOpenTransaction ? styles.rowInteractive : ""}`}
+                  onClick={event => {
+                    if (hashHex) {
+                      onTransactionClick?.(hashHex, row.transaction, event)
+                    }
+                  }}
+                  title={row.statusLabel}
+                >
+                  <td className={styles.timeCell}>
+                    <span
+                      title={timeTitle}
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
+                      {formatTimeAgo(row.time)}
+                    </span>
+                  </td>
+                  <td className={`${styles.addressCell} ${styles.fromCell}`}>
+                    <EndpointCell
+                      endpoint={row.from}
+                      copyPlacement="left"
+                      onAddressClick={onAddressClick}
+                    />
+                  </td>
+                  <td className={styles.directionCell}>
+                    <span
+                      className={`${styles.directionBadge} ${
+                        row.direction === "IN" ? styles.directionIn : styles.directionOut
+                      }`}
+                    >
+                      {row.direction}
+                    </span>
+                  </td>
+                  <td className={styles.addressCell}>
+                    <EndpointCell endpoint={row.to} onAddressClick={onAddressClick} />
+                  </td>
+                  <td className={styles.opcodeCell}>
+                    <span className={styles.opcodeValue}>{row.messageName ?? "—"}</span>
+                  </td>
+                  <td className={styles.valueCell}>
+                    <span
+                      className={`${styles.valueText} ${
+                        row.valueKind === "empty" ? styles.valueEmpty : ""
+                      }`}
+                    >
+                      {row.valueLabel}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })
+          )}
         </tbody>
       </table>
     </div>

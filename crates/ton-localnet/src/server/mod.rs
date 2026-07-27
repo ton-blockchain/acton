@@ -17,7 +17,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 
-const MAX_API_CALLS: usize = 500;
+const MAX_EXTERNAL_API_CALLS: usize = 1_000;
+const MAX_STUDIO_UI_API_CALLS: usize = 200;
+const MAX_API_CALLS: usize = MAX_EXTERNAL_API_CALLS + MAX_STUDIO_UI_API_CALLS;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct StartupWallet {
@@ -102,8 +104,13 @@ impl NetworkConditions {
 
 #[derive(Clone)]
 pub struct ApiCallLog {
-    entries: Arc<Mutex<VecDeque<ApiCallRecord>>>,
+    entries: Arc<Mutex<ApiCallEntries>>,
     next_sequence: Arc<AtomicU64>,
+}
+
+struct ApiCallEntries {
+    external: VecDeque<ApiCallRecord>,
+    studio_ui: VecDeque<ApiCallRecord>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -111,12 +118,16 @@ pub struct ApiCallRecord {
     pub sequence: u64,
     pub status: ApiCallStatus,
     pub status_code: u16,
+    pub source: ApiCallSource,
     pub call_type: ApiCallType,
     pub api_family: ApiCallFamily,
     pub http_method: String,
     pub path: String,
     pub method: String,
     pub request_id: Value,
+    pub query_params: Option<Value>,
+    pub request_body: Option<Value>,
+    pub request_body_truncated: bool,
     pub timestamp_ms: u128,
     pub duration_ns: u128,
 }
@@ -133,6 +144,13 @@ pub enum ApiCallStatus {
 pub enum ApiCallType {
     Read,
     Write,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiCallSource {
+    External,
+    StudioUi,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -161,22 +179,26 @@ pub struct ApiCallStart {
 
 #[derive(Clone, Debug)]
 pub struct ApiCallInput {
+    pub source: ApiCallSource,
     pub call_type: ApiCallType,
     pub api_family: ApiCallFamily,
     pub http_method: String,
     pub path: String,
     pub method: String,
     pub request_id: Value,
+    pub query_params: Option<Value>,
+    pub request_body: Option<Value>,
+    pub request_body_truncated: bool,
     pub status_code: u16,
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct ApiCallAlreadyRecorded;
 
 impl ApiCallLog {
     fn new() -> Self {
         Self {
-            entries: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_API_CALLS))),
+            entries: Arc::new(Mutex::new(ApiCallEntries {
+                external: VecDeque::with_capacity(MAX_EXTERNAL_API_CALLS),
+                studio_ui: VecDeque::with_capacity(MAX_STUDIO_UI_API_CALLS),
+            })),
             next_sequence: Arc::new(AtomicU64::new(1)),
         }
     }
@@ -205,12 +227,16 @@ impl ApiCallLog {
             sequence,
             status,
             status_code: input.status_code,
+            source: input.source,
             call_type: input.call_type,
             api_family: input.api_family,
             http_method: input.http_method,
             path: input.path,
             method: input.method,
             request_id: input.request_id,
+            query_params: input.query_params,
+            request_body: input.request_body,
+            request_body_truncated: input.request_body_truncated,
             timestamp_ms,
             duration_ns: start.duration_start.elapsed().as_nanos(),
         };
@@ -219,10 +245,15 @@ impl ApiCallLog {
             .entries
             .lock()
             .expect("API call log lock must not be poisoned");
-        if entries.len() == MAX_API_CALLS {
-            entries.pop_front();
+        let (source_entries, max_entries) = match input.source {
+            ApiCallSource::External => (&mut entries.external, MAX_EXTERNAL_API_CALLS),
+            ApiCallSource::StudioUi => (&mut entries.studio_ui, MAX_STUDIO_UI_API_CALLS),
+        };
+        if source_entries.len() == max_entries {
+            source_entries.pop_front();
         }
-        entries.push_back(record);
+        source_entries.push_back(record);
+        drop(entries);
     }
 
     #[must_use]
@@ -231,13 +262,22 @@ impl ApiCallLog {
             .entries
             .lock()
             .expect("API call log lock must not be poisoned");
+        let total_retained = entries.external.len() + entries.studio_ui.len();
         let limit = limit.unwrap_or(MAX_API_CALLS).min(MAX_API_CALLS);
-        let skip = entries.len().saturating_sub(limit);
-        let calls = entries.iter().skip(skip).cloned().collect();
+        let skip = total_retained.saturating_sub(limit);
+        let mut calls = entries
+            .external
+            .iter()
+            .chain(&entries.studio_ui)
+            .cloned()
+            .collect::<Vec<_>>();
+        drop(entries);
+        calls.sort_unstable_by_key(|call| call.sequence);
+        let calls = calls.into_iter().skip(skip).collect();
 
         ApiCallLogSnapshot {
             calls,
-            total_retained: entries.len(),
+            total_retained,
             max_retained: MAX_API_CALLS,
         }
     }
@@ -488,4 +528,56 @@ async fn seed_startup_wallet_names(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_call_sources_have_independent_retention_limits() {
+        let log = ApiCallLog::new();
+
+        for source in [
+            ApiCallSource::External,
+            ApiCallSource::StudioUi,
+            ApiCallSource::External,
+        ] {
+            let entries = match source {
+                ApiCallSource::External => MAX_EXTERNAL_API_CALLS,
+                ApiCallSource::StudioUi => MAX_STUDIO_UI_API_CALLS,
+            };
+            for _ in 0..entries {
+                log.record(
+                    ApiCallInput {
+                        source,
+                        call_type: ApiCallType::Read,
+                        api_family: ApiCallFamily::V3,
+                        http_method: "GET".to_owned(),
+                        path: "/api/v3/blocks".to_owned(),
+                        method: "blocks".to_owned(),
+                        request_id: Value::Null,
+                        query_params: None,
+                        request_body: None,
+                        request_body_truncated: false,
+                        status_code: 200,
+                    },
+                    ApiCallLog::start(),
+                );
+            }
+        }
+
+        let snapshot = log.snapshot(None);
+        let external_count = snapshot
+            .calls
+            .iter()
+            .filter(|call| matches!(call.source, ApiCallSource::External))
+            .count();
+        let studio_ui_count = snapshot.calls.len() - external_count;
+
+        assert_eq!(external_count, MAX_EXTERNAL_API_CALLS);
+        assert_eq!(studio_ui_count, MAX_STUDIO_UI_API_CALLS);
+        assert_eq!(snapshot.total_retained, MAX_API_CALLS);
+        assert_eq!(snapshot.max_retained, MAX_API_CALLS);
+    }
 }

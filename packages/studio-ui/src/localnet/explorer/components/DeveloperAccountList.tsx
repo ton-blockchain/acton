@@ -1,3 +1,4 @@
+import {DataTableEmpty} from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
 import type {V3AccountState} from "../api/types"
@@ -69,10 +70,6 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
   emptyState = "No accounts yet",
   onAddressClick,
 }) => {
-  if (accounts.length === 0) {
-    return <div className={`${styles.emptyState} ${className ?? ""}`}>{emptyState}</div>
-  }
-
   return (
     <div className={`${styles.tableWrap} ${className ?? ""}`}>
       {title ? <div className={styles.tableTitle}>{title}</div> : null}
@@ -86,48 +83,55 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
           </tr>
         </thead>
         <tbody>
-          {accounts.map(account => {
-            const status = getAccountStatus(account.state)
-            const type = getAccountType(account.state)
-            const balance = formatAccountBalance(account.state)
-            const canOpenAccount = onAddressClick !== undefined
+          {accounts.length === 0 ? (
+            <DataTableEmpty colSpan={4}>{emptyState}</DataTableEmpty>
+          ) : (
+            accounts.map(account => {
+              const status = getAccountStatus(account.state)
+              const type = getAccountType(account.state)
+              const balance = formatAccountBalance(account.state)
+              const canOpenAccount = onAddressClick !== undefined
 
-            return (
-              <tr
-                key={account.address}
-                className={`${styles.row} ${canOpenAccount ? styles.rowInteractive : ""}`}
-                onClick={event => onAddressClick?.(account.address, event)}
-                onKeyDown={event => {
-                  if (!canOpenAccount) {
-                    return
-                  }
+              return (
+                <tr
+                  key={account.address}
+                  className={`${styles.row} ${canOpenAccount ? styles.rowInteractive : ""}`}
+                  onClick={event => onAddressClick?.(account.address, event)}
+                  onKeyDown={event => {
+                    if (!canOpenAccount) {
+                      return
+                    }
 
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault()
-                    onAddressClick(account.address)
-                  }
-                }}
-                tabIndex={canOpenAccount ? 0 : undefined}
-                role={canOpenAccount ? "button" : undefined}
-                aria-label={canOpenAccount ? `Open account ${account.address}` : undefined}
-              >
-                <td className={styles.accountCell}>
-                  <ExplorerAddressChip address={account.address} onAddressClick={onAddressClick} />
-                </td>
-                <td className={styles.statusCell}>
-                  <span className={`${styles.statusBadge} ${styles[status.className]}`}>
-                    {status.label}
-                  </span>
-                </td>
-                <td className={styles.typeCell}>
-                  <span className={styles.typeValue}>{type}</span>
-                </td>
-                <td className={styles.balanceCell}>
-                  <span className={styles.balanceText}>{balance}</span>
-                </td>
-              </tr>
-            )
-          })}
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      onAddressClick(account.address)
+                    }
+                  }}
+                  tabIndex={canOpenAccount ? 0 : undefined}
+                  role={canOpenAccount ? "button" : undefined}
+                  aria-label={canOpenAccount ? `Open account ${account.address}` : undefined}
+                >
+                  <td className={styles.accountCell}>
+                    <ExplorerAddressChip
+                      address={account.address}
+                      onAddressClick={onAddressClick}
+                    />
+                  </td>
+                  <td className={styles.statusCell}>
+                    <span className={`${styles.statusBadge} ${styles[status.className]}`}>
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className={styles.typeCell}>
+                    <span className={styles.typeValue}>{type}</span>
+                  </td>
+                  <td className={styles.balanceCell}>
+                    <span className={styles.balanceText}>{balance}</span>
+                  </td>
+                </tr>
+              )
+            })
+          )}
         </tbody>
       </table>
     </div>

@@ -114,6 +114,7 @@ function StudioWorkspace({
   onSelectTestRun,
 }: StudioWorkspaceProps) {
   const {showToast} = useToast()
+  const location = useLocation()
   const runtime = useLocalnetRuntime()
   const activePath: StudioPath =
     route.kind === "page"
@@ -228,6 +229,9 @@ function StudioWorkspace({
   }
 
   const environmentRoute = route.kind === "environment" ? route : undefined
+  const isEnvironmentDashboard =
+    environmentRoute !== undefined &&
+    location.pathname === `${environmentRoute.basePath}/dashboard`
   const environmentLoadError =
     environmentsState.error ??
     (environmentRoute && !environmentsState.isLoading && !environment
@@ -247,7 +251,15 @@ function StudioWorkspace({
   return (
     <StudioShell
       activePath={activePath}
-      contentMode={environmentRoute ? "full" : hasSelectedTestRun ? "workspace" : "default"}
+      contentMode={
+        isEnvironmentDashboard
+          ? "workspace"
+          : environmentRoute
+            ? "full"
+            : hasSelectedTestRun
+              ? "workspace"
+              : "default"
+      }
       headerMode={hasSelectedTestRun ? "hidden" : "visible"}
       headerActions={
         environmentRoute ? (

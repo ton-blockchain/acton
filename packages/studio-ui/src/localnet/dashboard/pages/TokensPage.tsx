@@ -136,17 +136,19 @@ export const TokensPage: FC<TokensPageProps> = ({client}) => {
                     >
                       <DataTableCell>
                         <div className={styles.assetTableIdentity}>
-                          <img
-                            src={image}
-                            alt=""
-                            className={styles.assetTableImage}
-                            onError={event => {
-                              const imageElement = event.currentTarget
-                              if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                                imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                              }
-                            }}
-                          />
+                          <span className={styles.assetTableImageFrame}>
+                            <img
+                              src={image}
+                              alt=""
+                              className={styles.assetTableImage}
+                              onError={event => {
+                                const imageElement = event.currentTarget
+                                if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
+                                  imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                                }
+                              }}
+                            />
+                          </span>
                           <span className={styles.assetTableText}>
                             <strong className={styles.assetTableName}>{name}</strong>
                             <span className={styles.assetTableSecondary}>{symbol}</span>

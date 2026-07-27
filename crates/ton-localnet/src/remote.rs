@@ -43,19 +43,32 @@ fn create_api_client(network: Network) -> anyhow::Result<TonApiClient> {
     TonApiClient::new(network, config.custom_networks())
 }
 
-fn with_api_client<T>(
-    provider: &RemoteProvider,
+fn request_with_api_client<T>(
+    network: Network,
     request: impl FnOnce(&TonApiClient) -> anyhow::Result<T>,
 ) -> anyhow::Result<T> {
-    request(&create_api_client(provider.network.clone())?)
+    request(&create_api_client(network)?)
+}
+
+fn with_api_client<T: Send>(
+    provider: &RemoteProvider,
+    request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send,
+) -> anyhow::Result<T> {
+    let network = provider.network.clone();
+    std::thread::scope(|scope| {
+        scope
+            .spawn(move || request_with_api_client(network, request))
+            .join()
+            .map_err(|_| anyhow::anyhow!("Remote provider worker panicked"))?
+    })
 }
 
 async fn with_api_client_async<T: Send + 'static>(
     provider: &RemoteProvider,
     request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send + 'static,
 ) -> anyhow::Result<T> {
-    let provider = provider.clone();
-    tokio::task::spawn_blocking(move || with_api_client(&provider, request))
+    let network = provider.network.clone();
+    tokio::task::spawn_blocking(move || request_with_api_client(network, request))
         .await
         .context("Remote provider worker failed")?
 }
@@ -186,5 +199,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(provider.fork_block_number, Some(81_000_000));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn synchronous_api_client_request_is_safe_inside_runtime() {
+        let provider = RemoteProvider {
+            network: Network::Mainnet,
+            fork_block_number: Some(81_000_000),
+        };
+
+        with_api_client(&provider, |_| Ok(())).unwrap();
     }
 }

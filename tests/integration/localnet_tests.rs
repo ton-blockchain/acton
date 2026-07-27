@@ -1159,6 +1159,62 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
 }
 
 #[test]
+fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
+    let project = ProjectBuilder::new("localnet-auto-mining-fork-remote-account").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    let source_wallets = source_node.get_json("/acton_getStartupWallets");
+    let source_address = response_payload(&source_wallets)
+        .as_array()
+        .and_then(|wallets| wallets.first())
+        .and_then(|wallet| wallet["address"].as_str())
+        .expect("source startup wallet must expose an address");
+
+    append_custom_localnet_network(project.path(), "auto-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .args(["--fork-net", "custom:auto-fork-source"])
+        .start();
+
+    let (account_status, account_state) = forked_node.get_json_with_status(&format!(
+        "/api/v3/accountStates?address={source_address}&include_boc=false"
+    ));
+    let (node_info_status, node_info) = forked_node.get_json_with_status("/acton_nodeInfo");
+    let snapshot = json!({
+        "remote_account": {
+            "request_finished": account_status > 0,
+            "response_is_json": account_state.is_object(),
+        },
+        "node_after_fetch": {
+            "status": node_info_status,
+            "responded": node_info["ok"].as_bool(),
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_auto_mining_fork_remote_account.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
 fn localnet_records_api_calls_for_dashboard() {
     let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
     let node = project.localnet().start();
@@ -1168,7 +1224,14 @@ fn localnet_records_api_calls_for_dashboard() {
 
     let _admin_wallets = node.get_json("/acton_getStartupWallets");
     let _admin_status = node.get_json("/acton_nodeInfo");
-    let _v2_status = node.get_json("/api/v2/getMasterchainInfo");
+    let _v2_status = node.get_json("/api/v2/getMasterchainInfo?archival=true&limit=2");
+    Client::new()
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .header("X-Acton-Request-Source", "studio-ui")
+        .send()
+        .expect("Studio UI request must be sent")
+        .error_for_status()
+        .expect("Studio UI request must succeed");
     let _successful_rpc = node.post_json(
         "/api/v2/jsonRPC",
         &json!({
@@ -1185,6 +1248,24 @@ fn localnet_records_api_calls_for_dashboard() {
             "id": "missing",
             "method": "missingMethod",
             "params": {}
+        }),
+    );
+    let (_write_status, _write_rpc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "write",
+            "method": "sendBoc",
+            "params": {
+                "boc": "invalid"
+            }
+        }),
+    );
+    let (_estimate_status, _estimate_response) = node.post_json_with_status(
+        "/api/v3/estimateFee",
+        &json!({
+            "address": "invalid",
+            "body": "invalid"
         }),
     );
 

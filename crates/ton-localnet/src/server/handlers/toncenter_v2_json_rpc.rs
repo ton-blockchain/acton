@@ -9,9 +9,7 @@ use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_nam
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::{Localnet, TransactionLookupKind};
-use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
-use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Serialize;
@@ -34,8 +32,6 @@ macro_rules! validate {
 
 pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
-    State(api_calls): State<ApiCallLog>,
-    OriginalUri(original_uri): OriginalUri,
     Json(payload): Json<JsonRpcIncomingRequest<Value>>,
 ) -> impl IntoResponse {
     tracing::debug!(
@@ -44,36 +40,8 @@ pub async fn json_rpc(
         payload.id
     );
 
-    let start = ApiCallLog::start();
-    let method = payload.method.clone();
-    let call_type = classify_json_rpc_call(&method);
-    let request_id = payload.id.clone().unwrap_or(Value::Null);
-
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
-    let mut response = result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()));
-
-    api_calls.record(
-        ApiCallInput {
-            call_type,
-            api_family: ApiCallFamily::JsonRpc,
-            http_method: "POST".to_owned(),
-            path: original_uri.path().to_owned(),
-            method,
-            request_id,
-            status_code: response.status().as_u16(),
-        },
-        start,
-    );
-    response.extensions_mut().insert(ApiCallAlreadyRecorded);
-
-    response
-}
-
-fn classify_json_rpc_call(method: &str) -> ApiCallType {
-    match method {
-        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
-        _ => ApiCallType::Read,
-    }
+    result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()))
 }
 
 fn normalize_json_rpc_params(params: Option<Value>) -> anyhow::Result<Value> {

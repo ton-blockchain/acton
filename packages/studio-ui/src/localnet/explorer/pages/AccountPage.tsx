@@ -42,6 +42,7 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import {useLocalnetRoutes} from "../../routes"
 
 import styles from "./AccountPage.module.css"
 
@@ -69,6 +70,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const navigate = useNavigate()
   const location = useLocation()
   const routes = useExplorerRoutePaths()
+  const localnetRoutes = useLocalnetRoutes()
   const openPath = useOpenExplorerPath()
   const {addressFormat, network} = useNetworkInfo()
   const metadataRegistry = useMetadataRegistry()
@@ -1082,7 +1084,9 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                           className={styles.jettonMintButton}
                           onClick={() =>
                             void navigate(
-                              `/faucet?jetton=${encodeURIComponent(toRawAddress(jettonMaster.address))}`,
+                              `${localnetRoutes.path("/faucet")}?jetton=${encodeURIComponent(
+                                toRawAddress(jettonMaster.address),
+                              )}`,
                             )
                           }
                         >

@@ -47,6 +47,9 @@ interface TonClientOptions {
   readonly toncenterApiKey?: string
 }
 
+const REQUEST_SOURCE_HEADER = "X-Acton-Request-Source"
+const STUDIO_UI_REQUEST_SOURCE = "studio-ui"
+
 export type AccountHistorySortOrder = "asc" | "desc"
 export type RawBlockNetwork = "mainnet" | "testnet"
 
@@ -985,7 +988,7 @@ export class TonClient {
     })
   }
 
-  async getApiCalls(limit = 200): Promise<ApiCallLogResponse> {
+  async getApiCalls(limit = 1200): Promise<ApiCallLogResponse> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getApiCalls")
     url.searchParams.append("limit", limit.toString())
     return this.request(url, "Failed to fetch API calls")
@@ -1108,7 +1111,7 @@ export class TonClient {
       const url = this.buildStreamingSseUrl()
       const response = await fetch(
         url.toString(),
-        this.withApiAuthHeaders(url, {
+        this.withRequestHeaders(url, {
           method: "POST",
           headers: {
             Accept: "text/event-stream",
@@ -1226,7 +1229,7 @@ export class TonClient {
   }
 
   private async fetchRequest<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(url.toString(), this.withApiAuthHeaders(url, options))
+    const response = await fetch(url.toString(), this.withRequestHeaders(url, options))
     if (response.status === 401) {
       this.onUnauthorized?.()
     }
@@ -1251,7 +1254,7 @@ export class TonClient {
   }
 
   private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {
-    const response = await fetch(url.toString(), this.withApiAuthHeaders(url))
+    const response = await fetch(url.toString(), this.withRequestHeaders(url))
     if (response.status === 401) {
       this.onUnauthorized?.()
     }
@@ -1325,11 +1328,17 @@ export class TonClient {
     }
   }
 
-  private withApiAuthHeaders(url: URL, options?: RequestInit): RequestInit | undefined {
+  private withRequestHeaders(url: URL, options?: RequestInit): RequestInit | undefined {
     const headers = new Headers(options?.headers)
     let changed = false
 
-    if (this.localnetApiToken && this.isLocalnetApiUrl(url)) {
+    const isLocalnetApiUrl = this.isLocalnetApiUrl(url)
+    if (isLocalnetApiUrl) {
+      headers.set(REQUEST_SOURCE_HEADER, STUDIO_UI_REQUEST_SOURCE)
+      changed = true
+    }
+
+    if (this.localnetApiToken && isLocalnetApiUrl) {
       headers.set("Authorization", `Bearer ${this.localnetApiToken}`)
       changed = true
     }

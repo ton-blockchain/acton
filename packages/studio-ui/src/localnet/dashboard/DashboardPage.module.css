@@ -5,6 +5,7 @@
   color: var(--acton-color-text);
   overflow: hidden;
   position: relative;
+  overscroll-behavior: contain;
 }
 
 .sidebarSlot {
@@ -832,6 +833,7 @@
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .content {
@@ -2362,16 +2364,67 @@
   gap: 20px;
 }
 
+.rpcCallsFilterControls {
+  display: flex;
+  flex: 1 1 42rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  min-width: 0;
+}
+
+.rpcEndpointFilter {
+  flex: 0 1 17rem;
+  width: 17rem;
+  max-width: 100%;
+}
+
 .rpcStatusIcon {
   width: 22px;
   height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  vertical-align: middle;
 }
 
 .rpcCallsTable {
   --acton-color-surface-row: var(--acton-color-surface-hover);
+}
+
+.rpcCallsPagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpcCallsPaginationSummary,
+.rpcCallsPaginationPage {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.rpcCallsPaginationOverview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rpcCallsPageSize {
+  width: 8.5rem;
+}
+
+.rpcCallsPaginationActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rpcCallsPaginationPage {
+  min-width: 6rem;
+  text-align: center;
 }
 
 .rpcStatusSuccess {
@@ -2382,13 +2435,76 @@
   color: var(--acton-color-status-failed-text);
 }
 
-.rpcTypeCell {
-  text-transform: lowercase;
-}
-
 .rpcDurationCell,
 .rpcTimestampCell {
   white-space: nowrap;
+}
+
+.rpcDetailsRow {
+  background: var(--acton-color-surface-raised);
+}
+
+.rpcExpandHeader,
+.rpcExpandCell {
+  padding-inline: 0;
+}
+
+.rpcExpandAction {
+  vertical-align: middle;
+}
+
+.rpcExpandAction svg {
+  position: relative;
+  top: -1px;
+  width: 1rem;
+  height: 1rem;
+}
+
+.rpcDetailsCell {
+  padding: 0;
+  background: var(--acton-color-surface-raised);
+}
+
+.rpcDetails {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 16px 3rem;
+}
+
+.rpcRequestMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--acton-color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.rpcRequestPath {
+  overflow-wrap: anywhere;
+  font-family: var(--acton-font-mono);
+  font-weight: 500;
+}
+
+.rpcRequestCode {
+  --acton-highlighted-code-font-size: 0.75rem;
+  --acton-highlighted-code-line-height: 1.45;
+  --acton-highlighted-code-padding: 10px 12px 8px;
+}
+
+.rpcBodyNotice {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: 0.78rem;
+}
+
+.rpcEmptyRequest {
+  padding: 14px 16px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  color: var(--acton-color-text-muted);
+  font-size: 0.85rem;
 }
 
 .spinning {
@@ -2753,6 +2869,7 @@
     min-height: 0;
     flex: 0 0 auto;
     overflow: visible;
+    overscroll-behavior: contain;
   }
 
   .content {
