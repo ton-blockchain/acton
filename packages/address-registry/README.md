@@ -10,11 +10,12 @@ This package will aggregate and normalize data from:
 The generator downloads the account YAML files from both upstream repositories,
 validates their shapes, normalizes addresses to raw form, merges equal entries,
 and applies manual conflict resolutions. It fails if any name conflict does not
-have a resolution:
+have a resolution, then writes `src/addresses.json`. The stable TypeScript
+binding lives in `src/addresses.ts`:
 
 ```sh
 bun run generate
 ```
 
 The upstream `accounts/scammers.yaml` and `source/scam.yaml` files are
-intentionally excluded. The generator does not write a generated registry yet.
+intentionally excluded.

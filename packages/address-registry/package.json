@@ -6,7 +6,8 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./addresses.json": "./src/addresses.json"
   },
   "scripts": {
     "fmt": "biome format --write .",

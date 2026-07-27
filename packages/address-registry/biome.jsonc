@@ -8,8 +8,12 @@
   "linter": {
     "rules": {
       "correctness": {
+        "noNodejsModules": "off",
         "noUnresolvedImports": "off",
         "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off"
       },
       "style": {
         "useExportsLast": "off"
