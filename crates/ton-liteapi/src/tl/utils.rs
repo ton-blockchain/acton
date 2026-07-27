@@ -17,11 +17,7 @@ pub fn lossy_read<'tl, T: TlRead<'tl>>(packet: &'tl [u8]) -> TlResult<Option<T>>
 }
 
 pub fn fmt_string(bytes: &[u8], f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(
-        f,
-        "{}",
-        std::string::String::from_utf8(bytes.to_vec()).unwrap()
-    )
+    write!(f, "{}", std::string::String::from_utf8_lossy(bytes))
 }
 
 pub fn fmt_bytes(bytes: &[u8], f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {

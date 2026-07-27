@@ -255,6 +255,21 @@ pub(super) fn test_string_creation_from_string() {
 }
 
 #[test]
+pub(super) fn test_string_display_non_utf8_does_not_panic() {
+    let invalid =
+        tl_proto::deserialize::<String>(&tl_proto::serialize(&[0xffu8, 0x80, 0xfe][..])).unwrap();
+    assert_eq!(format!("{}", invalid), "\u{FFFD}\u{FFFD}\u{FFFD}");
+}
+
+#[test]
+pub(super) fn test_string_debug_non_utf8_does_not_panic() {
+    let invalid =
+        tl_proto::deserialize::<String>(&tl_proto::serialize(&[0xffu8, 0x80, 0xfe][..])).unwrap();
+    let debug_str = format!("{:?}", invalid);
+    assert!(debug_str.contains('\u{FFFD}'));
+}
+
+#[test]
 pub(super) fn test_block_link_back_creation() {
     let from = BlockIdExt {
         workchain: 0,
