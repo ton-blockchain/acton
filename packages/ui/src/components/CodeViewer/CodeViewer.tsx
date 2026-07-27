@@ -390,6 +390,22 @@ function languageForPath(path: string): HighlightedCodeLanguage | undefined {
   if (normalizedPath.endsWith(".fc") || normalizedPath.endsWith(".func")) return "func"
   if (normalizedPath.endsWith(".tact")) return "tact"
   if (
+    normalizedPath.endsWith(".js") ||
+    normalizedPath.endsWith(".jsx") ||
+    normalizedPath.endsWith(".mjs") ||
+    normalizedPath.endsWith(".cjs")
+  ) {
+    return "javascript"
+  }
+  if (
+    normalizedPath.endsWith(".sh") ||
+    normalizedPath.endsWith(".bash") ||
+    normalizedPath.endsWith(".zsh")
+  ) {
+    return "shellscript"
+  }
+  if (normalizedPath.endsWith(".toml")) return "toml"
+  if (
     normalizedPath.endsWith(".json") ||
     normalizedPath.endsWith(".abi") ||
     normalizedPath.endsWith(".pkg")

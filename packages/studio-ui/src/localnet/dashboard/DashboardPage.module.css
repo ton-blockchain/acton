@@ -930,14 +930,6 @@
   align-items: start;
 }
 
-.homeTopRow {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(660px, 1.9fr) minmax(340px, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
 .homeMainColumn,
 .homeSideColumn {
   min-width: 0;
@@ -1327,7 +1319,6 @@
   color: var(--acton-color-text-muted);
 }
 
-.endpointList,
 .nodeInfoList,
 .accountList {
   display: flex;
@@ -1335,7 +1326,6 @@
   gap: 10px;
 }
 
-.homeCard .endpointList,
 .homeCard .nodeInfoList {
   gap: 0;
 }
@@ -1442,123 +1432,9 @@
   justify-self: end;
 }
 
-.endpointRow {
-  display: grid;
-  grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
-  align-items: center;
-  justify-content: flex-start;
-  gap: 16px;
-  min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 8px;
-  background: var(--acton-color-surface);
-  color: inherit;
-}
-
-.homeCard .endpointRow {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 18px;
-  border: 0;
-  border-top: 1px solid var(--acton-color-border);
-  border-radius: 0;
-  background: transparent;
-  box-sizing: border-box;
-}
-
-.homeCard .endpointRow:first-child {
-  border-top: 0;
-}
-
-.endpointLabel,
 .rowSecondary {
   color: var(--acton-color-text-muted);
   font-size: 0.8rem;
-}
-
-.homeCard .endpointLabel {
-  min-width: 0;
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.endpointValue {
-  min-width: 0;
-  color: var(--acton-color-text);
-  font-size: 0.82rem;
-  line-height: 1.35;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.endpointValueRow {
-  min-width: 0;
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-self: end;
-  gap: 8px;
-}
-
-.homeCard .endpointValueRow {
-  display: flex;
-  justify-self: stretch;
-}
-
-.homeCard .endpointValue {
-  flex: 1 1 auto;
-}
-
-.endpointActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-
-.homeCard .endpointActions {
-  align-self: center;
-}
-
-.endpointButton {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  color: var(--acton-color-text-muted);
-  background: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color var(--acton-duration-fast),
-    border-color var(--acton-duration-fast),
-    color var(--acton-duration-fast);
-}
-
-.endpointButton:hover {
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface-hover);
-}
-
-.endpointButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.endpointButtonCopied {
-  color: var(--acton-color-text);
-  background: transparent;
 }
 
 .listTable {
@@ -2666,10 +2542,6 @@
   .homeLayout {
     grid-template-columns: 1fr;
   }
-
-  .homeTopRow {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 920px) {
@@ -3119,11 +2991,6 @@
   }
 
   .accountItem {
-    align-items: center;
-    flex-direction: row;
-  }
-
-  .endpointRow {
     align-items: center;
     flex-direction: row;
   }

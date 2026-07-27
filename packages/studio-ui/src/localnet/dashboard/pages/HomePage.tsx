@@ -1,5 +1,5 @@
-import {BookOpen, Check, Copy, FastForward} from "lucide-react"
-import {Button, Dialog, Input, Tooltip, useToast} from "@acton/ui"
+import {FastForward} from "lucide-react"
+import {Button, Dialog, Input, useToast} from "@acton/ui"
 import {Link, useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -28,6 +28,7 @@ import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
 import {useLocalnetRoutes} from "../../routes"
 import {EnvironmentActions} from "../components/EnvironmentActions"
+import {EnvironmentConnectPanel} from "../components/EnvironmentConnectPanel"
 import {collectRecentAccounts, formatForkNetworkLabel} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
@@ -95,7 +96,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const {showToast} = useToast()
   const {prefetchNames, updateDomains} = useAddressBook()
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
-  const [copiedEndpoint, setCopiedEndpoint] = useState<string>()
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false)
   const [timeAdvanceSeconds, setTimeAdvanceSeconds] = useState(DEFAULT_TIME_ADVANCE_SECONDS)
   const [timeAdvanceError, setTimeAdvanceError] = useState<string>()
@@ -120,27 +120,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
   const forkBadgeLabel = formatForkNetworkLabel(forkNetwork) ?? "clean network"
   const endpoints = useMemo(() => client.getEndpoints(), [client])
-  const endpointRows = useMemo(
-    () =>
-      [
-        {
-          label: "V2 API",
-          value: endpoints.apiV2,
-          referencePath: "/api-reference/v2",
-        },
-        {
-          label: "V3 API",
-          value: endpoints.apiV3,
-          referencePath: "/api-reference/v3",
-        },
-        {
-          label: "Control API",
-          value: endpoints.admin,
-          referencePath: "/api-reference/control",
-        },
-      ].filter(endpoint => endpoint.value.length > 0),
-    [endpoints],
-  )
   const nodeInfoRows = useMemo<readonly NodeInfoRow[]>(() => {
     const isLoading = nodeInfo === undefined
     const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
@@ -302,17 +281,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     void prefetchNames(displayedAddresses)
   }, [displayedAddresses, prefetchNames])
 
-  useEffect(() => {
-    if (!copiedEndpoint) {
-      return
-    }
-
-    const timeoutId = globalThis.setTimeout(() => setCopiedEndpoint(undefined), 2000)
-    return () => {
-      globalThis.clearTimeout(timeoutId)
-    }
-  }, [copiedEndpoint])
-
   const openTimeAdvanceModal = useCallback(() => {
     setTimeAdvanceSeconds(DEFAULT_TIME_ADVANCE_SECONDS)
     setTimeAdvanceError(undefined)
@@ -324,23 +292,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       setIsTimeModalOpen(false)
     }
   }, [isAdvancingTime])
-
-  const copyEndpoint = useCallback(
-    async (endpoint: string) => {
-      try {
-        await navigator.clipboard.writeText(endpoint)
-        setCopiedEndpoint(endpoint)
-      } catch (error) {
-        console.error("Failed to copy endpoint", error)
-        showToast({
-          variant: "error",
-          title: "Copy failed",
-          description: "Failed to copy endpoint URL.",
-        })
-      }
-    },
-    [showToast],
-  )
 
   const handleTimeAdvanceSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -404,98 +355,58 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       <div className={styles.environmentHomeScroll}>
         <section className={styles.environmentHomeContent}>
           <div className={styles.homeLayout}>
-            <div className={styles.homeTopRow}>
-              <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
-                <header className={styles.dashboardCardHeader}>
-                  <h2 className={styles.dashboardCardTitle}>Node info</h2>
-                </header>
-                <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
-                  {nodeInfoRows.map(row => {
-                    const value = row.value ?? "—"
-                    const title = row.title ?? value
-                    const rowClassName = `${styles.nodeInfoRow} ${
-                      row.variant === "wide" ? styles.nodeInfoWideRow : ""
-                    }`
+            <EnvironmentConnectPanel
+              apiV2Url={endpoints.apiV2}
+              apiV3Url={endpoints.apiV3}
+              controlUrl={endpoints.admin}
+              environmentName={runtime.environment?.name ?? "Virtual environment"}
+              explorerUrl={localnetRoutes.path("/explorer")}
+              rpcUrl={runtime.environment?.rpcUrl ?? endpoints.admin}
+              settingsPath={localnetRoutes.path("/settings")}
+            />
 
-                    return (
-                      <div key={row.label} className={rowClassName}>
-                        <span className={styles.nodeInfoLabel}>{row.label}</span>
-                        {row.isLoading ? (
-                          <span
-                            className={`${styles.skeletonLine} ${styles.nodeInfoValueSkeleton}`}
-                            aria-label={`Loading ${row.label}`}
-                          />
-                        ) : row.to ? (
-                          <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
-                            {value}
-                          </Link>
-                        ) : (
-                          <span
-                            className={styles.nodeInfoValue}
-                            title={title}
-                            data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
-                            data-visual-placeholder={row.visualPlaceholder}
-                          >
-                            <span className={styles.nodeInfoValueText}>{value}</span>
-                            {row.secondaryValue && (
-                              <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
+            <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+              <header className={styles.dashboardCardHeader}>
+                <h2 className={styles.dashboardCardTitle}>Node info</h2>
+              </header>
+              <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
+                {nodeInfoRows.map(row => {
+                  const value = row.value ?? "—"
+                  const title = row.title ?? value
+                  const rowClassName = `${styles.nodeInfoRow} ${
+                    row.variant === "wide" ? styles.nodeInfoWideRow : ""
+                  }`
 
-              <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
-                <header className={styles.dashboardCardHeader}>
-                  <h2 className={styles.dashboardCardTitle}>Endpoints</h2>
-                </header>
-                <div className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
-                  {endpointRows.map(endpoint => {
-                    const isCopied = copiedEndpoint === endpoint.value
-
-                    return (
-                      <div key={endpoint.label} className={styles.endpointRow}>
-                        <span className={styles.endpointLabel}>{endpoint.label}</span>
-                        <span className={styles.endpointValueRow}>
-                          <Tooltip content={endpoint.value}>
-                            <span className={styles.endpointValue}>{endpoint.value}</span>
-                          </Tooltip>
-                          <span className={styles.endpointActions}>
-                            <Tooltip content={isCopied ? "Copied" : "Copy endpoint"}>
-                              <button
-                                type="button"
-                                className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
-                                aria-label={
-                                  isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
-                                }
-                                onClick={() => void copyEndpoint(endpoint.value)}
-                              >
-                                {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                              </button>
-                            </Tooltip>
-                            <Tooltip content="Open API reference">
-                              <button
-                                type="button"
-                                className={styles.endpointButton}
-                                aria-label={`Open ${endpoint.label} reference`}
-                                onClick={() =>
-                                  void navigate(localnetRoutes.path(endpoint.referencePath))
-                                }
-                              >
-                                <BookOpen size={14} />
-                              </button>
-                            </Tooltip>
-                          </span>
+                  return (
+                    <div key={row.label} className={rowClassName}>
+                      <span className={styles.nodeInfoLabel}>{row.label}</span>
+                      {row.isLoading ? (
+                        <span
+                          className={`${styles.skeletonLine} ${styles.nodeInfoValueSkeleton}`}
+                          aria-label={`Loading ${row.label}`}
+                        />
+                      ) : row.to ? (
+                        <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
+                          {value}
+                        </Link>
+                      ) : (
+                        <span
+                          className={styles.nodeInfoValue}
+                          title={title}
+                          data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                          data-visual-placeholder={row.visualPlaceholder}
+                        >
+                          <span className={styles.nodeInfoValueText}>{value}</span>
+                          {row.secondaryValue && (
+                            <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                          )}
                         </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
 
             {homeState.error ? (
               <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
