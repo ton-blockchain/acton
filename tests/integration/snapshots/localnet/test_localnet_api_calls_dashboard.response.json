@@ -16,6 +16,31 @@
           "request_body": null,
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "ok": true,
+            "result": {
+              "@type": "blocks.masterchainInfo",
+              "init": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "last": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            }
+          },
+          "response_body_truncated": false,
           "sequence": 1,
           "source": "external",
           "status": "success",
@@ -43,6 +68,31 @@
           "request_body": null,
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "ok": true,
+            "result": {
+              "@type": "blocks.masterchainInfo",
+              "init": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "last": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            }
+          },
+          "response_body_truncated": false,
           "sequence": 1,
           "source": "external",
           "status": "success",
@@ -60,6 +110,8 @@
           "request_body": null,
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": null,
+          "response_body_truncated": false,
           "sequence": 2,
           "source": "external",
           "status": "success",
@@ -80,6 +132,31 @@
           "request_body": null,
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "ok": true,
+            "result": {
+              "@type": "blocks.masterchainInfo",
+              "init": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "last": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            }
+          },
+          "response_body_truncated": false,
           "sequence": 3,
           "source": "external",
           "status": "success",
@@ -97,6 +174,31 @@
           "request_body": null,
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "ok": true,
+            "result": {
+              "@type": "blocks.masterchainInfo",
+              "init": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "last": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            }
+          },
+          "response_body_truncated": false,
           "sequence": 4,
           "source": "studio_ui",
           "status": "success",
@@ -119,6 +221,31 @@
           },
           "request_body_truncated": false,
           "request_id": 1,
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "ok": true,
+            "result": {
+              "@type": "blocks.masterchainInfo",
+              "init": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "last": {
+                "@type": "ton.blockIdExt",
+                "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "seqno": 0,
+                "shard": "-9223372036854775808",
+                "workchain": -1
+              },
+              "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            }
+          },
+          "response_body_truncated": false,
           "sequence": 5,
           "source": "external",
           "status": "success",
@@ -141,6 +268,13 @@
           },
           "request_body_truncated": false,
           "request_id": "missing",
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "code": 404,
+            "error": "Method not found",
+            "ok": false
+          },
+          "response_body_truncated": false,
           "sequence": 6,
           "source": "external",
           "status": "failed",
@@ -165,6 +299,13 @@
           },
           "request_body_truncated": false,
           "request_id": "write",
+          "response_body": {
+            "@extra": "[EXTRA]",
+            "code": 500,
+            "error": "Invalid BOC base64",
+            "ok": false
+          },
+          "response_body_truncated": false,
           "sequence": 7,
           "source": "external",
           "status": "failed",
@@ -185,6 +326,11 @@
           },
           "request_body_truncated": false,
           "request_id": null,
+          "response_body": {
+            "code": 400,
+            "error": "Invalid address, only standard internal address is allowed"
+          },
+          "response_body_truncated": false,
           "sequence": 8,
           "source": "external",
           "status": "failed",

@@ -128,6 +128,8 @@ pub struct ApiCallRecord {
     pub query_params: Option<Value>,
     pub request_body: Option<Value>,
     pub request_body_truncated: bool,
+    pub response_body: Option<Value>,
+    pub response_body_truncated: bool,
     pub timestamp_ms: u128,
     pub duration_ns: u128,
 }
@@ -211,7 +213,7 @@ impl ApiCallLog {
         }
     }
 
-    pub fn record(&self, input: ApiCallInput, start: ApiCallStart) {
+    pub fn record(&self, input: ApiCallInput, start: ApiCallStart) -> u64 {
         let sequence = self.next_sequence.fetch_add(1, Ordering::Relaxed);
         let status = if input.status_code < 400 {
             ApiCallStatus::Success
@@ -237,6 +239,8 @@ impl ApiCallLog {
             query_params: input.query_params,
             request_body: input.request_body,
             request_body_truncated: input.request_body_truncated,
+            response_body: None,
+            response_body_truncated: false,
             timestamp_ms,
             duration_ns: start.duration_start.elapsed().as_nanos(),
         };
@@ -253,6 +257,33 @@ impl ApiCallLog {
             source_entries.pop_front();
         }
         source_entries.push_back(record);
+        drop(entries);
+
+        sequence
+    }
+
+    pub fn record_response(
+        &self,
+        sequence: u64,
+        response_body: Option<Value>,
+        response_body_truncated: bool,
+    ) {
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("API call log lock must not be poisoned");
+        let ApiCallEntries {
+            external,
+            studio_ui,
+        } = &mut *entries;
+        let call = external
+            .iter_mut()
+            .chain(studio_ui.iter_mut())
+            .find(|call| call.sequence == sequence);
+        if let Some(call) = call {
+            call.response_body = response_body;
+            call.response_body_truncated = response_body_truncated;
+        }
         drop(entries);
     }
 

@@ -8233,7 +8233,30 @@ fn normalize_api_calls_for_snapshot(response: &mut Value) {
             if let Some(duration_ns) = call.get_mut("duration_ns") {
                 *duration_ns = json!("[DURATION_NS]");
             }
+            if let Some(response_body) = call.get_mut("response_body") {
+                normalize_nested_extra_for_snapshot(response_body);
+            }
         }
+    }
+}
+
+fn normalize_nested_extra_for_snapshot(value: &mut Value) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                normalize_nested_extra_for_snapshot(item);
+            }
+        }
+        Value::Object(map) => {
+            for (key, inner) in map {
+                if key == "@extra" {
+                    *inner = json!("[EXTRA]");
+                } else {
+                    normalize_nested_extra_for_snapshot(inner);
+                }
+            }
+        }
+        _ => {}
     }
 }
 

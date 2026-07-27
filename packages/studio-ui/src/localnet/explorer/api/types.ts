@@ -1171,6 +1171,8 @@ export interface ApiCallRecord {
   readonly query_params: unknown | null
   readonly request_body: unknown | null
   readonly request_body_truncated: boolean
+  readonly response_body: unknown | null
+  readonly response_body_truncated: boolean
   readonly timestamp_ms: number
   readonly duration_ns: number
 }

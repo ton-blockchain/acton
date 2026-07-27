@@ -32,7 +32,7 @@ use crate::server::{
 };
 use axum::{
     Json, Router,
-    body::{Body, Bytes, to_bytes},
+    body::{Body, BodyDataStream, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Request, State},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
@@ -47,9 +47,12 @@ use std::fs;
 use std::num::NonZeroU32;
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_stream::Stream;
 use ton_api::toncenter::{v2::responses::TonlibErrorResponse, v3::responses::RequestError};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
@@ -63,6 +66,7 @@ static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/l
 
 const MAX_BUFFERED_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 const MAX_STORED_REQUEST_BODY_BYTES: usize = 64 * 1024;
+const MAX_STORED_RESPONSE_BODY_BYTES: usize = 64 * 1024;
 const REQUEST_SOURCE_HEADER: &str = "x-acton-request-source";
 const STUDIO_UI_REQUEST_SOURCE: &str = "studio-ui";
 
@@ -421,7 +425,8 @@ async fn record_api_call(request: Request, next: Next, api_calls: ApiCallLog) ->
         input.status_code = status_code;
     }
     if let Some(input) = input {
-        api_calls.record(input, start);
+        let sequence = api_calls.record(input, start);
+        return capture_response_body(response, api_calls, sequence, &path);
     }
 
     response
@@ -456,14 +461,109 @@ fn request_body_value(bytes: &Bytes) -> (Option<Value>, bool) {
 
     let truncated = bytes.len() > MAX_STORED_REQUEST_BODY_BYTES;
     let visible_bytes = &bytes[..bytes.len().min(MAX_STORED_REQUEST_BODY_BYTES)];
-    let value = if truncated {
-        Value::String(String::from_utf8_lossy(visible_bytes).into_owned())
-    } else {
-        serde_json::from_slice(visible_bytes)
-            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(visible_bytes).into_owned()))
-    };
+    (stored_body_value(visible_bytes, truncated), truncated)
+}
 
-    (Some(value), truncated)
+fn stored_body_value(bytes: &[u8], truncated: bool) -> Option<Value> {
+    if bytes.is_empty() {
+        return None;
+    }
+
+    Some(if truncated {
+        Value::String(String::from_utf8_lossy(bytes).into_owned())
+    } else {
+        serde_json::from_slice(bytes)
+            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(bytes).into_owned()))
+    })
+}
+
+fn capture_response_body(
+    response: Response,
+    api_calls: ApiCallLog,
+    sequence: u64,
+    path: &str,
+) -> Response {
+    if !should_capture_response_body(path) {
+        return response;
+    }
+
+    let (parts, body) = response.into_parts();
+    let stream = ApiCallResponseStream {
+        inner: body.into_data_stream(),
+        capture: Some(ApiCallResponseCapture {
+            api_calls,
+            sequence,
+            bytes: Vec::new(),
+            truncated: false,
+        }),
+    };
+    Response::from_parts(parts, Body::from_stream(stream))
+}
+
+fn should_capture_response_body(path: &str) -> bool {
+    !matches!(path, "/acton_getApiCalls" | "/acton_getStartupWallets")
+}
+
+struct ApiCallResponseCapture {
+    api_calls: ApiCallLog,
+    sequence: u64,
+    bytes: Vec<u8>,
+    truncated: bool,
+}
+
+impl ApiCallResponseCapture {
+    fn push(&mut self, bytes: &Bytes) {
+        let remaining = MAX_STORED_RESPONSE_BODY_BYTES.saturating_sub(self.bytes.len());
+        let visible_len = bytes.len().min(remaining);
+        self.bytes.extend_from_slice(&bytes[..visible_len]);
+        self.truncated |= visible_len < bytes.len();
+    }
+
+    fn finish(mut self, incomplete: bool) {
+        self.truncated |= incomplete;
+        let response_body = stored_body_value(&self.bytes, self.truncated);
+        self.api_calls
+            .record_response(self.sequence, response_body, self.truncated);
+    }
+}
+
+struct ApiCallResponseStream {
+    inner: BodyDataStream,
+    capture: Option<ApiCallResponseCapture>,
+}
+
+impl ApiCallResponseStream {
+    fn finish(&mut self, incomplete: bool) {
+        if let Some(capture) = self.capture.take() {
+            capture.finish(incomplete);
+        }
+    }
+}
+
+impl Stream for ApiCallResponseStream {
+    type Item = Result<Bytes, axum::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let result = Pin::new(&mut this.inner).poll_next(cx);
+        match &result {
+            Poll::Ready(Some(Ok(bytes))) => {
+                if let Some(capture) = this.capture.as_mut() {
+                    capture.push(bytes);
+                }
+            }
+            Poll::Ready(Some(Err(_))) => this.finish(true),
+            Poll::Ready(None) => this.finish(false),
+            Poll::Pending => {}
+        }
+        result
+    }
+}
+
+impl Drop for ApiCallResponseStream {
+    fn drop(&mut self) {
+        self.finish(true);
+    }
 }
 
 fn query_params_value(query: Option<&str>) -> Option<Value> {

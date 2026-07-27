@@ -264,6 +264,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                       const expanded = expandedCalls.has(call.sequence)
                       const queryParams = formatRequestData(call.query_params)
                       const requestBody = formatRequestData(call.request_body)
+                      const responseBody = formatRequestData(call.response_body)
                       return (
                         <Fragment key={call.sequence}>
                           <DataTableRow
@@ -288,7 +289,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                                 aria-expanded={expanded}
                                 className={styles.rpcExpandAction}
                                 icon={expanded ? <ChevronDown /> : <ChevronRight />}
-                                label={expanded ? "Hide request details" : "Show request details"}
+                                label={expanded ? "Hide API call details" : "Show API call details"}
                                 size="compact"
                               />
                             </DataTableCell>
@@ -380,7 +381,28 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                                   ) : undefined}
                                   {call.request_body_truncated ? (
                                     <p className={styles.rpcBodyNotice}>
-                                      Body preview is limited to 64 KB
+                                      Request body preview is limited to 64 KB
+                                    </p>
+                                  ) : undefined}
+                                  {responseBody === undefined ? undefined : (
+                                    <RawDataBlock
+                                      copyLabel="Copy response body"
+                                      customContent={
+                                        <HighlightedCode
+                                          className={styles.rpcRequestCode}
+                                          language="json"
+                                          maxHeight="18rem"
+                                          value={responseBody}
+                                          wrap
+                                        />
+                                      }
+                                      title="Response"
+                                      value={responseBody}
+                                    />
+                                  )}
+                                  {call.response_body_truncated ? (
+                                    <p className={styles.rpcBodyNotice}>
+                                      Response preview is limited to 64 KB
                                     </p>
                                   ) : undefined}
                                 </div>
