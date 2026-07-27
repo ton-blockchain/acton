@@ -1,3 +1,5 @@
+import {Address} from "@ton/core"
+
 export type AddressSourceId = "ton-assets" | "address-book"
 
 export interface SourceAddress {
@@ -24,6 +26,16 @@ const requireNonEmptyString = (value: unknown, path: string): string => {
   return value
 }
 
+const requireRawAddress = (value: unknown, path: string): string => {
+  const address = requireNonEmptyString(value, path)
+
+  try {
+    return Address.parse(address).toRawString()
+  } catch (error) {
+    throw new TypeError(`${path} must be a valid TON address`, {cause: error})
+  }
+}
+
 export const parseSourceAddresses = (
   value: unknown,
   sourcePath: string,
@@ -39,7 +51,7 @@ export const parseSourceAddresses = (
     }
 
     return {
-      address: requireNonEmptyString(row.address, `${path}.address`),
+      address: requireRawAddress(row.address, `${path}.address`),
       name: requireNonEmptyString(row.name, `${path}.name`),
     }
   })

@@ -5,51 +5,80 @@ import {ADDRESS_BOOK_URLS, parseAddressBook} from "../scripts/sources/address-bo
 import {parseSourceAddresses} from "../scripts/sources/shared.ts"
 import {TON_ASSETS_ACCOUNT_URLS, parseTonAssets} from "../scripts/sources/ton-assets.ts"
 
-describe("source parsing", () => {
-  test("reads address and name from every entry", () => {
+const RAW_ZERO = `0:${"0".repeat(64)}`
+const RAW_ONES = `0:${"1".repeat(64)}`
+const BOUNCEABLE_ZERO = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+const NON_BOUNCEABLE_ZERO = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
+
+describe("source address validation", () => {
+  test("normalizes addresses and reads names from every entry", () => {
     expect(
       parseSourceAddresses(
         [
-          {address: "0:abc", name: "Alpha"},
-          {address: "EQ123", name: "Beta", extra: true},
+          {address: BOUNCEABLE_ZERO, name: "Alpha"},
+          {address: RAW_ONES, name: "Beta", extra: true},
         ],
         "example.yaml",
       ),
     ).toEqual([
-      {address: "0:abc", name: "Alpha"},
-      {address: "EQ123", name: "Beta"},
+      {address: RAW_ZERO, name: "Alpha"},
+      {address: RAW_ONES, name: "Beta"},
     ])
   })
 
+  test("normalizes friendly variants to the same raw address", () => {
+    const addresses = parseSourceAddresses(
+      [
+        {address: BOUNCEABLE_ZERO, name: "Bounceable"},
+        {address: NON_BOUNCEABLE_ZERO, name: "Non-bounceable"},
+      ],
+      "example.yaml",
+    )
+
+    expect(addresses.map(({address}) => address)).toEqual([RAW_ZERO, RAW_ZERO])
+  })
+
+  test("rejects malformed entries", () => {
+    expect(() => parseSourceAddresses({}, "example.yaml")).toThrow("must contain an array")
+    expect(() => parseSourceAddresses([{address: RAW_ZERO}], "example.yaml")).toThrow(
+      "example.yaml[0].name",
+    )
+    expect(() =>
+      parseSourceAddresses([{address: "not-an-address", name: "Invalid"}], "example.yaml"),
+    ).toThrow("example.yaml[0].address must be a valid TON address")
+  })
+})
+
+describe("source YAML parsing", () => {
   test("parses YAML before validating entries", () => {
     expect(
       parseTonAssets(
         `
-- address: "0:abc"
+- address: "${BOUNCEABLE_ZERO}"
   name: "Alpha"
 `,
         "example.yaml",
       ),
-    ).toEqual([{address: "0:abc", name: "Alpha"}])
+    ).toEqual([{address: RAW_ZERO, name: "Alpha"}])
   })
 
   test("matches upstream recovery for reserved plain name scalars", () => {
     expect(
       parseAddressBook(
         `
-- address: "0:abc"
+- address: "${BOUNCEABLE_ZERO}"
   name: @wallet in Telegram
 `,
         "example.yaml",
       ),
-    ).toEqual([{address: "0:abc", name: "@wallet in Telegram"}])
+    ).toEqual([{address: RAW_ZERO, name: "@wallet in Telegram"}])
   })
 
   test("does not apply address-book recovery to ton-assets", () => {
     expect(() =>
       parseTonAssets(
         `
-- address: "0:abc"
+- address: "${BOUNCEABLE_ZERO}"
   name: @wallet in Telegram
 `,
         "example.yaml",
@@ -61,23 +90,16 @@ describe("source parsing", () => {
     expect(
       parseAddressBook(
         `
-- address: "0:active"
+- address: "${BOUNCEABLE_ZERO}"
   name: "Active"
 
-  - address: "0:disabled"
+  - address: "${RAW_ONES}"
   name: "Disabled"
   type: wallet
 `,
         "example.yaml",
       ),
-    ).toEqual([{address: "0:active", name: "Active"}])
-  })
-
-  test("rejects malformed entries", () => {
-    expect(() => parseSourceAddresses({}, "example.yaml")).toThrow("must contain an array")
-    expect(() => parseSourceAddresses([{address: "0:abc"}], "example.yaml")).toThrow(
-      "example.yaml[0].name",
-    )
+    ).toEqual([{address: RAW_ZERO, name: "Active"}])
   })
 })
 
@@ -91,8 +113,8 @@ test("readSources reads every allowed upstream YAML file", async () => {
   const read = (url: string): Promise<string> => {
     requestedUrls.push(url)
     return Promise.resolve(`
-- address: "${url}"
-  name: "Example"
+- address: "${BOUNCEABLE_ZERO}"
+  name: "${url}"
 `)
   }
 
@@ -103,12 +125,12 @@ test("readSources reads every allowed upstream YAML file", async () => {
     {
       id: "ton-assets",
       urls: TON_ASSETS_ACCOUNT_URLS,
-      addresses: TON_ASSETS_ACCOUNT_URLS.map(address => ({address, name: "Example"})),
+      addresses: TON_ASSETS_ACCOUNT_URLS.map(name => ({address: RAW_ZERO, name})),
     },
     {
       id: "address-book",
       urls: ADDRESS_BOOK_URLS,
-      addresses: ADDRESS_BOOK_URLS.map(address => ({address, name: "Example"})),
+      addresses: ADDRESS_BOOK_URLS.map(name => ({address: RAW_ZERO, name})),
     },
   ])
 })
