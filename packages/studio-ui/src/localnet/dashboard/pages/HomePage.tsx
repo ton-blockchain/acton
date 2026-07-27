@@ -42,13 +42,14 @@ import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
 import {useLocalnetRoutes} from "../../routes"
 import {EnvironmentActions} from "../components/EnvironmentActions"
-import {EnvironmentConnectPanel} from "../components/EnvironmentConnectPanel"
+import {EnvironmentConnect} from "../components/EnvironmentConnect"
 import {collectRecentAccounts, formatForkNetworkLabel} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
 
 const HOME_RECENT_TRANSACTIONS_REFRESH_MS = 2000
 const HOME_NODE_INFO_REFRESH_MS = 1000
+const CONNECT_PANEL_DISMISSED_STORAGE_PREFIX = "acton-studio:connect-panel-dismissed:"
 const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
 const DEFAULT_TIME_ADVANCE_SECONDS = "0"
 const MINUTE_SECONDS = 60
@@ -123,7 +124,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const hasFork = Boolean(forkNetwork?.trim())
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
   const forkBadgeLabel = formatForkNetworkLabel(forkNetwork) ?? "clean network"
-  const endpoints = useMemo(() => client.getEndpoints(), [client])
+  const connectPanelStorageKey = runtime.environment?.id
+    ? `${CONNECT_PANEL_DISMISSED_STORAGE_PREFIX}${runtime.environment.id}`
+    : undefined
+  const [isConnectPanelDismissed, setIsConnectPanelDismissed] = useState(
+    () =>
+      connectPanelStorageKey !== undefined &&
+      globalThis.localStorage.getItem(connectPanelStorageKey) === "true",
+  )
   const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
   const nodeTimeOffset =
     nodeInfo && nodeInfo.time_offset_seconds !== 0
@@ -151,6 +159,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     client,
     homeState.transactions,
   )
+
+  useEffect(() => {
+    setIsConnectPanelDismissed(
+      connectPanelStorageKey !== undefined &&
+        globalThis.localStorage.getItem(connectPanelStorageKey) === "true",
+    )
+  }, [connectPanelStorageKey])
 
   useEffect(() => {
     let cancelled = false
@@ -330,15 +345,17 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       <div className={styles.environmentHomeScroll}>
         <section className={styles.environmentHomeContent}>
           <div className={styles.homeLayout}>
-            <EnvironmentConnectPanel
-              apiV2Url={endpoints.apiV2}
-              apiV3Url={endpoints.apiV3}
-              controlUrl={endpoints.admin}
-              environmentName={runtime.environment?.name ?? "Virtual environment"}
-              explorerUrl={localnetRoutes.path("/explorer")}
-              rpcUrl={runtime.environment?.rpcUrl ?? endpoints.admin}
-              settingsPath={localnetRoutes.path("/settings")}
-            />
+            {isConnectPanelDismissed ? undefined : (
+              <EnvironmentConnect
+                client={client}
+                onDismiss={() => {
+                  setIsConnectPanelDismissed(true)
+                  if (connectPanelStorageKey !== undefined) {
+                    globalThis.localStorage.setItem(connectPanelStorageKey, "true")
+                  }
+                }}
+              />
+            )}
 
             <DataTable title="Node info" minWidth="42rem">
               <DataTableTable aria-label="Node info">

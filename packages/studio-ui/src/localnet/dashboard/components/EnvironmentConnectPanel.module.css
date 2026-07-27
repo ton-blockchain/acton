@@ -119,6 +119,50 @@
   gap: 18px;
 }
 
+.panel[data-dismissible] .setup {
+  padding-bottom: 8px;
+}
+
+.dismissFooter {
+  min-height: 40px;
+  padding: 0 12px 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
+.dismissHint {
+  min-width: 0;
+  color: var(--acton-color-text-subtle);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--acton-font-size-compact);
+  line-height: 1.4;
+}
+
+.dismissHint > svg {
+  flex: 0 0 auto;
+}
+
+.dismissHint a {
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: none;
+}
+
+.dismissHint a:hover {
+  text-decoration: underline;
+}
+
+.dismissHint a:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
 .step {
   min-width: 0;
   display: grid;

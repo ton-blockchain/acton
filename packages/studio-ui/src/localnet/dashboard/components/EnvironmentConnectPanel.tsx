@@ -1,5 +1,5 @@
-import {CopyInlineButton, HighlightedCode, Tooltip} from "@acton/ui"
-import {Braces, Cable, FileCode2, Settings} from "lucide-react"
+import {Button, CopyInlineButton, HighlightedCode, Tooltip} from "@acton/ui"
+import {Braces, Cable, CircleAlert, FileCode2, Settings} from "lucide-react"
 import {useMemo, useState} from "react"
 import {Link} from "react-router"
 
@@ -13,6 +13,8 @@ interface EnvironmentConnectPanelProps {
   readonly controlUrl: string
   readonly environmentName: string
   readonly explorerUrl: string
+  readonly integratePath: string
+  readonly onDismiss?: () => void
   readonly rpcUrl: string
   readonly settingsPath: string
 }
@@ -49,6 +51,8 @@ export function EnvironmentConnectPanel({
   controlUrl,
   environmentName,
   explorerUrl,
+  integratePath,
+  onDismiss,
   rpcUrl,
   settingsPath,
 }: EnvironmentConnectPanelProps) {
@@ -86,7 +90,11 @@ console.log(masterchain)`
   })
 
   return (
-    <section className={styles.panel} aria-labelledby="connect-environment-title">
+    <section
+      className={styles.panel}
+      aria-labelledby="connect-environment-title"
+      data-dismissible={onDismiss ? true : undefined}
+    >
       <header className={styles.header}>
         <h2 id="connect-environment-title">Connect environment</h2>
         <div className={styles.headerActions}>
@@ -250,6 +258,20 @@ console.log(masterchain)`
           </div>
         ) : undefined}
       </div>
+
+      {onDismiss ? (
+        <footer className={styles.dismissFooter}>
+          <span className={styles.dismissHint}>
+            <CircleAlert size={14} aria-hidden="true" />
+            <span>
+              This setup remains available on the <Link to={integratePath}>Integrate</Link> page
+            </span>
+          </span>
+          <Button type="button" variant="primary" size="sm" onClick={onDismiss}>
+            Finish setup
+          </Button>
+        </footer>
+      ) : undefined}
     </section>
   )
 }

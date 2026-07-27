@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent} from "react"
 import {
   Boxes,
+  Cable,
   ChartNoAxesColumn,
   CircleUserRound,
   FileJson,
@@ -89,6 +90,13 @@ const quickSearchResults: readonly SearchResult[] = [
     description: "Send test GRAM to a wallet",
     href: "/faucet",
     icon: Wallet,
+  },
+  {
+    id: "quick-integrate",
+    title: "Integrate",
+    description: "Connect a project, application or TON-compatible tool",
+    href: "/integrate",
+    icon: Cable,
   },
   {
     id: "quick-api-calls",

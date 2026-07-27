@@ -4,6 +4,7 @@ import {
   Activity,
   Binary,
   Brackets,
+  Cable,
   ChevronLeft,
   ChevronRight,
   HandCoins,
@@ -85,6 +86,12 @@ const apiCallsItem: SidebarItem = {
   label: "API Calls",
   icon: Activity,
   path: "/api-calls",
+}
+
+const integrateItem: SidebarItem = {
+  label: "Integrate",
+  icon: Cable,
+  path: "/integrate",
 }
 
 const apiReferenceItems: NestedSidebarItem[] = [
@@ -314,6 +321,11 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
         <div className={styles.navigationSectionGroup}>
           <div className={styles.navDivider} />
           <div className={styles.navSection}>
+            <NavigationItem
+              active={integrateItem.path === localPathname}
+              item={integrateItem}
+              onSelect={path => void navigate(routes.path(path))}
+            />
             <NavigationItem
               active={apiCallsItem.path === localPathname}
               item={apiCallsItem}

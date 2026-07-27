@@ -19,6 +19,7 @@ import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProvider"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
+import {IntegratePage} from "./dashboard/pages/IntegratePage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
@@ -49,6 +50,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/explorer/tokens": "Tokens",
   "/explorer/nfts": "NFTs",
   "/settings": "Settings",
+  "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
   "/api-reference/control": "Control API Reference",
@@ -64,6 +66,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/tokens": "Jettons detected in this virtual environment",
   "/explorer/nfts": "NFT items indexed from this virtual environment",
   "/settings": "Manage environment identity, network behavior and mining",
+  "/integrate": "Connect Acton projects, applications and TON-compatible tools",
   "/api-reference/v2": "Explore the localnet v2 API",
   "/api-reference/v3": "Explore the localnet v3 API",
   "/api-reference/control": "Explore localnet management methods",
@@ -229,6 +232,14 @@ const AppContent: FC<AppContentProps> = ({
                     onEnvironmentChange={onEnvironmentChange}
                     onEnvironmentDelete={onEnvironmentDelete}
                   />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path={path("/integrate")}
+              element={
+                <DashboardPage>
+                  <IntegratePage client={client} />
                 </DashboardPage>
               }
             />
