@@ -1,90 +1,105 @@
 import {describe, expect, test} from "bun:test"
 
 import {
-  ADDRESS_BOOK_URL,
-  TON_ASSETS_ACCOUNTS_URL,
-  parseAddressBook,
-  parseTonAssetsAccounts,
+  ADDRESS_BOOK_URLS,
+  TON_ASSETS_ACCOUNT_URLS,
+  parseSourceAddresses,
+  parseYamlAddresses,
   readSources,
 } from "../scripts/sources.ts"
 
-describe("parseTonAssetsAccounts", () => {
-  test("reads address and name from every array entry", () => {
+describe("source parsing", () => {
+  test("reads address and name from every entry", () => {
     expect(
-      parseTonAssetsAccounts([
-        {address: "0:abc", name: "Alpha"},
-        {address: "EQ123", name: "Beta", extra: true},
-      ]),
+      parseSourceAddresses(
+        [
+          {address: "0:abc", name: "Alpha"},
+          {address: "EQ123", name: "Beta", extra: true},
+        ],
+        "example.yaml",
+      ),
     ).toEqual([
       {address: "0:abc", name: "Alpha"},
       {address: "EQ123", name: "Beta"},
     ])
   })
 
-  test("rejects malformed entries", () => {
-    expect(() => parseTonAssetsAccounts({})).toThrow("must be an array")
-    expect(() => parseTonAssetsAccounts([{address: "0:abc"}])).toThrow("accounts.json[0].name")
-  })
-})
-
-describe("parseAddressBook", () => {
-  test("reads addresses from object keys and optional names from metadata", () => {
-    const alphaAddress = "EQ123"
-    const betaAddress = "UQ456"
-    const scamAddress = "UQ789"
-
+  test("parses YAML before validating entries", () => {
     expect(
-      parseAddressBook({
-        [alphaAddress]: {name: "Alpha"},
-        [betaAddress]: {name: "Beta", tonIcon: "💎"},
-        [scamAddress]: {isScam: true},
-      }),
-    ).toEqual([
-      {address: alphaAddress, name: "Alpha"},
-      {address: betaAddress, name: "Beta"},
-      {address: scamAddress},
-    ])
+      parseYamlAddresses(
+        `
+- address: "0:abc"
+  name: "Alpha"
+`,
+        "example.yaml",
+      ),
+    ).toEqual([{address: "0:abc", name: "Alpha"}])
   })
 
-  test("rejects malformed metadata", () => {
-    const address = "EQ123"
+  test("matches upstream recovery for reserved plain name scalars", () => {
+    expect(
+      parseYamlAddresses(
+        `
+- address: "0:abc"
+  name: @wallet in Telegram
+`,
+        "example.yaml",
+      ),
+    ).toEqual([{address: "0:abc", name: "@wallet in Telegram"}])
+  })
 
-    expect(() => parseAddressBook([])).toThrow("must be an object")
-    expect(() => parseAddressBook({[address]: {name: null}})).toThrow(
-      `addresses.json[${JSON.stringify(address)}].name`,
+  test("matches upstream convention for disabled indented entries", () => {
+    expect(
+      parseYamlAddresses(
+        `
+- address: "0:active"
+  name: "Active"
+
+  - address: "0:disabled"
+  name: "Disabled"
+  type: wallet
+`,
+        "example.yaml",
+      ),
+    ).toEqual([{address: "0:active", name: "Active"}])
+  })
+
+  test("rejects malformed entries", () => {
+    expect(() => parseSourceAddresses({}, "example.yaml")).toThrow("must contain an array")
+    expect(() => parseSourceAddresses([{address: "0:abc"}], "example.yaml")).toThrow(
+      "example.yaml[0].name",
     )
   })
 })
 
-test("readSources reads both upstream URLs", async () => {
+test("source lists exclude upstream scam files", () => {
+  expect(TON_ASSETS_ACCOUNT_URLS.some(url => url.endsWith("/scammers.yaml"))).toBeFalse()
+  expect(ADDRESS_BOOK_URLS.some(url => url.endsWith("/scam.yaml"))).toBeFalse()
+})
+
+test("readSources reads every allowed upstream YAML file", async () => {
   const requestedUrls: string[] = []
-  const read = (url: string): Promise<unknown> => {
+  const read = (url: string): Promise<string> => {
     requestedUrls.push(url)
-
-    if (url === TON_ASSETS_ACCOUNTS_URL) {
-      return Promise.resolve([{address: "0:abc", name: "Ton Assets"}])
-    }
-    if (url === ADDRESS_BOOK_URL) {
-      const address = "EQ123"
-      return Promise.resolve({[address]: {name: "Address Book"}})
-    }
-
-    return Promise.reject(new Error(`Unexpected URL: ${url}`))
+    return Promise.resolve(`
+- address: "${url}"
+  name: "Example"
+`)
   }
 
   const sources = await readSources(read)
 
-  expect(requestedUrls).toEqual([TON_ASSETS_ACCOUNTS_URL, ADDRESS_BOOK_URL])
+  expect(requestedUrls).toEqual([...TON_ASSETS_ACCOUNT_URLS, ...ADDRESS_BOOK_URLS])
   expect(sources).toEqual([
     {
       id: "ton-assets",
-      url: TON_ASSETS_ACCOUNTS_URL,
-      addresses: [{address: "0:abc", name: "Ton Assets"}],
+      urls: TON_ASSETS_ACCOUNT_URLS,
+      addresses: TON_ASSETS_ACCOUNT_URLS.map(address => ({address, name: "Example"})),
     },
     {
       id: "address-book",
-      url: ADDRESS_BOOK_URL,
-      addresses: [{address: "EQ123", name: "Address Book"}],
+      urls: ADDRESS_BOOK_URLS,
+      addresses: ADDRESS_BOOK_URLS.map(address => ({address, name: "Example"})),
     },
   ])
 })

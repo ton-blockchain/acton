@@ -1,22 +1,53 @@
-export const TON_ASSETS_ACCOUNTS_URL =
-  "https://raw.githubusercontent.com/tonkeeper/ton-assets/main/accounts.json"
+import {parseAllDocuments} from "yaml"
 
-export const ADDRESS_BOOK_URL = "https://address-book.tonscan.org/addresses.json"
+const TON_ASSETS_ACCOUNTS_BASE_URL =
+  "https://raw.githubusercontent.com/tonkeeper/ton-assets/main/accounts"
+const ADDRESS_BOOK_BASE_URL =
+  "https://raw.githubusercontent.com/catchain/address-book/master/source"
+
+const TON_ASSETS_ACCOUNT_FILES = [
+  "bridges.yaml",
+  "celebrities.yaml",
+  "custodians.yaml",
+  "dapps.yaml",
+  "defi.yaml",
+  "givers.yaml",
+  "infrastructure.yaml",
+  "notcoin.yaml",
+  "ston.yaml",
+  "validators.yaml",
+] as const
+
+const ADDRESS_BOOK_FILES = [
+  "community.yaml",
+  "exchanges.yaml",
+  "people.yaml",
+  "system.yaml",
+  "validators.yaml",
+] as const
+
+export const TON_ASSETS_ACCOUNT_URLS = TON_ASSETS_ACCOUNT_FILES.map(
+  fileName => `${TON_ASSETS_ACCOUNTS_BASE_URL}/${fileName}`,
+)
+
+export const ADDRESS_BOOK_URLS = ADDRESS_BOOK_FILES.map(
+  fileName => `${ADDRESS_BOOK_BASE_URL}/${fileName}`,
+)
 
 export type AddressSourceId = "ton-assets" | "address-book"
 
 export interface SourceAddress {
   readonly address: string
-  readonly name?: string
+  readonly name: string
 }
 
 export interface AddressSource {
   readonly id: AddressSourceId
-  readonly url: string
+  readonly urls: readonly string[]
   readonly addresses: readonly SourceAddress[]
 }
 
-type JsonReader = (url: string) => Promise<unknown>
+type TextReader = (url: string) => Promise<string>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -29,13 +60,16 @@ const requireNonEmptyString = (value: unknown, path: string): string => {
   return value
 }
 
-export const parseTonAssetsAccounts = (value: unknown): readonly SourceAddress[] => {
+export const parseSourceAddresses = (
+  value: unknown,
+  sourcePath: string,
+): readonly SourceAddress[] => {
   if (!Array.isArray(value)) {
-    throw new TypeError("ton-assets accounts.json must be an array")
+    throw new TypeError(`${sourcePath} must contain an array`)
   }
 
   return value.map((row, index) => {
-    const path = `ton-assets accounts.json[${index}]`
+    const path = `${sourcePath}[${index}]`
     if (!isRecord(row)) {
       throw new TypeError(`${path} must be an object`)
     }
@@ -47,58 +81,51 @@ export const parseTonAssetsAccounts = (value: unknown): readonly SourceAddress[]
   })
 }
 
-export const parseAddressBook = (value: unknown): readonly SourceAddress[] => {
-  if (!isRecord(value)) {
-    throw new TypeError("address-book addresses.json must be an object")
+export const parseYamlAddresses = (text: string, sourcePath: string): readonly SourceAddress[] => {
+  try {
+    const entries = parseAllDocuments(text, {logLevel: "silent"}).flatMap(document =>
+      document.toJS(),
+    )
+    return parseSourceAddresses(entries, sourcePath)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw error
+    }
+
+    throw new SyntaxError(`Failed to parse YAML from ${sourcePath}`, {cause: error})
   }
-
-  return Object.entries(value).map(([address, metadata]) => {
-    const path = `address-book addresses.json[${JSON.stringify(address)}]`
-    if (!isRecord(metadata)) {
-      throw new TypeError(`${path} must be an object`)
-    }
-
-    const sourceAddress: SourceAddress = {
-      address: requireNonEmptyString(address, `${path} key`),
-    }
-
-    if (metadata.name === undefined) {
-      return sourceAddress
-    }
-
-    return {
-      ...sourceAddress,
-      name: requireNonEmptyString(metadata.name, `${path}.name`),
-    }
-  })
 }
 
-export const readJson = async (url: string): Promise<unknown> => {
+export const readText = async (url: string): Promise<string> => {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Failed to read ${url}: HTTP ${response.status} ${response.statusText}`)
   }
 
-  try {
-    return await response.json()
-  } catch (error) {
-    throw new SyntaxError(`Failed to parse JSON from ${url}`, {cause: error})
+  return response.text()
+}
+
+const readSource = async (
+  id: AddressSourceId,
+  urls: readonly string[],
+  read: TextReader,
+): Promise<AddressSource> => {
+  const files = await Promise.all(urls.map(async url => parseYamlAddresses(await read(url), url)))
+
+  return {
+    id,
+    urls,
+    addresses: files.flat(),
   }
 }
 
-export const readTonAssets = async (read: JsonReader = readJson): Promise<AddressSource> => ({
-  id: "ton-assets",
-  url: TON_ASSETS_ACCOUNTS_URL,
-  addresses: parseTonAssetsAccounts(await read(TON_ASSETS_ACCOUNTS_URL)),
-})
+export const readTonAssets = async (read: TextReader = readText): Promise<AddressSource> =>
+  readSource("ton-assets", TON_ASSETS_ACCOUNT_URLS, read)
 
-export const readAddressBook = async (read: JsonReader = readJson): Promise<AddressSource> => ({
-  id: "address-book",
-  url: ADDRESS_BOOK_URL,
-  addresses: parseAddressBook(await read(ADDRESS_BOOK_URL)),
-})
+export const readAddressBook = async (read: TextReader = readText): Promise<AddressSource> =>
+  readSource("address-book", ADDRESS_BOOK_URLS, read)
 
 export const readSources = async (
-  read: JsonReader = readJson,
+  read: TextReader = readText,
 ): Promise<readonly [AddressSource, AddressSource]> =>
   Promise.all([readTonAssets(read), readAddressBook(read)])

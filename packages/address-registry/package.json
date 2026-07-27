@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "js-yaml": "5.2.1"
+    "yaml": "2.3.2"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
