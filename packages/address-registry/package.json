@@ -15,7 +15,7 @@
     "generate": "bun scripts/generate.ts",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
-    "test": "bun test",
+    "test": "bun test && bun run typecheck",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
