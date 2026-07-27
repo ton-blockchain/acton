@@ -1,6 +1,7 @@
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
@@ -149,6 +150,19 @@ impl TonApiClient {
         }
 
         request
+    }
+
+    fn get_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        transport_error_context: &str,
+        response_error_context: &str,
+    ) -> anyhow::Result<T> {
+        let response = self.send_with_retry(|| self.build_request(url), transport_error_context)?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
+        }
+        response.json().context(response_error_context.to_owned())
     }
 
     fn send_with_retry<F>(
@@ -436,6 +450,51 @@ impl TonApiClient {
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
         Ok(self.get_masterchain_info()?.result.last.seqno)
+    }
+
+    pub fn get_blocks_v3(&self, raw_query: &str) -> anyhow::Result<v3::BlocksResponse> {
+        let mut url = format!(
+            "{}/blocks",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send blocks request",
+            "Failed to parse blocks response",
+        )
+    }
+
+    pub fn get_transactions_v3(&self, raw_query: &str) -> anyhow::Result<v3::TransactionsResponse> {
+        let mut url = format!(
+            "{}/transactions",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send transactions request",
+            "Failed to parse transactions response",
+        )
+    }
+
+    pub fn get_shards(&self, seqno: u32) -> anyhow::Result<v2::Shards> {
+        let url = format!(
+            "{}/getShards?seqno={seqno}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response: v2::TonlibResponse<v2::Shards> = self.get_json(
+            &url,
+            "Failed to send getShards request",
+            "Failed to parse getShards response",
+        )?;
+        Ok(response.result)
     }
 
     pub fn get_account_info(

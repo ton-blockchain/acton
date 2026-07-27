@@ -4,6 +4,7 @@ use acton_config::config;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use ton_api::TonApiClient;
+use ton_api::toncenter::{v2, v3};
 use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -42,18 +43,48 @@ fn create_api_client(network: Network) -> anyhow::Result<TonApiClient> {
     TonApiClient::new(network, config.custom_networks())
 }
 
-// TODO: remove
-fn with_api_client<T: Send + 'static>(
+fn with_api_client<T>(
+    provider: &RemoteProvider,
+    request: impl FnOnce(&TonApiClient) -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
+    request(&create_api_client(provider.network.clone())?)
+}
+
+async fn with_api_client_async<T: Send + 'static>(
     provider: &RemoteProvider,
     request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send + 'static,
 ) -> anyhow::Result<T> {
-    let network = provider.network.clone();
-    std::thread::Builder::new()
-        .name("acton-remote-provider".to_owned())
-        .spawn(move || request(&create_api_client(network)?))
-        .context("Failed to start remote provider worker")?
-        .join()
-        .map_err(|_| anyhow::anyhow!("Remote provider worker panicked"))?
+    let provider = provider.clone();
+    tokio::task::spawn_blocking(move || with_api_client(&provider, request))
+        .await
+        .context("Remote provider worker failed")?
+}
+
+pub(crate) async fn fetch_remote_blocks_v3(
+    provider: &RemoteProvider,
+    raw_query: String,
+) -> anyhow::Result<v3::BlocksResponse> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_blocks_v3(&raw_query)
+    })
+    .await
+}
+
+pub(crate) async fn fetch_remote_transactions_v3(
+    provider: &RemoteProvider,
+    raw_query: String,
+) -> anyhow::Result<v3::TransactionsResponse> {
+    with_api_client_async(provider, move |api_client| {
+        api_client.get_transactions_v3(&raw_query)
+    })
+    .await
+}
+
+pub(crate) async fn fetch_remote_shards_v2(
+    provider: &RemoteProvider,
+    seqno: u32,
+) -> anyhow::Result<v2::Shards> {
+    with_api_client_async(provider, move |api_client| api_client.get_shards(seqno)).await
 }
 
 pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {

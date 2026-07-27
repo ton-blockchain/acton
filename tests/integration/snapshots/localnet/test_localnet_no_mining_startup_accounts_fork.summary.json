@@ -1,8 +1,18 @@
 {
+  "historical_reads": {
+    "blocks_match_source": true,
+    "first_local_block_is_local": true,
+    "fork_block_matches_source": true,
+    "requested_before_fork": true,
+    "shards_match_source": true,
+    "transactions_match_source": true
+  },
   "manual_mining": {
+    "manual_block_follows_head": true,
     "mine_ok": true,
-    "seqno_delta": 0,
-    "seqno_stable_after_start": true
+    "seqno_delta": 1,
+    "seqno_stable_after_start": true,
+    "startup_blocks_follow_fork": true
   },
   "runtime": {
     "auto_mining": false,

@@ -810,6 +810,12 @@ pub enum QueuePolicy {
 }
 
 pub struct Globals {
+    /// Sequence number of the state from which this local history starts.
+    ///
+    /// Clean localnets use zero. Forked localnets use the pinned remote
+    /// masterchain block, while `History` stores only blocks mined locally after
+    /// that point.
+    pub origin_seqno: Seqno,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -823,6 +829,7 @@ impl Globals {
     #[must_use]
     pub const fn new(config_boc_hash: Hash256) -> Self {
         Self {
+            origin_seqno: 0,
             head_seqno: 0,
             global_lt: 0,
             lt_step: 1,

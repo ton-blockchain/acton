@@ -494,7 +494,21 @@ pub async fn get_transactions_v3(
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<TransactionsQuery>(raw_query.as_deref()));
-    let parsed = parse!(parse_transactions_v3_query(payload));
+    let parsed = parse!(parse_transactions_v3_query(payload.clone()));
+
+    match node
+        .get_historical_transactions_v3(
+            payload.seqno.or(payload.mc_seqno),
+            raw_query.unwrap_or_default(),
+        )
+        .await
+    {
+        Ok(Some(response)) => return (StatusCode::OK, Json(response)).into_response(),
+        Ok(None) => {}
+        Err(error) => {
+            return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+        }
+    }
 
     match transactions_fast_path(&parsed) {
         Some(TransactionsFastPath::Empty) => {
@@ -528,9 +542,24 @@ pub async fn get_transactions_v3(
 
 pub async fn get_blocks_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlocksQuery>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let parsed = parse!(parse_blocks_v3_query(payload));
+    let payload = parse!(parse_v3_query::<BlocksQuery>(raw_query.as_deref()));
+    let parsed = parse!(parse_blocks_v3_query(payload.clone()));
+
+    match node
+        .get_historical_blocks_v3(
+            payload.seqno.or(payload.mc_seqno),
+            raw_query.unwrap_or_default(),
+        )
+        .await
+    {
+        Ok(Some(response)) => return (StatusCode::OK, Json(response)).into_response(),
+        Ok(None) => {}
+        Err(error) => {
+            return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+        }
+    }
 
     handle_v3_result(node.get_blocks(), move |blocks| {
         let filtered = filter_blocks_v3(blocks, &parsed);

@@ -301,15 +301,25 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     seqno: string
   }>()
   const navigate = useNavigate()
-  const {network} = useNetworkInfo()
+  const {network, nodeInfo} = useNetworkInfo()
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {prefetchNames, updateDomains} = useAddressBook()
+  const forkBlockNumber = nodeInfo?.fork_block_number ?? undefined
   const rawBlockNetwork: RawBlockNetwork | undefined =
     network.id === "mainnet" || network.id === "testnet" ? network.id : undefined
   const routeWorkchain = Number(params.workchain)
   const routeShard = params.shard ?? ""
   const routeSeqno = Number(params.seqno)
+  const isPublicBlock =
+    !latest &&
+    rawBlockNetwork !== undefined &&
+    forkBlockNumber !== undefined &&
+    forkBlockNumber !== null &&
+    routeSeqno <= forkBlockNumber
+  const publicBlockNetwork: RawBlockNetwork | undefined = isPublicBlock
+    ? rawBlockNetwork
+    : undefined
   const [state, setState] = useState<BlockDetailsState>({
     shardchainBlocks: [],
     transactions: [],
@@ -377,12 +387,12 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
         }
 
         const rawBlockMetadataPromise =
-          rawBlockNetwork &&
+          publicBlockNetwork &&
           (block.gen_software_version === undefined ||
             block.gen_software_capabilities === undefined ||
             block.fees_collected === undefined)
             ? client
-                .getRawBlockBoc(getExtendedBlockId(block), rawBlockNetwork)
+                .getRawBlockBoc(getExtendedBlockId(block), publicBlockNetwork)
                 .then(async cell => {
                   const {parseBlockMetadata} = await import("../cell-inspector/blockParser")
                   return parseBlockMetadata(cell)
@@ -441,7 +451,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     return () => {
       isActive = false
     }
-  }, [client, latest, rawBlockNetwork, routeShard, routeSeqno, routeWorkchain, updateDomains])
+  }, [client, latest, publicBlockNetwork, routeShard, routeSeqno, routeWorkchain, updateDomains])
 
   const workchain = latest ? (state.block?.workchain ?? -1) : routeWorkchain
   const shard = latest ? (state.block?.shard ?? MASTERCHAIN_SHARD) : routeShard
@@ -466,7 +476,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     () => state.transactions.map(transaction => transaction.account),
     [state.transactions],
   )
-  const blockActions = state.block ? getBlockActions(state.block, rawBlockNetwork) : undefined
+  const blockActions = state.block ? getBlockActions(state.block, publicBlockNetwork) : undefined
 
   useEffect(() => {
     void prefetchNames(transactionAddresses)
@@ -535,11 +545,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
                   !latestPath ||
                   (state.block !== undefined &&
                     latestPath ===
-                      routes.blockPath(
-                        state.block.workchain,
-                        state.block.shard,
-                        state.block.seqno,
-                      ))
+                      routes.blockPath(state.block.workchain, state.block.shard, state.block.seqno))
                 }
                 onClick={() => latestPath && void navigate(latestPath)}
               >
@@ -549,7 +555,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
 
             {state.block && blockActions ? (
               <div className={styles.blockHeaderActions} aria-label="Block actions">
-                {blockActions.downloadUrl ? (
+                {publicBlockNetwork && blockActions.downloadUrl ? (
                   <a
                     className={styles.blockActionLink}
                     href={blockActions.downloadUrl}
@@ -560,7 +566,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
                     Download
                   </a>
                 ) : null}
-                {rawBlockNetwork ? (
+                {publicBlockNetwork ? (
                   blockActions.configUrl ? (
                     <a
                       className={styles.blockActionLink}
@@ -588,7 +594,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
                 >
                   Copy block ID
                 </CopyButton>
-                {rawBlockNetwork ? (
+                {publicBlockNetwork ? (
                   <>
                     <span className={styles.blockActionSeparator} aria-hidden="true" />
                     <a
@@ -621,7 +627,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
         ) : state.isLoading || !state.block ? (
           <BlockDetailsSkeleton
             showShardchainBlocks={workchain === -1}
-            showRawBlockFields={rawBlockNetwork !== undefined}
+            showRawBlockFields={publicBlockNetwork !== undefined}
           />
         ) : (
           <>

@@ -955,21 +955,72 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("Failed to write wallets.toml");
 
-    let source_node = project.localnet().args(["--accounts", "deployer"]).start();
-    let source_fork_block = u64::try_from(latest_masterchain_seqno(&source_node))
-        .expect("source masterchain seqno must be non-negative");
-    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
-
-    let forked_node = project
+    let source_node = project
         .localnet()
         .args([
-            "--fork-net",
-            "custom:fork-source",
             "--accounts",
             "deployer",
             "--no-mining",
+            "--mine-empty-blocks",
         ])
         .start();
+    let source_fork_block = u64::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
+    let forked_db_path = project.path().join("state/forked.sqlite");
+    fs::create_dir_all(
+        forked_db_path
+            .parent()
+            .expect("forked database must have a parent"),
+    )
+    .expect("failed to create forked database directory");
+
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+
+    let historical_seqno = source_fork_block.saturating_sub(1);
+    let historical_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={historical_seqno}&limit=1"
+    );
+    let source_recent_transactions = source_node.get_json("/api/v3/transactions?limit=1&sort=desc");
+    let source_transaction = source_recent_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("fork source must expose a startup transaction");
+    let transaction_block = &source_transaction["block_ref"];
+    let transaction_workchain = transaction_block["workchain"]
+        .as_i64()
+        .expect("transaction block must expose workchain");
+    let transaction_shard = transaction_block["shard"]
+        .as_str()
+        .expect("transaction block must expose shard");
+    let transaction_seqno = transaction_block["seqno"]
+        .as_u64()
+        .expect("transaction block must expose seqno");
+    let historical_transactions_path = format!(
+        "/api/v3/transactions?workchain={transaction_workchain}&shard={transaction_shard}&seqno={transaction_seqno}&limit=100"
+    );
+    let historical_shards_path = format!("/api/v2/getShards?seqno={historical_seqno}");
+    let fork_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={source_fork_block}&limit=1"
+    );
+    let source_historical_block = source_node.get_json(&historical_block_path);
+    let forked_historical_block = forked_node.get_json(&historical_block_path);
+    let source_fork_block_response = source_node.get_json(&fork_block_path);
+    let forked_fork_block_response = forked_node.get_json(&fork_block_path);
+    let source_historical_transactions = source_node.get_json(&historical_transactions_path);
+    let forked_historical_transactions = forked_node.get_json(&historical_transactions_path);
+    let source_historical_shards = source_node.get_json(&historical_shards_path);
+    let forked_historical_shards = forked_node.get_json(&historical_shards_path);
 
     let startup_wallets = forked_node.get_json("/acton_getStartupWallets");
     let startup_wallets_payload = response_payload(&startup_wallets);
@@ -986,6 +1037,10 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     wait_until_address_state_active(&forked_node, address, Duration::from_secs(5));
     let node_info = forked_node.get_json("/acton_nodeInfo");
     let initial_seqno = latest_masterchain_seqno(&forked_node);
+    let local_block_path =
+        format!("/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={initial_seqno}&limit=1");
+    let source_at_local_seqno = source_node.get_json(&local_block_path);
+    let forked_local_block = forked_node.get_json(&local_block_path);
     thread::sleep(Duration::from_millis(250));
     let after_sleep_seqno = latest_masterchain_seqno(&forked_node);
     let mine_response = forked_node.post_json("/acton_mine", &json!({}));
@@ -1016,10 +1071,35 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
             "block_interval_ms": node_info["result"]["block_interval_ms"].as_u64(),
             "rate_limit_rps": node_info["result"]["rate_limit_rps"].as_u64(),
         },
+        "historical_reads": {
+            "requested_before_fork": historical_seqno < source_fork_block,
+            "blocks_match_source":
+                forked_historical_block["blocks"] == source_historical_block["blocks"],
+            "fork_block_matches_source":
+                forked_fork_block_response["blocks"] == source_fork_block_response["blocks"],
+            "transactions_match_source":
+                forked_historical_transactions["transactions"]
+                    == source_historical_transactions["transactions"]
+                    && source_historical_transactions["transactions"]
+                        .as_array()
+                        .is_some_and(|transactions| !transactions.is_empty()),
+            "shards_match_source":
+                forked_historical_shards["result"] == source_historical_shards["result"],
+            "first_local_block_is_local": forked_local_block["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty())
+                && source_at_local_seqno["blocks"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
+        },
         "manual_mining": {
+            "startup_blocks_follow_fork": u64::try_from(initial_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
             "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
             "mine_ok": mine_response["ok"].as_bool(),
             "seqno_delta": after_mine_seqno - after_sleep_seqno,
+            "manual_block_follows_head": after_mine_seqno == after_sleep_seqno + 1,
         }
     });
 
@@ -1031,6 +1111,50 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     );
 
     forked_node.stop();
+    let source_advance = source_node.post_json("/acton_mine", &json!({}));
+    let advanced_source_seqno = latest_masterchain_seqno(&source_node);
+    let advanced_source_at_local_seqno = source_node.get_json(&local_block_path);
+    let restarted_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+    let restarted_info = restarted_node.get_json("/acton_nodeInfo");
+    let restarted_local_block = restarted_node.get_json(&local_block_path);
+    let restart_snapshot = json!({
+        "source_advanced": source_advance["ok"].as_bool() == Some(true)
+            && u64::try_from(advanced_source_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
+        "fork_boundary_preserved":
+            restarted_info["result"]["fork_block_number"].as_u64() == Some(source_fork_block),
+        "head_preserved":
+            restarted_info["result"]["last_block_seqno"].as_u64()
+                == u64::try_from(after_mine_seqno).ok(),
+        "source_now_has_same_seqno":
+            advanced_source_at_local_seqno["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty()),
+        "local_block_preserved":
+            restarted_local_block["blocks"] == forked_local_block["blocks"],
+        "local_block_not_replaced_by_source":
+            restarted_local_block["blocks"] != advanced_source_at_local_seqno["blocks"],
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&restart_snapshot, project.path())
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_persisted_fork_boundary.summary.json"),
+    );
+
+    restarted_node.stop();
     source_node.stop();
 }
 

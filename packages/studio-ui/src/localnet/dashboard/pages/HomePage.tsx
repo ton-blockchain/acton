@@ -131,6 +131,10 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       : undefined
   const nodeTimeTitle = nodeTime && nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime
   const forkBlockExplorerUrl = getActonscanForkBlockUrl(forkNetwork, forkBlockNumber)
+  const localBlockCount =
+    nodeInfo && forkBlockNumber !== undefined && forkBlockNumber !== null
+      ? Math.max(0, nodeInfo.last_block_seqno - forkBlockNumber)
+      : undefined
   const recentAccounts = useMemo(
     () => collectRecentAccounts(homeState.transactions),
     [homeState.transactions],
@@ -340,14 +344,17 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               <DataTableTable aria-label="Node info">
                 <DataTableHead>
                   <DataTableRow>
-                    <DataTableHeaderCell columnWidth={hasFork ? "15%" : "25%"}>
+                    <DataTableHeaderCell columnWidth={hasFork ? "16%" : "25%"}>
                       Latest block
                     </DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth={hasFork ? "18%" : "27%"}>
+                    <DataTableHeaderCell columnWidth={hasFork ? "17%" : "27%"}>
                       State source
                     </DataTableHeaderCell>
                     {hasFork && (
-                      <DataTableHeaderCell columnWidth="27%">Fork block</DataTableHeaderCell>
+                      <>
+                        <DataTableHeaderCell columnWidth="18%">Fork block</DataTableHeaderCell>
+                        <DataTableHeaderCell columnWidth="13%">Local blocks</DataTableHeaderCell>
+                      </>
                     )}
                     <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
                       Uptime
@@ -393,23 +400,26 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </span>
                       </DataTableCell>
                       {hasFork && (
-                        <DataTableCell>
-                          {forkBlockNumber !== undefined && forkBlockNumber !== null ? (
-                            <BlockChip
-                              workchain={-1}
-                              shard={MASTERCHAIN_BLOCK_SHARD}
-                              seqno={forkBlockNumber}
-                              href={forkBlockExplorerUrl}
-                              title={
-                                forkBlockExplorerUrl
-                                  ? `Open fork block ${forkBlockNumber} in Actonscan`
-                                  : `Fork block ${forkBlockNumber}`
-                              }
-                            />
-                          ) : (
-                            "—"
-                          )}
-                        </DataTableCell>
+                        <>
+                          <DataTableCell>
+                            {forkBlockNumber !== undefined && forkBlockNumber !== null ? (
+                              <BlockChip
+                                workchain={-1}
+                                shard={MASTERCHAIN_BLOCK_SHARD}
+                                seqno={forkBlockNumber}
+                                href={forkBlockExplorerUrl}
+                                title={
+                                  forkBlockExplorerUrl
+                                    ? `Open fork block ${forkBlockNumber} in Actonscan`
+                                    : `Fork block ${forkBlockNumber}`
+                                }
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </DataTableCell>
+                          <DataTableCell>{localBlockCount ?? "—"}</DataTableCell>
+                        </>
                       )}
                       <DataTableCell data-visual-dynamic="time" data-visual-placeholder="<uptime>">
                         {formatDuration(nodeInfo.uptime_seconds)}
@@ -431,14 +441,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                     <DataTableSkeletonRows
                       alignments={
                         hasFork
-                          ? ["left", "left", "left", "left", "right"]
+                          ? ["left", "left", "left", "left", "left", "right"]
                           : ["left", "left", "left", "right"]
                       }
-                      columns={hasFork ? 5 : 4}
+                      columns={hasFork ? 6 : 4}
                       rows={1}
                       widths={
                         hasFork
-                          ? ["3rem", "5rem", "5rem", "4rem", "8rem"]
+                          ? ["3rem", "5rem", "5rem", "3rem", "4rem", "8rem"]
                           : ["3rem", "5rem", "4rem", "8rem"]
                       }
                     />

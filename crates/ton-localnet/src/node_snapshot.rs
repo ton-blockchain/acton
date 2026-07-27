@@ -1,4 +1,4 @@
-use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node};
+use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node, StateSource};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
     MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
@@ -50,6 +50,7 @@ pub(crate) struct NodeStateSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SnapshotGlobals {
+    pub origin_seqno: Seqno,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -167,6 +168,7 @@ impl Node {
 
         let snapshot = NodeStateSnapshot {
             globals: SnapshotGlobals {
+                origin_seqno: self.globals.origin_seqno,
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
                 lt_step: self.globals.lt_step,
@@ -272,6 +274,7 @@ impl Node {
         self.pending_freeze_current = snapshot.pending_freeze_current;
 
         self.globals = Globals {
+            origin_seqno: snapshot.globals.origin_seqno,
             head_seqno: snapshot.globals.head_seqno,
             global_lt: snapshot.globals.global_lt,
             lt_step: snapshot.globals.lt_step,
@@ -279,6 +282,9 @@ impl Node {
             queue_policy: snapshot.globals.queue_policy,
             checkpoint_every: snapshot.globals.checkpoint_every,
         };
+        if let StateSource::Remote(provider) = &mut self.state_source {
+            provider.fork_block_number = Some(u64::from(self.globals.origin_seqno));
+        }
         self.config_cell = config_cell;
         self.latest_masterchain_state = None;
         self.latest_shard_state = None;
@@ -306,24 +312,58 @@ impl Node {
 
     pub(crate) fn validate_snapshot(snapshot: &NodeStateSnapshot) -> anyhow::Result<Cell> {
         anyhow::ensure!(
-            snapshot.history_blocks.len() == snapshot.globals.head_seqno as usize,
-            "Block history length {} does not match head seqno {}",
+            snapshot.history_blocks.len() == snapshot.history_deltas_by_seqno.len(),
+            "Block history length {} does not match account delta history length {}",
             snapshot.history_blocks.len(),
-            snapshot.globals.head_seqno
+            snapshot.history_deltas_by_seqno.len()
         );
         anyhow::ensure!(
-            snapshot.history_deltas_by_seqno.len() == snapshot.globals.head_seqno as usize,
-            "Account delta history length {} does not match head seqno {}",
-            snapshot.history_deltas_by_seqno.len(),
-            snapshot.globals.head_seqno
+            snapshot.history_masterchain_blocks.is_empty()
+                || snapshot.history_masterchain_blocks.len() == snapshot.history_blocks.len(),
+            "Masterchain history length {} does not match basechain history length {}",
+            snapshot.history_masterchain_blocks.len(),
+            snapshot.history_blocks.len()
         );
         for (index, block) in snapshot.history_blocks.iter().enumerate() {
-            let expected_seqno = index as Seqno + 1;
+            let expected_seqno = snapshot
+                .globals
+                .origin_seqno
+                .checked_add(index as Seqno + 1)
+                .context("Block history seqno overflow")?;
             anyhow::ensure!(
                 block.seqno == expected_seqno,
                 "Block history is not contiguous at seqno {expected_seqno}"
             );
         }
+        for (index, block) in snapshot.history_masterchain_blocks.iter().enumerate() {
+            let expected_seqno = snapshot
+                .globals
+                .origin_seqno
+                .checked_add(index as Seqno + 1)
+                .context("Masterchain block history seqno overflow")?;
+            anyhow::ensure!(
+                block.seqno == expected_seqno,
+                "Masterchain block history is not contiguous at seqno {expected_seqno}"
+            );
+        }
+        let expected_head_seqno = snapshot
+            .globals
+            .origin_seqno
+            .checked_add(
+                snapshot
+                    .history_blocks
+                    .len()
+                    .try_into()
+                    .context("Block history length does not fit localnet block numbering")?,
+            )
+            .context("Block history head seqno overflow")?;
+        anyhow::ensure!(
+            snapshot.globals.head_seqno == expected_head_seqno,
+            "Head seqno {} does not match origin {} and block history length {}",
+            snapshot.globals.head_seqno,
+            snapshot.globals.origin_seqno,
+            snapshot.history_blocks.len()
+        );
 
         let mut cas = HashMap::with_capacity(snapshot.cas_entries.len());
         for (hash, boc) in &snapshot.cas_entries {
@@ -522,7 +562,7 @@ impl Node {
     fn rebuild_indexes(&mut self) {
         self.indexes = Indexes::new();
         for (index, deltas) in self.history.deltas_by_seqno.iter().enumerate() {
-            let seqno = index as Seqno + 1;
+            let seqno = self.history.blocks[index].seqno;
             for delta in deltas {
                 self.indexes
                     .account_deltas_by_addr

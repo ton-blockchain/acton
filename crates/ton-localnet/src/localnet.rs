@@ -3,6 +3,9 @@ use crate::executor::TvmEmulatorAdapter;
 use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
 use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
+use crate::remote::{
+    RemoteProvider, fetch_remote_blocks_v3, fetch_remote_shards_v2, fetch_remote_transactions_v3,
+};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
 use crate::streaming::StreamingCommitEvent;
@@ -57,20 +60,28 @@ pub struct LocalnetBlock {
 
 impl LocalnetBlockId {
     pub const fn first() -> Self {
+        Self::basechain_anchor(0)
+    }
+
+    pub const fn basechain_anchor(seqno: Seqno) -> Self {
         Self {
             workchain: 0,
             shard: -9223372036854775808,
-            seqno: 0,
+            seqno,
             root_hash: Hash256([0; 32]),
             file_hash: Hash256([0; 32]),
         }
     }
 
     pub const fn first_masterchain() -> Self {
+        Self::masterchain_anchor(0)
+    }
+
+    pub const fn masterchain_anchor(seqno: Seqno) -> Self {
         Self {
             workchain: -1,
             shard: -9223372036854775808,
-            seqno: 0,
+            seqno,
             root_hash: Hash256([0; 32]),
             file_hash: Hash256([0; 32]),
         }
@@ -493,6 +504,9 @@ pub(crate) enum Request {
     },
     GetBlocks {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetBlock>>>,
+    },
+    GetStateSource {
+        resp: oneshot::Sender<StateSource>,
     },
     GetPendingTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
@@ -1190,6 +1204,36 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn state_source(&self) -> anyhow::Result<StateSource> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetStateSource { resp }).await?;
+        Ok(rx.await?)
+    }
+
+    pub async fn get_historical_blocks_v3(
+        &self,
+        requested_seqno: Option<i32>,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::BlocksResponse>> {
+        let Some(provider) = self.historical_provider(requested_seqno).await? else {
+            return Ok(None);
+        };
+        fetch_remote_blocks_v3(&provider, raw_query).await.map(Some)
+    }
+
+    pub async fn get_historical_transactions_v3(
+        &self,
+        requested_seqno: Option<i32>,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::TransactionsResponse>> {
+        let Some(provider) = self.historical_provider(requested_seqno).await? else {
+            return Ok(None);
+        };
+        fetch_remote_transactions_v3(&provider, raw_query)
+            .await
+            .map(Some)
+    }
+
     pub async fn get_pending_transactions(&self) -> anyhow::Result<Vec<LocalnetTransaction>> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -1408,6 +1452,33 @@ impl Localnet {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetShards { seqno, resp }).await?;
         rx.await?
+    }
+
+    pub async fn get_historical_shards_v2(
+        &self,
+        seqno: u32,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::Shards>> {
+        let Some(provider) = self.historical_provider(i32::try_from(seqno).ok()).await? else {
+            return Ok(None);
+        };
+        fetch_remote_shards_v2(&provider, seqno).await.map(Some)
+    }
+
+    async fn historical_provider(
+        &self,
+        requested_seqno: Option<i32>,
+    ) -> anyhow::Result<Option<RemoteProvider>> {
+        let Some(requested_seqno) = requested_seqno.and_then(|seqno| u64::try_from(seqno).ok())
+        else {
+            return Ok(None);
+        };
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        Ok(provider
+            .fork_block_number
+            .is_some_and(|fork_seqno| requested_seqno <= fork_seqno)
+            .then_some(provider))
     }
 
     pub async fn lookup_block(
@@ -2160,6 +2231,9 @@ fn process_loop_request(
             let res = handle_get_blocks(node);
             let _ = resp.send(res);
         }
+        Request::GetStateSource { resp } => {
+            let _ = resp.send(node.state_source.clone());
+        }
         Request::GetPendingTransactions { resp } => {
             let res = handle_get_pending_transactions(node);
             let _ = resp.send(res);
@@ -2615,8 +2689,8 @@ const fn account_query_seqno(node: &Node, seqno: Option<Seqno>) -> Seqno {
 }
 
 fn block_id_for_query_seqno(node: &Node, seqno: Seqno) -> anyhow::Result<LocalnetBlockId> {
-    if seqno == 0 {
-        return Ok(LocalnetBlockId::first());
+    if seqno == node.globals.origin_seqno {
+        return Ok(LocalnetBlockId::basechain_anchor(seqno));
     }
 
     node.get_block_header(seqno)
@@ -3020,13 +3094,18 @@ fn handle_get_blocks(node: &Node) -> anyhow::Result<Vec<LocalnetBlock>> {
     let mut blocks =
         Vec::with_capacity(node.history.blocks.len() + node.history.masterchain_blocks.len());
     blocks.extend(node.history.masterchain_blocks.iter().map(|block| {
-        localnet_block_from_masterchain_meta(block, &node.history.masterchain_blocks)
+        localnet_block_from_masterchain_meta(
+            block,
+            &node.history.masterchain_blocks,
+            node.globals.origin_seqno,
+        )
     }));
     blocks.extend(node.history.blocks.iter().map(|block| {
         localnet_block_from_block_meta(
             block,
             &node.history.blocks,
             masterchain_by_seqno.get(&block.seqno).copied(),
+            node.globals.origin_seqno,
         )
     }));
 
@@ -3037,6 +3116,7 @@ fn localnet_block_from_block_meta(
     block: &BlockMeta,
     blocks: &[BlockMeta],
     masterchain_block: Option<&MasterchainBlockMeta>,
+    origin_seqno: Seqno,
 ) -> LocalnetBlock {
     let id = block.block_id();
     LocalnetBlock {
@@ -3056,6 +3136,10 @@ fn localnet_block_from_block_meta(
                     .iter()
                     .find(|candidate| candidate.seqno == seqno)
                     .map(BlockMeta::block_id)
+                    .or_else(|| {
+                        (seqno == origin_seqno)
+                            .then(|| LocalnetBlockId::basechain_anchor(origin_seqno))
+                    })
             })
             .into_iter()
             .collect(),
@@ -3066,6 +3150,7 @@ fn localnet_block_from_block_meta(
 fn localnet_block_from_masterchain_meta(
     block: &MasterchainBlockMeta,
     masterchain_blocks: &[MasterchainBlockMeta],
+    origin_seqno: Seqno,
 ) -> LocalnetBlock {
     let id = block.block_id();
     LocalnetBlock {
@@ -3085,6 +3170,10 @@ fn localnet_block_from_masterchain_meta(
                     .iter()
                     .find(|candidate| candidate.seqno == seqno)
                     .map(MasterchainBlockMeta::block_id)
+                    .or_else(|| {
+                        (seqno == origin_seqno)
+                            .then(|| LocalnetBlockId::masterchain_anchor(origin_seqno))
+                    })
             })
             .into_iter()
             .collect(),
@@ -3411,8 +3500,14 @@ fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LocalnetBl
     let block_boc = node.get_block_data(seqno)?;
     let prev_blocks = header
         .prev_seqno
-        .and_then(|prev_seqno| node.get_block_header(prev_seqno))
-        .map(|prev| prev.block_id())
+        .and_then(|prev_seqno| {
+            node.get_block_header(prev_seqno)
+                .map(|prev| prev.block_id())
+                .or_else(|| {
+                    (prev_seqno == node.globals.origin_seqno)
+                        .then(|| LocalnetBlockId::basechain_anchor(prev_seqno))
+                })
+        })
         .into_iter()
         .collect();
     parse_block_header(header.block_id(), prev_blocks, &block_boc)
@@ -3428,8 +3523,14 @@ fn handle_get_masterchain_block_header(
     let block_boc = node.get_masterchain_block_data(seqno)?;
     let prev_blocks = header
         .prev_seqno
-        .and_then(|prev_seqno| node.get_masterchain_block_header(prev_seqno))
-        .map(|prev| prev.block_id())
+        .and_then(|prev_seqno| {
+            node.get_masterchain_block_header(prev_seqno)
+                .map(|prev| prev.block_id())
+                .or_else(|| {
+                    (prev_seqno == node.globals.origin_seqno)
+                        .then(|| LocalnetBlockId::masterchain_anchor(prev_seqno))
+                })
+        })
         .into_iter()
         .collect();
     parse_block_header(header.block_id(), prev_blocks, &block_boc)
@@ -3499,8 +3600,8 @@ fn handle_get_block_transactions(
 }
 
 fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<LocalnetMasterchainInfo> {
-    if node.globals.head_seqno == 0 {
-        let block_id = LocalnetBlockId::first_masterchain();
+    if node.history.masterchain_blocks.is_empty() {
+        let block_id = LocalnetBlockId::masterchain_anchor(node.globals.origin_seqno);
         return Ok(LocalnetMasterchainInfo {
             state_root_hash: block_id.root_hash,
             last: block_id.clone(),
@@ -3596,7 +3697,7 @@ fn handle_get_config_all(node: &Node, seqno: Option<u32>) -> anyhow::Result<BocB
     ensure_seqno_exists(node, seqno)?;
 
     let config_boc_hash = match seqno {
-        Some(seqno) if seqno > 0 => {
+        Some(seqno) if seqno > 0 && seqno != node.globals.origin_seqno => {
             node.get_masterchain_block_header(seqno)
                 .ok_or(LocalnetError::BlockNotFound { seqno })?
                 .config_boc_hash
@@ -3608,6 +3709,9 @@ fn handle_get_config_all(node: &Node, seqno: Option<u32>) -> anyhow::Result<BocB
 }
 
 fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Vec<LocalnetBlockId>> {
+    if seqno == node.globals.origin_seqno {
+        return Ok(vec![LocalnetBlockId::basechain_anchor(seqno)]);
+    }
     let Some(block_header) = node.get_block_header(seqno) else {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
@@ -3617,6 +3721,7 @@ fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Vec<LocalnetBloc
 fn ensure_seqno_exists(node: &Node, seqno: Option<u32>) -> anyhow::Result<()> {
     if let Some(seqno) = seqno
         && seqno > 0
+        && seqno != node.globals.origin_seqno
         && node.get_block_header(seqno).is_none()
     {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
@@ -3641,7 +3746,13 @@ fn handle_lookup_block(
             .into());
         }
 
-        let found_block = if let Some(s) = seqno.filter(|seqno| *seqno > 0) {
+        if seqno == Some(node.globals.origin_seqno) {
+            return Ok(LocalnetBlockId::masterchain_anchor(
+                node.globals.origin_seqno,
+            ));
+        }
+
+        let found_block = if let Some(s) = seqno {
             node.get_masterchain_block_header(s)
         } else if let Some(l) = lt {
             node.find_masterchain_block_by_lt(l)
@@ -3671,7 +3782,11 @@ fn handle_lookup_block(
         .into());
     }
 
-    let found_block = if let Some(s) = seqno.filter(|seqno| *seqno > 0) {
+    if seqno == Some(node.globals.origin_seqno) {
+        return Ok(LocalnetBlockId::basechain_anchor(node.globals.origin_seqno));
+    }
+
+    let found_block = if let Some(s) = seqno {
         node.get_block_header(s)
     } else if let Some(l) = lt {
         node.find_block_by_lt(l)

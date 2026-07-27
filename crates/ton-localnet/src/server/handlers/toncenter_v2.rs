@@ -434,7 +434,18 @@ pub async fn get_shards(
     Query(payload): Query<SeqnoRequest>,
 ) -> Response {
     let seqno = parse!(parse_required_seqno(&payload.seqno));
-    handle_result(node.get_shards(seqno), |shards| v2::map_shards(shards)).await
+    handle_result(
+        async move {
+            if let Some(shards) = node.get_historical_shards_v2(seqno).await? {
+                return Ok(shards);
+            }
+            node.get_shards(seqno)
+                .await
+                .map(|shards| v2::map_shards(&shards))
+        },
+        Clone::clone,
+    )
+    .await
 }
 
 pub async fn lookup_block(

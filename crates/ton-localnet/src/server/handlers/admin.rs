@@ -86,7 +86,6 @@ struct LocalnetAdminStatus {
 pub async fn get_status(State(state): State<ServerState>) -> Response {
     let ServerState {
         node,
-        state_source,
         network_conditions,
         rate_limit_rps,
         ..
@@ -96,6 +95,7 @@ pub async fn get_status(State(state): State<ServerState>) -> Response {
             let masterchain_info = node.get_masterchain_info().await?;
             let clock_info = node.clock_info().await?;
             let mining_mode = node.get_mining_mode().await?;
+            let state_source = node.state_source().await?;
 
             Ok(LocalnetAdminStatus {
                 uptime_seconds: node.uptime_seconds(),
@@ -107,7 +107,7 @@ pub async fn get_status(State(state): State<ServerState>) -> Response {
                 block_interval_ms: node.block_interval_ms(),
                 rate_limit_rps,
                 mining_mode,
-                state_source: state_source.as_ref().clone(),
+                state_source: StateSourceInfo::from(&state_source),
                 network_conditions: network_conditions.info(),
             })
         },

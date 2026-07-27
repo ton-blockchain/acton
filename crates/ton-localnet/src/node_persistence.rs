@@ -5,8 +5,9 @@ use crate::storage::{
     MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Seqno};
+use anyhow::Context;
 use core::cmp;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -19,6 +20,7 @@ pub(crate) struct PersistedNodeState {
     pub latest: LatestState,
     pub history: History,
     pub indexes: Indexes,
+    pub origin_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
 }
 
@@ -50,6 +52,13 @@ impl NodePersistence {
         let mut head_seqno = 0;
 
         let conn = self.conn.lock().expect("Failed to lock DB connection");
+        let origin_seqno = conn
+            .query_row(
+                "SELECT value FROM node_metadata WHERE key = 'origin_seqno'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
 
         let mut stmt = conn.prepare("SELECT data FROM blocks ORDER BY seqno ASC")?;
         let block_iter = stmt.query_map([], |row| {
@@ -59,11 +68,21 @@ impl NodePersistence {
         })?;
         for block in block_iter {
             let block = block?;
-            let expected_seqno = history.blocks.len() as Seqno + 1;
-            anyhow::ensure!(
-                block.seqno == expected_seqno,
-                "SQLite block history is not contiguous at seqno {expected_seqno}"
-            );
+            if let Some(previous) = history.blocks.last() {
+                let expected_seqno = previous
+                    .seqno
+                    .checked_add(1)
+                    .context("SQLite block history seqno overflow")?;
+                anyhow::ensure!(
+                    block.seqno == expected_seqno,
+                    "SQLite block history is not contiguous at seqno {expected_seqno}"
+                );
+            } else {
+                anyhow::ensure!(
+                    block.seqno > 0,
+                    "SQLite block history cannot start at seqno zero"
+                );
+            }
             head_seqno = block.seqno;
             history.blocks.push(block);
         }
@@ -76,6 +95,19 @@ impl NodePersistence {
         })?;
         for block in block_iter {
             history.masterchain_blocks.push(block?);
+        }
+        anyhow::ensure!(
+            history.masterchain_blocks.is_empty()
+                || history.masterchain_blocks.len() == history.blocks.len(),
+            "SQLite masterchain history length does not match basechain history"
+        );
+        for (masterchain, basechain) in history.masterchain_blocks.iter().zip(&history.blocks) {
+            anyhow::ensure!(
+                masterchain.seqno == basechain.seqno,
+                "SQLite masterchain block {} does not match basechain block {}",
+                masterchain.seqno,
+                basechain.seqno
+            );
         }
 
         let mut stmt = conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
@@ -125,6 +157,9 @@ impl NodePersistence {
                 .insert(block.seqno, block.tx_hashes.clone());
         }
 
+        history
+            .deltas_by_seqno
+            .resize(history.blocks.len(), Vec::new());
         let mut stmt = conn.prepare("SELECT seqno, data FROM account_deltas ORDER BY seqno ASC")?;
         let delta_iter = stmt.query_map([], |row| {
             let seqno: Seqno = row.get(0)?;
@@ -135,10 +170,22 @@ impl NodePersistence {
         })?;
         for row in delta_iter {
             let (seqno, deltas) = row?;
-            if seqno == 0 {
-                continue;
-            }
-            history.deltas_by_seqno.resize(seqno as usize, Vec::new());
+            let first_seqno = history
+                .blocks
+                .first()
+                .context("SQLite account deltas exist without block history")?
+                .seqno;
+            let index = seqno
+                .checked_sub(first_seqno)
+                .and_then(|index| usize::try_from(index).ok())
+                .filter(|index| *index < history.deltas_by_seqno.len())
+                .with_context(|| {
+                    format!("SQLite account deltas reference unknown block {seqno}")
+                })?;
+            anyhow::ensure!(
+                history.blocks[index].seqno == seqno,
+                "SQLite account deltas are not aligned with block {seqno}"
+            );
             for delta in &deltas {
                 indexes
                     .account_deltas_by_addr
@@ -146,7 +193,7 @@ impl NodePersistence {
                     .or_default()
                     .insert(seqno, delta.clone());
             }
-            history.deltas_by_seqno[seqno as usize - 1] = deltas;
+            history.deltas_by_seqno[index] = deltas;
         }
 
         let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
@@ -205,8 +252,20 @@ impl NodePersistence {
             latest,
             history,
             indexes,
+            origin_seqno,
             head_seqno,
         })
+    }
+
+    pub(crate) fn set_origin_seqno(&self, origin_seqno: Seqno) -> anyhow::Result<()> {
+        self.conn
+            .lock()
+            .expect("Failed to lock DB connection")
+            .execute(
+                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
+                params![origin_seqno],
+            )?;
+        Ok(())
     }
 
     pub(crate) fn persist_commit(
@@ -407,6 +466,10 @@ impl NodePersistence {
         tx.execute("DELETE FROM accounts", [])?;
         tx.execute("DELETE FROM compiler_abis", [])?;
         tx.execute("DELETE FROM verified_sources", [])?;
+        tx.execute(
+            "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
+            params![snapshot.globals.origin_seqno],
+        )?;
 
         for (hash, boc) in &snapshot.cas_entries {
             tx.execute(
@@ -432,7 +495,7 @@ impl NodePersistence {
         }
 
         for (index, deltas) in snapshot.history_deltas_by_seqno.iter().enumerate() {
-            let seqno = index as Seqno + 1;
+            let seqno = snapshot.history_blocks[index].seqno;
             let data = serde_json::to_vec(deltas)?;
             tx.execute(
                 "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
@@ -492,6 +555,10 @@ impl NodePersistence {
 }
 
 fn init_schema(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS node_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL)",
+        [],
+    )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS cas (hash BLOB PRIMARY KEY, boc BLOB)",
         [],

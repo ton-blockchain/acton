@@ -4,6 +4,7 @@ pub mod router;
 
 use crate::liteapi;
 use crate::localnet::Localnet;
+use crate::node::StateSource;
 use acton_config::color::OwoColorize;
 use axum::extract::FromRef;
 use serde::Serialize;
@@ -33,7 +34,6 @@ pub struct StartupWallet {
 pub struct ServerState {
     pub node: Arc<Localnet>,
     pub startup_wallets: Arc<Vec<StartupWallet>>,
-    pub state_source: Arc<StateSourceInfo>,
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
     pub rate_limit_rps: Option<u32>,
@@ -46,6 +46,23 @@ pub struct StateSourceInfo {
     pub state_source: &'static str,
     pub fork_network: Option<String>,
     pub fork_block_number: Option<u64>,
+}
+
+impl From<&StateSource> for StateSourceInfo {
+    fn from(state_source: &StateSource) -> Self {
+        match state_source {
+            StateSource::Local => Self {
+                state_source: "local",
+                fork_network: None,
+                fork_block_number: None,
+            },
+            StateSource::Remote(provider) => Self {
+                state_source: "remote",
+                fork_network: Some(provider.network.to_string()),
+                fork_block_number: provider.fork_block_number,
+            },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -260,12 +277,6 @@ impl FromRef<ServerState> for Arc<Vec<StartupWallet>> {
     }
 }
 
-impl FromRef<ServerState> for Arc<StateSourceInfo> {
-    fn from_ref(state: &ServerState) -> Self {
-        state.state_source.clone()
-    }
-}
-
 impl FromRef<ServerState> for ShutdownSignal {
     fn from_ref(state: &ServerState) -> Self {
         state.shutdown.clone()
@@ -342,20 +353,10 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     let network_conditions = NetworkConditions::new(response_delay_ms);
     let api_calls = ApiCallLog::new();
 
-    let state_source = StateSourceInfo {
-        state_source: if fork_network.is_some() {
-            "remote"
-        } else {
-            "local"
-        },
-        fork_network: fork_network.clone(),
-        fork_block_number,
-    };
     let shutdown = ShutdownSignal::new();
     let app = router::create_router(ServerState {
         node: Arc::clone(&node),
         startup_wallets: Arc::new(startup_wallets),
-        state_source: Arc::new(state_source),
         shutdown: shutdown.clone(),
         network_conditions: network_conditions.clone(),
         rate_limit_rps,
