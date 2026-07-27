@@ -1,12 +1,9 @@
 import {describe, expect, test} from "bun:test"
 
-import {
-  ADDRESS_BOOK_URLS,
-  TON_ASSETS_ACCOUNT_URLS,
-  parseSourceAddresses,
-  parseYamlAddresses,
-  readSources,
-} from "../scripts/sources.ts"
+import {readSources} from "../scripts/sources.ts"
+import {ADDRESS_BOOK_URLS, parseAddressBook} from "../scripts/sources/address-book.ts"
+import {parseSourceAddresses} from "../scripts/sources/shared.ts"
+import {TON_ASSETS_ACCOUNT_URLS, parseTonAssets} from "../scripts/sources/ton-assets.ts"
 
 describe("source parsing", () => {
   test("reads address and name from every entry", () => {
@@ -26,7 +23,7 @@ describe("source parsing", () => {
 
   test("parses YAML before validating entries", () => {
     expect(
-      parseYamlAddresses(
+      parseTonAssets(
         `
 - address: "0:abc"
   name: "Alpha"
@@ -38,7 +35,7 @@ describe("source parsing", () => {
 
   test("matches upstream recovery for reserved plain name scalars", () => {
     expect(
-      parseYamlAddresses(
+      parseAddressBook(
         `
 - address: "0:abc"
   name: @wallet in Telegram
@@ -50,7 +47,7 @@ describe("source parsing", () => {
 
   test("matches upstream convention for disabled indented entries", () => {
     expect(
-      parseYamlAddresses(
+      parseAddressBook(
         `
 - address: "0:active"
   name: "Active"
