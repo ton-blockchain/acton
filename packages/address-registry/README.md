@@ -9,8 +9,8 @@ This package will aggregate and normalize data from:
 
 The generator downloads the account YAML files from both upstream repositories,
 validates their shapes, normalizes addresses to raw form, merges equal entries,
-applies manual conflict resolutions, and saves unresolved name conflicts to
-`conflicts.json`:
+and applies manual conflict resolutions. It fails if any name conflict does not
+have a resolution:
 
 ```sh
 bun run generate
