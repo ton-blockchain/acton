@@ -1208,16 +1208,6 @@ export interface ApiCallLogResponse {
   readonly max_retained: number
 }
 
-export interface StartupWallet {
-  readonly name: string
-  readonly mnemonic: readonly string[]
-  readonly version: string
-  readonly network: string
-  readonly address: string
-  readonly public_key: string
-  readonly wallet_id: number
-}
-
 export interface V3RunGetMethodStackEntry {
   readonly type: string
   readonly value: unknown

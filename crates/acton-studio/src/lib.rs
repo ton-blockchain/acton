@@ -28,6 +28,7 @@ mod local_test_process;
 mod test_api;
 mod test_run;
 mod test_runtime;
+mod wallet;
 
 pub use contract_source_artifact::{
     CONTRACT_SOURCE_HISTORY_PATH, ContractSourceArtifact, ContractSourceArtifactError,
@@ -51,12 +52,17 @@ pub use test_run::{
     test_contract_artifact_file_name, test_history_dir, test_output_paths, test_trace_dir,
 };
 pub use test_runtime::{TestRunRuntime, TestRunRuntimeError, TestRunRuntimeFuture};
+pub use wallet::{
+    SignWalletRequest, SignWalletResponse, StudioWallet, WalletRuntime, WalletRuntimeError,
+    WalletRuntimeFuture,
+};
 
 pub const DEFAULT_STUDIO_PORT: u16 = 3015;
 pub const STUDIO_API_VERSION: u32 = 1;
 pub const STUDIO_ENVIRONMENTS_PATH: &str = "/api/v1/environments";
 pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
+pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/studio-ui/dist");
@@ -125,6 +131,7 @@ pub struct StudioServer {
     config: StudioServerConfig,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
+    wallet_runtime: Arc<dyn WalletRuntime>,
 }
 
 impl StudioServer {
@@ -134,6 +141,7 @@ impl StudioServer {
             config,
             environment_runtime: Arc::new(environment::EmptyEnvironmentRuntime),
             test_run_runtime: Arc::new(test_runtime::EmptyTestRunRuntime::new()),
+            wallet_runtime: Arc::new(wallet::EmptyWalletRuntime),
         }
     }
 
@@ -152,6 +160,15 @@ impl StudioServer {
         R: EnvironmentRuntime + 'static,
     {
         self.environment_runtime = Arc::new(environment_runtime);
+        self
+    }
+
+    #[must_use]
+    pub fn with_wallet_runtime<R>(mut self, wallet_runtime: R) -> Self
+    where
+        R: WalletRuntime + 'static,
+    {
+        self.wallet_runtime = Arc::new(wallet_runtime);
         self
     }
 
@@ -176,6 +193,7 @@ impl StudioServer {
             },
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
+            wallet_runtime: Arc::clone(&self.wallet_runtime),
             http_client: reqwest::Client::new(),
         };
         let api = Router::new()
@@ -198,6 +216,11 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route("/environments/{environment_id}/wallets", get(list_wallets))
+            .route(
+                "/environments/{environment_id}/wallets/{wallet_name}/sign",
+                post(sign_wallet),
             )
             .route(
                 "/environments/{environment_id}/rpc",
@@ -258,6 +281,7 @@ pub(crate) struct StudioState {
     info: StudioInfo,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
+    wallet_runtime: Arc<dyn WalletRuntime>,
     http_client: reqwest::Client,
 }
 
@@ -377,6 +401,87 @@ async fn restart_environment(
         .await
         .map(|environment| Json(public_environment(environment)))
         .map_err(StudioApiError)
+}
+
+async fn list_wallets(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Vec<StudioWallet>>, WalletApiError> {
+    let environment = wallet_environment(&state, &environment_id).await?;
+    state
+        .wallet_runtime
+        .list(&environment)
+        .await
+        .map(Json)
+        .map_err(WalletApiError::Wallet)
+}
+
+async fn sign_wallet(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, wallet_name)): AxumPath<(String, String)>,
+    Json(request): Json<SignWalletRequest>,
+) -> Result<Json<SignWalletResponse>, WalletApiError> {
+    const MAX_SIGNING_PAYLOAD_BYTES: usize = 64 * 1024;
+
+    let environment = wallet_environment(&state, &environment_id).await?;
+    let bytes = request.bytes.strip_prefix("0x").ok_or_else(|| {
+        WalletApiError::Wallet(WalletRuntimeError::InvalidRequest {
+            code: "wallet_signing_payload_invalid",
+            message: "Signing bytes must be a 0x-prefixed hexadecimal string".to_owned(),
+        })
+    })?;
+    let bytes = hex::decode(bytes).map_err(|error| {
+        WalletApiError::Wallet(WalletRuntimeError::InvalidRequest {
+            code: "wallet_signing_payload_invalid",
+            message: format!("Signing bytes are not valid hexadecimal: {error}"),
+        })
+    })?;
+    if bytes.len() > MAX_SIGNING_PAYLOAD_BYTES {
+        return Err(WalletApiError::Wallet(WalletRuntimeError::InvalidRequest {
+            code: "wallet_signing_payload_too_large",
+            message: format!("Signing payload exceeds the {MAX_SIGNING_PAYLOAD_BYTES} byte limit"),
+        }));
+    }
+
+    state
+        .wallet_runtime
+        .sign(&environment, &wallet_name, bytes)
+        .await
+        .map(|signature| {
+            Json(SignWalletResponse {
+                signature: format!("0x{}", hex::encode(signature)),
+            })
+        })
+        .map_err(WalletApiError::Wallet)
+}
+
+async fn wallet_environment(
+    state: &StudioState,
+    environment_id: &str,
+) -> Result<StudioEnvironment, WalletApiError> {
+    let environment = state
+        .environment_runtime
+        .get(environment_id)
+        .await
+        .map_err(WalletApiError::Environment)?;
+    if environment.status != EnvironmentStatus::Running {
+        return Err(WalletApiError::Environment(
+            EnvironmentRuntimeError::Conflict {
+                code: "environment_not_running",
+                message: format!("Environment {} is not running", environment.name),
+            },
+        ));
+    }
+    if !environment
+        .capabilities
+        .contains(&EnvironmentCapability::Wallets)
+    {
+        return Err(WalletApiError::Wallet(WalletRuntimeError::InvalidRequest {
+            code: "environment_wallets_unavailable",
+            message: format!("Wallets are not available in {}", environment.name),
+        }));
+    }
+    Ok(environment)
 }
 
 fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
@@ -563,6 +668,11 @@ async fn api_not_found() -> StatusCode {
 
 struct StudioApiError(EnvironmentRuntimeError);
 
+enum WalletApiError {
+    Environment(EnvironmentRuntimeError),
+    Wallet(WalletRuntimeError),
+}
+
 #[derive(Serialize)]
 struct StudioApiErrorBody {
     error: StudioApiErrorDetails,
@@ -595,6 +705,49 @@ impl IntoResponse for StudioApiError {
                     code,
                     message: self.0.to_string(),
                 },
+            }),
+        )
+            .into_response()
+    }
+}
+
+impl IntoResponse for WalletApiError {
+    fn into_response(self) -> Response {
+        let (status, code, message) = match self {
+            Self::Environment(error) => {
+                let status = match &error {
+                    EnvironmentRuntimeError::InvalidRequest { .. } => StatusCode::BAD_REQUEST,
+                    EnvironmentRuntimeError::Conflict { .. } => StatusCode::CONFLICT,
+                    EnvironmentRuntimeError::NotFound { .. } => StatusCode::NOT_FOUND,
+                    EnvironmentRuntimeError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                let code = match &error {
+                    EnvironmentRuntimeError::InvalidRequest { code, .. }
+                    | EnvironmentRuntimeError::Conflict { code, .. }
+                    | EnvironmentRuntimeError::Internal { code, .. } => *code,
+                    EnvironmentRuntimeError::NotFound { .. } => "environment_not_found",
+                };
+                (status, code, error.to_string())
+            }
+            Self::Wallet(error) => {
+                let (status, code) = match &error {
+                    WalletRuntimeError::InvalidRequest { code, .. } => {
+                        (StatusCode::BAD_REQUEST, *code)
+                    }
+                    WalletRuntimeError::NotFound { .. } => {
+                        (StatusCode::NOT_FOUND, "wallet_not_found")
+                    }
+                    WalletRuntimeError::Internal { code, .. } => {
+                        (StatusCode::INTERNAL_SERVER_ERROR, *code)
+                    }
+                };
+                (status, code, error.to_string())
+            }
+        };
+        (
+            status,
+            Json(StudioApiErrorBody {
+                error: StudioApiErrorDetails { code, message },
             }),
         )
             .into_response()

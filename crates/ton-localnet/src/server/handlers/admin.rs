@@ -11,7 +11,7 @@ use crate::server::models::{
     SetTimeRequest,
 };
 use crate::server::{
-    ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupWallet,
+    ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount,
     StateSourceInfo,
 };
 use crate::storage::compiler_abi_contract_name;
@@ -118,11 +118,11 @@ pub async fn get_status(State(state): State<ServerState>) -> Response {
     .await
 }
 
-pub async fn get_startup_wallets(
-    State(startup_wallets): State<Arc<Vec<StartupWallet>>>,
+pub async fn get_startup_accounts(
+    State(startup_accounts): State<Arc<Vec<StartupAccount>>>,
 ) -> Response {
     handle_result(
-        async move { Ok::<_, anyhow::Error>(startup_wallets.as_ref().clone()) },
+        async move { Ok::<_, anyhow::Error>(startup_accounts.as_ref().clone()) },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
     )
     .await

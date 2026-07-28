@@ -21,7 +21,6 @@ import type {
   LocalnetTimeInfo,
   NftItem,
   Shards,
-  StartupWallet,
   StreamingTransactionsEvent,
   SourceTraceResponse,
   V3ActionsResponse,
@@ -1017,11 +1016,6 @@ export class TonClient {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getApiCalls")
     url.searchParams.append("limit", limit.toString())
     return this.request(url, "Failed to fetch API calls")
-  }
-
-  async getStartupWallets(): Promise<StartupWallet[]> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getStartupWallets")
-    return this.request(url, "Failed to fetch startup wallets")
   }
 
   async setAddressName(address: string, name: string): Promise<void> {

@@ -12,7 +12,20 @@ use acton_studio::{
 };
 use anyhow::Context;
 
+use crate::studio_wallets::ProjectWalletRuntime;
+
 pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> anyhow::Result<()> {
+    let configured_project = configured_project()?;
+    if !host.is_loopback()
+        && configured_project
+            .as_ref()
+            .is_some_and(|(_, wallet_runtime)| !wallet_runtime.is_empty())
+    {
+        anyhow::bail!(
+            "Project wallet signing requires a loopback Studio host until remote authentication is configured"
+        );
+    }
+
     let address = SocketAddr::new(host, port);
     let listener = tokio::net::TcpListener::bind(address)
         .await
@@ -23,7 +36,8 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
     let url = format!("http://{address}");
 
     let mut config = StudioServerConfig::new(crate::build_info::SHORT_VERSION);
-    if let Some(workspace) = configured_workspace()? {
+    if let Some((workspace, _)) = &configured_project {
+        let workspace = workspace.clone();
         config = config.with_workspace(workspace);
     }
     let acton_executable =
@@ -34,9 +48,12 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
     let reporter_url = local_reporter_url(address);
     let test_run_runtime =
         LocalProcessTestRunRuntime::new(acton_executable, &project_root, &reporter_url);
-    let server = StudioServer::new(config)
+    let mut server = StudioServer::new(config)
         .with_environment_runtime(environment_runtime)
         .with_test_run_runtime(test_run_runtime);
+    if let Some((_, wallet_runtime)) = configured_project {
+        server = server.with_wallet_runtime(wallet_runtime);
+    }
     let daemon_guard = StudioDaemonGuard::register(&project_root, reporter_url)?;
 
     println!("    {} Acton Studio at {}", "Starting".green().bold(), url);
@@ -95,17 +112,22 @@ impl Drop for StudioDaemonGuard {
     }
 }
 
-fn configured_workspace() -> anyhow::Result<Option<StudioWorkspace>> {
+fn configured_project() -> anyhow::Result<Option<(StudioWorkspace, ProjectWalletRuntime)>> {
     if !configured_manifest_path().is_file() {
         return Ok(None);
     }
 
-    let config = ActonConfig::load_manifest()?;
-    let wallet_names = ActonConfig::load_wallets()?.wallets.into_keys().collect();
-    Ok(Some(
-        StudioWorkspace::new(config.package.name, configured_project_root())
-            .with_wallet_names(wallet_names),
-    ))
+    let config = ActonConfig::load()?;
+    let wallet_names = config
+        .wallets()
+        .into_iter()
+        .flatten()
+        .map(|(name, _)| name.clone())
+        .collect();
+    let workspace = StudioWorkspace::new(config.package.name.clone(), configured_project_root())
+        .with_wallet_names(wallet_names);
+    let wallet_runtime = ProjectWalletRuntime::new(&config)?;
+    Ok(Some((workspace, wallet_runtime)))
 }
 
 async fn shutdown_signal() {

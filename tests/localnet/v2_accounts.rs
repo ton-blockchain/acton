@@ -31,8 +31,8 @@ fn wallet_and_extended_account_information_match_upstream_shapes() {
         ])
         .start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let mut wallets = response_payload(&startup_wallets)
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let mut wallets = response_payload(&startup_accounts)
         .as_array()
         .expect("startup wallets response must contain an array")
         .iter()

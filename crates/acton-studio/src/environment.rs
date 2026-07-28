@@ -105,6 +105,7 @@ pub struct EnvironmentEndpoints {
 pub struct EnvironmentNetwork {
     pub id: String,
     pub label: String,
+    pub chain_id: i32,
     pub test_only: bool,
 }
 
@@ -188,6 +189,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Explorer,
                 EnvironmentCapability::Integration,
                 EnvironmentCapability::GramFaucet,
+                EnvironmentCapability::Wallets,
                 EnvironmentCapability::Simulator,
             ],
         }
@@ -206,16 +208,19 @@ impl EnvironmentConfig {
                     "testnet" => "Testnet fork".to_owned(),
                     _ => format!("{network} fork"),
                 },
+                chain_id: -3,
                 test_only: true,
             },
             Self::ActonLocalnet { .. } => EnvironmentNetwork {
                 id: "acton-localnet".to_owned(),
                 label: "Acton localnet".to_owned(),
+                chain_id: -3,
                 test_only: true,
             },
             Self::FullTonNetwork { .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
                 label: "Local TON network".to_owned(),
+                chain_id: -239,
                 test_only: true,
             },
         }

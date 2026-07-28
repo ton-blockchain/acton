@@ -14,7 +14,7 @@ use super::handlers::{
     get_multisig_wallets, get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers,
     get_out_msg_queue_size, get_pending_actions_v3, get_pending_traces_v3,
     get_pending_transactions_v3, get_registered_verified_source, get_shard_account_cell,
-    get_shards, get_startup_wallets, get_status, get_token_data, get_top_accounts_by_balance_v3,
+    get_shards, get_startup_accounts, get_status, get_token_data, get_top_accounts_by_balance_v3,
     get_traces, get_transactions, get_transactions_by_masterchain_block_v3,
     get_transactions_by_message_v3, get_transactions_std, get_transactions_v3, get_verified_source,
     get_vesting, get_wallet_information, get_wallet_information_v3, get_wallet_states_v3,
@@ -251,7 +251,7 @@ pub fn create_router(state: ServerState) -> Router {
         .route("/acton_setShardAccount", post(set_shard_account))
         .route("/acton_changeAccountState", post(change_account_state))
         .route("/acton_sendInternalMessage", post(send_internal_message))
-        .route("/acton_getStartupWallets", get(get_startup_wallets))
+        .route("/acton_getStartupAccounts", get(get_startup_accounts))
         .route("/acton_setNetworkConditions", post(set_network_conditions))
         .route("/acton_setMiningMode", post(set_mining_mode))
         .route("/acton_mine", post(mine_blocks))
@@ -508,7 +508,7 @@ fn capture_response_body(
 }
 
 fn should_capture_response_body(path: &str) -> bool {
-    !matches!(path, "/acton_getApiCalls" | "/acton_getStartupWallets")
+    !matches!(path, "/acton_getApiCalls" | "/acton_getStartupAccounts")
 }
 
 struct ApiCallResponseCapture {

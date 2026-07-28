@@ -1022,9 +1022,9 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     let source_historical_shards = source_node.get_json(&historical_shards_path);
     let forked_historical_shards = forked_node.get_json(&historical_shards_path);
 
-    let startup_wallets = forked_node.get_json("/acton_getStartupWallets");
-    let startup_wallets_payload = response_payload(&startup_wallets);
-    let wallets = startup_wallets_payload
+    let startup_accounts = forked_node.get_json("/acton_getStartupAccounts");
+    let startup_accounts_payload = response_payload(&startup_accounts);
+    let wallets = startup_accounts_payload
         .as_array()
         .expect("startup wallets response must contain an array");
     let wallet = wallets
@@ -1341,8 +1341,8 @@ fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
             "--mine-empty-blocks",
         ])
         .start();
-    let source_wallets = source_node.get_json("/acton_getStartupWallets");
-    let source_address = response_payload(&source_wallets)
+    let source_accounts = source_node.get_json("/acton_getStartupAccounts");
+    let source_address = response_payload(&source_accounts)
         .as_array()
         .and_then(|wallets| wallets.first())
         .and_then(|wallet| wallet["address"].as_str())
@@ -1390,7 +1390,7 @@ fn localnet_records_api_calls_for_dashboard() {
     let mut initial_log = node.get_json("/acton_getApiCalls");
     normalize_api_calls_for_snapshot(&mut initial_log);
 
-    let _admin_wallets = node.get_json("/acton_getStartupWallets");
+    let _startup_accounts = node.get_json("/acton_getStartupAccounts");
     let _admin_status = node.get_json("/acton_nodeInfo");
     let _v2_status = node.get_json("/api/v2/getMasterchainInfo?archival=true&limit=2");
     Client::new()
@@ -3968,8 +3968,8 @@ fn localnet_supports_emulate_v1_emulate_ton_connect() {
         .args(["--accounts", "wallet_v3,wallet_v4,wallet_v5", "--no-mining"])
         .start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallets = response_payload(&startup_wallets)
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallets = response_payload(&startup_accounts)
         .as_array()
         .expect("startup wallets response must contain an array");
     let transactions_before = node.get_json("/api/v3/transactions?limit=100");
@@ -4118,8 +4118,8 @@ fn localnet_supports_v3_estimate_fee_and_top_accounts() {
         .args(["--accounts", "wallet_v4", "--no-mining"])
         .start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallet = response_payload(&startup_wallets)
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet = response_payload(&startup_accounts)
         .as_array()
         .and_then(|wallets| wallets.first())
         .expect("startup wallet must be present");
@@ -5614,8 +5614,8 @@ fn localnet_supports_v3_core_lookup_endpoints() {
         .expect("Failed to write wallets.toml");
     let node = project.localnet().args(["--accounts", "deployer"]).start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallet_address = response_payload(&startup_wallets)[0]["address"]
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet_address = response_payload(&startup_accounts)[0]["address"]
         .as_str()
         .expect("startup wallet must expose address")
         .to_owned();

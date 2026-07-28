@@ -23,7 +23,6 @@ import {
   Search as SearchIcon,
   Settings2,
   Star,
-  Wallet,
   X,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
@@ -58,7 +57,6 @@ const mainItems: SidebarItem[] = [
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
   {label: "Emulate", icon: Play, path: "/explorer/emulate"},
   {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
-  {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
   {label: "Tokens", icon: Coins, path: "/tokens"},
   {label: "NFTs", icon: Image, path: "/nfts"},

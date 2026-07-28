@@ -138,7 +138,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
           >
             <div className={styles.walletTableTitleBar}>
               <h2 id="wallets-table-title" className={styles.walletTableTitle}>
-                Startup wallets
+                Project wallets
               </h2>
               <Button
                 type="button"
@@ -164,8 +164,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
               <WalletRowsSkeleton />
             ) : runtimeWallets.length === 0 ? (
               <div className={`${dashboardStyles.emptyState} ${styles.walletTableEmpty}`}>
-                No supported startup wallets, start localnet with `--accounts` or
-                `[localnet].accounts`
+                No supported project wallets are configured in Acton.toml
               </div>
             ) : (
               <table className={`${styles.walletTable} ${styles.walletsTable}`}>

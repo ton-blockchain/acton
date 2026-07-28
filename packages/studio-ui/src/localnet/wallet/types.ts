@@ -1,19 +1,17 @@
 import type {Wallet} from "@ton/walletkit"
 
-import type {StartupWallet} from "../explorer/api/types"
+import type {StudioWallet, StudioWalletVersion} from "../../studioApi"
 
-export type SupportedWalletVersion = "v4r2" | "v5r1"
-
-export interface StartupWalletRecord extends StartupWallet {
-  readonly version: SupportedWalletVersion
+export interface ProjectWalletRecord extends StudioWallet {
+  readonly version: StudioWalletVersion
 }
 
 export interface RuntimeWallet {
   readonly id: string
-  readonly record: StartupWalletRecord
+  readonly record: ProjectWalletRecord
   readonly wallet: Wallet
 }
 
-export function isSupportedWalletVersion(version: string): version is SupportedWalletVersion {
+export function isSupportedWalletVersion(version: string): version is StudioWalletVersion {
   return version === "v4r2" || version === "v5r1"
 }

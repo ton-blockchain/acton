@@ -17,7 +17,7 @@ use ton_localnet::node::StateSource;
 use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
 use ton_localnet::{
-    Localnet, LocalnetMiningMode, ServerArgs, ServerError, StartupWallet, run_server,
+    Localnet, LocalnetMiningMode, ServerArgs, ServerError, StartupAccount, run_server,
 };
 use ton_retrace::Network;
 use toncenter_keys::LOCALNET_API_KEY_ENV;
@@ -101,7 +101,7 @@ pub async fn localnet_start_cmd(
         );
     }
 
-    let startup_wallets = setup_startup_accounts(&node, &accounts, no_mining).await?;
+    let startup_accounts = setup_startup_accounts(&node, &accounts, no_mining).await?;
     let auth_token = require_auth.then(localnet_auth_token);
     let run_result = run_server(
         node.clone(),
@@ -112,7 +112,7 @@ pub async fn localnet_start_cmd(
             fork_block_number,
             rate_limit_rps: rate_limit,
             response_delay_ms,
-            startup_wallets,
+            startup_accounts,
             auth_token,
             liteapi,
             liteapi_port,
@@ -155,7 +155,7 @@ async fn setup_startup_accounts(
     node: &Arc<Localnet>,
     accounts: &[String],
     manual_mining: bool,
-) -> anyhow::Result<Vec<StartupWallet>> {
+) -> anyhow::Result<Vec<StartupAccount>> {
     if accounts.is_empty() {
         return Ok(Vec::new());
     }
@@ -168,23 +168,10 @@ async fn setup_startup_accounts(
         return Ok(Vec::new());
     }
 
-    let configured_wallets = config
-        .wallets
-        .as_ref()
-        .map(|wallets| &wallets.wallets)
-        .context("No wallets are configured in Acton.toml")?;
-    let mut startup_wallets = Vec::with_capacity(selected_wallets.len());
+    let mut startup_accounts = Vec::with_capacity(selected_wallets.len());
 
     for (wallet_name, wallet) in selected_wallets {
         let address = format_std_address(&wallet.address(), &Network::Localnet);
-        let wallet_config = configured_wallets
-            .get(&wallet_name)
-            .with_context(|| format!("Wallet '{wallet_name}' disappeared from Acton.toml"))?;
-        let mnemonic = wallets::load_mnemonic(&wallet_name, wallet_config)
-            .with_context(|| format!("Failed to load mnemonic for wallet '{wallet_name}'"))?
-            .split_whitespace()
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
         let version = wallet_version_to_string(wallet.wallet.version).to_owned();
 
         let has_history = node
@@ -239,18 +226,15 @@ async fn setup_startup_accounts(
             }
         }
 
-        startup_wallets.push(StartupWallet {
+        startup_accounts.push(StartupAccount {
             name: wallet_name,
-            mnemonic,
             version,
             network: "localnet".to_owned(),
             address,
-            public_key: hex::encode(wallet.wallet.key_pair.public_key),
-            wallet_id: wallet.wallet.wallet_id,
         });
     }
 
-    Ok(startup_wallets)
+    Ok(startup_accounts)
 }
 
 async fn wait_for_startup_wallet_funds(
@@ -301,7 +285,7 @@ async fn wait_for_startup_wallet_deploy(
     }
 }
 
-const fn wallet_version_to_string(version: WalletVersion) -> &'static str {
+pub(crate) const fn wallet_version_to_string(version: WalletVersion) -> &'static str {
     match version {
         WalletVersion::V1R1 => "v1r1",
         WalletVersion::V1R2 => "v1r2",

@@ -29,8 +29,6 @@ import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
-import {WalletsPage} from "./dashboard/pages/WalletsPage"
-import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
 import "@acton/ui/styles/tokens.css"
 import "./index.css"
 import styles from "./App.module.css"
@@ -62,7 +60,6 @@ const ApiCallsPage = lazy(async () => {
 const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/faucet": "Faucet",
-  "/wallets": "Wallets",
   "/tokens": "Tokens",
   "/nfts": "NFTs",
   "/api-reference/v2": "API Reference v2",
@@ -154,23 +151,17 @@ export const App: FC = () => {
           <ExplorerRoutesProvider>
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
-                <WalletRuntimeProvider
+                <AppContent
                   client={client}
-                  host={HOST}
+                  isAuthOverlayOpen={isAuthOverlayOpen}
+                  isAuthOverlayRequired={isAuthOverlayRequired}
                   localnetApiToken={localnetApiToken}
-                >
-                  <AppContent
-                    client={client}
-                    isAuthOverlayOpen={isAuthOverlayOpen}
-                    isAuthOverlayRequired={isAuthOverlayRequired}
-                    localnetApiToken={localnetApiToken}
-                    onClearAuthToken={clearAuthToken}
-                    onCloseAuthOverlay={closeAuthOverlay}
-                    onOpenAuthOverlay={openAuthOverlay}
-                    onRequireAuthToken={handleUnauthorized}
-                    onSaveAuthToken={saveAuthToken}
-                  />
-                </WalletRuntimeProvider>
+                  onClearAuthToken={clearAuthToken}
+                  onCloseAuthOverlay={closeAuthOverlay}
+                  onOpenAuthOverlay={openAuthOverlay}
+                  onRequireAuthToken={handleUnauthorized}
+                  onSaveAuthToken={saveAuthToken}
+                />
               </AddressBookProvider>
             </MetadataRegistryProvider>
           </ExplorerRoutesProvider>
@@ -256,14 +247,6 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <BlockDetailsPage client={client} />
-                </DashboardPage>
-              }
-            />
-            <Route
-              path="/wallets"
-              element={
-                <DashboardPage {...dashboardProps}>
-                  <WalletsPage client={client} />
                 </DashboardPage>
               }
             />

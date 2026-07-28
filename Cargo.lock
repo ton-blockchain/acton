@@ -209,6 +209,7 @@ dependencies = [
  "expect-test",
  "fs2",
  "futures",
+ "hex",
  "include_dir",
  "reqwest",
  "serde",

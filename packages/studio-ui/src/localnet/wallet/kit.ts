@@ -2,23 +2,26 @@ import {
   ApiClientToncenter,
   LocalStorageAdapter,
   Network,
-  Signer,
   TonWalletKit,
+  Uint8ArrayToHex,
+  WalletV4R2Adapter,
+  WalletV5R1Adapter,
   createDeviceInfo,
   createWalletManifest,
+  type Hex,
   type Wallet,
+  type WalletSigner,
 } from "@ton/walletkit"
 
+import {signWithStudioWallet} from "../../studioApi"
+
 import {createLocalnetWalletV4R2Adapter, createLocalnetWalletV5R1Adapter} from "./localnetAdapters"
-import type {StartupWalletRecord} from "./types"
+import type {ProjectWalletRecord} from "./types"
 
 const TON_CONNECT_BRIDGE_URL =
   import.meta.env.VITE_TON_CONNECT_BRIDGE_URL?.trim() || "https://bridge.tonapi.io/bridge"
-export const ACTON_TON_CONNECT_URL = "https://ton-blockchain.github.io/acton"
-const TONKEEPER_TON_CONNECT_URL = "https://tonkeeper.com"
-const TONKEEPER_TON_CONNECT_ICON_URL = "https://tonkeeper.com/assets/tonconnect-icon.png"
-export const ACTON_WALLET_APP_NAME = "Tonkeeper"
-export const ACTON_WALLET_JS_BRIDGE_KEY = "tonkeeper"
+export const ACTON_WALLET_APP_NAME = "Acton Studio"
+export const ACTON_WALLET_JS_BRIDGE_KEY = "acton-studio"
 
 function getWalletOrigin(): string {
   if (globalThis.location === undefined) {
@@ -72,20 +75,17 @@ function createLocalnetApiClient(
   })
 }
 
-export function getWalletNetwork(): Network {
-  return Network.testnet()
-}
-
-export function getWalletNetworkLabel(): string {
-  return "Localnet"
-}
-
-export function createWalletKit(apiBaseUrl: string, localnetApiToken?: string): TonWalletKit {
+export function createWalletKit(
+  apiBaseUrl: string,
+  environmentId: string,
+  chainId: number,
+  localnetApiToken?: string,
+): TonWalletKit {
   const origin = getWalletOrigin()
   const walletUrl = origin
+  const walletIconUrl = new URL("/favicon.svg", origin).toString()
   const apiEndpoint = getApiEndpoint(apiBaseUrl)
-  const mainnet = Network.mainnet()
-  const testnet = Network.testnet()
+  const network = Network.custom(String(chainId))
 
   return new TonWalletKit({
     deviceInfo: createDeviceInfo({
@@ -100,8 +100,8 @@ export function createWalletKit(apiBaseUrl: string, localnetApiToken?: string): 
     walletManifest: createWalletManifest({
       name: ACTON_WALLET_APP_NAME,
       appName: ACTON_WALLET_APP_NAME,
-      imageUrl: TONKEEPER_TON_CONNECT_ICON_URL,
-      aboutUrl: TONKEEPER_TON_CONNECT_URL,
+      imageUrl: walletIconUrl,
+      aboutUrl: origin,
       universalLink: walletUrl,
       bridgeUrl: TON_CONNECT_BRIDGE_URL,
       jsBridgeKey: ACTON_WALLET_JS_BRIDGE_KEY,
@@ -110,37 +110,64 @@ export function createWalletKit(apiBaseUrl: string, localnetApiToken?: string): 
       platforms: ["chrome", "firefox", "safari", "android", "ios", "windows", "macos", "linux"],
     }),
     networks: {
-      [mainnet.chainId]: {
-        apiClient: createLocalnetApiClient(apiEndpoint, mainnet, localnetApiToken),
-      },
-      [testnet.chainId]: {
-        apiClient: createLocalnetApiClient(apiEndpoint, testnet, localnetApiToken),
+      [network.chainId]: {
+        apiClient: createLocalnetApiClient(apiEndpoint, network, localnetApiToken),
       },
     },
-    storage: new LocalStorageAdapter({prefix: "acton-localnet-walletkit:"}),
+    storage: new LocalStorageAdapter({
+      prefix: `acton-studio:${environmentId}:walletkit:`,
+    }),
     dev: {
       disableManifestDomainCheck: true,
     },
   })
 }
 
-export async function addStartupWalletToKit(
+export async function addProjectWalletToKit(
   kit: TonWalletKit,
-  walletRecord: StartupWalletRecord,
+  walletRecord: ProjectWalletRecord,
+  options: {
+    readonly environmentId: string
+    readonly chainId: number
+    readonly useLocalnetAdapters: boolean
+  },
 ): Promise<Wallet | undefined> {
-  const signer = await Signer.fromMnemonic([...walletRecord.mnemonic])
-  const network = getWalletNetwork()
+  const signer = createStudioWalletSigner(options.environmentId, walletRecord)
+  const network = Network.custom(String(options.chainId))
   const client = kit.getApiClient(network)
-  const options = {
+  const adapterOptions = {
     client,
     network,
-    walletId: walletRecord.wallet_id,
+    walletId: walletRecord.walletId,
+    workchain: walletRecord.workchain,
   }
 
-  const adapter =
-    walletRecord.version === "v4r2"
-      ? await createLocalnetWalletV4R2Adapter(signer, options)
-      : await createLocalnetWalletV5R1Adapter(signer, options)
+  if (walletRecord.version === "v4r2") {
+    const adapter = options.useLocalnetAdapters
+      ? await createLocalnetWalletV4R2Adapter(signer, adapterOptions)
+      : await WalletV4R2Adapter.create(signer, adapterOptions)
+    return kit.addWallet(adapter)
+  }
 
+  const adapter = options.useLocalnetAdapters
+    ? await createLocalnetWalletV5R1Adapter(signer, adapterOptions)
+    : await WalletV5R1Adapter.create(signer, adapterOptions)
   return kit.addWallet(adapter)
+}
+
+function createStudioWalletSigner(
+  environmentId: string,
+  wallet: ProjectWalletRecord,
+): WalletSigner {
+  return {
+    publicKey: wallet.publicKey as Hex,
+    sign: async bytes => {
+      const response = await signWithStudioWallet(
+        environmentId,
+        wallet.name,
+        Uint8ArrayToHex(bytes),
+      )
+      return response.signature as Hex
+    },
+  }
 }

@@ -657,15 +657,15 @@
         }
       }
     },
-    "/acton_getStartupWallets": {
+    "/acton_getStartupAccounts": {
       "get": {
         "tags": ["Localnet Control"],
-        "operationId": "getStartupWallets",
-        "summary": "List startup wallets",
-        "description": "Returns wallets selected when the localnet server started.",
+        "operationId": "getStartupAccounts",
+        "summary": "List startup accounts",
+        "description": "Returns public account descriptors selected when the localnet server started.",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/StartupWalletsResponse"
+            "$ref": "#/components/responses/StartupAccountsResponse"
           }
         }
       }
@@ -1095,8 +1095,8 @@
           }
         }
       },
-      "StartupWalletsResponse": {
-        "description": "Successful startup wallets response.",
+      "StartupAccountsResponse": {
+        "description": "Successful startup accounts response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1110,7 +1110,7 @@
                     "result": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/StartupWallet"
+                        "$ref": "#/components/schemas/StartupAccount"
                       }
                     }
                   }
@@ -1957,26 +1957,12 @@
           }
         }
       },
-      "StartupWallet": {
+      "StartupAccount": {
         "type": "object",
-        "required": [
-          "name",
-          "mnemonic",
-          "version",
-          "network",
-          "address",
-          "public_key",
-          "wallet_id"
-        ],
+        "required": ["name", "version", "network", "address"],
         "properties": {
           "name": {
             "type": "string"
-          },
-          "mnemonic": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           },
           "version": {
             "type": "string"
@@ -1986,12 +1972,6 @@
           },
           "address": {
             "type": "string"
-          },
-          "public_key": {
-            "type": "string"
-          },
-          "wallet_id": {
-            "type": "integer"
           }
         }
       },

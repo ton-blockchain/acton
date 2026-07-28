@@ -4,7 +4,7 @@ import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router"
 
-import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
+import type {JettonMaster} from "../../explorer/api/types"
 import type {TonClient} from "../../explorer/api/client"
 import {waitForTraceTransactionHash} from "../../explorer/api/waitForTraceTransactionHash"
 import {
@@ -15,6 +15,7 @@ import {
 } from "../../explorer/components/utils"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+import {useOptionalWalletRuntime} from "../../wallet/useWalletRuntime"
 import {QUICK_AMOUNTS, TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {parseGramAmount} from "../dashboardUtils"
 import {normalizeJettonDecimals, parseJettonAmount} from "../jettonFaucet"
@@ -26,7 +27,7 @@ interface FaucetPageProps {
   readonly client: TonClient
   readonly gramFaucetEnabled: boolean
   readonly jettonFaucetEnabled: boolean
-  readonly startupWalletsEnabled: boolean
+  readonly projectWalletsEnabled: boolean
 }
 
 type FaucetMode = "ton" | "jetton"
@@ -53,9 +54,10 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   client,
   gramFaucetEnabled,
   jettonFaucetEnabled,
-  startupWalletsEnabled,
+  projectWalletsEnabled,
 }) => {
   const {dismissToast, showToast, updateToast} = useToast()
+  const walletRuntime = useOptionalWalletRuntime()
   const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
   const [searchParams] = useSearchParams()
@@ -66,11 +68,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   const [address, setAddress] = useState("")
   const [jettonMinter, setJettonMinter] = useState("")
   const [amount, setAmount] = useState("1")
-  const [startupWallets, setStartupWallets] = useState<StartupWallet[]>([])
   const [jettonMasters, setJettonMasters] = useState<JettonMaster[]>([])
-  const [walletsLoading, setWalletsLoading] = useState(startupWalletsEnabled)
   const [jettonsLoading, setJettonsLoading] = useState(jettonFaucetEnabled)
-  const [walletsError, setWalletsError] = useState<string>()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false)
   const [minterAddressDraft, setMinterAddressDraft] = useState("")
@@ -80,6 +79,13 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   const minterLookupToastRef = useRef<string | undefined>(undefined)
   const loadedJettonMinterQueryRef = useRef<string | undefined>(undefined)
   const amountNano = useMemo(() => parseGramAmount(amount), [amount])
+  const projectWallets = walletRuntime?.projectWallets ?? []
+  const walletsLoading =
+    projectWalletsEnabled &&
+    (walletRuntime?.isLoadingWallets ||
+      walletRuntime?.isInitializing ||
+      walletRuntime?.isSyncingWallets ||
+      walletRuntime === undefined)
   const isJettonMode = mode === "jetton"
   const canChooseAsset = jettonFaucetEnabled
   const isSubmitDisabled =
@@ -172,42 +178,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   }, [addressFormat, isAssetModalOpen, jettonFaucetEnabled, minterAddressDraft])
 
   useEffect(() => {
-    if (!startupWalletsEnabled) {
-      setStartupWallets([])
-      setWalletsError(undefined)
-      setWalletsLoading(false)
-      return
-    }
-
-    let cancelled = false
-
-    void (async () => {
-      setWalletsLoading(true)
-      setWalletsError(undefined)
-
-      try {
-        const wallets = await client.getStartupWallets()
-        if (!cancelled) {
-          setStartupWallets(wallets)
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStartupWallets([])
-          setWalletsError(error instanceof Error ? error.message : "Failed to load wallets")
-        }
-      } finally {
-        if (!cancelled) {
-          setWalletsLoading(false)
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [client, startupWalletsEnabled])
-
-  useEffect(() => {
     if (!jettonFaucetEnabled) {
       setJettonMasters([])
       setJettonsLoading(false)
@@ -243,7 +213,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
 
   const walletOptions = useMemo<FaucetOption[]>(
     () =>
-      startupWallets.map(wallet => {
+      projectWallets.map(wallet => {
         const value = parseAddress(wallet.address)?.toString(addressFormat) ?? wallet.address
         return {
           id: wallet.address,
@@ -254,7 +224,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
           fallbackInitial: wallet.name.slice(0, 1).toUpperCase(),
         }
       }),
-    [addressFormat, startupWallets],
+    [addressFormat, projectWallets],
   )
   const selectedWalletOption = useMemo(
     () => walletOptions.find(option => isSameAddress(option.value, address)),
@@ -650,11 +620,11 @@ export const FaucetPage: FC<FaucetPageProps> = ({
             <label className={styles.label} htmlFor="dashboard-address">
               Recipient
             </label>
-            {startupWalletsEnabled ? (
+            {projectWalletsEnabled ? (
               <FaucetDropdownInput
                 id="dashboard-address"
                 menuLabel="Choose wallet"
-                emptyLabel={walletsError ?? "No startup wallets found."}
+                emptyLabel="No project wallets found."
                 isLoading={walletsLoading}
                 loadingLabel="Loading wallets..."
                 options={walletOptions}

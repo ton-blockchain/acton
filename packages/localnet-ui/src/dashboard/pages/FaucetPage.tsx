@@ -4,7 +4,7 @@ import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router"
 
-import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
+import type {JettonMaster, StartupAccount} from "../../explorer/api/types"
 import type {TonClient} from "../../explorer/api/client"
 import {waitForTraceTransactionHash} from "../../explorer/api/waitForTraceTransactionHash"
 import {
@@ -53,7 +53,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   const [address, setAddress] = useState("")
   const [jettonMinter, setJettonMinter] = useState("")
   const [amount, setAmount] = useState("1")
-  const [startupWallets, setStartupWallets] = useState<StartupWallet[]>([])
+  const [startupAccounts, setStartupAccounts] = useState<StartupAccount[]>([])
   const [jettonMasters, setJettonMasters] = useState<JettonMaster[]>([])
   const [walletsLoading, setWalletsLoading] = useState(true)
   const [jettonsLoading, setJettonsLoading] = useState(true)
@@ -148,14 +148,14 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
       setWalletsError(undefined)
 
       try {
-        const wallets = await client.getStartupWallets()
+        const accounts = await client.getStartupAccounts()
         if (!cancelled) {
-          setStartupWallets(wallets)
+          setStartupAccounts(accounts)
         }
       } catch (error) {
         if (!cancelled) {
-          setStartupWallets([])
-          setWalletsError(error instanceof Error ? error.message : "Failed to load wallets")
+          setStartupAccounts([])
+          setWalletsError(error instanceof Error ? error.message : "Failed to load accounts")
         }
       } finally {
         if (!cancelled) {
@@ -199,18 +199,18 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
   const walletOptions = useMemo<FaucetOption[]>(
     () =>
-      startupWallets.map(wallet => {
-        const value = parseAddress(wallet.address)?.toString(addressFormat) ?? wallet.address
+      startupAccounts.map(account => {
+        const value = parseAddress(account.address)?.toString(addressFormat) ?? account.address
         return {
-          id: wallet.address,
-          title: wallet.name,
-          subtitle: `${wallet.version} · ${formatAddress(value, true, addressFormat)}`,
+          id: account.address,
+          title: account.name,
+          subtitle: `${account.version} · ${formatAddress(value, true, addressFormat)}`,
           value,
-          badge: wallet.name,
-          fallbackInitial: wallet.name.slice(0, 1).toUpperCase(),
+          badge: account.name,
+          fallbackInitial: account.name.slice(0, 1).toUpperCase(),
         }
       }),
-    [addressFormat, startupWallets],
+    [addressFormat, startupAccounts],
   )
   const selectedWalletOption = useMemo(
     () => walletOptions.find(option => isSameAddress(option.value, address)),

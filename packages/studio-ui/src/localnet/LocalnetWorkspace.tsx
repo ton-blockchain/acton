@@ -75,7 +75,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Localnet status, network activity and runtime controls",
   "/faucet": "Fund accounts in this virtual environment",
-  "/wallets": "Startup wallets from this environment, ready for TON Connect",
+  "/wallets": "Project wallets available in this environment, ready for TON Connect",
   "/simulator": "Build and replay messages against this virtual environment",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
   "/contracts": "Track deployed contracts and match them with Acton build artifacts",
@@ -118,6 +118,7 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
   onShellChange,
 }) => {
   const runtime = useLocalnetRuntime()
+  const environment = runtime.environment
   const content = (
     <AppContent
       basePath={basePath}
@@ -130,11 +131,15 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
   return (
     <MetadataRegistryProvider registry={runtime.metadataRegistry}>
       <AddressBookProvider>
-        {supports(runtime.environment, "wallets") ? (
+        {environment && supports(environment, "wallets") ? (
           <WalletRuntimeProvider
+            key={environment.id}
             apiBaseUrl={runtime.rpcBaseUrl}
-            client={runtime.client}
+            environmentId={environment.id}
+            environmentKind={environment.config.kind}
             localnetApiToken={runtime.localnetApiToken}
+            networkLabel={environment.network.label}
+            chainId={environment.network.chainId}
           >
             {content}
           </WalletRuntimeProvider>
@@ -233,7 +238,7 @@ const AppContent: FC<AppContentProps> = ({
                       client={client}
                       gramFaucetEnabled={runtime.gramFaucetEnabled}
                       jettonFaucetEnabled={runtime.jettonFaucetEnabled}
-                      startupWalletsEnabled={supports(runtime.environment, "wallets")}
+                      projectWalletsEnabled={supports(runtime.environment, "wallets")}
                     />
                   </DashboardPage>
                 ) : (

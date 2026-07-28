@@ -15,6 +15,7 @@ axum = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 fs2 = { workspace = true }
+hex = { workspace = true }
 include_dir = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 serde = { workspace = true }

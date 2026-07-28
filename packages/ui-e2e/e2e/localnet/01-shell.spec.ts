@@ -1,36 +1,6 @@
-import {expect, test, type Page} from "@playwright/test"
+import {expect, test} from "@playwright/test"
 
-import {mockTonConnectStartupWallet} from "../support/tonConnect"
 import {expectVisualSnapshot, prepareVisualPage, visualSnapshotsEnabled} from "../support/visual"
-
-const demoTonConnectUrl =
-  "tc://?v=2&id=3b1cba70841d3695092dc3792246ffb6cb76398be67a5684b5c570dc85c4e172&trace_id=019f7f09-9036-7416-8c01-0c47c208000e&r=%7B%22manifestUrl%22%3A%22https%3A%2F%2Ftonconnect-sdk-demo-dapp.vercel.app%2Ftonconnect-manifest.json%22%2C%22items%22%3A%5B%7B%22name%22%3A%22ton_addr%22%7D%5D%7D&ret=none"
-const mockTonConnectRequest = async (page: Page) => {
-  await page.route(
-    "https://tonconnect-sdk-demo-dapp.vercel.app/tonconnect-manifest.json",
-    async route =>
-      route.fulfill({
-        json: {
-          url: "https://tonconnect-sdk-demo-dapp.vercel.app",
-          name: "Demo Dapp with React UI",
-          iconUrl: "https://tonconnect-sdk-demo-dapp.vercel.app/favicon.ico",
-        },
-      }),
-  )
-  await mockTonConnectStartupWallet(
-    page,
-    "0:3029b3eaeda86a5381d86100f2a8b761c38de45642edb6e4bb1cca2e6dd7ffed",
-  )
-}
-
-const openTonConnectRequest = async (page: Page) => {
-  await mockTonConnectRequest(page)
-  await page.goto("/wallets")
-  await expect(page.getByLabel("Connect URL")).toBeEnabled()
-  await page.getByLabel("Connect URL").fill(demoTonConnectUrl)
-  await page.getByRole("button", {name: "Handle request"}).click()
-  await expect(page.getByRole("dialog", {name: "Connection Request"})).toBeVisible()
-}
 
 test.describe("Localnet shell", () => {
   test.beforeEach(async ({page}) => {
@@ -38,7 +8,6 @@ test.describe("Localnet shell", () => {
     await page.goto("/explorer")
     await expect(page.getByRole("complementary", {name: "Main navigation"})).toBeVisible()
     await expect(page.getByRole("combobox", {name: "Explorer search"})).toBeVisible()
-    await expect(page.getByText("Failed to load wallets")).toHaveCount(0)
   })
 
   test("renders explorer inside dashboard navigation", async ({page}) => {
@@ -54,21 +23,6 @@ test.describe("Localnet shell", () => {
       "href",
       "/explorer/cell",
     )
-  })
-
-  test("opens a TON Connect connection request", async ({page}) => {
-    await openTonConnectRequest(page)
-
-    const dialog = page.getByRole("dialog", {name: "Connection Request"})
-    await expect(
-      dialog.getByText("Demo Dapp with React UI wants to connect", {exact: true}),
-    ).toBeVisible()
-    await expect(dialog.getByText("Connect with", {exact: true})).toBeVisible()
-    await expect(dialog.getByRole("button", {name: "Reject"})).toBeVisible()
-    await expect(dialog.getByRole("button", {name: "Connect", exact: true})).toBeVisible()
-    await expect(
-      page.locator('[data-variant="info"]').filter({hasText: "TON Connect request received"}),
-    ).toBeVisible()
   })
 
   test.describe("visual snapshots", () => {
@@ -126,12 +80,6 @@ test.describe("Localnet shell", () => {
       await expectVisualSnapshot(page, "loc-modal-asset-dark")
     })
 
-    test("loc-modal-ton-connect-dark", async ({page}) => {
-      await prepareVisualPage(page, {app: "localnet", theme: "dark"})
-      await openTonConnectRequest(page)
-      await expectVisualSnapshot(page, "loc-modal-ton-connect-dark")
-    })
-
     test("loc-shell-explorer-dark", async ({page}) => {
       await prepareVisualPage(page, {app: "localnet", theme: "dark"})
       await page.reload()
@@ -144,21 +92,4 @@ test.describe("Localnet shell", () => {
       await expectVisualSnapshot(page, "loc-shell-explorer-mobile")
     })
   })
-})
-
-test("does not duplicate the global wallet error toast", async ({page}) => {
-  await prepareVisualPage(page, {app: "localnet"})
-  await page.route(
-    url => url.pathname === "/acton_getStartupWallets",
-    async route => route.abort("connectionfailed"),
-  )
-
-  await page.goto("/explorer")
-
-  const errorToast = page.locator('[data-variant="error"]').filter({
-    hasText: "Failed to load wallets",
-  })
-  await expect(errorToast).toHaveCount(1)
-  await page.waitForTimeout(500)
-  await expect(errorToast).toHaveCount(1)
 })

@@ -12,14 +12,13 @@ import {
   type TONConnectSession,
 } from "@ton/walletkit"
 
+import {fetchStudioWallets, type EnvironmentConfig, type StudioWallet} from "../../studioApi"
 import styles from "../dashboard/pages/WalletsPage.module.css"
-import type {TonClient} from "../explorer/api/client"
-import type {StartupWallet} from "../explorer/api/types"
 import {formatAddress, normalizeAddress} from "../explorer/components/utils"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
-import {addStartupWalletToKit, createWalletKit, getWalletNetworkLabel} from "./kit"
-import type {RuntimeWallet, StartupWalletRecord} from "./types"
+import {addProjectWalletToKit, createWalletKit} from "./kit"
+import type {ProjectWalletRecord, RuntimeWallet} from "./types"
 import {isSupportedWalletVersion} from "./types"
 import {useTonConnectPasteHandler} from "./useTonConnectPasteHandler"
 import {
@@ -33,9 +32,12 @@ type WalletBalanceResult =
   | {readonly id: string; readonly error: string}
 
 interface WalletRuntimeProviderProps {
-  readonly client: TonClient
   readonly apiBaseUrl: string
+  readonly environmentId: string
+  readonly environmentKind: EnvironmentConfig["kind"]
   readonly localnetApiToken?: string
+  readonly networkLabel: string
+  readonly chainId: number
   readonly children: ReactNode
 }
 
@@ -44,14 +46,17 @@ interface SignRequestPreviewProps {
 }
 
 export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
-  client,
   apiBaseUrl,
+  environmentId,
+  environmentKind,
   localnetApiToken,
+  networkLabel,
+  chainId,
   children,
 }) => {
   const {showToast} = useToast()
   const addressFormat = useAddressFormat()
-  const [startupWallets, setStartupWallets] = useState<StartupWallet[]>([])
+  const [projectWallets, setProjectWallets] = useState<StudioWallet[]>([])
   const [walletKit, setWalletKit] = useState<ReturnType<typeof createWalletKit>>()
   const [runtimeWallets, setRuntimeWallets] = useState<RuntimeWallet[]>([])
   const [sessions, setSessions] = useState<TONConnectSession[]>([])
@@ -71,14 +76,14 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   const supportedWallets = useMemo(
     () =>
-      startupWallets.filter((wallet): wallet is StartupWalletRecord =>
+      projectWallets.filter((wallet): wallet is ProjectWalletRecord =>
         isSupportedWalletVersion(wallet.version),
       ),
-    [startupWallets],
+    [projectWallets],
   )
   const unsupportedWallets = useMemo(
-    () => startupWallets.filter(wallet => !isSupportedWalletVersion(wallet.version)),
-    [startupWallets],
+    () => projectWallets.filter(wallet => !isSupportedWalletVersion(wallet.version)),
+    [projectWallets],
   )
   const selectedConnectWallet =
     runtimeWallets.find(wallet => wallet.id === selectedConnectWalletId) ?? runtimeWallets[0]
@@ -196,35 +201,35 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
   }, [refreshWalletBalances, runtimeWallets])
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
 
     void (async () => {
       setIsLoadingWallets(true)
       try {
-        const wallets = await client.getStartupWallets()
-        if (!cancelled) {
-          setStartupWallets(wallets)
+        const wallets = await fetchStudioWallets(environmentId, controller.signal)
+        if (!controller.signal.aborted) {
+          setProjectWallets(wallets)
         }
       } catch (error) {
-        if (!cancelled) {
-          showErrorToast("Failed to load wallets", error, "Failed to load startup wallets.")
-          setStartupWallets([])
+        if (!controller.signal.aborted) {
+          showErrorToast("Failed to load wallets", error, "Failed to load project wallets.")
+          setProjectWallets([])
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setIsLoadingWallets(false)
         }
       }
     })()
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
-  }, [client, showErrorToast])
+  }, [environmentId, showErrorToast])
 
   useEffect(() => {
     let cancelled = false
-    const nextWalletKit = createWalletKit(apiBaseUrl, localnetApiToken)
+    const nextWalletKit = createWalletKit(apiBaseUrl, environmentId, chainId, localnetApiToken)
 
     const handleRequestError = (event: RequestErrorEvent) => {
       const fallback = "WalletKit request failed."
@@ -275,7 +280,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       cancelled = true
       void nextWalletKit.close()
     }
-  }, [apiBaseUrl, localnetApiToken, showErrorToast, showToast])
+  }, [apiBaseUrl, chainId, environmentId, localnetApiToken, showErrorToast, showToast])
 
   useEffect(() => {
     if (!walletKit) {
@@ -290,7 +295,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       try {
         const nextRuntimeWallets: RuntimeWallet[] = []
         for (const walletRecord of supportedWallets) {
-          const wallet = await addStartupWalletToKit(walletKit, walletRecord)
+          const wallet = await addProjectWalletToKit(walletKit, walletRecord, {
+            environmentId,
+            chainId,
+            useLocalnetAdapters: environmentKind === "actonLocalnet",
+          })
           if (wallet) {
             nextRuntimeWallets.push({
               id: wallet.getWalletId(),
@@ -309,7 +318,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           showErrorToast(
             "Wallet sync failed",
             error,
-            "Failed to load startup wallets into WalletKit.",
+            "Failed to load project wallets into WalletKit.",
           )
         }
       } finally {
@@ -324,7 +333,15 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
     return () => {
       cancelled = true
     }
-  }, [refreshSessions, showErrorToast, supportedWallets, walletKit])
+  }, [
+    chainId,
+    environmentId,
+    environmentKind,
+    refreshSessions,
+    showErrorToast,
+    supportedWallets,
+    walletKit,
+  ])
 
   useEffect(() => {
     if (!pendingConnectRequest) {
@@ -362,7 +379,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
         showToast({
           variant: "error",
           title: "No wallets available",
-          description: "No startup wallets are available for TON Connect.",
+          description: "No project wallets are available for TON Connect.",
         })
         return
       }
@@ -642,6 +659,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
 
   const value = useMemo<WalletRuntimeContextValue>(
     () => ({
+      projectWallets,
       runtimeWallets,
       unsupportedWallets,
       sessions,
@@ -671,6 +689,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       isSubmitting,
       isSyncingWallets,
       pendingRequestCount,
+      projectWallets,
       refreshWalletBalances,
       runtimeWallets,
       sessions,
@@ -692,8 +711,9 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           maxWidth={520}
           closeLabel="Close request"
           contentClassName={styles.modalContent}
+          dismissible={!isSubmitting}
           onOpenChange={open => {
-            if (!open) setPendingConnectRequest(undefined)
+            if (!open) void handleRejectConnect()
           }}
         >
           <div className={styles.permissionsList}>
@@ -720,6 +740,13 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             {runtimeWallets.map(wallet => {
               const isSelected = wallet.id === selectedConnectWallet?.id
               const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
+              const balance = walletBalances[wallet.id]
+              const balanceLabel =
+                balance?.value === undefined
+                  ? balance?.isLoading
+                    ? "Loading balance"
+                    : "Balance unavailable"
+                  : `${formatGramBalance(balance.value)} GRAM`
               return (
                 <button
                   key={wallet.id}
@@ -727,11 +754,16 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
                   className={`${styles.pickerOption} ${isSelected ? styles.pickerOptionActive : ""}`}
                   onClick={() => setSelectedConnectWalletId(wallet.id)}
                 >
-                  <span>
-                    <span className={styles.pickerTitle}>{wallet.record.name}</span>
-                    <span className={styles.pickerSubtitle}>
-                      {formatAddress(walletAddress, true, addressFormat)} ·{" "}
-                      {getWalletNetworkLabel()}
+                  <span className={styles.pickerOptionContent}>
+                    <span className={styles.pickerPrimary}>
+                      <span className={styles.pickerTitle}>{wallet.record.name}</span>
+                      <span className={styles.pickerBalance}>{balanceLabel}</span>
+                    </span>
+                    <span className={styles.pickerMeta}>
+                      <span className={styles.pickerAddress} title={walletAddress}>
+                        {formatAddress(walletAddress, true, addressFormat)}
+                      </span>
+                      <span className={styles.pickerNetwork}>{networkLabel}</span>
                     </span>
                   </span>
                   <span className={styles.radio}>{isSelected && <Check size={14} />}</span>
@@ -768,19 +800,16 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           maxWidth={520}
           closeLabel="Close request"
           contentClassName={styles.modalContent}
+          dismissible={!isSubmitting}
           onOpenChange={open => {
-            if (!open) setPendingTransactionRequest(undefined)
+            if (!open) void handleRejectTransaction()
           }}
         >
           <div className={styles.requestSummary}>
             <MetaRow label="Messages">
               {String(pendingTransactionRequest.request.messages.length)}
             </MetaRow>
-            <MetaRow label="Network">
-              {pendingTransactionRequest.request.network?.chainId === "-239"
-                ? "Mainnet"
-                : "Testnet"}
-            </MetaRow>
+            <MetaRow label="Network">{networkLabel}</MetaRow>
             <MetaRow label="Amount">
               {formatGramBalance(
                 pendingTransactionRequest.request.messages
@@ -841,8 +870,9 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           contentClassName={`${styles.modalContent} ${
             pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialogContent : ""
           }`}
+          dismissible={!isSubmitting}
           onOpenChange={open => {
-            if (!open) setPendingSignDataRequest(undefined)
+            if (!open) void handleRejectSignData()
           }}
         >
           <div className={styles.signRequestPreview}>

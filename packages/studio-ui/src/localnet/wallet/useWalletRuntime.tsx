@@ -2,7 +2,7 @@ import {createContext, useContext} from "react"
 
 import type {TONConnectSession} from "@ton/walletkit"
 
-import type {StartupWallet} from "../explorer/api/types"
+import type {StudioWallet} from "../../studioApi"
 
 import type {RuntimeWallet} from "./types"
 
@@ -13,8 +13,9 @@ export interface WalletBalanceState {
 }
 
 export interface WalletRuntimeContextValue {
+  readonly projectWallets: readonly StudioWallet[]
   readonly runtimeWallets: readonly RuntimeWallet[]
-  readonly unsupportedWallets: readonly StartupWallet[]
+  readonly unsupportedWallets: readonly StudioWallet[]
   readonly sessions: readonly TONConnectSession[]
   readonly walletBalances: Readonly<Record<string, WalletBalanceState>>
   readonly copiedAddress?: string
@@ -40,4 +41,8 @@ export function useWalletRuntime(): WalletRuntimeContextValue {
     throw new Error("useWalletRuntime must be used inside WalletRuntimeProvider")
   }
   return value
+}
+
+export function useOptionalWalletRuntime(): WalletRuntimeContextValue | undefined {
+  return useContext(WalletRuntimeContext)
 }

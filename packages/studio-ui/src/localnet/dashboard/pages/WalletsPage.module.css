@@ -253,7 +253,6 @@
 }
 
 .sessionDomain,
-.pickerSubtitle,
 .permissionDescription,
 .unsupportedTitle,
 .metaLabel,
@@ -633,6 +632,22 @@
   text-align: left;
 }
 
+.pickerOptionContent {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 3px;
+}
+
+.pickerPrimary,
+.pickerMeta {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .pickerOption:hover {
   border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-hover);
@@ -649,8 +664,39 @@
 }
 
 .pickerTitle,
-.pickerSubtitle {
+.pickerBalance,
+.pickerAddress,
+.pickerNetwork {
   display: block;
+}
+
+.pickerTitle,
+.pickerAddress {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickerBalance,
+.pickerNetwork {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pickerBalance {
+  color: var(--acton-color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pickerAddress,
+.pickerNetwork {
+  color: var(--acton-color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
 }
 
 .radio {
@@ -720,5 +766,14 @@
 
   .metaValue {
     text-align: left;
+  }
+
+  .pickerOption {
+    align-items: flex-start;
+  }
+
+  .pickerPrimary,
+  .pickerMeta {
+    gap: 8px;
   }
 }

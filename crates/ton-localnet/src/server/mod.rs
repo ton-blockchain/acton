@@ -22,20 +22,17 @@ const MAX_STUDIO_UI_API_CALLS: usize = 200;
 const MAX_API_CALLS: usize = MAX_EXTERNAL_API_CALLS + MAX_STUDIO_UI_API_CALLS;
 
 #[derive(Clone, Debug, Serialize)]
-pub struct StartupWallet {
+pub struct StartupAccount {
     pub name: String,
-    pub mnemonic: Vec<String>,
     pub version: String,
     pub network: String,
     pub address: String,
-    pub public_key: String,
-    pub wallet_id: i32,
 }
 
 #[derive(Clone)]
 pub struct ServerState {
     pub node: Arc<Localnet>,
-    pub startup_wallets: Arc<Vec<StartupWallet>>,
+    pub startup_accounts: Arc<Vec<StartupAccount>>,
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
     pub rate_limit_rps: Option<u32>,
@@ -343,9 +340,9 @@ impl FromRef<ServerState> for Arc<Localnet> {
     }
 }
 
-impl FromRef<ServerState> for Arc<Vec<StartupWallet>> {
+impl FromRef<ServerState> for Arc<Vec<StartupAccount>> {
     fn from_ref(state: &ServerState) -> Self {
-        state.startup_wallets.clone()
+        state.startup_accounts.clone()
     }
 }
 
@@ -374,7 +371,7 @@ pub struct ServerArgs {
     pub fork_block_number: Option<u64>,
     pub rate_limit_rps: Option<u32>,
     pub response_delay_ms: Option<u64>,
-    pub startup_wallets: Vec<StartupWallet>,
+    pub startup_accounts: Vec<StartupAccount>,
     pub auth_token: Option<String>,
     pub liteapi: bool,
     pub liteapi_port: Option<u16>,
@@ -389,16 +386,16 @@ pub enum ServerError {
     #[error("failed to bind localnet LiteAPI to {address}")]
     LiteApiBind { address: String, source: io::Error },
     #[error("failed to seed startup wallet names")]
-    SeedStartupWalletNames(#[from] SeedStartupWalletNamesError),
+    SeedStartupAccountNames(#[from] SeedStartupAccountNamesError),
     #[error("localnet server stopped with an error")]
     Serve { source: io::Error },
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SeedStartupWalletNamesError {
-    #[error("failed to read existing startup wallet address names")]
+pub enum SeedStartupAccountNamesError {
+    #[error("failed to read existing startup account address names")]
     ReadExistingNames { source: anyhow::Error },
-    #[error("failed to set startup wallet address name {name} for {address}")]
+    #[error("failed to set startup account address name {name} for {address}")]
     SetAddressName {
         address: String,
         name: String,
@@ -414,21 +411,21 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         fork_block_number,
         rate_limit_rps,
         response_delay_ms,
-        startup_wallets,
+        startup_accounts,
         auth_token,
         liteapi,
         liteapi_port,
     } = args;
     let auth_token = auth_token.map(Arc::<str>::from);
 
-    seed_startup_wallet_names(&node, &startup_wallets).await?;
+    seed_startup_account_names(&node, &startup_accounts).await?;
     let network_conditions = NetworkConditions::new(response_delay_ms);
     let api_calls = ApiCallLog::new();
 
     let shutdown = ShutdownSignal::new();
     let app = router::create_router(ServerState {
         node: Arc::clone(&node),
-        startup_wallets: Arc::new(startup_wallets),
+        startup_accounts: Arc::new(startup_accounts),
         shutdown: shutdown.clone(),
         network_conditions: network_conditions.clone(),
         rate_limit_rps,
@@ -517,16 +514,16 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     Ok(())
 }
 
-async fn seed_startup_wallet_names(
+async fn seed_startup_account_names(
     node: &Localnet,
-    startup_wallets: &[StartupWallet],
-) -> Result<(), SeedStartupWalletNamesError> {
+    startup_accounts: &[StartupAccount],
+) -> Result<(), SeedStartupAccountNamesError> {
     let mut seen_addresses = HashSet::new();
     let mut named_wallets = Vec::new();
 
-    for wallet in startup_wallets {
-        let address = wallet.address.trim();
-        let name = wallet.name.trim();
+    for account in startup_accounts {
+        let address = account.address.trim();
+        let name = account.name.trim();
         if address.is_empty() || name.is_empty() || !seen_addresses.insert(address.to_string()) {
             continue;
         }
@@ -545,13 +542,13 @@ async fn seed_startup_wallet_names(
                 .collect(),
         )
         .await
-        .map_err(|source| SeedStartupWalletNamesError::ReadExistingNames { source })?;
+        .map_err(|source| SeedStartupAccountNamesError::ReadExistingNames { source })?;
 
     for ((address, name), (_, existing_name)) in named_wallets.into_iter().zip(existing_names) {
         if existing_name.is_none() {
             node.set_address_name(address.clone(), name.clone())
                 .await
-                .map_err(|source| SeedStartupWalletNamesError::SetAddressName {
+                .map_err(|source| SeedStartupAccountNamesError::SetAddressName {
                     address,
                     name,
                     source,

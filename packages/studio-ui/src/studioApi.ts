@@ -87,6 +87,7 @@ export interface EnvironmentEndpoints {
 export interface EnvironmentNetwork {
   readonly id: string
   readonly label: string
+  readonly chainId: number
   readonly testOnly: boolean
 }
 
@@ -100,6 +101,19 @@ export interface StudioEnvironment {
   readonly endpoints: EnvironmentEndpoints
   readonly network: EnvironmentNetwork
   readonly error?: string
+}
+
+export type StudioWalletVersion = "v4r2" | "v5r1"
+
+export type StudioHex = `0x${string}`
+
+export interface StudioWallet {
+  readonly name: string
+  readonly address: string
+  readonly publicKey: StudioHex
+  readonly version: string
+  readonly walletId: number
+  readonly workchain: number
 }
 
 export interface CreateEnvironmentRequest {
@@ -255,6 +269,37 @@ export async function deleteStudioEnvironment(environmentId: string): Promise<vo
     method: "DELETE",
     headers: {accept: "application/json"},
   })
+}
+
+export function fetchStudioWallets(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<StudioWallet[]> {
+  return requestJson<StudioWallet[]>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/wallets`,
+    {
+      headers: {accept: "application/json"},
+      signal,
+    },
+  )
+}
+
+export function signWithStudioWallet(
+  environmentId: string,
+  walletName: string,
+  bytes: StudioHex,
+): Promise<{readonly signature: StudioHex}> {
+  return requestJson<{readonly signature: StudioHex}>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/wallets/${encodeURIComponent(walletName)}/sign`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({bytes}),
+    },
+  )
 }
 
 export function fetchStudioTestRuns(signal?: AbortSignal): Promise<TestRunSummary[]> {
