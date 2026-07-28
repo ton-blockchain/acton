@@ -15,7 +15,7 @@ import {Button, Dialog, InlineButton, Input, useToast} from "@acton/ui"
 import {useCallback, useRef, useState} from "react"
 import type {ChangeEvent, FC, FormEvent} from "react"
 
-import {supports} from "../../../environmentCapabilities"
+import {supports, supportsAny} from "../../../environmentCapabilities"
 import type {StudioEnvironment} from "../../../studioApi"
 import type {TonClient} from "../../explorer/api/client"
 import type {LocalnetCheckpoint} from "../../explorer/api/types"
@@ -63,7 +63,8 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   const [stateFile, setStateFile] = useState<File>()
   const [stateFileDetails, setStateFileDetails] = useState<StateFileDetails>()
   const [checkpointToRestore, setCheckpointToRestore] = useState<LocalnetCheckpoint>()
-  const hasAccountActions = supports(environment, "faucet") || supports(environment, "simulator")
+  const hasFaucet = supportsAny(environment, "gramFaucet", "jettonFaucet")
+  const hasAccountActions = hasFaucet || supports(environment, "simulator")
   const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
   const hasStateActions = supports(environment, "checkpoints") || supports(environment, "snapshots")
 
@@ -301,7 +302,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         <div className={styles.environmentActions}>
           {hasAccountActions ? (
             <div className={styles.environmentActionGroup} aria-label="Account actions">
-              {supports(environment, "faucet") ? (
+              {hasFaucet ? (
                 <InlineButton leadingIcon={<HandCoins size={15} />} onClick={onFund}>
                   Fund
                 </InlineButton>

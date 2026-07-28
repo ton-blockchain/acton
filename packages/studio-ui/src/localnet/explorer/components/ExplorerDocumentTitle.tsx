@@ -60,9 +60,7 @@ function explorerRelativePath(pathname: string, rootPath: string): string | unde
   if (rootPath === "/") return pathname
   if (pathname === rootPath) return "/"
   if (pathname.startsWith(`${rootPath}/`)) return pathname.slice(rootPath.length)
-  const localnetRoot = rootPath.endsWith("/explorer")
-    ? rootPath.slice(0, -"/explorer".length)
-    : ""
+  const localnetRoot = rootPath.endsWith("/explorer") ? rootPath.slice(0, -"/explorer".length) : ""
   if (pathname.startsWith(`${localnetRoot}/block/`)) {
     return pathname.slice(localnetRoot.length)
   }

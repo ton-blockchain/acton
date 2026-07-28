@@ -77,7 +77,8 @@ pub enum EnvironmentCapability {
     ControlApi,
     Explorer,
     Integration,
-    Faucet,
+    GramFaucet,
+    JettonFaucet,
     Wallets,
     Simulator,
     Contracts,
@@ -170,7 +171,8 @@ impl EnvironmentConfig {
                 EnvironmentCapability::ControlApi,
                 EnvironmentCapability::Explorer,
                 EnvironmentCapability::Integration,
-                EnvironmentCapability::Faucet,
+                EnvironmentCapability::GramFaucet,
+                EnvironmentCapability::JettonFaucet,
                 EnvironmentCapability::Wallets,
                 EnvironmentCapability::Simulator,
                 EnvironmentCapability::Contracts,
@@ -185,6 +187,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::ApiV3,
                 EnvironmentCapability::Explorer,
                 EnvironmentCapability::Integration,
+                EnvironmentCapability::GramFaucet,
             ],
         }
     }

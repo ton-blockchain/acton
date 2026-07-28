@@ -17,7 +17,7 @@ import {
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router"
 
-import {supports} from "../../environmentCapabilities"
+import {supports, supportsAny} from "../../environmentCapabilities"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
 import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
@@ -210,7 +210,9 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   )
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
   const visibleEnvironmentItems = environmentItems.filter(item =>
-    item.path === "/wallets" ? supports(environment, "wallets") : supports(environment, "faucet"),
+    item.path === "/wallets"
+      ? supports(environment, "wallets")
+      : supportsAny(environment, "gramFaucet", "jettonFaucet"),
   )
   const visibleApiReferenceItems = apiReferenceItems.filter(item =>
     item.path === "/api-reference/v2"

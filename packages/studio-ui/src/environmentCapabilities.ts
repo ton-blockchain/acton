@@ -6,3 +6,10 @@ export function supports(
 ): boolean {
   return environment?.capabilities.includes(capability) ?? false
 }
+
+export function supportsAny(
+  environment: StudioEnvironment | undefined,
+  ...capabilities: readonly EnvironmentCapability[]
+): boolean {
+  return capabilities.some(capability => supports(environment, capability))
+}

@@ -24,6 +24,9 @@ import styles from "../DashboardPage.module.css"
 
 interface FaucetPageProps {
   readonly client: TonClient
+  readonly gramFaucetEnabled: boolean
+  readonly jettonFaucetEnabled: boolean
+  readonly startupWalletsEnabled: boolean
 }
 
 type FaucetMode = "ton" | "jetton"
@@ -34,6 +37,7 @@ const GRAM_LOGO_IMAGE = `data:image/svg+xml,${encodeURIComponent(GRAM_LOGO_SVG)}
 const PINNED_USDT_MINTER_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
 const TOKEN_MINTER_NOT_FOUND_MESSAGE = "This address is not a token minter."
 const TOKEN_MINTER_NOT_MINTABLE_MESSAGE = "This token cannot be minted by the faucet."
+const FAUCET_TRACE_WAIT_ATTEMPTS = 60
 
 interface FaucetOption {
   readonly id: string
@@ -45,20 +49,27 @@ interface FaucetOption {
   readonly fallbackInitial?: string
 }
 
-export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
+export const FaucetPage: FC<FaucetPageProps> = ({
+  client,
+  gramFaucetEnabled,
+  jettonFaucetEnabled,
+  startupWalletsEnabled,
+}) => {
   const {dismissToast, showToast, updateToast} = useToast()
   const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
   const [searchParams] = useSearchParams()
-  const requestedJettonMinter = searchParams.get("jetton")?.trim() ?? ""
-  const [mode, setMode] = useState<FaucetMode>("ton")
+  const requestedJettonMinter = jettonFaucetEnabled
+    ? (searchParams.get("jetton")?.trim() ?? "")
+    : ""
+  const [mode, setMode] = useState<FaucetMode>(() => (gramFaucetEnabled ? "ton" : "jetton"))
   const [address, setAddress] = useState("")
   const [jettonMinter, setJettonMinter] = useState("")
   const [amount, setAmount] = useState("1")
   const [startupWallets, setStartupWallets] = useState<StartupWallet[]>([])
   const [jettonMasters, setJettonMasters] = useState<JettonMaster[]>([])
-  const [walletsLoading, setWalletsLoading] = useState(true)
-  const [jettonsLoading, setJettonsLoading] = useState(true)
+  const [walletsLoading, setWalletsLoading] = useState(startupWalletsEnabled)
+  const [jettonsLoading, setJettonsLoading] = useState(jettonFaucetEnabled)
   const [walletsError, setWalletsError] = useState<string>()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false)
@@ -70,6 +81,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   const loadedJettonMinterQueryRef = useRef<string | undefined>(undefined)
   const amountNano = useMemo(() => parseGramAmount(amount), [amount])
   const isJettonMode = mode === "jetton"
+  const canChooseAsset = jettonFaucetEnabled
   const isSubmitDisabled =
     isSubmitting ||
     address.trim().length === 0 ||
@@ -81,27 +93,44 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   }, [])
 
   const openAssetModal = useCallback(() => {
+    if (!canChooseAsset) return
     setMinterAddressDraft("")
     lastAutoMinterLookupAddressRef.current = undefined
     setIsAssetModalOpen(true)
-  }, [])
+  }, [canChooseAsset])
 
   const selectGramAsset = useCallback(() => {
+    if (!gramFaucetEnabled) return
     selectMode("ton")
     setIsAssetModalOpen(false)
-  }, [selectMode])
+  }, [gramFaucetEnabled, selectMode])
 
   const selectJettonAsset = useCallback(
     (option: FaucetOption) => {
+      if (!jettonFaucetEnabled) return
       setJettonMinter(option.value)
       selectMode("jetton")
       setIsAssetModalOpen(false)
     },
-    [selectMode],
+    [jettonFaucetEnabled, selectMode],
   )
 
   useEffect(() => {
-    if (!isAssetModalOpen) {
+    if (!jettonFaucetEnabled) {
+      setIsAssetModalOpen(false)
+      setJettonMinter("")
+      setMinterAddressDraft("")
+    }
+
+    if (mode === "jetton" && !jettonFaucetEnabled && gramFaucetEnabled) {
+      setMode("ton")
+    } else if (mode === "ton" && !gramFaucetEnabled && jettonFaucetEnabled) {
+      setMode("jetton")
+    }
+  }, [gramFaucetEnabled, jettonFaucetEnabled, mode])
+
+  useEffect(() => {
+    if (!isAssetModalOpen || !jettonFaucetEnabled) {
       return
     }
 
@@ -111,10 +140,10 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     return () => {
       globalThis.cancelAnimationFrame(frame)
     }
-  }, [isAssetModalOpen])
+  }, [isAssetModalOpen, jettonFaucetEnabled])
 
   useEffect(() => {
-    if (!isAssetModalOpen) {
+    if (!isAssetModalOpen || !jettonFaucetEnabled) {
       return
     }
 
@@ -140,9 +169,16 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     return () => {
       globalThis.clearTimeout(timeoutId)
     }
-  }, [addressFormat, isAssetModalOpen, minterAddressDraft])
+  }, [addressFormat, isAssetModalOpen, jettonFaucetEnabled, minterAddressDraft])
 
   useEffect(() => {
+    if (!startupWalletsEnabled) {
+      setStartupWallets([])
+      setWalletsError(undefined)
+      setWalletsLoading(false)
+      return
+    }
+
     let cancelled = false
 
     void (async () => {
@@ -169,9 +205,15 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     return () => {
       cancelled = true
     }
-  }, [client])
+  }, [client, startupWalletsEnabled])
 
   useEffect(() => {
+    if (!jettonFaucetEnabled) {
+      setJettonMasters([])
+      setJettonsLoading(false)
+      return
+    }
+
     let cancelled = false
 
     void (async () => {
@@ -197,7 +239,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     return () => {
       cancelled = true
     }
-  }, [client])
+  }, [client, jettonFaucetEnabled])
 
   const walletOptions = useMemo<FaucetOption[]>(
     () =>
@@ -219,6 +261,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     [address, walletOptions],
   )
   const jettonOptions = useMemo<FaucetOption[]>(() => {
+    if (!jettonFaucetEnabled) return []
+
     const usdtValue =
       parseAddress(PINNED_USDT_MINTER_ADDRESS)?.toString(addressFormat) ??
       PINNED_USDT_MINTER_ADDRESS
@@ -253,7 +297,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
       })
 
     return [pinnedUsdtOption, ...apiOptions]
-  }, [addressFormat, jettonMasters])
+  }, [addressFormat, jettonFaucetEnabled, jettonMasters])
   const selectedJettonOption = useMemo(
     () => jettonOptions.find(option => isSameAddress(option.value, jettonMinter)),
     [jettonMinter, jettonOptions],
@@ -263,6 +307,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
   useEffect(() => {
     if (
+      !jettonFaucetEnabled ||
       jettonsLoading ||
       requestedJettonMinter.length === 0 ||
       loadedJettonMinterQueryRef.current === requestedJettonMinter
@@ -272,10 +317,14 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
     loadedJettonMinterQueryRef.current = requestedJettonMinter
     void loadMinterAddress(requestedJettonMinter)
-  }, [jettonsLoading, requestedJettonMinter])
+  }, [jettonFaucetEnabled, jettonsLoading, requestedJettonMinter])
 
   async function handleSubmit(event?: FormEvent): Promise<void> {
     event?.preventDefault()
+    if ((isJettonMode && !jettonFaucetEnabled) || (!isJettonMode && !gramFaucetEnabled)) {
+      return
+    }
+
     const trimmedAddress = address.trim()
     const parsedAddress = parseAddress(trimmedAddress)
     const tonAmountNano = amountNano
@@ -417,7 +466,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
       durationMs: 60_000,
     })
 
-    const rawTxHash = await waitForTraceTransactionHash(client, msgHash)
+    const rawTxHash = await waitForTraceTransactionHash(client, msgHash, FAUCET_TRACE_WAIT_ATTEMPTS)
     const txHash = hashToHex(rawTxHash) ?? rawTxHash
 
     updateToast(toastId, {
@@ -440,6 +489,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   }
 
   async function loadMinterAddress(rawMinter: string): Promise<void> {
+    if (!jettonFaucetEnabled) return
+
     const parsedMinter = parseAddress(rawMinter.trim())
     if (!parsedMinter) {
       showToast({
@@ -536,7 +587,9 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
               <Input
                 id="dashboard-amount"
                 aria-label="Amount"
-                className={`${styles.fieldInput} ${styles.amountAssetInput}`}
+                className={`${styles.fieldInput} ${styles.amountAssetInput} ${
+                  canChooseAsset ? "" : styles.amountAssetInputStatic
+                }`}
                 inputMode="decimal"
                 placeholder={isJettonMode ? "0.0" : "0.0 GRAM"}
                 value={amount}
@@ -545,40 +598,51 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
                 spellCheck={false}
                 onChange={event => setAmount(event.target.value)}
               />
-              <button
-                type="button"
-                className={styles.assetSelectorButton}
-                aria-label="Choose faucet asset"
-                aria-haspopup="dialog"
-                aria-expanded={isAssetModalOpen}
-                onClick={openAssetModal}
-              >
-                <span className={styles.assetSelectorIcon}>
-                  {isJettonMode && selectedJettonOption?.image ? (
-                    <img
-                      src={selectedJettonOption.image}
-                      alt=""
-                      onError={event => {
-                        const imageElement = event.currentTarget
-                        if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                          imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                        }
-                      }}
-                    />
-                  ) : isJettonMode ? (
-                    <Coins size={17} />
-                  ) : (
+              {canChooseAsset ? (
+                <button
+                  type="button"
+                  className={styles.assetSelectorButton}
+                  aria-label="Choose faucet asset"
+                  aria-haspopup="dialog"
+                  aria-expanded={isAssetModalOpen}
+                  onClick={openAssetModal}
+                >
+                  <span className={styles.assetSelectorIcon}>
+                    {isJettonMode && selectedJettonOption?.image ? (
+                      <img
+                        src={selectedJettonOption.image}
+                        alt=""
+                        onError={event => {
+                          const imageElement = event.currentTarget
+                          if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
+                            imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                          }
+                        }}
+                      />
+                    ) : isJettonMode ? (
+                      <Coins size={17} />
+                    ) : (
+                      <img src={GRAM_LOGO_IMAGE} alt="" />
+                    )}
+                  </span>
+                  <span className={styles.assetSelectorText}>
+                    <span className={styles.assetSelectorSymbol}>{selectedAssetSymbol}</span>
+                    {isJettonMode && selectedAssetTitle !== selectedAssetSymbol && (
+                      <span className={styles.assetSelectorName}>{selectedAssetTitle}</span>
+                    )}
+                  </span>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </button>
+              ) : (
+                <div className={styles.assetSelectorStatic} aria-label="Available asset: GRAM">
+                  <span className={styles.assetSelectorIcon}>
                     <img src={GRAM_LOGO_IMAGE} alt="" />
-                  )}
-                </span>
-                <span className={styles.assetSelectorText}>
-                  <span className={styles.assetSelectorSymbol}>{selectedAssetSymbol}</span>
-                  {isJettonMode && selectedAssetTitle !== selectedAssetSymbol && (
-                    <span className={styles.assetSelectorName}>{selectedAssetTitle}</span>
-                  )}
-                </span>
-                <ChevronDown size={16} aria-hidden="true" />
-              </button>
+                  </span>
+                  <span className={styles.assetSelectorText}>
+                    <span className={styles.assetSelectorSymbol}>GRAM</span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -586,19 +650,32 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
             <label className={styles.label} htmlFor="dashboard-address">
               Recipient
             </label>
-            <FaucetDropdownInput
-              id="dashboard-address"
-              menuLabel="Choose wallet"
-              emptyLabel={walletsError ?? "No startup wallets found."}
-              isLoading={walletsLoading}
-              loadingLabel="Loading wallets..."
-              options={walletOptions}
-              placeholder="EQ..."
-              selectedOption={selectedWalletOption}
-              value={address}
-              onChange={setAddress}
-              onSelect={option => setAddress(option.value)}
-            />
+            {startupWalletsEnabled ? (
+              <FaucetDropdownInput
+                id="dashboard-address"
+                menuLabel="Choose wallet"
+                emptyLabel={walletsError ?? "No startup wallets found."}
+                isLoading={walletsLoading}
+                loadingLabel="Loading wallets..."
+                options={walletOptions}
+                placeholder="EQ..."
+                selectedOption={selectedWalletOption}
+                value={address}
+                onChange={setAddress}
+                onSelect={option => setAddress(option.value)}
+              />
+            ) : (
+              <Input
+                id="dashboard-address"
+                className={styles.fieldInput}
+                placeholder="EQ..."
+                value={address}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={event => setAddress(event.target.value)}
+              />
+            )}
           </div>
 
           <div className={styles.quickActions}>
@@ -631,105 +708,111 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
         </form>
       </section>
 
-      <Dialog
-        open={isAssetModalOpen}
-        title="Asset"
-        className={styles.dashboardDialog}
-        maxWidth={560}
-        closeLabel="Close asset selector"
-        onOpenChange={setIsAssetModalOpen}
-      >
-        <div className={styles.assetModalContent}>
-          <div className={styles.assetChoiceList}>
-            <button
-              type="button"
-              className={`${styles.assetChoiceButton} ${isJettonMode ? "" : styles.assetChoiceButtonSelected}`}
-              onClick={selectGramAsset}
-            >
-              <img src={GRAM_LOGO_IMAGE} alt="" className={styles.assetChoiceImage} />
-              <span className={styles.assetChoiceText}>
-                <span className={styles.assetChoiceTitle}>GRAM</span>
-                <span className={styles.assetChoiceSubtitle}>Native localnet balance</span>
-              </span>
-              {!isJettonMode && <Check size={17} className={styles.assetChoiceCheck} />}
-            </button>
-
-            {jettonOptions.map(option => {
-              const isSelected = isJettonMode && isSameAddress(option.value, jettonMinter)
-              return (
+      {jettonFaucetEnabled ? (
+        <Dialog
+          open={isAssetModalOpen}
+          title="Asset"
+          className={styles.dashboardDialog}
+          maxWidth={560}
+          closeLabel="Close asset selector"
+          onOpenChange={setIsAssetModalOpen}
+        >
+          <div className={styles.assetModalContent}>
+            <div className={styles.assetChoiceList}>
+              {gramFaucetEnabled ? (
                 <button
-                  key={option.id}
                   type="button"
-                  className={`${styles.assetChoiceButton} ${isSelected ? styles.assetChoiceButtonSelected : ""}`}
-                  onClick={() => selectJettonAsset(option)}
+                  className={`${styles.assetChoiceButton} ${isJettonMode ? "" : styles.assetChoiceButtonSelected}`}
+                  onClick={selectGramAsset}
                 >
-                  {option.image ? (
-                    <img
-                      src={option.image}
-                      alt=""
-                      className={styles.assetChoiceImage}
-                      onError={event => {
-                        const imageElement = event.currentTarget
-                        if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                          imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className={styles.assetChoiceIcon}>
-                      <Coins size={18} />
-                    </span>
-                  )}
+                  <img src={GRAM_LOGO_IMAGE} alt="" className={styles.assetChoiceImage} />
                   <span className={styles.assetChoiceText}>
-                    <span className={styles.assetChoiceTitle}>{option.title}</span>
-                    <span className={styles.assetChoiceSubtitle}>{option.subtitle}</span>
+                    <span className={styles.assetChoiceTitle}>GRAM</span>
+                    <span className={styles.assetChoiceSubtitle}>Native network balance</span>
                   </span>
-                  {option.badge && <span className={styles.assetChoiceBadge}>{option.badge}</span>}
-                  {isSelected && <Check size={17} className={styles.assetChoiceCheck} />}
+                  {!isJettonMode && <Check size={17} className={styles.assetChoiceCheck} />}
                 </button>
-              )
-            })}
-            {jettonsLoading && (
-              <div className={styles.assetLookupStatus}>
-                <Loader2 size={14} className={styles.spinning} />
-                Loading local jettons...
-              </div>
-            )}
-          </div>
+              ) : undefined}
 
-          <div className={styles.assetMinterLookup}>
-            <label className={styles.label} htmlFor="dashboard-asset-minter">
-              Paste token minter address
-            </label>
-            <Input
-              ref={minterInputRef}
-              id="dashboard-asset-minter"
-              className={styles.fieldInput}
-              placeholder="EQ..."
-              value={minterAddressDraft}
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              onChange={event => {
-                setMinterAddressDraft(event.target.value)
-              }}
-              onPaste={event => {
-                const pastedText = event.clipboardData.getData("text")
-                const parsedMinter = parseAddress(pastedText.trim())
-                if (!parsedMinter) {
-                  return
-                }
+              {jettonOptions.map(option => {
+                const isSelected = isJettonMode && isSameAddress(option.value, jettonMinter)
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`${styles.assetChoiceButton} ${isSelected ? styles.assetChoiceButtonSelected : ""}`}
+                    onClick={() => selectJettonAsset(option)}
+                  >
+                    {option.image ? (
+                      <img
+                        src={option.image}
+                        alt=""
+                        className={styles.assetChoiceImage}
+                        onError={event => {
+                          const imageElement = event.currentTarget
+                          if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
+                            imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className={styles.assetChoiceIcon}>
+                        <Coins size={18} />
+                      </span>
+                    )}
+                    <span className={styles.assetChoiceText}>
+                      <span className={styles.assetChoiceTitle}>{option.title}</span>
+                      <span className={styles.assetChoiceSubtitle}>{option.subtitle}</span>
+                    </span>
+                    {option.badge && (
+                      <span className={styles.assetChoiceBadge}>{option.badge}</span>
+                    )}
+                    {isSelected && <Check size={17} className={styles.assetChoiceCheck} />}
+                  </button>
+                )
+              })}
+              {jettonsLoading && (
+                <div className={styles.assetLookupStatus}>
+                  <Loader2 size={14} className={styles.spinning} />
+                  Loading jettons...
+                </div>
+              )}
+            </div>
 
-                event.preventDefault()
-                const normalizedMinter = parsedMinter.toString(addressFormat)
-                lastAutoMinterLookupAddressRef.current = normalizedMinter
-                setMinterAddressDraft(normalizedMinter)
-                void loadMinterAddress(normalizedMinter)
-              }}
-            />
+            <div className={styles.assetMinterLookup}>
+              <label className={styles.label} htmlFor="dashboard-asset-minter">
+                Paste token minter address
+              </label>
+              <Input
+                ref={minterInputRef}
+                id="dashboard-asset-minter"
+                className={styles.fieldInput}
+                placeholder="EQ..."
+                value={minterAddressDraft}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={event => {
+                  setMinterAddressDraft(event.target.value)
+                }}
+                onPaste={event => {
+                  const pastedText = event.clipboardData.getData("text")
+                  const parsedMinter = parseAddress(pastedText.trim())
+                  if (!parsedMinter) {
+                    return
+                  }
+
+                  event.preventDefault()
+                  const normalizedMinter = parsedMinter.toString(addressFormat)
+                  lastAutoMinterLookupAddressRef.current = normalizedMinter
+                  setMinterAddressDraft(normalizedMinter)
+                  void loadMinterAddress(normalizedMinter)
+                }}
+              />
+            </div>
           </div>
-        </div>
-      </Dialog>
+        </Dialog>
+      ) : undefined}
     </>
   )
 }

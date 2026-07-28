@@ -1,7 +1,6 @@
 services:
   localton:
     image: "__MYLOCALACTON_IMAGE__"
-    platform: "__MYLOCALACTON_PLATFORM__"
     command:
       - run
       - --state-dir
@@ -74,7 +73,6 @@ services:
 
   v3-migrations:
     image: "__MYLOCALACTON_IMAGE__"
-    platform: "__MYLOCALACTON_PLATFORM__"
     command:
       - v3-migrate
     depends_on:
@@ -86,7 +84,6 @@ services:
 
   v3-worker:
     image: "__MYLOCALACTON_IMAGE__"
-    platform: "__MYLOCALACTON_PLATFORM__"
     user: "0:0"
     command:
       - v3-worker
@@ -132,7 +129,6 @@ services:
 
   v3-api:
     image: "__MYLOCALACTON_IMAGE__"
-    platform: "__MYLOCALACTON_PLATFORM__"
     command:
       - v3-api
     environment:
@@ -169,7 +165,6 @@ services:
 
   v3-classifier:
     image: "__MYLOCALACTON_IMAGE__"
-    platform: "__MYLOCALACTON_PLATFORM__"
     command:
       - v3-classifier
       - --pool-size

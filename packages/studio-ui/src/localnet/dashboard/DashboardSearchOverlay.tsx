@@ -19,6 +19,9 @@ import {NftImage} from "../explorer/components/NftImage"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
 import {useExplorerRoutePaths} from "../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
+import {supports, supportsAny} from "../../environmentCapabilities"
+import type {EnvironmentCapability} from "../../studioApi"
+import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {useLocalnetRoutes} from "../routes"
 
 import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
@@ -59,6 +62,7 @@ interface SearchResult {
   readonly fallbackImage?: string
   readonly collectionName?: string
   readonly isScam?: boolean
+  readonly capabilities?: readonly EnvironmentCapability[]
 }
 
 interface LoadedSearchAssets {
@@ -71,8 +75,8 @@ const searchAssetsCache = new WeakMap<TonClient, Promise<LoadedSearchAssets>>()
 const quickSearchResults: readonly SearchResult[] = [
   {
     id: "quick-home",
-    title: "TON Localnet",
-    description: "by Acton",
+    title: "Environment",
+    description: "Open the environment home",
     href: "/dashboard",
     icon: CircleUserRound,
     workspace: true,
@@ -83,13 +87,15 @@ const quickSearchResults: readonly SearchResult[] = [
     description: "Search any address or transaction",
     href: "/explorer",
     icon: Search,
+    capabilities: ["explorer"],
   },
   {
     id: "quick-faucet",
     title: "Faucet",
-    description: "Send test GRAM to a wallet",
+    description: "Fund an account in this environment",
     href: "/faucet",
     icon: Wallet,
+    capabilities: ["gramFaucet", "jettonFaucet"],
   },
   {
     id: "quick-integrate",
@@ -97,27 +103,31 @@ const quickSearchResults: readonly SearchResult[] = [
     description: "Connect a project, application or TON-compatible tool",
     href: "/integrate",
     icon: Cable,
+    capabilities: ["integration"],
   },
   {
     id: "quick-api-calls",
     title: "API Calls",
-    description: "Recent API traffic handled by localnet",
+    description: "Recent API traffic handled by this environment",
     href: "/api-calls",
     icon: FileJson,
+    capabilities: ["apiCalls"],
   },
   {
     id: "quick-tokens",
     title: "Tokens",
-    description: "Jettons indexed from the local network",
+    description: "Jettons indexed from this environment",
     href: "/explorer/tokens",
     icon: Boxes,
+    capabilities: ["explorer"],
   },
   {
     id: "quick-nfts",
     title: "NFTs",
-    description: "NFT items indexed from the local network",
+    description: "NFT items indexed from this environment",
     href: "/explorer/nfts",
     icon: Image,
+    capabilities: ["explorer"],
   },
 ]
 
@@ -132,6 +142,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
+  const {environment} = useLocalnetRuntime()
   const [searchQuery, setSearchQuery] = useState("")
   const [searchAssetsState, setSearchAssetsState] = useState<SearchAssetsState>({
     tokens: [],
@@ -149,10 +160,16 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   const searchResults = useMemo<readonly SearchResult[]>(() => {
     const trimmed = searchQuery.trim()
     if (trimmed.length === 0) {
-      return quickSearchResults.map(result => ({
-        ...result,
-        href: localnetRoutes.path(result.href),
-      }))
+      return quickSearchResults
+        .filter(
+          result =>
+            result.capabilities === undefined || supportsAny(environment, ...result.capabilities),
+        )
+        .map(result => ({
+          ...result,
+          title: result.id === "quick-home" ? (environment?.name ?? result.title) : result.title,
+          href: localnetRoutes.path(result.href),
+        }))
     }
 
     const query = trimmed.toLocaleLowerCase()
@@ -181,7 +198,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
 
     if (results.length < 12) {
       for (const entry of apiSearchState.entries) {
-        if (!entry.searchText.includes(query)) {
+        if (!supports(environment, entry.capability) || !entry.searchText.includes(query)) {
           continue
         }
 
@@ -189,7 +206,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           id: entry.id,
           title: entry.title,
           description: entry.description,
-          href: entry.href,
+          href: localnetRoutes.path(entry.href),
           icon: FileJson,
         })
         if (results.length >= 12) {
@@ -254,6 +271,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   }, [
     addressFormat,
     apiSearchState.entries,
+    environment,
     localnetRoutes,
     routes,
     searchAssetsState.nfts,
@@ -515,7 +533,12 @@ function loadSearchAssets(client: TonClient): Promise<LoadedSearchAssets> {
         offset: 0,
         sortByLastTransactionLt: true,
       }),
-    ]).then(([tokens, nfts]) => ({tokens, nfts}))
+    ])
+      .then(([tokens, nfts]) => ({tokens, nfts}))
+      .catch(error => {
+        searchAssetsCache.delete(client)
+        throw error
+      })
     searchAssetsCache.set(client, cached)
   }
   return cached

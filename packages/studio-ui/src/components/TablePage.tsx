@@ -12,13 +12,7 @@ interface TablePageProps {
   readonly onRetry: () => Promise<void>
 }
 
-export function TablePage({
-  children,
-  error,
-  errorTitle,
-  hasContent,
-  onRetry,
-}: TablePageProps) {
+export function TablePage({children, error, errorTitle, hasContent, onRetry}: TablePageProps) {
   return (
     <div className={styles.page}>
       {error && !hasContent ? (

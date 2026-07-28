@@ -46,9 +46,7 @@ export function useStudioTestRuns(
   const selectedRunIdRef = useRef(selectedRunId)
   const runsRequestRef = useRef(0)
   const selectedRunRequestRef = useRef(0)
-  const selectedRunKnown = selectedRunId
-    ? runs.some(run => run.id === selectedRunId)
-    : false
+  const selectedRunKnown = selectedRunId ? runs.some(run => run.id === selectedRunId) : false
 
   useEffect(() => {
     selectedRunIdRef.current = selectedRunId
@@ -86,10 +84,7 @@ export function useStudioTestRuns(
             ? fetchStudioTestRunOutput(runId, signal)
             : Promise.resolve<TestRunOutput | undefined>(undefined),
         ])
-        if (
-          requestId !== selectedRunRequestRef.current ||
-          selectedRunIdRef.current !== runId
-        ) {
+        if (requestId !== selectedRunRequestRef.current || selectedRunIdRef.current !== runId) {
           return
         }
         setSelectedRun(run)

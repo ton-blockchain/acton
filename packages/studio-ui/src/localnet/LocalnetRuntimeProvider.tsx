@@ -26,8 +26,10 @@ export interface LocalnetRuntime {
   readonly client: TonClient
   readonly closeAuthOverlay: () => void
   readonly environment?: StudioEnvironment
+  readonly gramFaucetEnabled: boolean
   readonly isAuthOverlayOpen: boolean
   readonly isAuthOverlayRequired: boolean
+  readonly jettonFaucetEnabled: boolean
   readonly localnetApiToken?: string
   readonly metadataRegistry: CompositeMetadataRegistry
   readonly openAuthOverlay: () => void
@@ -61,6 +63,13 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   const apiV3BaseUrl = environment?.endpoints.apiV3 ?? `${rpcBaseUrl}/api/v3`
   const controlBaseUrl = environment?.endpoints.control ?? rpcBaseUrl
   const controlEnabled = supports(environment, "controlApi")
+  const contractsEnabled = supports(environment, "contracts")
+  const gramFaucetEnabled = supports(environment, "gramFaucet")
+  const jettonFaucetEnabled = supports(environment, "jettonFaucet")
+  const networkIdentity = useMemo(
+    () => environment?.network,
+    [environment?.network.id, environment?.network.label, environment?.network.testOnly],
+  )
   const [localnetApiToken, setLocalnetApiTokenState] = useState<string>()
   const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false)
   const [isAuthOverlayRequired, setIsAuthOverlayRequired] = useState(false)
@@ -145,11 +154,11 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       new BundledAbiRegistry(getBundledCompilerAbis),
       new VerifierMetadataRegistry(),
     ]
-    if (supports(environment, "contracts")) {
+    if (contractsEnabled) {
       registries.unshift(new LocalnetMetadataRegistry(client))
     }
     return new CompositeMetadataRegistry(registries)
-  }, [client, environment])
+  }, [client, contractsEnabled])
   const explorerApi = useMemo(
     () => ({
       v2BaseUrl: apiV2BaseUrl,
@@ -165,8 +174,10 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       client,
       closeAuthOverlay,
       environment,
+      gramFaucetEnabled,
       isAuthOverlayOpen,
       isAuthOverlayRequired,
+      jettonFaucetEnabled,
       localnetApiToken,
       metadataRegistry,
       openAuthOverlay,
@@ -181,8 +192,10 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       client,
       closeAuthOverlay,
       environment,
+      gramFaucetEnabled,
       isAuthOverlayOpen,
       isAuthOverlayRequired,
+      jettonFaucetEnabled,
       localnetApiToken,
       metadataRegistry,
       openAuthOverlay,
@@ -198,7 +211,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
         client={client}
         api={explorerApi}
         enabled={environment?.status === "running" && controlEnabled}
-        network={environment?.network}
+        network={networkIdentity}
       >
         <ExplorerRoutesProvider
           abiPath={localnetPath(basePath, "/contracts/abi")}

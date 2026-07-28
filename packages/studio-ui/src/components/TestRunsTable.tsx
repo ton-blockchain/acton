@@ -30,12 +30,7 @@ interface TestRunsTableProps {
   readonly onRunTests: () => void
 }
 
-export function TestRunsTable({
-  isLoading,
-  runs,
-  onOpenRun,
-  onRunTests,
-}: TestRunsTableProps) {
+export function TestRunsTable({isLoading, runs, onOpenRun, onRunTests}: TestRunsTableProps) {
   return (
     <DataTable minWidth="48rem">
       <DataTableTable aria-label="Test runs">
@@ -100,7 +95,9 @@ export function TestRunsTable({
                 <DataTableCell>
                   <RunStatus status={run.status} />
                 </DataTableCell>
-                <DataTableCell tone="muted">{run.source === "studio" ? "Studio" : "CLI"}</DataTableCell>
+                <DataTableCell tone="muted">
+                  {run.source === "studio" ? "Studio" : "CLI"}
+                </DataTableCell>
                 <DataTableCell tone="muted">{testRunSummary(run)}</DataTableCell>
                 <DataTableCell tone="muted">
                   {formatTestRunDuration(run.stats.durationMs)}

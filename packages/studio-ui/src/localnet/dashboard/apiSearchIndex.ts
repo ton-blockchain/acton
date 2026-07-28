@@ -1,5 +1,8 @@
+import type {EnvironmentCapability} from "../../studioApi"
+
 interface ApiReferenceSpec {
   readonly version: "control" | "v2" | "v3"
+  readonly capability: EnvironmentCapability
   readonly label: string
   readonly path: string
   readonly specUrl: string
@@ -12,11 +15,13 @@ export interface ApiSearchIndexEntry {
   readonly description: string
   readonly href: string
   readonly searchText: string
+  readonly capability: EnvironmentCapability
 }
 
 const apiReferenceSpecs: readonly ApiReferenceSpec[] = [
   {
     version: "v2",
+    capability: "apiV2",
     label: "v2 API",
     path: "/api-reference/v2",
     specUrl: "/openapi/ton-api-v2.openapi.json",
@@ -24,6 +29,7 @@ const apiReferenceSpecs: readonly ApiReferenceSpec[] = [
   },
   {
     version: "v3",
+    capability: "apiV3",
     label: "v3 API",
     path: "/api-reference/v3",
     specUrl: "/openapi/ton-api-v3.openapi.json",
@@ -31,6 +37,7 @@ const apiReferenceSpecs: readonly ApiReferenceSpec[] = [
   },
   {
     version: "control",
+    capability: "controlApi",
     label: "Control API",
     path: "/api-reference/control",
     specUrl: "/openapi/acton-localnet-control.openapi.json",
@@ -115,6 +122,7 @@ function buildApiSearchIndex(
         description: resultDescription,
         href: `${reference.path}${apiReferenceAnchor(tag, methodLabel, pathName)}`,
         searchText: searchFields.join(" ").toLocaleLowerCase(),
+        capability: reference.capability,
       })
     }
   }

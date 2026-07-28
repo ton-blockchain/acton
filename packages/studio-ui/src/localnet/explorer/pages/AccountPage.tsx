@@ -49,6 +49,7 @@ import styles from "./AccountPage.module.css"
 interface AccountPageProps {
   readonly client: TonClient
   readonly enableJettonMint?: boolean
+  readonly enableTransactionStreaming?: boolean
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
@@ -65,7 +66,11 @@ interface AccountLoadIssue {
   readonly networkLabel: string
 }
 
-export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = false}) => {
+export const AccountPage: FC<AccountPageProps> = ({
+  client,
+  enableJettonMint = false,
+  enableTransactionStreaming = true,
+}) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -586,7 +591,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   }, [accountCodeLookupHash, metadataRegistry])
 
   useEffect(() => {
-    if (!formattedAddress) {
+    if (!formattedAddress || !enableTransactionStreaming) {
       return
     }
 
@@ -627,7 +632,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       isActive = false
       unsubscribe()
     }
-  }, [accountAddressKey, client])
+  }, [accountAddressKey, client, enableTransactionStreaming])
 
   useEffect(() => {
     setJettonMetadataOpen(false)

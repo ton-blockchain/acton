@@ -226,12 +226,20 @@ const AppContent: FC<AppContentProps> = ({
             />
             <Route
               path={path("/faucet")}
-              element={withCapability(
-                "faucet",
-                <DashboardPage>
-                  <FaucetPage client={client} />
-                </DashboardPage>,
-              )}
+              element={
+                runtime.gramFaucetEnabled || runtime.jettonFaucetEnabled ? (
+                  <DashboardPage>
+                    <FaucetPage
+                      client={client}
+                      gramFaucetEnabled={runtime.gramFaucetEnabled}
+                      jettonFaucetEnabled={runtime.jettonFaucetEnabled}
+                      startupWalletsEnabled={supports(runtime.environment, "wallets")}
+                    />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
+              }
             />
             <Route
               path={path("/blocks")}
@@ -514,7 +522,14 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <AccountPage client={client} enableJettonMint />
+                  <AccountPage
+                    client={client}
+                    enableJettonMint={runtime.jettonFaucetEnabled}
+                    enableTransactionStreaming={
+                      runtime.environment?.status === "running" &&
+                      supports(runtime.environment, "controlApi")
+                    }
+                  />
                 </DashboardPage>,
               )}
             />

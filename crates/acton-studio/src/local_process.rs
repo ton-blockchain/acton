@@ -27,7 +27,9 @@ const MAX_FULL_TON_VALIDATORS: u16 = 100;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
-const FULL_TON_START_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const FULL_TON_IMAGE_INSPECT_TIMEOUT: Duration = Duration::from_secs(10);
+const FULL_TON_IMAGE_PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const FULL_TON_COMPOSE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
 const PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL: Duration = Duration::from_secs(2);
@@ -66,6 +68,34 @@ enum EnvironmentDriver {
         port: u16,
     },
     FullTonNetwork(FullTonNetworkDriver),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FullTonStartPhase {
+    LocalImageCheck,
+    ImagePull(FullTonImagePullKind),
+    ComposeUp,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FullTonProcessOutcome {
+    Succeeded,
+    Failed,
+    TimedOut,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FullTonTransition {
+    StartImagePull,
+    StartCompose,
+    Running,
+    Failed { cleanup_compose: bool },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FullTonImagePullKind {
+    ActiveDockerConfiguration,
+    IsolatedPublicImage,
 }
 
 struct ArtifactRevision {
@@ -572,7 +602,7 @@ impl EnvironmentDriver {
                 config,
                 ..
             } => spawn_localnet(acton_executable, workspace_root, db_path.clone(), config),
-            Self::FullTonNetwork(driver) => driver.spawn_up(),
+            Self::FullTonNetwork(driver) => driver.spawn_image_inspect(),
         }
     }
 
@@ -814,23 +844,74 @@ async fn monitor_full_ton_network(
     environment: Arc<LocalEnvironment>,
     generation: u64,
 ) {
-    let deadline = Instant::now() + FULL_TON_START_TIMEOUT;
+    let mut phase = FullTonStartPhase::LocalImageCheck;
+    let mut deadline = Instant::now() + FULL_TON_IMAGE_INSPECT_TIMEOUT;
+
     loop {
         if !is_current_generation(&environment, generation) {
             return;
         }
-        if Instant::now() >= deadline {
-            fail_environment(
-                &environment,
-                generation,
-                "Full TON network startup timed out while Docker was preparing its images"
-                    .to_owned(),
-            )
-            .await;
-            return;
-        }
-        match child_exit_status(&environment).await {
-            Ok(Some(status)) if status.success() => {
+
+        let (outcome, exit_status) = if Instant::now() >= deadline {
+            terminate_child(&environment).await;
+            (FullTonProcessOutcome::TimedOut, None)
+        } else {
+            match child_exit_status(&environment).await {
+                Ok(Some(status)) if status.success() => {
+                    (FullTonProcessOutcome::Succeeded, Some(status))
+                }
+                Ok(Some(status)) => (FullTonProcessOutcome::Failed, Some(status)),
+                Ok(None) => {
+                    sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
+                    continue;
+                }
+                Err(error) => {
+                    fail_full_ton_network(
+                        driver,
+                        &environment,
+                        generation,
+                        matches!(phase, FullTonStartPhase::ComposeUp),
+                        format!("Failed to inspect the Docker startup process: {error}"),
+                    )
+                    .await;
+                    return;
+                }
+            }
+        };
+
+        match full_ton_transition(phase, outcome) {
+            FullTonTransition::StartImagePull => {
+                match start_full_ton_image_pull(driver, &environment, generation).await {
+                    Ok(Some(kind)) => {
+                        phase = FullTonStartPhase::ImagePull(kind);
+                        deadline = Instant::now() + FULL_TON_IMAGE_PULL_TIMEOUT;
+                    }
+                    Ok(None) => return,
+                    Err(error) => {
+                        fail_environment(&environment, generation, error.to_string()).await;
+                        return;
+                    }
+                }
+            }
+            FullTonTransition::StartCompose => {
+                let started = match spawn_child_if_current(&environment, generation, || {
+                    driver.spawn_compose_up()
+                })
+                .await
+                {
+                    Ok(started) => started,
+                    Err(error) => {
+                        fail_environment(&environment, generation, error.to_string()).await;
+                        return;
+                    }
+                };
+                if !started {
+                    return;
+                }
+                phase = FullTonStartPhase::ComposeUp;
+                deadline = Instant::now() + FULL_TON_COMPOSE_TIMEOUT;
+            }
+            FullTonTransition::Running => {
                 set_environment_status_if_current(
                     &environment,
                     generation,
@@ -840,24 +921,157 @@ async fn monitor_full_ton_network(
                 .await;
                 return;
             }
-            Ok(Some(status)) => {
-                let error = driver.startup_failure_message(status).await;
-                fail_environment(&environment, generation, error).await;
-                return;
-            }
-            Ok(None) => {}
-            Err(error) => {
-                fail_environment(
-                    &environment,
-                    generation,
-                    format!("Failed to inspect the Docker Compose process: {error}"),
-                )
-                .await;
+            FullTonTransition::Failed { cleanup_compose } => {
+                let error = if let Some(status) = exit_status {
+                    driver
+                        .startup_failure_message(full_ton_operation(phase), status)
+                        .await
+                } else {
+                    full_ton_timeout_message(phase)
+                };
+                fail_full_ton_network(driver, &environment, generation, cleanup_compose, error)
+                    .await;
                 return;
             }
         }
-        sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
     }
+}
+
+const fn full_ton_transition(
+    phase: FullTonStartPhase,
+    outcome: FullTonProcessOutcome,
+) -> FullTonTransition {
+    match (phase, outcome) {
+        (
+            FullTonStartPhase::LocalImageCheck,
+            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
+        ) => FullTonTransition::StartImagePull,
+        (FullTonStartPhase::LocalImageCheck, FullTonProcessOutcome::Succeeded)
+        | (FullTonStartPhase::ImagePull(_), FullTonProcessOutcome::Succeeded) => {
+            FullTonTransition::StartCompose
+        }
+        (
+            FullTonStartPhase::ImagePull(_),
+            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
+        ) => FullTonTransition::Failed {
+            cleanup_compose: false,
+        },
+        (FullTonStartPhase::ComposeUp, FullTonProcessOutcome::Succeeded) => {
+            FullTonTransition::Running
+        }
+        (
+            FullTonStartPhase::ComposeUp,
+            FullTonProcessOutcome::Failed | FullTonProcessOutcome::TimedOut,
+        ) => FullTonTransition::Failed {
+            cleanup_compose: true,
+        },
+    }
+}
+
+const fn full_ton_operation(phase: FullTonStartPhase) -> &'static str {
+    match phase {
+        FullTonStartPhase::LocalImageCheck => "inspect the full TON network image with Docker",
+        FullTonStartPhase::ImagePull(kind) => match kind {
+            FullTonImagePullKind::IsolatedPublicImage => {
+                "pull the public full TON network image using the isolated Docker configuration"
+            }
+            FullTonImagePullKind::ActiveDockerConfiguration => {
+                "pull the full TON network image using the active Docker configuration"
+            }
+        },
+        FullTonStartPhase::ComposeUp => "start the full TON network with Docker Compose",
+    }
+}
+
+fn full_ton_timeout_message(phase: FullTonStartPhase) -> String {
+    match phase {
+        FullTonStartPhase::LocalImageCheck => {
+            "Docker image inspection did not finish within 10 seconds".to_owned()
+        }
+        FullTonStartPhase::ImagePull(_) => {
+            "Docker image pull did not finish within 15 minutes".to_owned()
+        }
+        FullTonStartPhase::ComposeUp => {
+            "Full TON network startup did not finish within 15 minutes".to_owned()
+        }
+    }
+}
+
+async fn start_full_ton_image_pull(
+    driver: &FullTonNetworkDriver,
+    environment: &LocalEnvironment,
+    generation: u64,
+) -> Result<Option<FullTonImagePullKind>, EnvironmentRuntimeError> {
+    if !is_current_generation(environment, generation) {
+        return Ok(None);
+    }
+
+    let (kind, isolated_target) = match driver.isolated_pull_target().await {
+        Ok(Some(target)) => (FullTonImagePullKind::IsolatedPublicImage, Some(target)),
+        Ok(None) => (FullTonImagePullKind::ActiveDockerConfiguration, None),
+        Err(error) => {
+            tracing::warn!(
+                %error,
+                "Isolated Docker image pull is unavailable; using the active Docker configuration"
+            );
+            (FullTonImagePullKind::ActiveDockerConfiguration, None)
+        }
+    };
+
+    let started = spawn_child_if_current(environment, generation, move || {
+        if let Some(target) = isolated_target {
+            driver.spawn_isolated_pull(&target)
+        } else {
+            driver.spawn_normal_pull()
+        }
+    })
+    .await?;
+    if started { Ok(Some(kind)) } else { Ok(None) }
+}
+
+async fn fail_full_ton_network(
+    driver: &FullTonNetworkDriver,
+    environment: &LocalEnvironment,
+    generation: u64,
+    cleanup_compose: bool,
+    error: String,
+) {
+    let _lifecycle_guard = environment.lifecycle.lock().await;
+    if !is_current_generation(environment, generation) {
+        return;
+    }
+    terminate_child(environment).await;
+    let mut error = error;
+    if cleanup_compose && let Err(cleanup_error) = driver.stop().await {
+        tracing::warn!(
+            %cleanup_error,
+            "Failed to stop partially started full TON network containers"
+        );
+        error = format!(
+            "{error}\nCleanup failed; some full TON network containers may still be running: {cleanup_error}"
+        );
+    }
+    set_environment_status_if_current(
+        environment,
+        generation,
+        EnvironmentStatus::Failed,
+        Some(error),
+    )
+    .await;
+}
+
+async fn spawn_child_if_current(
+    environment: &LocalEnvironment,
+    generation: u64,
+    spawn: impl FnOnce() -> Result<Child, EnvironmentRuntimeError>,
+) -> Result<bool, EnvironmentRuntimeError> {
+    let _lifecycle_guard = environment.lifecycle.lock().await;
+    if !is_current_generation(environment, generation) {
+        return Ok(false);
+    }
+    let child = spawn()?;
+    *environment.child.lock().await = Some(child);
+    Ok(true)
 }
 
 fn schedule_project_artifact_sync(runtime: &Arc<LocalProcessRuntimeInner>) {
@@ -1211,6 +1425,143 @@ async fn set_environment_status(
     let mut details = environment.details.write().await;
     details.status = status;
     details.error = error;
+}
+
+#[cfg(test)]
+mod full_ton_start_tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use expect_test::expect;
+    use tokio::sync::{Mutex, RwLock};
+
+    use super::{
+        EnvironmentConfig, EnvironmentDriver, EnvironmentEndpoints, EnvironmentRuntimeError,
+        EnvironmentStatus, FullTonImagePullKind, FullTonProcessOutcome, FullTonStartPhase,
+        LocalEnvironment, StudioEnvironment, full_ton_transition, spawn_child_if_current,
+    };
+
+    #[test]
+    fn startup_transition_table_cleans_up_only_after_compose_started() {
+        let image_pull = FullTonStartPhase::ImagePull(FullTonImagePullKind::IsolatedPublicImage);
+        let cases = [
+            (
+                FullTonStartPhase::LocalImageCheck,
+                FullTonProcessOutcome::Succeeded,
+            ),
+            (
+                FullTonStartPhase::LocalImageCheck,
+                FullTonProcessOutcome::Failed,
+            ),
+            (
+                FullTonStartPhase::LocalImageCheck,
+                FullTonProcessOutcome::TimedOut,
+            ),
+            (image_pull, FullTonProcessOutcome::Succeeded),
+            (image_pull, FullTonProcessOutcome::Failed),
+            (image_pull, FullTonProcessOutcome::TimedOut),
+            (
+                FullTonStartPhase::ComposeUp,
+                FullTonProcessOutcome::Succeeded,
+            ),
+            (FullTonStartPhase::ComposeUp, FullTonProcessOutcome::Failed),
+            (
+                FullTonStartPhase::ComposeUp,
+                FullTonProcessOutcome::TimedOut,
+            ),
+        ];
+        let actual = cases
+            .into_iter()
+            .map(|(phase, outcome)| {
+                format!(
+                    "{phase:?} + {outcome:?} => {:?}",
+                    full_ton_transition(phase, outcome)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        expect![[r"LocalImageCheck + Succeeded => StartCompose
+LocalImageCheck + Failed => StartImagePull
+LocalImageCheck + TimedOut => StartImagePull
+ImagePull(IsolatedPublicImage) + Succeeded => StartCompose
+ImagePull(IsolatedPublicImage) + Failed => Failed { cleanup_compose: false }
+ImagePull(IsolatedPublicImage) + TimedOut => Failed { cleanup_compose: false }
+ComposeUp + Succeeded => Running
+ComposeUp + Failed => Failed { cleanup_compose: true }
+ComposeUp + TimedOut => Failed { cleanup_compose: true }"]]
+        .assert_eq(&actual);
+    }
+
+    #[tokio::test]
+    async fn cancelled_generation_cannot_spawn_the_next_startup_phase() {
+        let environment = test_environment();
+        let next_phase_spawned = Arc::new(AtomicBool::new(false));
+        let lifecycle_guard = environment.lifecycle.lock().await;
+        let task_environment = Arc::clone(&environment);
+        let task_spawned = Arc::clone(&next_phase_spawned);
+        let task = tokio::spawn(async move {
+            spawn_child_if_current(&task_environment, 1, move || {
+                task_spawned.store(true, Ordering::Release);
+                Err(EnvironmentRuntimeError::Internal {
+                    code: "unexpected_spawn",
+                    message: "cancelled phase was spawned".to_owned(),
+                })
+            })
+            .await
+        });
+
+        environment.generation.fetch_add(1, Ordering::AcqRel);
+        drop(lifecycle_guard);
+
+        let started = task
+            .await
+            .expect("startup task")
+            .expect("cancelled phase must not be spawned");
+        let actual = format!(
+            "started: {started}\nspawn called: {}\nchild installed: {}",
+            next_phase_spawned.load(Ordering::Acquire),
+            environment.child.lock().await.is_some(),
+        );
+        expect![[r"started: false
+spawn called: false
+child installed: false"]]
+        .assert_eq(&actual);
+    }
+
+    fn test_environment() -> Arc<LocalEnvironment> {
+        let config = EnvironmentConfig::ActonLocalnet {
+            port: 5411,
+            fork_network: None,
+            fork_block_number: None,
+            accounts: Vec::new(),
+            rate_limit: None,
+            response_delay_ms: None,
+            block_interval_ms: None,
+            no_mining: false,
+            mine_empty_blocks: false,
+        };
+        Arc::new(LocalEnvironment {
+            details: RwLock::new(StudioEnvironment::new(
+                "environment-1",
+                "Test environment",
+                EnvironmentStatus::Starting,
+                config.clone(),
+                EnvironmentEndpoints::default(),
+            )),
+            driver: EnvironmentDriver::ActonLocalnet {
+                acton_executable: PathBuf::from("acton"),
+                workspace_root: PathBuf::from("."),
+                db_path: PathBuf::from("localnet.sqlite"),
+                config,
+                port: 5411,
+            },
+            child: Mutex::new(None),
+            lifecycle: Mutex::new(()),
+            generation: 1.into(),
+        })
+    }
 }
 
 #[cfg(test)]

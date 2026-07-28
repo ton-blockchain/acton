@@ -492,6 +492,20 @@ fn environment_upstream_url(
                 environment.runtime_endpoints.api_v3.as_deref(),
                 remaining_path,
             )
+        } else if path == "acton_fundAccount"
+            && matches!(
+                &environment.config,
+                EnvironmentConfig::FullTonNetwork { .. }
+            )
+        {
+            (
+                environment
+                    .runtime_endpoints
+                    .api_v2
+                    .as_deref()
+                    .and_then(|endpoint| endpoint.strip_suffix("/api/v2")),
+                path,
+            )
         } else {
             (environment.runtime_endpoints.control.as_deref(), path)
         };

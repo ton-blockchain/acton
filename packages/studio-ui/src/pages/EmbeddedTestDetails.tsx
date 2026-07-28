@@ -1,9 +1,4 @@
-import {
-  TestDetails,
-  TestUiApiProvider,
-  type TestReport,
-  useTestTrace,
-} from "@acton/test-ui/embed"
+import {TestDetails, TestUiApiProvider, type TestReport, useTestTrace} from "@acton/test-ui/embed"
 
 interface EmbeddedTestDetailsProps {
   readonly baseUrl: string

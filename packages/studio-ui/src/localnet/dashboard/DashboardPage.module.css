@@ -1801,7 +1801,12 @@
   font-weight: 560;
 }
 
-.assetSelectorButton {
+.fieldInput.amountAssetInputStatic {
+  padding-right: 132px;
+}
+
+.assetSelectorButton,
+.assetSelectorStatic {
   position: absolute;
   top: 7px;
   right: 7px;
@@ -1817,11 +1822,18 @@
   justify-content: center;
   gap: 9px;
   font: inherit;
+}
+
+.assetSelectorButton {
   cursor: pointer;
   transition:
     border-color 150ms ease,
     background-color 150ms ease,
     color 150ms ease;
+}
+
+.assetSelectorStatic {
+  pointer-events: none;
 }
 
 .assetSelectorButton:hover {

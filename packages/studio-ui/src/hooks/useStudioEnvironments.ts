@@ -20,7 +20,9 @@ export function useStudioEnvironments(): StudioEnvironmentsState {
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const nextEnvironments = await fetchStudioEnvironments(signal)
-    setEnvironments(nextEnvironments)
+    setEnvironments(current =>
+      JSON.stringify(current) === JSON.stringify(nextEnvironments) ? current : nextEnvironments,
+    )
     setError(undefined)
     setIsLoading(false)
   }, [])

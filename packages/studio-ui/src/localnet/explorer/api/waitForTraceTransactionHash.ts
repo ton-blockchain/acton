@@ -3,8 +3,9 @@ import type {TonClient} from "./client"
 export async function waitForTraceTransactionHash(
   client: TonClient,
   msgHash: string,
+  maxAttempts = 8,
 ): Promise<string | undefined> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (attempt > 0) {
       await delay(500)
     }
