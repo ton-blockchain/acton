@@ -188,6 +188,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Explorer,
                 EnvironmentCapability::Integration,
                 EnvironmentCapability::GramFaucet,
+                EnvironmentCapability::Simulator,
             ],
         }
     }

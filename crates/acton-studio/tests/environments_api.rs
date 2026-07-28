@@ -444,7 +444,7 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
     let actual = response_snapshot(response).await;
 
     expect![[r#"status: 201 Created
-body: {"id":"test-environment-1","name":"Protocol network","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration","gramFaucet"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Local TON network","testOnly":true}}"#]]
+body: {"id":"test-environment-1","name":"Protocol network","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration","gramFaucet","simulator"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Local TON network","testOnly":true}}"#]]
     .assert_eq(&actual);
 }
 
