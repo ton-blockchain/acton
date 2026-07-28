@@ -10,7 +10,7 @@ use axum::{
 };
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
-use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
+use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig, ProxyConfig};
 use faucet_pow::Pow;
 use faucet_valkey::{
     AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
@@ -56,6 +56,13 @@ async fn main() -> anyhow::Result<()> {
         toncenter_url = %config.toncenter.url,
         "Loaded startup config"
     );
+    if config.server.proxy.enabled {
+        info!(
+            header = %config.server.proxy.header,
+            ips = ?config.server.proxy.ips,
+            "Trusted proxy support enabled"
+        );
+    }
 
     info!(database_url = %config.database.url, "Connecting to database");
     let opts = SqliteConnectOptions::from_str(&config.database.url)
@@ -134,14 +141,11 @@ async fn main() -> anyhow::Result<()> {
 
     let cors = handlers::airdrop_cors_layer(&shared_state.config.github_auth.frontend_url)
         .context("Failed to configure browser CORS")?;
-    let trust_proxy_headers = shared_state.config.server.trust_proxy_headers;
+    let proxy = shared_state.config.server.proxy.clone();
     let app = handlers::router(shared_state)
         .layer(
             ServiceBuilder::new()
-                .layer(middleware::from_fn_with_state(
-                    trust_proxy_headers,
-                    insert_client_ip,
-                ))
+                .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
                 .layer(GovernorLayer::default()),
         )
         // Preflight requests must not consume the stricter per-claim rate limit.
@@ -209,16 +213,16 @@ async fn shutdown_signal() {
 }
 
 async fn insert_client_ip(
-    State(trust_proxy_headers): State<bool>,
+    State(proxy): State<ProxyConfig>,
     mut request: Request,
     next: Next,
 ) -> Response {
-    let client_ip = client_ip(&request, trust_proxy_headers);
+    let client_ip = client_ip(&request, &proxy);
     request.extensions_mut().insert(RealIp(client_ip));
     next.run(request).await
 }
 
-fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
+fn client_ip(request: &Request, proxy: &ProxyConfig) -> std::net::IpAddr {
     let Some(peer_ip) = request
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
@@ -227,11 +231,11 @@ fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
         return std::net::Ipv4Addr::LOCALHOST.into();
     };
 
-    if trust_proxy_headers
-        && is_trusted_proxy_peer(peer_ip)
+    if proxy.enabled
+        && proxy.ips.iter().any(|network| network.contains(&peer_ip))
         && let Some(forwarded_ip) = request
             .headers()
-            .get("x-real-ip")
+            .get(proxy.header.as_str())
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.trim().parse().ok())
     {
@@ -239,15 +243,6 @@ fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
     }
 
     peer_ip
-}
-
-fn is_trusted_proxy_peer(ip: std::net::IpAddr) -> bool {
-    match ip {
-        std::net::IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
-        std::net::IpAddr::V6(ip) => {
-            ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local()
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -686,14 +681,27 @@ mod tests {
     use axum::{
         body::Body,
         extract::{ConnectInfo, Request},
+        http::HeaderName,
     };
+    use faucet_config::ProxyConfig;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use super::client_ip;
 
-    fn request_from(peer_ip: IpAddr, forwarded_ip: &str) -> Request {
+    fn trusted_proxy(enabled: bool, header: &str) -> ProxyConfig {
+        ProxyConfig {
+            enabled,
+            header: header.to_string(),
+            ips: vec![IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1)).into()],
+        }
+    }
+
+    fn request_from(peer_ip: IpAddr, header: &str, forwarded_ip: &str) -> Request {
         let mut request = Request::builder()
-            .header("x-real-ip", forwarded_ip)
+            .header(
+                HeaderName::from_bytes(header.as_bytes()).unwrap(),
+                forwarded_ip,
+            )
             .body(Body::empty())
             .unwrap();
         request
@@ -705,27 +713,64 @@ mod tests {
     #[test]
     fn ignores_forwarded_ip_when_proxy_headers_are_disabled() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(false, "X-Real-IP");
 
-        assert_eq!(client_ip(&request, false), peer_ip);
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
     }
 
     #[test]
     fn ignores_forwarded_ip_from_untrusted_public_peer() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
 
-        assert_eq!(client_ip(&request, true), peer_ip);
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
     }
 
     #[test]
-    fn accepts_forwarded_ip_only_from_configured_private_proxy_path() {
+    fn accepts_forwarded_ip_from_explicitly_trusted_proxy() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
 
         assert_eq!(
-            client_ip(&request, true),
+            client_ip(&request, &proxy),
             IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
+
+    #[test]
+    fn accepts_forwarded_ip_from_trusted_proxy_network() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 100, 42));
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let mut proxy = trusted_proxy(true, "X-Real-IP");
+        proxy.ips = vec!["192.168.100.0/24".parse().unwrap()];
+
+        assert_eq!(
+            client_ip(&request, &proxy),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_from_unlisted_private_peer() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 2));
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
+
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
+    }
+
+    #[test]
+    fn accepts_ip_from_configured_proxy_header() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
+        let request = request_from(peer_ip, "CF-Connecting-IP", "198.51.100.30");
+        let proxy = trusted_proxy(true, "CF-Connecting-IP");
+
+        assert_eq!(
+            client_ip(&request, &proxy),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 30))
         );
     }
 }

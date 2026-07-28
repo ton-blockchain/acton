@@ -1,5 +1,7 @@
 use anyhow::Context;
-use std::str::FromStr;
+use http::HeaderName;
+use ipnet::IpNet;
+use std::{net::IpAddr, str::FromStr};
 
 const NANOGRAMS_PER_GRAM: u64 = 1_000_000_000;
 
@@ -26,7 +28,14 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub trust_proxy_headers: bool,
+    pub proxy: ProxyConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub header: String,
+    pub ips: Vec<IpNet>,
 }
 
 #[derive(Clone, Debug)]
@@ -152,7 +161,15 @@ impl Config {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
                 port: parse_env_number("PORT", 3001),
-                trust_proxy_headers: parse_env_bool("SERVER_TRUST_PROXY_HEADERS", false),
+                proxy: ProxyConfig {
+                    enabled: parse_env_bool("SERVER_TRUST_PROXY", false),
+                    header: std::env::var("SERVER_TRUST_PROXY_HEADER")
+                        .unwrap_or_else(|_| "X-Real-IP".to_string()),
+                    ips: parse_ip_list(
+                        &std::env::var("SERVER_TRUST_PROXY_IPS").unwrap_or_default(),
+                    )
+                    .context("Invalid SERVER_TRUST_PROXY_IPS")?,
+                },
             },
             rate_limit: RateLimitConfig {
                 default: DefaultRateLimitConfig {
@@ -278,6 +295,10 @@ impl Config {
     }
 
     fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.server.proxy.header.parse::<HeaderName>().is_ok(),
+            "SERVER_TRUST_PROXY_HEADER must be a valid HTTP header name"
+        );
         anyhow::ensure!(
             self.pow.max_challenges > 0,
             "POW_MAX_CHALLENGES must be positive"
@@ -427,6 +448,20 @@ fn parse_env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+fn parse_ip_list(value: &str) -> anyhow::Result<Vec<IpNet>> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .parse::<IpNet>()
+                .or_else(|_| value.parse::<IpAddr>().map(IpNet::from))
+                .with_context(|| format!("Invalid IP address or network `{value}`"))
+        })
+        .collect()
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value.trim_end().to_ascii_lowercase().as_str() {
         "true" | "yes" | "on" => Some(true),
@@ -437,12 +472,13 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
+    use ipnet::IpNet;
     use super::{
         AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
         FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
-        PowConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
+        PowConfig, ProxyConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
         SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
-        WorkerConfig, parse_bool, parse_nanograms, parse_number,
+        WorkerConfig, parse_bool, parse_ip_list, parse_nanograms, parse_number,
     };
 
     fn valid_config() -> Config {
@@ -453,7 +489,11 @@ mod tests {
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 3001,
-                trust_proxy_headers: false,
+                proxy: ProxyConfig {
+                    enabled: false,
+                    header: "X-Real-IP".to_string(),
+                    ips: Vec::new(),
+                },
             },
             rate_limit: RateLimitConfig {
                 default: DefaultRateLimitConfig {
@@ -606,6 +646,32 @@ mod tests {
     fn parses_proxy_header_trust_flag() {
         assert_eq!(parse_bool("true"), Some(true));
         assert_eq!(parse_bool("false"), Some(false));
+    }
+
+    #[test]
+    fn parses_trusted_proxy_ip_list() {
+        assert_eq!(
+            parse_ip_list("192.168.100.1, 192.168.200.0/24, ::1, fd00::/64").unwrap(),
+            vec![
+                "192.168.100.1/32".parse::<IpNet>().unwrap(),
+                "192.168.200.0/24".parse().unwrap(),
+                "::1/128".parse().unwrap(),
+                "fd00::/64".parse().unwrap(),
+            ]
+        );
+        assert!(parse_ip_list("192.168.100.0/33").is_err());
+        assert!(parse_ip_list("not-an-ip").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_proxy_header_name() {
+        let mut config = valid_config();
+        config.server.proxy.header = "invalid header".to_string();
+
+        assert_eq!(
+            validation_error(&config),
+            "SERVER_TRUST_PROXY_HEADER must be a valid HTTP header name"
+        );
     }
 
     #[test]

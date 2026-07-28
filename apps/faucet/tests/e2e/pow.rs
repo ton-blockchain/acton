@@ -8,9 +8,9 @@ use axum::{
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
     AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
-    FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, RateLimitConfig,
-    SentAmountWindowCheckConfig, ServerConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
-    ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
+    FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, ProxyConfig,
+    RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig, SuccessfulClaimWindowCheckConfig,
+    ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -70,7 +70,11 @@ fn config(pow_enabled: bool) -> Config {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3001,
-            trust_proxy_headers: false,
+            proxy: ProxyConfig {
+                enabled: false,
+                header: "X-Real-IP".to_string(),
+                ips: Vec::new(),
+            },
         },
         rate_limit: RateLimitConfig {
             default: DefaultRateLimitConfig {
