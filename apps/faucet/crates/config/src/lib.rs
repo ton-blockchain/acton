@@ -472,7 +472,6 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use ipnet::IpNet;
     use super::{
         AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
         FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
@@ -480,6 +479,7 @@ mod tests {
         SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
         WorkerConfig, parse_bool, parse_ip_list, parse_nanograms, parse_number,
     };
+    use ipnet::IpNet;
 
     fn valid_config() -> Config {
         Config {
