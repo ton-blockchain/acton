@@ -20,6 +20,7 @@ use tower_http::services::{ServeDir, ServeFile};
 
 mod contract_source_artifact;
 mod environment;
+mod environment_store;
 mod full_ton_network;
 mod local_artifacts;
 mod local_process;

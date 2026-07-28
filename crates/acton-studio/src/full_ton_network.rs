@@ -5,6 +5,7 @@ use std::process::ExitStatus;
 use std::process::Stdio;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
 
@@ -15,6 +16,8 @@ const DEFAULT_MYLOCALACTON_IMAGE: &str =
     "ghcr.io/i582/mylocalacton:sha-bf02368cf822b311aa89ba8bc599fa0a6b90accb";
 const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
 const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
+const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
+const RUNTIME_DESCRIPTOR_VERSION: u16 = 1;
 const STARTUP_LOG_FILE: &str = "startup.log";
 const STARTUP_ERROR_LINES: usize = 12;
 const DOCKER_METADATA_TIMEOUT: Duration = Duration::from_secs(10);
@@ -30,9 +33,19 @@ pub(crate) struct FullTonNetworkDriver {
     startup_log_file: PathBuf,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 enum DockerTarget {
     Context(String),
     Host(String),
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeDescriptor {
+    version: u16,
+    image: String,
+    docker_target: DockerTarget,
 }
 
 pub(crate) struct IsolatedPullTarget {
@@ -48,10 +61,28 @@ impl FullTonNetworkDriver {
         api_v3_port: u16,
         validators: u16,
     ) -> Result<Self, EnvironmentRuntimeError> {
-        let image = std::env::var("ACTON_STUDIO_MYLOCALACTON_IMAGE")
-            .unwrap_or_else(|_| DEFAULT_MYLOCALACTON_IMAGE.to_owned());
-        validate_image_reference(&image)?;
-        let docker_target = resolve_docker_target().await?;
+        let runtime_file = data_dir.join(RUNTIME_DESCRIPTOR_FILE);
+        let runtime = match load_runtime_descriptor(&runtime_file).await? {
+            Some(runtime) => runtime,
+            None => {
+                let image = std::env::var("ACTON_STUDIO_MYLOCALACTON_IMAGE")
+                    .unwrap_or_else(|_| DEFAULT_MYLOCALACTON_IMAGE.to_owned());
+                validate_image_reference(&image)?;
+                let runtime = RuntimeDescriptor {
+                    version: RUNTIME_DESCRIPTOR_VERSION,
+                    image,
+                    docker_target: resolve_docker_target().await?,
+                };
+                write_runtime_descriptor(&runtime_file, &runtime).await?;
+                runtime
+            }
+        };
+        validate_image_reference(&runtime.image)?;
+        let RuntimeDescriptor {
+            image,
+            docker_target,
+            ..
+        } = runtime;
 
         let compose_file = data_dir.join("compose.yaml");
         let isolated_docker_config_dir = if image == DEFAULT_MYLOCALACTON_IMAGE {
@@ -388,6 +419,76 @@ impl FullTonNetworkDriver {
     }
 }
 
+async fn load_runtime_descriptor(
+    path: &Path,
+) -> Result<Option<RuntimeDescriptor>, EnvironmentRuntimeError> {
+    let contents = match tokio::fs::read(path).await {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(EnvironmentRuntimeError::Internal {
+                code: "environment_storage_failed",
+                message: format!(
+                    "Failed to read the full TON network runtime descriptor at {}: {error}",
+                    path.display()
+                ),
+            });
+        }
+    };
+    let runtime: RuntimeDescriptor =
+        serde_json::from_slice(&contents).map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!(
+                "Failed to parse the full TON network runtime descriptor at {}: {error}",
+                path.display()
+            ),
+        })?;
+    if runtime.version != RUNTIME_DESCRIPTOR_VERSION {
+        return Err(EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!(
+                "The full TON network runtime descriptor at {} uses unsupported version {}",
+                path.display(),
+                runtime.version
+            ),
+        });
+    }
+    Ok(Some(runtime))
+}
+
+async fn write_runtime_descriptor(
+    path: &Path,
+    runtime: &RuntimeDescriptor,
+) -> Result<(), EnvironmentRuntimeError> {
+    let mut contents =
+        serde_json::to_vec_pretty(runtime).map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!("Failed to serialize the full TON network runtime: {error}"),
+        })?;
+    contents.push(b'\n');
+    let temp_path = path.with_extension(format!("json.{}.tmp", std::process::id()));
+    tokio::fs::write(&temp_path, contents)
+        .await
+        .map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!(
+                "Failed to write the full TON network runtime descriptor at {}: {error}",
+                temp_path.display()
+            ),
+        })?;
+    if let Err(error) = tokio::fs::rename(&temp_path, path).await {
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        return Err(EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!(
+                "Failed to publish the full TON network runtime descriptor at {}: {error}",
+                path.display()
+            ),
+        });
+    }
+    Ok(())
+}
+
 async fn resolve_docker_target() -> Result<DockerTarget, EnvironmentRuntimeError> {
     match std::env::var("DOCKER_CONTEXT") {
         Ok(context) if !context.is_empty() => return Ok(DockerTarget::Context(context)),
@@ -465,7 +566,7 @@ fn validate_image_reference(image: &str) -> Result<(), EnvironmentRuntimeError> 
     {
         return Err(EnvironmentRuntimeError::InvalidRequest {
             code: "environment_image_invalid",
-            message: "ACTON_STUDIO_MYLOCALACTON_IMAGE is not a valid container image reference"
+            message: "The full TON network image is not a valid container image reference"
                 .to_owned(),
         });
     }
@@ -480,7 +581,8 @@ mod tests {
 
     use super::{
         DEFAULT_MYLOCALACTON_IMAGE, DockerTarget, FullTonNetworkDriver, IsolatedPullTarget,
-        compose_project_name, render_compose,
+        RUNTIME_DESCRIPTOR_FILE, RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor,
+        compose_project_name, render_compose, write_runtime_descriptor,
     };
 
     #[test]
@@ -511,6 +613,149 @@ mod tests {
     image: "registry.example/ton:build-42""#]]
         .assert_eq(&actual);
         assert!(!compose.contains("platform:"));
+    }
+
+    #[test]
+    fn runtime_descriptor_round_trips_image_and_docker_target() {
+        let runtimes = [
+            RuntimeDescriptor {
+                version: RUNTIME_DESCRIPTOR_VERSION,
+                image: "registry.example/ton:context-build".to_owned(),
+                docker_target: DockerTarget::Context("desktop-linux".to_owned()),
+            },
+            RuntimeDescriptor {
+                version: RUNTIME_DESCRIPTOR_VERSION,
+                image: "registry.example/ton:host-build".to_owned(),
+                docker_target: DockerTarget::Host("unix:///var/run/docker.sock".to_owned()),
+            },
+        ];
+        let actual = runtimes
+            .into_iter()
+            .map(|runtime| {
+                let json = serde_json::to_string_pretty(&runtime).unwrap();
+                let decoded = serde_json::from_str(&json).unwrap();
+                assert_eq!(runtime, decoded);
+                json
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        expect![[r#"
+            {
+              "version": 1,
+              "image": "registry.example/ton:context-build",
+              "dockerTarget": {
+                "kind": "context",
+                "value": "desktop-linux"
+              }
+            }
+
+            {
+              "version": 1,
+              "image": "registry.example/ton:host-build",
+              "dockerTarget": {
+                "kind": "host",
+                "value": "unix:///var/run/docker.sock"
+              }
+            }"#]]
+        .assert_eq(&actual);
+    }
+
+    #[tokio::test]
+    async fn materialize_reuses_persisted_runtime() {
+        let data_dir = tempfile::tempdir_in("/tmp").unwrap();
+        let runtime_file = data_dir.path().join(RUNTIME_DESCRIPTOR_FILE);
+        let runtime = RuntimeDescriptor {
+            version: RUNTIME_DESCRIPTOR_VERSION,
+            image: "registry.example/persisted/ton:build-17".to_owned(),
+            docker_target: DockerTarget::Host("unix:///persisted/docker.sock".to_owned()),
+        };
+        write_runtime_descriptor(&runtime_file, &runtime)
+            .await
+            .unwrap();
+
+        let driver =
+            FullTonNetworkDriver::materialize(data_dir.path(), "environment-17", 19180, 19181, 5)
+                .await
+                .unwrap();
+        let descriptor = tokio::fs::read_to_string(runtime_file).await.unwrap();
+        let compose = tokio::fs::read_to_string(&driver.compose_file)
+            .await
+            .unwrap();
+        let compose_values = compose
+            .lines()
+            .filter(|line| {
+                line.contains("registry.example")
+                    || line.contains("127.0.0.1:1918")
+                    || line.contains("\"5\"")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let command = command_args(&driver.compose_command())
+            .replace(&data_dir.path().display().to_string(), "<environment-data>");
+        let actual = format!(
+            "RUNTIME\n{}\n\nCOMMAND\n{}\n\nCOMPOSE\n{compose_values}",
+            descriptor.trim_end(),
+            command
+        );
+
+        expect![[r#"
+            RUNTIME
+            {
+              "version": 1,
+              "image": "registry.example/persisted/ton:build-17",
+              "dockerTarget": {
+                "kind": "host",
+                "value": "unix:///persisted/docker.sock"
+              }
+            }
+
+            COMMAND
+            --host
+            unix:///persisted/docker.sock
+            compose
+            -p
+            acton-studio-environment-17
+            -f
+            <environment-data>/compose.yaml
+
+            COMPOSE
+                image: "registry.example/persisted/ton:build-17"
+                  - "5"
+                  - "127.0.0.1:19180:18080"
+                image: "registry.example/persisted/ton:build-17"
+                image: "registry.example/persisted/ton:build-17"
+                image: "registry.example/persisted/ton:build-17"
+                  - "127.0.0.1:19181:8081"
+                image: "registry.example/persisted/ton:build-17""#]]
+        .assert_eq(&actual);
+    }
+
+    #[tokio::test]
+    async fn materialize_rejects_invalid_persisted_image() {
+        let data_dir = tempfile::tempdir_in("/tmp").unwrap();
+        let runtime = RuntimeDescriptor {
+            version: RUNTIME_DESCRIPTOR_VERSION,
+            image: "registry.example/ton image:invalid".to_owned(),
+            docker_target: DockerTarget::Context("desktop-linux".to_owned()),
+        };
+        write_runtime_descriptor(&data_dir.path().join(RUNTIME_DESCRIPTOR_FILE), &runtime)
+            .await
+            .unwrap();
+
+        let error = FullTonNetworkDriver::materialize(
+            data_dir.path(),
+            "environment-invalid",
+            18180,
+            18181,
+            1,
+        )
+        .await
+        .err()
+        .expect("an invalid persisted image must be rejected");
+
+        expect!["The full TON network image is not a valid container image reference"]
+            .assert_eq(&error.to_string());
     }
 
     #[test]

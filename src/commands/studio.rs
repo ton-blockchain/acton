@@ -30,7 +30,7 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
         std::env::current_exe().context("Failed to locate the Acton executable")?;
     let project_root = configured_project_root().to_path_buf();
     let environment_runtime =
-        LocalProcessEnvironmentRuntime::new(acton_executable.clone(), &project_root);
+        LocalProcessEnvironmentRuntime::open(acton_executable.clone(), &project_root).await?;
     let reporter_url = local_reporter_url(address);
     let test_run_runtime =
         LocalProcessTestRunRuntime::new(acton_executable, &project_root, &reporter_url);

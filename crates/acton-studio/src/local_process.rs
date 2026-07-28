@@ -16,6 +16,9 @@ use crate::environment::{
     EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus,
     StudioEnvironment, UpdateEnvironmentRequest,
 };
+use crate::environment_store::{
+    LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
+};
 use crate::full_ton_network::FullTonNetworkDriver;
 use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint, SourceRegistration};
 
@@ -57,6 +60,8 @@ struct LocalEnvironment {
     child: Mutex<Option<Child>>,
     lifecycle: Mutex<()>,
     generation: AtomicU64,
+    resume_on_startup: AtomicBool,
+    deleted: AtomicBool,
 }
 
 enum EnvironmentDriver {
@@ -181,26 +186,33 @@ impl ArtifactCoordinatorState {
 }
 
 impl LocalProcessEnvironmentRuntime {
-    #[must_use]
-    pub fn new(acton_executable: impl Into<PathBuf>, workspace_root: impl Into<PathBuf>) -> Self {
+    pub async fn open(
+        acton_executable: impl Into<PathBuf>,
+        workspace_root: impl Into<PathBuf>,
+    ) -> Result<Self, EnvironmentRuntimeError> {
         let acton_executable = acton_executable.into();
         let workspace_root = workspace_root.into();
-        Self {
-            inner: Arc::new(LocalProcessRuntimeInner {
-                artifact_synchronizer: ProjectArtifactSynchronizer::new(
-                    acton_executable.clone(),
-                    workspace_root.clone(),
-                ),
-                acton_executable,
-                workspace_root,
-                next_id: AtomicU64::new(1),
-                create_lock: Mutex::new(()),
-                environments: RwLock::new(Vec::new()),
-                artifact_coordinator_started: AtomicBool::new(false),
-                artifact_coordinator_wakeup: Notify::new(),
-                shutting_down: AtomicBool::new(false),
-            }),
+        let LoadedEnvironments { records, next_id } = load_environments(&workspace_root).await?;
+        let inner = Arc::new(LocalProcessRuntimeInner {
+            artifact_synchronizer: ProjectArtifactSynchronizer::new(
+                acton_executable.clone(),
+                workspace_root.clone(),
+            ),
+            acton_executable,
+            workspace_root,
+            next_id: AtomicU64::new(next_id),
+            create_lock: Mutex::new(()),
+            environments: RwLock::new(Vec::with_capacity(records.len())),
+            artifact_coordinator_started: AtomicBool::new(false),
+            artifact_coordinator_wakeup: Notify::new(),
+            shutting_down: AtomicBool::new(false),
+        });
+
+        for record in records {
+            restore_environment(&inner, record).await?;
         }
+
+        Ok(Self { inner })
     }
 }
 
@@ -224,10 +236,17 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let _create_guard = self.inner.create_lock.lock().await;
             let reserved_ports = reserved_environment_ports(&self.inner).await;
             let (name, config) = resolve_request(request, &reserved_ports)?;
-            let id = format!(
-                "environment-{}",
-                self.inner.next_id.fetch_add(1, Ordering::Relaxed)
-            );
+            let id_number = self
+                .inner
+                .next_id
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next_id| {
+                    next_id.checked_add(1)
+                })
+                .map_err(|_| EnvironmentRuntimeError::Internal {
+                    code: "environment_store_id_exhausted",
+                    message: "Studio cannot allocate another environment id".to_owned(),
+                })?;
+            let id = format!("environment-{id_number}");
             let data_dir = environment_data_dir(&self.inner.workspace_root, &id);
             tokio::fs::create_dir_all(&data_dir)
                 .await
@@ -239,16 +258,22 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                     ),
                 })?;
 
-            let driver = EnvironmentDriver::new(
+            let driver = match EnvironmentDriver::new(
                 &self.inner.acton_executable,
                 &self.inner.workspace_root,
                 &data_dir,
                 &id,
                 &config,
             )
-            .await?;
+            .await
+            {
+                Ok(driver) => driver,
+                Err(error) => {
+                    let _ = tokio::fs::remove_dir_all(&data_dir).await;
+                    return Err(error);
+                }
+            };
             let runtime_endpoints = runtime_endpoints(&config);
-            let child = driver.spawn_start()?;
             let environment = Arc::new(LocalEnvironment {
                 details: RwLock::new(StudioEnvironment::new(
                     id,
@@ -258,17 +283,42 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                     runtime_endpoints,
                 )),
                 driver,
-                child: Mutex::new(Some(child)),
+                child: Mutex::new(None),
                 lifecycle: Mutex::new(()),
                 generation: AtomicU64::new(1),
+                resume_on_startup: AtomicBool::new(true),
+                deleted: AtomicBool::new(false),
             });
+            if let Err(error) =
+                persist_environment_definition(&self.inner, &environment, true).await
+            {
+                let _ = tokio::fs::remove_dir_all(&data_dir).await;
+                return Err(error);
+            }
+            let should_monitor = match environment.driver.spawn_start() {
+                Ok(child) => {
+                    *environment.child.lock().await = Some(child);
+                    true
+                }
+                Err(error) => {
+                    set_environment_status(
+                        &environment,
+                        EnvironmentStatus::Failed,
+                        Some(error.to_string()),
+                    )
+                    .await;
+                    false
+                }
+            };
             let result = environment.details.read().await.clone();
             self.inner
                 .environments
                 .write()
                 .await
                 .push(Arc::clone(&environment));
-            spawn_environment_monitor(Arc::clone(&self.inner), environment, 1);
+            if should_monitor {
+                spawn_environment_monitor(Arc::clone(&self.inner), environment, 1);
+            }
             Ok(result)
         })
     }
@@ -290,6 +340,19 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         Box::pin(async move {
             let name = validate_environment_name(&request.name)?;
             let environment = find_environment(&self.inner, &environment_id).await?;
+            let _lifecycle_guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+            let details = environment.details.read().await.clone();
+            persist_environment(
+                &self.inner.workspace_root,
+                &StoredEnvironment {
+                    id: details.id,
+                    name: name.clone(),
+                    config: details.config,
+                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                },
+            )
+            .await?;
             let mut details = environment.details.write().await;
             details.name = name;
             Ok(details.clone())
@@ -300,26 +363,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            delete_environment_runtime(&environment).await?;
-
-            let data_dir = environment_data_dir(&self.inner.workspace_root, &environment_id);
-            if let Err(error) = tokio::fs::remove_dir_all(&data_dir).await
-                && error.kind() != std::io::ErrorKind::NotFound
-            {
-                return Err(EnvironmentRuntimeError::Internal {
-                    code: "environment_storage_delete_failed",
-                    message: format!(
-                        "Failed to delete environment storage at {}: {error}",
-                        data_dir.display()
-                    ),
-                });
-            }
-
-            self.inner
-                .environments
-                .write()
-                .await
-                .retain(|candidate| !Arc::ptr_eq(candidate, &environment));
+            delete_environment_runtime(&self.inner, &environment).await?;
             Ok(())
         })
     }
@@ -328,7 +372,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            stop_environment(&environment).await?;
+            stop_environment(&self.inner, &environment, true).await?;
             Ok(environment.details.read().await.clone())
         })
     }
@@ -348,7 +392,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let environments = self.inner.environments.read().await.clone();
             let mut first_error = None;
             for environment in environments {
-                if let Err(error) = stop_environment(&environment).await
+                if let Err(error) = stop_environment(&self.inner, &environment, false).await
                     && first_error.is_none()
                 {
                     first_error = Some(error);
@@ -561,6 +605,86 @@ fn environment_data_dir(workspace_root: &Path, environment_id: &str) -> PathBuf 
         .join(environment_id)
 }
 
+async fn restore_environment(
+    runtime: &Arc<LocalProcessRuntimeInner>,
+    record: StoredEnvironment,
+) -> Result<(), EnvironmentRuntimeError> {
+    let data_dir = environment_data_dir(&runtime.workspace_root, &record.id);
+    let driver = EnvironmentDriver::new(
+        &runtime.acton_executable,
+        &runtime.workspace_root,
+        &data_dir,
+        &record.id,
+        &record.config,
+    )
+    .await?;
+    let runtime_endpoints = runtime_endpoints(&record.config);
+    let (status, error, child) = if record.resume_on_startup {
+        match driver
+            .ensure_restartable()
+            .and_then(|()| driver.spawn_start())
+        {
+            Ok(child) => (EnvironmentStatus::Starting, None, Some(child)),
+            Err(error) => {
+                tracing::warn!(
+                    environment_id = %record.id,
+                    %error,
+                    "Failed to resume Studio environment"
+                );
+                (EnvironmentStatus::Failed, Some(error.to_string()), None)
+            }
+        }
+    } else {
+        (EnvironmentStatus::Stopped, None, None)
+    };
+    let environment = Arc::new(LocalEnvironment {
+        details: RwLock::new(StudioEnvironment::new(
+            record.id,
+            record.name,
+            status,
+            record.config,
+            runtime_endpoints,
+        )),
+        driver,
+        child: Mutex::new(child),
+        lifecycle: Mutex::new(()),
+        generation: AtomicU64::new(1),
+        resume_on_startup: AtomicBool::new(record.resume_on_startup),
+        deleted: AtomicBool::new(false),
+    });
+    if let Some(error) = error {
+        environment.details.write().await.error = Some(error);
+    }
+    runtime
+        .environments
+        .write()
+        .await
+        .push(Arc::clone(&environment));
+    let should_monitor = environment.child.lock().await.is_some();
+    if should_monitor {
+        spawn_environment_monitor(Arc::clone(runtime), environment, 1);
+    }
+    Ok(())
+}
+
+async fn persist_environment_definition(
+    runtime: &LocalProcessRuntimeInner,
+    environment: &LocalEnvironment,
+    resume_on_startup: bool,
+) -> Result<(), EnvironmentRuntimeError> {
+    let details = environment.details.read().await;
+    persist_environment(
+        &runtime.workspace_root,
+        &StoredEnvironment {
+            id: details.id.clone(),
+            name: details.name.clone(),
+            config: details.config.clone(),
+            resume_on_startup,
+        },
+    )
+    .await
+}
+
 impl EnvironmentDriver {
     async fn new(
         acton_executable: &Path,
@@ -738,6 +862,17 @@ async fn find_environment(
     }
     Err(EnvironmentRuntimeError::NotFound {
         environment_id: environment_id.to_owned(),
+    })
+}
+
+async fn ensure_environment_not_deleted(
+    environment: &LocalEnvironment,
+) -> Result<(), EnvironmentRuntimeError> {
+    if !environment.deleted.load(Ordering::Acquire) {
+        return Ok(());
+    }
+    Err(EnvironmentRuntimeError::NotFound {
+        environment_id: environment.details.read().await.id.clone(),
     })
 }
 
@@ -1303,10 +1438,21 @@ async fn record_exit(environment: &LocalEnvironment, generation: u64, status: Ex
     .await;
 }
 
-async fn stop_environment(environment: &LocalEnvironment) -> Result<(), EnvironmentRuntimeError> {
+async fn stop_environment(
+    runtime: &LocalProcessRuntimeInner,
+    environment: &LocalEnvironment,
+    persist_intent: bool,
+) -> Result<(), EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
+    ensure_environment_not_deleted(environment).await?;
     let current_status = environment.details.read().await.status;
     if current_status == EnvironmentStatus::Stopped {
+        if persist_intent {
+            persist_environment_definition(runtime, environment, false).await?;
+            environment
+                .resume_on_startup
+                .store(false, Ordering::Release);
+        }
         return Ok(());
     }
 
@@ -1322,14 +1468,22 @@ async fn stop_environment(environment: &LocalEnvironment) -> Result<(), Environm
         .await;
         return Err(error);
     }
+    if persist_intent {
+        persist_environment_definition(runtime, environment, false).await?;
+        environment
+            .resume_on_startup
+            .store(false, Ordering::Release);
+    }
     set_environment_status(environment, EnvironmentStatus::Stopped, None).await;
     Ok(())
 }
 
 async fn delete_environment_runtime(
+    runtime: &LocalProcessRuntimeInner,
     environment: &LocalEnvironment,
 ) -> Result<(), EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
+    ensure_environment_not_deleted(environment).await?;
     environment.generation.fetch_add(1, Ordering::AcqRel);
     set_environment_status(environment, EnvironmentStatus::Stopping, None).await;
     terminate_child(environment).await;
@@ -1343,6 +1497,25 @@ async fn delete_environment_runtime(
         return Err(error);
     }
     set_environment_status(environment, EnvironmentStatus::Stopped, None).await;
+    let environment_id = environment.details.read().await.id.clone();
+    let data_dir = environment_data_dir(&runtime.workspace_root, &environment_id);
+    if let Err(error) = tokio::fs::remove_dir_all(&data_dir).await
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        return Err(EnvironmentRuntimeError::Internal {
+            code: "environment_storage_delete_failed",
+            message: format!(
+                "Failed to delete environment storage at {}: {error}",
+                data_dir.display()
+            ),
+        });
+    }
+    environment.deleted.store(true, Ordering::Release);
+    runtime
+        .environments
+        .write()
+        .await
+        .retain(|candidate| !std::ptr::eq(candidate.as_ref(), environment));
     Ok(())
 }
 
@@ -1351,6 +1524,7 @@ async fn restart_environment(
     environment: &Arc<LocalEnvironment>,
 ) -> Result<StudioEnvironment, EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
+    ensure_environment_not_deleted(environment).await?;
     let details = environment.details.read().await.clone();
     if !matches!(
         details.status,
@@ -1365,10 +1539,31 @@ async fn restart_environment(
         });
     }
 
+    persist_environment_definition(runtime, environment, true).await?;
+    environment.resume_on_startup.store(true, Ordering::Release);
+    if let Err(error) = environment.driver.ensure_restartable() {
+        set_environment_status(
+            environment,
+            EnvironmentStatus::Failed,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error);
+    }
     environment.generation.fetch_add(1, Ordering::AcqRel);
     terminate_child(environment).await;
-    environment.driver.ensure_restartable()?;
-    let child = environment.driver.spawn_start()?;
+    let child = match environment.driver.spawn_start() {
+        Ok(child) => child,
+        Err(error) => {
+            set_environment_status(
+                environment,
+                EnvironmentStatus::Failed,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(error);
+        }
+    };
     *environment.child.lock().await = Some(child);
     let generation = environment.generation.load(Ordering::Acquire);
     set_environment_status(environment, EnvironmentStatus::Starting, None).await;
@@ -1560,6 +1755,8 @@ child installed: false"]]
             child: Mutex::new(None),
             lifecycle: Mutex::new(()),
             generation: 1.into(),
+            resume_on_startup: AtomicBool::new(true),
+            deleted: AtomicBool::new(false),
         })
     }
 }
