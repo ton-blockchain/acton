@@ -212,7 +212,7 @@
   color: var(--acton-color-text);
 }
 
-.localBadge {
+.environmentBadge {
   flex: 0 0 auto;
   position: relative;
   top: -4px;

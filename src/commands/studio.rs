@@ -6,8 +6,8 @@ use acton_config::config::{
     ActonConfig, manifest_path as configured_manifest_path, project_root as configured_project_root,
 };
 use acton_studio::{
-    LocalProcessEnvironmentRuntime, LocalProcessTestRunRuntime, STUDIO_API_VERSION,
-    StudioDaemonDescriptor, StudioServer, StudioServerConfig, StudioWorkspace,
+    ContractRegistryStore, LocalProcessEnvironmentRuntime, LocalProcessTestRunRuntime,
+    STUDIO_API_VERSION, StudioDaemonDescriptor, StudioServer, StudioServerConfig, StudioWorkspace,
     persist_studio_daemon_descriptor, remove_studio_daemon_descriptor,
 };
 use anyhow::Context;
@@ -43,13 +43,19 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
     let acton_executable =
         std::env::current_exe().context("Failed to locate the Acton executable")?;
     let project_root = configured_project_root().to_path_buf();
-    let environment_runtime =
-        LocalProcessEnvironmentRuntime::open(acton_executable.clone(), &project_root).await?;
+    let contract_registry = ContractRegistryStore::for_project(&project_root);
+    let environment_runtime = LocalProcessEnvironmentRuntime::open(
+        acton_executable.clone(),
+        &project_root,
+        contract_registry.clone(),
+    )
+    .await?;
     let reporter_url = local_reporter_url(address);
     let test_run_runtime =
         LocalProcessTestRunRuntime::new(acton_executable, &project_root, &reporter_url);
     let mut server = StudioServer::new(config)
         .with_environment_runtime(environment_runtime)
+        .with_contract_registry(contract_registry)
         .with_test_run_runtime(test_run_runtime);
     if let Some((_, wallet_runtime)) = configured_project {
         server = server.with_wallet_runtime(wallet_runtime);

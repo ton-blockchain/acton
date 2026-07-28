@@ -2,13 +2,12 @@ use crate::node::GIVER_ADDR;
 use crate::node_snapshot::NodeStateSnapshot;
 use crate::storage::{
     AccountDelta, AccountMeta, BlockMeta, History, Indexes, LatestState, MasterchainBlockMeta,
-    MsgMeta, PendingCommit, ReverseLtKey, TxMeta, VerifiedSourceArtifact,
+    MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Seqno};
 use anyhow::Context;
 use core::cmp;
 use rusqlite::{Connection, OptionalExtension, params};
-use serde_json::Value;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -223,79 +222,6 @@ impl NodePersistence {
             history.msg_by_hash.insert(hash, meta);
         }
 
-        let mut stmt = conn.prepare("SELECT code_hash, data FROM compiler_abis")?;
-        let abi_iter = stmt.query_map([], |row| {
-            let hash: Hash256 = row.get(0)?;
-            let data: Vec<u8> = row.get(1)?;
-            let compiler_abi = serde_json::from_slice::<Value>(&data)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            Ok((hash, compiler_abi))
-        })?;
-        for abi in abi_iter {
-            let (hash, compiler_abi) = abi?;
-            history.compiler_abis.insert(hash, compiler_abi);
-        }
-
-        let mut stmt = conn.prepare("SELECT code_hash, data FROM verified_sources")?;
-        let source_iter = stmt.query_map([], |row| {
-            let hash: Hash256 = row.get(0)?;
-            let data: Vec<u8> = row.get(1)?;
-            let source = serde_json::from_slice::<Value>(&data)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            Ok((hash, source))
-        })?;
-        for source in source_iter {
-            let (hash, value) = source?;
-            history.verified_sources.insert(hash, value);
-        }
-
-        let mut stmt = conn.prepare(
-            "SELECT artifact_id, code_hash, data, saved_at FROM verified_source_artifacts",
-        )?;
-        let artifact_iter = stmt.query_map([], |row| {
-            let artifact_id: String = row.get(0)?;
-            let code_hash: Hash256 = row.get(1)?;
-            let data: Vec<u8> = row.get(2)?;
-            let saved_at: u64 = row.get(3)?;
-            let source = serde_json::from_slice::<Value>(&data)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            Ok(VerifiedSourceArtifact {
-                artifact_id,
-                code_hash,
-                source,
-                saved_at,
-            })
-        })?;
-        for artifact in artifact_iter {
-            let artifact = artifact?;
-            history
-                .verified_source_artifacts
-                .insert(artifact.artifact_id.clone(), artifact);
-        }
-        for (code_hash, source) in &history.verified_sources {
-            let artifact = VerifiedSourceArtifact::new(*code_hash, source.clone(), 0);
-            history
-                .verified_source_artifacts
-                .entry(artifact.artifact_id.clone())
-                .or_insert(artifact);
-        }
-
-        let mut stmt = conn.prepare("SELECT address, name FROM address_names")?;
-        let name_iter = stmt.query_map([], |row| {
-            let address: Addr = row.get(0)?;
-            let name: String = row.get(1)?;
-            Ok((address, name))
-        })?;
-        for name in name_iter {
-            let (address, name) = name?;
-            history.address_names.insert(address, name);
-        }
-
-        let mut stmt = conn.prepare("SELECT address FROM registered_contracts")?;
-        let contract_iter = stmt.query_map([], |row| row.get::<_, Addr>(0))?;
-        for address in contract_iter {
-            history.registered_contracts.insert(address?);
-        }
         Ok(PersistedNodeState {
             latest,
             history,
@@ -420,226 +346,6 @@ impl NodePersistence {
         Ok(())
     }
 
-    pub(crate) fn set_compiler_abi(
-        &self,
-        code_hash: Hash256,
-        compiler_abi: &Value,
-        stale_keys: &[Hash256],
-    ) -> anyhow::Result<()> {
-        let data = serde_json::to_vec(compiler_abi)?;
-        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-        let tx = conn.transaction()?;
-        for stale_key in stale_keys {
-            tx.execute(
-                "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![stale_key.to_bytes()],
-            )?;
-        }
-        tx.execute(
-            "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-            params![code_hash.to_bytes(), data],
-        )?;
-        tx.commit()?;
-        drop(conn);
-        Ok(())
-    }
-
-    pub(crate) fn delete_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![code_hash.to_bytes()],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn set_address_name(&self, address: Addr, name: &str) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "INSERT OR REPLACE INTO address_names (address, name) VALUES (?1, ?2)",
-                params![address.to_bytes(), name],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn delete_address_name(&self, address: Addr) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "DELETE FROM address_names WHERE address = ?1",
-                params![address.to_bytes()],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn register_contract(&self, address: Addr) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "INSERT OR IGNORE INTO registered_contracts (address) VALUES (?1)",
-                params![address.to_bytes()],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn set_verified_source(
-        &self,
-        artifact: &VerifiedSourceArtifact,
-    ) -> anyhow::Result<()> {
-        let data = serde_json::to_vec(&artifact.source)?;
-        {
-            let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-            let tx = conn.transaction()?;
-            tx.execute(
-                "INSERT OR IGNORE INTO verified_source_artifacts \
-                 (artifact_id, code_hash, data, saved_at) VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    artifact.artifact_id,
-                    artifact.code_hash.to_bytes(),
-                    data,
-                    artifact.saved_at
-                ],
-            )?;
-            tx.execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![artifact.code_hash.to_bytes(), data],
-            )?;
-            tx.commit()?;
-            drop(conn);
-        }
-        Ok(())
-    }
-
-    pub(crate) fn register_verified_sources(
-        &self,
-        artifacts: &[VerifiedSourceArtifact],
-        compiler_abis: &[(Hash256, Value, Vec<Hash256>)],
-    ) -> anyhow::Result<()> {
-        let artifact_data = artifacts
-            .iter()
-            .map(|artifact| Ok((artifact, serde_json::to_vec(&artifact.source)?)))
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        let compiler_abi_data = compiler_abis
-            .iter()
-            .map(|(code_hash, compiler_abi, stale_keys)| {
-                Ok((
-                    *code_hash,
-                    serde_json::to_vec(compiler_abi)?,
-                    stale_keys.as_slice(),
-                ))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-        let tx = conn.transaction()?;
-        for (artifact, data) in artifact_data {
-            let existing = tx
-                .query_row(
-                    "SELECT code_hash, data FROM verified_source_artifacts WHERE artifact_id = ?1",
-                    params![artifact.artifact_id],
-                    |row| Ok((row.get::<_, Hash256>(0)?, row.get::<_, Vec<u8>>(1)?)),
-                )
-                .optional()?;
-            if let Some((existing_code_hash, existing_data)) = existing {
-                let existing_source: Value = serde_json::from_slice(&existing_data)?;
-                anyhow::ensure!(
-                    existing_code_hash == artifact.code_hash && existing_source == artifact.source,
-                    "Verified source artifact {} is immutable",
-                    artifact.artifact_id
-                );
-            } else {
-                tx.execute(
-                    "INSERT INTO verified_source_artifacts \
-                     (artifact_id, code_hash, data, saved_at) VALUES (?1, ?2, ?3, ?4)",
-                    params![
-                        artifact.artifact_id,
-                        artifact.code_hash.to_bytes(),
-                        data,
-                        artifact.saved_at
-                    ],
-                )?;
-            }
-            tx.execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![artifact.code_hash.to_bytes(), data],
-            )?;
-        }
-
-        for (code_hash, data, stale_keys) in compiler_abi_data {
-            for stale_key in stale_keys {
-                tx.execute(
-                    "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                    params![stale_key.to_bytes()],
-                )?;
-            }
-            tx.execute(
-                "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        }
-        tx.commit()?;
-        drop(conn);
-        Ok(())
-    }
-
-    pub(crate) fn delete_verified_source(&self, code_hash: Hash256) -> anyhow::Result<()> {
-        {
-            let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-            let tx = conn.transaction()?;
-            tx.execute(
-                "DELETE FROM verified_sources WHERE code_hash = ?1",
-                params![code_hash.to_bytes()],
-            )?;
-            tx.execute(
-                "DELETE FROM verified_source_artifacts WHERE code_hash = ?1",
-                params![code_hash.to_bytes()],
-            )?;
-            tx.commit()?;
-            drop(conn);
-        }
-        Ok(())
-    }
-
-    pub(crate) fn delete_verified_source_artifact(
-        &self,
-        artifact_id: &str,
-        code_hash: Hash256,
-        was_selected: bool,
-        replacement: Option<&VerifiedSourceArtifact>,
-    ) -> anyhow::Result<()> {
-        {
-            let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-            let tx = conn.transaction()?;
-            tx.execute(
-                "DELETE FROM verified_source_artifacts WHERE artifact_id = ?1",
-                params![artifact_id],
-            )?;
-            if was_selected {
-                if let Some(replacement) = replacement {
-                    let data = serde_json::to_vec(&replacement.source)?;
-                    tx.execute(
-                        "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                        params![code_hash.to_bytes(), data],
-                    )?;
-                } else {
-                    tx.execute(
-                        "DELETE FROM verified_sources WHERE code_hash = ?1",
-                        params![code_hash.to_bytes()],
-                    )?;
-                }
-            }
-            tx.commit()?;
-            drop(conn);
-        }
-        Ok(())
-    }
-
     #[allow(clippy::significant_drop_tightening)]
     pub(crate) fn export_cas_entries(&self) -> anyhow::Result<Vec<(Hash256, BocBytes)>> {
         let conn = self.conn.lock().expect("Failed to lock DB connection");
@@ -670,11 +376,6 @@ impl NodePersistence {
         tx.execute("DELETE FROM transactions", [])?;
         tx.execute("DELETE FROM messages", [])?;
         tx.execute("DELETE FROM accounts", [])?;
-        tx.execute("DELETE FROM compiler_abis", [])?;
-        tx.execute("DELETE FROM verified_sources", [])?;
-        tx.execute("DELETE FROM verified_source_artifacts", [])?;
-        tx.execute("DELETE FROM address_names", [])?;
-        tx.execute("DELETE FROM registered_contracts", [])?;
         tx.execute(
             "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
             params![snapshot.globals.origin_seqno],
@@ -742,50 +443,6 @@ impl NodePersistence {
             )?;
         }
 
-        for (code_hash, compiler_abi) in &snapshot.history_compiler_abis {
-            let data = serde_json::to_vec(compiler_abi)?;
-            tx.execute(
-                "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        }
-
-        for (code_hash, source) in &snapshot.history_verified_sources {
-            let data = serde_json::to_vec(source)?;
-            tx.execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        }
-
-        for artifact in &snapshot.history_verified_source_artifacts {
-            let data = serde_json::to_vec(&artifact.source)?;
-            tx.execute(
-                "INSERT INTO verified_source_artifacts \
-                 (artifact_id, code_hash, data, saved_at) VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    artifact.artifact_id,
-                    artifact.code_hash.to_bytes(),
-                    data,
-                    artifact.saved_at
-                ],
-            )?;
-        }
-
-        for (address, name) in &snapshot.history_address_names {
-            tx.execute(
-                "INSERT OR REPLACE INTO address_names (address, name) VALUES (?1, ?2)",
-                params![address.to_bytes(), name],
-            )?;
-        }
-
-        for address in &snapshot.history_registered_contracts {
-            tx.execute(
-                "INSERT OR IGNORE INTO registered_contracts (address) VALUES (?1)",
-                params![address.to_bytes()],
-            )?;
-        }
-
         tx.commit()?;
         Ok(())
     }
@@ -822,36 +479,6 @@ fn init_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS accounts (address BLOB PRIMARY KEY, data BLOB)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS compiler_abis (code_hash BLOB PRIMARY KEY, data BLOB)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS verified_sources (code_hash BLOB PRIMARY KEY, data BLOB)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS verified_source_artifacts (
-            artifact_id TEXT PRIMARY KEY,
-            code_hash BLOB NOT NULL,
-            data BLOB NOT NULL,
-            saved_at INTEGER NOT NULL
-        )",
-        [],
-    )?;
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS verified_source_artifacts_code_hash_idx
-         ON verified_source_artifacts (code_hash)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS address_names (address BLOB PRIMARY KEY, name TEXT NOT NULL)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS registered_contracts (address BLOB PRIMARY KEY)",
         [],
     )?;
     Ok(())

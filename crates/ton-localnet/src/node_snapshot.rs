@@ -1,14 +1,13 @@
 use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node, StateSource};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
-    MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta, VerifiedSourceArtifact,
+    MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -29,21 +28,12 @@ pub(crate) struct NodeStateSnapshot {
     pub history_tx_by_hash: Vec<(Hash256, TxMeta)>,
     pub history_msg_by_hash: Vec<(Hash256, MsgMeta)>,
     pub history_msg_to_tx: Vec<(Hash256, Hash256)>,
-    pub history_address_names: Vec<(Addr, String)>,
     pub history_jetton_masters: Vec<(Addr, JettonMasterMeta)>,
     pub history_jetton_wallets: Vec<(Addr, storage::JettonWalletMeta)>,
     #[serde(default)]
     pub history_nft_items: Vec<(Addr, NftItemMeta)>,
     #[serde(default)]
     pub history_asset_detection_checked: Vec<Addr>,
-    #[serde(default)]
-    pub history_compiler_abis: Vec<(Hash256, Value)>,
-    #[serde(default)]
-    pub history_verified_sources: Vec<(Hash256, Value)>,
-    #[serde(default)]
-    pub history_verified_source_artifacts: Vec<VerifiedSourceArtifact>,
-    #[serde(default)]
-    pub history_registered_contracts: Vec<Addr>,
     pub cas_entries: Vec<(Hash256, BocBytes)>,
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
@@ -115,14 +105,6 @@ impl Node {
             .collect::<Vec<_>>();
         history_msg_to_tx.sort_by_key(|(msg, _)| *msg);
 
-        let mut history_address_names = self
-            .history
-            .address_names
-            .iter()
-            .map(|(addr, name)| (*addr, name.clone()))
-            .collect::<Vec<_>>();
-        history_address_names.sort_by_key(|(addr, _)| *addr);
-
         let history_jetton_masters = self
             .history
             .jetton_masters
@@ -152,39 +134,6 @@ impl Node {
             .collect::<Vec<_>>();
         history_asset_detection_checked.sort();
 
-        let mut history_compiler_abis = self
-            .history
-            .compiler_abis
-            .iter()
-            .map(|(hash, abi)| (*hash, abi.clone()))
-            .collect::<Vec<_>>();
-        history_compiler_abis.sort_by_key(|(hash, _)| *hash);
-
-        let mut history_verified_sources = self
-            .history
-            .verified_sources
-            .iter()
-            .map(|(hash, source)| (*hash, source.clone()))
-            .collect::<Vec<_>>();
-        history_verified_sources.sort_by_key(|(hash, _)| *hash);
-
-        let mut history_verified_source_artifacts = self
-            .history
-            .verified_source_artifacts
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
-        history_verified_source_artifacts
-            .sort_by(|left, right| left.artifact_id.cmp(&right.artifact_id));
-
-        let mut history_registered_contracts = self
-            .history
-            .registered_contracts
-            .iter()
-            .copied()
-            .collect::<Vec<_>>();
-        history_registered_contracts.sort_unstable();
-
         let cas_entries = self.export_cas_entries()?;
 
         let snapshot = NodeStateSnapshot {
@@ -206,15 +155,10 @@ impl Node {
             history_tx_by_hash,
             history_msg_by_hash,
             history_msg_to_tx,
-            history_address_names,
             history_jetton_masters,
             history_jetton_wallets,
             history_nft_items,
             history_asset_detection_checked,
-            history_compiler_abis,
-            history_verified_sources,
-            history_verified_source_artifacts,
-            history_registered_contracts,
             cas_entries,
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
@@ -280,7 +224,6 @@ impl Node {
         self.history.tx_by_hash = snapshot.history_tx_by_hash.into_iter().collect();
         self.history.msg_by_hash = snapshot.history_msg_by_hash.into_iter().collect();
         self.history.msg_to_tx = snapshot.history_msg_to_tx.into_iter().collect();
-        self.history.address_names = snapshot.history_address_names.into_iter().collect();
         self.history.jetton_masters = snapshot.history_jetton_masters.into_iter().collect();
         self.history.jetton_wallets = snapshot.history_jetton_wallets.into_iter().collect();
         self.history.nft_items = snapshot.history_nft_items.into_iter().collect();
@@ -288,16 +231,6 @@ impl Node {
             .history_asset_detection_checked
             .into_iter()
             .collect();
-        self.history.compiler_abis = snapshot.history_compiler_abis.into_iter().collect();
-        self.history.verified_sources = snapshot.history_verified_sources.into_iter().collect();
-        self.history.verified_source_artifacts = snapshot
-            .history_verified_source_artifacts
-            .into_iter()
-            .map(|artifact| (artifact.artifact_id.clone(), artifact))
-            .collect();
-        self.history.registered_contracts =
-            snapshot.history_registered_contracts.into_iter().collect();
-
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;
         self.pool.rr_turn = snapshot.pool_rr_turn;
@@ -394,57 +327,6 @@ impl Node {
             snapshot.globals.origin_seqno,
             snapshot.history_blocks.len()
         );
-
-        let mut verified_source_artifacts =
-            HashMap::with_capacity(snapshot.history_verified_source_artifacts.len());
-        for artifact in &snapshot.history_verified_source_artifacts {
-            anyhow::ensure!(
-                verified_source_artifacts
-                    .insert(artifact.artifact_id.as_str(), artifact)
-                    .is_none(),
-                "Duplicate verified source artifact {}",
-                artifact.artifact_id
-            );
-            let expected_artifact = VerifiedSourceArtifact::new(
-                artifact.code_hash,
-                artifact.source.clone(),
-                artifact.saved_at,
-            );
-            anyhow::ensure!(
-                artifact.artifact_id == expected_artifact.artifact_id,
-                "Verified source artifact {} does not match its immutable content and code hash; \
-                 expected artifact ID {}",
-                artifact.artifact_id,
-                expected_artifact.artifact_id
-            );
-        }
-
-        let mut selected_verified_sources =
-            HashSet::with_capacity(snapshot.history_verified_sources.len());
-        for (code_hash, source) in &snapshot.history_verified_sources {
-            anyhow::ensure!(
-                selected_verified_sources.insert(*code_hash),
-                "Duplicate selected verified source for code hash {}",
-                code_hash.to_hex()
-            );
-            let selected_artifact = VerifiedSourceArtifact::new(*code_hash, source.clone(), 0);
-            let immutable_artifact = verified_source_artifacts
-                .get(selected_artifact.artifact_id.as_str())
-                .with_context(|| {
-                    format!(
-                        "Selected verified source for code hash {} has no matching immutable \
-                         artifact {}",
-                        code_hash.to_hex(),
-                        selected_artifact.artifact_id
-                    )
-                })?;
-            anyhow::ensure!(
-                immutable_artifact.code_hash == *code_hash && immutable_artifact.source == *source,
-                "Selected verified source for code hash {} conflicts with immutable artifact {}",
-                code_hash.to_hex(),
-                selected_artifact.artifact_id
-            );
-        }
 
         let mut cas = HashMap::with_capacity(snapshot.cas_entries.len());
         for (hash, boc) in &snapshot.cas_entries {

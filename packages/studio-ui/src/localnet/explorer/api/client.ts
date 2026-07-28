@@ -715,10 +715,6 @@ export class TonClient {
   }
 
   async getAddressNames(addresses: readonly string[]): Promise<Record<string, string | undefined>> {
-    if (!this.localnetControlEnabled) {
-      return {}
-    }
-
     const uniqueAddresses = [...new Set(addresses.filter(Boolean))]
     if (uniqueAddresses.length === 0) {
       return {}

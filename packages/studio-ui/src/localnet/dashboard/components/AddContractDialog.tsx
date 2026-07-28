@@ -69,7 +69,7 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
     <Dialog
       open={open}
       title="Add contract"
-      description="Add a deployed contract from this virtual environment"
+      description="Add a deployed contract from this environment"
       maxWidth={520}
       onOpenChange={onOpenChange}
     >

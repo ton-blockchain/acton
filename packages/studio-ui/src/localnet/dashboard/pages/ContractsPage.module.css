@@ -48,8 +48,7 @@
   white-space: nowrap;
 }
 
-.source > span:last-child,
-.muted {
+.source > span:last-child {
   min-width: 0;
   overflow: hidden;
   color: var(--acton-color-text-muted);
@@ -61,15 +60,6 @@
 .source > span:first-child {
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-xs);
-}
-
-.lastActivity {
-  display: block;
-  overflow: hidden;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .actions {

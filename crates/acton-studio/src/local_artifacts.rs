@@ -2,16 +2,13 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
-use std::time::Duration;
 
 use fs2::FileExt;
-use reqwest::Client;
-use serde::Serialize;
-use serde_json::Value;
 use tokio::process::Command;
 use uuid::Uuid;
 use xxhash_rust::xxh3::xxh3_128;
 
+use crate::contract_registry::VerifiedSourceRegistration;
 use crate::{ContractSourceArtifactError, ContractSourceArtifactStore};
 
 const EXCLUDED_PROJECT_DIRECTORIES: &[&str] = &[
@@ -30,13 +27,6 @@ pub(crate) struct ProjectArtifactSynchronizer {
     staging_dir: PathBuf,
     artifact_store: ContractSourceArtifactStore,
     publish_lock_path: PathBuf,
-    http_client: Client,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub(crate) struct SourceRegistration {
-    pub(crate) code_hash: String,
-    pub(crate) source: Value,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -46,11 +36,6 @@ pub(crate) struct ProjectFingerprint(Vec<ProjectFileFingerprint>);
 struct ProjectFileFingerprint {
     path: PathBuf,
     content_hash: u128,
-}
-
-#[derive(Serialize)]
-struct RegisterVerifiedSourcesRequest<'a> {
-    entries: &'a [SourceRegistration],
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -66,8 +51,6 @@ pub(crate) enum ArtifactSyncError {
     BuildFailed { status: ExitStatus },
     #[error("Artifact filesystem worker failed: {message}")]
     WorkerFailed { message: String },
-    #[error("Failed to register source artifacts: {0}")]
-    Request(#[from] reqwest::Error),
     #[error(transparent)]
     Store(#[from] ContractSourceArtifactError),
 }
@@ -92,13 +75,12 @@ impl ProjectArtifactSynchronizer {
                 artifacts_root.join("by-bundle"),
             ),
             publish_lock_path: artifacts_root.join(".publish.lock"),
-            http_client: Client::new(),
         }
     }
 
     pub(crate) async fn build_and_store(
         &self,
-    ) -> Result<Vec<SourceRegistration>, ArtifactSyncError> {
+    ) -> Result<Vec<VerifiedSourceRegistration>, ArtifactSyncError> {
         let staging_dir = self.staging_dir.clone();
         tokio::task::spawn_blocking(move || prepare_staging_source_dir(&staging_dir))
             .await
@@ -150,7 +132,9 @@ impl ProjectArtifactSynchronizer {
         Ok(registrations)
     }
 
-    pub(crate) async fn load_history(&self) -> Result<Vec<SourceRegistration>, ArtifactSyncError> {
+    pub(crate) async fn load_history(
+        &self,
+    ) -> Result<Vec<VerifiedSourceRegistration>, ArtifactSyncError> {
         let artifact_store = self.artifact_store.clone();
         tokio::task::spawn_blocking(move || {
             artifact_store
@@ -158,7 +142,7 @@ impl ProjectArtifactSynchronizer {
                 .map(|artifacts| {
                     artifacts
                         .into_iter()
-                        .map(|artifact| SourceRegistration {
+                        .map(|artifact| VerifiedSourceRegistration {
                             code_hash: artifact.code_hash,
                             source: artifact.source,
                         })
@@ -179,28 +163,6 @@ impl ProjectArtifactSynchronizer {
             .map_err(|error| ArtifactSyncError::WorkerFailed {
                 message: error.to_string(),
             })?
-    }
-
-    pub(crate) async fn register(
-        &self,
-        rpc_url: &str,
-        artifacts: &[SourceRegistration],
-    ) -> Result<(), ArtifactSyncError> {
-        if artifacts.is_empty() {
-            return Ok(());
-        }
-        let url = format!(
-            "{}/acton_registerVerifiedSources",
-            rpc_url.trim_end_matches('/')
-        );
-        self.http_client
-            .post(url)
-            .timeout(Duration::from_secs(5))
-            .json(&RegisterVerifiedSourcesRequest { entries: artifacts })
-            .send()
-            .await?
-            .error_for_status()?;
-        Ok(())
     }
 }
 
@@ -289,7 +251,7 @@ fn replace_current_source_dir(
 fn load_and_persist_source_artifacts(
     current_dir: &Path,
     artifact_store: &ContractSourceArtifactStore,
-) -> Result<Vec<SourceRegistration>, ArtifactSyncError> {
+) -> Result<Vec<VerifiedSourceRegistration>, ArtifactSyncError> {
     let mut registrations = Vec::new();
     for path in source_artifact_paths(current_dir)? {
         let bytes = fs::read(&path).map_err(|source| ArtifactSyncError::Io {
@@ -298,7 +260,7 @@ fn load_and_persist_source_artifacts(
             source,
         })?;
         let artifact = artifact_store.publish(&bytes)?;
-        registrations.push(SourceRegistration {
+        registrations.push(VerifiedSourceRegistration {
             code_hash: artifact.code_hash,
             source: artifact.source,
         });

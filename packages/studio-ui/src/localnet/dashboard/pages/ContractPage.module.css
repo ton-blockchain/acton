@@ -104,7 +104,7 @@
 .summaryList {
   border-top: 1px solid var(--acton-color-border);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .summaryList .detail {
@@ -369,7 +369,7 @@
   min-height: 4rem;
   border-top: 1px solid var(--acton-color-border);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .skeletonSummary > div {

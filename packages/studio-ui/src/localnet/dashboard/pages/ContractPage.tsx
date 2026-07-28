@@ -6,16 +6,19 @@ import {useState, type ReactNode} from "react"
 import {useNavigate, useParams} from "react-router"
 
 import {TablePage} from "../../../components/TablePage"
+import {supports} from "../../../environmentCapabilities"
+import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "../../explorer/api/client"
 import type {LocalnetContract} from "../../explorer/api/types"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
-import {formatAddress, formatRelativeTime} from "../../explorer/components/utils"
+import {formatAddress} from "../../explorer/components/utils"
 import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import type {RegisteredSource} from "../../explorer/metadata/types"
 import {localnetContractPath, useLocalnetRoutes} from "../../routes"
 import {EditContractNameDialog} from "../components/EditContractNameDialog"
 import {
+  contractOriginLabels,
   formatContractCompiler,
   getContractIdentity,
   shortenTechnicalValue,
@@ -44,6 +47,8 @@ export function ContractPage({client, section}: ContractPageProps) {
   const explorerRoutes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
   const addressFormat = useAddressFormat()
+  const {environment} = useLocalnetRuntime()
+  const simulatorEnabled = supports(environment, "simulator")
   const {details, error, loading, reload} = useContractDetails(client, address)
   const [renaming, setRenaming] = useState(false)
 
@@ -116,14 +121,16 @@ export function ContractPage({client, section}: ContractPageProps) {
               <Button size="sm" variant="outline" leadingIcon={<Search />} onClick={openExplorer}>
                 Open in Explorer
               </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                leadingIcon={<Waypoints />}
-                onClick={openSimulator}
-              >
-                Simulate
-              </Button>
+              {simulatorEnabled ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  leadingIcon={<Waypoints />}
+                  onClick={openSimulator}
+                >
+                  Simulate
+                </Button>
+              ) : null}
             </div>
           </div>
           <ContractSummary details={details} />
@@ -176,18 +183,10 @@ export function ContractPage({client, section}: ContractPageProps) {
 function ContractSummary({details}: {readonly details: ContractDetails}) {
   const {contract, deployedSource} = details
   const artifactId = deployedArtifactId(contract, deployedSource)
-  const lastActivity = contract.lastActivityAt
-    ? formatRelativeTime(contract.lastActivityAt)
-    : contract.lastTransactionLt
-      ? "Date unavailable"
-      : "No activity"
 
   return (
     <dl className={`${styles.detailList} ${styles.summaryList}`}>
-      <Detail label="Origin">
-        {contract.sourceKind === "fork" ? "Fork state" : "Created locally"}
-      </Detail>
-      <Detail label="Last activity">{lastActivity}</Detail>
+      <Detail label="Origin">{contractOriginLabels[contract.sourceKind].detail}</Detail>
       <Detail label="Code hash">
         <TechnicalValue value={contract.codeHash} label="code hash" />
       </Detail>
@@ -444,7 +443,7 @@ function ContractPageSkeleton() {
           <Skeleton width="18rem" height="2rem" radius="md" />
         </div>
         <div className={styles.skeletonSummary}>
-          {Array.from({length: 4}, (_, index) => (
+          {Array.from({length: 3}, (_, index) => (
             <div key={index}>
               <Skeleton width="5rem" height="0.75rem" />
               <Skeleton width="8rem" height="0.875rem" />

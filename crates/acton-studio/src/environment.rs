@@ -191,6 +191,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::GramFaucet,
                 EnvironmentCapability::Wallets,
                 EnvironmentCapability::Simulator,
+                EnvironmentCapability::Contracts,
             ],
         }
     }

@@ -1142,7 +1142,7 @@ export interface LocalnetNodeInfo extends LocalnetTimeInfo {
 }
 
 export type LocalnetContractStatus = "active" | "frozen" | "uninitialized" | "nonexist"
-export type LocalnetContractSourceKind = "local" | "fork"
+export type LocalnetContractSourceKind = "local" | "fork" | "network"
 
 export interface LocalnetContractArtifact {
   readonly artifactId: string
@@ -1154,14 +1154,9 @@ export interface LocalnetContractArtifact {
 export interface LocalnetContract {
   readonly address: string
   readonly status: LocalnetContractStatus
-  readonly balance: string
   readonly codeHash: string
-  readonly dataHash?: string
   readonly name?: string
   readonly abiName?: string
-  readonly lastTransactionHash?: string
-  readonly lastTransactionLt?: string
-  readonly lastActivityAt?: number
   readonly sourceKind: LocalnetContractSourceKind
   readonly artifact?: LocalnetContractArtifact
 }

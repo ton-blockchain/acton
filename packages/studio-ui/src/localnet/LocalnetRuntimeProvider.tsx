@@ -9,7 +9,7 @@ import {ExplorerRoutesProvider} from "./explorer/hooks/useExplorerRoutes"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
 import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
-import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
+import {EnvironmentMetadataRegistry} from "./explorer/metadata/environmentRegistry"
 import type {ExplorerMetadataRegistry} from "./explorer/metadata/types"
 import {VerifierMetadataRegistry} from "./explorer/metadata/verifierRegistry"
 import {LocalnetRoutesProvider, localnetPath} from "./routes"
@@ -155,7 +155,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       new VerifierMetadataRegistry(),
     ]
     if (contractsEnabled) {
-      registries.unshift(new LocalnetMetadataRegistry(client))
+      registries.unshift(new EnvironmentMetadataRegistry(client))
     }
     return new CompositeMetadataRegistry(registries)
   }, [client, contractsEnabled])

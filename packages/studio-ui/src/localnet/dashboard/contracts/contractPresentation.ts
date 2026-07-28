@@ -1,4 +1,8 @@
-import type {LocalnetContract, LocalnetContractStatus} from "../../explorer/api/types"
+import type {
+  LocalnetContract,
+  LocalnetContractSourceKind,
+  LocalnetContractStatus,
+} from "../../explorer/api/types"
 
 export const contractStatusLabels = {
   active: "Active",
@@ -6,6 +10,12 @@ export const contractStatusLabels = {
   uninitialized: "Uninitialized",
   nonexist: "Not deployed",
 } satisfies Record<LocalnetContractStatus, string>
+
+export const contractOriginLabels = {
+  local: {short: "Local", detail: "Created locally"},
+  fork: {short: "Fork", detail: "Fork state"},
+  network: {short: "Network", detail: "Network state"},
+} satisfies Record<LocalnetContractSourceKind, {readonly short: string; readonly detail: string}>
 
 export interface ContractIdentity {
   readonly title: string

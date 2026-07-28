@@ -6,8 +6,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use acton_studio::{
-    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime,
-    LocalProcessEnvironmentRuntime, StudioEnvironment, UpdateEnvironmentRequest,
+    ContractRegistryStore, CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentConfig,
+    EnvironmentRuntime, LocalProcessEnvironmentRuntime, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 use expect_test::expect;
 use serde_json::Value;
@@ -20,9 +21,13 @@ async fn local_process_environment_persists_its_full_lifecycle() {
     write_sleeping_executable(&executable);
     let port = available_local_port();
 
-    let runtime = LocalProcessEnvironmentRuntime::open(&executable, workspace.path())
-        .await
-        .expect("empty environment runtime must open");
+    let runtime = LocalProcessEnvironmentRuntime::open(
+        &executable,
+        workspace.path(),
+        ContractRegistryStore::for_project(workspace.path()),
+    )
+    .await
+    .expect("empty environment runtime must open");
     let created = runtime
         .create(CreateEnvironmentRequest {
             name: "Initial localnet".to_owned(),
@@ -68,9 +73,13 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         .expect("created environment must shut down");
     drop(runtime);
 
-    let runtime = LocalProcessEnvironmentRuntime::open(&executable, workspace.path())
-        .await
-        .expect("environment runtime must reopen");
+    let runtime = LocalProcessEnvironmentRuntime::open(
+        &executable,
+        workspace.path(),
+        ContractRegistryStore::for_project(workspace.path()),
+    )
+    .await
+    .expect("environment runtime must reopen");
     let restored = only_environment(&runtime).await;
     append_environment(
         &mut actual,
@@ -97,9 +106,13 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         .expect("stopped environment runtime must shut down");
     drop(runtime);
 
-    let runtime = LocalProcessEnvironmentRuntime::open(&executable, workspace.path())
-        .await
-        .expect("stopped environment runtime must reopen");
+    let runtime = LocalProcessEnvironmentRuntime::open(
+        &executable,
+        workspace.path(),
+        ContractRegistryStore::for_project(workspace.path()),
+    )
+    .await
+    .expect("stopped environment runtime must reopen");
     let restored_stopped = only_environment(&runtime).await;
     append_environment(
         &mut actual,
@@ -126,9 +139,13 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         .expect("restarted environment runtime must shut down");
     drop(runtime);
 
-    let runtime = LocalProcessEnvironmentRuntime::open(&executable, workspace.path())
-        .await
-        .expect("desired-running environment runtime must reopen");
+    let runtime = LocalProcessEnvironmentRuntime::open(
+        &executable,
+        workspace.path(),
+        ContractRegistryStore::for_project(workspace.path()),
+    )
+    .await
+    .expect("desired-running environment runtime must reopen");
     let resumed = only_environment(&runtime).await;
     append_environment(
         &mut actual,
@@ -159,9 +176,13 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         .expect("empty environment runtime must shut down");
     drop(runtime);
 
-    let runtime = LocalProcessEnvironmentRuntime::open(&executable, workspace.path())
-        .await
-        .expect("environment runtime must reopen after deletion");
+    let runtime = LocalProcessEnvironmentRuntime::open(
+        &executable,
+        workspace.path(),
+        ContractRegistryStore::for_project(workspace.path()),
+    )
+    .await
+    .expect("environment runtime must reopen after deletion");
     writeln!(
         actual,
         "after delete reopen\nlisted: {}",

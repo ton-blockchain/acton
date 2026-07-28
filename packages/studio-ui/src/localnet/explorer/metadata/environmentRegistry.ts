@@ -10,7 +10,7 @@ import type {
   SourceRegistration,
 } from "./types"
 
-export class LocalnetMetadataRegistry implements ExplorerMetadataRegistry {
+export class EnvironmentMetadataRegistry implements ExplorerMetadataRegistry {
   readonly canWriteAddressNames = true
   readonly canWriteCompilerAbis = true
   readonly canWriteSources = true

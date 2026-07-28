@@ -2,38 +2,32 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
-    ArtifactIdRequest, ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
-    CodeHashRequest, CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest,
-    GetVerifiedSourceRequest, ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest,
-    MineBlocksRequest, RegisterCompilerAbisRequest, RegisterContractRequest,
-    RegisterVerifiedSourcesRequest, SetAddressNameRequest, SetMiningModeRequest,
-    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
-    SetTimeRequest,
+    ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
+    CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest,
+    ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest,
+    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
+    SetShardAccountRequest, SetTimeRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount,
     StateSourceInfo,
 };
-use crate::storage::compiler_abi_contract_name;
 use crate::types::Hash256;
-use anyhow::Context;
 use axum::{
     Json,
     body::Bytes,
     extract::Query,
-    extract::{RawQuery, State},
+    extract::State,
     http::header::{CONTENT_DISPOSITION, CONTENT_TYPE},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use ton_api::toncenter::v2::requests::SendBocRequest;
 
 const VERIFIER_SOURCE_URL: &str = "https://verifier.acton.monster/api/v1/verification/source";
-const VERIFIER_ABI_URL: &str = "https://verifier.acton.monster/api/v1/abi";
 const VERIFIER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 const fn user_agent() -> &'static str {
@@ -344,250 +338,8 @@ pub async fn send_internal_message(
     .await
 }
 
-pub async fn set_address_name(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<SetAddressNameRequest>,
-) -> Response {
-    handle_result(node.set_address_name(payload.address, payload.name), |()| {
-        Value::Null
-    })
-    .await
-}
-
-pub async fn get_address_name(
-    State(node): State<Arc<Localnet>>,
-    RawQuery(query): RawQuery,
-) -> Response {
-    let addresses = query
-        .as_deref()
-        .map(|query| {
-            url::form_urlencoded::parse(query.as_bytes())
-                .filter_map(|(key, value)| (key == "address").then(|| value.into_owned()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    handle_result(node.get_address_names(addresses), |entries| {
-        serde_json::to_value(entries.iter().cloned().collect::<BTreeMap<_, _>>())
-            .unwrap_or(Value::Null)
-    })
-    .await
-}
-
-pub async fn register_compiler_abis(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<RegisterCompilerAbisRequest>,
-) -> Response {
-    handle_result(
-        async move {
-            let entries = payload
-                .entries
-                .into_iter()
-                .map(|entry| compiler_abi_registration_entry(entry.abi))
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            node.register_compiler_abis(entries).await
-        },
-        |()| Value::Null,
-    )
-    .await
-}
-
-fn compiler_abi_registration_entry(abi: Value) -> anyhow::Result<(Hash256, Value)> {
-    let code_hash = abi
-        .get("code_hashes")
-        .and_then(Value::as_array)
-        .and_then(|code_hashes| code_hashes.iter().find_map(Value::as_str))
-        .ok_or_else(|| anyhow::anyhow!("compiler ABI registration requires abi.code_hashes[0]"))?;
-    Ok((parse_hash_any(code_hash)?, abi))
-}
-
-pub async fn list_compiler_abis(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(node.list_compiler_abis(), |entries| {
-        serde_json::to_value(
-            entries
-                .iter()
-                .map(|(code_hash, abi)| {
-                    serde_json::json!({
-                        "codeHash": code_hash,
-                        "abi": abi,
-                        "savedAt": 0_u64,
-                    })
-                })
-                .collect::<Vec<_>>(),
-        )
-        .unwrap_or(Value::Null)
-    })
-    .await
-}
-
-pub async fn delete_compiler_abi(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CodeHashRequest>,
-) -> Response {
-    handle_result(node.delete_compiler_abi(payload.code_hash), |()| {
-        Value::Null
-    })
-    .await
-}
-
-pub async fn get_compiler_abi(
-    State(node): State<Arc<Localnet>>,
-    RawQuery(query): RawQuery,
-) -> Response {
-    let code_hashes = query
-        .as_deref()
-        .map(|query| {
-            url::form_urlencoded::parse(query.as_bytes())
-                .filter_map(|(key, value)| (key == "code_hash").then(|| value.into_owned()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    handle_result(node.get_compiler_abis(code_hashes), |entries| {
-        serde_json::to_value(entries.iter().cloned().collect::<BTreeMap<_, _>>())
-            .unwrap_or(Value::Null)
-    })
-    .await
-}
-
-pub async fn register_verified_sources(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<RegisterVerifiedSourcesRequest>,
-) -> Response {
-    handle_result(
-        async move {
-            let entries = payload
-                .entries
-                .into_iter()
-                .map(|entry| {
-                    let code_hash = parse_hash_any(&entry.code_hash)?;
-                    let compiler_abis =
-                        compiler_abis_from_registered_source(&code_hash, &entry.source);
-                    Ok((code_hash, entry.source, compiler_abis))
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            let mut compiler_abis = Vec::new();
-            let sources = entries
-                .into_iter()
-                .map(|(code_hash, source, source_compiler_abis)| {
-                    compiler_abis.extend(source_compiler_abis);
-                    (code_hash, source)
-                })
-                .collect();
-            node.register_verified_sources(sources, compiler_abis).await
-        },
-        |()| Value::Null,
-    )
-    .await
-}
-
-pub async fn get_registered_verified_source(
-    State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetVerifiedSourceRequest>,
-) -> Response {
-    handle_result(
-        async move {
-            let source = node
-                .get_registered_verified_source(payload.address.clone(), payload.code_hash.clone())
-                .await?;
-            Ok(source.unwrap_or_else(|| unverified_source_response(&payload)))
-        },
-        Clone::clone,
-    )
-    .await
-}
-
-pub async fn list_verified_sources(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(node.list_verified_sources(), |entries| {
-        serde_json::to_value(
-            entries
-                .iter()
-                .map(|artifact| {
-                    serde_json::json!({
-                        "artifactId": artifact.artifact_id,
-                        "codeHash": artifact.code_hash.to_hex(),
-                        "source": artifact.source,
-                        "savedAt": artifact.saved_at,
-                    })
-                })
-                .collect::<Vec<_>>(),
-        )
-        .unwrap_or(Value::Null)
-    })
-    .await
-}
-
-pub async fn delete_verified_source_artifact(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<ArtifactIdRequest>,
-) -> Response {
-    handle_result(
-        node.delete_verified_source_artifact(payload.artifact_id),
-        |()| Value::Null,
-    )
-    .await
-}
-
-pub async fn list_contracts(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(node.list_contracts(), |contracts| {
-        serde_json::to_value(contracts).unwrap_or(Value::Null)
-    })
-    .await
-}
-
-pub async fn register_contract(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<RegisterContractRequest>,
-) -> Response {
-    handle_result(
-        node.register_contract(payload.address, payload.name),
-        Clone::clone,
-    )
-    .await
-}
-
-pub async fn delete_verified_source(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CodeHashRequest>,
-) -> Response {
-    handle_result(node.delete_verified_source(payload.code_hash), |()| {
-        Value::Null
-    })
-    .await
-}
-
-pub async fn get_verified_source(
-    State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetVerifiedSourceRequest>,
-) -> Response {
-    handle_result(
-        async move {
-            if let Some(source) = node
-                .get_registered_verified_source(payload.address.clone(), payload.code_hash.clone())
-                .await?
-            {
-                return Ok(source);
-            }
-
-            let value = fetch_verified_source(payload).await?;
-            let entries = match fetch_verified_compiler_abis(&value).await {
-                Ok(entries) => entries,
-                Err(error) => {
-                    tracing::warn!(?error, "failed to fetch verifier compiler ABI records");
-                    verified_source_compiler_abis(&value)
-                }
-            };
-            if !entries.is_empty()
-                && let Err(error) = node.register_compiler_abis(entries).await
-            {
-                tracing::warn!(?error, "failed to register verifier compiler ABI");
-            }
-
-            Ok(value)
-        },
-        Clone::clone,
-    )
-    .await
+pub async fn get_verified_source(Query(payload): Query<GetVerifiedSourceRequest>) -> Response {
+    handle_result(fetch_verified_source(payload), Clone::clone).await
 }
 
 async fn fetch_verified_source(payload: GetVerifiedSourceRequest) -> anyhow::Result<Value> {
@@ -624,143 +376,8 @@ async fn fetch_verified_source(payload: GetVerifiedSourceRequest) -> anyhow::Res
     Ok(value)
 }
 
-fn unverified_source_response(payload: &GetVerifiedSourceRequest) -> Value {
-    serde_json::json!({
-        "code_hash": payload.code_hash.as_deref().and_then(|code_hash| {
-            parse_hash_any(code_hash).ok().map(|hash| hash.to_hex())
-        }),
-        "verified": false,
-        "bundle": null,
-    })
-}
-
-async fn fetch_verified_compiler_abis(source: &Value) -> anyhow::Result<Vec<(Hash256, Value)>> {
-    let code_hash = source
-        .get("code_hash")
-        .and_then(Value::as_str)
-        .context("Verifier source response does not contain code_hash")?;
-
-    let mut url = reqwest::Url::parse(VERIFIER_ABI_URL)?;
-    url.query_pairs_mut().append_pair("code_hash", code_hash);
-
-    let response = build_verifier_http_client()?.get(url).send().await?;
-    let status = response.status();
-    let body = response.text().await?;
-    let value = serde_json::from_str::<Value>(&body).unwrap_or(Value::String(body));
-
-    if !status.is_success() {
-        let message = value.get("error").and_then(Value::as_str).map_or_else(
-            || format!("Verifier ABI request failed with status {status}"),
-            ToOwned::to_owned,
-        );
-        anyhow::bail!("{message}");
-    }
-
-    Ok(abi_response_compiler_abis(&value))
-}
-
-fn abi_response_compiler_abis(value: &Value) -> Vec<(Hash256, Value)> {
-    let Some(items) = value.get("items").and_then(Value::as_array) else {
-        return Vec::new();
-    };
-
-    items
-        .iter()
-        .filter_map(|item| {
-            let code_hash = item.get("code_hash").and_then(Value::as_str)?;
-            let code_hash = parse_hash_any(code_hash).ok()?;
-            let compiler_abi = item.get("abi").filter(|abi| abi.is_object())?.clone();
-            Some((
-                code_hash,
-                compiler_abi_payload_value(&code_hash, compiler_abi),
-            ))
-        })
-        .collect()
-}
-
 fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
-}
-
-fn verified_source_compiler_abis(value: &Value) -> Vec<(Hash256, Value)> {
-    let Some(code_hash) = value.get("code_hash").and_then(Value::as_str) else {
-        return Vec::new();
-    };
-    let Ok(code_hash) = parse_hash_any(code_hash) else {
-        return Vec::new();
-    };
-    let Some(compiler_abi) = value
-        .get("bundle")
-        .and_then(compiler_abi_from_verified_source_bundle)
-    else {
-        return Vec::new();
-    };
-
-    vec![(
-        code_hash,
-        compiler_abi_payload_value(&code_hash, compiler_abi),
-    )]
-}
-
-fn compiler_abis_from_registered_source(
-    code_hash: &Hash256,
-    value: &Value,
-) -> Vec<(Hash256, Value)> {
-    let Some(compiler_abi) = value
-        .get("bundle")
-        .and_then(compiler_abi_from_verified_source_bundle)
-    else {
-        return Vec::new();
-    };
-
-    vec![(
-        *code_hash,
-        compiler_abi_payload_value(code_hash, compiler_abi),
-    )]
-}
-
-fn compiler_abi_payload_value(code_hash: &Hash256, compiler_abi: Value) -> Value {
-    let display_name = compiler_abi_contract_name(&compiler_abi);
-
-    serde_json::json!({
-        "compiler_abi": compiler_abi,
-        "display_name": display_name,
-        "code_hashes": [code_hash.to_hex()],
-        "links": [],
-    })
-}
-
-fn compiler_abi_from_verified_source_bundle(bundle: &Value) -> Option<Value> {
-    if let Some(compiler_abi) = bundle
-        .get("compiler_abi")
-        .filter(|compiler_abi| compiler_abi.is_object())
-        .cloned()
-    {
-        return Some(compiler_abi);
-    }
-
-    bundle
-        .get("files")
-        .and_then(Value::as_array)?
-        .iter()
-        .find_map(compiler_abi_from_verified_source_file)
-}
-
-fn compiler_abi_from_verified_source_file(file: &Value) -> Option<Value> {
-    let path = file.get("path").and_then(Value::as_str)?;
-    if !path.ends_with(".abi.json") {
-        return None;
-    }
-
-    let content = verified_source_file_content(file)?;
-    let compiler_abi = serde_json::from_str::<Value>(&content).ok()?;
-    compiler_abi.is_object().then_some(compiler_abi)
-}
-
-fn verified_source_file_content(file: &Value) -> Option<String> {
-    file.get("content")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
@@ -810,80 +427,4 @@ fn parse_optional_balance(balance: Option<String>) -> anyhow::Result<u128> {
     balance
         .parse::<u128>()
         .map_err(|_| anyhow::anyhow!("Invalid balance: {balance}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn extracts_compiler_abi_from_verified_source_file_text() {
-        let code_hash = Hash256([0x42; 32]);
-        let source = json!({
-            "code_hash": code_hash.to_hex(),
-            "bundle": {
-                "files": [
-                    {
-                        "path": "output/counter.abi.json",
-                        "content": r#"{"contract_name":"Counter","get_methods":[]}"#
-                    }
-                ]
-            }
-        });
-
-        let entries = verified_source_compiler_abis(&source);
-
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].0, code_hash);
-        assert_eq!(entries[0].1["display_name"], "Counter");
-        assert_eq!(entries[0].1["compiler_abi"]["contract_name"], "Counter");
-        assert_eq!(entries[0].1["code_hashes"], json!([code_hash.to_hex()]));
-    }
-
-    #[test]
-    fn extracts_compiler_abi_from_abi_response() {
-        let code_hash = Hash256([0x24; 32]);
-        let abi_response = json!({
-            "items": [
-                {
-                    "code_hash": code_hash.to_hex(),
-                    "abi": {
-                        "contract_name": "Wallet",
-                        "get_methods": []
-                    }
-                }
-            ]
-        });
-
-        let entries = abi_response_compiler_abis(&abi_response);
-
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].0, code_hash);
-        assert_eq!(entries[0].1["display_name"], "Wallet");
-        assert_eq!(entries[0].1["compiler_abi"]["contract_name"], "Wallet");
-        assert_eq!(entries[0].1["code_hashes"], json!([code_hash.to_hex()]));
-    }
-
-    #[test]
-    fn ignores_missing_or_invalid_verified_source_abi() {
-        let code_hash = Hash256([0x11; 32]);
-        let source = json!({
-            "code_hash": code_hash.to_hex(),
-            "bundle": {
-                "files": [
-                    {
-                        "path": "output/broken.abi.json",
-                        "content": "not json"
-                    },
-                    {
-                        "path": "src/main.tolk",
-                        "content": "fun main() {}"
-                    }
-                ]
-            }
-        });
-
-        assert!(verified_source_compiler_abis(&source).is_empty());
-    }
 }

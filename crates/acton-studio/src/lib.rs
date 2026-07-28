@@ -1,23 +1,29 @@
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::body::Body;
+use axum::body::{Body, to_bytes};
 use axum::extract::{Path as AxumPath, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
-use axum::http::{HeaderName, StatusCode};
+use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use axum::http::{HeaderMap, HeaderName, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
+use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
+mod contract_facade;
+mod contract_registry;
 mod contract_source_artifact;
 mod environment;
 mod environment_store;
@@ -30,6 +36,7 @@ mod test_run;
 mod test_runtime;
 mod wallet;
 
+pub use contract_registry::ContractRegistryStore;
 pub use contract_source_artifact::{
     CONTRACT_SOURCE_HISTORY_PATH, ContractSourceArtifact, ContractSourceArtifactError,
     ContractSourceArtifactStore,
@@ -63,6 +70,8 @@ pub const STUDIO_ENVIRONMENTS_PATH: &str = "/api/v1/environments";
 pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
+
+const MAX_CONTRACT_OBSERVATION_BODY_BYTES: usize = 1024 * 1024;
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/studio-ui/dist");
@@ -129,6 +138,7 @@ impl StudioServerConfig {
 #[derive(Clone)]
 pub struct StudioServer {
     config: StudioServerConfig,
+    contract_registry: ContractRegistryStore,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -139,10 +149,17 @@ impl StudioServer {
     pub fn new(config: StudioServerConfig) -> Self {
         Self {
             config,
+            contract_registry: ContractRegistryStore::ephemeral(),
             environment_runtime: Arc::new(environment::EmptyEnvironmentRuntime),
             test_run_runtime: Arc::new(test_runtime::EmptyTestRunRuntime::new()),
             wallet_runtime: Arc::new(wallet::EmptyWalletRuntime),
         }
+    }
+
+    #[must_use]
+    pub fn with_contract_registry(mut self, contract_registry: ContractRegistryStore) -> Self {
+        self.contract_registry = contract_registry;
+        self
     }
 
     #[must_use]
@@ -191,6 +208,7 @@ impl StudioServer {
                         wallet_names: workspace.wallet_names.clone(),
                     }),
             },
+            contract_registry: self.contract_registry.clone(),
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
@@ -279,6 +297,7 @@ impl StudioServer {
 #[derive(Clone)]
 pub(crate) struct StudioState {
     info: StudioInfo,
+    contract_registry: ContractRegistryStore,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -544,7 +563,34 @@ async fn proxy_environment_request(
         }));
     }
 
+    if contract_facade::handles(request.method(), &path) {
+        return Ok(contract_facade::handle(
+            &state.contract_registry,
+            &state.http_client,
+            &environment,
+            &path,
+            request,
+        )
+        .await);
+    }
+
     let (parts, body) = request.into_parts();
+    let mut observed_contracts = BTreeMap::new();
+    collect_form_contract_addresses(parts.uri.query(), &mut observed_contracts);
+    let body = if is_observable_body(&parts.headers) {
+        let bytes = to_bytes(body, MAX_CONTRACT_OBSERVATION_BODY_BYTES)
+            .await
+            .map_err(|error| {
+                StudioApiError(EnvironmentRuntimeError::Internal {
+                    code: "environment_proxy_request_failed",
+                    message: format!("Failed to read the environment request: {error}"),
+                })
+            })?;
+        collect_body_contract_addresses(&parts.headers, &bytes, &mut observed_contracts);
+        Body::from(bytes)
+    } else {
+        body
+    };
     let mut upstream_url = environment_upstream_url(&environment, &path)?;
     if let Some(query) = parts.uri.query() {
         upstream_url.push('?');
@@ -565,6 +611,14 @@ async fn proxy_environment_request(
         .map_err(proxy_error)?;
     let status = upstream_response.status();
     let headers = upstream_response.headers().clone();
+    if status.is_success() {
+        observe_contracts(
+            &state.contract_registry,
+            &environment.id,
+            observed_contracts,
+        )
+        .await;
+    }
     let mut response = Response::builder().status(status);
     for (name, value) in &headers {
         if !is_hop_by_hop_header(name) {
@@ -653,6 +707,104 @@ fn is_hop_by_hop_header(name: &HeaderName) -> bool {
             | "transfer-encoding"
             | "upgrade"
     )
+}
+
+fn is_observable_body(headers: &HeaderMap) -> bool {
+    let Some(content_length) = headers
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok())
+    else {
+        return false;
+    };
+    if content_length > MAX_CONTRACT_OBSERVATION_BODY_BYTES {
+        return false;
+    }
+
+    headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|content_type| {
+            let media_type = content_type.split(';').next().unwrap_or_default().trim();
+            media_type.eq_ignore_ascii_case("application/json")
+                || media_type.ends_with("+json")
+                || media_type.eq_ignore_ascii_case("application/x-www-form-urlencoded")
+        })
+}
+
+fn collect_body_contract_addresses(
+    headers: &HeaderMap,
+    body: &[u8],
+    contracts: &mut BTreeMap<String, String>,
+) {
+    let media_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|content_type| content_type.split(';').next())
+        .map(str::trim)
+        .unwrap_or_default();
+    if media_type.eq_ignore_ascii_case("application/x-www-form-urlencoded") {
+        collect_form_contract_addresses(std::str::from_utf8(body).ok(), contracts);
+        return;
+    }
+    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) {
+        collect_json_contract_addresses(&value, contracts);
+    }
+}
+
+fn collect_form_contract_addresses(
+    encoded: Option<&str>,
+    contracts: &mut BTreeMap<String, String>,
+) {
+    let Some(encoded) = encoded else {
+        return;
+    };
+    for (_, value) in url::form_urlencoded::parse(encoded.as_bytes()) {
+        collect_contract_address(&value, contracts);
+    }
+}
+
+fn collect_json_contract_addresses(
+    value: &serde_json::Value,
+    contracts: &mut BTreeMap<String, String>,
+) {
+    match value {
+        serde_json::Value::String(value) => collect_contract_address(value, contracts),
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_json_contract_addresses(value, contracts);
+            }
+        }
+        serde_json::Value::Object(values) => {
+            for value in values.values() {
+                collect_json_contract_addresses(value, contracts);
+            }
+        }
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
+}
+
+fn collect_contract_address(value: &str, contracts: &mut BTreeMap<String, String>) {
+    let Ok(address) = TonAddress::from_str(value.trim()) else {
+        return;
+    };
+    contracts
+        .entry(address.to_hex())
+        .or_insert_with(|| address.to_base64(false, true, true));
+}
+
+async fn observe_contracts(
+    store: &ContractRegistryStore,
+    environment_id: &str,
+    contracts: BTreeMap<String, String>,
+) {
+    if let Err(error) = store.observe_contracts(environment_id, contracts).await {
+        tracing::warn!(
+            environment_id,
+            error = %error,
+            "Failed to persist contracts observed through Studio RPC"
+        );
+    }
 }
 
 fn proxy_error(error: reqwest::Error) -> StudioApiError {

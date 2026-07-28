@@ -31,7 +31,7 @@ export function useContractDetails(client: TonClient, address: string) {
     const contracts = await client.listContracts()
     const contract = contracts.find(candidate => isSameAddress(candidate.address, address))
     if (!contract) {
-      throw new Error("This contract is not available in the current virtual environment")
+      throw new Error("This contract is not available in the current environment")
     }
     return contract
   }, [address, client])
@@ -54,15 +54,18 @@ export function useContractDetails(client: TonClient, address: string) {
               : {abi: null, contract},
         }))
 
+        const codeHash = contract.codeHash.trim()
         const [sourcesResult, abiResult] = await Promise.allSettled([
           metadataRegistry.listSources(),
-          metadataRegistry.getCompilerAbis([contract.codeHash]),
+          codeHash
+            ? metadataRegistry.getCompilerAbis([codeHash])
+            : Promise.resolve<Record<string, ExtendedContractABI | null>>({}),
         ])
         const sources = sourcesResult.status === "fulfilled" ? sourcesResult.value : []
         const deployedSource = findDeployedSource(contract, sources)
         const currentSource = findCurrentSource(contract, deployedSource, sources)
         const abi =
-          abiResult.status === "fulfilled" ? (abiResult.value[contract.codeHash] ?? null) : null
+          codeHash && abiResult.status === "fulfilled" ? (abiResult.value[codeHash] ?? null) : null
 
         if (loadId !== latestLoadId.current) return
         setState({
@@ -141,6 +144,7 @@ function findDeployedSource(
   }
 
   const deployedCodeHash = normalizeCodeHash(contract.codeHash)
+  if (!deployedCodeHash) return undefined
   return sources.find(source => normalizeCodeHash(source.codeHash) === deployedCodeHash)
 }
 

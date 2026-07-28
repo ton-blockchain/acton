@@ -9,7 +9,7 @@ use acton_config::color::OwoColorize;
 use axum::extract::FromRef;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -385,22 +385,8 @@ pub enum ServerError {
     LiteApiPortOverflow { http_port: u16 },
     #[error("failed to bind localnet LiteAPI to {address}")]
     LiteApiBind { address: String, source: io::Error },
-    #[error("failed to seed startup wallet names")]
-    SeedStartupAccountNames(#[from] SeedStartupAccountNamesError),
     #[error("localnet server stopped with an error")]
     Serve { source: io::Error },
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum SeedStartupAccountNamesError {
-    #[error("failed to read existing startup account address names")]
-    ReadExistingNames { source: anyhow::Error },
-    #[error("failed to set startup account address name {name} for {address}")]
-    SetAddressName {
-        address: String,
-        name: String,
-        source: anyhow::Error,
-    },
 }
 
 pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), ServerError> {
@@ -418,7 +404,6 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     } = args;
     let auth_token = auth_token.map(Arc::<str>::from);
 
-    seed_startup_account_names(&node, &startup_accounts).await?;
     let network_conditions = NetworkConditions::new(response_delay_ms);
     let api_calls = ApiCallLog::new();
 
@@ -511,51 +496,6 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         })
         .await
         .map_err(|source| ServerError::Serve { source })?;
-    Ok(())
-}
-
-async fn seed_startup_account_names(
-    node: &Localnet,
-    startup_accounts: &[StartupAccount],
-) -> Result<(), SeedStartupAccountNamesError> {
-    let mut seen_addresses = HashSet::new();
-    let mut named_wallets = Vec::new();
-
-    for account in startup_accounts {
-        let address = account.address.trim();
-        let name = account.name.trim();
-        if address.is_empty() || name.is_empty() || !seen_addresses.insert(address.to_string()) {
-            continue;
-        }
-        named_wallets.push((address.to_string(), name.to_string()));
-    }
-
-    if named_wallets.is_empty() {
-        return Ok(());
-    }
-
-    let existing_names = node
-        .get_address_names(
-            named_wallets
-                .iter()
-                .map(|(address, _)| address.clone())
-                .collect(),
-        )
-        .await
-        .map_err(|source| SeedStartupAccountNamesError::ReadExistingNames { source })?;
-
-    for ((address, name), (_, existing_name)) in named_wallets.into_iter().zip(existing_names) {
-        if existing_name.is_none() {
-            node.set_address_name(address.clone(), name.clone())
-                .await
-                .map_err(|source| SeedStartupAccountNamesError::SetAddressName {
-                    address,
-                    name,
-                    source,
-                })?;
-        }
-    }
-
     Ok(())
 }
 

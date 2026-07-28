@@ -214,12 +214,16 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "ton",
+ "ton-api",
  "tower 0.5.2",
  "tower-http",
  "tracing",
+ "url",
  "urlencoding",
  "uuid",
  "xxhash-rust",
@@ -5487,7 +5491,6 @@ dependencies = [
 name = "ton-localnet"
 version = "1.1.0"
 dependencies = [
- "acton-abi-catalog",
  "acton-config",
  "acton-source-trace",
  "anyhow",
@@ -5506,7 +5509,6 @@ dependencies = [
  "serde",
  "serde_html_form",
  "serde_json",
- "sha2",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",

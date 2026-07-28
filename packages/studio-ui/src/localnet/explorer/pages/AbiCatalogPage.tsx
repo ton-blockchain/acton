@@ -32,7 +32,7 @@ interface RegisteredMetadataState {
 
 interface AbiCatalogTableEntry {
   readonly slug: string
-  readonly source: "bundled" | "local"
+  readonly source: "bundled" | "environment"
   readonly abi: ExtendedContractABI
   readonly deleteCodeHash?: string
 }
@@ -304,8 +304,8 @@ export const AbiCatalogPage: FC = () => {
                           <span className={styles.primaryCell}>
                             <span className={styles.nameLine}>
                               <span className={styles.nameText}>{title}</span>
-                              {entry.source === "local" && (
-                                <span className={styles.localBadge}>local</span>
+                              {entry.source === "environment" && (
+                                <span className={styles.environmentBadge}>environment</span>
                               )}
                             </span>
                             {title !== contractName && <small>{contractName}</small>}
@@ -517,8 +517,8 @@ function buildAbiTableEntries(
 ): readonly AbiCatalogTableEntry[] {
   return [
     ...registeredEntries.map(entry => ({
-      slug: localAbiSlug(entry.codeHash),
-      source: "local" as const,
+      slug: environmentAbiSlug(entry.codeHash),
+      source: "environment" as const,
       abi: entry.abi,
       deleteCodeHash: entry.codeHash,
     })),
@@ -530,8 +530,8 @@ function buildAbiTableEntries(
   ]
 }
 
-function localAbiSlug(codeHash: string): string {
-  return `local-${normalizeCodeHash(codeHash) ?? codeHash.trim().toLowerCase()}`
+function environmentAbiSlug(codeHash: string): string {
+  return `environment-${normalizeCodeHash(codeHash) ?? codeHash.trim().toLowerCase()}`
 }
 
 function abiTitle(abi: ExtendedContractABI): string {

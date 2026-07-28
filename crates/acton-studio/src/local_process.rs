@@ -11,6 +11,7 @@ use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::{Instant, sleep, timeout};
 
+use crate::contract_registry::{ContractRegistryStore, VerifiedSourceRegistration};
 use crate::environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentConfig, EnvironmentEndpoints,
     EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus,
@@ -20,7 +21,7 @@ use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
 };
 use crate::full_ton_network::FullTonNetworkDriver;
-use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint, SourceRegistration};
+use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint};
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
 const FIRST_FULL_TON_V2_PORT: u16 = 18080;
@@ -35,7 +36,7 @@ const FULL_TON_IMAGE_PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const FULL_TON_COMPOSE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
-const PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL: Duration = Duration::from_secs(2);
+const PROJECT_ARTIFACT_PUBLISH_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct LocalProcessEnvironmentRuntime {
@@ -49,6 +50,7 @@ struct LocalProcessRuntimeInner {
     create_lock: Mutex<()>,
     environments: RwLock<Vec<Arc<LocalEnvironment>>>,
     artifact_synchronizer: ProjectArtifactSynchronizer,
+    contract_registry: ContractRegistryStore,
     artifact_coordinator_started: AtomicBool,
     artifact_coordinator_wakeup: Notify,
     shutting_down: AtomicBool,
@@ -106,7 +108,7 @@ enum FullTonImagePullKind {
 struct ArtifactRevision {
     id: u64,
     fingerprint: Option<ProjectFingerprint>,
-    artifacts: Vec<SourceRegistration>,
+    artifacts: Vec<VerifiedSourceRegistration>,
 }
 
 #[derive(Default)]
@@ -128,7 +130,7 @@ impl ArtifactCoordinatorState {
         &mut self,
         before_build: ProjectFingerprint,
         after_build: &ProjectFingerprint,
-        artifacts: Vec<SourceRegistration>,
+        artifacts: Vec<VerifiedSourceRegistration>,
     ) -> bool {
         if before_build != *after_build {
             return false;
@@ -150,7 +152,7 @@ impl ArtifactCoordinatorState {
         true
     }
 
-    fn refresh_history(&mut self, artifacts: Vec<SourceRegistration>) {
+    fn refresh_history(&mut self, artifacts: Vec<VerifiedSourceRegistration>) {
         if self
             .current
             .as_ref()
@@ -189,6 +191,7 @@ impl LocalProcessEnvironmentRuntime {
     pub async fn open(
         acton_executable: impl Into<PathBuf>,
         workspace_root: impl Into<PathBuf>,
+        contract_registry: ContractRegistryStore,
     ) -> Result<Self, EnvironmentRuntimeError> {
         let acton_executable = acton_executable.into();
         let workspace_root = workspace_root.into();
@@ -198,6 +201,7 @@ impl LocalProcessEnvironmentRuntime {
                 acton_executable.clone(),
                 workspace_root.clone(),
             ),
+            contract_registry,
             acton_executable,
             workspace_root,
             next_id: AtomicU64::new(next_id),
@@ -751,10 +755,6 @@ impl EnvironmentDriver {
         }
     }
 
-    const fn supports_project_artifacts(&self) -> bool {
-        matches!(self, Self::ActonLocalnet { .. })
-    }
-
     async fn monitor(
         &self,
         runtime: Arc<LocalProcessRuntimeInner>,
@@ -766,7 +766,7 @@ impl EnvironmentDriver {
                 monitor_localnet(runtime, environment, generation, *port).await;
             }
             Self::FullTonNetwork(driver) => {
-                monitor_full_ton_network(driver, environment, generation).await;
+                monitor_full_ton_network(driver, runtime, environment, generation).await;
             }
         }
     }
@@ -976,6 +976,7 @@ async fn monitor_localnet(
 
 async fn monitor_full_ton_network(
     driver: &FullTonNetworkDriver,
+    runtime: Arc<LocalProcessRuntimeInner>,
     environment: Arc<LocalEnvironment>,
     generation: u64,
 ) {
@@ -1054,6 +1055,7 @@ async fn monitor_full_ton_network(
                     None,
                 )
                 .await;
+                schedule_project_artifact_sync(&runtime);
                 return;
             }
             FullTonTransition::Failed { cleanup_compose } => {
@@ -1235,7 +1237,7 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
     let mut observed_fingerprint = None;
     let mut changed_at = None;
     let mut failed_build_fingerprint = None;
-    let mut next_register_retry = Instant::now();
+    let mut next_publish_retry = Instant::now();
 
     loop {
         if runtime.shutting_down.load(Ordering::Acquire) {
@@ -1244,7 +1246,7 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
         if !has_running_environment(runtime).await {
             runtime.artifact_coordinator_wakeup.notified().await;
             failed_build_fingerprint = None;
-            next_register_retry = Instant::now();
+            next_publish_retry = Instant::now();
             continue;
         }
 
@@ -1296,7 +1298,7 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
                         };
                         if state.commit_if_stable(fingerprint.clone(), &after_build, history) {
                             failed_build_fingerprint = None;
-                            next_register_retry = Instant::now();
+                            next_publish_retry = Instant::now();
                         } else {
                             observed_fingerprint = Some(after_build);
                             changed_at = Some(Instant::now());
@@ -1322,10 +1324,10 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
             }
         }
 
-        if state.current.is_some() && Instant::now() >= next_register_retry {
+        if state.current.is_some() && Instant::now() >= next_publish_retry {
             let had_failures = publish_current_artifact_revision(runtime, &mut state).await;
-            next_register_retry = if had_failures {
-                Instant::now() + PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL
+            next_publish_retry = if had_failures {
+                Instant::now() + PROJECT_ARTIFACT_PUBLISH_RETRY_INTERVAL
             } else {
                 Instant::now()
             };
@@ -1357,9 +1359,6 @@ async fn publish_current_artifact_revision(
     let mut had_failures = false;
     let environments = runtime.environments.read().await.clone();
     for environment in environments {
-        if !environment.driver.supports_project_artifacts() {
-            continue;
-        }
         let details = environment.details.read().await.clone();
         let generation = environment.generation.load(Ordering::Acquire);
         if details.status != EnvironmentStatus::Running
@@ -1367,16 +1366,11 @@ async fn publish_current_artifact_revision(
         {
             continue;
         }
-        let result = {
-            let revision = state.current.as_ref().expect("revision exists");
-            let Some(control_endpoint) = details.runtime_endpoints.control.as_deref() else {
-                continue;
-            };
-            runtime
-                .artifact_synchronizer
-                .register(control_endpoint, &revision.artifacts)
-                .await
-        };
+        let revision = state.current.as_ref().expect("revision exists");
+        let result = runtime
+            .contract_registry
+            .register_verified_sources(&details.id, &revision.artifacts)
+            .await;
         match result {
             Ok(()) => {
                 state.mark_published(details.id.clone(), generation, revision_id);
@@ -1406,9 +1400,7 @@ async fn publish_current_artifact_revision(
 async fn has_running_environment(runtime: &LocalProcessRuntimeInner) -> bool {
     let environments = runtime.environments.read().await.clone();
     for environment in environments {
-        if environment.driver.supports_project_artifacts()
-            && environment.details.read().await.status == EnvironmentStatus::Running
-        {
+        if environment.details.read().await.status == EnvironmentStatus::Running {
             return true;
         }
     }
@@ -1768,7 +1760,9 @@ mod artifact_coordinator_tests {
     use serde_json::json;
     use tempfile::tempdir;
 
-    use super::{ArtifactCoordinatorState, ProjectArtifactSynchronizer, SourceRegistration};
+    use super::{
+        ArtifactCoordinatorState, ProjectArtifactSynchronizer, VerifiedSourceRegistration,
+    };
 
     #[tokio::test]
     async fn unstable_builds_are_discarded_and_publish_revisions_never_move_backwards() {
@@ -1785,7 +1779,7 @@ mod artifact_coordinator_tests {
         assert!(!state.commit_if_stable(
             before_build,
             &after_build,
-            vec![SourceRegistration {
+            vec![VerifiedSourceRegistration {
                 code_hash: "stale".to_owned(),
                 source: json!({"revision": "stale"}),
             }],
@@ -1795,7 +1789,7 @@ mod artifact_coordinator_tests {
         assert!(state.commit_if_stable(
             after_build.clone(),
             &after_build,
-            vec![SourceRegistration {
+            vec![VerifiedSourceRegistration {
                 code_hash: "revision-1".to_owned(),
                 source: json!({"revision": 1}),
             }],
@@ -1810,7 +1804,7 @@ mod artifact_coordinator_tests {
         assert!(state.commit_if_stable(
             next_fingerprint.clone(),
             &next_fingerprint,
-            vec![SourceRegistration {
+            vec![VerifiedSourceRegistration {
                 code_hash: "revision-2".to_owned(),
                 source: json!({"revision": 2}),
             }],
@@ -1826,11 +1820,11 @@ mod artifact_coordinator_tests {
     fn restored_history_is_published_before_a_workspace_rebuild() {
         let mut state = ArtifactCoordinatorState::default();
         state.refresh_history(vec![
-            SourceRegistration {
+            VerifiedSourceRegistration {
                 code_hash: "old-code".to_owned(),
                 source: json!({"bundle": "old"}),
             },
-            SourceRegistration {
+            VerifiedSourceRegistration {
                 code_hash: "new-code".to_owned(),
                 source: json!({"bundle": "new"}),
             },

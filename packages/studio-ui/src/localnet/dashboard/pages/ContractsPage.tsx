@@ -16,16 +16,18 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import {useNavigate} from "react-router"
 
 import {TablePage} from "../../../components/TablePage"
+import {supports} from "../../../environmentCapabilities"
+import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "../../explorer/api/client"
 import type {LocalnetContract} from "../../explorer/api/types"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
-import {formatAddress, formatRelativeTime} from "../../explorer/components/utils"
+import {formatAddress} from "../../explorer/components/utils"
 import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {localnetContractPath, useLocalnetRoutes} from "../../routes"
 import {AddContractDialog} from "../components/AddContractDialog"
 import {EditContractNameDialog} from "../components/EditContractNameDialog"
-import {getContractIdentity} from "../contracts/contractPresentation"
+import {contractOriginLabels, getContractIdentity} from "../contracts/contractPresentation"
 import {ContractStatus} from "../contracts/ContractStatus"
 
 import styles from "./ContractsPage.module.css"
@@ -41,6 +43,8 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
   const addressFormat = useAddressFormat()
+  const {environment} = useLocalnetRuntime()
+  const simulatorEnabled = supports(environment, "simulator")
   const [contracts, setContracts] = useState<readonly LocalnetContract[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>()
@@ -119,15 +123,14 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
         hasContent={contracts.length > 0}
         onRetry={loadContracts}
       >
-        <DataTable minWidth="64rem">
+        <DataTable minWidth="56rem">
           <DataTableTable aria-label="Contracts">
             <DataTableHead>
               <DataTableRow>
-                <DataTableHeaderCell columnWidth="24%">Name</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="22%">Address</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="11%">Status</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="18%">Origin and source</DataTableHeaderCell>
-                <DataTableHeaderCell>Last activity</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="26%">Name</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="24%">Address</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="12%">Status</DataTableHeaderCell>
+                <DataTableHeaderCell>Origin and source</DataTableHeaderCell>
                 <DataTableHeaderCell align="right" columnWidth="6.5rem">
                   Actions
                 </DataTableHeaderCell>
@@ -136,13 +139,13 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
             <DataTableBody>
               {loading && contracts.length === 0 ? (
                 <DataTableSkeletonRows
-                  columns={6}
+                  columns={5}
                   rows={4}
-                  widths={["64%", "72%", "44%", "62%", "50%", "72%"]}
-                  alignments={["left", "left", "left", "left", "left", "right"]}
+                  widths={["64%", "72%", "44%", "62%", "72%"]}
+                  alignments={["left", "left", "left", "left", "right"]}
                 />
               ) : contracts.length === 0 ? (
-                <DataTableEmpty colSpan={6}>
+                <DataTableEmpty colSpan={5}>
                   <div className={styles.emptyState}>
                     <span className={styles.emptyIcon}>
                       <Box size={20} aria-hidden="true" />
@@ -194,9 +197,6 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                     <DataTableCell>
                       <ContractSource contract={contract} />
                     </DataTableCell>
-                    <DataTableCell>
-                      <ContractLastActivity contract={contract} />
-                    </DataTableCell>
                     <DataTableCell align="right">
                       <span className={styles.actions}>
                         <InlineAction
@@ -209,11 +209,13 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                           icon={<ExternalLink />}
                           onClick={() => openExplorer(contract.address)}
                         />
-                        <InlineAction
-                          label="Open in Simulator"
-                          icon={<Waypoints />}
-                          onClick={() => openSimulator(contract.address)}
-                        />
+                        {simulatorEnabled ? (
+                          <InlineAction
+                            label="Open in Simulator"
+                            icon={<Waypoints />}
+                            onClick={() => openSimulator(contract.address)}
+                          />
+                        ) : null}
                       </span>
                     </DataTableCell>
                   </DataTableRow>
@@ -255,32 +257,8 @@ function ContractIdentity({contract}: {readonly contract: LocalnetContract}) {
 function ContractSource({contract}: {readonly contract: LocalnetContract}) {
   return (
     <span className={styles.source}>
-      <span>{contract.sourceKind === "fork" ? "Fork" : "Local"}</span>
+      <span>{contractOriginLabels[contract.sourceKind].short}</span>
       <span>{contract.artifact ? "Acton source" : "Source unavailable"}</span>
-    </span>
-  )
-}
-
-function ContractLastActivity({contract}: {readonly contract: LocalnetContract}) {
-  if (contract.lastActivityAt) {
-    const date = new Date(contract.lastActivityAt * 1000)
-    return (
-      <time
-        className={styles.lastActivity}
-        dateTime={date.toISOString()}
-        title={date.toLocaleString()}
-      >
-        {formatRelativeTime(contract.lastActivityAt)}
-      </time>
-    )
-  }
-
-  return (
-    <span
-      className={styles.muted}
-      title={contract.lastTransactionLt ? `Logical time ${contract.lastTransactionLt}` : undefined}
-    >
-      {contract.lastTransactionLt ? "Date unavailable" : "No activity"}
     </span>
   )
 }
