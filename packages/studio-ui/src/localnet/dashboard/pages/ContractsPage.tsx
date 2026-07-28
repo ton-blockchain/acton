@@ -96,10 +96,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
 
   const openContractDetails = (address: string) => {
     void navigate(
-      localnetContractPath(
-        localnetRoutes.basePath,
-        formatAddress(address, false, addressFormat),
-      ),
+      localnetContractPath(localnetRoutes.basePath, formatAddress(address, false, addressFormat)),
     )
   }
 
