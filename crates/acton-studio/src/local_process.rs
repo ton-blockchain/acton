@@ -12,15 +12,22 @@ use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::{Instant, sleep, timeout};
 
 use crate::environment::{
-    CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
+    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentConfig, EnvironmentEndpoints,
+    EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus,
+    StudioEnvironment, UpdateEnvironmentRequest,
 };
+use crate::full_ton_network::FullTonNetworkDriver;
 use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint, SourceRegistration};
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
+const FIRST_FULL_TON_V2_PORT: u16 = 18080;
+const FIRST_FULL_TON_V3_PORT: u16 = 18081;
+const DEFAULT_FULL_TON_VALIDATORS: u16 = 1;
+const MAX_FULL_TON_VALIDATORS: u16 = 100;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const FULL_TON_START_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
 const PROJECT_ARTIFACT_REGISTER_RETRY_INTERVAL: Duration = Duration::from_secs(2);
@@ -44,9 +51,21 @@ struct LocalProcessRuntimeInner {
 
 struct LocalEnvironment {
     details: RwLock<StudioEnvironment>,
+    driver: EnvironmentDriver,
     child: Mutex<Option<Child>>,
     lifecycle: Mutex<()>,
     generation: AtomicU64,
+}
+
+enum EnvironmentDriver {
+    ActonLocalnet {
+        acton_executable: PathBuf,
+        workspace_root: PathBuf,
+        db_path: PathBuf,
+        config: EnvironmentConfig,
+        port: u16,
+    },
+    FullTonNetwork(FullTonNetworkDriver),
 }
 
 struct ArtifactRevision {
@@ -172,9 +191,9 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         request: CreateEnvironmentRequest,
     ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         Box::pin(async move {
-            let request = validate_request(request)?;
             let _create_guard = self.inner.create_lock.lock().await;
-            let port = select_port(request.port)?;
+            let reserved_ports = reserved_environment_ports(&self.inner).await;
+            let (name, config) = resolve_request(request, &reserved_ports)?;
             let id = format!(
                 "environment-{}",
                 self.inner.next_id.fetch_add(1, Ordering::Relaxed)
@@ -190,33 +209,25 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                     ),
                 })?;
 
-            let config = EnvironmentConfig {
-                port,
-                fork_network: request.fork_network,
-                fork_block_number: request.fork_block_number,
-                accounts: request.accounts,
-                rate_limit: request.rate_limit,
-                response_delay_ms: request.response_delay_ms,
-                block_interval_ms: request.block_interval_ms,
-                no_mining: request.no_mining,
-                mine_empty_blocks: request.mine_empty_blocks,
-            };
-            let rpc_url = format!("http://127.0.0.1:{port}");
-            let child = spawn_localnet(
+            let driver = EnvironmentDriver::new(
                 &self.inner.acton_executable,
                 &self.inner.workspace_root,
-                data_dir.join("localnet.sqlite"),
+                &data_dir,
+                &id,
                 &config,
-            )?;
+            )
+            .await?;
+            let runtime_endpoints = runtime_endpoints(&config);
+            let child = driver.spawn_start()?;
             let environment = Arc::new(LocalEnvironment {
-                details: RwLock::new(StudioEnvironment {
+                details: RwLock::new(StudioEnvironment::new(
                     id,
-                    name: request.name,
-                    status: EnvironmentStatus::Starting,
-                    rpc_url,
+                    name,
+                    EnvironmentStatus::Starting,
                     config,
-                    error: None,
-                }),
+                    runtime_endpoints,
+                )),
+                driver,
                 child: Mutex::new(Some(child)),
                 lifecycle: Mutex::new(()),
                 generation: AtomicU64::new(1),
@@ -227,7 +238,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 .write()
                 .await
                 .push(Arc::clone(&environment));
-            tokio::spawn(monitor_localnet(Arc::clone(&self.inner), environment, 1));
+            spawn_environment_monitor(Arc::clone(&self.inner), environment, 1);
             Ok(result)
         })
     }
@@ -259,7 +270,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            stop_environment(&environment).await;
+            delete_environment_runtime(&environment).await?;
 
             let data_dir = environment_data_dir(&self.inner.workspace_root, &environment_id);
             if let Err(error) = tokio::fs::remove_dir_all(&data_dir).await
@@ -287,7 +298,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         let environment_id = environment_id.to_owned();
         Box::pin(async move {
             let environment = find_environment(&self.inner, &environment_id).await?;
-            stop_environment(&environment).await;
+            stop_environment(&environment).await?;
             Ok(environment.details.read().await.clone())
         })
     }
@@ -305,59 +316,126 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             self.inner.shutting_down.store(true, Ordering::Release);
             self.inner.artifact_coordinator_wakeup.notify_one();
             let environments = self.inner.environments.read().await.clone();
+            let mut first_error = None;
             for environment in environments {
-                stop_environment(&environment).await;
+                if let Err(error) = stop_environment(&environment).await
+                    && first_error.is_none()
+                {
+                    first_error = Some(error);
+                }
+            }
+            if let Some(error) = first_error {
+                return Err(error);
             }
             Ok(())
         })
     }
 }
 
-fn validate_request(
-    mut request: CreateEnvironmentRequest,
-) -> Result<CreateEnvironmentRequest, EnvironmentRuntimeError> {
-    request.name = validate_environment_name(&request.name)?;
-    if request.port == Some(0) {
+fn resolve_request(
+    request: CreateEnvironmentRequest,
+    reserved_ports: &[u16],
+) -> Result<(String, EnvironmentConfig), EnvironmentRuntimeError> {
+    let name = validate_environment_name(&request.name)?;
+    let config = match request.config {
+        CreateEnvironmentConfig::ActonLocalnet {
+            port,
+            mut fork_network,
+            fork_block_number,
+            accounts,
+            rate_limit,
+            response_delay_ms,
+            block_interval_ms,
+            no_mining,
+            mine_empty_blocks,
+        } => {
+            validate_requested_port(port)?;
+            fork_network = fork_network
+                .map(|network| network.trim().to_owned())
+                .filter(|network| !network.is_empty());
+            if fork_block_number.is_some() && fork_network.is_none() {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "fork_network_required",
+                    message: "Fork network is required when a fork block is selected".to_owned(),
+                });
+            }
+            if rate_limit == Some(0) || response_delay_ms == Some(0) || block_interval_ms == Some(0)
+            {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_limit_invalid",
+                    message:
+                        "Rate limit, response delay and block interval must be greater than zero"
+                            .to_owned(),
+                });
+            }
+            if no_mining && mine_empty_blocks {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_mining_mode_invalid",
+                    message: "Empty blocks cannot be mined while automatic mining is disabled"
+                        .to_owned(),
+                });
+            }
+
+            EnvironmentConfig::ActonLocalnet {
+                port: select_port(FIRST_LOCALNET_PORT, port, reserved_ports)?,
+                fork_network,
+                fork_block_number,
+                accounts: accounts
+                    .into_iter()
+                    .map(|account| account.trim().to_owned())
+                    .filter(|account| !account.is_empty())
+                    .collect(),
+                rate_limit,
+                response_delay_ms,
+                block_interval_ms,
+                no_mining,
+                mine_empty_blocks,
+            }
+        }
+        CreateEnvironmentConfig::FullTonNetwork {
+            api_v2_port,
+            api_v3_port,
+            validators,
+        } => {
+            validate_requested_port(api_v2_port)?;
+            validate_requested_port(api_v3_port)?;
+            let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
+            if api_v3_port == Some(api_v2_port) {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_ports_must_differ",
+                    message: "V2 and V3 API ports must be different".to_owned(),
+                });
+            }
+            let mut excluded_ports = reserved_ports.to_vec();
+            excluded_ports.push(api_v2_port);
+            let api_v3_port = select_port(FIRST_FULL_TON_V3_PORT, api_v3_port, &excluded_ports)?;
+            let validators = validators.unwrap_or(DEFAULT_FULL_TON_VALIDATORS);
+            if !(1..=MAX_FULL_TON_VALIDATORS).contains(&validators) {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_validators_invalid",
+                    message: format!(
+                        "Validator count must be between 1 and {MAX_FULL_TON_VALIDATORS}"
+                    ),
+                });
+            }
+            EnvironmentConfig::FullTonNetwork {
+                api_v2_port,
+                api_v3_port,
+                validators,
+            }
+        }
+    };
+    Ok((name, config))
+}
+
+fn validate_requested_port(port: Option<u16>) -> Result<(), EnvironmentRuntimeError> {
+    if port == Some(0) {
         return Err(EnvironmentRuntimeError::InvalidRequest {
             code: "environment_port_invalid",
-            message: "Environment port must be greater than zero".to_owned(),
+            message: "Environment ports must be greater than zero".to_owned(),
         });
     }
-
-    request.fork_network = request
-        .fork_network
-        .map(|network| network.trim().to_owned())
-        .filter(|network| !network.is_empty());
-    if request.fork_block_number.is_some() && request.fork_network.is_none() {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "fork_network_required",
-            message: "Fork network is required when a fork block is selected".to_owned(),
-        });
-    }
-    if request.rate_limit == Some(0)
-        || request.response_delay_ms == Some(0)
-        || request.block_interval_ms == Some(0)
-    {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_limit_invalid",
-            message: "Rate limit, response delay and block interval must be greater than zero"
-                .to_owned(),
-        });
-    }
-    if request.no_mining && request.mine_empty_blocks {
-        return Err(EnvironmentRuntimeError::InvalidRequest {
-            code: "environment_mining_mode_invalid",
-            message: "Empty blocks cannot be mined while automatic mining is disabled".to_owned(),
-        });
-    }
-
-    request.accounts = request
-        .accounts
-        .into_iter()
-        .map(|account| account.trim().to_owned())
-        .filter(|account| !account.is_empty())
-        .collect();
-    Ok(request)
+    Ok(())
 }
 
 fn validate_environment_name(name: &str) -> Result<String, EnvironmentRuntimeError> {
@@ -377,9 +455,13 @@ fn validate_environment_name(name: &str) -> Result<String, EnvironmentRuntimeErr
     Ok(name.to_owned())
 }
 
-fn select_port(requested: Option<u16>) -> Result<u16, EnvironmentRuntimeError> {
+fn select_port(
+    first_port: u16,
+    requested: Option<u16>,
+    excluded: &[u16],
+) -> Result<u16, EnvironmentRuntimeError> {
     if let Some(port) = requested {
-        return if port_is_available(port) {
+        return if !excluded.contains(&port) && port_is_available(port) {
             Ok(port)
         } else {
             Err(EnvironmentRuntimeError::Conflict {
@@ -389,8 +471,8 @@ fn select_port(requested: Option<u16>) -> Result<u16, EnvironmentRuntimeError> {
         };
     }
 
-    (FIRST_LOCALNET_PORT..=u16::MAX)
-        .find(|port| port_is_available(*port))
+    (first_port..=u16::MAX)
+        .find(|port| !excluded.contains(port) && port_is_available(*port))
         .ok_or_else(|| EnvironmentRuntimeError::Conflict {
             code: "environment_port_unavailable",
             message: "No local port is available for a new environment".to_owned(),
@@ -401,11 +483,139 @@ fn port_is_available(port: u16) -> bool {
     StdTcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok()
 }
 
+async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u16> {
+    let environments = runtime.environments.read().await.clone();
+    let mut ports = Vec::with_capacity(environments.len() * 2);
+    for environment in environments {
+        match &environment.details.read().await.config {
+            EnvironmentConfig::ActonLocalnet { port, .. } => ports.push(*port),
+            EnvironmentConfig::FullTonNetwork {
+                api_v2_port,
+                api_v3_port,
+                ..
+            } => {
+                ports.push(*api_v2_port);
+                ports.push(*api_v3_port);
+            }
+        }
+    }
+    ports
+}
+
+fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
+    match config {
+        EnvironmentConfig::ActonLocalnet { port, .. } => {
+            let root = format!("http://127.0.0.1:{port}");
+            EnvironmentEndpoints {
+                api_v2: Some(format!("{root}/api/v2")),
+                api_v3: Some(format!("{root}/api/v3")),
+                control: Some(root),
+            }
+        }
+        EnvironmentConfig::FullTonNetwork {
+            api_v2_port,
+            api_v3_port,
+            ..
+        } => EnvironmentEndpoints {
+            api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
+            api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
+            control: None,
+        },
+    }
+}
+
 fn environment_data_dir(workspace_root: &Path, environment_id: &str) -> PathBuf {
     workspace_root
         .join(".studio")
         .join("environments")
         .join(environment_id)
+}
+
+impl EnvironmentDriver {
+    async fn new(
+        acton_executable: &Path,
+        workspace_root: &Path,
+        data_dir: &Path,
+        environment_id: &str,
+        config: &EnvironmentConfig,
+    ) -> Result<Self, EnvironmentRuntimeError> {
+        match config {
+            EnvironmentConfig::ActonLocalnet { port, .. } => Ok(Self::ActonLocalnet {
+                acton_executable: acton_executable.to_owned(),
+                workspace_root: workspace_root.to_owned(),
+                db_path: data_dir.join("localnet.sqlite"),
+                config: config.clone(),
+                port: *port,
+            }),
+            EnvironmentConfig::FullTonNetwork {
+                api_v2_port,
+                api_v3_port,
+                validators,
+            } => FullTonNetworkDriver::materialize(
+                data_dir,
+                environment_id,
+                *api_v2_port,
+                *api_v3_port,
+                *validators,
+            )
+            .await
+            .map(Self::FullTonNetwork),
+        }
+    }
+
+    fn spawn_start(&self) -> Result<Child, EnvironmentRuntimeError> {
+        match self {
+            Self::ActonLocalnet {
+                acton_executable,
+                workspace_root,
+                db_path,
+                config,
+                ..
+            } => spawn_localnet(acton_executable, workspace_root, db_path.clone(), config),
+            Self::FullTonNetwork(driver) => driver.spawn_up(),
+        }
+    }
+
+    fn ensure_restartable(&self) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::ActonLocalnet { port, .. } => select_port(*port, Some(*port), &[]).map(|_| ()),
+            Self::FullTonNetwork(_) => Ok(()),
+        }
+    }
+
+    async fn stop(&self) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::ActonLocalnet { .. } => Ok(()),
+            Self::FullTonNetwork(driver) => driver.stop().await,
+        }
+    }
+
+    async fn delete(&self) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::ActonLocalnet { .. } => Ok(()),
+            Self::FullTonNetwork(driver) => driver.delete().await,
+        }
+    }
+
+    const fn supports_project_artifacts(&self) -> bool {
+        matches!(self, Self::ActonLocalnet { .. })
+    }
+
+    async fn monitor(
+        &self,
+        runtime: Arc<LocalProcessRuntimeInner>,
+        environment: Arc<LocalEnvironment>,
+        generation: u64,
+    ) {
+        match self {
+            Self::ActonLocalnet { port, .. } => {
+                monitor_localnet(runtime, environment, generation, *port).await;
+            }
+            Self::FullTonNetwork(driver) => {
+                monitor_full_ton_network(driver, environment, generation).await;
+            }
+        }
+    }
 }
 
 fn spawn_localnet(
@@ -414,6 +624,20 @@ fn spawn_localnet(
     db_path: PathBuf,
     config: &EnvironmentConfig,
 ) -> Result<Child, EnvironmentRuntimeError> {
+    let EnvironmentConfig::ActonLocalnet {
+        port,
+        fork_network,
+        fork_block_number,
+        accounts,
+        rate_limit,
+        response_delay_ms,
+        block_interval_ms,
+        no_mining,
+        mine_empty_blocks,
+    } = config
+    else {
+        unreachable!("localnet driver requires an Acton localnet configuration");
+    };
     let mut command = Command::new(acton_executable);
     command
         .arg("--project-root")
@@ -421,7 +645,7 @@ fn spawn_localnet(
         .arg("localnet")
         .arg("start")
         .arg("--port")
-        .arg(config.port.to_string())
+        .arg(port.to_string())
         .arg("--db-path")
         .arg(db_path)
         .current_dir(workspace_root)
@@ -430,34 +654,34 @@ fn spawn_localnet(
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    if let Some(fork_network) = &config.fork_network {
+    if let Some(fork_network) = fork_network {
         command.arg("--fork-net").arg(fork_network);
     }
-    if let Some(fork_block_number) = config.fork_block_number {
+    if let Some(fork_block_number) = fork_block_number {
         command
             .arg("--fork-block-number")
             .arg(fork_block_number.to_string());
     }
-    if !config.accounts.is_empty() {
-        command.arg("--accounts").arg(config.accounts.join(","));
+    if !accounts.is_empty() {
+        command.arg("--accounts").arg(accounts.join(","));
     }
-    if let Some(rate_limit) = config.rate_limit {
+    if let Some(rate_limit) = rate_limit {
         command.arg("--rate-limit").arg(rate_limit.to_string());
     }
-    if let Some(response_delay_ms) = config.response_delay_ms {
+    if let Some(response_delay_ms) = response_delay_ms {
         command
             .arg("--response-delay-ms")
             .arg(response_delay_ms.to_string());
     }
-    if let Some(block_interval_ms) = config.block_interval_ms {
+    if let Some(block_interval_ms) = block_interval_ms {
         command
             .arg("--block-interval-ms")
             .arg(block_interval_ms.to_string());
     }
-    if config.no_mining {
+    if *no_mining {
         command.arg("--no-mining");
     }
-    if config.mine_empty_blocks {
+    if *mine_empty_blocks {
         command.arg("--mine-empty-blocks");
     }
 
@@ -487,12 +711,26 @@ async fn find_environment(
     })
 }
 
-async fn monitor_localnet(
+fn spawn_environment_monitor(
     runtime: Arc<LocalProcessRuntimeInner>,
     environment: Arc<LocalEnvironment>,
     generation: u64,
 ) {
-    let port = environment.details.read().await.config.port;
+    tokio::spawn(async move {
+        let monitored_environment = Arc::clone(&environment);
+        environment
+            .driver
+            .monitor(runtime, monitored_environment, generation)
+            .await;
+    });
+}
+
+async fn monitor_localnet(
+    runtime: Arc<LocalProcessRuntimeInner>,
+    environment: Arc<LocalEnvironment>,
+    generation: u64,
+    port: u16,
+) {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let ready_deadline = Instant::now() + LOCALNET_READY_TIMEOUT;
 
@@ -568,6 +806,57 @@ async fn monitor_localnet(
                 return;
             }
         }
+    }
+}
+
+async fn monitor_full_ton_network(
+    driver: &FullTonNetworkDriver,
+    environment: Arc<LocalEnvironment>,
+    generation: u64,
+) {
+    let deadline = Instant::now() + FULL_TON_START_TIMEOUT;
+    loop {
+        if !is_current_generation(&environment, generation) {
+            return;
+        }
+        if Instant::now() >= deadline {
+            fail_environment(
+                &environment,
+                generation,
+                "Full TON network startup timed out while Docker was preparing its images"
+                    .to_owned(),
+            )
+            .await;
+            return;
+        }
+        match child_exit_status(&environment).await {
+            Ok(Some(status)) if status.success() => {
+                set_environment_status_if_current(
+                    &environment,
+                    generation,
+                    EnvironmentStatus::Running,
+                    None,
+                )
+                .await;
+                return;
+            }
+            Ok(Some(status)) => {
+                let error = driver.startup_failure_message(status).await;
+                fail_environment(&environment, generation, error).await;
+                return;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                fail_environment(
+                    &environment,
+                    generation,
+                    format!("Failed to inspect the Docker Compose process: {error}"),
+                )
+                .await;
+                return;
+            }
+        }
+        sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
     }
 }
 
@@ -719,6 +1008,9 @@ async fn publish_current_artifact_revision(
     let mut had_failures = false;
     let environments = runtime.environments.read().await.clone();
     for environment in environments {
+        if !environment.driver.supports_project_artifacts() {
+            continue;
+        }
         let details = environment.details.read().await.clone();
         let generation = environment.generation.load(Ordering::Acquire);
         if details.status != EnvironmentStatus::Running
@@ -728,9 +1020,12 @@ async fn publish_current_artifact_revision(
         }
         let result = {
             let revision = state.current.as_ref().expect("revision exists");
+            let Some(control_endpoint) = details.runtime_endpoints.control.as_deref() else {
+                continue;
+            };
             runtime
                 .artifact_synchronizer
-                .register(&details.rpc_url, &revision.artifacts)
+                .register(control_endpoint, &revision.artifacts)
                 .await
         };
         match result {
@@ -762,7 +1057,9 @@ async fn publish_current_artifact_revision(
 async fn has_running_environment(runtime: &LocalProcessRuntimeInner) -> bool {
     let environments = runtime.environments.read().await.clone();
     for environment in environments {
-        if environment.details.read().await.status == EnvironmentStatus::Running {
+        if environment.driver.supports_project_artifacts()
+            && environment.details.read().await.status == EnvironmentStatus::Running
+        {
             return true;
         }
     }
@@ -792,17 +1089,47 @@ async fn record_exit(environment: &LocalEnvironment, generation: u64, status: Ex
     .await;
 }
 
-async fn stop_environment(environment: &LocalEnvironment) {
+async fn stop_environment(environment: &LocalEnvironment) -> Result<(), EnvironmentRuntimeError> {
     let _lifecycle_guard = environment.lifecycle.lock().await;
     let current_status = environment.details.read().await.status;
     if current_status == EnvironmentStatus::Stopped {
-        return;
+        return Ok(());
     }
 
     environment.generation.fetch_add(1, Ordering::AcqRel);
     set_environment_status(environment, EnvironmentStatus::Stopping, None).await;
     terminate_child(environment).await;
+    if let Err(error) = environment.driver.stop().await {
+        set_environment_status(
+            environment,
+            EnvironmentStatus::Failed,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error);
+    }
     set_environment_status(environment, EnvironmentStatus::Stopped, None).await;
+    Ok(())
+}
+
+async fn delete_environment_runtime(
+    environment: &LocalEnvironment,
+) -> Result<(), EnvironmentRuntimeError> {
+    let _lifecycle_guard = environment.lifecycle.lock().await;
+    environment.generation.fetch_add(1, Ordering::AcqRel);
+    set_environment_status(environment, EnvironmentStatus::Stopping, None).await;
+    terminate_child(environment).await;
+    if let Err(error) = environment.driver.delete().await {
+        set_environment_status(
+            environment,
+            EnvironmentStatus::Failed,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error);
+    }
+    set_environment_status(environment, EnvironmentStatus::Stopped, None).await;
+    Ok(())
 }
 
 async fn restart_environment(
@@ -826,21 +1153,12 @@ async fn restart_environment(
 
     environment.generation.fetch_add(1, Ordering::AcqRel);
     terminate_child(environment).await;
-    select_port(Some(details.config.port))?;
-    let child = spawn_localnet(
-        &runtime.acton_executable,
-        &runtime.workspace_root,
-        environment_data_dir(&runtime.workspace_root, &details.id).join("localnet.sqlite"),
-        &details.config,
-    )?;
+    environment.driver.ensure_restartable()?;
+    let child = environment.driver.spawn_start()?;
     *environment.child.lock().await = Some(child);
     let generation = environment.generation.load(Ordering::Acquire);
     set_environment_status(environment, EnvironmentStatus::Starting, None).await;
-    tokio::spawn(monitor_localnet(
-        Arc::clone(runtime),
-        Arc::clone(environment),
-        generation,
-    ));
+    spawn_environment_monitor(Arc::clone(runtime), Arc::clone(environment), generation);
     Ok(environment.details.read().await.clone())
 }
 

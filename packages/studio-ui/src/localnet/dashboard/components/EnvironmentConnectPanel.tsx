@@ -1,6 +1,6 @@
 import {Button, CopyInlineButton, HighlightedCode, Tooltip} from "@acton/ui"
 import {Braces, Cable, CircleAlert, FileCode2, Settings} from "lucide-react"
-import {useMemo, useState} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {Link} from "react-router"
 
 import styles from "./EnvironmentConnectPanel.module.css"
@@ -8,14 +8,13 @@ import styles from "./EnvironmentConnectPanel.module.css"
 type IntegrationTarget = "acton" | "ton-client" | "rpc"
 
 interface EnvironmentConnectPanelProps {
-  readonly apiV2Url: string
-  readonly apiV3Url: string
-  readonly controlUrl: string
+  readonly apiV2Url?: string
+  readonly apiV3Url?: string
+  readonly controlUrl?: string
   readonly environmentName: string
-  readonly explorerUrl: string
+  readonly explorerUrl?: string
   readonly integratePath: string
   readonly onDismiss?: () => void
-  readonly rpcUrl: string
   readonly settingsPath: string
 }
 
@@ -53,28 +52,54 @@ export function EnvironmentConnectPanel({
   explorerUrl,
   integratePath,
   onDismiss,
-  rpcUrl,
   settingsPath,
 }: EnvironmentConnectPanelProps) {
-  const [target, setTarget] = useState<IntegrationTarget>("acton")
   const urls = useMemo(
     () => ({
       apiV2: toAbsoluteUrl(apiV2Url),
       apiV3: toAbsoluteUrl(apiV3Url),
       control: toAbsoluteUrl(controlUrl),
       explorer: toAbsoluteUrl(explorerUrl),
-      rpc: toAbsoluteUrl(rpcUrl),
     }),
-    [apiV2Url, apiV3Url, controlUrl, explorerUrl, rpcUrl],
+    [apiV2Url, apiV3Url, controlUrl, explorerUrl],
   )
-  const actonConfig = `[networks.localnet]
-api.v2 = "${urls.apiV2}"
-api.v3 = "${urls.apiV3}"
-explorer = "${urls.explorer}"`
+  const endpointEntries = useMemo(
+    () =>
+      [
+        urls.apiV2 ? {label: "V2 API", value: urls.apiV2} : undefined,
+        urls.apiV3 ? {label: "V3 API", value: urls.apiV3} : undefined,
+        urls.control ? {label: "Control API", value: urls.control} : undefined,
+      ].filter((entry): entry is {readonly label: string; readonly value: string} =>
+        Boolean(entry),
+      ),
+    [urls.apiV2, urls.apiV3, urls.control],
+  )
+  const availableOptions = useMemo(
+    () =>
+      integrationOptions.filter(option =>
+        option.id === "rpc" ? endpointEntries.length > 0 : urls.apiV2 !== undefined,
+      ),
+    [endpointEntries.length, urls.apiV2],
+  )
+  const [target, setTarget] = useState<IntegrationTarget>(() => (urls.apiV2 ? "acton" : "rpc"))
+  useEffect(() => {
+    if (!availableOptions.some(option => option.id === target)) {
+      setTarget(availableOptions[0]?.id ?? "rpc")
+    }
+  }, [availableOptions, target])
+
+  const actonConfig = [
+    "[networks.localnet]",
+    urls.apiV2 ? `api.v2 = "${urls.apiV2}"` : undefined,
+    urls.apiV3 ? `api.v3 = "${urls.apiV3}"` : undefined,
+    urls.explorer ? `explorer = "${urls.explorer}"` : undefined,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n")
   const tonClientSetup = `import { TonClient } from "@ton/ton"
 
 const client = new TonClient({
-  endpoint: "${withoutTrailingSlash(urls.apiV2)}/jsonRPC",
+  endpoint: "${withoutTrailingSlash(urls.apiV2 ?? "")}/jsonRPC",
 })`
   const actonRunCommand = "acton script --net localnet scripts/deploy.tolk"
   const tonClientRequest = `const masterchain = await client.getMasterchainInfo()
@@ -88,6 +113,7 @@ console.log(masterchain)`
     tonClientRequest,
     urls,
   })
+  const primaryEndpoint = endpointEntries[0]
 
   return (
     <section
@@ -114,24 +140,26 @@ console.log(masterchain)`
         </div>
       </header>
 
-      <dl className={styles.summary}>
-        <div className={styles.summaryItem}>
-          <dt>RPC endpoint</dt>
-          <dd>
-            <Tooltip content={urls.rpc}>
-              <code>{urls.rpc}</code>
-            </Tooltip>
-            <CopyInlineButton
-              value={urls.rpc}
-              label="Copy RPC endpoint"
-              copiedLabel="RPC endpoint copied"
-              copiedChildren={null}
-            >
-              {null}
-            </CopyInlineButton>
-          </dd>
-        </div>
-      </dl>
+      {primaryEndpoint ? (
+        <dl className={styles.summary}>
+          <div className={styles.summaryItem}>
+            <dt>{primaryEndpoint.label}</dt>
+            <dd>
+              <Tooltip content={primaryEndpoint.value}>
+                <code>{primaryEndpoint.value}</code>
+              </Tooltip>
+              <CopyInlineButton
+                value={primaryEndpoint.value}
+                label={`Copy ${primaryEndpoint.label} endpoint`}
+                copiedLabel={`${primaryEndpoint.label} endpoint copied`}
+                copiedChildren={null}
+              >
+                {null}
+              </CopyInlineButton>
+            </dd>
+          </div>
+        </dl>
+      ) : undefined}
 
       <div className={styles.setup}>
         <div className={styles.step}>
@@ -139,7 +167,7 @@ console.log(masterchain)`
           <div className={styles.stepContent}>
             <h3>Choose what to connect</h3>
             <div className={styles.integrationOptions}>
-              {integrationOptions.map(option => {
+              {availableOptions.map(option => {
                 const Icon = option.icon
                 const selected = target === option.id
 
@@ -190,9 +218,9 @@ console.log(masterchain)`
 
             {target === "rpc" ? (
               <div className={styles.endpointList}>
-                <EndpointRow label="V2 API" value={urls.apiV2} />
-                <EndpointRow label="V3 API" value={urls.apiV3} />
-                <EndpointRow label="Control API" value={urls.control} />
+                {endpointEntries.map(endpoint => (
+                  <EndpointRow key={endpoint.label} {...endpoint} />
+                ))}
               </div>
             ) : (
               <HighlightedCode
@@ -311,11 +339,10 @@ function integrationPromptFor({
   readonly tonClientSetup: string
   readonly tonClientRequest: string
   readonly urls: {
-    readonly apiV2: string
-    readonly apiV3: string
-    readonly control: string
-    readonly explorer: string
-    readonly rpc: string
+    readonly apiV2?: string
+    readonly apiV3?: string
+    readonly control?: string
+    readonly explorer?: string
   }
 }): string {
   if (target === "acton") {
@@ -338,16 +365,20 @@ Make requests with the same TonClient API as testnet and mainnet:
 ${tonClientRequest}`
   }
 
+  const endpointLines = [
+    urls.apiV2 ? `V2 API: ${urls.apiV2}` : undefined,
+    urls.apiV3 ? `V3 API: ${urls.apiV3}` : undefined,
+    urls.control ? `Control API: ${urls.control}` : undefined,
+    urls.explorer ? `Explorer: ${urls.explorer}` : undefined,
+  ].filter((line): line is string => Boolean(line))
+
   return `Connect the TON application to the "${environmentName}" Acton virtual environment.
 
-RPC endpoint: ${urls.rpc}
-V2 API: ${urls.apiV2}
-V3 API: ${urls.apiV3}
-Control API: ${urls.control}
-Explorer: ${urls.explorer}`
+${endpointLines.join("\n")}`
 }
 
-function toAbsoluteUrl(value: string): string {
+function toAbsoluteUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
   try {
     return new URL(value, globalThis.location.origin).href
   } catch {

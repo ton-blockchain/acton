@@ -15,7 +15,8 @@ export type StudioConnectionState = "connecting" | "connected" | "disconnected"
 
 export type EnvironmentStatus = "starting" | "running" | "stopping" | "stopped" | "failed"
 
-export interface EnvironmentConfig {
+export interface ActonLocalnetEnvironmentConfig {
+  readonly kind: "actonLocalnet"
   readonly port: number
   readonly forkNetwork?: string
   readonly forkBlockNumber?: number
@@ -27,17 +28,17 @@ export interface EnvironmentConfig {
   readonly mineEmptyBlocks: boolean
 }
 
-export interface StudioEnvironment {
-  readonly id: string
-  readonly name: string
-  readonly status: EnvironmentStatus
-  readonly rpcUrl: string
-  readonly config: EnvironmentConfig
-  readonly error?: string
+export interface FullTonNetworkEnvironmentConfig {
+  readonly kind: "fullTonNetwork"
+  readonly apiV2Port: number
+  readonly apiV3Port: number
+  readonly validators: number
 }
 
-export interface CreateEnvironmentRequest {
-  readonly name: string
+export type EnvironmentConfig = ActonLocalnetEnvironmentConfig | FullTonNetworkEnvironmentConfig
+
+export interface CreateActonLocalnetEnvironmentConfig {
+  readonly kind: "actonLocalnet"
   readonly port?: number
   readonly forkNetwork?: string
   readonly forkBlockNumber?: number
@@ -47,6 +48,62 @@ export interface CreateEnvironmentRequest {
   readonly blockIntervalMs?: number
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
+}
+
+export interface CreateFullTonNetworkEnvironmentConfig {
+  readonly kind: "fullTonNetwork"
+  readonly apiV2Port?: number
+  readonly apiV3Port?: number
+  readonly validators?: number
+}
+
+export type CreateEnvironmentConfig =
+  | CreateActonLocalnetEnvironmentConfig
+  | CreateFullTonNetworkEnvironmentConfig
+
+export type EnvironmentCapability =
+  | "apiV2"
+  | "apiV3"
+  | "explorer"
+  | "integration"
+  | "controlApi"
+  | "simulator"
+  | "wallets"
+  | "faucet"
+  | "contracts"
+  | "apiCalls"
+  | "mining"
+  | "timeTravel"
+  | "snapshots"
+  | "checkpoints"
+
+export interface EnvironmentEndpoints {
+  readonly apiV2?: string
+  readonly apiV3?: string
+  readonly control?: string
+}
+
+export interface EnvironmentNetwork {
+  readonly id: string
+  readonly label: string
+  readonly testOnly: boolean
+}
+
+export interface StudioEnvironment {
+  readonly id: string
+  readonly name: string
+  readonly status: EnvironmentStatus
+  readonly rpcUrl: string
+  readonly config: EnvironmentConfig
+  readonly capabilities: readonly EnvironmentCapability[]
+  readonly endpoints: EnvironmentEndpoints
+  readonly network: EnvironmentNetwork
+  readonly error?: string
+}
+
+export interface CreateEnvironmentRequest {
+  readonly name: string
+  readonly config: CreateEnvironmentConfig
 }
 
 export interface UpdateEnvironmentRequest {

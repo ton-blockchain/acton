@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 
+import type {EnvironmentNetwork} from "../../../studioApi"
 import type {TonClient} from "../api/client"
 import type {LocalnetNodeInfo} from "../api/types"
 
@@ -16,6 +17,7 @@ interface NetworkInfoProviderProps {
   readonly api: ExplorerApiConfig
   readonly children: ReactNode
   readonly enabled?: boolean
+  readonly network?: EnvironmentNetwork
 }
 
 export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
@@ -23,6 +25,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
   api,
   children,
   enabled = true,
+  network: networkIdentity,
 }) => {
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
 
@@ -57,16 +60,21 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
   const forkNetwork = nodeInfo?.fork_network?.trim()
   const normalizedForkNetwork = forkNetwork?.toLocaleLowerCase()
   const isFork = nodeInfo?.state_source === "remote" && Boolean(forkNetwork)
-  const isMainnetFork = isFork && normalizedForkNetwork === "mainnet"
+  const baselineNetwork = useMemo<ExplorerNetworkInfo>(() => {
+    const id = explorerNetworkId(networkIdentity?.id)
+    return {
+      id,
+      label: networkIdentity?.label ?? "Localnet",
+      testOnly: networkIdentity?.testOnly ?? true,
+      supportsActions: id === "mainnet" || id === "testnet",
+      api,
+    }
+  }, [api, networkIdentity])
+  const isMainnetFork =
+    (isFork && normalizedForkNetwork === "mainnet") || (!isFork && baselineNetwork.id === "mainnet")
   const network = useMemo<ExplorerNetworkInfo>(() => {
     if (!isFork) {
-      return {
-        id: "localnet",
-        label: "Localnet",
-        testOnly: true,
-        supportsActions: false,
-        api,
-      }
+      return baselineNetwork
     }
     if (normalizedForkNetwork === "mainnet") {
       return {
@@ -93,7 +101,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
       supportsActions: false,
       api,
     }
-  }, [api, forkNetwork, isFork, normalizedForkNetwork])
+  }, [api, baselineNetwork, forkNetwork, isFork, normalizedForkNetwork])
   const addressFormat = useMemo(
     () => ({
       testOnly: network.testOnly,
@@ -112,4 +120,13 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
   }, [addressFormat, forkNetwork, isFork, isMainnetFork, network, nodeInfo])
 
   return <NetworkInfoContext.Provider value={value}>{children}</NetworkInfoContext.Provider>
+}
+
+function explorerNetworkId(id: string | undefined): ExplorerNetworkInfo["id"] {
+  const normalized = id?.trim().toLocaleLowerCase()
+  if (!normalized || normalized === "localnet" || normalized === "acton-localnet") {
+    return "localnet"
+  }
+  if (normalized === "mainnet" || normalized === "testnet") return normalized
+  return normalized.startsWith("custom:") ? `custom:${normalized.slice(7)}` : `custom:${normalized}`
 }

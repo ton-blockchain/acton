@@ -1,6 +1,7 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 
+import {supports} from "../environmentCapabilities"
 import type {StudioEnvironment} from "../studioApi"
 import {TonClient} from "./explorer/api/client"
 import {getBundledCompilerAbis} from "./explorer/api/compilerAbiCatalog"
@@ -9,6 +10,7 @@ import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
 import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
 import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
+import type {ExplorerMetadataRegistry} from "./explorer/metadata/types"
 import {VerifierMetadataRegistry} from "./explorer/metadata/verifierRegistry"
 import {LocalnetRoutesProvider, localnetPath} from "./routes"
 
@@ -55,8 +57,10 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
         : DEFAULT_RPC_BASE_URL,
     [environment],
   )
-  const apiV2BaseUrl = `${rpcBaseUrl}/api/v2`
-  const apiV3BaseUrl = `${rpcBaseUrl}/api/v3`
+  const apiV2BaseUrl = environment?.endpoints.apiV2 ?? `${rpcBaseUrl}/api/v2`
+  const apiV3BaseUrl = environment?.endpoints.apiV3 ?? `${rpcBaseUrl}/api/v3`
+  const controlBaseUrl = environment?.endpoints.control ?? rpcBaseUrl
+  const controlEnabled = supports(environment, "controlApi")
   const [localnetApiToken, setLocalnetApiTokenState] = useState<string>()
   const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false)
   const [isAuthOverlayRequired, setIsAuthOverlayRequired] = useState(false)
@@ -121,21 +125,31 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       new TonClient({
         v2BaseUrl: apiV2BaseUrl,
         v3BaseUrl: apiV3BaseUrl,
-        addressNameBaseUrl: rpcBaseUrl,
+        addressNameBaseUrl: controlBaseUrl,
+        localnetControlEnabled: controlEnabled,
+        toncenterApiCompatible: !controlEnabled,
         localnetApiToken,
         onUnauthorized: requireAuthToken,
       }),
-    [apiV2BaseUrl, apiV3BaseUrl, localnetApiToken, requireAuthToken, rpcBaseUrl],
+    [
+      apiV2BaseUrl,
+      apiV3BaseUrl,
+      controlBaseUrl,
+      controlEnabled,
+      localnetApiToken,
+      requireAuthToken,
+    ],
   )
-  const metadataRegistry = useMemo(
-    () =>
-      new CompositeMetadataRegistry([
-        new LocalnetMetadataRegistry(client),
-        new BundledAbiRegistry(getBundledCompilerAbis),
-        new VerifierMetadataRegistry(),
-      ]),
-    [client],
-  )
+  const metadataRegistry = useMemo(() => {
+    const registries: ExplorerMetadataRegistry[] = [
+      new BundledAbiRegistry(getBundledCompilerAbis),
+      new VerifierMetadataRegistry(),
+    ]
+    if (supports(environment, "contracts")) {
+      registries.unshift(new LocalnetMetadataRegistry(client))
+    }
+    return new CompositeMetadataRegistry(registries)
+  }, [client, environment])
   const explorerApi = useMemo(
     () => ({
       v2BaseUrl: apiV2BaseUrl,
@@ -183,7 +197,8 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       <NetworkInfoProvider
         client={client}
         api={explorerApi}
-        enabled={environment?.status === "running"}
+        enabled={environment?.status === "running" && controlEnabled}
+        network={environment?.network}
       >
         <ExplorerRoutesProvider
           abiPath={localnetPath(basePath, "/contracts/abi")}

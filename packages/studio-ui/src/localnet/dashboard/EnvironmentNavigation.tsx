@@ -17,6 +17,8 @@ import {
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router"
 
+import {supports} from "../../environmentCapabilities"
+import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
 import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
 import {useLocalnetRoutes} from "../routes"
@@ -197,9 +199,26 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const location = useLocation()
   const navigate = useNavigate()
   const routes = useLocalnetRoutes()
-  const {forkNetwork} = useNetworkInfo()
+  const {environment} = useLocalnetRuntime()
+  const {forkNetwork, network} = useNetworkInfo()
   const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
-  const forkBadgeLabel = useMemo(() => formatForkNetworkLabel(forkNetwork), [forkNetwork])
+  const forkBadgeLabel = useMemo(
+    () =>
+      formatForkNetworkLabel(forkNetwork) ??
+      (network.id === "localnet" ? undefined : network.label),
+    [forkNetwork, network.id, network.label],
+  )
+  const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
+  const visibleEnvironmentItems = environmentItems.filter(item =>
+    item.path === "/wallets" ? supports(environment, "wallets") : supports(environment, "faucet"),
+  )
+  const visibleApiReferenceItems = apiReferenceItems.filter(item =>
+    item.path === "/api-reference/v2"
+      ? supports(environment, "apiV2")
+      : item.path === "/api-reference/v3"
+        ? supports(environment, "apiV3")
+        : supports(environment, "controlApi"),
+  )
   const localPathname = location.pathname.slice(routes.basePath.length) || "/"
   const isExplorerActive =
     localPathname.startsWith("/explorer") || localPathname.startsWith("/block/")
@@ -273,47 +292,51 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
             />
           ))}
 
-          <NavigationDisclosure
-            active={isExplorerActive}
-            ariaLabel="Explorer pages"
-            controlsId="environment-explorer-navigation"
-            icon={SearchIcon}
-            isItemActive={item =>
-              item.path === "/explorer"
-                ? isExplorerOverviewActive
-                : item.path === "/explorer/blocks"
-                  ? localPathname === item.path || localPathname.startsWith("/block/")
-                  : localPathname === item.path
-            }
-            items={explorerItems}
-            label="Explorer"
-            onItemSelect={path => void navigate(routes.path(path))}
-            onParentSelect={() => void navigate(routes.path(explorerPath))}
-            onToggle={() => setIsExplorerOpen(open => !open)}
-            open={isExplorerOpen}
-          />
+          {supports(environment, "explorer") ? (
+            <NavigationDisclosure
+              active={isExplorerActive}
+              ariaLabel="Explorer pages"
+              controlsId="environment-explorer-navigation"
+              icon={SearchIcon}
+              isItemActive={item =>
+                item.path === "/explorer"
+                  ? isExplorerOverviewActive
+                  : item.path === "/explorer/blocks"
+                    ? localPathname === item.path || localPathname.startsWith("/block/")
+                    : localPathname === item.path
+              }
+              items={explorerItems}
+              label="Explorer"
+              onItemSelect={path => void navigate(routes.path(path))}
+              onParentSelect={() => void navigate(routes.path(explorerPath))}
+              onToggle={() => setIsExplorerOpen(open => !open)}
+              open={isExplorerOpen}
+            />
+          ) : undefined}
 
-          <NavigationDisclosure
-            active={isContractsActive}
-            ariaLabel="Contract pages"
-            controlsId="environment-contract-navigation"
-            icon={Box}
-            isItemActive={item =>
-              item.path === "/contracts"
-                ? localPathname === item.path
-                : item.path === "/contracts/abi"
-                  ? localPathname.startsWith(item.path)
-                  : localPathname === item.path
-            }
-            items={contractItems}
-            label="Contracts"
-            onItemSelect={path => void navigate(routes.path(path))}
-            onParentSelect={() => void navigate(routes.path("/contracts"))}
-            onToggle={() => setIsContractsOpen(open => !open)}
-            open={isContractsOpen}
-          />
+          {supports(environment, "contracts") ? (
+            <NavigationDisclosure
+              active={isContractsActive}
+              ariaLabel="Contract pages"
+              controlsId="environment-contract-navigation"
+              icon={Box}
+              isItemActive={item =>
+                item.path === "/contracts"
+                  ? localPathname === item.path
+                  : item.path === "/contracts/abi"
+                    ? localPathname.startsWith(item.path)
+                    : localPathname === item.path
+              }
+              items={contractItems}
+              label="Contracts"
+              onItemSelect={path => void navigate(routes.path(path))}
+              onParentSelect={() => void navigate(routes.path("/contracts"))}
+              onToggle={() => setIsContractsOpen(open => !open)}
+              open={isContractsOpen}
+            />
+          ) : undefined}
 
-          {standaloneItems.map(item => (
+          {visibleStandaloneItems.map(item => (
             <NavigationItem
               key={item.label}
               active={item.path === localPathname}
@@ -323,48 +346,62 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
           ))}
         </div>
 
-        <div className={styles.navigationSectionGroup}>
-          <div className={styles.navDivider} />
-          <div className={styles.navSection}>
-            {environmentItems.map(item => (
-              <NavigationItem
-                key={item.label}
-                active={item.path === localPathname}
-                item={item}
-                onSelect={path => void navigate(routes.path(path))}
-              />
-            ))}
+        {visibleEnvironmentItems.length > 0 ? (
+          <div className={styles.navigationSectionGroup}>
+            <div className={styles.navDivider} />
+            <div className={styles.navSection}>
+              {visibleEnvironmentItems.map(item => (
+                <NavigationItem
+                  key={item.label}
+                  active={item.path === localPathname}
+                  item={item}
+                  onSelect={path => void navigate(routes.path(path))}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        ) : undefined}
 
-        <div className={styles.navigationSectionGroup}>
-          <div className={styles.navDivider} />
-          <div className={styles.navSection}>
-            <NavigationItem
-              active={integrateItem.path === localPathname}
-              item={integrateItem}
-              onSelect={path => void navigate(routes.path(path))}
-            />
-            <NavigationItem
-              active={apiCallsItem.path === localPathname}
-              item={apiCallsItem}
-              onSelect={path => void navigate(routes.path(path))}
-            />
-            <NavigationDisclosure
-              active={isApiReferenceActive}
-              ariaLabel="API Reference pages"
-              controlsId="environment-api-reference-navigation"
-              icon={Brackets}
-              isItemActive={item => localPathname === item.path}
-              items={apiReferenceItems}
-              label="API Reference"
-              onItemSelect={path => void navigate(routes.path(path))}
-              onParentSelect={() => void navigate(routes.path(apiReferenceItems[0].path))}
-              onToggle={() => setIsApiReferenceOpen(open => !open)}
-              open={isApiReferenceOpen}
-            />
+        {supports(environment, "integration") ||
+        supports(environment, "apiCalls") ||
+        visibleApiReferenceItems.length > 0 ? (
+          <div className={styles.navigationSectionGroup}>
+            <div className={styles.navDivider} />
+            <div className={styles.navSection}>
+              {supports(environment, "integration") ? (
+                <NavigationItem
+                  active={integrateItem.path === localPathname}
+                  item={integrateItem}
+                  onSelect={path => void navigate(routes.path(path))}
+                />
+              ) : undefined}
+              {supports(environment, "apiCalls") ? (
+                <NavigationItem
+                  active={apiCallsItem.path === localPathname}
+                  item={apiCallsItem}
+                  onSelect={path => void navigate(routes.path(path))}
+                />
+              ) : undefined}
+              {visibleApiReferenceItems.length > 0 ? (
+                <NavigationDisclosure
+                  active={isApiReferenceActive}
+                  ariaLabel="API Reference pages"
+                  controlsId="environment-api-reference-navigation"
+                  icon={Brackets}
+                  isItemActive={item => localPathname === item.path}
+                  items={visibleApiReferenceItems}
+                  label="API Reference"
+                  onItemSelect={path => void navigate(routes.path(path))}
+                  onParentSelect={() =>
+                    void navigate(routes.path(visibleApiReferenceItems[0].path))
+                  }
+                  onToggle={() => setIsApiReferenceOpen(open => !open)}
+                  open={isApiReferenceOpen}
+                />
+              ) : undefined}
+            </div>
           </div>
-        </div>
+        ) : undefined}
       </div>
     </nav>
   )

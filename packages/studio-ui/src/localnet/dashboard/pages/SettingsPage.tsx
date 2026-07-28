@@ -3,6 +3,7 @@ import {CircleHelp, Trash2} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
 import type {FC} from "react"
 
+import {supports} from "../../../environmentCapabilities"
 import {deleteStudioEnvironment, updateStudioEnvironment} from "../../../studioApi"
 import type {StudioEnvironment} from "../../../studioApi"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
@@ -25,6 +26,12 @@ export const SettingsPage: FC<SettingsPageProps> = ({
 }) => {
   const {showToast} = useToast()
   const {environment} = useLocalnetRuntime()
+  const localnetConfig =
+    environment?.config.kind === "actonLocalnet" ? environment.config : undefined
+  const fullNetworkConfig =
+    environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
+  const hasControlApi = supports(environment, "controlApi")
+  const hasMining = supports(environment, "mining")
   const [miningMode, setMiningMode] = useState<LocalnetMiningMode>()
   const [autoMining, setAutoMining] = useState<boolean>()
   const [blockIntervalMs, setBlockIntervalMs] = useState<number>()
@@ -38,6 +45,17 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const [isDeleting, setIsDeleting] = useState(false)
 
   const loadRuntimeSettings = useCallback(async () => {
+    if (!hasControlApi) {
+      setMiningMode(undefined)
+      setAutoMining(undefined)
+      setBlockIntervalMs(undefined)
+      setRateLimitRps(undefined)
+      setResponseDelay("")
+      setLoadError(undefined)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setLoadError(undefined)
     try {
@@ -52,7 +70,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
     } finally {
       setIsLoading(false)
     }
-  }, [client])
+  }, [client, hasControlApi])
 
   useEffect(() => {
     void loadRuntimeSettings()
@@ -169,9 +187,19 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   }, [environment, onEnvironmentDelete, showToast])
 
   const parsedResponseDelay = parseResponseDelay(responseDelay)
-  const rpcUrl = environment?.rpcUrl
-    ? new URL(environment.rpcUrl, globalThis.location.origin).href
-    : undefined
+  const endpointRows = environment
+    ? [
+        environment.endpoints.apiV2
+          ? {label: "V2 API endpoint", value: absoluteUrl(environment.endpoints.apiV2)}
+          : undefined,
+        environment.endpoints.apiV3
+          ? {label: "V3 API endpoint", value: absoluteUrl(environment.endpoints.apiV3)}
+          : undefined,
+        environment.endpoints.control
+          ? {label: "Control API endpoint", value: absoluteUrl(environment.endpoints.control)}
+          : undefined,
+      ].filter((row): row is {readonly label: string; readonly value: string} => Boolean(row))
+    : []
   const nameCanBeSaved =
     environment !== undefined &&
     environmentName.trim().length > 0 &&
@@ -233,172 +261,207 @@ export const SettingsPage: FC<SettingsPageProps> = ({
         />
 
         <div className={styles.settingsRows}>
-          <div className={styles.settingsRow}>
-            <div className={styles.settingsRowCopy}>
-              <strong>RPC endpoint</strong>
-              <span>Connect apps and development tools to this environment</span>
-            </div>
-            <div className={styles.settingsCopyValue}>
-              <code title={rpcUrl}>{rpcUrl ?? "Unavailable"}</code>
-              {rpcUrl ? (
-                <CopyInlineButton
-                  value={rpcUrl}
-                  label="Copy RPC endpoint"
-                  copiedLabel="RPC endpoint copied"
-                  copiedChildren={null}
-                >
-                  {null}
-                </CopyInlineButton>
-              ) : undefined}
-            </div>
-          </div>
-
           <SettingsValueRow
-            label="Runtime port"
-            description="The port assigned to this environment"
-            value={environment?.config.port.toString() ?? "Unavailable"}
-            copyValue={environment?.config.port.toString()}
-            technical
+            label="Environment type"
+            description="The runtime used by this environment"
+            value={
+              environment?.config.kind === "fullTonNetwork"
+                ? "Full TON network"
+                : "Fast local network"
+            }
           />
 
           <SettingsValueRow
-            label="Initial state"
-            description="Network state loaded when this environment was created"
-            value={formatForkState(environment)}
+            label="Network"
+            description="The TON network identity exposed to connected tools"
+            value={environment?.network.label ?? "Unavailable"}
           />
 
-          <div className={styles.settingsRow}>
-            <div className={styles.settingsRowCopy}>
-              <strong>Response delay</strong>
-              <span>Simulate slower network responses, or use 0 to disable the delay</span>
-            </div>
-            <div className={styles.settingsNumberControl}>
-              <Input
-                aria-label="Response delay"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={60_000}
-                size="sm"
-                suffix="ms"
-                value={responseDelay}
-                invalid={responseDelay.length > 0 && parsedResponseDelay === undefined}
-                disabled={isLoading}
-                onChange={event => setResponseDelay(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === "Enter") void saveResponseDelay()
-                }}
+          {endpointRows.map(endpoint => (
+            <SettingsValueRow
+              key={endpoint.label}
+              label={endpoint.label}
+              description="Connect compatible tools to this environment"
+              value={endpoint.value}
+              copyValue={endpoint.value}
+              technical
+            />
+          ))}
+
+          {endpointRows.length === 0 ? (
+            <SettingsValueRow
+              label="Endpoints"
+              description="Connections become available when the environment is running"
+              value="Unavailable"
+            />
+          ) : undefined}
+
+          {localnetConfig ? (
+            <>
+              <SettingsValueRow
+                label="Runtime port"
+                description="The port assigned to this environment"
+                value={localnetConfig.port?.toString() ?? "Automatic"}
+                copyValue={localnetConfig.port?.toString()}
+                technical
               />
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={savingAction === "response-delay"}
-                disabled={parsedResponseDelay === undefined || isLoading}
-                onClick={() => void saveResponseDelay()}
-              >
-                Apply
-              </Button>
-            </div>
-          </div>
 
-          <SettingsValueRow
-            label="Rate limit"
-            description="Maximum number of requests this environment accepts per second"
-            value={
-              isLoading
-                ? "Loading"
-                : rateLimitRps === undefined
-                  ? "Unavailable"
-                  : rateLimitRps === null
-                    ? "Unlimited"
-                    : `${rateLimitRps.toLocaleString()} requests/s`
-            }
-          />
-
-          <div className={styles.settingsRow}>
-            <div className={styles.settingsRowCopy}>
-              <strong>Startup accounts</strong>
-              <span>Wallets available as soon as this environment starts</span>
-            </div>
-            <div className={styles.settingsBadges}>
-              {environment && environment.config.accounts.length > 0 ? (
-                environment.config.accounts.map(account => (
-                  <span key={account} className={styles.settingsBadge}>
-                    {account}
-                  </span>
-                ))
-              ) : (
-                <span className={styles.settingsValueMuted}>None</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.settingsSection} aria-labelledby="mining-settings-title">
-        <SettingsSectionHeader
-          id="mining-settings-title"
-          title="Mining"
-          description="Review how this environment creates new blocks"
-        />
-
-        <div className={styles.settingsRows}>
-          <SettingsValueRow
-            label="Automatic mining"
-            description="Create blocks automatically while the environment is running"
-            value={
-              isLoading
-                ? "Loading"
-                : autoMining === undefined
-                  ? "Unavailable"
-                  : autoMining
-                    ? "Enabled"
-                    : "Disabled"
-            }
-          />
-
-          <SettingsValueRow
-            label="Block interval"
-            description="Time between automatic block creation attempts"
-            value={
-              isLoading
-                ? "Loading"
-                : autoMining === false
-                  ? "Not applicable"
-                  : blockIntervalMs === undefined
-                    ? "Unavailable"
-                    : `${blockIntervalMs.toLocaleString()} ms`
-            }
-          />
-
-          <div className={styles.settingsRow}>
-            <div className={styles.settingsRowCopy}>
-              <strong>Empty blocks</strong>
-              <span>Create blocks even when there are no pending messages</span>
-            </div>
-            {isLoading ? (
-              <span className={styles.settingsValueMuted}>Loading</span>
-            ) : loadError ? (
-              <Button size="sm" variant="outline" onClick={() => void loadRuntimeSettings()}>
-                Retry
-              </Button>
-            ) : (
-              <Checkbox
-                label="Mine empty blocks"
-                checked={!miningMode?.skip_empty_blocks}
-                disabled={savingAction === "empty-blocks"}
-                onChange={event => void updateEmptyBlockMining(event.target.checked)}
+              <SettingsValueRow
+                label="Initial state"
+                description="Network state loaded when this environment was created"
+                value={formatForkState(environment)}
               />
-            )}
-          </div>
+            </>
+          ) : undefined}
 
-          {loadError ? (
-            <div className={styles.settingsInlineError} role="alert">
-              {loadError}
+          {fullNetworkConfig ? (
+            <SettingsValueRow
+              label="Validators"
+              description="Validator nodes configured for this network"
+              value={(fullNetworkConfig.validators ?? 1).toLocaleString()}
+            />
+          ) : undefined}
+
+          {hasControlApi ? (
+            <>
+              <div className={styles.settingsRow}>
+                <div className={styles.settingsRowCopy}>
+                  <strong>Response delay</strong>
+                  <span>Simulate slower network responses, or use 0 to disable the delay</span>
+                </div>
+                <div className={styles.settingsNumberControl}>
+                  <Input
+                    aria-label="Response delay"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={60_000}
+                    size="sm"
+                    suffix="ms"
+                    value={responseDelay}
+                    invalid={responseDelay.length > 0 && parsedResponseDelay === undefined}
+                    disabled={isLoading}
+                    onChange={event => setResponseDelay(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === "Enter") void saveResponseDelay()
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={savingAction === "response-delay"}
+                    disabled={parsedResponseDelay === undefined || isLoading}
+                    onClick={() => void saveResponseDelay()}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </div>
+
+              <SettingsValueRow
+                label="Rate limit"
+                description="Maximum number of requests this environment accepts per second"
+                value={
+                  isLoading
+                    ? "Loading"
+                    : rateLimitRps === undefined
+                      ? "Unavailable"
+                      : rateLimitRps === null
+                        ? "Unlimited"
+                        : `${rateLimitRps.toLocaleString()} requests/s`
+                }
+              />
+            </>
+          ) : undefined}
+
+          {localnetConfig && supports(environment, "wallets") ? (
+            <div className={styles.settingsRow}>
+              <div className={styles.settingsRowCopy}>
+                <strong>Startup accounts</strong>
+                <span>Wallets available as soon as this environment starts</span>
+              </div>
+              <div className={styles.settingsBadges}>
+                {localnetConfig.accounts.length > 0 ? (
+                  localnetConfig.accounts.map(account => (
+                    <span key={account} className={styles.settingsBadge}>
+                      {account}
+                    </span>
+                  ))
+                ) : (
+                  <span className={styles.settingsValueMuted}>None</span>
+                )}
+              </div>
             </div>
           ) : undefined}
         </div>
       </section>
+
+      {hasMining ? (
+        <section className={styles.settingsSection} aria-labelledby="mining-settings-title">
+          <SettingsSectionHeader
+            id="mining-settings-title"
+            title="Mining"
+            description="Review how this environment creates new blocks"
+          />
+
+          <div className={styles.settingsRows}>
+            <SettingsValueRow
+              label="Automatic mining"
+              description="Create blocks automatically while the environment is running"
+              value={
+                isLoading
+                  ? "Loading"
+                  : autoMining === undefined
+                    ? "Unavailable"
+                    : autoMining
+                      ? "Enabled"
+                      : "Disabled"
+              }
+            />
+
+            <SettingsValueRow
+              label="Block interval"
+              description="Time between automatic block creation attempts"
+              value={
+                isLoading
+                  ? "Loading"
+                  : autoMining === false
+                    ? "Not applicable"
+                    : blockIntervalMs === undefined
+                      ? "Unavailable"
+                      : `${blockIntervalMs.toLocaleString()} ms`
+              }
+            />
+
+            <div className={styles.settingsRow}>
+              <div className={styles.settingsRowCopy}>
+                <strong>Empty blocks</strong>
+                <span>Create blocks even when there are no pending messages</span>
+              </div>
+              {isLoading ? (
+                <span className={styles.settingsValueMuted}>Loading</span>
+              ) : loadError ? (
+                <Button size="sm" variant="outline" onClick={() => void loadRuntimeSettings()}>
+                  Retry
+                </Button>
+              ) : (
+                <Checkbox
+                  label="Mine empty blocks"
+                  checked={!miningMode?.skip_empty_blocks}
+                  disabled={savingAction === "empty-blocks"}
+                  onChange={event => void updateEmptyBlockMining(event.target.checked)}
+                />
+              )}
+            </div>
+
+            {loadError ? (
+              <div className={styles.settingsInlineError} role="alert">
+                {loadError}
+              </div>
+            ) : undefined}
+          </div>
+        </section>
+      ) : undefined}
 
       <section className={styles.settingsSection} aria-labelledby="danger-settings-title">
         <SettingsSectionHeader
@@ -442,11 +505,21 @@ function parseResponseDelay(value: string): number | undefined {
 }
 
 function formatForkState(environment?: StudioEnvironment): string {
-  const network = environment?.config.forkNetwork
+  if (environment?.config.kind !== "actonLocalnet") return "Not applicable"
+
+  const network = environment.config.forkNetwork
   if (!network) return "Clean network"
 
   const block = environment.config.forkBlockNumber
   return block ? `${network} at block ${block.toLocaleString()}` : `${network} latest`
+}
+
+function absoluteUrl(value: string): string {
+  try {
+    return new URL(value, globalThis.location.origin).href
+  } catch {
+    return value
+  }
 }
 
 interface SettingsSectionHeaderProps {

@@ -19,6 +19,7 @@ import {useState} from "react"
 
 import {TablePage} from "../components/TablePage"
 import {
+  type EnvironmentConfig,
   type EnvironmentStatus,
   type StudioEnvironment,
   restartStudioEnvironment,
@@ -129,14 +130,15 @@ export function VirtualEnvironmentsPage({
         hasContent={environments.length > 0}
         onRetry={onRefresh}
       >
-        <DataTable minWidth="50rem">
+        <DataTable minWidth="62rem">
           <DataTableTable aria-label="Virtual environments">
             <DataTableHead>
               <DataTableRow>
-                <DataTableHeaderCell columnWidth="28%">Name</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="14%">Status</DataTableHeaderCell>
-                <DataTableHeaderCell columnWidth="15%">Network</DataTableHeaderCell>
-                <DataTableHeaderCell>RPC endpoint</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="22%">Name</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="12%">Status</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="17%">Type</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="14%">Network</DataTableHeaderCell>
+                <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
                 <DataTableHeaderCell align="right" columnWidth="9rem">
                   Actions
                 </DataTableHeaderCell>
@@ -145,13 +147,13 @@ export function VirtualEnvironmentsPage({
             <DataTableBody>
               {isLoading ? (
                 <DataTableSkeletonRows
-                  columns={5}
+                  columns={6}
                   rows={3}
-                  widths={["58%", "44%", "48%", "74%", "60%"]}
-                  alignments={["left", "left", "left", "left", "right"]}
+                  widths={["58%", "44%", "62%", "48%", "74%", "60%"]}
+                  alignments={["left", "left", "left", "left", "left", "right"]}
                 />
               ) : environments.length === 0 ? (
-                <DataTableEmpty colSpan={5}>
+                <DataTableEmpty colSpan={6}>
                   <div className={styles.emptyState}>
                     <span className={styles.emptyIcon}>
                       <Boxes size={21} aria-hidden="true" />
@@ -212,21 +214,26 @@ export function VirtualEnvironmentsPage({
                         <EnvironmentStatusLabel status={environment.status} />
                       </DataTableCell>
                       <DataTableCell tone="muted">
-                        {formatNetwork(environment.config.forkNetwork)}
+                        {formatEnvironmentType(environment.config)}
                       </DataTableCell>
+                      <DataTableCell tone="muted">{environment.network.label}</DataTableCell>
                       <DataTableCell>
-                        <InlineActions
-                          visibility="always"
-                          actions={
-                            <CopyInlineAction
-                              value={environment.rpcUrl}
-                              label="Copy RPC endpoint"
-                              copiedLabel="RPC endpoint copied"
-                            />
-                          }
-                        >
-                          <span className={styles.rpcUrl}>{environment.rpcUrl}</span>
-                        </InlineActions>
+                        {primaryEndpoint(environment) ? (
+                          <InlineActions
+                            visibility="always"
+                            actions={
+                              <CopyInlineAction
+                                value={primaryEndpoint(environment) ?? ""}
+                                label="Copy endpoint"
+                                copiedLabel="Endpoint copied"
+                              />
+                            }
+                          >
+                            <span className={styles.rpcUrl}>{primaryEndpoint(environment)}</span>
+                          </InlineActions>
+                        ) : (
+                          <span className={styles.rpcUrl}>Unavailable</span>
+                        )}
                       </DataTableCell>
                       <DataTableCell align="right">
                         {canRestart ? (
@@ -284,9 +291,12 @@ function EnvironmentStatusLabel({status}: {readonly status: EnvironmentStatus}) 
   )
 }
 
-function formatNetwork(forkNetwork: string | undefined) {
-  if (!forkNetwork) return "Clean state"
-  return `${forkNetwork.charAt(0).toUpperCase()}${forkNetwork.slice(1)} fork`
+function formatEnvironmentType(config: EnvironmentConfig) {
+  return config.kind === "actonLocalnet" ? "Fast local network" : "Full TON network"
+}
+
+function primaryEndpoint(environment: StudioEnvironment): string | undefined {
+  return environment.endpoints.apiV3 ?? environment.endpoints.apiV2 ?? environment.endpoints.control
 }
 
 function getErrorMessage(error: unknown) {

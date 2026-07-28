@@ -18,6 +18,7 @@ import {useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
 
+import {supports} from "../../../environmentCapabilities"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "../../explorer/api/client"
 import {addressKey} from "../../explorer/api/compilerAbi"
@@ -93,6 +94,11 @@ interface HomeState {
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
   const runtime = useLocalnetRuntime()
+  const environment = runtime.environment
+  const localnetConfig =
+    environment?.config.kind === "actonLocalnet" ? environment.config : undefined
+  const hasControlApi = supports(environment, "controlApi")
+  const hasIntegration = supports(environment, "integration")
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
@@ -115,15 +121,19 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const timeAdvanceTargetValue = nodeInfo
     ? formatNodeDateTime(nodeInfo.current_unix_time + (parsedTimeAdvanceSeconds ?? 0))
     : "—"
-  const forkNetwork =
-    nodeInfo === undefined ? runtime.environment?.config.forkNetwork : nodeInfo.fork_network
+  const forkNetwork = nodeInfo === undefined ? localnetConfig?.forkNetwork : nodeInfo.fork_network
   const forkBlockNumber =
-    nodeInfo === undefined
-      ? runtime.environment?.config.forkBlockNumber
-      : nodeInfo.fork_block_number
+    nodeInfo === undefined ? localnetConfig?.forkBlockNumber : nodeInfo.fork_block_number
   const hasFork = Boolean(forkNetwork?.trim())
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
-  const forkBadgeLabel = formatForkNetworkLabel(forkNetwork) ?? "clean network"
+  const networkSummary = hasControlApi
+    ? forkSummary
+    : (environment?.network.label ?? "Virtual environment")
+  const forkBadgeLabel =
+    formatForkNetworkLabel(forkNetwork) ??
+    (environment?.network.id === "localnet"
+      ? "Local genesis"
+      : (environment?.network.label ?? "Local genesis"))
   const connectPanelStorageKey = runtime.environment?.id
     ? `${CONNECT_PANEL_DISMISSED_STORAGE_PREFIX}${runtime.environment.id}`
     : undefined
@@ -168,6 +178,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   }, [connectPanelStorageKey])
 
   useEffect(() => {
+    if (!hasControlApi) {
+      setNodeInfo(undefined)
+      return
+    }
+
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
@@ -196,7 +211,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client])
+  }, [client, hasControlApi])
 
   useEffect(() => {
     let cancelled = false
@@ -326,12 +341,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           <h1 className={styles.environmentHomeName}>
             {runtime.environment?.name ?? "Virtual environment"}
           </h1>
-          <span className={styles.workspaceForkBadge} title={forkSummary}>
+          <span className={styles.workspaceForkBadge} title={networkSummary}>
             {forkBadgeLabel}
           </span>
         </div>
         <EnvironmentActions
           client={client}
+          environment={environment}
           isAdvanceTimeOpen={isTimeModalOpen}
           latestBlockSeqno={nodeInfo?.last_block_seqno}
           onAdvanceTime={openTimeAdvanceModal}
@@ -345,9 +361,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       <div className={styles.environmentHomeScroll}>
         <section className={styles.environmentHomeContent}>
           <div className={styles.homeLayout}>
-            {isConnectPanelDismissed ? undefined : (
+            {!hasIntegration || isConnectPanelDismissed ? undefined : (
               <EnvironmentConnect
-                client={client}
                 onDismiss={() => {
                   setIsConnectPanelDismissed(true)
                   if (connectPanelStorageKey !== undefined) {
@@ -357,122 +372,127 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               />
             )}
 
-            <DataTable title="Node info" minWidth="42rem">
-              <DataTableTable aria-label="Node info">
-                <DataTableHead>
-                  <DataTableRow>
-                    <DataTableHeaderCell columnWidth={hasFork ? "16%" : "25%"}>
-                      Latest block
-                    </DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth={hasFork ? "17%" : "27%"}>
-                      State source
-                    </DataTableHeaderCell>
-                    {hasFork && (
-                      <>
-                        <DataTableHeaderCell columnWidth="18%">Fork block</DataTableHeaderCell>
-                        <DataTableHeaderCell columnWidth="13%">Local blocks</DataTableHeaderCell>
-                      </>
-                    )}
-                    <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
-                      Uptime
-                    </DataTableHeaderCell>
-                    <DataTableHeaderCell align="right">Node time</DataTableHeaderCell>
-                  </DataTableRow>
-                </DataTableHead>
-                <DataTableBody>
-                  {nodeInfo ? (
+            {hasControlApi ? (
+              <DataTable title="Node info" minWidth="42rem">
+                <DataTableTable aria-label="Node info">
+                  <DataTableHead>
                     <DataTableRow>
-                      <DataTableCell>
-                        <BlockChip
-                          workchain={-1}
-                          shard={MASTERCHAIN_BLOCK_SHARD}
-                          seqno={nodeInfo.last_block_seqno}
-                          href={localnetRoutes.path(
-                            getMasterchainBlockPath(nodeInfo.last_block_seqno),
-                          )}
-                          onClick={event => {
-                            event.preventDefault()
-                            openPath(
-                              localnetRoutes.path(
-                                getMasterchainBlockPath(nodeInfo.last_block_seqno),
-                              ),
-                              event,
-                            )
-                          }}
-                        />
-                      </DataTableCell>
-                      <DataTableCell>
-                        <span className={styles.nodeInfoStateSource}>
-                          {nodeInfo.fork_network ? (
-                            <>
-                              <GitBranch size={15} aria-hidden="true" />
-                              <span>Fork</span>
-                            </>
-                          ) : (
-                            <>
-                              <CircleDot size={15} aria-hidden="true" />
-                              <span>Local genesis</span>
-                            </>
-                          )}
-                        </span>
-                      </DataTableCell>
+                      <DataTableHeaderCell columnWidth={hasFork ? "16%" : "25%"}>
+                        Latest block
+                      </DataTableHeaderCell>
+                      <DataTableHeaderCell columnWidth={hasFork ? "17%" : "27%"}>
+                        State source
+                      </DataTableHeaderCell>
                       {hasFork && (
                         <>
-                          <DataTableCell>
-                            {forkBlockNumber !== undefined && forkBlockNumber !== null ? (
-                              <BlockChip
-                                workchain={-1}
-                                shard={MASTERCHAIN_BLOCK_SHARD}
-                                seqno={forkBlockNumber}
-                                href={forkBlockExplorerUrl}
-                                title={
-                                  forkBlockExplorerUrl
-                                    ? `Open fork block ${forkBlockNumber} in Actonscan`
-                                    : `Fork block ${forkBlockNumber}`
-                                }
-                              />
-                            ) : (
-                              "—"
-                            )}
-                          </DataTableCell>
-                          <DataTableCell>{localBlockCount ?? "—"}</DataTableCell>
+                          <DataTableHeaderCell columnWidth="18%">Fork block</DataTableHeaderCell>
+                          <DataTableHeaderCell columnWidth="13%">Local blocks</DataTableHeaderCell>
                         </>
                       )}
-                      <DataTableCell data-visual-dynamic="time" data-visual-placeholder="<uptime>">
-                        {formatDuration(nodeInfo.uptime_seconds)}
-                      </DataTableCell>
-                      <DataTableCell align="right" title={nodeTimeTitle}>
-                        <span
-                          className={styles.nodeInfoTime}
-                          data-visual-dynamic="time"
-                          data-visual-placeholder="<time>"
-                        >
-                          <span>{nodeTime}</span>
-                          {nodeTimeOffset && (
-                            <span className={styles.nodeInfoValueMeta}>{nodeTimeOffset}</span>
-                          )}
-                        </span>
-                      </DataTableCell>
+                      <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
+                        Uptime
+                      </DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Node time</DataTableHeaderCell>
                     </DataTableRow>
-                  ) : (
-                    <DataTableSkeletonRows
-                      alignments={
-                        hasFork
-                          ? ["left", "left", "left", "left", "left", "right"]
-                          : ["left", "left", "left", "right"]
-                      }
-                      columns={hasFork ? 6 : 4}
-                      rows={1}
-                      widths={
-                        hasFork
-                          ? ["3rem", "5rem", "5rem", "3rem", "4rem", "8rem"]
-                          : ["3rem", "5rem", "4rem", "8rem"]
-                      }
-                    />
-                  )}
-                </DataTableBody>
-              </DataTableTable>
-            </DataTable>
+                  </DataTableHead>
+                  <DataTableBody>
+                    {nodeInfo ? (
+                      <DataTableRow>
+                        <DataTableCell>
+                          <BlockChip
+                            workchain={-1}
+                            shard={MASTERCHAIN_BLOCK_SHARD}
+                            seqno={nodeInfo.last_block_seqno}
+                            href={localnetRoutes.path(
+                              getMasterchainBlockPath(nodeInfo.last_block_seqno),
+                            )}
+                            onClick={event => {
+                              event.preventDefault()
+                              openPath(
+                                localnetRoutes.path(
+                                  getMasterchainBlockPath(nodeInfo.last_block_seqno),
+                                ),
+                                event,
+                              )
+                            }}
+                          />
+                        </DataTableCell>
+                        <DataTableCell>
+                          <span className={styles.nodeInfoStateSource}>
+                            {nodeInfo.fork_network ? (
+                              <>
+                                <GitBranch size={15} aria-hidden="true" />
+                                <span>Fork</span>
+                              </>
+                            ) : (
+                              <>
+                                <CircleDot size={15} aria-hidden="true" />
+                                <span>Local genesis</span>
+                              </>
+                            )}
+                          </span>
+                        </DataTableCell>
+                        {hasFork && (
+                          <>
+                            <DataTableCell>
+                              {forkBlockNumber !== undefined && forkBlockNumber !== null ? (
+                                <BlockChip
+                                  workchain={-1}
+                                  shard={MASTERCHAIN_BLOCK_SHARD}
+                                  seqno={forkBlockNumber}
+                                  href={forkBlockExplorerUrl}
+                                  title={
+                                    forkBlockExplorerUrl
+                                      ? `Open fork block ${forkBlockNumber} in Actonscan`
+                                      : `Fork block ${forkBlockNumber}`
+                                  }
+                                />
+                              ) : (
+                                "—"
+                              )}
+                            </DataTableCell>
+                            <DataTableCell>{localBlockCount ?? "—"}</DataTableCell>
+                          </>
+                        )}
+                        <DataTableCell
+                          data-visual-dynamic="time"
+                          data-visual-placeholder="<uptime>"
+                        >
+                          {formatDuration(nodeInfo.uptime_seconds)}
+                        </DataTableCell>
+                        <DataTableCell align="right" title={nodeTimeTitle}>
+                          <span
+                            className={styles.nodeInfoTime}
+                            data-visual-dynamic="time"
+                            data-visual-placeholder="<time>"
+                          >
+                            <span>{nodeTime}</span>
+                            {nodeTimeOffset && (
+                              <span className={styles.nodeInfoValueMeta}>{nodeTimeOffset}</span>
+                            )}
+                          </span>
+                        </DataTableCell>
+                      </DataTableRow>
+                    ) : (
+                      <DataTableSkeletonRows
+                        alignments={
+                          hasFork
+                            ? ["left", "left", "left", "left", "left", "right"]
+                            : ["left", "left", "left", "right"]
+                        }
+                        columns={hasFork ? 6 : 4}
+                        rows={1}
+                        widths={
+                          hasFork
+                            ? ["3rem", "5rem", "5rem", "3rem", "4rem", "8rem"]
+                            : ["3rem", "5rem", "4rem", "8rem"]
+                        }
+                      />
+                    )}
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
+            ) : undefined}
 
             {homeState.isLoading ? (
               <DeveloperTransactionListSkeleton
@@ -517,99 +537,101 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         </section>
       </div>
 
-      <Dialog
-        open={isTimeModalOpen}
-        title="Advance time"
-        className={styles.dashboardDialog}
-        maxWidth={420}
-        dismissible={!isAdvancingTime}
-        closeLabel="Close time control"
-        onOpenChange={open => {
-          if (!open) closeTimeAdvanceModal()
-        }}
-      >
-        <form className={styles.timeModalContent} onSubmit={handleTimeAdvanceSubmit}>
-          <div className={styles.fieldBlock}>
-            <label className={styles.label} htmlFor="node-time-advance-seconds">
-              Seconds
-            </label>
-            <Input
-              id="node-time-advance-seconds"
-              className={styles.fieldInput}
-              type="number"
-              min="0"
-              step="1"
-              inputMode="numeric"
-              value={timeAdvanceSeconds}
-              disabled={isAdvancingTime}
-              onChange={event => {
-                setTimeAdvanceSeconds(event.target.value)
-                setTimeAdvanceError(undefined)
-              }}
-            />
-          </div>
-
-          <div className={styles.timeAdvancePresets}>
-            {TIME_ADVANCE_PRESETS.map(preset => (
-              <button
-                key={preset.seconds}
-                type="button"
-                className={styles.timeAdvancePresetButton}
-                aria-label={`Add ${preset.label} to time shift`}
+      {supports(environment, "timeTravel") ? (
+        <Dialog
+          open={isTimeModalOpen}
+          title="Advance time"
+          className={styles.dashboardDialog}
+          maxWidth={420}
+          dismissible={!isAdvancingTime}
+          closeLabel="Close time control"
+          onOpenChange={open => {
+            if (!open) closeTimeAdvanceModal()
+          }}
+        >
+          <form className={styles.timeModalContent} onSubmit={handleTimeAdvanceSubmit}>
+            <div className={styles.fieldBlock}>
+              <label className={styles.label} htmlFor="node-time-advance-seconds">
+                Seconds
+              </label>
+              <Input
+                id="node-time-advance-seconds"
+                className={styles.fieldInput}
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={timeAdvanceSeconds}
                 disabled={isAdvancingTime}
-                onClick={() => {
-                  setTimeAdvanceSeconds(currentSeconds =>
-                    addTimeAdvanceSeconds(currentSeconds, preset.seconds),
-                  )
+                onChange={event => {
+                  setTimeAdvanceSeconds(event.target.value)
                   setTimeAdvanceError(undefined)
                 }}
+              />
+            </div>
+
+            <div className={styles.timeAdvancePresets}>
+              {TIME_ADVANCE_PRESETS.map(preset => (
+                <button
+                  key={preset.seconds}
+                  type="button"
+                  className={styles.timeAdvancePresetButton}
+                  aria-label={`Add ${preset.label} to time shift`}
+                  disabled={isAdvancingTime}
+                  onClick={() => {
+                    setTimeAdvanceSeconds(currentSeconds =>
+                      addTimeAdvanceSeconds(currentSeconds, preset.seconds),
+                    )
+                    setTimeAdvanceError(undefined)
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.timeAdvancePreview}>
+              <div className={styles.timeAdvancePreviewRow}>
+                <span>Shift</span>
+                <strong>{timeAdvanceShiftValue}</strong>
+              </div>
+              <div className={styles.timeAdvancePreviewRow}>
+                <span>Current</span>
+                <strong>{timeAdvanceCurrentValue}</strong>
+              </div>
+              <div className={styles.timeAdvancePreviewRow}>
+                <span>After</span>
+                <strong>{timeAdvanceTargetValue}</strong>
+              </div>
+            </div>
+
+            {timeAdvanceError && (
+              <div className={styles.timeAdvanceError} role="alert">
+                {timeAdvanceError}
+              </div>
+            )}
+
+            <div className={styles.timeModalActions}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isAdvancingTime}
+                onClick={closeTimeAdvanceModal}
               >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.timeAdvancePreview}>
-            <div className={styles.timeAdvancePreviewRow}>
-              <span>Shift</span>
-              <strong>{timeAdvanceShiftValue}</strong>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                trailingIcon={<FastForward size={15} />}
+                disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
+              >
+                {isAdvancingTime ? "Advancing..." : "Advance"}
+              </Button>
             </div>
-            <div className={styles.timeAdvancePreviewRow}>
-              <span>Current</span>
-              <strong>{timeAdvanceCurrentValue}</strong>
-            </div>
-            <div className={styles.timeAdvancePreviewRow}>
-              <span>After</span>
-              <strong>{timeAdvanceTargetValue}</strong>
-            </div>
-          </div>
-
-          {timeAdvanceError && (
-            <div className={styles.timeAdvanceError} role="alert">
-              {timeAdvanceError}
-            </div>
-          )}
-
-          <div className={styles.timeModalActions}>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isAdvancingTime}
-              onClick={closeTimeAdvanceModal}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              trailingIcon={<FastForward size={15} />}
-              disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
-            >
-              {isAdvancingTime ? "Advancing..." : "Advance"}
-            </Button>
-          </div>
-        </form>
-      </Dialog>
+          </form>
+        </Dialog>
+      ) : undefined}
     </div>
   )
 }

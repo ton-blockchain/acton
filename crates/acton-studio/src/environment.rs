@@ -3,22 +3,39 @@ use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateEnvironmentRequest {
     pub name: String,
-    pub port: Option<u16>,
-    pub fork_network: Option<String>,
-    pub fork_block_number: Option<u64>,
-    #[serde(default)]
-    pub accounts: Vec<String>,
-    pub rate_limit: Option<u32>,
-    pub response_delay_ms: Option<u64>,
-    pub block_interval_ms: Option<u64>,
-    #[serde(default)]
-    pub no_mining: bool,
-    #[serde(default)]
-    pub mine_empty_blocks: bool,
+    pub config: CreateEnvironmentConfig,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum CreateEnvironmentConfig {
+    ActonLocalnet {
+        port: Option<u16>,
+        fork_network: Option<String>,
+        fork_block_number: Option<u64>,
+        #[serde(default)]
+        accounts: Vec<String>,
+        rate_limit: Option<u32>,
+        response_delay_ms: Option<u64>,
+        block_interval_ms: Option<u64>,
+        #[serde(default)]
+        no_mining: bool,
+        #[serde(default)]
+        mine_empty_blocks: bool,
+    },
+    FullTonNetwork {
+        api_v2_port: Option<u16>,
+        api_v3_port: Option<u16>,
+        validators: Option<u16>,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -28,17 +45,66 @@ pub struct UpdateEnvironmentRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum EnvironmentConfig {
+    ActonLocalnet {
+        port: u16,
+        fork_network: Option<String>,
+        fork_block_number: Option<u64>,
+        accounts: Vec<String>,
+        rate_limit: Option<u32>,
+        response_delay_ms: Option<u64>,
+        block_interval_ms: Option<u64>,
+        no_mining: bool,
+        mine_empty_blocks: bool,
+    },
+    FullTonNetwork {
+        api_v2_port: u16,
+        api_v3_port: u16,
+        validators: u16,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EnvironmentConfig {
-    pub port: u16,
-    pub fork_network: Option<String>,
-    pub fork_block_number: Option<u64>,
-    pub accounts: Vec<String>,
-    pub rate_limit: Option<u32>,
-    pub response_delay_ms: Option<u64>,
-    pub block_interval_ms: Option<u64>,
-    pub no_mining: bool,
-    pub mine_empty_blocks: bool,
+pub enum EnvironmentCapability {
+    ApiV2,
+    ApiV3,
+    ControlApi,
+    Explorer,
+    Integration,
+    Faucet,
+    Wallets,
+    Simulator,
+    Contracts,
+    ApiCalls,
+    Mining,
+    TimeTravel,
+    Snapshots,
+    Checkpoints,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentEndpoints {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_v2: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_v3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub control: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentNetwork {
+    pub id: String,
+    pub label: String,
+    pub test_only: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -59,8 +125,97 @@ pub struct StudioEnvironment {
     pub status: EnvironmentStatus,
     pub rpc_url: String,
     pub config: EnvironmentConfig,
+    pub capabilities: Vec<EnvironmentCapability>,
+    pub endpoints: EnvironmentEndpoints,
+    pub network: EnvironmentNetwork,
+    #[serde(skip)]
+    pub runtime_endpoints: EnvironmentEndpoints,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+impl StudioEnvironment {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        status: EnvironmentStatus,
+        config: EnvironmentConfig,
+        runtime_endpoints: EnvironmentEndpoints,
+    ) -> Self {
+        let capabilities = config.capabilities();
+        let network = config.network();
+        Self {
+            id: id.into(),
+            name: name.into(),
+            status,
+            rpc_url: String::new(),
+            config,
+            capabilities,
+            endpoints: EnvironmentEndpoints::default(),
+            network,
+            runtime_endpoints,
+            error: None,
+        }
+    }
+}
+
+impl EnvironmentConfig {
+    #[must_use]
+    pub fn capabilities(&self) -> Vec<EnvironmentCapability> {
+        match self {
+            Self::ActonLocalnet { .. } => vec![
+                EnvironmentCapability::ApiV2,
+                EnvironmentCapability::ApiV3,
+                EnvironmentCapability::ControlApi,
+                EnvironmentCapability::Explorer,
+                EnvironmentCapability::Integration,
+                EnvironmentCapability::Faucet,
+                EnvironmentCapability::Wallets,
+                EnvironmentCapability::Simulator,
+                EnvironmentCapability::Contracts,
+                EnvironmentCapability::ApiCalls,
+                EnvironmentCapability::Mining,
+                EnvironmentCapability::TimeTravel,
+                EnvironmentCapability::Snapshots,
+                EnvironmentCapability::Checkpoints,
+            ],
+            Self::FullTonNetwork { .. } => vec![
+                EnvironmentCapability::ApiV2,
+                EnvironmentCapability::ApiV3,
+                EnvironmentCapability::Explorer,
+                EnvironmentCapability::Integration,
+            ],
+        }
+    }
+
+    #[must_use]
+    pub fn network(&self) -> EnvironmentNetwork {
+        match self {
+            Self::ActonLocalnet {
+                fork_network: Some(network),
+                ..
+            } => EnvironmentNetwork {
+                id: network.clone(),
+                label: match network.as_str() {
+                    "mainnet" => "Mainnet fork".to_owned(),
+                    "testnet" => "Testnet fork".to_owned(),
+                    _ => format!("{network} fork"),
+                },
+                test_only: true,
+            },
+            Self::ActonLocalnet { .. } => EnvironmentNetwork {
+                id: "acton-localnet".to_owned(),
+                label: "Acton localnet".to_owned(),
+                test_only: true,
+            },
+            Self::FullTonNetwork { .. } => EnvironmentNetwork {
+                id: "full-ton-network".to_owned(),
+                label: "Local TON network".to_owned(),
+                test_only: true,
+            },
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

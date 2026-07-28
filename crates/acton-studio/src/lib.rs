@@ -20,6 +20,7 @@ use tower_http::services::{ServeDir, ServeFile};
 
 mod contract_source_artifact;
 mod environment;
+mod full_ton_network;
 mod local_artifacts;
 mod local_process;
 mod local_test_process;
@@ -32,7 +33,8 @@ pub use contract_source_artifact::{
     ContractSourceArtifactStore,
 };
 pub use environment::{
-    CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
+    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentCapability, EnvironmentConfig,
+    EnvironmentEndpoints, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use local_process::LocalProcessEnvironmentRuntime;
@@ -377,10 +379,28 @@ async fn restart_environment(
 }
 
 fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
-    environment.rpc_url = format!(
+    let proxy_root = format!(
         "{STUDIO_ENVIRONMENTS_PATH}/{}/rpc",
         urlencoding::encode(&environment.id)
     );
+    environment.rpc_url.clone_from(&proxy_root);
+    environment.endpoints = EnvironmentEndpoints {
+        api_v2: environment
+            .runtime_endpoints
+            .api_v2
+            .as_ref()
+            .map(|_| format!("{proxy_root}/api/v2")),
+        api_v3: environment
+            .runtime_endpoints
+            .api_v3
+            .as_ref()
+            .map(|_| format!("{proxy_root}/api/v3")),
+        control: environment
+            .runtime_endpoints
+            .control
+            .as_ref()
+            .map(|_| proxy_root),
+    };
     environment
 }
 
@@ -419,11 +439,7 @@ async fn proxy_environment_request(
     }
 
     let (parts, body) = request.into_parts();
-    let mut upstream_url = format!(
-        "{}/{}",
-        environment.rpc_url.trim_end_matches('/'),
-        path.trim_start_matches('/')
-    );
+    let mut upstream_url = environment_upstream_url(&environment, &path)?;
     if let Some(query) = parts.uri.query() {
         upstream_url.push('?');
         upstream_url.push_str(query);
@@ -458,6 +474,51 @@ async fn proxy_environment_request(
                 message: format!("Failed to build the environment response: {error}"),
             })
         })
+}
+
+fn environment_upstream_url(
+    environment: &StudioEnvironment,
+    path: &str,
+) -> Result<String, StudioApiError> {
+    let path = path.trim_start_matches('/');
+    let (endpoint, remaining_path) =
+        if let Some(remaining_path) = endpoint_relative_path(path, "api/v2") {
+            (
+                environment.runtime_endpoints.api_v2.as_deref(),
+                remaining_path,
+            )
+        } else if let Some(remaining_path) = endpoint_relative_path(path, "api/v3") {
+            (
+                environment.runtime_endpoints.api_v3.as_deref(),
+                remaining_path,
+            )
+        } else {
+            (environment.runtime_endpoints.control.as_deref(), path)
+        };
+    let Some(endpoint) = endpoint else {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "environment_endpoint_unavailable",
+            message: format!("This endpoint is not available in {}", environment.name),
+        }));
+    };
+
+    Ok(if remaining_path.is_empty() {
+        endpoint.to_owned()
+    } else {
+        format!(
+            "{}/{}",
+            endpoint.trim_end_matches('/'),
+            remaining_path.trim_start_matches('/')
+        )
+    })
+}
+
+fn endpoint_relative_path<'a>(path: &'a str, endpoint: &str) -> Option<&'a str> {
+    if path == endpoint {
+        return Some("");
+    }
+    path.strip_prefix(endpoint)
+        .and_then(|remaining| remaining.strip_prefix('/'))
 }
 
 fn is_hop_by_hop_header(name: &HeaderName) -> bool {

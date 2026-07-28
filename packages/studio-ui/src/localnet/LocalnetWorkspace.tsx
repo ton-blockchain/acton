@@ -13,6 +13,8 @@ import {
 } from "react"
 import type {FC, ReactNode} from "react"
 
+import {supports} from "../environmentCapabilities"
+import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
 import {useExplorerPageTitle} from "./explorer/components/ExplorerDocumentTitle"
 import {AccountPage} from "./explorer/pages/AccountPage"
@@ -38,7 +40,6 @@ import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {useLocalnetRuntime} from "./LocalnetRuntimeProvider"
 import {localnetPath} from "./routes"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
-import type {StudioEnvironment} from "../studioApi"
 import "@acton/ui/styles/tokens.css"
 import "./index.css"
 import styles from "./LocalnetWorkspace.module.css"
@@ -117,22 +118,29 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
   onShellChange,
 }) => {
   const runtime = useLocalnetRuntime()
+  const content = (
+    <AppContent
+      basePath={basePath}
+      onEnvironmentChange={onEnvironmentChange}
+      onEnvironmentDelete={onEnvironmentDelete}
+      onShellChange={onShellChange}
+    />
+  )
 
   return (
     <MetadataRegistryProvider registry={runtime.metadataRegistry}>
       <AddressBookProvider>
-        <WalletRuntimeProvider
-          apiBaseUrl={runtime.rpcBaseUrl}
-          client={runtime.client}
-          localnetApiToken={runtime.localnetApiToken}
-        >
-          <AppContent
-            basePath={basePath}
-            onEnvironmentChange={onEnvironmentChange}
-            onEnvironmentDelete={onEnvironmentDelete}
-            onShellChange={onShellChange}
-          />
-        </WalletRuntimeProvider>
+        {supports(runtime.environment, "wallets") ? (
+          <WalletRuntimeProvider
+            apiBaseUrl={runtime.rpcBaseUrl}
+            client={runtime.client}
+            localnetApiToken={runtime.localnetApiToken}
+          >
+            {content}
+          </WalletRuntimeProvider>
+        ) : (
+          content
+        )}
       </AddressBookProvider>
     </MetadataRegistryProvider>
   )
@@ -167,18 +175,30 @@ const AppContent: FC<AppContentProps> = ({
     contractDetailsPageDescription(localPathname) ??
     "Inspect blocks, accounts, transactions and contract activity"
   const path = (value: string) => localnetPath(basePath, value)
+  const fallback = <Navigate to={path("/dashboard")} replace />
+  const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
+    supports(runtime.environment, capability) ? page : fallback
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
   const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(
     () =>
-      localPathname === "/contracts"
+      localPathname === "/contracts" && supports(runtime.environment, "contracts")
         ? {icon: "plus", label: "Add contract", onClick: openAddContract}
         : undefined,
-    [localPathname, openAddContract],
+    [localPathname, openAddContract, runtime.environment],
   )
+  const primaryEndpoint =
+    runtime.environment?.endpoints.apiV3 ??
+    runtime.environment?.endpoints.apiV2 ??
+    runtime.environment?.endpoints.control
 
   useLayoutEffect(() => {
-    onShellChange({pageDescription, pageTitle, primaryAction, rpcUrl: runtime.rpcBaseUrl})
-  }, [onShellChange, pageDescription, pageTitle, primaryAction, runtime.rpcBaseUrl])
+    onShellChange({
+      pageDescription,
+      pageTitle,
+      primaryAction,
+      rpcUrl: primaryEndpoint ? absoluteUrl(primaryEndpoint) : undefined,
+    })
+  }, [onShellChange, pageDescription, pageTitle, primaryAction, primaryEndpoint])
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
@@ -206,11 +226,12 @@ const AppContent: FC<AppContentProps> = ({
             />
             <Route
               path={path("/faucet")}
-              element={
+              element={withCapability(
+                "faucet",
                 <DashboardPage>
                   <FaucetPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/blocks")}
@@ -218,51 +239,57 @@ const AppContent: FC<AppContentProps> = ({
             />
             <Route
               path={path("/explorer/blocks")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <BlocksPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/block/last")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <BlockDetailsPage client={client} latest />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/block/:workchain/:shard/:seqno")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <BlockDetailsPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/wallets")}
-              element={
+              element={withCapability(
+                "wallets",
                 <DashboardPage>
                   <WalletsPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/tokens")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage>
                   <TokensPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/nfts")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage>
                   <NftsPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/settings")}
@@ -278,79 +305,99 @@ const AppContent: FC<AppContentProps> = ({
             />
             <Route
               path={path("/integrate")}
-              element={
+              element={withCapability(
+                "integration",
                 <DashboardPage>
-                  <IntegratePage client={client} />
-                </DashboardPage>
-              }
+                  <IntegratePage />
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <ContractsPage
                     addOpen={isAddContractOpen}
                     client={client}
                     onAddOpenChange={setIsAddContractOpen}
                   />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/abi")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <AbiCatalogPage />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/abi/:slug")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <AbiDetailsPage />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/sources")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <SourceCatalogPage />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/:address")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <ContractPage client={client} section="source" />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/:address/abi")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <ContractPage client={client} section="abi" />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/contracts/:address/raw-abi")}
-              element={
+              element={withCapability(
+                "contracts",
                 <DashboardPage>
                   <ContractPage client={client} section="raw-abi" />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/api-reference")}
-              element={<Navigate to={path("/api-reference/v2")} replace />}
+              element={
+                <Navigate
+                  to={path(
+                    supports(runtime.environment, "apiV2")
+                      ? "/api-reference/v2"
+                      : supports(runtime.environment, "apiV3")
+                        ? "/api-reference/v3"
+                        : "/dashboard",
+                  )}
+                  replace
+                />
+              }
             />
             <Route
               path={path("/api-reference/v2")}
-              element={
+              element={withCapability(
+                "apiV2",
                 <DashboardPage embedded>
                   <RouteSuspense>
                     <ApiReferencePage
@@ -360,12 +407,13 @@ const AppContent: FC<AppContentProps> = ({
                       version="v2"
                     />
                   </RouteSuspense>
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/api-reference/v3")}
-              element={
+              element={withCapability(
+                "apiV3",
                 <DashboardPage embedded>
                   <RouteSuspense>
                     <ApiReferencePage
@@ -375,23 +423,24 @@ const AppContent: FC<AppContentProps> = ({
                       version="v3"
                     />
                   </RouteSuspense>
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/api-reference/control")}
-              element={
+              element={withCapability(
+                "controlApi",
                 <DashboardPage embedded>
                   <RouteSuspense>
                     <ApiReferencePage
-                      apiBaseUrl={runtime.rpcBaseUrl}
+                      apiBaseUrl={runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl}
                       localnetApiToken={runtime.localnetApiToken}
                       onUnauthorized={runtime.requireAuthToken}
                       version="control"
                     />
                   </RouteSuspense>
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/dashboard/faucet")}
@@ -415,76 +464,84 @@ const AppContent: FC<AppContentProps> = ({
             />
             <Route
               path={path("/api-calls")}
-              element={
+              element={withCapability(
+                "apiCalls",
                 <DashboardPage>
                   <RouteSuspense>
                     <ApiCallsPage client={client} />
                   </RouteSuspense>
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <ExplorerIndexPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/cell-inspector")}
-              element={
+              element={withCapability(
+                "simulator",
                 <DashboardPage embedded>
                   <CellInspectorPage />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/simulator")}
-              element={
+              element={withCapability(
+                "simulator",
                 <DashboardPage embedded>
                   <EmulatePage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/favorites")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <FavoriteAccountsPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/address/:address")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <AccountPage client={client} enableJettonMint />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/tx/:hash/trace")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <TransactionPage client={client} openRetraceOnLoad />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/explorer/tx/:hash")}
-              element={
+              element={withCapability(
+                "explorer",
                 <DashboardPage embedded>
                   <TransactionPage client={client} />
-                </DashboardPage>
-              }
+                </DashboardPage>,
+              )}
             />
             <Route path={`${basePath}/*`} element={<Navigate to={path("/dashboard")} replace />} />
           </Routes>
         </main>
       </div>
 
-      {runtime.isAuthOverlayOpen && (
+      {runtime.isAuthOverlayOpen && supports(runtime.environment, "controlApi") && (
         <LocalnetAuthOverlay
           localnetApiToken={runtime.localnetApiToken}
           onClear={runtime.clearAuthToken}
@@ -542,6 +599,14 @@ function contractDetailsPageDescription(localPathname: string): string | undefin
   return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname)
     ? "Inspect deployed code, ABI and project artifacts"
     : undefined
+}
+
+function absoluteUrl(value: string): string {
+  try {
+    return new URL(value, globalThis.location.origin).href
+  } catch {
+    return value
+  }
 }
 
 interface LocalnetAuthOverlayProps {

@@ -2,9 +2,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use acton_studio::{
-    CreateEnvironmentRequest, EnvironmentConfig, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentStatus, STUDIO_ENVIRONMENTS_PATH, StudioEnvironment,
-    StudioServer, StudioServerConfig, UpdateEnvironmentRequest,
+    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentConfig, EnvironmentEndpoints,
+    EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus,
+    STUDIO_ENVIRONMENTS_PATH, StudioEnvironment, StudioServer, StudioServerConfig,
+    UpdateEnvironmentRequest,
 };
 use axum::Router;
 use axum::body::{Body, to_bytes};
@@ -35,28 +36,69 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
         request: CreateEnvironmentRequest,
     ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
         Box::pin(async move {
-            let port = request.port.unwrap_or(5411);
-            let environment = StudioEnvironment {
-                id: format!(
+            let (config, runtime_endpoints) = match request.config {
+                CreateEnvironmentConfig::ActonLocalnet {
+                    port,
+                    fork_network,
+                    fork_block_number,
+                    accounts,
+                    rate_limit,
+                    response_delay_ms,
+                    block_interval_ms,
+                    no_mining,
+                    mine_empty_blocks,
+                } => {
+                    let port = port.unwrap_or(5411);
+                    (
+                        EnvironmentConfig::ActonLocalnet {
+                            port,
+                            fork_network,
+                            fork_block_number,
+                            accounts,
+                            rate_limit,
+                            response_delay_ms,
+                            block_interval_ms,
+                            no_mining,
+                            mine_empty_blocks,
+                        },
+                        EnvironmentEndpoints {
+                            api_v2: Some(format!("http://127.0.0.1:{port}/api/v2")),
+                            api_v3: Some(format!("http://127.0.0.1:{port}/api/v3")),
+                            control: Some(format!("http://127.0.0.1:{port}")),
+                        },
+                    )
+                }
+                CreateEnvironmentConfig::FullTonNetwork {
+                    api_v2_port,
+                    api_v3_port,
+                    validators,
+                } => {
+                    let api_v2_port = api_v2_port.unwrap_or(18080);
+                    let api_v3_port = api_v3_port.unwrap_or(18081);
+                    (
+                        EnvironmentConfig::FullTonNetwork {
+                            api_v2_port,
+                            api_v3_port,
+                            validators: validators.unwrap_or(1),
+                        },
+                        EnvironmentEndpoints {
+                            api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
+                            api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
+                            control: None,
+                        },
+                    )
+                }
+            };
+            let environment = StudioEnvironment::new(
+                format!(
                     "test-environment-{}",
                     self.next_id.fetch_add(1, Ordering::Relaxed) + 1
                 ),
-                name: request.name,
-                status: EnvironmentStatus::Running,
-                rpc_url: format!("http://127.0.0.1:{port}"),
-                config: EnvironmentConfig {
-                    port,
-                    fork_network: request.fork_network,
-                    fork_block_number: request.fork_block_number,
-                    accounts: request.accounts,
-                    rate_limit: request.rate_limit,
-                    response_delay_ms: request.response_delay_ms,
-                    block_interval_ms: request.block_interval_ms,
-                    no_mining: request.no_mining,
-                    mine_empty_blocks: request.mine_empty_blocks,
-                },
-                error: None,
-            };
+                request.name,
+                EnvironmentStatus::Running,
+                config,
+                runtime_endpoints,
+            );
             self.environments
                 .lock()
                 .expect("environment lock must not be poisoned")
@@ -186,13 +228,16 @@ async fn proxy_target(request: Request<Body>) -> (StatusCode, String) {
         .get("x-test-marker")
         .and_then(|value| value.to_str().ok())
         .unwrap_or("missing");
+    let body = if body.is_empty() {
+        "<empty>".into()
+    } else {
+        String::from_utf8_lossy(&body)
+    };
     (
         StatusCode::ACCEPTED,
         format!(
             "method: {}\nuri: {}\nmarker: {marker}\nbody: {}",
-            parts.method,
-            parts.uri,
-            String::from_utf8_lossy(&body)
+            parts.method, parts.uri, body
         ),
     )
 }
@@ -208,14 +253,17 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
                 .body(Body::from(
                     r#"{
                         "name":"Forked mainnet",
-                        "port":5511,
-                        "forkNetwork":"mainnet",
-                        "forkBlockNumber":81973221,
-                        "accounts":["deployer","treasury"],
-                        "rateLimit":30,
-                        "responseDelayMs":120,
-                        "blockIntervalMs":750,
-                        "mineEmptyBlocks":true
+                        "config":{
+                            "kind":"actonLocalnet",
+                            "port":5511,
+                            "forkNetwork":"mainnet",
+                            "forkBlockNumber":81973221,
+                            "accounts":["deployer","treasury"],
+                            "rateLimit":30,
+                            "responseDelayMs":120,
+                            "blockIntervalMs":750,
+                            "mineEmptyBlocks":true
+                        }
                     }"#,
                 ))
                 .expect("create request must be valid"),
@@ -289,23 +337,23 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
 
     expect![[r#"CREATE
 status: 201 Created
-body: {"id":"test-environment-1","name":"Forked mainnet","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+body: {"id":"test-environment-1","name":"Forked mainnet","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","faucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","testOnly":true}}
 
 LIST
 status: 200 OK
-body: [{"id":"test-environment-1","name":"Forked mainnet","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}]
+body: [{"id":"test-environment-1","name":"Forked mainnet","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","faucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","testOnly":true}}]
 
 UPDATE
 status: 200 OK
-body: {"id":"test-environment-1","name":"Renamed environment","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+body: {"id":"test-environment-1","name":"Renamed environment","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","faucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","testOnly":true}}
 
 STOP
 status: 200 OK
-body: {"id":"test-environment-1","name":"Renamed environment","status":"stopped","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+body: {"id":"test-environment-1","name":"Renamed environment","status":"stopped","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","faucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","testOnly":true}}
 
 RESTART
 status: 200 OK
-body: {"id":"test-environment-1","name":"Renamed environment","status":"starting","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true}}
+body: {"id":"test-environment-1","name":"Renamed environment","status":"starting","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","faucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","testOnly":true}}
 
 DELETE
 status: 204 No Content
@@ -343,7 +391,7 @@ async fn environment_rpc_is_proxied_through_the_studio_origin() {
             Request::post(STUDIO_ENVIRONMENTS_PATH)
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
-                    r#"{{"name":"Proxy target","port":{port}}}"#
+                    r#"{{"name":"Proxy target","config":{{"kind":"actonLocalnet","port":{port}}}}}"#
                 )))
                 .expect("create request must be valid"),
         )
@@ -369,6 +417,162 @@ body: method: POST
 uri: /api/v3/transactions?limit=2
 marker: forwarded
 body: {"account":"test"}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_advertises_only_its_supported_surface() {
+    let response = router()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{
+                        "name":"Protocol network",
+                        "config":{
+                            "kind":"fullTonNetwork",
+                            "apiV2Port":18180,
+                            "apiV3Port":18181,
+                            "validators":3
+                        }
+                    }"#,
+                ))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+    let actual = response_snapshot(response).await;
+
+    expect![[r#"status: 201 Created
+body: {"id":"test-environment-1","name":"Protocol network","status":"running","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Local TON network","testOnly":true}}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_routes_v2_and_v3_to_separate_upstreams() {
+    let v2_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("V2 proxy test listener must bind");
+    let v2_port = v2_listener
+        .local_addr()
+        .expect("V2 listener must have an address")
+        .port();
+    let v2_upstream = tokio::spawn(async move {
+        axum::serve(
+            v2_listener,
+            Router::new()
+                .fallback(any(proxy_target))
+                .into_make_service(),
+        )
+        .await
+        .expect("V2 proxy target must serve");
+    });
+    let v3_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("V3 proxy test listener must bind");
+    let v3_port = v3_listener
+        .local_addr()
+        .expect("V3 listener must have an address")
+        .port();
+    let v3_upstream = tokio::spawn(async move {
+        axum::serve(
+            v3_listener,
+            Router::new()
+                .fallback(any(proxy_target))
+                .into_make_service(),
+        )
+        .await
+        .expect("V3 proxy target must serve");
+    });
+
+    let app = router();
+    app.clone()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{
+                        "name":"Protocol network",
+                        "config":{{
+                            "kind":"fullTonNetwork",
+                            "apiV2Port":{v2_port},
+                            "apiV3Port":{v3_port}
+                        }}
+                    }}"#
+                )))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+    let v2_root_response = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/environments/test-environment-1/rpc/api/v2")
+                .body(Body::empty())
+                .expect("V2 root proxy request must be valid"),
+        )
+        .await
+        .expect("V2 root proxy request must succeed");
+    let v2_response = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/environments/test-environment-1/rpc/api/v2/getMasterchainInfo")
+                .body(Body::empty())
+                .expect("V2 proxy request must be valid"),
+        )
+        .await
+        .expect("V2 proxy request must succeed");
+    let v3_response = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/environments/test-environment-1/rpc/api/v3/transactions?limit=1")
+                .body(Body::empty())
+                .expect("V3 proxy request must be valid"),
+        )
+        .await
+        .expect("V3 proxy request must succeed");
+    let control_response = app
+        .oneshot(
+            Request::get("/api/v1/environments/test-environment-1/rpc/status")
+                .body(Body::empty())
+                .expect("control proxy request must be valid"),
+        )
+        .await
+        .expect("control proxy request must succeed");
+    let actual = format!(
+        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nCONTROL\n{}",
+        response_snapshot(v2_root_response).await,
+        response_snapshot(v2_response).await,
+        response_snapshot(v3_response).await,
+        response_snapshot(control_response).await,
+    );
+    v2_upstream.abort();
+    v3_upstream.abort();
+
+    expect![[r#"V2 ROOT
+status: 202 Accepted
+body: method: GET
+uri: /api/v2
+marker: missing
+body: <empty>
+
+V2
+status: 202 Accepted
+body: method: GET
+uri: /api/v2/getMasterchainInfo
+marker: missing
+body: <empty>
+
+V3
+status: 202 Accepted
+body: method: GET
+uri: /api/v3/transactions?limit=1
+marker: missing
+body: <empty>
+
+CONTROL
+status: 409 Conflict
+body: {"error":{"code":"environment_endpoint_unavailable","message":"This endpoint is not available in Protocol network"}}"#]]
     .assert_eq(&actual);
 }
 

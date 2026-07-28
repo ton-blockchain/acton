@@ -15,6 +15,8 @@ import {Button, Dialog, InlineButton, Input, useToast} from "@acton/ui"
 import {useCallback, useRef, useState} from "react"
 import type {ChangeEvent, FC, FormEvent} from "react"
 
+import {supports} from "../../../environmentCapabilities"
+import type {StudioEnvironment} from "../../../studioApi"
 import type {TonClient} from "../../explorer/api/client"
 import type {LocalnetCheckpoint} from "../../explorer/api/types"
 
@@ -22,6 +24,7 @@ import styles from "../DashboardPage.module.css"
 
 interface EnvironmentActionsProps {
   readonly client: TonClient
+  readonly environment?: StudioEnvironment
   readonly isAdvanceTimeOpen: boolean
   readonly latestBlockSeqno?: number
   readonly onAdvanceTime: () => void
@@ -40,6 +43,7 @@ interface StateFileDetails {
 
 export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   client,
+  environment,
   isAdvanceTimeOpen,
   latestBlockSeqno,
   onAdvanceTime,
@@ -59,6 +63,9 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   const [stateFile, setStateFile] = useState<File>()
   const [stateFileDetails, setStateFileDetails] = useState<StateFileDetails>()
   const [checkpointToRestore, setCheckpointToRestore] = useState<LocalnetCheckpoint>()
+  const hasAccountActions = supports(environment, "faucet") || supports(environment, "simulator")
+  const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
+  const hasStateActions = supports(environment, "checkpoints") || supports(environment, "snapshots")
 
   const loadCheckpoints = useCallback(async () => {
     setIsLoadingCheckpoints(true)
@@ -290,61 +297,83 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
 
   return (
     <>
-      <div className={styles.environmentActions}>
-        <div className={styles.environmentActionGroup} aria-label="Account actions">
-          <InlineButton leadingIcon={<HandCoins size={15} />} onClick={onFund}>
-            Fund
-          </InlineButton>
-          <InlineButton leadingIcon={<Send size={15} />} onClick={onSend}>
-            Send
-          </InlineButton>
-        </div>
+      {hasAccountActions || hasRuntimeActions || hasStateActions ? (
+        <div className={styles.environmentActions}>
+          {hasAccountActions ? (
+            <div className={styles.environmentActionGroup} aria-label="Account actions">
+              {supports(environment, "faucet") ? (
+                <InlineButton leadingIcon={<HandCoins size={15} />} onClick={onFund}>
+                  Fund
+                </InlineButton>
+              ) : undefined}
+              {supports(environment, "simulator") ? (
+                <InlineButton leadingIcon={<Send size={15} />} onClick={onSend}>
+                  Send
+                </InlineButton>
+              ) : undefined}
+            </div>
+          ) : undefined}
 
-        <div className={styles.environmentActionGroup} aria-label="Runtime actions">
-          <InlineButton
-            leadingIcon={<Pickaxe size={15} />}
-            disabled={busyAction === "mine-block"}
-            onClick={() => void mineBlock()}
-          >
-            {busyAction === "mine-block" ? "Mining" : "Mine block"}
-          </InlineButton>
-          <InlineButton
-            aria-haspopup="dialog"
-            aria-expanded={isAdvanceTimeOpen}
-            leadingIcon={<FastForward size={15} />}
-            onClick={onAdvanceTime}
-          >
-            Advance time
-          </InlineButton>
-        </div>
+          {hasRuntimeActions ? (
+            <div className={styles.environmentActionGroup} aria-label="Runtime actions">
+              {supports(environment, "mining") ? (
+                <InlineButton
+                  leadingIcon={<Pickaxe size={15} />}
+                  disabled={busyAction === "mine-block"}
+                  onClick={() => void mineBlock()}
+                >
+                  {busyAction === "mine-block" ? "Mining" : "Mine block"}
+                </InlineButton>
+              ) : undefined}
+              {supports(environment, "timeTravel") ? (
+                <InlineButton
+                  aria-haspopup="dialog"
+                  aria-expanded={isAdvanceTimeOpen}
+                  leadingIcon={<FastForward size={15} />}
+                  onClick={onAdvanceTime}
+                >
+                  Advance time
+                </InlineButton>
+              ) : undefined}
+            </div>
+          ) : undefined}
 
-        <div className={styles.environmentActionGroup} aria-label="State actions">
-          <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
-            Checkpoints
-          </InlineButton>
-          <InlineButton
-            leadingIcon={<Upload size={15} />}
-            onClick={() => stateFileInputRef.current?.click()}
-          >
-            Load state
-          </InlineButton>
-          <InlineButton
-            leadingIcon={<Download size={15} />}
-            disabled={busyAction === "download-state"}
-            onClick={() => void downloadState()}
-          >
-            {busyAction === "download-state" ? "Downloading" : "Download state"}
-          </InlineButton>
-          <input
-            ref={stateFileInputRef}
-            className={styles.visuallyHiddenInput}
-            type="file"
-            accept="application/json,.json"
-            tabIndex={-1}
-            onChange={selectStateFile}
-          />
+          {hasStateActions ? (
+            <div className={styles.environmentActionGroup} aria-label="State actions">
+              {supports(environment, "checkpoints") ? (
+                <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
+                  Checkpoints
+                </InlineButton>
+              ) : undefined}
+              {supports(environment, "snapshots") ? (
+                <>
+                  <InlineButton
+                    leadingIcon={<Upload size={15} />}
+                    onClick={() => stateFileInputRef.current?.click()}
+                  >
+                    Load state
+                  </InlineButton>
+                  <InlineButton
+                    leadingIcon={<Download size={15} />}
+                    disabled={busyAction === "download-state"}
+                    onClick={() => void downloadState()}
+                  >
+                    {busyAction === "download-state" ? "Downloading" : "Download state"}
+                  </InlineButton>
+                  <input
+                    ref={stateFileInputRef}
+                    className={styles.visuallyHiddenInput}
+                    type="file"
+                    accept="application/json,.json"
+                    tabIndex={-1}
+                    onChange={selectStateFile}
+                  />
+                </>
+              ) : undefined}
+            </div>
+          ) : undefined}
         </div>
-      </div>
+      ) : undefined}
 
       <Dialog
         open={isCheckpointsOpen}
