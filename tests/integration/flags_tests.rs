@@ -1292,6 +1292,52 @@ fn test_manifest_path_accepts_relative_path_from_parent() {
 }
 
 #[test]
+fn test_project_root_loads_dotenv_from_selected_project() {
+    let project = ProjectBuilder::new("project-root-dotenv")
+        .raw_file(".env", "ACTON_PROJECT_CONTEXT=selected-project\n")
+        .script_file(
+            "dotenv",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                println("project context: {}", env<string>("ACTON_PROJECT_CONTEXT"));
+            }
+            "#,
+        )
+        .build();
+    project.acton().init().run().success();
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+    let script_path = project.path().join("scripts/dotenv.tolk");
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg(
+            project
+                .path()
+                .to_str()
+                .expect("Project path should be valid UTF-8"),
+        )
+        .script(
+            script_path
+                .to_str()
+                .expect("Script path should be valid UTF-8"),
+        )
+        .current_dir(project_parent)
+        .env_remove("ACTON_PROJECT_CONTEXT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_project_root_loads_dotenv_from_selected_project.stdout.txt",
+        );
+}
+
+#[test]
 fn test_manifest_path_missing_file_returns_clear_error() {
     let project = ProjectBuilder::new("manifest-path-missing")
         .contract("simple", SIMPLE_CONTRACT)
