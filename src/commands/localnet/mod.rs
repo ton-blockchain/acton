@@ -67,18 +67,18 @@ pub async fn localnet_start_cmd(
         anyhow::bail!("localnet block interval must be greater than 0");
     }
 
-    let (state_source, fork_network) = if let Some(network) = fork_net {
+    let (state_source, fork_network, fork_block_number) = if let Some(network) = fork_net {
         let network = Network::from_str(&network)?;
-        let fork_network = network.to_string();
+        let provider = RemoteProvider::pinned(network, fork_block_number).await?;
+        let fork_network = provider.network.to_string();
+        let fork_block_number = provider.fork_block_number;
         (
-            StateSource::Remote(RemoteProvider {
-                network,
-                fork_block_number,
-            }),
+            StateSource::Remote(provider),
             Some(fork_network),
+            fork_block_number,
         )
     } else {
-        (StateSource::Local, None)
+        (StateSource::Local, None, None)
     };
 
     let node = Arc::new(Localnet::new(

@@ -12,7 +12,11 @@
     "version": "v4r2"
   },
   "state_source": {
-    "fork_block_number": null,
+    "fork_block_number": {
+      "matches_source_at_fork": true,
+      "nonzero": true,
+      "present": true
+    },
     "fork_network": "fork-source",
     "state_source": "remote"
   }

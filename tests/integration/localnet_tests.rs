@@ -955,7 +955,9 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("Failed to write wallets.toml");
 
-    let source_node = project.localnet().start();
+    let source_node = project.localnet().args(["--accounts", "deployer"]).start();
+    let source_fork_block = u64::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
     append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
 
     let forked_node = project
@@ -1000,7 +1002,14 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
         "state_source": {
             "state_source": node_info["result"]["state_source"].as_str(),
             "fork_network": node_info["result"]["fork_network"].as_str(),
-            "fork_block_number": node_info["result"]["fork_block_number"].as_u64(),
+            "fork_block_number": {
+                "present": node_info["result"]["fork_block_number"].as_u64().is_some(),
+                "matches_source_at_fork": node_info["result"]["fork_block_number"].as_u64()
+                    == Some(source_fork_block),
+                "nonzero": node_info["result"]["fork_block_number"]
+                    .as_u64()
+                    .is_some_and(|seqno| seqno > 0),
+            },
         },
         "manual_mining": {
             "seqno_stable_after_start": after_sleep_seqno == initial_seqno,

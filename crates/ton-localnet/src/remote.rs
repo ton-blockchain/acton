@@ -16,6 +16,32 @@ pub struct RemoteProvider {
     pub fork_block_number: Option<u64>,
 }
 
+impl RemoteProvider {
+    pub async fn pinned(network: Network, fork_block_number: Option<u64>) -> anyhow::Result<Self> {
+        let fork_block_number = match fork_block_number {
+            Some(fork_block_number) => fork_block_number,
+            None => {
+                let network = network.clone();
+                tokio::task::spawn_blocking(move || {
+                    create_api_client(network)?.get_last_block_seqno()
+                })
+                .await
+                .context("Failed to resolve latest fork block")??
+            }
+        };
+
+        Ok(Self {
+            network,
+            fork_block_number: Some(fork_block_number),
+        })
+    }
+}
+
+fn create_api_client(network: Network) -> anyhow::Result<TonApiClient> {
+    let config = config::ActonConfig::load().unwrap_or_default();
+    TonApiClient::new(network, config.custom_networks())
+}
+
 // TODO: remove
 fn with_api_client<T: Send + 'static>(
     provider: &RemoteProvider,
@@ -24,11 +50,7 @@ fn with_api_client<T: Send + 'static>(
     let network = provider.network.clone();
     std::thread::Builder::new()
         .name("acton-remote-provider".to_owned())
-        .spawn(move || {
-            let config = config::ActonConfig::load().unwrap_or_default();
-            let api_client = TonApiClient::new(network, config.custom_networks())?;
-            request(&api_client)
-        })
+        .spawn(move || request(&create_api_client(network)?))
         .context("Failed to start remote provider worker")?
         .join()
         .map_err(|_| anyhow::anyhow!("Remote provider worker panicked"))?
@@ -120,4 +142,18 @@ pub(crate) fn account_meta_from_shard_account(
         data_hash,
         frozen_hash,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn explicit_fork_block_is_preserved() {
+        let provider = RemoteProvider::pinned(Network::Mainnet, Some(81_000_000))
+            .await
+            .unwrap();
+
+        assert_eq!(provider.fork_block_number, Some(81_000_000));
+    }
 }
