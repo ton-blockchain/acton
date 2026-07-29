@@ -1,4 +1,4 @@
-import {Buffer} from "node:buffer"
+import {Buffer} from "buffer"
 
 import {isTransactionSuccessful, type TransactionInfo} from "@acton/transaction-ui"
 import {
