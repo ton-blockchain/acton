@@ -11,7 +11,7 @@
   ✗ foo [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── EvaaMasterClassicSupplyMaster 1 GRAM -> simple B                            gas=836 aborted action_result_code=37
+        └── DaolamaBorrow 1 GRAM -> simple B                                            gas=836 aborted action_result_code=37
             ├── account created
             ├── Action phase failed
             ├── Description: Not enough GRAM

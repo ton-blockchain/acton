@@ -144,6 +144,46 @@
   font-size: var(--acton-font-size-sm);
 }
 
+.skeleton,
+.skeletonLine {
+  background: linear-gradient(
+    90deg,
+    var(--acton-color-surface-raised) 25%,
+    color-mix(in srgb, var(--acton-color-surface-raised) 82%, var(--acton-color-text)) 50%,
+    var(--acton-color-surface-raised) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.skeleton.searchBox {
+  border-color: transparent;
+}
+
+.skeletonLine {
+  width: 88%;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeletonLineShort {
+  width: 52%;
+}
+
+.skeletonLineMedium {
+  width: 68%;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @media (max-width: 720px) {
   .container {
     padding: 16px;
@@ -157,5 +197,12 @@
   .list {
     grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
     gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeletonLine {
+    animation: none;
   }
 }

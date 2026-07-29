@@ -11,12 +11,13 @@ use crate::{
     blockchain::normalize_code_hash,
     error::ApiError,
     registry::{
-        AbiContractsRequest, LastVerifiedRequest, VerificationStatisticsReceipt,
-        VerificationStatusReceipt, VerificationStatusRequest, VerifiedBundleRequest,
+        AbiContractsRequest, LastVerifiedRequest, VerificationStatisticsHistoryReceipt,
+        VerificationStatisticsReceipt, VerificationStatusReceipt, VerificationStatusRequest,
+        VerifiedBundleRequest,
     },
     registry_index::{
         IndexedAbiContract, IndexedCompilerVersionStatistics, IndexedLanguageStatistics,
-        IndexedVerifiedBundleSummary,
+        IndexedVerificationStatisticsHistoryItem, IndexedVerifiedBundleSummary,
     },
     source_storage::{CompilerMetadata, SourceMapData, StoredSourceBundle, StoredSourceFile},
     state::AppState,
@@ -150,6 +151,23 @@ pub async fn statistics_handler(
     let receipt = state.verification_registry().statistics().await?;
 
     Ok(Json(VerificationStatisticsResponse::from(receipt)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/history",
+    responses(
+        (status = 200, description = "All verified source bundles with their verification timestamp, compiler, and compiler version", body = VerificationStatisticsHistoryResponse),
+        (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
+pub async fn statistics_history_handler(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let receipt = state.verification_registry().statistics_history().await?;
+
+    Ok(Json(VerificationStatisticsHistoryResponse::from(receipt)))
 }
 
 #[utoipa::path(
@@ -407,6 +425,46 @@ impl From<IndexedCompilerVersionStatistics> for CompilerVersionStatisticsRespons
         Self {
             version: statistics.version,
             total: statistics.total,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerificationStatisticsHistoryResponse {
+    items: Vec<VerificationStatisticsHistoryItemResponse>,
+}
+
+impl From<VerificationStatisticsHistoryReceipt> for VerificationStatisticsHistoryResponse {
+    fn from(receipt: VerificationStatisticsHistoryReceipt) -> Self {
+        Self {
+            items: receipt
+                .items
+                .into_iter()
+                .map(VerificationStatisticsHistoryItemResponse::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerificationStatisticsHistoryItemResponse {
+    /// Verification time as a Unix timestamp in seconds.
+    #[schema(example = 1_700_000_000)]
+    timestamp: u64,
+    /// Compiler identifier, such as `func`, `tact`, or `tolk`.
+    #[schema(example = "tolk")]
+    compiler: String,
+    /// Compiler version used for the verification.
+    #[schema(example = "1.4.1")]
+    version: String,
+}
+
+impl From<IndexedVerificationStatisticsHistoryItem> for VerificationStatisticsHistoryItemResponse {
+    fn from(item: IndexedVerificationStatisticsHistoryItem) -> Self {
+        Self {
+            timestamp: item.timestamp,
+            compiler: item.compiler,
+            version: item.version,
         }
     }
 }

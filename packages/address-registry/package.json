@@ -1,0 +1,28 @@
+{
+  "name": "@acton/address-registry",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./addresses.json": "./src/addresses.json"
+  },
+  "scripts": {
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "generate": "bun scripts/generate.ts",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "test": "bun test && bun run typecheck",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ton/core": "0.63.1",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

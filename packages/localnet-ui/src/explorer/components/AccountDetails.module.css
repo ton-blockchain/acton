@@ -692,6 +692,7 @@
 .technicalLabelPopoverContent {
   display: block;
   overflow-wrap: anywhere;
+  user-select: text;
   white-space: pre-wrap;
 }
 
@@ -781,6 +782,22 @@ th.valueContainer {
 .tokenValue {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
+}
+
+.listLoadMore {
+  min-height: 52px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--acton-color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.listLoadMoreError {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-sm);
 }
 
 .pagination {

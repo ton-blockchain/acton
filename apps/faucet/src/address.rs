@@ -10,12 +10,12 @@ const NON_BOUNCEABLE_TAG: u8 = 0x51;
 const TESTNET_FLAG: u8 = 0x80;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum AddressValidationError {
+pub(crate) enum AddressValidationError {
     Invalid,
     Mainnet,
 }
 
-pub(super) fn parse_testnet_address(value: &str) -> Result<TonAddress, AddressValidationError> {
+pub(crate) fn parse_testnet_address(value: &str) -> Result<TonAddress, AddressValidationError> {
     let address = TonAddress::from_str(value).map_err(|_| AddressValidationError::Invalid)?;
 
     // Raw addresses do not encode a network. Friendly addresses do, so require

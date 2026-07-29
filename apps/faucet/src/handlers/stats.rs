@@ -15,6 +15,7 @@ pub(super) struct StatsResponse {
 struct AntifraudStatsResponse {
     wallet_balance: u64,
     sent_amount_window: u64,
+    subnet_amount_window: u64,
     successful_claim_window: u64,
 }
 
@@ -46,6 +47,7 @@ impl From<FaucetStats> for StatsResponse {
             antifraud: AntifraudStatsResponse {
                 wallet_balance: stats.antifraud.wallet_balance,
                 sent_amount_window: stats.antifraud.sent_amount_window,
+                subnet_amount_window: stats.antifraud.subnet_amount_window,
                 successful_claim_window: stats.antifraud.successful_claim_window,
             },
         }
@@ -66,7 +68,8 @@ mod tests {
             antifraud: AntifraudStats {
                 wallet_balance: 2,
                 sent_amount_window: 3,
-                successful_claim_window: 4,
+                subnet_amount_window: 4,
+                successful_claim_window: 5,
             },
         });
 
@@ -77,7 +80,8 @@ mod tests {
                 "antifraud": {
                     "wallet_balance": 2,
                     "sent_amount_window": 3,
-                    "successful_claim_window": 4,
+                    "subnet_amount_window": 4,
+                    "successful_claim_window": 5,
                 },
             })
         );

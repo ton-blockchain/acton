@@ -19,6 +19,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@acton/address-registry": "workspace:*",
     "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",

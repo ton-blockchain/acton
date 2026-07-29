@@ -80,10 +80,14 @@ jobs:
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
           cargo xtask deploy-explorer \
+            --repository "https://github.com/i582/actonscan" \
             --branch pages \
             --checkout "${RUNNER_TEMP}/actonscan-pages" \
             --cname "${ACTONSCAN_URL}" \
-            --message "Deploy actonscan from ${DEPLOY_COMMIT}"
+            --wait-for-deployment \
+            --message "Deploy actonscan from ${DEPLOY_COMMIT}
+
+          Original commit: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${DEPLOY_COMMIT}"
 
       - name: Save Bun cache
         if: steps.bun-cache.outputs.cache-hit != 'true'

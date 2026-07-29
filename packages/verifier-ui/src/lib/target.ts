@@ -3,7 +3,7 @@ export interface LookupTarget {
   readonly value: string
 }
 
-const HEX_CODE_HASH = /^[0-9a-fA-F]{64}$/
+const HEX_CODE_HASH = /^(?:0x)?([0-9a-f]{64})$/i
 const BASE64_CODE_HASH = /^(?:[A-Za-z0-9+/]{43}|[A-Za-z0-9_-]{43})=?$/
 const CODE_HASH_BYTES = 32
 
@@ -13,10 +13,11 @@ export function parseLookupTarget(rawValue: string): LookupTarget {
     throw new Error("Enter a contract address or code hash")
   }
 
-  if (HEX_CODE_HASH.test(value)) {
+  const hexCodeHash = value.match(HEX_CODE_HASH)?.[1]
+  if (hexCodeHash) {
     return {
       kind: "code_hash",
-      value: value.toLowerCase(),
+      value: hexCodeHash.toLowerCase(),
     }
   }
 

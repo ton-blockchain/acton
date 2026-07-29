@@ -97,12 +97,14 @@ async fn openapi_json_documents_verifier_api() {
     assert!(body["paths"]["/api/v1/verify"].is_object());
     assert!(body["paths"]["/api/v1/last_verified"].is_object());
     assert!(body["paths"]["/api/v1/statistics"].is_object());
+    assert!(body["paths"]["/api/v1/statistics/history"].is_object());
     assert!(body["paths"]["/api/v1/abi"].is_object());
     assert!(body["paths"]["/api/v1/verification/status"].is_object());
     assert!(body["paths"]["/api/v1/verification/source"].is_object());
     assert!(body["components"]["schemas"]["VerifyResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationSourceResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationStatisticsResponse"].is_object());
+    assert!(body["components"]["schemas"]["VerificationStatisticsHistoryResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
 }
 
@@ -255,6 +257,67 @@ async fn statistics_returns_counts_by_language_and_compiler_version() {
                         {"version": "1.4.1", "total": 1},
                         {"version": "1.5.0", "total": 1}
                     ]
+                }
+            ]
+        })
+    );
+}
+
+#[tokio::test]
+async fn statistics_history_returns_timestamp_compiler_and_version_for_every_verification() {
+    let state = mapped_compiler_app_state(&[
+        ("tolk", "1.4.1", CODE_HASH_ONE),
+        ("func", "0.4.6", CODE_HASH_TWO),
+    ]);
+
+    for (code_hash, language, compile_params, sources, file_name, source) in [
+        (
+            CODE_HASH_ONE,
+            "tolk",
+            COMPILE_PARAMS_TOLK,
+            SOURCES_MAIN,
+            "main.tolk",
+            "fun main() {}",
+        ),
+        (
+            CODE_HASH_TWO,
+            "func",
+            COMPILE_PARAMS_FUNC,
+            SOURCES_FUNC_MAIN,
+            "main.fc",
+            "() recv_internal() {}",
+        ),
+    ] {
+        let response = post_verify(
+            state.clone(),
+            vec![
+                text_part("code_hash", code_hash),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                text_part("sources", sources),
+                file_part("files", file_name, "text/plain", source),
+            ],
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    let response = get(state, "/api/v1/statistics/history").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(
+        body,
+        json!({
+            "items": [
+                {
+                    "timestamp": 1_700_000_000_u64,
+                    "compiler": "func",
+                    "version": "0.4.6"
+                },
+                {
+                    "timestamp": 1_700_000_000_u64,
+                    "compiler": "tolk",
+                    "version": "1.4.1"
                 }
             ]
         })

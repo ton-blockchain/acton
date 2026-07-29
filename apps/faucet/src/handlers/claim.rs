@@ -1,6 +1,7 @@
 use crate::AppState;
+use crate::address::{AddressValidationError, parse_testnet_address};
+use crate::antifraud_subject;
 use crate::github_auth::FaucetTier;
-use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::{auth, challenge};
 use apalis::prelude::TaskSink;
 use axum::{
@@ -9,10 +10,9 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use faucet_backend::middlewares::ClientContext;
-use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
+use faucet_valkey::{AmountWindowDecision, AntifraudModule, SuccessfulClaimWindowDecision};
 use real::RealIp;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv6Addr};
 use tracing::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,6 +28,10 @@ pub(crate) struct CreateClaim {
     pub(crate) max_requests: u32,
     #[serde(default)]
     pub(crate) client_window_subject: Option<String>,
+    #[serde(default)]
+    pub(crate) device_window_subject: Option<String>,
+    #[serde(default)]
+    pub(crate) subnet_amount_window_subject: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -60,6 +64,13 @@ pub(super) async fn create_claim(
     headers: HeaderMap,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
+    info!(
+        address = %payload.address,
+        client_ip = %client_ip.ip(),
+        device_uid = %client.device_uid,
+        "Received faucet claim request"
+    );
+
     let address = match parse_testnet_address(&payload.address) {
         Ok(address) => address.to_hex(),
         Err(AddressValidationError::Invalid) => {
@@ -121,15 +132,17 @@ pub(super) async fn create_claim(
     }
 
     check_successful_claim_window(&state, &address, max_requests).await?;
-    let client_window_subject = client_claim_window_key(client_ip.ip());
+    let client_window_subject = antifraud_subject::client_ip(client_ip.ip());
+    let device_window_subject = antifraud_subject::device_uid(&client.device_uid);
     if let Some(github_user_id) = github_user_id {
         check_successful_claim_window(
             &state,
-            &github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
             max_requests,
         )
         .await?;
     }
+    check_successful_claim_window(&state, &device_window_subject, max_requests).await?;
     if tier == FaucetTier::Guest {
         check_successful_claim_window(
             &state,
@@ -138,6 +151,8 @@ pub(super) async fn create_claim(
         )
         .await?;
     }
+
+    let subnet_amount_window_subject = check_subnet_amount_window(&state, client_ip.ip()).await?;
 
     let consumed_context = state
         .valkey
@@ -163,6 +178,8 @@ pub(super) async fn create_claim(
             tier,
             max_requests,
             client_window_subject: Some(client_window_subject),
+            device_window_subject: Some(device_window_subject),
+            subnet_amount_window_subject,
         })
         .await
         .map_err(|_| response_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to queue claim"))?;
@@ -173,6 +190,92 @@ pub(super) async fn create_claim(
             message: "Your claim has been queued. It will be processed soon.",
         }),
     ))
+}
+
+async fn check_subnet_amount_window(
+    state: &AppState,
+    client_ip: std::net::IpAddr,
+) -> Result<Option<String>, (StatusCode, Json<ErrorResponse>)> {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return Ok(None);
+    };
+    let amount = state.config.faucet.amount;
+    let subject = antifraud_subject::client_subnet(client_ip, window.ipv4_prefix_length);
+
+    if let Err(err) = state.antifraud.check_subnet_amount_window_transfer(amount) {
+        state
+            .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+            .await;
+        error!(
+            subject,
+            amount,
+            max_amount = window.max_amount,
+            error = ?err,
+            "Claim amount exceeds subnet amount window limit"
+        );
+        return Err(response_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Subnet amount limit exceeded",
+        ));
+    }
+
+    match state
+        .valkey
+        .check_subnet_amount_window(&subject, amount, window.max_amount, window.window_seconds)
+        .await
+    {
+        Ok(AmountWindowDecision::Allowed {
+            current,
+            attempted,
+            max,
+            window_seconds,
+        }) => {
+            info!(
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                "Subnet amount sliding window checked"
+            );
+            Ok(Some(subject))
+        }
+        Ok(AmountWindowDecision::Limited {
+            current,
+            attempted,
+            max,
+            window_seconds,
+            retry_after_ms,
+        }) => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+                .await;
+            warn!(
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                retry_after_ms,
+                "Subnet amount sliding window limit reached"
+            );
+            Err(response_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Subnet amount limit exceeded",
+            ))
+        }
+        Err(err) => {
+            error!(
+                subject,
+                error = %err,
+                "Failed to check subnet amount window"
+            );
+            Err(response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check subnet amount limit",
+            ))
+        }
+    }
 }
 
 // TODO: сделать по другому
@@ -240,24 +343,6 @@ async fn check_successful_claim_window(
     }
 }
 
-pub(crate) fn github_claim_window_key(github_user_id: u64) -> String {
-    format!("github:{github_user_id}")
-}
-
-pub(crate) fn client_claim_window_key(ip: IpAddr) -> String {
-    let ip = match ip {
-        IpAddr::V6(ip) if ip.to_ipv4_mapped().is_some() => {
-            IpAddr::V4(ip.to_ipv4_mapped().expect("checked IPv4-mapped address"))
-        }
-        IpAddr::V6(ip) => {
-            let network = u128::from(ip) & (u128::MAX << 64);
-            IpAddr::V6(Ipv6Addr::from(network))
-        }
-        IpAddr::V4(ip) => IpAddr::V4(ip),
-    };
-    format!("client-ip:{ip}")
-}
-
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
     response_error(StatusCode::BAD_REQUEST, error)
 }
@@ -270,9 +355,7 @@ fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<
 mod tests {
     use serde_json::json;
 
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
-    use super::{CreateClaim, CreateClaimRequest, FaucetTier, client_claim_window_key};
+    use super::{CreateClaim, CreateClaimRequest, FaucetTier};
 
     #[test]
     fn deserializes_challenge_version() {
@@ -306,23 +389,7 @@ mod tests {
         assert_eq!(claim.tier, FaucetTier::Guest);
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);
-    }
-
-    #[test]
-    fn builds_client_window_subjects_from_peer_ip() {
-        assert_eq!(
-            client_claim_window_key(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 7))),
-            "client-ip:203.0.113.7"
-        );
-        assert_eq!(
-            client_claim_window_key(IpAddr::V6(
-                "2001:db8:1234:5678:abcd::1".parse::<Ipv6Addr>().unwrap()
-            )),
-            "client-ip:2001:db8:1234:5678::"
-        );
-        assert_eq!(
-            client_claim_window_key(IpAddr::V6("::ffff:192.0.2.44".parse::<Ipv6Addr>().unwrap())),
-            "client-ip:192.0.2.44"
-        );
+        assert_eq!(claim.device_window_subject, None);
+        assert_eq!(claim.subnet_amount_window_subject, None);
     }
 }

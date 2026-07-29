@@ -254,7 +254,7 @@ test("block transactions and masterchain shards share the historical cache polic
 
   try {
     const transactionsUrl =
-      "https://actonscan.example/api/toncenter/testnet/v3/transactions?limit=0100&seqno=00042&shard=8000000000000000&workchain=-1"
+      "https://actonscan.example/api/toncenter/testnet/v3/transactions?offset=00100&limit=0100&seqno=00042&shard=8000000000000000&workchain=-1"
     const shardsUrl = "https://actonscan.example/api/toncenter/testnet/v2/getShards?seqno=081928675"
     const transactionsMiss = await onTransactionsRequest(context(transactionsUrl))
     const shardsMiss = await onGetShardsRequest(context(shardsUrl))
@@ -329,7 +329,7 @@ test("block transactions and masterchain shards share the historical cache polic
     }).toMatchInlineSnapshot(`
       {
         "cacheKeys": [
-          "https://actonscan.example/api/toncenter/testnet/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100",
+          "https://actonscan.example/api/toncenter/testnet/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100&offset=100",
           "https://actonscan.example/api/toncenter/testnet/v2/getShards?seqno=81928675",
         ],
         "hits": [
@@ -405,7 +405,7 @@ test("block transactions and masterchain shards share the historical cache polic
         "upstreamRequests": [
           {
             "apiKey": "server-testnet-key",
-            "url": "https://testnet.toncenter.com/api/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100",
+            "url": "https://testnet.toncenter.com/api/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100&offset=100",
           },
           {
             "apiKey": "server-testnet-key",

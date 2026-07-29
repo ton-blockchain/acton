@@ -1100,6 +1100,8 @@ name = "faucet-config"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "http",
+ "ipnet",
 ]
 
 [[package]]

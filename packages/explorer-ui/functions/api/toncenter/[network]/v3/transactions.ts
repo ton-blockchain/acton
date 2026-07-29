@@ -10,8 +10,9 @@ import {
   validateToncenterRequest,
 } from "../../../../../worker/toncenterProxy"
 
-const TRANSACTION_PARAMETER_NAMES = ["workchain", "shard", "seqno", "limit"] as const
+const TRANSACTION_PARAMETER_NAMES = ["workchain", "shard", "seqno", "limit", "offset"] as const
 const TRANSACTION_PARAMETER_SET = new Set<string>(TRANSACTION_PARAMETER_NAMES)
+const REQUIRED_TRANSACTION_PARAMETER_SET = new Set<string>(["workchain", "shard", "seqno"])
 
 export async function onRequest(context: PagesContext): Promise<Response> {
   const network = validateToncenterRequest(context)
@@ -46,7 +47,7 @@ function normalizeSearchParams(
   const searchParams = new URLSearchParams()
   for (const name of TRANSACTION_PARAMETER_NAMES) {
     const values = input.getAll(name)
-    if (values.length !== 1 && name !== "limit") {
+    if (values.length === 0 && REQUIRED_TRANSACTION_PARAMETER_SET.has(name)) {
       return {error: `Exactly one ${name} query parameter is required`}
     }
     if (values.length > 1) {

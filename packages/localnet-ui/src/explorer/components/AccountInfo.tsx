@@ -21,7 +21,13 @@ import {
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
 import {getAccountNameDetails} from "./accountNameDetails"
-import {formatAddress, formatNano, normalizeAddress, toRawAddress} from "./utils"
+import {
+  formatAddress,
+  formatNano,
+  normalizeAddress,
+  toAccountQrAddress,
+  toRawAddress,
+} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
@@ -90,6 +96,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
   const nonBounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: false})
   const rawAddress = toRawAddress(address)
+  const qrAddress = toAccountQrAddress(address, state?.status, addressFormat)
 
   const [tokenMastersByAddress, setTokenMastersByAddress] = useState<
     Map<string, JettonMasterMetadata>
@@ -172,7 +179,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     domain,
     domains,
     customName: nameSources.customName,
-    tonAssetsName: nameSources.tonAssetsName,
+    registryName: nameSources.registryName,
     tonDnsName: nameSources.tonDnsName,
   })
   const hasNameDetails = nameDetailGroups.length > 0
@@ -255,13 +262,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
 
   const qrCode = (
     <QRCodeSVG
-      value={rawAddress}
+      value={qrAddress}
       size={132}
       level="M"
       marginSize={3}
       bgColor="var(--acton-color-surface-raised)"
       fgColor="var(--acton-color-text)"
-      title={`QR code for ${rawAddress}`}
+      title={`QR code for ${qrAddress}`}
       className={styles.qrSvg}
     />
   )

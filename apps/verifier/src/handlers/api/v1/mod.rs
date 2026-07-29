@@ -14,6 +14,10 @@ pub fn router() -> Router<AppState> {
         .route("/openapi.json", get(openapi_handler))
         .route("/last_verified", get(verification::last_verified_handler))
         .route("/statistics", get(verification::statistics_handler))
+        .route(
+            "/statistics/history",
+            get(verification::statistics_history_handler),
+        )
         .route("/abi", get(verification::abi_handler))
         .route("/verify", post(verify::handler))
         .route("/verification/status", get(verification::status_handler))
@@ -39,6 +43,7 @@ fn openapi() -> utoipa::openapi::OpenApi {
         verify::handler,
         verification::last_verified_handler,
         verification::statistics_handler,
+        verification::statistics_history_handler,
         verification::abi_handler,
         verification::status_handler,
         verification::source_handler
@@ -58,6 +63,8 @@ fn openapi() -> utoipa::openapi::OpenApi {
         verification::LastVerifiedResponse,
         verification::LastVerifiedItemResponse,
         verification::VerificationStatisticsResponse,
+        verification::VerificationStatisticsHistoryResponse,
+        verification::VerificationStatisticsHistoryItemResponse,
         verification::LanguageStatisticsResponse,
         verification::CompilerVersionStatisticsResponse,
         verification::AbiContractsResponse,

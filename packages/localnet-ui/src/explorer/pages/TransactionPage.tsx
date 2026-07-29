@@ -353,6 +353,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   fetchNameRef.current = fetchName
   // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address format without restarting it
   addressFormatRef.current = addressFormat
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading scoped to the latest trace lookup
   traceLookupHashRef.current = traceLookupHash
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {

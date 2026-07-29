@@ -7,7 +7,25 @@ import {
   mergeAccountDomains,
   parseTonDnsSearchQuery,
   shortenIdentifier,
+  toAccountQrAddress,
 } from "../src/explorer/components/utils"
+
+describe("toAccountQrAddress", () => {
+  const rawAddress = "0:ca6e321c7cce9ecedf0a8ca2492ec8592494aa5fb5ce0387dff96ef6af982a3e"
+
+  test("uses account-aware user-friendly URL-safe addresses", () => {
+    const statuses = ["active", "frozen", "uninitialized", "uninit", "nonexist"] as const
+
+    expect({
+      mainnet: Object.fromEntries(
+        statuses.map(status => [status, toAccountQrAddress(rawAddress, status, {testOnly: false})]),
+      ),
+      testnet: Object.fromEntries(
+        statuses.map(status => [status, toAccountQrAddress(rawAddress, status, {testOnly: true})]),
+      ),
+    }).toMatchSnapshot()
+  })
+})
 
 describe("parseTonDnsSearchQuery", () => {
   test("accepts .ton and .t.me TON DNS names", () => {

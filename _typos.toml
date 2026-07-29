@@ -20,7 +20,8 @@ extend-exclude = [
   "crates/acton-abi-catalog/data/data-abis.json",
   "*.csv",
   "crates/ton-liteapi/src/tl/schemas/**",
-  "packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts"
+  "packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts",
+  "packages/address-registry/src/addresses.json",
 ]
 
 [default]

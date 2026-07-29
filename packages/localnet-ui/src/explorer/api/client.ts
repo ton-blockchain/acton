@@ -73,6 +73,17 @@ interface DnsRecordsResponse {
   }[]
 }
 
+interface DnsResolvedResponse {
+  readonly entries: readonly {
+    readonly entry: {
+      readonly "@type": string
+      readonly smc_address?: {
+        readonly account_address?: string
+      }
+    }
+  }[]
+}
+
 interface GetBlocksOptions {
   readonly workchain?: number
   readonly shard?: string
@@ -94,6 +105,7 @@ interface GetBlockTransactionsOptions {
   readonly shard: string
   readonly seqno: number
   readonly limit?: number
+  readonly offset?: number
 }
 
 interface RawBlockResponse {
@@ -105,6 +117,8 @@ interface GetTracesOptions {
 }
 
 interface GetJettonWalletsOptions {
+  readonly limit?: number
+  readonly offset?: number
   readonly sort?: "asc" | "desc"
 }
 
@@ -150,6 +164,9 @@ const NFT_CONTENT_KEYS = [
   "collection",
   "collection_name",
 ] as const
+
+const TON_DNS_ROOT_ADDRESS = "-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c"
+const DNS_RESOLVE_TTL = 10
 
 function jettonMasterMetadataFromWalletResponse(
   jettonAddress: string,
@@ -325,7 +342,16 @@ export class TonClient {
     const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
     url.searchParams.append("domain", domain)
     const response = await this.request<DnsRecordsResponse>(url, "Failed to resolve TON DNS name")
-    return response.records.find(record => record.dns_wallet)?.dns_wallet ?? undefined
+    const walletAddress = response.records.find(record => record.dns_wallet)?.dns_wallet
+    if (walletAddress || response.records.length > 0) {
+      return walletAddress ?? undefined
+    }
+
+    const resolved = await this.requestDnsFromChain(domain)
+    return resolved.entries
+      .filter(entry => entry.entry["@type"] === "dns.entryDataSmcAddress")
+      .map(entry => stringValue(entry.entry.smc_address?.account_address))
+      .find(address => address !== undefined)
   }
 
   async getWalletDnsNames(address: string): Promise<readonly string[]> {
@@ -494,21 +520,22 @@ export class TonClient {
       addresses.map(async addr => {
         const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")
         url.searchParams.append(paramName, addr)
+        if (options.limit !== undefined) {
+          url.searchParams.append("limit", options.limit.toString())
+        }
+        if (options.offset !== undefined && options.offset > 0) {
+          url.searchParams.append("offset", options.offset.toString())
+        }
         if (options.sort) {
           url.searchParams.append("sort", options.sort)
         }
-        try {
-          const response = await this.request<JettonWalletsResponse>(
-            url,
-            "Failed to fetch jetton wallets",
-          )
-          return response.jetton_wallets.map(wallet =>
-            this.attachJettonWalletMaster(wallet, response.metadata),
-          )
-        } catch (error) {
-          console.error(`Failed to fetch jetton wallets for ${addr}`, error)
-          return []
-        }
+        const response = await this.request<JettonWalletsResponse>(
+          url,
+          "Failed to fetch jetton wallets",
+        )
+        return response.jetton_wallets.map(wallet =>
+          this.attachJettonWalletMaster(wallet, response.metadata),
+        )
       }),
     )
 
@@ -628,6 +655,9 @@ export class TonClient {
     url.searchParams.append("shard", options.shard)
     url.searchParams.append("seqno", options.seqno.toString())
     url.searchParams.append("limit", (options.limit ?? 100).toString())
+    if (options.offset !== undefined && options.offset > 0) {
+      url.searchParams.append("offset", options.offset.toString())
+    }
     return this.request(url, "Failed to fetch block transactions")
   }
 
@@ -664,43 +694,22 @@ export class TonClient {
     }
 
     if (addresses && addresses.length > 0) {
-      const results = await Promise.all(
-        addresses.map(async addr => {
-          try {
-            return await buildAndFetch("address", addr)
-          } catch (error) {
-            console.error(`Failed to fetch NFT for ${addr}`, error)
-            return []
-          }
-        }),
-      )
+      const results = await Promise.all(addresses.map(async addr => buildAndFetch("address", addr)))
       return this.dedupNftItems(results.flat())
     }
 
     if (ownerAddresses && ownerAddresses.length > 0) {
       const results = await Promise.all(
-        ownerAddresses.map(async owner => {
-          try {
-            return await buildAndFetch("owner_address", owner)
-          } catch (error) {
-            console.error(`Failed to fetch NFTs for owner ${owner}`, error)
-            return []
-          }
-        }),
+        ownerAddresses.map(async owner => buildAndFetch("owner_address", owner)),
       )
       return this.dedupNftItems(results.flat())
     }
 
     if (collectionAddresses && collectionAddresses.length > 0) {
       const results = await Promise.all(
-        collectionAddresses.map(async collection => {
-          try {
-            return await buildAndFetch("collection_address", collection)
-          } catch (error) {
-            console.error(`Failed to fetch NFTs for collection ${collection}`, error)
-            return []
-          }
-        }),
+        collectionAddresses.map(async collection =>
+          buildAndFetch("collection_address", collection),
+        ),
       )
       return this.dedupNftItems(results.flat())
     }
@@ -1218,6 +1227,16 @@ export class TonClient {
     }
 
     return raw as T
+  }
+
+  private async requestDnsFromChain(domain: string): Promise<DnsResolvedResponse> {
+    const url = this.buildUrl(this.v2BaseUrl, "/dnsResolve")
+    url.searchParams.append("address", TON_DNS_ROOT_ADDRESS)
+    url.searchParams.append("name", domain)
+    url.searchParams.append("category", "wallet")
+    url.searchParams.append("ttl", DNS_RESOLVE_TTL.toString())
+
+    return this.request<DnsResolvedResponse>(url, "Failed to resolve TON DNS name on-chain")
   }
 
   private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {

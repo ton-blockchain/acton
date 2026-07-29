@@ -3,6 +3,8 @@ import {Buffer} from "node:buffer"
 import {Address} from "@ton/core"
 import {toUnicode} from "punycode/"
 
+import type {AddressInformation} from "../api/types"
+
 const HEX_HASH_RE = /^[a-fA-F0-9]{64}$/
 const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/
 const BASE64_URL_RE = /^[A-Za-z0-9_-]+$/
@@ -107,6 +109,21 @@ export function toTestnetAddress(address: string): string | undefined {
 
 export function normalizeAddress(address: string, options?: AddressFormatOptions): string {
   return toDisplayAddress(address, options) ?? address
+}
+
+export function toAccountQrAddress(
+  address: string,
+  status: AddressInformation["status"] | undefined,
+  options?: AddressFormatOptions,
+): string {
+  const parsed = parseAddress(address)
+  if (!parsed) return address
+
+  return parsed.toString({
+    ...getAddressFormatOptions(options),
+    bounceable: status === "active" || status === "frozen",
+    urlSafe: true,
+  })
 }
 
 export function toRawAddress(address: string): string {

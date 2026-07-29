@@ -11,6 +11,7 @@ import {
 import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
 import {AbiGetMethods, fmt} from "@acton/transaction-ui"
 import {
+  Button,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -100,7 +101,7 @@ import {
   NFT_IMAGE_SOURCE_KEYS,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
-import {Nfts} from "./Nfts"
+import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
 import {
@@ -115,7 +116,7 @@ import {
   shortenIdentifier,
 } from "./utils"
 
-type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "holders"
+type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
 interface AccountDetailsProps {
   readonly transactions: V3TransactionListItem[]
@@ -131,11 +132,25 @@ interface AccountDetailsProps {
   readonly ownerAddress: string
   readonly jettonWallets: JettonWallet[]
   readonly nftItems: NftItem[]
+  readonly collectionItems?: NftItem[]
   readonly jettonMaster?: JettonMaster
   readonly holders?: JettonWallet[]
   readonly tokensLoading?: boolean
+  readonly tokensHasMore?: boolean
+  readonly tokensLoadingMore?: boolean
+  readonly tokensLoadMoreError?: string
   readonly nftsLoading?: boolean
+  readonly nftsHasMore?: boolean
+  readonly nftsLoadingMore?: boolean
+  readonly nftsLoadMoreError?: string
+  readonly collectionItemsLoading?: boolean
+  readonly collectionItemsHasMore?: boolean
+  readonly collectionItemsLoadingMore?: boolean
+  readonly collectionItemsLoadMoreError?: string
   readonly holdersLoading?: boolean
+  readonly holdersHasMore?: boolean
+  readonly holdersLoadingMore?: boolean
+  readonly holdersLoadMoreError?: string
   readonly transactionsLoading?: boolean
   readonly transactionsError?: string
   readonly transactionsHasMore?: boolean
@@ -148,9 +163,14 @@ interface AccountDetailsProps {
   readonly actionsLoadingMore?: boolean
   readonly accountLoading?: boolean
   readonly showHoldersTab?: boolean
+  readonly showItemsTab?: boolean
   readonly client: TonClient
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
+  readonly onLoadMoreTokens?: () => void
+  readonly onLoadMoreNfts?: () => void
+  readonly onLoadMoreCollectionItems?: () => void
+  readonly onLoadMoreHolders?: () => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
   readonly historySortOrder?: AccountHistorySortOrder
@@ -281,11 +301,25 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   ownerAddress,
   jettonWallets,
   nftItems,
+  collectionItems = [],
   jettonMaster,
   holders,
   tokensLoading = false,
+  tokensHasMore = false,
+  tokensLoadingMore = false,
+  tokensLoadMoreError,
   nftsLoading = false,
+  nftsHasMore = false,
+  nftsLoadingMore = false,
+  nftsLoadMoreError,
+  collectionItemsLoading = false,
+  collectionItemsHasMore = false,
+  collectionItemsLoadingMore = false,
+  collectionItemsLoadMoreError,
   holdersLoading = false,
+  holdersHasMore = false,
+  holdersLoadingMore = false,
+  holdersLoadMoreError,
   transactionsLoading = false,
   transactionsError,
   transactionsHasMore = false,
@@ -298,9 +332,14 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   actionsLoadingMore = false,
   accountLoading = false,
   showHoldersTab = false,
+  showItemsTab = false,
   client,
   onAddressClick,
   onTransactionClick,
+  onLoadMoreTokens,
+  onLoadMoreNfts,
+  onLoadMoreCollectionItems,
+  onLoadMoreHolders,
   onLoadMoreTransactions,
   onLoadMoreActions,
   historySortOrder,
@@ -313,6 +352,10 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const historyLoadMoreRef = useRef<HTMLDivElement>(null)
+  const tokensLoadMoreRef = useRef<HTMLDivElement>(null)
+  const nftsLoadMoreRef = useRef<HTMLDivElement>(null)
+  const collectionItemsLoadMoreRef = useRef<HTMLDivElement>(null)
+  const holdersLoadMoreRef = useRef<HTMLDivElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
     FilterPopoverPosition | undefined
@@ -334,15 +377,17 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
         (activeTabHash === "get-methods" && compilerAbi !== undefined) ||
         activeTabHash === "tokens" ||
         (activeTabHash === "nfts" && showNftsTab) ||
+        (activeTabHash === "items" && showItemsTab) ||
         activeTabHash === "holders")
     ) {
       setActiveTab(activeTabHash as Tabs)
     }
-  }, [activeTabHash, compilerAbi, showNftsTab])
+  }, [activeTabHash, compilerAbi, showItemsTab, showNftsTab])
 
   useEffect(() => {
     const unavailable =
       (activeTab === "nfts" && !showNftsTab) ||
+      (activeTab === "items" && !showItemsTab) ||
       (activeTab === "get-methods" && compilerAbi === undefined)
     if (!unavailable) {
       return
@@ -350,7 +395,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
 
     setActiveTab("history")
     onTabChange?.("history")
-  }, [activeTab, compilerAbi, onTabChange, showNftsTab])
+  }, [activeTab, compilerAbi, onTabChange, showItemsTab, showNftsTab])
 
   const handleTabClick = (tab: Tabs) => {
     setActiveTab(tab)
@@ -514,6 +559,141 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     return () => observer.disconnect()
   }, [activeHistoryLoadingMore, activeLoadMoreHistory, activeTab, showLoadMoreHistory])
 
+  const showLoadMoreTokens = !tokensLoading && tokensHasMore && onLoadMoreTokens !== undefined
+
+  useEffect(() => {
+    const target = tokensLoadMoreRef.current
+    if (
+      activeTab !== "tokens" ||
+      !showLoadMoreTokens ||
+      tokensLoadingMore ||
+      tokensLoadMoreError ||
+      !onLoadMoreTokens ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreTokens()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, onLoadMoreTokens, showLoadMoreTokens, tokensLoadMoreError, tokensLoadingMore])
+
+  const showLoadMoreNfts = !nftsLoading && nftsHasMore && onLoadMoreNfts !== undefined
+
+  useEffect(() => {
+    const target = nftsLoadMoreRef.current
+    if (
+      activeTab !== "nfts" ||
+      !showLoadMoreNfts ||
+      nftsLoadingMore ||
+      nftsLoadMoreError ||
+      !onLoadMoreNfts ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreNfts()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, nftsLoadMoreError, nftsLoadingMore, onLoadMoreNfts, showLoadMoreNfts])
+
+  const showLoadMoreCollectionItems =
+    !collectionItemsLoading && collectionItemsHasMore && onLoadMoreCollectionItems !== undefined
+
+  useEffect(() => {
+    const target = collectionItemsLoadMoreRef.current
+    if (
+      activeTab !== "items" ||
+      !showLoadMoreCollectionItems ||
+      collectionItemsLoadingMore ||
+      collectionItemsLoadMoreError ||
+      !onLoadMoreCollectionItems ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreCollectionItems()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [
+    activeTab,
+    collectionItemsLoadMoreError,
+    collectionItemsLoadingMore,
+    onLoadMoreCollectionItems,
+    showLoadMoreCollectionItems,
+  ])
+
+  const showLoadMoreHolders = !holdersLoading && holdersHasMore && onLoadMoreHolders !== undefined
+
+  useEffect(() => {
+    const target = holdersLoadMoreRef.current
+    if (
+      activeTab !== "holders" ||
+      !showLoadMoreHolders ||
+      holdersLoadingMore ||
+      holdersLoadMoreError ||
+      !onLoadMoreHolders ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreHolders()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, holdersLoadMoreError, holdersLoadingMore, onLoadMoreHolders, showLoadMoreHolders])
+
   useEffect(() => {
     try {
       globalThis.localStorage?.setItem(
@@ -672,6 +852,19 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 <UsersRound size={18} />
               </span>
               Holders
+            </button>
+          )}
+          {showItemsTab && (
+            <button
+              type="button"
+              ref={activeTab === "items" ? activeTabRef : undefined}
+              className={`${styles.tab} ${activeTab === "items" ? styles.tabActive : ""}`}
+              onClick={() => handleTabClick("items")}
+            >
+              <span className={styles.tabIcon} aria-hidden="true">
+                <Layers size={18} />
+              </span>
+              Items
             </button>
           )}
           {showNftsTab && (
@@ -1127,10 +1320,81 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
           ) : (
             <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
           )}
+          {showLoadMoreTokens && onLoadMoreTokens && (
+            <div ref={tokensLoadMoreRef} className={styles.listLoadMore}>
+              {tokensLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {tokensLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreTokens}
+                disabled={tokensLoadingMore}
+              >
+                {tokensLoadingMore ? "Loading..." : tokensLoadMoreError ? "Retry" : "Load more"}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : activeTab === "items" && showItemsTab ? (
+        <div className={styles.tokensContent}>
+          {collectionItemsLoading ? (
+            <NftsSkeleton />
+          ) : (
+            <Nfts
+              items={collectionItems}
+              emptyLabel="No collection items found"
+              searchLabel="Search collection items"
+              onAddressClick={onAddressClick}
+            />
+          )}
+          {showLoadMoreCollectionItems && onLoadMoreCollectionItems && (
+            <div ref={collectionItemsLoadMoreRef} className={styles.listLoadMore}>
+              {collectionItemsLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {collectionItemsLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreCollectionItems}
+                disabled={collectionItemsLoadingMore}
+              >
+                {collectionItemsLoadingMore
+                  ? "Loading..."
+                  : collectionItemsLoadMoreError
+                    ? "Retry"
+                    : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       ) : activeTab === "nfts" && showNftsTab ? (
         <div className={styles.tokensContent}>
           <Nfts items={nftItems} onAddressClick={onAddressClick} />
+          {showLoadMoreNfts && onLoadMoreNfts && (
+            <div ref={nftsLoadMoreRef} className={styles.listLoadMore}>
+              {nftsLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {nftsLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreNfts}
+                disabled={nftsLoadingMore}
+              >
+                {nftsLoadingMore ? "Loading..." : nftsLoadMoreError ? "Retry" : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       ) : activeTab === "holders" ? (
         <div className={styles.historyContent}>
@@ -1200,6 +1464,24 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+          {showLoadMoreHolders && onLoadMoreHolders && (
+            <div ref={holdersLoadMoreRef} className={styles.listLoadMore}>
+              {holdersLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {holdersLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreHolders}
+                disabled={holdersLoadingMore}
+              >
+                {holdersLoadingMore ? "Loading..." : holdersLoadMoreError ? "Retry" : "Load more"}
+              </Button>
             </div>
           )}
         </div>

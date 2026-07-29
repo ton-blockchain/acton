@@ -73,6 +73,22 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.blockTransactionsLoadMore {
+  min-height: 52px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--acton-color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.blockTransactionsLoadMoreError {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-sm);
+}
+
 .blocksTable {
   width: 100%;
   min-width: 520px;

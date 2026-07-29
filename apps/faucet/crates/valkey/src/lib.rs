@@ -5,6 +5,12 @@ const SENT_AMOUNT_WINDOW_KEY: &str = "faucet:antifraud:sent-amount-window";
 const SENT_AMOUNT_WINDOW_SEQ_KEY: &str = "faucet:antifraud:sent-amount-window:seq";
 const SENT_AMOUNT_WINDOW_SCRIPT: &str = include_str!("../scripts/reserve_sliding_window.lua");
 
+const SUBNET_AMOUNT_WINDOW_KEY_PREFIX: &str = "faucet:antifraud:subnet-amount-window";
+const SUBNET_AMOUNT_WINDOW_SEQ_KEY_PREFIX: &str = "faucet:antifraud:subnet-amount-window:seq";
+const CHECK_SUBNET_AMOUNT_WINDOW_SCRIPT: &str = include_str!("../scripts/check_amount_window.lua");
+const RECORD_SUBNET_AMOUNT_WINDOW_SCRIPT: &str =
+    include_str!("../scripts/record_amount_window.lua");
+
 const SUCCESSFUL_CLAIM_WINDOW_KEY_PREFIX: &str = "faucet:antifraud:successful-claim-window";
 const SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX: &str = "faucet:antifraud:successful-claim-window:seq";
 const CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT: &str =
@@ -21,6 +27,7 @@ const ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX: &str = "faucet:stats:antifraud";
 pub enum AntifraudModule {
     WalletBalance,
     SentAmountWindow,
+    SubnetAmountWindow,
     SuccessfulClaimWindow,
 }
 
@@ -28,6 +35,7 @@ pub enum AntifraudModule {
 pub struct AntifraudStats {
     pub wallet_balance: u64,
     pub sent_amount_window: u64,
+    pub subnet_amount_window: u64,
     pub successful_claim_window: u64,
 }
 
@@ -42,6 +50,7 @@ impl AntifraudModule {
         match self {
             Self::WalletBalance => "wallet-balance",
             Self::SentAmountWindow => "sent-amount-window",
+            Self::SubnetAmountWindow => "subnet-amount-window",
             Self::SuccessfulClaimWindow => "successful-claim-window",
         }
     }
@@ -58,6 +67,23 @@ pub struct SentAmountWindowReservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SentAmountWindowDecision {
     Reserved(SentAmountWindowReservation),
+    Limited {
+        current: u64,
+        attempted: u64,
+        max: u64,
+        window_seconds: u64,
+        retry_after_ms: u64,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AmountWindowDecision {
+    Allowed {
+        current: u64,
+        attempted: u64,
+        max: u64,
+        window_seconds: u64,
+    },
     Limited {
         current: u64,
         attempted: u64,
@@ -219,11 +245,14 @@ impl ValkeyStore {
 
     pub async fn get_stats(&self) -> anyhow::Result<FaucetStats> {
         let mut connection = self.connection.clone();
-        let values: (Option<u64>, Option<u64>, Option<u64>, Option<u64>) = redis::cmd("MGET")
+        let values: Vec<Option<u64>> = redis::cmd("MGET")
             .arg(TOTAL_SENT_NANOGRAMS_KEY)
             .arg(antifraud_trigger_count_key(AntifraudModule::WalletBalance))
             .arg(antifraud_trigger_count_key(
                 AntifraudModule::SentAmountWindow,
+            ))
+            .arg(antifraud_trigger_count_key(
+                AntifraudModule::SubnetAmountWindow,
             ))
             .arg(antifraud_trigger_count_key(
                 AntifraudModule::SuccessfulClaimWindow,
@@ -231,13 +260,15 @@ impl ValkeyStore {
             .query_async(&mut connection)
             .await
             .context("Failed to get faucet stats")?;
+        let value = |index| values.get(index).copied().flatten().unwrap_or_default();
 
         Ok(FaucetStats {
-            total_sent_nanograms: values.0.unwrap_or_default(),
+            total_sent_nanograms: value(0),
             antifraud: AntifraudStats {
-                wallet_balance: values.1.unwrap_or_default(),
-                sent_amount_window: values.2.unwrap_or_default(),
-                successful_claim_window: values.3.unwrap_or_default(),
+                wallet_balance: value(1),
+                sent_amount_window: value(2),
+                subnet_amount_window: value(3),
+                successful_claim_window: value(4),
             },
         })
     }
@@ -248,21 +279,101 @@ impl ValkeyStore {
         max_amount: u64,
         window_seconds: u64,
     ) -> anyhow::Result<SentAmountWindowDecision> {
-        anyhow::ensure!(window_seconds > 0, "Sent amount window must be positive");
+        self.reserve_amount_window(
+            SENT_AMOUNT_WINDOW_KEY,
+            SENT_AMOUNT_WINDOW_SEQ_KEY,
+            amount,
+            max_amount,
+            window_seconds,
+            "sent amount",
+        )
+        .await
+    }
+
+    pub async fn check_subnet_amount_window(
+        &self,
+        subject: &str,
+        amount: u64,
+        max_amount: u64,
+        window_seconds: u64,
+    ) -> anyhow::Result<AmountWindowDecision> {
+        anyhow::ensure!(window_seconds > 0, "Subnet amount window must be positive");
 
         let ttl_seconds = window_seconds.saturating_mul(2).max(1);
-
         let mut connection = self.connection.clone();
-        let response: (u64, u64, String, u64) = redis::Script::new(SENT_AMOUNT_WINDOW_SCRIPT)
-            .key(SENT_AMOUNT_WINDOW_KEY)
-            .key(SENT_AMOUNT_WINDOW_SEQ_KEY)
+        let response: (u64, u64, u64) = redis::Script::new(CHECK_SUBNET_AMOUNT_WINDOW_SCRIPT)
+            .key(subnet_amount_window_key(subject))
             .arg(amount)
             .arg(max_amount)
             .arg(window_seconds)
             .arg(ttl_seconds)
             .invoke_async(&mut connection)
             .await
-            .context("Failed to reserve sent amount window")?;
+            .context("Failed to check subnet amount window")?;
+
+        match response.0 {
+            1 => Ok(AmountWindowDecision::Allowed {
+                current: response.1,
+                attempted: amount,
+                max: max_amount,
+                window_seconds,
+            }),
+            0 => Ok(AmountWindowDecision::Limited {
+                current: response.1,
+                attempted: amount,
+                max: max_amount,
+                window_seconds,
+                retry_after_ms: response.2,
+            }),
+            value => anyhow::bail!("Unexpected subnet amount window decision: {value}"),
+        }
+    }
+
+    pub async fn record_subnet_amount_window(
+        &self,
+        subject: &str,
+        amount: u64,
+        window_seconds: u64,
+    ) -> anyhow::Result<u64> {
+        anyhow::ensure!(window_seconds > 0, "Subnet amount window must be positive");
+
+        let ttl_seconds = window_seconds.saturating_mul(2).max(1);
+        let mut connection = self.connection.clone();
+        redis::Script::new(RECORD_SUBNET_AMOUNT_WINDOW_SCRIPT)
+            .key(subnet_amount_window_key(subject))
+            .key(subnet_amount_window_seq_key(subject))
+            .arg(amount)
+            .arg(window_seconds)
+            .arg(ttl_seconds)
+            .invoke_async(&mut connection)
+            .await
+            .context("Failed to record subnet amount window")
+    }
+
+    async fn reserve_amount_window(
+        &self,
+        window_key: &str,
+        sequence_key: &str,
+        amount: u64,
+        max_amount: u64,
+        window_seconds: u64,
+        name: &str,
+    ) -> anyhow::Result<SentAmountWindowDecision> {
+        anyhow::ensure!(window_seconds > 0, "Sent amount window must be positive");
+
+        let ttl_seconds = window_seconds.saturating_mul(2).max(1);
+
+        let mut connection = self.connection.clone();
+        let response: (u64, u64, String, u64) = redis::Script::new(SENT_AMOUNT_WINDOW_SCRIPT)
+            .key(window_key)
+            .key(sequence_key)
+            .arg(amount)
+            .arg(max_amount)
+            .arg(window_seconds)
+            .arg(ttl_seconds)
+            .invoke_async(&mut connection)
+            .await
+            .with_context(|| format!("Failed to reserve {name} window"))?;
 
         let decision = response.0;
         let current_or_total = response.1;
@@ -357,6 +468,14 @@ fn successful_claim_window_seq_key(address: &str) -> String {
     format!("{SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX}:{address}")
 }
 
+fn subnet_amount_window_key(subject: &str) -> String {
+    format!("{SUBNET_AMOUNT_WINDOW_KEY_PREFIX}:{subject}")
+}
+
+fn subnet_amount_window_seq_key(subject: &str) -> String {
+    format!("{SUBNET_AMOUNT_WINDOW_SEQ_KEY_PREFIX}:{subject}")
+}
+
 fn antifraud_trigger_count_key(module: AntifraudModule) -> String {
     format!("{ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX}:{}", module.name())
 }
@@ -368,7 +487,8 @@ mod tests {
     use faucet_config::ValkeyConfig;
 
     use super::{
-        AntifraudModule, CappedEphemeralStoreDecision, ValkeyStore, antifraud_trigger_count_key,
+        AmountWindowDecision, AntifraudModule, CappedEphemeralStoreDecision, ValkeyStore,
+        antifraud_trigger_count_key, subnet_amount_window_key, subnet_amount_window_seq_key,
         successful_claim_window_key, successful_claim_window_seq_key,
     };
 
@@ -403,8 +523,108 @@ mod tests {
             "faucet:stats:antifraud:sent-amount-window"
         );
         assert_eq!(
+            antifraud_trigger_count_key(AntifraudModule::SubnetAmountWindow),
+            "faucet:stats:antifraud:subnet-amount-window"
+        );
+        assert_eq!(
             antifraud_trigger_count_key(AntifraudModule::SuccessfulClaimWindow),
             "faucet:stats:antifraud:successful-claim-window"
+        );
+    }
+
+    #[test]
+    fn builds_subnet_amount_window_keys_from_subject() {
+        let subject = "client-subnet:203.0.113.0/24";
+
+        assert_eq!(
+            subnet_amount_window_key(subject),
+            "faucet:antifraud:subnet-amount-window:client-subnet:203.0.113.0/24"
+        );
+        assert_eq!(
+            subnet_amount_window_seq_key(subject),
+            "faucet:antifraud:subnet-amount-window:seq:client-subnet:203.0.113.0/24"
+        );
+    }
+
+    #[tokio::test]
+    async fn records_only_sent_amounts_and_isolates_subnet_windows() {
+        let Ok(uri) = std::env::var("VALKEY_TEST_URI") else {
+            return;
+        };
+        let store = ValkeyStore::new(&ValkeyConfig { uri }).await.unwrap();
+        let namespace = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let first_subject = format!("client-subnet:test-{namespace}-first");
+        let second_subject = format!("client-subnet:test-{namespace}-second");
+
+        assert_eq!(
+            store
+                .check_subnet_amount_window(&first_subject, 6, 10, 60)
+                .await
+                .unwrap(),
+            AmountWindowDecision::Allowed {
+                current: 0,
+                attempted: 6,
+                max: 10,
+                window_seconds: 60,
+            }
+        );
+        assert_eq!(
+            store
+                .check_subnet_amount_window(&first_subject, 6, 10, 60)
+                .await
+                .unwrap(),
+            AmountWindowDecision::Allowed {
+                current: 0,
+                attempted: 6,
+                max: 10,
+                window_seconds: 60,
+            }
+        );
+        assert_eq!(
+            store
+                .record_subnet_amount_window(&first_subject, 6, 60)
+                .await
+                .unwrap(),
+            6
+        );
+
+        match store
+            .check_subnet_amount_window(&first_subject, 5, 10, 60)
+            .await
+            .unwrap()
+        {
+            AmountWindowDecision::Limited {
+                current,
+                attempted,
+                max,
+                window_seconds,
+                retry_after_ms,
+            } => {
+                assert_eq!(current, 6);
+                assert_eq!(attempted, 5);
+                assert_eq!(max, 10);
+                assert_eq!(window_seconds, 60);
+                assert!(retry_after_ms > 0);
+            }
+            AmountWindowDecision::Allowed { .. } => {
+                panic!("send above the subnet limit must be rejected");
+            }
+        }
+
+        assert_eq!(
+            store
+                .check_subnet_amount_window(&second_subject, 6, 10, 60)
+                .await
+                .unwrap(),
+            AmountWindowDecision::Allowed {
+                current: 0,
+                attempted: 6,
+                max: 10,
+                window_seconds: 60,
+            }
         );
     }
 

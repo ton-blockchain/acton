@@ -8,9 +8,10 @@ use axum::{
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
     AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
-    FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, RateLimitConfig,
-    SentAmountWindowCheckConfig, ServerConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
-    ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
+    FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, ProxyConfig,
+    RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig, SubnetAmountWindowCheckConfig,
+    SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
+    WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -70,7 +71,11 @@ fn config(pow_enabled: bool) -> Config {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3001,
-            trust_proxy_headers: false,
+            proxy: ProxyConfig {
+                enabled: false,
+                header: "X-Real-IP".to_string(),
+                ips: Vec::new(),
+            },
         },
         rate_limit: RateLimitConfig {
             default: DefaultRateLimitConfig {
@@ -122,6 +127,12 @@ fn config(pow_enabled: bool) -> Config {
                 enabled: true,
                 max_amount: 10_000_000_000,
                 window_seconds: 60,
+            },
+            subnet_amount_window: SubnetAmountWindowCheckConfig {
+                enabled: false,
+                max_amount: 10_000_000_000,
+                ipv4_prefix_length: 24,
+                window_seconds: 86_400,
             },
             successful_claim_window: SuccessfulClaimWindowCheckConfig {
                 enabled: true,

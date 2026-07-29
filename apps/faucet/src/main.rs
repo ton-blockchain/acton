@@ -10,10 +10,11 @@ use axum::{
 };
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
-use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
+use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig, ProxyConfig};
 use faucet_pow::Pow;
 use faucet_valkey::{
-    AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
+    AmountWindowDecision, AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision,
+    ValkeyStore,
 };
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
@@ -34,10 +35,15 @@ use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
+mod address;
+mod antifraud_subject;
+mod blacklist;
 mod github_auth;
 mod handlers;
 mod logger;
 mod wallet;
+
+use blacklist::BlacklistStore;
 
 pub const LONG_VERSION: &str = env!("FAUCET_LONG_VERSION");
 
@@ -56,6 +62,13 @@ async fn main() -> anyhow::Result<()> {
         toncenter_url = %config.toncenter.url,
         "Loaded startup config"
     );
+    if config.server.proxy.enabled {
+        info!(
+            header = %config.server.proxy.header,
+            ips = ?config.server.proxy.ips,
+            "Trusted proxy support enabled"
+        );
+    }
 
     info!(database_url = %config.database.url, "Connecting to database");
     let opts = SqliteConnectOptions::from_str(&config.database.url)
@@ -84,6 +97,10 @@ async fn main() -> anyhow::Result<()> {
     SqliteStorage::setup(&pool)
         .await
         .context("Failed to setup storage")?;
+    let blacklist = BlacklistStore::setup(pool.clone())
+        .await
+        .context("Failed to setup antifraud blacklist")?;
+    info!("Initialized antifraud blacklist");
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
     let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
     info!("Initialized claim storage");
@@ -113,6 +130,7 @@ async fn main() -> anyhow::Result<()> {
         pow: Pow::new(config.pow.difficulty),
         valkey,
         antifraud,
+        blacklist,
         github_auth,
         config: Arc::new(config),
     };
@@ -134,14 +152,11 @@ async fn main() -> anyhow::Result<()> {
 
     let cors = handlers::airdrop_cors_layer(&shared_state.config.github_auth.frontend_url)
         .context("Failed to configure browser CORS")?;
-    let trust_proxy_headers = shared_state.config.server.trust_proxy_headers;
+    let proxy = shared_state.config.server.proxy.clone();
     let app = handlers::router(shared_state)
         .layer(
             ServiceBuilder::new()
-                .layer(middleware::from_fn_with_state(
-                    trust_proxy_headers,
-                    insert_client_ip,
-                ))
+                .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
                 .layer(GovernorLayer::default()),
         )
         // Preflight requests must not consume the stricter per-claim rate limit.
@@ -209,16 +224,16 @@ async fn shutdown_signal() {
 }
 
 async fn insert_client_ip(
-    State(trust_proxy_headers): State<bool>,
+    State(proxy): State<ProxyConfig>,
     mut request: Request,
     next: Next,
 ) -> Response {
-    let client_ip = client_ip(&request, trust_proxy_headers);
+    let client_ip = client_ip(&request, &proxy);
     request.extensions_mut().insert(RealIp(client_ip));
     next.run(request).await
 }
 
-fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
+fn client_ip(request: &Request, proxy: &ProxyConfig) -> std::net::IpAddr {
     let Some(peer_ip) = request
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
@@ -227,11 +242,11 @@ fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
         return std::net::Ipv4Addr::LOCALHOST.into();
     };
 
-    if trust_proxy_headers
-        && is_trusted_proxy_peer(peer_ip)
+    if proxy.enabled
+        && proxy.ips.iter().any(|network| network.contains(&peer_ip))
         && let Some(forwarded_ip) = request
             .headers()
-            .get("x-real-ip")
+            .get(proxy.header.as_str())
             .and_then(|value| value.to_str().ok())
             .and_then(|value| value.trim().parse().ok())
     {
@@ -239,15 +254,6 @@ fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
     }
 
     peer_ip
-}
-
-fn is_trusted_proxy_peer(ip: std::net::IpAddr) -> bool {
-    match ip {
-        std::net::IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
-        std::net::IpAddr::V6(ip) => {
-            ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local()
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -258,6 +264,7 @@ pub(crate) struct AppState {
     pub(crate) pow: Pow,
     pub(crate) valkey: ValkeyStore,
     pub(crate) antifraud: Antifraud,
+    pub(crate) blacklist: BlacklistStore,
     pub(crate) github_auth: GitHubAuth,
     pub(crate) config: Arc<Config>,
 }
@@ -293,6 +300,10 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
         return Ok(());
     }
 
+    if !can_process_subnet_amount_window(&state, &task, amount).await? {
+        return Ok(());
+    }
+
     wait_for_sent_amount_window(&state, &task.address, amount).await?;
 
     let max_retries = state.config.worker.max_retries;
@@ -310,6 +321,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
         match status {
             Ok(_) => {
                 record_successful_claim(&state, &task).await;
+                record_sent_subnet_amount(&state, &task, amount).await;
                 match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanograms) => {
                         info!(
@@ -361,6 +373,115 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
     unreachable!("send_claim loop should always return");
 }
 
+async fn can_process_subnet_amount_window(
+    state: &AppState,
+    task: &CreateClaim,
+    amount: u64,
+) -> anyhow::Result<bool> {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return Ok(true);
+    };
+    let Some(subject) = task.subnet_amount_window_subject.as_deref() else {
+        return Ok(true);
+    };
+
+    if let Err(err) = state.antifraud.check_subnet_amount_window_transfer(amount) {
+        state
+            .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+            .await;
+        error!(
+            address = %task.address,
+            subject,
+            amount,
+            max_amount = window.max_amount,
+            error = ?err,
+            "Claim amount exceeds subnet amount window limit"
+        );
+        return Ok(false);
+    }
+
+    match state
+        .valkey
+        .check_subnet_amount_window(subject, amount, window.max_amount, window.window_seconds)
+        .await?
+    {
+        AmountWindowDecision::Allowed {
+            current,
+            attempted,
+            max,
+            window_seconds,
+        } => {
+            info!(
+                address = %task.address,
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                "Subnet amount sliding window allows send"
+            );
+            Ok(true)
+        }
+        AmountWindowDecision::Limited {
+            current,
+            attempted,
+            max,
+            window_seconds,
+            retry_after_ms,
+        } => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+                .await;
+            warn!(
+                address = %task.address,
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                retry_after_ms,
+                "Subnet amount sliding window limit reached, skipping queued claim"
+            );
+            Ok(false)
+        }
+    }
+}
+
+async fn record_sent_subnet_amount(state: &AppState, task: &CreateClaim, amount: u64) {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return;
+    };
+    let Some(subject) = task.subnet_amount_window_subject.as_deref() else {
+        return;
+    };
+
+    match state
+        .valkey
+        .record_subnet_amount_window(subject, amount, window.window_seconds)
+        .await
+    {
+        Ok(total) => {
+            info!(
+                address = %task.address,
+                subject,
+                amount,
+                sent_in_window_nanograms = total,
+                window_seconds = window.window_seconds,
+                "Recorded sent amount for subnet in Valkey"
+            );
+        }
+        Err(err) => {
+            warn!(
+                address = %task.address,
+                subject,
+                amount,
+                error = %err,
+                "Failed to record sent amount for subnet in Valkey"
+            );
+        }
+    }
+}
+
 // TODO: вынести куда-то
 async fn can_process_successful_claim_window(
     state: &AppState,
@@ -392,7 +513,20 @@ async fn can_process_successful_claim_window(
     if let Some(github_user_id) = task.github_user_id
         && !claim_window_allows(
             state,
-            &handlers::github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
+            max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    if let Some(device_subject) = task.device_window_subject.as_deref()
+        && !claim_window_allows(
+            state,
+            device_subject,
             max_requests,
             window.window_seconds,
             &task.address,
@@ -491,7 +625,16 @@ async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
     if let Some(github_user_id) = task.github_user_id {
         record_successful_claim_subject(
             state,
-            &handlers::github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+    if let Some(device_subject) = task.device_window_subject.as_deref() {
+        record_successful_claim_subject(
+            state,
+            device_subject,
             &task.address,
             window.window_seconds,
         )
@@ -686,14 +829,27 @@ mod tests {
     use axum::{
         body::Body,
         extract::{ConnectInfo, Request},
+        http::HeaderName,
     };
+    use faucet_config::ProxyConfig;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use super::client_ip;
 
-    fn request_from(peer_ip: IpAddr, forwarded_ip: &str) -> Request {
+    fn trusted_proxy(enabled: bool, header: &str) -> ProxyConfig {
+        ProxyConfig {
+            enabled,
+            header: header.to_string(),
+            ips: vec![IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1)).into()],
+        }
+    }
+
+    fn request_from(peer_ip: IpAddr, header: &str, forwarded_ip: &str) -> Request {
         let mut request = Request::builder()
-            .header("x-real-ip", forwarded_ip)
+            .header(
+                HeaderName::from_bytes(header.as_bytes()).unwrap(),
+                forwarded_ip,
+            )
             .body(Body::empty())
             .unwrap();
         request
@@ -705,27 +861,64 @@ mod tests {
     #[test]
     fn ignores_forwarded_ip_when_proxy_headers_are_disabled() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(false, "X-Real-IP");
 
-        assert_eq!(client_ip(&request, false), peer_ip);
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
     }
 
     #[test]
     fn ignores_forwarded_ip_from_untrusted_public_peer() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
 
-        assert_eq!(client_ip(&request, true), peer_ip);
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
     }
 
     #[test]
-    fn accepts_forwarded_ip_only_from_configured_private_proxy_path() {
+    fn accepts_forwarded_ip_from_explicitly_trusted_proxy() {
         let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
-        let request = request_from(peer_ip, "198.51.100.20");
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
 
         assert_eq!(
-            client_ip(&request, true),
+            client_ip(&request, &proxy),
             IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
+
+    #[test]
+    fn accepts_forwarded_ip_from_trusted_proxy_network() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 100, 42));
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let mut proxy = trusted_proxy(true, "X-Real-IP");
+        proxy.ips = vec!["192.168.100.0/24".parse().unwrap()];
+
+        assert_eq!(
+            client_ip(&request, &proxy),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_from_unlisted_private_peer() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 2));
+        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
+        let proxy = trusted_proxy(true, "X-Real-IP");
+
+        assert_eq!(client_ip(&request, &proxy), peer_ip);
+    }
+
+    #[test]
+    fn accepts_ip_from_configured_proxy_header() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
+        let request = request_from(peer_ip, "CF-Connecting-IP", "198.51.100.30");
+        let proxy = trusted_proxy(true, "CF-Connecting-IP");
+
+        assert_eq!(
+            client_ip(&request, &proxy),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 30))
         );
     }
 }

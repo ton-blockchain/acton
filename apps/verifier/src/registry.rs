@@ -11,7 +11,8 @@ use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
     registry_index::{
         IndexedAbiContract, IndexedAbiContractsQuery, IndexedLanguageStatistics,
-        IndexedVerifiedBundleSummary, SharedVerificationIndex, VerificationIndexError,
+        IndexedVerificationStatisticsHistoryItem, IndexedVerifiedBundleSummary,
+        SharedVerificationIndex, VerificationIndexError,
     },
     source_storage::{
         SharedSourceStorage, SourceStorageError, SourceStorageReceipt, StoreSourceBundleRequest,
@@ -44,6 +45,10 @@ pub trait VerificationRegistry: Send + Sync + 'static {
     ) -> Result<LastVerifiedReceipt, RegistryError>;
 
     async fn statistics(&self) -> Result<VerificationStatisticsReceipt, RegistryError>;
+
+    async fn statistics_history(
+        &self,
+    ) -> Result<VerificationStatisticsHistoryReceipt, RegistryError>;
 
     async fn abi_contracts(
         &self,
@@ -102,6 +107,11 @@ pub struct LastVerifiedReceipt {
 pub struct VerificationStatisticsReceipt {
     pub total: usize,
     pub languages: Vec<IndexedLanguageStatistics>,
+}
+
+#[derive(Clone, Debug)]
+pub struct VerificationStatisticsHistoryReceipt {
+    pub items: Vec<IndexedVerificationStatisticsHistoryItem>,
 }
 
 #[derive(Clone, Debug)]
@@ -249,6 +259,15 @@ impl VerificationRegistry for SourceVerificationRegistry {
             total: statistics.total,
             languages: statistics.languages,
         })
+    }
+
+    async fn statistics_history(
+        &self,
+    ) -> Result<VerificationStatisticsHistoryReceipt, RegistryError> {
+        self.ensure_current().await?;
+        let items = self.verification_index.statistics_history().await?;
+
+        Ok(VerificationStatisticsHistoryReceipt { items })
     }
 
     async fn abi_contracts(

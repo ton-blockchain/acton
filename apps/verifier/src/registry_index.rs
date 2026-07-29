@@ -53,6 +53,10 @@ pub trait VerificationIndex: Send + Sync + 'static {
 
     async fn statistics(&self) -> Result<IndexedVerificationStatistics, VerificationIndexError>;
 
+    async fn statistics_history(
+        &self,
+    ) -> Result<Vec<IndexedVerificationStatisticsHistoryItem>, VerificationIndexError>;
+
     async fn abi_contracts(
         &self,
         query: IndexedAbiContractsQuery,
@@ -102,6 +106,13 @@ pub struct IndexedLanguageStatistics {
 pub struct IndexedCompilerVersionStatistics {
     pub version: String,
     pub total: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedVerificationStatisticsHistoryItem {
+    pub timestamp: u64,
+    pub compiler: String,
+    pub version: String,
 }
 
 #[derive(Clone, Debug)]
@@ -464,6 +475,43 @@ impl VerificationIndex for SqliteVerificationIndex {
             total,
             languages: languages.into_values().collect(),
         })
+    }
+
+    async fn statistics_history(
+        &self,
+    ) -> Result<Vec<IndexedVerificationStatisticsHistoryItem>, VerificationIndexError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r"
+            select
+              verified_at,
+              json_extract(compiler_json, '$.language') as compiler,
+              json_extract(compiler_json, '$.version') as version
+            from verified_bundles
+            order by verified_at asc, compiler asc, version asc, code_hash asc
+            ",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?;
+
+        let mut items = Vec::new();
+        for row in rows {
+            let (timestamp, compiler, version) = row?;
+            items.push(IndexedVerificationStatisticsHistoryItem {
+                timestamp: i64_to_u64("timestamp", timestamp)?,
+                compiler,
+                version,
+            });
+        }
+        drop(statement);
+        drop(connection);
+
+        Ok(items)
     }
 
     async fn abi_contracts(

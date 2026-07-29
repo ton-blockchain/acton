@@ -13,6 +13,11 @@
     "test": "echo \"no test specified\" && exit 0",
     "typecheck": "tsc --noEmit"
   },
+  "overrides": {
+    "brace-expansion": "5.0.8",
+    "minimatch": "10.2.5",
+    "postcss": "8.5.18"
+  },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.4",

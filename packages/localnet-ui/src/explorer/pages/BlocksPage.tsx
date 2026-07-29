@@ -21,7 +21,7 @@ import {
   type ModeInfo,
   type ModeParser,
 } from "@acton/ui"
-import {useEffect, useMemo, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
 import type {RawBlockNetwork, TonClient} from "../api/client"
@@ -44,7 +44,8 @@ import styles from "./BlocksPage.module.css"
 const BLOCKS_PAGE_LIMIT = 8
 const LAST_TRANSACTION_MESSAGES_LIMIT = 5
 const LAST_TRANSACTIONS_FETCH_LIMIT = 12
-const BLOCK_TRANSACTIONS_LIMIT = 100
+const BLOCK_TRANSACTIONS_INITIAL_LIMIT = 100
+const BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT = 100
 const BLOCKS_REFRESH_MS = 2000
 const MASTERCHAIN_SHARD = "8000000000000000"
 const MIN_BLOCK_UNIX_TIME = 0
@@ -131,6 +132,7 @@ interface BlocksPageProps {
 
 interface BlockDetailsPageProps extends BlocksPageProps {
   readonly latest?: boolean
+  readonly transactionsLoadMoreLimit?: number
 }
 
 interface BlocksPageState {
@@ -147,6 +149,9 @@ interface BlockDetailsState {
   readonly shardchainBlocks: readonly V3Block[]
   readonly transactions: readonly V3TransactionListItem[]
   readonly isLoading: boolean
+  readonly isLoadingMoreTransactions: boolean
+  readonly hasMoreTransactions: boolean
+  readonly loadMoreTransactionsError?: string
   readonly error?: string
 }
 
@@ -290,7 +295,11 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
   )
 }
 
-export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = false}) => {
+export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
+  client,
+  latest = false,
+  transactionsLoadMoreLimit = BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT,
+}) => {
   const params = useParams<{
     workchain: string
     shard: string
@@ -310,7 +319,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     shardchainBlocks: [],
     transactions: [],
     isLoading: true,
+    isLoadingMoreTransactions: false,
+    hasMoreTransactions: false,
   })
+  const isLoadingMoreTransactionsRef = useRef(false)
 
   useEffect(() => {
     let isActive = true
@@ -324,6 +336,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
           shardchainBlocks: [],
           transactions: [],
           isLoading: false,
+          isLoadingMoreTransactions: false,
+          hasMoreTransactions: false,
           error: "Invalid block route.",
         })
         return
@@ -332,6 +346,9 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
       setState(current => ({
         ...current,
         isLoading: true,
+        isLoadingMoreTransactions: false,
+        hasMoreTransactions: false,
+        loadMoreTransactionsError: undefined,
         error: undefined,
       }))
       try {
@@ -366,6 +383,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
               shardchainBlocks: [],
               transactions: [],
               isLoading: false,
+              isLoadingMoreTransactions: false,
+              hasMoreTransactions: false,
               error: "Block not found.",
             })
           }
@@ -390,7 +409,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
             workchain: block.workchain,
             shard: block.shard,
             seqno: block.seqno,
-            limit: BLOCK_TRANSACTIONS_LIMIT,
+            limit: BLOCK_TRANSACTIONS_INITIAL_LIMIT,
           }),
           block.workchain === -1
             ? client.getMasterchainBlockShards(block.seqno)
@@ -419,6 +438,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
           shardchainBlocks: shardchainResponse.blocks,
           transactions: transactionsResponse.transactions,
           isLoading: false,
+          isLoadingMoreTransactions: false,
+          hasMoreTransactions:
+            transactionsResponse.transactions.length === BLOCK_TRANSACTIONS_INITIAL_LIMIT &&
+            transactionsResponse.transactions.length < block.tx_count,
         })
       } catch (error) {
         if (!isActive) {
@@ -427,6 +450,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
         setState(current => ({
           ...current,
           isLoading: false,
+          isLoadingMoreTransactions: false,
+          hasMoreTransactions: false,
           error: error instanceof Error ? error.message : "Failed to load block",
         }))
       }
@@ -438,6 +463,87 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
       isActive = false
     }
   }, [client, latest, rawBlockNetwork, routeShard, routeSeqno, routeWorkchain, updateDomains])
+
+  const loadMoreTransactions = useCallback(() => {
+    const block = state.block
+    const offset = state.transactions.length
+    if (
+      !block ||
+      state.isLoading ||
+      !state.hasMoreTransactions ||
+      isLoadingMoreTransactionsRef.current
+    ) {
+      return
+    }
+
+    isLoadingMoreTransactionsRef.current = true
+    setState(current => ({
+      ...current,
+      isLoadingMoreTransactions: true,
+      loadMoreTransactionsError: undefined,
+    }))
+
+    void client
+      .getBlockTransactions({
+        workchain: block.workchain,
+        shard: block.shard,
+        seqno: block.seqno,
+        limit: transactionsLoadMoreLimit,
+        offset,
+      })
+      .then(response => {
+        updateDomains(response.address_book)
+        setState(current => {
+          if (
+            current.isLoading ||
+            !current.block ||
+            current.transactions.length !== offset ||
+            !isSameBlock(current.block, block.workchain, block.shard, block.seqno)
+          ) {
+            return current
+          }
+
+          const transactions = [...current.transactions, ...response.transactions]
+          return {
+            ...current,
+            transactions,
+            isLoadingMoreTransactions: false,
+            hasMoreTransactions:
+              response.transactions.length === transactionsLoadMoreLimit &&
+              transactions.length < current.block.tx_count,
+          }
+        })
+      })
+      .catch(error => {
+        setState(current => {
+          if (
+            current.isLoading ||
+            !current.block ||
+            current.transactions.length !== offset ||
+            !isSameBlock(current.block, block.workchain, block.shard, block.seqno)
+          ) {
+            return current
+          }
+          return {
+            ...current,
+            isLoadingMoreTransactions: false,
+            loadMoreTransactionsError:
+              error instanceof Error ? error.message : "Failed to load more transactions",
+          }
+        })
+      })
+      .finally(() => {
+        isLoadingMoreTransactionsRef.current = false
+      })
+  }, [
+    client,
+    state.block,
+    state.hasMoreTransactions,
+    state.isLoading,
+    state.transactions.length,
+    transactionsLoadMoreLimit,
+    updateDomains,
+  ])
 
   const workchain = latest ? (state.block?.workchain ?? -1) : routeWorkchain
   const shard = latest ? (state.block?.shard ?? MASTERCHAIN_SHARD) : routeShard
@@ -625,6 +731,11 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
 
             <BlockTransactionsTable
               transactions={state.transactions}
+              totalCount={state.block.tx_count}
+              hasMore={state.hasMoreTransactions}
+              isLoadingMore={state.isLoadingMoreTransactions}
+              loadMoreError={state.loadMoreTransactionsError}
+              onLoadMore={loadMoreTransactions}
               onOpenAccount={(address, event) => openPath(routes.addressPath(address), event)}
               onOpenTransaction={(hash, event) =>
                 openPath(routes.transactionPath(hashToHex(hash) ?? hash), event)
@@ -863,16 +974,62 @@ const BlockTableSection: FC<{
 
 const BlockTransactionsTable: FC<{
   readonly transactions: readonly V3TransactionListItem[]
+  readonly totalCount: number
+  readonly hasMore: boolean
+  readonly isLoadingMore: boolean
+  readonly loadMoreError?: string
+  readonly onLoadMore: () => void
   readonly onOpenAccount: (address: string, event?: ExplorerNavigationClickEvent) => void
   readonly onOpenTransaction: (hash: string, event?: ExplorerNavigationClickEvent) => void
-}> = ({transactions, onOpenAccount, onOpenTransaction}) => {
+}> = ({
+  transactions,
+  totalCount,
+  hasMore,
+  isLoadingMore,
+  loadMoreError,
+  onLoadMore,
+  onOpenAccount,
+  onOpenTransaction,
+}) => {
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (
+      !hasMore ||
+      isLoadingMore ||
+      loadMoreError ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMore()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, loadMoreError, onLoadMore])
+
   if (transactions.length === 0) {
     return <TableStateBlock title="Transactions">No transactions in this block</TableStateBlock>
   }
 
   return (
     <section className={styles.blocksTableFrame} aria-label="Transactions">
-      <header className={styles.blocksTableTitle}>Transactions</header>
+      <header className={styles.blocksTableTitle}>
+        Transactions ({transactions.length.toLocaleString()} of {totalCount.toLocaleString()})
+      </header>
       <div className={styles.blocksTableScroller}>
         <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
           <thead>
@@ -937,6 +1094,24 @@ const BlockTransactionsTable: FC<{
           </tbody>
         </table>
       </div>
+      {hasMore ? (
+        <div ref={loadMoreRef} className={styles.blockTransactionsLoadMore}>
+          {loadMoreError ? (
+            <span className={styles.blockTransactionsLoadMoreError} role="alert">
+              {loadMoreError}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? "Loading..." : loadMoreError ? "Retry" : "Load more"}
+          </Button>
+        </div>
+      ) : null}
     </section>
   )
 }

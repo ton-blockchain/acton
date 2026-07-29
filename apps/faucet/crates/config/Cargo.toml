@@ -12,3 +12,5 @@ doctest = false
 
 [dependencies]
 anyhow = { workspace = true }
+http = { workspace = true }
+ipnet = { workspace = true }

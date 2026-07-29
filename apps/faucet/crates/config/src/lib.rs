@@ -1,5 +1,7 @@
 use anyhow::Context;
-use std::str::FromStr;
+use http::HeaderName;
+use ipnet::IpNet;
+use std::{net::IpAddr, str::FromStr};
 
 const NANOGRAMS_PER_GRAM: u64 = 1_000_000_000;
 
@@ -26,7 +28,14 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub trust_proxy_headers: bool,
+    pub proxy: ProxyConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub header: String,
+    pub ips: Vec<IpNet>,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +104,7 @@ pub struct AntifraudConfig {
     pub enabled: bool,
     pub wallet_balance: WalletBalanceCheckConfig,
     pub sent_amount_window: SentAmountWindowCheckConfig,
+    pub subnet_amount_window: SubnetAmountWindowCheckConfig,
     pub successful_claim_window: SuccessfulClaimWindowCheckConfig,
 }
 
@@ -108,6 +118,14 @@ pub struct WalletBalanceCheckConfig {
 pub struct SentAmountWindowCheckConfig {
     pub enabled: bool,
     pub max_amount: u64,
+    pub window_seconds: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct SubnetAmountWindowCheckConfig {
+    pub enabled: bool,
+    pub max_amount: u64,
+    pub ipv4_prefix_length: u32,
     pub window_seconds: u64,
 }
 
@@ -152,7 +170,15 @@ impl Config {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
                 port: parse_env_number("PORT", 3001),
-                trust_proxy_headers: parse_env_bool("SERVER_TRUST_PROXY_HEADERS", false),
+                proxy: ProxyConfig {
+                    enabled: parse_env_bool("SERVER_TRUST_PROXY", false),
+                    header: std::env::var("SERVER_TRUST_PROXY_HEADER")
+                        .unwrap_or_else(|_| "X-Real-IP".to_string()),
+                    ips: parse_ip_list(
+                        &std::env::var("SERVER_TRUST_PROXY_IPS").unwrap_or_default(),
+                    )
+                    .context("Invalid SERVER_TRUST_PROXY_IPS")?,
+                },
             },
             rate_limit: RateLimitConfig {
                 default: DefaultRateLimitConfig {
@@ -227,6 +253,22 @@ impl Config {
                     ),
                     window_seconds: parse_env_number("ANTIFRAUD_SENT_AMOUNT_WINDOW_SECONDS", 60),
                 },
+                subnet_amount_window: SubnetAmountWindowCheckConfig {
+                    enabled: parse_env_bool("ANTIFRAUD_SUBNET_AMOUNT_WINDOW_ENABLED", true),
+                    max_amount: parse_env_nanograms(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOGRAMS",
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOTONS",
+                        32_000_000_000,
+                    ),
+                    ipv4_prefix_length: parse_env_number(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH",
+                        24,
+                    ),
+                    window_seconds: parse_env_number(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS",
+                        86_400,
+                    ),
+                },
                 successful_claim_window: SuccessfulClaimWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_ENABLED", true),
                     max_requests: parse_env_number(
@@ -279,6 +321,10 @@ impl Config {
 
     fn validate(&self) -> anyhow::Result<()> {
         anyhow::ensure!(
+            self.server.proxy.header.parse::<HeaderName>().is_ok(),
+            "SERVER_TRUST_PROXY_HEADER must be a valid HTTP header name"
+        );
+        anyhow::ensure!(
             self.pow.max_challenges > 0,
             "POW_MAX_CHALLENGES must be positive"
         );
@@ -294,6 +340,16 @@ impl Config {
             anyhow::ensure!(
                 self.antifraud.successful_claim_window.window_seconds > 0,
                 "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
+            );
+        }
+        if self.antifraud.enabled && self.antifraud.subnet_amount_window.enabled {
+            anyhow::ensure!(
+                self.antifraud.subnet_amount_window.ipv4_prefix_length <= 32,
+                "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH must be between 0 and 32"
+            );
+            anyhow::ensure!(
+                self.antifraud.subnet_amount_window.window_seconds > 0,
+                "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS must be positive"
             );
         }
 
@@ -427,6 +483,20 @@ fn parse_env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+fn parse_ip_list(value: &str) -> anyhow::Result<Vec<IpNet>> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .parse::<IpNet>()
+                .or_else(|_| value.parse::<IpAddr>().map(IpNet::from))
+                .with_context(|| format!("Invalid IP address or network `{value}`"))
+        })
+        .collect()
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value.trim_end().to_ascii_lowercase().as_str() {
         "true" | "yes" | "on" => Some(true),
@@ -440,10 +510,12 @@ mod tests {
     use super::{
         AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
         FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
-        PowConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
-        SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
-        WorkerConfig, parse_bool, parse_nanograms, parse_number,
+        PowConfig, ProxyConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
+        SubnetAmountWindowCheckConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
+        ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig, parse_bool, parse_ip_list,
+        parse_nanograms, parse_number,
     };
+    use ipnet::IpNet;
 
     fn valid_config() -> Config {
         Config {
@@ -453,7 +525,11 @@ mod tests {
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 3001,
-                trust_proxy_headers: false,
+                proxy: ProxyConfig {
+                    enabled: false,
+                    header: "X-Real-IP".to_string(),
+                    ips: Vec::new(),
+                },
             },
             rate_limit: RateLimitConfig {
                 default: DefaultRateLimitConfig {
@@ -505,6 +581,12 @@ mod tests {
                     enabled: true,
                     max_amount: 10_000_000_000,
                     window_seconds: 60,
+                },
+                subnet_amount_window: SubnetAmountWindowCheckConfig {
+                    enabled: true,
+                    max_amount: 10_000_000_000,
+                    ipv4_prefix_length: 24,
+                    window_seconds: 86_400,
                 },
                 successful_claim_window: SuccessfulClaimWindowCheckConfig {
                     enabled: true,
@@ -609,6 +691,32 @@ mod tests {
     }
 
     #[test]
+    fn parses_trusted_proxy_ip_list() {
+        assert_eq!(
+            parse_ip_list("192.168.100.1, 192.168.200.0/24, ::1, fd00::/64").unwrap(),
+            vec![
+                "192.168.100.1/32".parse::<IpNet>().unwrap(),
+                "192.168.200.0/24".parse().unwrap(),
+                "::1/128".parse().unwrap(),
+                "fd00::/64".parse().unwrap(),
+            ]
+        );
+        assert!(parse_ip_list("192.168.100.0/33").is_err());
+        assert!(parse_ip_list("not-an-ip").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_proxy_header_name() {
+        let mut config = valid_config();
+        config.server.proxy.header = "invalid header".to_string();
+
+        assert_eq!(
+            validation_error(&config),
+            "SERVER_TRUST_PROXY_HEADER must be a valid HTTP header name"
+        );
+    }
+
+    #[test]
     fn rejects_zero_pow_challenge_ttl_when_github_auth_is_disabled() {
         let mut config = valid_config();
         config.github_auth.enabled = false;
@@ -637,6 +745,30 @@ mod tests {
             validation_error(&config),
             "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
         );
+
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.antifraud.subnet_amount_window.window_seconds = 0;
+        assert_eq!(
+            validation_error(&config),
+            "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS must be positive"
+        );
+    }
+
+    #[test]
+    fn validates_ipv4_subnet_prefix_length() {
+        for prefix_length in 0..=32 {
+            let mut config = valid_config();
+            config.antifraud.subnet_amount_window.ipv4_prefix_length = prefix_length;
+            config.validate().unwrap();
+        }
+
+        let mut config = valid_config();
+        config.antifraud.subnet_amount_window.ipv4_prefix_length = 33;
+        assert_eq!(
+            validation_error(&config),
+            "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH must be between 0 and 32"
+        );
     }
 
     #[test]
@@ -645,6 +777,8 @@ mod tests {
         config.github_auth.enabled = false;
         config.antifraud.enabled = false;
         config.antifraud.successful_claim_window.window_seconds = 0;
+        config.antifraud.subnet_amount_window.ipv4_prefix_length = 33;
+        config.antifraud.subnet_amount_window.window_seconds = 0;
 
         config.validate().unwrap();
     }
