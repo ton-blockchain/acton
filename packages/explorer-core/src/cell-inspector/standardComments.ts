@@ -1,5 +1,4 @@
 import type {Cell, Slice} from "@ton/core"
-import {Buffer} from "buffer"
 
 import {confidence, type ParserProvenance, type ParserWarning} from "./model"
 

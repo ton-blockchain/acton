@@ -73,7 +73,6 @@
     "@ton/tasm": "^0.6.1",
     "@ton/tolk-abi-to-typescript": "^0.5.0",
     "@ton/walletkit": "0.0.9",
-    "buffer": "^6.0.3",
     "framer-motion": "^12.11.0",
     "idb": "8.0.3",
     "lucide-react": "^0.474.0",

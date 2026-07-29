@@ -1,5 +1,4 @@
 import {CellType, type Cell} from "@ton/core"
-import {Buffer} from "buffer"
 
 import type {ParserWarning} from "./model"
 

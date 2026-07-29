@@ -1,5 +1,3 @@
-import {Buffer} from "buffer"
-
 import {Address} from "@ton/core"
 import {toUnicode} from "punycode/"
 

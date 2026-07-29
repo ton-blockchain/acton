@@ -1,5 +1,4 @@
 import {Cell} from "@ton/core"
-import {Buffer} from "buffer"
 
 import type {
   CellInputError,

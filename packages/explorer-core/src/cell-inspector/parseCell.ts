@@ -1,7 +1,6 @@
 import type {ParsedValue} from "@acton/ui"
 import {decodeCellWithAbi, type ExtendedContractABI} from "@acton/transaction-ui"
 import type {Cell} from "@ton/core"
-import {Buffer} from "buffer"
 
 import {parseBlockTlb} from "./blockParser"
 import {tryParseCustomTlb} from "./customTlb"
