@@ -131,6 +131,31 @@ open, or remove.
   localnet/shared UI.
 - Keep hover reveal keyboard-accessible via `focus-within`.
 
+### MultiValueInput
+
+Use `MultiValueInput` when a field selects several values from a known,
+searchable option set.
+
+- Selected values render as removable chips inside the same control.
+- Keep values controlled as an array; never use comma-separated display text as
+  application state.
+- The caller owns options, loading, validation, and domain meaning.
+- Use the normal sans-serif interface font for chips and suggestions.
+- Keep the suggestion list directly attached to the control.
+- Do not use it for arbitrary tags or a single selected value.
+
+### Disclosure
+
+Use `Disclosure` for full-width collapsible sections in forms, settings, and
+inspection panels.
+
+- It keeps native `details` behavior while owning marker removal, the shared
+  chevron, focus treatment, spacing, and open-state rotation.
+- Pass domain content as children and use `contentClassName` for its layout.
+- Use `description` only when the section consequence is not obvious.
+- Do not add a second chevron or style raw browser disclosure markers.
+- Use `DisclosureToggle` for compact inline Show/Hide actions.
+
 ### DisclosureToggle
 
 Use `DisclosureToggle` for compact inline Show/Hide controls that reveal content

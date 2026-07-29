@@ -8,7 +8,7 @@
   /* Hover surface for neutral interactive elements. */
   --acton-color-surface-hover: hsl(240 5% 96%);
   /* Table header and row-hover surface aligned with localnet row bands. */
-  --acton-color-surface-row: hsl(240 5% 94%);
+  --acton-color-surface-row: hsl(240 5% 97%);
   /* Subtle fill behind inline markdown code fragments. */
   --acton-color-inline-code-surface: hsl(240 5% 92%);
   /* Grouped-control and collapsible-row surface. */

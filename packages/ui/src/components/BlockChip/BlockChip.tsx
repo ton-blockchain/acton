@@ -32,7 +32,12 @@ export function BlockChip({
 }: BlockChipProps) {
   const toncenterBlockId = formatToncenterBlockId({workchain, shard, seqno})
   const content = label ?? (display === "full" ? toncenterBlockId : seqno)
-  const chipClassName = cx(styles.blockChip, highlighted && styles.highlighted, className)
+  const chipClassName = cx(
+    styles.blockChip,
+    display === "full" ? styles.fullBlockId : styles.blockSeqno,
+    highlighted && styles.highlighted,
+    className,
+  )
   const chipTitle = title ?? (display === "full" ? toncenterBlockId : `Block ${seqno}`)
 
   return (

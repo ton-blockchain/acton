@@ -7,6 +7,37 @@ which primitives exist or when to use each visual variant.
 This is not prop documentation. Prefer the TypeScript source for exact API
 details.
 
+## Product Visual Direction
+
+Acton products use a calm, compact application hierarchy similar to Vercel
+Dashboard and Cloudflare Dashboard. Pages should feel like working tools, not
+marketing landing pages.
+
+- Do not use oversized display headings or hero typography in product UI.
+- Do not use landing-page hero composition inside product screens: avoid an
+  eyebrow followed by a marketing sentence as the title and a broad promotional
+  subtitle. Start pages with a compact functional title, a short description,
+  and nearby actions when needed.
+- Do not end headings or subheadings with a period.
+- Avoid decorative eyebrow or overline labels above headings, such as
+  `WORKSPACE`, `TIMELINE`, or `PROJECT`. Use an overline only when it is
+  critical to disambiguate hierarchy or domain and that context cannot be
+  inferred from the heading or surrounding UI.
+- Prefer restrained page titles, compact descriptions, and dense but readable
+  spacing.
+- Let navigation, data, state, and the primary action establish hierarchy
+  instead of decorative scale.
+- Keep surfaces neutral and quiet so technical content remains the visual focus.
+- Do not use box shadows on application headers, panels, cards, or persistent
+  sections. Separate surfaces with borders, spacing, and restrained background
+  contrast. Reserve shadow only for transient overlays or popovers when depth
+  must be communicated.
+- Use the sans-serif product typeface for interface text. Monospace is reserved
+  for content whose shape carries technical meaning, such as code, paths,
+  addresses, hashes, or fixed-width data.
+- Never use monospace for navigation, buttons, labels, status text, metadata
+  captions, headings, or decorative terminal styling.
+
 ## Button
 
 Status: ready
@@ -338,6 +369,61 @@ and forwards native attributes and refs.
   icons and `shortcut` for a focus shortcut; unit suffixes and interactive
   actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
+
+## MultiValueInput
+
+Status: ready
+
+Import:
+
+```tsx
+import { MultiValueInput } from "@acton/ui"
+```
+
+Use MultiValueInput when a form accepts several values from a searchable,
+caller-provided option set. Selected values become removable chips while the
+remaining inline input filters the available options.
+
+### Composition
+
+```tsx
+<MultiValueInput
+  label="Startup accounts"
+  description="Wallets to create when the environment starts"
+  placeholder="Search wallets"
+  values={accounts}
+  options={walletNames}
+  onValuesChange={setAccounts}
+/>
+```
+
+- `values`: controlled selected strings rendered as chips.
+- `options`: caller-owned available strings. Selected values are removed from
+  the suggestion list.
+- `onValuesChange`: receives the complete next value list after selection,
+  chip removal, or empty-input Backspace.
+- `label` and `description`: optional field context linked to the native input.
+- `invalid`, `required`, and `disabled`: shared form states.
+- Arrow keys move through suggestions, Enter selects, Escape closes the list,
+  and Backspace removes the last chip when the query is empty.
+
+### States To Review Visually
+
+- Empty field with suggestions
+- Filtered suggestions
+- One and several selected chips
+- Long selected values
+- Keyboard selection and chip removal
+- Disabled, invalid, and required
+
+### Agent Guidance
+
+- Keep option loading and domain validation in the caller.
+- Use MultiValueInput for a finite known option set, not arbitrary tag entry.
+- Store selected values as an array. Do not serialize them into a comma-separated
+  input string.
+- Do not add a second completion popup or render chips outside the control.
+- Use Select for one value and SearchInput for navigation or result lookup.
 
 ## Select
 
@@ -805,6 +891,54 @@ It owns hexadecimal formatting and composes its copy interaction from
 - Do not wrap OpcodeChip in another copy control.
 - Do not duplicate copy state, timers, clipboard calls, or copy/check icons in
   consumers.
+
+## Disclosure
+
+Status: ready
+
+Import:
+
+```tsx
+import { Disclosure } from "@acton/ui"
+```
+
+Use Disclosure for full-width collapsible sections in forms, settings, and
+inspection panels. It keeps native `details` behavior while replacing the
+browser marker with the shared chevron, focus treatment, spacing, and
+open-state motion.
+
+### Composition
+
+```tsx
+<Disclosure
+  label="Network and mining"
+  description="Optional runtime behavior"
+>
+  <NetworkSettings />
+</Disclosure>
+```
+
+- `label`: required visible section name.
+- `description`: optional supporting text in the trigger.
+- `contentClassName`: layout hook for domain content.
+- Native `details` props such as `open`, `name`, and `onToggle` are forwarded.
+
+### States To Review Visually
+
+- Closed and open
+- Keyboard focus
+- Hover in light and dark themes
+- With and without a description
+- Narrow viewport and wrapped labels
+
+### Agent Guidance
+
+- Use Disclosure instead of raw `details` and `summary` for full-width
+  collapsible UI.
+- Let Disclosure own the chevron and marker removal.
+- Keep domain form and inspection content inside the component.
+- Use DisclosureToggle for compact inline Show/Hide controls rather than
+  full-width sections.
 
 ## DisclosureToggle
 

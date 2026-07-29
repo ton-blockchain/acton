@@ -30,7 +30,10 @@ export const getHighlightedCodeHighlighter = () => {
       grammarWithName(tasmGrammarRaw, "tasm"),
       grammarWithName(tlbGrammarRaw, "tlb"),
       grammarWithName(tolkGrammarRaw, "tolk"),
+      import("shiki/langs/javascript.mjs"),
       import("shiki/langs/json.mjs"),
+      import("shiki/langs/shellscript.mjs"),
+      import("shiki/langs/toml.mjs"),
     ],
     engine: createJavaScriptRegexEngine(),
   })

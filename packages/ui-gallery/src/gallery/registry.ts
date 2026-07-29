@@ -10,6 +10,7 @@ import {contentTabsGallery} from "./contentTabsGallery"
 import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
 import {dialogGallery} from "./dialogGallery"
+import {disclosureGallery} from "./disclosureGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
@@ -21,6 +22,7 @@ import {inlineButtonGallery} from "./inlineButtonGallery"
 import {inlineLoaderGallery} from "./inlineLoaderGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
 import {modeViewerGallery} from "./modeViewerGallery"
+import {multiValueInputGallery} from "./multiValueInputGallery"
 import {nftChipGallery} from "./nftChipGallery"
 import {opcodeChipGallery} from "./opcodeChipGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
@@ -49,6 +51,7 @@ export const galleries = [
   buttonGallery,
   tooltipGallery,
   inputGallery,
+  multiValueInputGallery,
   selectGallery,
   searchInputGallery,
   breadcrumbsGallery,
@@ -59,6 +62,7 @@ export const galleries = [
   contractChipGallery,
   nftChipGallery,
   dialogGallery,
+  disclosureGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,
   opcodeChipGallery,
