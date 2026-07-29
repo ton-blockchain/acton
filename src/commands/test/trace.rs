@@ -16,6 +16,7 @@ use ton_emulator::SendMessageResultSuccess;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use tycho_types::boc::Boc;
 use tycho_types::models::AccountStatus;
+use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TestTrace {
@@ -122,7 +123,13 @@ fn safe_file_stem(name: &str, fallback: &str) -> String {
 }
 
 pub(super) fn contract_file_name(contract_name: &str) -> String {
-    acton_studio::test_contract_artifact_file_name(contract_name)
+    let stem = safe_file_stem(contract_name, "contract");
+    if stem == contract_name {
+        return format!("{stem}.json");
+    }
+
+    let suffix = xxh3_64(contract_name.as_bytes());
+    format!("{stem}-{suffix:016x}.json")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

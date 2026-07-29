@@ -9,7 +9,6 @@ use crate::commands::test::coverage::{
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
-use crate::commands::test::reporting::studio::StudioReporter;
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
 use crate::commands::test::reporting::ui::{UiReporter, reserve_ui_listener, start_ui_server};
 use crate::commands::test::reporting::{
@@ -77,8 +76,6 @@ pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 pub(crate) const INTERNAL_SKIP_BUILD_ENV: &str = "ACTON_INTERNAL_SKIP_BUILD";
-pub(crate) const INTERNAL_DISABLE_STUDIO_REPORTER_ENV: &str =
-    "ACTON_INTERNAL_DISABLE_STUDIO_REPORTER";
 pub(crate) const INTERNAL_REQUIRE_TESTS_ENV: &str = "ACTON_INTERNAL_REQUIRE_TESTS";
 pub(crate) use self::fuzz::FuzzConfig;
 use self::fuzz::{FuzzParameter, attach_test_parameter_metadata, validate_test_configuration};
@@ -562,7 +559,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let project_root = configured_project_root();
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
-    let studio_reporter = StudioReporter::prepare(project_root, &mut config);
 
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
@@ -599,7 +595,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
 
     let mut global_reporter = ReporterManager::new();
-    global_reporter.add_reporter(Box::new(studio_reporter));
     let reporter_project_root =
         dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
     TestRunner::setup_reporters(
@@ -671,7 +666,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
     if let Some(message) = empty_test_selection_message(&test_files, &config, total_tests) {
-        runner.reporter_manager.on_run_finished(false)?;
         runner.reporter_manager.finalize()?;
         println!("\n{message}");
         process::exit(1);
@@ -761,6 +755,8 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
         }
     }
 
+    runner.reporter_manager.finalize()?;
+
     if config.snapshot.is_some()
         || config.baseline_snapshot.is_some()
         || config.gas_profile.is_some()
@@ -786,10 +782,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
             println!("\n{} {skipped_outputs}", "Note:".yellow(),);
         }
     }
-
-    let run_succeeded = total_failed == 0 && !coverage_threshold_failed;
-    runner.reporter_manager.on_run_finished(run_succeeded)?;
-    runner.reporter_manager.finalize()?;
 
     if config.ui
         && let Some(reports) = reports_for_ui
@@ -1007,7 +999,6 @@ pub fn find_test_files_recursively(
         "**/.git/**",
         "**/target/**",
         "**/.acton/**",
-        "**/.studio/**",
         "**/.codex/**",
         "**/.claude/**",
     ] {

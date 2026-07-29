@@ -108,7 +108,6 @@ dependencies = [
  "tvm-ffi",
  "tvm-logs",
  "tycho-types",
- "urlencoding",
  "walkdir",
  "xxhash-rust",
 ]
