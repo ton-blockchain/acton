@@ -13,6 +13,8 @@ import styles from "./Nfts.module.css"
 
 interface NftsProps {
   readonly items: NftItem[]
+  readonly emptyLabel?: string
+  readonly searchLabel?: string
   readonly onAddressClick?: (addr: string, event?: ExplorerNavigationClickEvent) => void
 }
 
@@ -33,7 +35,12 @@ function getNftDisplayName(item: NftItem): string {
   return getContentString(item.content, "name") || `${collectionName || "NFT"} #${item.index}`
 }
 
-export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
+export const Nfts: FC<NftsProps> = ({
+  items,
+  emptyLabel = "No NFTs found",
+  searchLabel = "Search collectibles",
+  onAddressClick,
+}) => {
   const [query, setQuery] = useState("")
   const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const normalizedQuery = query.trim().toLowerCase()
@@ -64,7 +71,7 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
   }, [eligibleItems, normalizedQuery])
 
   if (eligibleItems.length === 0) {
-    return <div className={styles.empty}>No NFTs found</div>
+    return <div className={styles.empty}>{emptyLabel}</div>
   }
 
   return (
@@ -75,7 +82,7 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder="Search"
-          aria-label="Search collectibles"
+          aria-label={searchLabel}
         />
       </label>
       <div className={styles.list}>
@@ -128,3 +135,21 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
     </div>
   )
 }
+
+export const NftsSkeleton: FC = () => (
+  <div className={styles.container} aria-label="Loading collection items">
+    <div className={`${styles.searchBox} ${styles.skeleton}`} />
+    <div className={styles.list}>
+      {Array.from({length: 6}, (_, index) => (
+        <div key={index} className={styles.nftItem} aria-hidden="true">
+          <div className={`${styles.imageFrame} ${styles.skeleton}`} />
+          <div className={styles.nftInfo}>
+            <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+            <div className={styles.skeletonLine} />
+            <div className={`${styles.skeletonLine} ${styles.skeletonLineMedium}`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)

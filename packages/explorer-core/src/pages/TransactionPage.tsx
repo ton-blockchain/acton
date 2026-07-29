@@ -125,6 +125,9 @@ export const traceOverviewDataFromTrace = (trace: V3Trace): TraceOverviewData =>
   traceState: trace.trace_info.trace_state,
 })
 
+const blockPath = (blockRef: TransactionBlockRef): string =>
+  `/block/${blockRef.workchain}/${encodeURIComponent(blockRef.shard)}/${blockRef.seqno}`
+
 export const transactionExecutionCodeHash = (tx: TransactionInfo): string | undefined =>
   tx.codeHashBefore ??
   tx.transaction.inMessage?.init?.code?.hash().toString("hex") ??
@@ -360,11 +363,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     blockRef: TransactionBlockRef,
     event?: ExplorerNavigationClickEvent,
   ) => {
-    openExplorerPath(
-      navigate,
-      routes.blockPath(blockRef.workchain, blockRef.shard, blockRef.seqno),
-      event,
-    )
+    openExplorerPath(navigate, blockPath(blockRef), event)
   }
 
   const handleActiveTabChange = (tab: TransactionTraceTabType) => {
@@ -935,9 +934,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       onTransactionSelect={handleTransactionSelect}
       onTraceGapLoad={partialTraceState ? handleTraceGapLoad : undefined}
       onBlockClick={handleBlockClick}
-      getBlockPath={blockRef =>
-        routes.blockPath(blockRef.workchain, blockRef.shard, blockRef.seqno)
-      }
       onToggleFavorite={selectedTraceTransaction ? handleToggleFavorite : undefined}
       loadActions={loadTransactionActions}
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
@@ -1032,7 +1028,7 @@ export function TransactionTraceView({
   onTraceGapLoad,
   onBlockClick,
   onToggleFavorite,
-  getBlockPath = () => undefined,
+  getBlockPath = blockPath,
   loadActions,
   resolveVerifiedSourceByCodeHash,
   renderSelectedTransactionExtra,

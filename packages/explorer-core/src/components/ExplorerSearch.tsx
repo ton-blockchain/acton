@@ -14,7 +14,7 @@ import {
 import type {TonClient} from "../api/client"
 import {EXPLORER_HISTORY_STORAGE_KEY} from "../explorerResume"
 import {useAddressBook} from "../hooks/useAddressBook"
-import type {TonAssetsNameMatch} from "../hooks/useAddressBook"
+import type {RegistryNameMatch} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import type {ExplorerRoutes} from "../hooks/explorerRoutesContext"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -69,14 +69,14 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   const routes = useExplorerRoutePaths()
   const navigate = useNavigate()
   const {showToast} = useToast()
-  const {searchTonAssetsNames} = useAddressBook()
+  const {searchRegistryNames} = useAddressBook()
   const [input, setInput] = useState("")
   const [history, setHistory] = useState<readonly string[]>([])
   const [abiSearchIndex, setAbiSearchIndex] = useState<readonly AbiSearchIndexEntry[]>([])
   const [isInvalid, setIsInvalid] = useState(false)
   const searchRequestIdRef = useRef(0)
   const hasQuery = input.trim().length > 0
-  const tonAssetsNameMatches = searchTonAssetsNames(input)
+  const registryNameMatches = searchRegistryNames(input)
   const abiNameMatches = useMemo(
     () => searchAbiIndex(input, abiSearchIndex, MAX_ABI_SEARCH_MATCHES),
     [abiSearchIndex, input],
@@ -178,9 +178,9 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
           return true
         }
 
-        const [nameMatch] = searchTonAssetsNames(value, 1)
+        const [nameMatch] = searchRegistryNames(value, 1)
         if (nameMatch) {
-          openTonAssetsNameMatch({
+          openRegistryNameMatch({
             match: nameMatch,
             addressFormat,
             routes,
@@ -238,19 +238,19 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
       navigate,
       network.label,
       routes,
-      searchTonAssetsNames,
+      searchRegistryNames,
       showToast,
     ],
   )
 
   const dropdownItems: readonly SearchInputItem[] = [
-    ...tonAssetsNameMatches.map(match => ({
-      id: `tonassets:${match.address}`,
+    ...registryNameMatches.map(match => ({
+      id: `registry:${match.address}`,
       label: match.name,
       description: formatAddress(match.address, false, addressFormat),
       icon: <Search size={16} />,
       onSelect: () =>
-        openTonAssetsNameMatch({
+        openRegistryNameMatch({
           match,
           addressFormat,
           routes,
@@ -386,7 +386,7 @@ function formatHistoryItem(value: string, addressFormat: AddressFormatOptions): 
   return hashToHex(value) ?? value
 }
 
-function openTonAssetsNameMatch({
+function openRegistryNameMatch({
   match,
   addressFormat,
   routes,
@@ -394,7 +394,7 @@ function openTonAssetsNameMatch({
   addToHistory,
   setInput,
 }: {
-  readonly match: TonAssetsNameMatch
+  readonly match: RegistryNameMatch
   readonly addressFormat: AddressFormatOptions
   readonly routes: ExplorerRoutes
   readonly navigate: NavigateFunction

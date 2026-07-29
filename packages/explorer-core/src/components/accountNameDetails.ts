@@ -6,7 +6,7 @@ export interface AccountNameDetailValue {
 }
 
 export interface AccountNameDetailGroup {
-  readonly key: "custom" | "ton-assets" | "ton-dns" | "telegram"
+  readonly key: "custom" | "registry" | "ton-dns" | "telegram"
   readonly label: "Custom" | "Known names" | "TON DNS" | "Telegram"
   readonly values: readonly AccountNameDetailValue[]
 }
@@ -16,7 +16,7 @@ interface AccountNameDetailsOptions {
   readonly domain?: string
   readonly domains?: readonly string[]
   readonly customName?: string
-  readonly tonAssetsName?: string
+  readonly registryName?: string
   readonly tonDnsName?: string
 }
 
@@ -30,7 +30,7 @@ export function getAccountNameDetails({
   domain,
   domains = [],
   customName,
-  tonAssetsName,
+  registryName,
   tonDnsName,
 }: AccountNameDetailsOptions): AccountNameDetails {
   const normalizedDisplayName = displayName?.trim()
@@ -41,7 +41,7 @@ export function getAccountNameDetails({
       : displayName
   const groups = [
     nameDetailGroup("custom", "Custom", [customName], normalizedDisplayName),
-    nameDetailGroup("ton-assets", "Known names", [tonAssetsName], normalizedDisplayName),
+    nameDetailGroup("registry", "Known names", [registryName], normalizedDisplayName),
     nameDetailGroup(
       "ton-dns",
       "TON DNS",
