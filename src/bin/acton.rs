@@ -2140,14 +2140,14 @@ fn load_project_dotenv() {
     }
 }
 
-fn configure_studio_testnet_routing(command: &Commands) {
+fn configure_studio_public_network_routing(command: &Commands) {
     if matches!(command, Commands::Studio { .. }) || !configured_manifest_path().is_file() {
         return;
     }
     let Ok(config) = ActonConfig::load_manifest() else {
         return;
     };
-    let _ = acton::studio_discovery::activate_studio_testnet_gateway(
+    let _ = acton::studio_discovery::activate_studio_public_network_gateways(
         configured_project_root(),
         &config.package.name,
     );
@@ -2206,7 +2206,7 @@ fn main() {
         // we need some better way
     }
 
-    configure_studio_testnet_routing(&command);
+    configure_studio_public_network_routing(&command);
 
     let result = match command {
         Commands::Init {

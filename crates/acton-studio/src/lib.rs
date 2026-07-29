@@ -47,7 +47,9 @@ pub use environment::{
     EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus, PublicTonNetwork,
     StudioEnvironment, UpdateEnvironmentRequest,
 };
-pub use environment_catalog::TESTNET_ENVIRONMENT_ID;
+pub use environment_catalog::{
+    MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
+};
 pub use local_process::LocalProcessEnvironmentRuntime;
 pub use local_test_process::LocalProcessTestRunRuntime;
 pub use test_run::{
@@ -74,7 +76,6 @@ pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
 
 const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
-const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
 const TONCENTER_API_KEY_HEADER: &str = "x-api-key";
 
 #[cfg(not(debug_assertions))]
@@ -122,7 +123,7 @@ impl StudioWorkspace {
 pub struct StudioServerConfig {
     server_version: String,
     workspace: Option<StudioWorkspace>,
-    testnet_api_key: Option<HeaderValue>,
+    toncenter_api_keys: PublicToncenterApiKeys,
 }
 
 impl StudioServerConfig {
@@ -130,9 +131,7 @@ impl StudioServerConfig {
         Self {
             server_version: server_version.into(),
             workspace: None,
-            testnet_api_key: std::env::var(TONCENTER_TESTNET_API_KEY_ENV)
-                .ok()
-                .and_then(|value| sensitive_header_value(&value)),
+            toncenter_api_keys: PublicToncenterApiKeys::from_environment(),
         }
     }
 
@@ -143,9 +142,51 @@ impl StudioServerConfig {
     }
 
     #[must_use]
-    pub fn with_testnet_api_key(mut self, api_key: impl AsRef<str>) -> Self {
-        self.testnet_api_key = sensitive_header_value(api_key.as_ref());
+    pub fn with_toncenter_api_key(
+        mut self,
+        network: PublicTonNetwork,
+        api_key: impl AsRef<str>,
+    ) -> Self {
+        self.toncenter_api_keys
+            .set(network, sensitive_header_value(api_key.as_ref()));
         self
+    }
+}
+
+#[derive(Clone, Default)]
+struct PublicToncenterApiKeys {
+    testnet: Option<HeaderValue>,
+    mainnet: Option<HeaderValue>,
+}
+
+impl PublicToncenterApiKeys {
+    fn from_environment() -> Self {
+        let mut keys = Self::default();
+        for descriptor in environment_catalog::PUBLIC_TON_NETWORKS {
+            let value = std::env::var(descriptor.api_key_environment_variable)
+                .ok()
+                .and_then(|value| sensitive_header_value(&value));
+            keys.set(descriptor.network, value);
+        }
+        keys
+    }
+
+    fn set(&mut self, network: PublicTonNetwork, value: Option<HeaderValue>) {
+        match network {
+            PublicTonNetwork::Testnet => self.testnet = value,
+            PublicTonNetwork::Mainnet => self.mainnet = value,
+        }
+    }
+
+    const fn get(&self, network: PublicTonNetwork) -> Option<&HeaderValue> {
+        match network {
+            PublicTonNetwork::Testnet => self.testnet.as_ref(),
+            PublicTonNetwork::Mainnet => self.mainnet.as_ref(),
+        }
+    }
+
+    fn for_environment(&self, environment: &StudioEnvironment) -> Option<&HeaderValue> {
+        self.get(public_ton_network(environment)?)
     }
 }
 
@@ -233,7 +274,7 @@ impl StudioServer {
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
             http_client: reqwest::Client::new(),
-            testnet_api_key: self.config.testnet_api_key.clone(),
+            toncenter_api_keys: self.config.toncenter_api_keys.clone(),
         };
         let api = Router::new()
             .route("/health", get(health))
@@ -323,7 +364,7 @@ pub(crate) struct StudioState {
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
     http_client: reqwest::Client,
-    testnet_api_key: Option<HeaderValue>,
+    toncenter_api_keys: PublicToncenterApiKeys,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -584,13 +625,14 @@ async fn proxy_environment_request(
             message: format!("Environment {} is not running", environment.name),
         }));
     }
+    let toncenter_api_key = state.toncenter_api_keys.for_environment(&environment);
 
     if contract_facade::handles(request.method(), &path) {
         return Ok(contract_facade::handle(
             &state.contract_registry,
             &state.http_client,
             &environment,
-            state.testnet_api_key.as_ref(),
+            toncenter_api_key,
             &path,
             request,
         )
@@ -611,12 +653,12 @@ async fn proxy_environment_request(
         upstream_url.push_str(query);
     }
 
-    let is_testnet = is_external_testnet(&environment);
+    let is_public_toncenter = public_ton_network(&environment).is_some();
     let upstream_request = apply_upstream_headers(
         state.http_client.request(parts.method, upstream_url),
         &parts.headers,
         &environment,
-        state.testnet_api_key.as_ref(),
+        toncenter_api_key,
     );
 
     let upstream_response = upstream_request
@@ -628,7 +670,7 @@ async fn proxy_environment_request(
     let headers = upstream_response.headers().clone();
     let mut response = Response::builder().status(status);
     for (name, value) in &headers {
-        if should_forward_upstream_response_header(name, is_testnet) {
+        if should_forward_upstream_response_header(name, is_public_toncenter) {
             response = response.header(name, value);
         }
     }
@@ -737,14 +779,14 @@ fn is_hop_by_hop_header(name: &HeaderName) -> bool {
     )
 }
 
-fn is_external_testnet(environment: &StudioEnvironment) -> bool {
-    environment.lifecycle == EnvironmentLifecycle::External
-        && matches!(
-            &environment.config,
-            EnvironmentConfig::RemoteTonNetwork {
-                network: PublicTonNetwork::Testnet,
-            }
-        )
+fn public_ton_network(environment: &StudioEnvironment) -> Option<PublicTonNetwork> {
+    if environment.lifecycle != EnvironmentLifecycle::External {
+        return None;
+    }
+    match &environment.config {
+        EnvironmentConfig::RemoteTonNetwork { network } => Some(*network),
+        EnvironmentConfig::ActonLocalnet { .. } | EnvironmentConfig::FullTonNetwork { .. } => None,
+    }
 }
 
 fn is_safe_external_request_header(name: &HeaderName) -> bool {
@@ -767,25 +809,25 @@ fn is_safe_external_request_header(name: &HeaderName) -> bool {
     )
 }
 
-fn should_forward_upstream_request_header(name: &HeaderName, is_external_testnet: bool) -> bool {
-    if is_external_testnet {
+fn should_forward_upstream_request_header(name: &HeaderName, is_public_toncenter: bool) -> bool {
+    if is_public_toncenter {
         return is_safe_external_request_header(name);
     }
     !is_hop_by_hop_header(name) && name != axum::http::header::HOST
 }
 
-fn should_forward_upstream_response_header(name: &HeaderName, is_external_testnet: bool) -> bool {
+fn should_forward_upstream_response_header(name: &HeaderName, is_public_toncenter: bool) -> bool {
     !(is_hop_by_hop_header(name)
-        || is_external_testnet && matches!(name.as_str(), TONCENTER_API_KEY_HEADER | "set-cookie"))
+        || is_public_toncenter && matches!(name.as_str(), TONCENTER_API_KEY_HEADER | "set-cookie"))
 }
 
 pub(crate) fn apply_environment_upstream_auth(
     mut request: reqwest::RequestBuilder,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
 ) -> reqwest::RequestBuilder {
-    if is_external_testnet(environment)
-        && let Some(api_key) = testnet_api_key
+    if public_ton_network(environment).is_some()
+        && let Some(api_key) = toncenter_api_key
     {
         request = request.header(TONCENTER_API_KEY_HEADER, api_key);
     }
@@ -796,15 +838,15 @@ fn apply_upstream_headers(
     mut request: reqwest::RequestBuilder,
     headers: &HeaderMap,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
 ) -> reqwest::RequestBuilder {
-    let is_testnet = is_external_testnet(environment);
+    let is_public_toncenter = public_ton_network(environment).is_some();
     for (name, value) in headers {
-        if should_forward_upstream_request_header(name, is_testnet) {
+        if should_forward_upstream_request_header(name, is_public_toncenter) {
             request = request.header(name, value);
         }
     }
-    apply_environment_upstream_auth(request, environment, testnet_api_key)
+    apply_environment_upstream_auth(request, environment, toncenter_api_key)
 }
 
 fn sensitive_header_value(value: &str) -> Option<HeaderValue> {
@@ -1118,9 +1160,9 @@ mod proxy_header_tests {
 
     use super::{
         CapturedSubmissionBody, DeploymentSubmissionKind, MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES,
-        TONCENTER_API_KEY_HEADER, apply_environment_upstream_auth, apply_upstream_headers,
-        deployment_submission_accepted, deployment_submission_boc, sensitive_header_value,
-        should_forward_upstream_response_header,
+        PublicToncenterApiKeys, TONCENTER_API_KEY_HEADER, apply_environment_upstream_auth,
+        apply_upstream_headers, deployment_submission_accepted, deployment_submission_boc,
+        sensitive_header_value, should_forward_upstream_response_header,
     };
     use crate::{
         EnvironmentConfig, EnvironmentEndpoints, EnvironmentStatus, PublicTonNetwork,
@@ -1128,7 +1170,7 @@ mod proxy_header_tests {
     };
 
     #[test]
-    fn external_testnet_only_forwards_safe_request_headers_and_uses_server_api_key() {
+    fn public_toncenter_only_forwards_safe_request_headers_and_uses_server_api_key() {
         let mut incoming = HeaderMap::new();
         incoming.insert(HOST, HeaderValue::from_static("studio.local"));
         incoming.insert(
@@ -1165,8 +1207,9 @@ mod proxy_header_tests {
         incoming.insert("if-none-match", HeaderValue::from_static("\"revision\""));
         let server_key = sensitive_header_value("server-key").expect("server key must be valid");
         let client = reqwest::Client::new();
-        let testnet = testnet_environment(true);
-        let managed = testnet_environment(false);
+        let testnet = remote_environment(PublicTonNetwork::Testnet, true);
+        let mainnet = remote_environment(PublicTonNetwork::Mainnet, true);
+        let managed = remote_environment(PublicTonNetwork::Testnet, false);
 
         let testnet_request = apply_upstream_headers(
             client.get("https://testnet.toncenter.com/api/v2"),
@@ -1176,6 +1219,14 @@ mod proxy_header_tests {
         )
         .build()
         .expect("testnet request must build");
+        let mainnet_request = apply_upstream_headers(
+            client.get("https://toncenter.com/api/v2"),
+            &incoming,
+            &mainnet,
+            Some(&server_key),
+        )
+        .build()
+        .expect("mainnet request must build");
         let managed_request = apply_upstream_headers(
             client.get("http://127.0.0.1:5411/api/v2"),
             &incoming,
@@ -1185,9 +1236,10 @@ mod proxy_header_tests {
         .build()
         .expect("managed request must build");
 
+        assert_eq!(testnet_request.headers(), mainnet_request.headers());
         let actual = request_headers_snapshot(&testnet_request, &managed_request);
 
-        expect![[r#"TESTNET
+        expect![[r#"PUBLIC TONCENTER
 api key: server-key
 api key sensitive: true
 host: <missing>
@@ -1231,45 +1283,68 @@ if-none-match: "revision""#]]
     }
 
     #[test]
-    fn direct_testnet_requests_share_server_side_auth() {
-        let server_key = sensitive_header_value("server-key").expect("server key must be valid");
+    fn direct_public_toncenter_requests_use_their_network_api_key() {
+        let mut api_keys = PublicToncenterApiKeys::default();
+        api_keys.set(
+            PublicTonNetwork::Testnet,
+            sensitive_header_value("testnet-key"),
+        );
+        api_keys.set(
+            PublicTonNetwork::Mainnet,
+            sensitive_header_value("mainnet-key"),
+        );
         let client = reqwest::Client::new();
-        let testnet = testnet_environment(true);
-        let managed = testnet_environment(false);
+        let testnet = remote_environment(PublicTonNetwork::Testnet, true);
+        let mainnet = remote_environment(PublicTonNetwork::Mainnet, true);
+        let managed = remote_environment(PublicTonNetwork::Testnet, false);
         let testnet_request = apply_environment_upstream_auth(
             client.get("https://testnet.toncenter.com/api/v3/accountStates"),
             &testnet,
-            Some(&server_key),
+            api_keys.for_environment(&testnet),
         )
         .build()
         .expect("testnet request must build");
+        let mainnet_request = apply_environment_upstream_auth(
+            client.get("https://toncenter.com/api/v3/accountStates"),
+            &mainnet,
+            api_keys.for_environment(&mainnet),
+        )
+        .build()
+        .expect("mainnet request must build");
         let managed_request = apply_environment_upstream_auth(
             client.get("http://127.0.0.1:5411/api/v3/accountStates"),
             &managed,
-            Some(&server_key),
+            api_keys.get(PublicTonNetwork::Testnet),
         )
         .build()
         .expect("managed request must build");
         let actual = format!(
-            "testnet api key: {}\ntestnet api key sensitive: {}\nmanaged api key: {}",
+            "testnet api key: {}\ntestnet api key sensitive: {}\nmainnet api key: {}\nmainnet api key sensitive: {}\nmanaged api key: {}",
             header(&testnet_request, TONCENTER_API_KEY_HEADER),
             testnet_request
+                .headers()
+                .get(TONCENTER_API_KEY_HEADER)
+                .is_some_and(HeaderValue::is_sensitive),
+            header(&mainnet_request, TONCENTER_API_KEY_HEADER),
+            mainnet_request
                 .headers()
                 .get(TONCENTER_API_KEY_HEADER)
                 .is_some_and(HeaderValue::is_sensitive),
             header(&managed_request, TONCENTER_API_KEY_HEADER),
         );
 
-        expect![[r"testnet api key: server-key
+        expect![[r"testnet api key: testnet-key
 testnet api key sensitive: true
+mainnet api key: mainnet-key
+mainnet api key sensitive: true
 managed api key: <missing>"]]
         .assert_eq(&actual);
     }
 
     #[test]
-    fn external_testnet_response_cannot_set_credentials() {
+    fn public_toncenter_response_cannot_set_credentials() {
         let actual = format!(
-            "TESTNET\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}\n\nMANAGED\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}",
+            "PUBLIC TONCENTER\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}\n\nMANAGED\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}",
             should_forward_upstream_response_header(&CONTENT_TYPE, true),
             should_forward_upstream_response_header(&SET_COOKIE, true),
             should_forward_upstream_response_header(
@@ -1284,7 +1359,7 @@ managed api key: <missing>"]]
             ),
         );
 
-        expect![[r"TESTNET
+        expect![[r"PUBLIC TONCENTER
 content-type: true
 set-cookie: false
 x-api-key: false
@@ -1350,14 +1425,16 @@ not json: false"]]
         );
     }
 
-    fn testnet_environment(external: bool) -> StudioEnvironment {
-        let config = EnvironmentConfig::RemoteTonNetwork {
-            network: PublicTonNetwork::Testnet,
-        };
+    fn remote_environment(network: PublicTonNetwork, external: bool) -> StudioEnvironment {
+        let descriptor = crate::environment_catalog::PUBLIC_TON_NETWORKS
+            .iter()
+            .find(|descriptor| descriptor.network == network)
+            .expect("public TON network descriptor");
+        let config = EnvironmentConfig::RemoteTonNetwork { network };
         if external {
             StudioEnvironment::new_external(
-                "testnet",
-                "Testnet",
+                descriptor.environment_id,
+                descriptor.display_name,
                 EnvironmentStatus::Running,
                 config,
                 EnvironmentEndpoints::default(),
@@ -1373,7 +1450,7 @@ not json: false"]]
         }
     }
 
-    fn request_headers_snapshot(testnet: &reqwest::Request, managed: &reqwest::Request) -> String {
+    fn request_headers_snapshot(public: &reqwest::Request, managed: &reqwest::Request) -> String {
         const HEADERS: &[(&str, &str)] = &[
             ("api key", TONCENTER_API_KEY_HEADER),
             ("host", "host"),
@@ -1395,15 +1472,15 @@ not json: false"]]
             ("if-none-match", "if-none-match"),
         ];
         let mut output = format!(
-            "TESTNET\napi key: {}\napi key sensitive: {}",
-            header(testnet, TONCENTER_API_KEY_HEADER),
-            testnet
+            "PUBLIC TONCENTER\napi key: {}\napi key sensitive: {}",
+            header(public, TONCENTER_API_KEY_HEADER),
+            public
                 .headers()
                 .get(TONCENTER_API_KEY_HEADER)
                 .is_some_and(HeaderValue::is_sensitive),
         );
         for (label, name) in &HEADERS[1..] {
-            let _ = write!(output, "\n{label}: {}", header(testnet, name));
+            let _ = write!(output, "\n{label}: {}", header(public, name));
         }
         output.push_str("\n\nMANAGED");
         for (label, name) in HEADERS {

@@ -73,7 +73,7 @@ pub(crate) async fn handle(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
     path: &str,
     request: Request,
 ) -> Response {
@@ -84,7 +84,7 @@ pub(crate) async fn handle(
         store,
         http_client,
         environment,
-        testnet_api_key,
+        toncenter_api_key,
         route,
         request,
     )
@@ -99,7 +99,7 @@ async fn handle_route(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
     route: ContractRoute,
     request: Request,
 ) -> Result<Response, ContractFacadeError> {
@@ -130,14 +130,14 @@ async fn handle_route(
         }
         ContractRoute::ListContracts => {
             let contracts =
-                list_contracts(store, http_client, environment, testnet_api_key).await?;
+                list_contracts(store, http_client, environment, toncenter_api_key).await?;
             Ok(success(contracts))
         }
         ContractRoute::RegisterContract => {
             let payload: RegisterContractRequest = json_body(request).await?;
             let canonical = canonical_address(&payload.address)?;
             let state =
-                fetch_single_account_state(http_client, environment, testnet_api_key, &canonical)
+                fetch_single_account_state(http_client, environment, toncenter_api_key, &canonical)
                     .await?;
             ensure_active_contract(&state, &payload.address)?;
             let display_address = display_address(&canonical)?;
@@ -231,7 +231,7 @@ async fn handle_route(
                     fetch_single_account_state(
                         http_client,
                         environment,
-                        testnet_api_key,
+                        toncenter_api_key,
                         &canonical,
                     )
                     .await?
@@ -297,7 +297,7 @@ async fn list_contracts(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
 ) -> Result<Vec<ContractListEntry>, ContractFacadeError> {
     let mut snapshot = store.snapshot(&environment.id).await?;
     let addresses = snapshot
@@ -313,7 +313,7 @@ async fn list_contracts(
     }
 
     let mut states =
-        fetch_registered_account_states(http_client, environment, testnet_api_key, &addresses)
+        fetch_registered_account_states(http_client, environment, toncenter_api_key, &addresses)
             .await?;
     let confirmed = states
         .iter()
@@ -361,13 +361,13 @@ async fn list_contracts(
 async fn fetch_single_account_state(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
     requested_canonical_address: &str,
 ) -> Result<AccountStateFull, ContractFacadeError> {
     fetch_account_states(
         http_client,
         environment,
-        testnet_api_key,
+        toncenter_api_key,
         &[requested_canonical_address.to_owned()],
     )
     .await?
@@ -388,13 +388,13 @@ async fn fetch_single_account_state(
 async fn fetch_registered_account_states(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
     canonical_addresses: &[String],
 ) -> Result<Vec<AccountStateFull>, ContractFacadeError> {
     let mut states = Vec::new();
     for addresses in canonical_addresses.chunks(MAX_ACCOUNT_STATES_BATCH_SIZE) {
         states.extend(
-            fetch_account_states(http_client, environment, testnet_api_key, addresses).await?,
+            fetch_account_states(http_client, environment, toncenter_api_key, addresses).await?,
         );
     }
     Ok(states)
@@ -403,7 +403,7 @@ async fn fetch_registered_account_states(
 async fn fetch_account_states(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
-    testnet_api_key: Option<&HeaderValue>,
+    toncenter_api_key: Option<&HeaderValue>,
     canonical_addresses: &[String],
 ) -> Result<Vec<AccountStateFull>, ContractFacadeError> {
     let api_v3 = environment
@@ -423,7 +423,7 @@ async fn fetch_account_states(
         query.append_pair("include_boc", "false");
     }
     let response =
-        apply_environment_upstream_auth(http_client.get(url), environment, testnet_api_key)
+        apply_environment_upstream_auth(http_client.get(url), environment, toncenter_api_key)
             .send()
             .await
             .map_err(upstream_error)?;

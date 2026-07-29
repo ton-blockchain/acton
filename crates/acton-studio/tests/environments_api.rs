@@ -243,7 +243,7 @@ async fn proxy_target(request: Request<Body>) -> (StatusCode, String) {
 }
 
 #[tokio::test]
-async fn testnet_is_a_permanent_external_environment() {
+async fn public_ton_networks_are_permanent_external_environments() {
     let app = router();
     let list = app
         .clone()
@@ -254,7 +254,7 @@ async fn testnet_is_a_permanent_external_environment() {
         )
         .await
         .expect("list request must succeed");
-    let get = app
+    let get_testnet = app
         .clone()
         .oneshot(
             Request::get("/api/v1/environments/testnet")
@@ -273,10 +273,19 @@ async fn testnet_is_a_permanent_external_environment() {
         )
         .await
         .expect("update request must succeed");
+    let get_mainnet = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/environments/mainnet")
+                .body(Body::empty())
+                .expect("get request must be valid"),
+        )
+        .await
+        .expect("get request must succeed");
     let stop = app
         .clone()
         .oneshot(
-            Request::post("/api/v1/environments/testnet/stop")
+            Request::post("/api/v1/environments/mainnet/stop")
                 .body(Body::empty())
                 .expect("stop request must be valid"),
         )
@@ -293,16 +302,17 @@ async fn testnet_is_a_permanent_external_environment() {
         .expect("restart request must succeed");
     let delete = app
         .oneshot(
-            Request::delete("/api/v1/environments/testnet")
+            Request::delete("/api/v1/environments/mainnet")
                 .body(Body::empty())
                 .expect("delete request must be valid"),
         )
         .await
         .expect("delete request must succeed");
     let actual = format!(
-        "LIST\n{}\n\nGET\n{}\n\nUPDATE\n{}\n\nSTOP\n{}\n\nRESTART\n{}\n\nDELETE\n{}",
+        "LIST\n{}\n\nGET TESTNET\n{}\n\nGET MAINNET\n{}\n\nUPDATE TESTNET\n{}\n\nSTOP MAINNET\n{}\n\nRESTART TESTNET\n{}\n\nDELETE MAINNET\n{}",
         response_snapshot(list).await,
-        response_snapshot(get).await,
+        response_snapshot(get_testnet).await,
+        response_snapshot(get_mainnet).await,
         response_snapshot(update).await,
         response_snapshot(stop).await,
         response_snapshot(restart).await,
@@ -311,27 +321,31 @@ async fn testnet_is_a_permanent_external_environment() {
 
     expect![[r#"LIST
 status: 200 OK
-body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}}]
+body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}},{"id":"mainnet","name":"Mainnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/mainnet/rpc","config":{"kind":"remoteTonNetwork","network":"mainnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/mainnet/rpc/api/v2","apiV3":"/api/v1/environments/mainnet/rpc/api/v3"},"network":{"id":"mainnet","label":"Mainnet","chainId":-239,"testOnly":false}}]
 
-GET
+GET TESTNET
 status: 200 OK
 body: {"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}}
 
-UPDATE
+GET MAINNET
+status: 200 OK
+body: {"id":"mainnet","name":"Mainnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/mainnet/rpc","config":{"kind":"remoteTonNetwork","network":"mainnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/mainnet/rpc/api/v2","apiV3":"/api/v1/environments/mainnet/rpc/api/v3"},"network":{"id":"mainnet","label":"Mainnet","chainId":-239,"testOnly":false}}
+
+UPDATE TESTNET
 status: 409 Conflict
 body: {"error":{"code":"environment_lifecycle_unavailable","message":"Testnet is an external environment and cannot be updated by Studio"}}
 
-STOP
+STOP MAINNET
 status: 409 Conflict
-body: {"error":{"code":"environment_lifecycle_unavailable","message":"Testnet is an external environment and cannot be stopped by Studio"}}
+body: {"error":{"code":"environment_lifecycle_unavailable","message":"Mainnet is an external environment and cannot be stopped by Studio"}}
 
-RESTART
+RESTART TESTNET
 status: 409 Conflict
 body: {"error":{"code":"environment_lifecycle_unavailable","message":"Testnet is an external environment and cannot be restarted by Studio"}}
 
-DELETE
+DELETE MAINNET
 status: 409 Conflict
-body: {"error":{"code":"environment_lifecycle_unavailable","message":"Testnet is an external environment and cannot be deleted by Studio"}}"#]]
+body: {"error":{"code":"environment_lifecycle_unavailable","message":"Mainnet is an external environment and cannot be deleted by Studio"}}"#]]
     .assert_eq(&actual);
 }
 
@@ -462,7 +476,7 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
 
         LIST
         status: 200 OK
-        body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}},{"id":"test-environment-1","name":"Forked mainnet","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","gramFaucet","jettonFaucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","chainId":-3,"testOnly":true}}]
+        body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}},{"id":"mainnet","name":"Mainnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/mainnet/rpc","config":{"kind":"remoteTonNetwork","network":"mainnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/mainnet/rpc/api/v2","apiV3":"/api/v1/environments/mainnet/rpc/api/v3"},"network":{"id":"mainnet","label":"Mainnet","chainId":-239,"testOnly":false}},{"id":"test-environment-1","name":"Forked mainnet","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"actonLocalnet","port":5511,"forkNetwork":"mainnet","forkBlockNumber":81973221,"accounts":["deployer","treasury"],"rateLimit":30,"responseDelayMs":120,"blockIntervalMs":750,"noMining":false,"mineEmptyBlocks":true},"capabilities":["apiV2","apiV3","controlApi","explorer","integration","gramFaucet","jettonFaucet","wallets","simulator","contracts","apiCalls","mining","timeTravel","snapshots","checkpoints"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"mainnet","label":"Mainnet fork","chainId":-3,"testOnly":true}}]
 
         UPDATE
         status: 200 OK
@@ -482,7 +496,7 @@ async fn environment_create_list_stop_and_restart_share_one_api_contract() {
 
         LIST AFTER DELETE
         status: 200 OK
-        body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}}]"#]]
+        body: [{"id":"testnet","name":"Testnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/testnet/rpc","config":{"kind":"remoteTonNetwork","network":"testnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/testnet/rpc/api/v2","apiV3":"/api/v1/environments/testnet/rpc/api/v3"},"network":{"id":"testnet","label":"Testnet","chainId":-3,"testOnly":true}},{"id":"mainnet","name":"Mainnet","status":"running","lifecycle":"external","rpcUrl":"/api/v1/environments/mainnet/rpc","config":{"kind":"remoteTonNetwork","network":"mainnet"},"capabilities":["apiV2","apiV3","explorer","integration","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/mainnet/rpc/api/v2","apiV3":"/api/v1/environments/mainnet/rpc/api/v3"},"network":{"id":"mainnet","label":"Mainnet","chainId":-239,"testOnly":false}}]"#]]
     .assert_eq(&actual);
 }
 

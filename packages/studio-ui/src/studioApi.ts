@@ -38,7 +38,7 @@ export interface FullTonNetworkEnvironmentConfig {
 
 export interface RemoteTonNetworkEnvironmentConfig {
   readonly kind: "remoteTonNetwork"
-  readonly network: "testnet"
+  readonly network: "testnet" | "mainnet"
 }
 
 export type EnvironmentConfig =

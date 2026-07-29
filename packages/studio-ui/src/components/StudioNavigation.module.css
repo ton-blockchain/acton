@@ -874,6 +874,28 @@
   flex: 0 0 auto;
 }
 
+.networkNavIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.networkNavBadge {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  color: var(--acton-color-warning-text);
+  font-size: 0.59rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--acton-color-warning) 8%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--acton-color-warning) 28%, var(--acton-color-border));
+  border-radius: 5px;
+}
+
 .environmentStatusDot {
   width: 7px;
   height: 7px;

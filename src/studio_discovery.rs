@@ -6,7 +6,7 @@ use acton_studio::{
     STUDIO_API_VERSION, STUDIO_ENVIRONMENTS_PATH, STUDIO_INFO_PATH, StudioInfo,
     load_studio_daemon_descriptor,
 };
-use ton_networks::{CustomNetworkUrls, set_runtime_testnet_urls};
+use ton_networks::{CustomNetworkUrls, PublicNetworkUrls, set_runtime_public_network_urls};
 
 const STUDIO_CONNECT_TIMEOUT: Duration = Duration::from_millis(100);
 const STUDIO_REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
@@ -28,7 +28,10 @@ pub fn configured_studio_url(project_root: &Path) -> Option<String> {
 }
 
 #[must_use]
-pub fn activate_studio_testnet_gateway(project_root: &Path, expected_workspace_name: &str) -> bool {
+pub fn activate_studio_public_network_gateways(
+    project_root: &Path,
+    expected_workspace_name: &str,
+) -> bool {
     let Some(studio_url) = configured_studio_url(project_root) else {
         return false;
     };
@@ -36,7 +39,7 @@ pub fn activate_studio_testnet_gateway(project_root: &Path, expected_workspace_n
         return false;
     }
 
-    set_runtime_testnet_urls(testnet_gateway_urls(&studio_url)).is_ok()
+    set_runtime_public_network_urls(public_network_gateway_urls(&studio_url)).is_ok()
 }
 
 fn is_matching_studio_running(studio_url: &str, expected_workspace_name: &str) -> bool {
@@ -62,8 +65,15 @@ fn is_matching_studio_running(studio_url: &str, expected_workspace_name: &str) -
             .is_some_and(|workspace| workspace.name == expected_workspace_name)
 }
 
-fn testnet_gateway_urls(studio_url: &str) -> CustomNetworkUrls {
-    let proxy_url = format!("{studio_url}{STUDIO_ENVIRONMENTS_PATH}/testnet/rpc");
+fn public_network_gateway_urls(studio_url: &str) -> PublicNetworkUrls {
+    PublicNetworkUrls {
+        mainnet: network_gateway_urls(studio_url, "mainnet"),
+        testnet: network_gateway_urls(studio_url, "testnet"),
+    }
+}
+
+fn network_gateway_urls(studio_url: &str, network: &str) -> CustomNetworkUrls {
+    let proxy_url = format!("{studio_url}{STUDIO_ENVIRONMENTS_PATH}/{network}/rpc");
     CustomNetworkUrls {
         v2_url: Arc::from(format!("{proxy_url}/api/v2")),
         v3_url: Some(Arc::from(format!("{proxy_url}/api/v3"))),
@@ -91,17 +101,25 @@ mod tests {
     use acton_studio::{StudioServer, StudioServerConfig, StudioWorkspace};
 
     #[test]
-    fn builds_normalized_testnet_gateway_urls() {
+    fn builds_normalized_public_network_gateway_urls() {
         let studio_url = normalize_base_url("  http://127.0.0.1:3016/?ignored=true#fragment  ")
             .expect("url should normalize");
-        let urls = testnet_gateway_urls(&studio_url);
+        let urls = public_network_gateway_urls(&studio_url);
 
         assert_eq!(
-            urls.v2_url.as_ref(),
+            urls.mainnet.v2_url.as_ref(),
+            "http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v2"
+        );
+        assert_eq!(
+            urls.mainnet.v3_url.as_deref(),
+            Some("http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v3")
+        );
+        assert_eq!(
+            urls.testnet.v2_url.as_ref(),
             "http://127.0.0.1:3016/api/v1/environments/testnet/rpc/api/v2"
         );
         assert_eq!(
-            urls.v3_url.as_deref(),
+            urls.testnet.v3_url.as_deref(),
             Some("http://127.0.0.1:3016/api/v1/environments/testnet/rpc/api/v3")
         );
     }

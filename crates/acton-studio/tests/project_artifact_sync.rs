@@ -1,5 +1,6 @@
 #![cfg(unix)]
 
+use std::fmt::Write as _;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -7,14 +8,14 @@ use std::time::Duration;
 
 use acton_studio::{
     ContractRegistryStore, EnvironmentRuntime, LocalProcessEnvironmentRuntime,
-    TESTNET_ENVIRONMENT_ID,
+    PUBLIC_TON_ENVIRONMENT_IDS,
 };
 use expect_test::expect;
 use serde_json::Value;
 use tokio::time::{sleep, timeout};
 
 #[tokio::test]
-async fn project_artifacts_are_published_to_testnet_without_a_managed_environment() {
+async fn project_artifacts_are_published_to_public_networks_without_a_managed_environment() {
     let temp = tempfile::tempdir_in("/tmp").expect("temporary workspace");
     let project_root = temp.path().join("project");
     fs::create_dir(&project_root).expect("project directory");
@@ -29,36 +30,59 @@ async fn project_artifacts_are_published_to_testnet_without_a_managed_environmen
         &executable,
         &project_root,
         ContractRegistryStore::for_project(&project_root),
-        vec![TESTNET_ENVIRONMENT_ID.to_owned()],
+        PUBLIC_TON_ENVIRONMENT_IDS
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
     )
     .await
     .expect("environment runtime");
 
-    let registry_path = project_root
-        .join(".studio/environments")
-        .join(TESTNET_ENVIRONMENT_ID)
-        .join("registry.json");
-    let registry = wait_for_published_registry(&registry_path).await;
+    let mut registries = Vec::new();
+    for environment_id in PUBLIC_TON_ENVIRONMENT_IDS {
+        let registry_path = project_root
+            .join(".studio/environments")
+            .join(environment_id)
+            .join("registry.json");
+        registries.push((
+            environment_id,
+            wait_for_published_registry(&registry_path).await,
+        ));
+    }
     sleep(Duration::from_millis(1_500)).await;
 
-    let actual = format!(
-        "managed environments: {}\nverified sources: {}\ncompiler ABIs: {}\nbuilds: {}",
+    let mut actual = format!(
+        "managed environments: {}",
         runtime.list().await.expect("environment list").len(),
-        registry["verifiedSources"]
-            .as_object()
-            .map_or(0, serde_json::Map::len),
-        registry["compilerAbis"]
-            .as_object()
-            .map_or(0, serde_json::Map::len),
+    );
+    for (environment_id, registry) in registries {
+        write!(
+            actual,
+            "\n{environment_id} verified sources: {}\n{environment_id} compiler ABIs: {}",
+            registry["verifiedSources"]
+                .as_object()
+                .map_or(0, serde_json::Map::len),
+            registry["compilerAbis"]
+                .as_object()
+                .map_or(0, serde_json::Map::len),
+        )
+        .expect("artifact snapshot must be writable");
+    }
+    write!(
+        actual,
+        "\nbuilds: {}",
         fs::read_to_string(&build_count_path)
             .expect("build count")
             .lines()
             .count(),
-    );
+    )
+    .expect("artifact snapshot must be writable");
     expect![[r"
         managed environments: 0
-        verified sources: 1
-        compiler ABIs: 1
+        testnet verified sources: 1
+        testnet compiler ABIs: 1
+        mainnet verified sources: 1
+        mainnet compiler ABIs: 1
         builds: 1"]]
     .assert_eq(&actual);
 
