@@ -2093,13 +2093,16 @@ fn configure_project_roots(
     Ok(())
 }
 
-fn load_project_dotenv() {
-    let project_dotenv = configured_project_root().join(".env");
-    if configured_manifest_path().is_file() && project_dotenv.is_file() {
-        from_path(project_dotenv).ok();
-    } else {
-        dotenv().ok();
+fn load_project_dotenv(project_roots_configured: bool) {
+    if project_roots_configured {
+        let project_dotenv = configured_project_root().join(".env");
+        if configured_manifest_path().is_file() && project_dotenv.is_file() {
+            from_path(project_dotenv).ok();
+            return;
+        }
     }
+
+    dotenv().ok();
 }
 
 fn main() {
@@ -2136,7 +2139,7 @@ fn main() {
         process::exit(1);
     }
 
-    load_project_dotenv();
+    load_project_dotenv(configure_roots);
 
     if configure_roots
         && (command_checks_toolchain_version(&command) || rpc_project_override)
