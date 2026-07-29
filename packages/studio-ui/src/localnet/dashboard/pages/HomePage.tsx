@@ -1,4 +1,4 @@
-import {CircleDot, FastForward, GitBranch} from "lucide-react"
+import {CircleDot, FastForward, GitBranch, Network} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -92,12 +92,20 @@ interface HomeState {
   readonly error?: string
 }
 
+interface NetworkNodeInfo {
+  readonly lastBlockSeqno: number
+  readonly latestBlockUnixTime: number
+}
+
 export const HomePage: FC<HomePageProps> = ({client}) => {
   const runtime = useLocalnetRuntime()
   const environment = runtime.environment
   const localnetConfig =
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
+  const fullNetworkConfig =
+    environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const hasControlApi = supports(environment, "controlApi")
+  const hasNetworkNodeInfo = !hasControlApi && supports(environment, "apiV3")
   const hasIntegration = supports(environment, "integration")
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
@@ -106,6 +114,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const {showToast} = useToast()
   const {prefetchNames, updateDomains} = useAddressBook()
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
+  const [networkNodeInfo, setNetworkNodeInfo] = useState<NetworkNodeInfo | undefined>()
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false)
   const [timeAdvanceSeconds, setTimeAdvanceSeconds] = useState(DEFAULT_TIME_ADVANCE_SECONDS)
   const [timeAdvanceError, setTimeAdvanceError] = useState<string>()
@@ -142,7 +151,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       connectPanelStorageKey !== undefined &&
       globalThis.localStorage.getItem(connectPanelStorageKey) === "true",
   )
-  const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
+  const latestBlockSeqno = nodeInfo?.last_block_seqno ?? networkNodeInfo?.lastBlockSeqno
+  const nodeTime = nodeInfo
+    ? formatNodeDateTime(nodeInfo.current_unix_time)
+    : networkNodeInfo
+      ? formatNodeDateTime(networkNodeInfo.latestBlockUnixTime)
+      : undefined
   const nodeTimeOffset =
     nodeInfo && nodeInfo.time_offset_seconds !== 0
       ? formatTimeOffset(nodeInfo.time_offset_seconds)
@@ -212,6 +226,54 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       }
     }
   }, [client, hasControlApi])
+
+  useEffect(() => {
+    if (!hasNetworkNodeInfo) {
+      setNetworkNodeInfo(undefined)
+      return
+    }
+
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const loadNetworkNodeInfo = async () => {
+      try {
+        const response = await client.getBlocks({workchain: -1, limit: 1, sort: "desc"})
+        const latestBlock = response.blocks[0]
+        const latestBlockUnixTime = latestBlock ? Number(latestBlock.gen_utime) : Number.NaN
+        if (!latestBlock || !Number.isFinite(latestBlockUnixTime)) {
+          throw new Error("Latest masterchain block is unavailable")
+        }
+
+        if (!cancelled) {
+          setNetworkNodeInfo({
+            lastBlockSeqno: latestBlock.seqno,
+            latestBlockUnixTime,
+          })
+        }
+      } catch {
+        if (!cancelled) {
+          setNetworkNodeInfo(undefined)
+        }
+      } finally {
+        if (!cancelled) {
+          timeoutId = globalThis.setTimeout(
+            () => void loadNetworkNodeInfo(),
+            HOME_NODE_INFO_REFRESH_MS,
+          )
+        }
+      }
+    }
+
+    void loadNetworkNodeInfo()
+
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) {
+        globalThis.clearTimeout(timeoutId)
+      }
+    }
+  }, [client, hasNetworkNodeInfo])
 
   useEffect(() => {
     let cancelled = false
@@ -349,7 +411,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           client={client}
           environment={environment}
           isAdvanceTimeOpen={isTimeModalOpen}
-          latestBlockSeqno={nodeInfo?.last_block_seqno}
+          latestBlockSeqno={latestBlockSeqno}
           onAdvanceTime={openTimeAdvanceModal}
           onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}
@@ -372,7 +434,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               />
             )}
 
-            {hasControlApi ? (
+            {hasControlApi || hasNetworkNodeInfo ? (
               <DataTable title="Node info" minWidth="42rem">
                 <DataTableTable aria-label="Node info">
                   <DataTableHead>
@@ -389,29 +451,31 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                           <DataTableHeaderCell columnWidth="13%">Local blocks</DataTableHeaderCell>
                         </>
                       )}
-                      <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
-                        Uptime
+                      {fullNetworkConfig ? (
+                        <DataTableHeaderCell columnWidth="20%">Validators</DataTableHeaderCell>
+                      ) : (
+                        <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
+                          Uptime
+                        </DataTableHeaderCell>
+                      )}
+                      <DataTableHeaderCell align="right">
+                        {fullNetworkConfig ? "Latest block time" : "Node time"}
                       </DataTableHeaderCell>
-                      <DataTableHeaderCell align="right">Node time</DataTableHeaderCell>
                     </DataTableRow>
                   </DataTableHead>
                   <DataTableBody>
-                    {nodeInfo ? (
+                    {latestBlockSeqno !== undefined && nodeTime ? (
                       <DataTableRow>
                         <DataTableCell>
                           <BlockChip
                             workchain={-1}
                             shard={MASTERCHAIN_BLOCK_SHARD}
-                            seqno={nodeInfo.last_block_seqno}
-                            href={localnetRoutes.path(
-                              getMasterchainBlockPath(nodeInfo.last_block_seqno),
-                            )}
+                            seqno={latestBlockSeqno}
+                            href={localnetRoutes.path(getMasterchainBlockPath(latestBlockSeqno))}
                             onClick={event => {
                               event.preventDefault()
                               openPath(
-                                localnetRoutes.path(
-                                  getMasterchainBlockPath(nodeInfo.last_block_seqno),
-                                ),
+                                localnetRoutes.path(getMasterchainBlockPath(latestBlockSeqno)),
                                 event,
                               )
                             }}
@@ -419,7 +483,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </DataTableCell>
                         <DataTableCell>
                           <span className={styles.nodeInfoStateSource}>
-                            {nodeInfo.fork_network ? (
+                            {fullNetworkConfig ? (
+                              <>
+                                <Network size={15} aria-hidden="true" />
+                                <span>Validator network</span>
+                              </>
+                            ) : nodeInfo?.fork_network ? (
                               <>
                                 <GitBranch size={15} aria-hidden="true" />
                                 <span>Fork</span>
@@ -454,12 +523,16 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                             <DataTableCell>{localBlockCount ?? "—"}</DataTableCell>
                           </>
                         )}
-                        <DataTableCell
-                          data-visual-dynamic="time"
-                          data-visual-placeholder="<uptime>"
-                        >
-                          {formatDuration(nodeInfo.uptime_seconds)}
-                        </DataTableCell>
+                        {fullNetworkConfig ? (
+                          <DataTableCell>{fullNetworkConfig.validators}</DataTableCell>
+                        ) : (
+                          <DataTableCell
+                            data-visual-dynamic="time"
+                            data-visual-placeholder="<uptime>"
+                          >
+                            {nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : "—"}
+                          </DataTableCell>
+                        )}
                         <DataTableCell align="right" title={nodeTimeTitle}>
                           <span
                             className={styles.nodeInfoTime}
