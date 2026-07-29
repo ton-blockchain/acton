@@ -20,27 +20,27 @@ import type {FC, FormEvent} from "react"
 
 import {supports} from "../../../environmentCapabilities"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
-import type {TonClient} from "../../explorer/api/client"
-import {addressKey} from "../../explorer/api/compilerAbi"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import {addressKey} from "@acton/explorer-core/api/compilerAbi"
 import type {
   LocalnetNodeInfo,
   V3AccountState,
   V3TransactionListItem,
-} from "../../explorer/api/types"
+} from "@acton/explorer-core/api/types"
 import {
   DeveloperAccountList,
   DeveloperAccountListSkeleton,
   type DeveloperAccountListItem,
-} from "../../explorer/components/DeveloperAccountList"
+} from "@acton/explorer-core/components/DeveloperAccountList"
 import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
-} from "../../explorer/components/DeveloperTransactionList"
-import {formatDuration} from "../../explorer/components/utils"
-import {useAddressBook} from "../../explorer/hooks/useAddressBook"
-import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
-import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
-import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
+} from "@acton/explorer-core/components/DeveloperTransactionList"
+import {formatDuration} from "@acton/explorer-core/components/utils"
+import {useAddressBook} from "@acton/explorer-core/hooks/useAddressBook"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
+import {useOpenExplorerPath} from "@acton/explorer-core/hooks/useOpenExplorerPath"
+import {useTransactionMessageNames} from "@acton/explorer-core/hooks/useTransactionMessageNames"
 import {useLocalnetRoutes} from "../../routes"
 import {EnvironmentActions} from "../components/EnvironmentActions"
 import {EnvironmentConnect} from "../components/EnvironmentConnect"

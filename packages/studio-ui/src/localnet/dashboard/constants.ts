@@ -1,4 +1,4 @@
-import {TOKEN_PLACEHOLDER_IMAGE as EXPLORER_TOKEN_PLACEHOLDER_IMAGE} from "../explorer/components/imageFallbacks"
+import {TOKEN_PLACEHOLDER_IMAGE as EXPLORER_TOKEN_PLACEHOLDER_IMAGE} from "@acton/explorer-core/components/imageFallbacks"
 
 export const QUICK_AMOUNTS = ["1", "5", "20", "100"]
 export const TOKEN_PLACEHOLDER_IMAGE = EXPLORER_TOKEN_PLACEHOLDER_IMAGE

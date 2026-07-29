@@ -37,14 +37,8 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-#[cfg(not(debug_assertions))]
-use include_dir::{Dir, include_dir};
 use serde_json::{Value, json};
-#[cfg(debug_assertions)]
-use std::fs;
 use std::num::NonZeroU32;
-#[cfg(debug_assertions)]
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -58,9 +52,6 @@ use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-
-#[cfg(not(debug_assertions))]
-static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/localnet-ui/dist");
 
 const MAX_BUFFERED_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
 const MAX_STORED_REQUEST_BODY_BYTES: usize = 64 * 1024;
@@ -765,53 +756,5 @@ async fn handle_unknown_route(State(state): State<ServerState>, request: Request
         return tonlib_error_response(StatusCode::NOT_FOUND, "Not Found");
     }
 
-    handle_embedded_ui(request.uri()).await
-}
-
-async fn handle_embedded_ui(uri: &axum::http::Uri) -> Response {
-    let path = uri.path().trim_start_matches('/');
-    let path = if path.is_empty() { "index.html" } else { path };
-
-    if let Some(contents) = load_ui_file(path) {
-        return (([("content-type", ui_content_type(path))]), contents).into_response();
-    }
-
-    if let Some(index) = load_ui_file("index.html") {
-        return (([("content-type", "text/html")]), index).into_response();
-    }
-
     StatusCode::NOT_FOUND.into_response()
-}
-
-fn ui_content_type(path: &str) -> &'static str {
-    match path.split('.').next_back() {
-        Some("html") => "text/html",
-        Some("js") => "application/javascript",
-        Some("css") => "text/css",
-        Some("svg") => "image/svg+xml",
-        Some("png") => "image/png",
-        Some("json") => "application/json",
-        _ => "application/octet-stream",
-    }
-}
-
-#[cfg(debug_assertions)]
-fn load_ui_file(path: &str) -> Option<Vec<u8>> {
-    if path.contains("..") {
-        return None;
-    }
-    let dist_path = PathBuf::from(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../packages/localnet-ui/dist"
-    ));
-    let file_path = dist_path.join(path);
-    if !file_path.is_file() {
-        return None;
-    }
-    fs::read(file_path).ok()
-}
-
-#[cfg(not(debug_assertions))]
-fn load_ui_file(path: &str) -> Option<Vec<u8>> {
-    UI_DIR.get_file(path).map(|file| file.contents().to_vec())
 }

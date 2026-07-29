@@ -3,7 +3,7 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**", "!!src/localnet/explorer/cell-inspector/block.tlb.generated.ts"]
+    "includes": ["**"]
   },
   "linter": {
     "rules": {

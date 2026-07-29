@@ -18,8 +18,8 @@ import {
 import {Fragment, useCallback, useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 
-import type {TonClient} from "../../explorer/api/client"
-import type {ApiCallRecord, ApiCallStatus, ApiCallType} from "../../explorer/api/types"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import type {ApiCallRecord, ApiCallStatus, ApiCallType} from "@acton/explorer-core/api/types"
 
 import styles from "../DashboardPage.module.css"
 

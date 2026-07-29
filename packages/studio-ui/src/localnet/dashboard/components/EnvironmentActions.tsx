@@ -17,8 +17,8 @@ import type {ChangeEvent, FC, FormEvent} from "react"
 
 import {supports, supportsAny} from "../../../environmentCapabilities"
 import type {StudioEnvironment} from "../../../studioApi"
-import type {TonClient} from "../../explorer/api/client"
-import type {LocalnetCheckpoint} from "../../explorer/api/types"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import type {LocalnetCheckpoint} from "@acton/explorer-core/api/types"
 
 import styles from "../DashboardPage.module.css"
 

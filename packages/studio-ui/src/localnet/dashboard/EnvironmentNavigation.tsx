@@ -19,8 +19,8 @@ import {useLocation, useNavigate} from "react-router"
 
 import {supports, supportsAny} from "../../environmentCapabilities"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
-import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
-import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
+import {readExplorerLastPath, writeExplorerLastPath} from "@acton/explorer-core/explorerResume"
+import {useNetworkInfo} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useLocalnetRoutes} from "../routes"
 import {formatForkNetworkLabel} from "./dashboardUtils"
 

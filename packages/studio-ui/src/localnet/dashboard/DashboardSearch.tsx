@@ -3,7 +3,7 @@ import {createPortal} from "react-dom"
 import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react"
 import type {CSSProperties, FC} from "react"
 
-import type {TonClient} from "../explorer/api/client"
+import type {TonClient} from "@acton/explorer-core/api/client"
 
 import {isTextEntryTarget} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"

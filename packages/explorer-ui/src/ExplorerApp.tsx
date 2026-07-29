@@ -33,34 +33,34 @@ import {
   useParams,
 } from "react-router"
 
-import {TonClient} from "../../localnet-ui/src/explorer/api/client"
-import {getBundledCompilerAbis} from "../../localnet-ui/src/explorer/api/compilerAbiCatalog"
-import {AddressBookProvider} from "../../localnet-ui/src/explorer/hooks/useAddressBook"
-import {ExplorerRoutesProvider} from "../../localnet-ui/src/explorer/hooks/useExplorerRoutes"
-import {StaticNetworkInfoProvider} from "../../localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
-import {BrowserMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/browserRegistry"
-import {BundledAbiRegistry} from "../../localnet-ui/src/explorer/metadata/bundledAbiRegistry"
-import {CompositeMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/compositeRegistry"
-import {MetadataRegistryProvider} from "../../localnet-ui/src/explorer/metadata/MetadataRegistryProvider"
-import {VerifierMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/verifierRegistry"
+import {TonClient} from "@acton/explorer-core/api/client"
+import {getBundledCompilerAbis} from "@acton/explorer-core/api/compilerAbiCatalog"
+import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
+import {ExplorerRoutesProvider} from "@acton/explorer-core/hooks/useExplorerRoutes"
+import {StaticNetworkInfoProvider} from "@acton/explorer-core/hooks/StaticNetworkInfoProvider"
+import {BrowserMetadataRegistry} from "@acton/explorer-core/metadata/browserRegistry"
+import {BundledAbiRegistry} from "@acton/explorer-core/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "@acton/explorer-core/metadata/compositeRegistry"
+import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "@acton/explorer-core/metadata/verifierRegistry"
 import type {
   CustomExplorerNetworkId,
   ExplorerApiConfig,
   ExplorerNetworkInfo,
-} from "../../localnet-ui/src/explorer/hooks/useNetworkInfo"
-import {BlockDetailsPage, BlocksPage} from "../../localnet-ui/src/explorer/pages/BlocksPage"
-import {CellInspectorPage} from "../../localnet-ui/src/explorer/pages/CellInspectorPage"
-import {EmulatePage} from "../../localnet-ui/src/explorer/pages/EmulatePage"
-import {AccountPage} from "../../localnet-ui/src/explorer/pages/AccountPage"
-import {AbiCatalogPage, AbiDetailsPage} from "../../localnet-ui/src/explorer/pages/AbiCatalogPage"
-import {SourceCatalogPage} from "../../localnet-ui/src/explorer/pages/SourceCatalogPage"
-import {ExplorerSearch} from "../../localnet-ui/src/explorer/components/ExplorerSearch"
-import {ExplorerDocumentTitle} from "../../localnet-ui/src/explorer/components/ExplorerDocumentTitle"
-import {ExplorerIndexPage} from "../../localnet-ui/src/explorer/pages/ExplorerIndexPage"
-import {FavoriteAccountsPage} from "../../localnet-ui/src/explorer/pages/FavoriteAccountsPage"
-import {TransactionPage} from "../../localnet-ui/src/explorer/pages/TransactionPage"
+} from "@acton/explorer-core/hooks/useNetworkInfo"
+import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
+import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
+import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
+import {AbiCatalogPage, AbiDetailsPage} from "@acton/explorer-core/pages/AbiCatalogPage"
+import {SourceCatalogPage} from "@acton/explorer-core/pages/SourceCatalogPage"
+import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
+import {ExplorerDocumentTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
+import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
+import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import "@acton/ui/styles/tokens.css"
-import "../../localnet-ui/src/index.css"
+import "@acton/explorer-core/styles.css"
 import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
@@ -1401,7 +1401,7 @@ export const ExplorerApp: FC = () => {
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
-                      <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route path="/sources" element={<SourceCatalogPage client={client} />} />
                       <Route
                         path="/faucet"
                         element={

@@ -78,7 +78,6 @@
 "localnet":
   - changed-files:
       - any-glob-to-any-file:
-          - "packages/localnet-ui/**"
           - "crates/ton-indexer/**"
           - "crates/ton-localnet/**"
           - "src/commands/localnet/**"
@@ -86,6 +85,7 @@
 "explorer":
   - changed-files:
       - any-glob-to-any-file:
+          - "packages/explorer-core/**"
           - "packages/explorer-ui/**"
 
 "wallets":

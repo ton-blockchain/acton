@@ -4,17 +4,17 @@ import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router"
 
-import type {JettonMaster} from "../../explorer/api/types"
-import type {TonClient} from "../../explorer/api/client"
-import {waitForTraceTransactionHash} from "../../explorer/api/waitForTraceTransactionHash"
+import type {JettonMaster} from "@acton/explorer-core/api/types"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import {waitForTraceTransactionHash} from "@acton/explorer-core/api/waitForTraceTransactionHash"
 import {
   formatAddress,
   hashToHex,
   isSameAddress,
   parseAddress,
-} from "../../explorer/components/utils"
-import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
-import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+} from "@acton/explorer-core/components/utils"
+import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useOptionalWalletRuntime} from "../../wallet/useWalletRuntime"
 import {QUICK_AMOUNTS, TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {parseGramAmount} from "../dashboardUtils"

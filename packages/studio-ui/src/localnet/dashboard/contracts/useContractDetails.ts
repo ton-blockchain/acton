@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from "react"
 
-import type {TonClient} from "../../explorer/api/client"
-import type {ExtendedContractABI} from "../../explorer/api/compilerAbi"
-import type {LocalnetContract} from "../../explorer/api/types"
-import {isSameAddress} from "../../explorer/components/utils"
-import {normalizeCodeHash} from "../../explorer/metadata/codeHash"
-import {useMetadataRegistry} from "../../explorer/metadata/MetadataRegistryProvider"
-import type {RegisteredSource} from "../../explorer/metadata/types"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import type {ExtendedContractABI} from "@acton/explorer-core/api/compilerAbi"
+import type {LocalnetContract} from "@acton/explorer-core/api/types"
+import {isSameAddress} from "@acton/explorer-core/components/utils"
+import {normalizeCodeHash} from "@acton/explorer-core/metadata/codeHash"
+import {useMetadataRegistry} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
+import type {RegisteredSource} from "@acton/explorer-core/metadata/types"
 
 export interface ContractDetails {
   readonly abi: ExtendedContractABI | null

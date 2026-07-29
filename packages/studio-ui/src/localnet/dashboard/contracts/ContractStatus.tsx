@@ -1,4 +1,4 @@
-import type {LocalnetContractStatus} from "../../explorer/api/types"
+import type {LocalnetContractStatus} from "@acton/explorer-core/api/types"
 
 import {contractStatusLabels} from "./contractPresentation"
 import styles from "./ContractStatus.module.css"

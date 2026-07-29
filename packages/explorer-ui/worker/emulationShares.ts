@@ -1,7 +1,4 @@
-import {
-  parseSharedEmulation,
-  type SharedEmulation,
-} from "../../localnet-ui/src/explorer/pages/emulateSharing"
+import {parseSharedEmulation, type SharedEmulation} from "@acton/explorer-core/pages/emulateSharing"
 
 export const EMULATION_SHARE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 

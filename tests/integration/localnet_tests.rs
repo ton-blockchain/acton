@@ -1572,46 +1572,6 @@ fn localnet_serves_get_shard_account_cell_for_active_account() {
 }
 
 #[test]
-fn localnet_serves_embedded_ui_and_spa_routes() {
-    let project = ProjectBuilder::new("localnet-ui-smoke").build();
-    let node = project.localnet().start();
-    let client = Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("Failed to create HTTP client for Localnet UI smoke test");
-
-    for path in ["", "/explorer"] {
-        let url = format!("{}{}", node.base_url(), path);
-        let response = client
-            .get(&url)
-            .send()
-            .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
-        let status = response.status();
-        let body = response
-            .text()
-            .unwrap_or_else(|error| panic!("Failed to read GET {url} response body: {error}"));
-
-        assert!(
-            status.is_success(),
-            "GET {url} failed with status {status}: {body}"
-        );
-        assert!(
-            body.contains("<title>TON Localnet UI</title>"),
-            "Expected Localnet UI HTML from {url}, got:\n{body}"
-        );
-        assert!(
-            body.contains("<div id=\"root\"></div>"),
-            "Expected Localnet UI root container from {url}, got:\n{body}"
-        );
-    }
-
-    let response = node.get_json("/api/v2/getMasterchainInfo");
-    assert_eq!(response["ok"].as_bool(), Some(true));
-
-    node.stop();
-}
-
-#[test]
 fn localnet_require_auth_protects_http_api() {
     let project = ProjectBuilder::new("localnet-require-auth").build();
     let node = project.localnet().require_auth().start();

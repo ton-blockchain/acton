@@ -14,8 +14,8 @@ import {
 
 import {fetchStudioWallets, type EnvironmentConfig, type StudioWallet} from "../../studioApi"
 import styles from "../dashboard/pages/WalletsPage.module.css"
-import {formatAddress, normalizeAddress} from "../explorer/components/utils"
-import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
+import {formatAddress, normalizeAddress} from "@acton/explorer-core/components/utils"
+import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import {addProjectWalletToKit, createWalletKit} from "./kit"
 import type {ProjectWalletRecord, RuntimeWallet} from "./types"

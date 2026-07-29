@@ -2,7 +2,7 @@ import type {
   LocalnetContract,
   LocalnetContractSourceKind,
   LocalnetContractStatus,
-} from "../../explorer/api/types"
+} from "@acton/explorer-core/api/types"
 
 export const contractStatusLabels = {
   active: "Active",

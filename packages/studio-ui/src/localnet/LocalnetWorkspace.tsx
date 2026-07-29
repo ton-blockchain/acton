@@ -16,18 +16,18 @@ import type {FC, ReactNode} from "react"
 import {supports} from "../environmentCapabilities"
 import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
-import {useExplorerPageTitle} from "./explorer/components/ExplorerDocumentTitle"
-import {AccountPage} from "./explorer/pages/AccountPage"
-import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
-import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
-import {CellInspectorPage} from "./explorer/pages/CellInspectorPage"
-import {EmulatePage} from "./explorer/pages/EmulatePage"
-import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
-import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
-import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
-import {TransactionPage} from "./explorer/pages/TransactionPage"
-import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
-import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProvider"
+import {useExplorerPageTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
+import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
+import {AbiCatalogPage, AbiDetailsPage} from "@acton/explorer-core/pages/AbiCatalogPage"
+import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
+import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
+import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
+import {SourceCatalogPage} from "@acton/explorer-core/pages/SourceCatalogPage"
+import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
+import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
+import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {IntegratePage} from "./dashboard/pages/IntegratePage"
@@ -365,7 +365,7 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "contracts",
                 <DashboardPage>
-                  <SourceCatalogPage />
+                  <SourceCatalogPage client={client} />
                 </DashboardPage>,
               )}
             />
@@ -534,6 +534,7 @@ const AppContent: FC<AppContentProps> = ({
                   <AccountPage
                     client={client}
                     enableJettonMint={runtime.jettonFaucetEnabled}
+                    jettonMintPath={path("/faucet")}
                     enableTransactionStreaming={
                       runtime.environment?.status === "running" &&
                       supports(runtime.environment, "controlApi")

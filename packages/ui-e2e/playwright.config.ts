@@ -5,7 +5,6 @@ import {defineConfig, devices} from "@playwright/test"
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..")
 const localnetNodePort = Number(process.env.ACTON_UI_E2E_NODE_PORT ?? 15_411)
-const localnetUiPort = Number(process.env.ACTON_UI_E2E_LOCALNET_UI_PORT ?? 14_306)
 const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_307)
 const tonConnectDappPort = Number(process.env.ACTON_UI_E2E_TONCONNECT_DAPP_PORT ?? 14_308)
 const tonConnectBridgePort = Number(process.env.ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT ?? 14_309)
@@ -36,15 +35,6 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "localnet-desktop",
-      testMatch: /localnet\/.*\.spec\.ts/,
-      use: {
-        ...devices["Desktop Chrome"],
-        baseURL: `http://127.0.0.1:${localnetUiPort}`,
-        viewport: {width: 1440, height: 1000},
-      },
-    },
-    {
       name: "explorer-desktop",
       testMatch: /explorer\/.*\.spec\.ts/,
       use: {
@@ -61,13 +51,6 @@ export default defineConfig({
       url: `http://127.0.0.1:${localnetNodePort}/acton_nodeInfo`,
       reuseExistingServer: false,
       timeout: 180_000,
-    },
-    {
-      command: `VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} VITE_TON_CONNECT_BRIDGE_URL=${tonConnectBridgeUrl} bunx vite build && VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} VITE_TON_CONNECT_BRIDGE_URL=${tonConnectBridgeUrl} bunx vite preview --host 127.0.0.1 --port ${localnetUiPort}`,
-      cwd: path.join(repositoryRoot, "packages/localnet-ui"),
-      port: localnetUiPort,
-      reuseExistingServer: false,
-      timeout: 60_000,
     },
     {
       command: `bun run build && XDG_CONFIG_HOME=../../target/wrangler-config WRANGLER_LOG_PATH=../../target/wrangler-logs bunx wrangler pages dev dist --ip 127.0.0.1 --port ${explorerUiPort} --compatibility-date 2026-06-18`,

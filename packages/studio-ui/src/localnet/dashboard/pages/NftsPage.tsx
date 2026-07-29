@@ -13,12 +13,15 @@ import {useNavigate} from "react-router"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
 
-import type {TonClient} from "../../explorer/api/client"
-import type {NftItem} from "../../explorer/api/types"
-import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
-import {NftImage} from "../../explorer/components/NftImage"
-import {NFT_IMAGE_SOURCE_KEYS, getImageSources} from "../../explorer/components/imageFallbacks"
-import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import type {NftItem} from "@acton/explorer-core/api/types"
+import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
+import {NftImage} from "@acton/explorer-core/components/NftImage"
+import {
+  NFT_IMAGE_SOURCE_KEYS,
+  getImageSources,
+} from "@acton/explorer-core/components/imageFallbacks"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {contentString} from "../dashboardUtils"
 

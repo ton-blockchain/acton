@@ -5502,7 +5502,6 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "dunce",
  "hex",
- "include_dir",
  "indexmap 2.12.0",
  "num-bigint",
  "reqwest",

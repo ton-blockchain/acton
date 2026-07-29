@@ -16,7 +16,7 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link, useSearchParams} from "react-router"
 
-import type {TonClient} from "../../../localnet-ui/src/explorer/api/client"
+import type {TonClient} from "@acton/explorer-core/api/client"
 import {
   clearFaucetSession,
   disconnectFaucetSession,

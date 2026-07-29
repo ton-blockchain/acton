@@ -1,4 +1,4 @@
-import type {JettonMaster, V3TransactionListItem} from "../explorer/api/types"
+import type {JettonMaster, V3TransactionListItem} from "@acton/explorer-core/api/types"
 
 export function parseGramAmount(value: string): number | undefined {
   const trimmed = value.trim()

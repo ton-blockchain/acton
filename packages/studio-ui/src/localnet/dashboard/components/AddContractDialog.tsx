@@ -2,9 +2,9 @@ import {Button, Dialog, Input, useToast} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FormEvent} from "react"
 
-import type {TonClient} from "../../explorer/api/client"
-import {parseAddress, formatAddress} from "../../explorer/components/utils"
-import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import {parseAddress, formatAddress} from "@acton/explorer-core/components/utils"
+import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import styles from "./AddContractDialog.module.css"
 

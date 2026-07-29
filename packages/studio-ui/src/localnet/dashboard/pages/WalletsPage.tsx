@@ -3,25 +3,25 @@ import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
 import {Button, Input} from "@acton/ui"
 
-import type {TonClient} from "../../explorer/api/client"
+import type {TonClient} from "@acton/explorer-core/api/client"
 import {
   loadJettonWalletsWithMasters,
   sortJettonWalletsByAmount,
-} from "../../explorer/api/jettonWallets"
-import type {JettonWallet} from "../../explorer/api/types"
-import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
-import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
+} from "@acton/explorer-core/api/jettonWallets"
+import type {JettonWallet} from "@acton/explorer-core/api/types"
+import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
+import {WalletAccountSummary} from "@acton/explorer-core/components/WalletAccountSummary"
 import {
   normalizeAddress,
   toRawAddress,
   type AddressFormatOptions,
-} from "../../explorer/components/utils"
-import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
-import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+} from "@acton/explorer-core/components/utils"
+import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {
   useOpenExplorerPath,
   type ExplorerNavigationClickEvent,
-} from "../../explorer/hooks/useOpenExplorerPath"
+} from "@acton/explorer-core/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
 import {useWalletRuntime} from "../../wallet/useWalletRuntime"
 import dashboardStyles from "../DashboardPage.module.css"

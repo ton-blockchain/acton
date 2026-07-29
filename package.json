@@ -11,7 +11,6 @@
   "scripts": {
     "build": "bun --filter '*' build",
     "dev:ui": "bun --filter @acton/ui-gallery dev",
-    "dev:localnet": "bun --filter @acton/localnet-ui dev",
     "dev:studio": "bun --filter @acton/studio-ui dev",
     "dev:test": "bun --filter @acton/test-ui dev",
     "fmt": "bun --filter '*' fmt",

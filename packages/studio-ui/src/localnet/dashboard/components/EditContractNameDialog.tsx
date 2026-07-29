@@ -2,8 +2,8 @@ import {Button, Dialog, Input, useToast} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FormEvent} from "react"
 
-import type {TonClient} from "../../explorer/api/client"
-import type {LocalnetContract} from "../../explorer/api/types"
+import type {TonClient} from "@acton/explorer-core/api/client"
+import type {LocalnetContract} from "@acton/explorer-core/api/types"
 
 import styles from "./AddContractDialog.module.css"
 

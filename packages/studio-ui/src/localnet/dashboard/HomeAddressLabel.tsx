@@ -1,9 +1,9 @@
 import {useMemo} from "react"
 import type {FC} from "react"
 
-import {formatAddress, normalizeAddress, parseAddress} from "../explorer/components/utils"
-import {useAddressName} from "../explorer/hooks/useAddressBook"
-import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
+import {formatAddress, normalizeAddress, parseAddress} from "@acton/explorer-core/components/utils"
+import {useAddressName} from "@acton/explorer-core/hooks/useAddressBook"
+import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 
 import styles from "./DashboardPage.module.css"
 
