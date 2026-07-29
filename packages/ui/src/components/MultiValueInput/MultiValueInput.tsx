@@ -1,5 +1,5 @@
 import {X} from "lucide-react"
-import {useId, useMemo, useRef, useState} from "react"
+import {useEffect, useId, useMemo, useRef, useState} from "react"
 import type {KeyboardEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
@@ -39,13 +39,20 @@ export function MultiValueInput({
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState("")
   const [isFocused, setIsFocused] = useState(false)
+  const [isListDismissed, setIsListDismissed] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const suggestions = useMemo(
     () => getSuggestions(query, options, values),
     [options, query, values],
   )
-  const open = isFocused && !disabled && suggestions.length > 0
+  const open = isFocused && !isListDismissed && !disabled && suggestions.length > 0
   const activeSuggestion = open ? suggestions[Math.min(activeIndex, suggestions.length - 1)] : null
+
+  useEffect(() => {
+    inputRef.current?.setCustomValidity(
+      required && values.length === 0 ? "Select at least one value." : "",
+    )
+  }, [required, values.length])
 
   const selectValue = (value: string) => {
     onValuesChange([...values, value])
@@ -75,8 +82,11 @@ export function MultiValueInput({
     } else if (event.key === "Enter" && activeSuggestion) {
       event.preventDefault()
       selectValue(activeSuggestion)
+    } else if (event.key === "Tab" && !event.shiftKey && activeSuggestion) {
+      event.preventDefault()
+      selectValue(activeSuggestion)
     } else if (event.key === "Escape") {
-      setIsFocused(false)
+      setIsListDismissed(true)
     }
   }
 
@@ -130,12 +140,19 @@ export function MultiValueInput({
             aria-activedescendant={
               activeSuggestion ? multiValueOptionId(inputId, activeSuggestion) : undefined
             }
-            onBlur={() => setIsFocused(false)}
+            onBlur={() => {
+              setIsFocused(false)
+              setIsListDismissed(false)
+            }}
             onChange={event => {
               setQuery(event.target.value)
+              setIsListDismissed(false)
               setActiveIndex(0)
             }}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => {
+              setIsFocused(true)
+              setIsListDismissed(false)
+            }}
             onKeyDown={handleKeyDown}
           />
         </div>
@@ -146,6 +163,7 @@ export function MultiValueInput({
                 key={suggestion}
                 id={multiValueOptionId(inputId, suggestion)}
                 type="button"
+                tabIndex={-1}
                 className={styles.option}
                 role="option"
                 aria-selected={suggestion === activeSuggestion}

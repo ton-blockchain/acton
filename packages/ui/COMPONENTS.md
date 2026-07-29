@@ -403,9 +403,11 @@ remaining inline input filters the available options.
 - `onValuesChange`: receives the complete next value list after selection,
   chip removal, or empty-input Backspace.
 - `label` and `description`: optional field context linked to the native input.
-- `invalid`, `required`, and `disabled`: shared form states.
-- Arrow keys move through suggestions, Enter selects, Escape closes the list,
-  and Backspace removes the last chip when the query is empty.
+- `invalid`, `required`, and `disabled`: shared form states. Required validation
+  is satisfied by a selected value, not by filter text.
+- Arrow keys move through suggestions; Enter or Tab selects the active option.
+  Escape closes the list so Tab can leave the field. Backspace removes the last
+  chip when the query is empty.
 
 ### States To Review Visually
 
