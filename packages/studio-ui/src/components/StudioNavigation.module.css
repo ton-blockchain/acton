@@ -891,8 +891,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   background: color-mix(in srgb, var(--acton-color-warning) 8%, transparent);
-  border: 1px solid
-    color-mix(in srgb, var(--acton-color-warning) 28%, var(--acton-color-border));
+  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 28%, var(--acton-color-border));
   border-radius: 5px;
 }
 

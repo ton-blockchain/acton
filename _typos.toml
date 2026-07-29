@@ -21,6 +21,7 @@ extend-exclude = [
   "*.csv",
   "crates/ton-liteapi/src/tl/schemas/**",
   "packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts",
+  "packages/studio-ui/src/localnet/explorer/cell-inspector/block.tlb.generated.ts",
   "packages/address-registry/src/addresses.json",
 ]
 

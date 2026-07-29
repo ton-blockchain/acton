@@ -206,7 +206,11 @@ const getRelativePath = (filePath: string, projectRoot?: string) => {
     return "unknown source"
   }
 
-  const normalizedProjectRoot = projectRoot?.replace(/\/+$/, "")
+  let projectRootEnd = projectRoot?.length ?? 0
+  while (projectRoot && projectRootEnd > 0 && projectRoot.charCodeAt(projectRootEnd - 1) === 47) {
+    projectRootEnd -= 1
+  }
+  const normalizedProjectRoot = projectRoot?.slice(0, projectRootEnd)
   if (
     normalizedProjectRoot &&
     (filePath === normalizedProjectRoot || filePath.startsWith(`${normalizedProjectRoot}/`))

@@ -1764,7 +1764,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("init", ""), ("studio", "<COMMAND>")];
+    let core_commands = vec![("new", "[PATH]"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -1778,6 +1778,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         // ("localnet", "<COMMAND>"),
+        // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
