@@ -26,7 +26,6 @@ use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use path_absolutize::Absolutize;
 use rand::RngCore;
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -526,9 +525,6 @@ fn send_message_impl(
 
         if tonconnect.is_some() || wallet.is_some() {
             let custom_networks = ctx.env.config.custom_networks();
-            if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
-                warn!("Failed to register compiler ABI in localnet: {err:#}");
-            }
 
             if let Some(tonconnect) = tonconnect {
                 let (wallet_ext_in, norm_hash) =
@@ -3385,118 +3381,6 @@ fn localnet_transaction_link(ctx: &Context, tx_hash_hex: &str) -> Option<String>
     let custom_networks = ctx.env.config.custom_networks();
     let localnet_urls = custom_networks.get("localnet")?;
     configured_network_transaction_link(localnet_urls, tx_hash_hex)
-}
-
-#[derive(Serialize)]
-struct RegisterAbiPayload {
-    entries: Vec<RegisterAbiEntry>,
-}
-
-#[derive(Serialize)]
-struct RegisterAbiEntry {
-    abi: serde_json::Value,
-}
-
-fn register_localnet_abis(
-    ctx: &Context,
-    custom_networks: &HashMap<String, acton_config::config::CustomNetworkUrls>,
-) -> anyhow::Result<()> {
-    if !matches!(ctx.network(), Network::Localnet) {
-        return Ok(());
-    }
-
-    let mut entries_by_hash = HashMap::<String, serde_json::Value>::new();
-    for result in ctx.build.build_cache.built.values() {
-        let Some(abi) = result.abi.as_ref() else {
-            continue;
-        };
-        let mut abi = abi.as_ref().clone();
-        if abi.contract_name.is_empty() {
-            abi.contract_name.clone_from(&result.name);
-        }
-        let display_name = abi.contract_name.clone();
-        let code_hash = result.code_hash.to_string();
-        entries_by_hash.entry(code_hash.clone()).or_insert_with(|| {
-            serde_json::json!({
-                "compiler_abi": abi,
-                "display_name": display_name,
-                "code_hashes": [code_hash],
-                "links": [],
-            })
-        });
-    }
-
-    if entries_by_hash.is_empty() {
-        return Ok(());
-    }
-
-    let url = localnet_acton_url(custom_networks, "acton_registerCompilerAbis")?;
-    let payload = RegisterAbiPayload {
-        entries: entries_by_hash
-            .into_values()
-            .map(|abi| RegisterAbiEntry { abi })
-            .collect(),
-    };
-
-    let client = crate::http::blocking_client_builder()
-        .connect_timeout(Duration::from_secs(2))
-        .timeout(Duration::from_secs(5))
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let request = client.post(&url).json(&payload);
-    let response = with_localnet_auth(request)
-        .send()
-        .with_context(|| format!("Failed to POST compiler ABI registry to {url}"))?;
-    let status = response.status();
-    let body = response.text().unwrap_or_default();
-
-    anyhow::ensure!(
-        status.is_success(),
-        "Localnet compiler ABI registration failed with status {status}: {body}"
-    );
-
-    let response_json: serde_json::Value = serde_json::from_str(&body).with_context(|| {
-        format!("Localnet compiler ABI registration returned invalid JSON: {body}")
-    })?;
-    anyhow::ensure!(
-        response_json.get("ok").and_then(serde_json::Value::as_bool) == Some(true),
-        "Localnet compiler ABI registration failed: {}",
-        response_json
-            .get("error")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(body.as_str())
-    );
-
-    Ok(())
-}
-
-fn with_localnet_auth(
-    request: reqwest::blocking::RequestBuilder,
-) -> reqwest::blocking::RequestBuilder {
-    match crate::commands::localnet::resolve_localnet_auth_token(None) {
-        Some(token) => request.bearer_auth(token),
-        None => request,
-    }
-}
-
-fn localnet_acton_url(
-    custom_networks: &HashMap<String, acton_config::config::CustomNetworkUrls>,
-    endpoint: &str,
-) -> anyhow::Result<String> {
-    let v2_url = Network::Localnet.toncenter_v2_url(custom_networks)?;
-    let mut url = reqwest::Url::parse(&v2_url)?;
-    let base_path = url.path().trim_end_matches('/');
-    let acton_base = base_path.strip_suffix("/api/v2").unwrap_or(base_path);
-    let acton_path = if acton_base.is_empty() {
-        format!("/{endpoint}")
-    } else {
-        format!("{acton_base}/{endpoint}")
-    };
-
-    url.set_path(&acton_path);
-    url.set_query(None);
-    url.set_fragment(None);
-    Ok(url.to_string())
 }
 
 fn configured_network_transaction_link(
