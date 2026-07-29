@@ -1,3 +1,5 @@
+import {Buffer} from "node:buffer"
+
 import {Address} from "@ton/core"
 import {toUnicode} from "punycode/"
 

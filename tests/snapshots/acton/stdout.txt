@@ -5,7 +5,6 @@ Usage: acton[EXE] <command> [...flags] [...args]
 Commands:
   new              [PATH]              Create a new project from a template
   init                                 Add Acton support to current directory
-  studio           <COMMAND>           Manage Acton Studio
 
   test             [PATH]              Run tests from files or directories
   build            [CONTRACT_NAME]     Build one contract or every contract

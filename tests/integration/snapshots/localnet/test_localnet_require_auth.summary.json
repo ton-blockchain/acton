@@ -14,9 +14,9 @@
   },
   "ui": {
     "has_bootstrap_token": false,
-    "html_shell": true,
+    "html_shell": false,
     "leaks_token": false,
-    "status": 200
+    "status": 404
   },
   "unauthorized": {
     "control": {

@@ -1,3 +1,4 @@
+import {Buffer} from "node:buffer"
 import {useMemo, useState} from "react"
 import type {FC, JSX} from "react"
 import {ParsedValueView, RawDataBlock} from "@acton/ui"

@@ -1,4 +1,5 @@
 import {Address, Cell, Dictionary, ExternalAddress} from "@ton/core"
+import {Buffer} from "buffer"
 
 import type {SerializableObject, SerializableValue} from "./model"
 
