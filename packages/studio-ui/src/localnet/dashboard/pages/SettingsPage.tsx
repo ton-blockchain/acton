@@ -267,7 +267,9 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             value={
               environment?.config.kind === "fullTonNetwork"
                 ? "Full TON network"
-                : "Fast local network"
+                : environment?.config.kind === "remoteTonNetwork"
+                  ? "Remote TON network"
+                  : "Fast local network"
             }
           />
 

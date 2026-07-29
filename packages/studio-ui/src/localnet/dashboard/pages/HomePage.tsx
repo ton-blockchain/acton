@@ -104,6 +104,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
   const fullNetworkConfig =
     environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
+  const remoteNetworkConfig =
+    environment?.config.kind === "remoteTonNetwork" ? environment.config : undefined
   const hasControlApi = supports(environment, "controlApi")
   const hasNetworkNodeInfo = !hasControlApi && supports(environment, "apiV3")
   const hasIntegration = supports(environment, "integration")
@@ -134,6 +136,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const forkBlockNumber =
     nodeInfo === undefined ? localnetConfig?.forkBlockNumber : nodeInfo.fork_block_number
   const hasFork = Boolean(forkNetwork?.trim())
+  const showUptime = hasControlApi && !fullNetworkConfig
+  const nodeInfoColumnCount = hasFork ? 6 : remoteNetworkConfig ? 3 : 4
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
   const networkSummary = hasControlApi
     ? forkSummary
@@ -453,11 +457,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                       )}
                       {fullNetworkConfig ? (
                         <DataTableHeaderCell columnWidth="20%">Validators</DataTableHeaderCell>
-                      ) : (
+                      ) : showUptime ? (
                         <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
                           Uptime
                         </DataTableHeaderCell>
-                      )}
+                      ) : undefined}
                       <DataTableHeaderCell align="right">
                         {fullNetworkConfig ? "Latest block time" : "Node time"}
                       </DataTableHeaderCell>
@@ -483,7 +487,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </DataTableCell>
                         <DataTableCell>
                           <span className={styles.nodeInfoStateSource}>
-                            {fullNetworkConfig ? (
+                            {remoteNetworkConfig ? (
+                              <>
+                                <Network size={15} aria-hidden="true" />
+                                <span>{environment?.network.label ?? "Remote network"}</span>
+                              </>
+                            ) : fullNetworkConfig ? (
                               <>
                                 <Network size={15} aria-hidden="true" />
                                 <span>Validator network</span>
@@ -525,14 +534,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         )}
                         {fullNetworkConfig ? (
                           <DataTableCell>{fullNetworkConfig.validators}</DataTableCell>
-                        ) : (
+                        ) : showUptime ? (
                           <DataTableCell
                             data-visual-dynamic="time"
                             data-visual-placeholder="<uptime>"
                           >
                             {nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : "—"}
                           </DataTableCell>
-                        )}
+                        ) : undefined}
                         <DataTableCell align="right" title={nodeTimeTitle}>
                           <span
                             className={styles.nodeInfoTime}
@@ -551,14 +560,18 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         alignments={
                           hasFork
                             ? ["left", "left", "left", "left", "left", "right"]
-                            : ["left", "left", "left", "right"]
+                            : remoteNetworkConfig
+                              ? ["left", "left", "right"]
+                              : ["left", "left", "left", "right"]
                         }
-                        columns={hasFork ? 6 : 4}
+                        columns={nodeInfoColumnCount}
                         rows={1}
                         widths={
                           hasFork
                             ? ["3rem", "5rem", "5rem", "3rem", "4rem", "8rem"]
-                            : ["3rem", "5rem", "4rem", "8rem"]
+                            : remoteNetworkConfig
+                              ? ["3rem", "5rem", "8rem"]
+                              : ["3rem", "5rem", "4rem", "8rem"]
                         }
                       />
                     )}

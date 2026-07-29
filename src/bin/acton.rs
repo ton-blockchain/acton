@@ -49,7 +49,7 @@ use clap_complete::engine::{
     ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
 };
 use commands::common::error_fmt;
-use dotenvy::dotenv;
+use dotenvy::{dotenv, from_path};
 use human_panic::{Metadata, setup_panic};
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
@@ -2131,6 +2131,28 @@ fn configure_project_roots(
     Ok(())
 }
 
+fn load_project_dotenv() {
+    let project_dotenv = configured_project_root().join(".env");
+    if configured_manifest_path().is_file() && project_dotenv.is_file() {
+        from_path(project_dotenv).ok();
+    } else {
+        dotenv().ok();
+    }
+}
+
+fn configure_studio_testnet_routing(command: &Commands) {
+    if matches!(command, Commands::Studio { .. }) || !configured_manifest_path().is_file() {
+        return;
+    }
+    let Ok(config) = ActonConfig::load_manifest() else {
+        return;
+    };
+    let _ = acton::studio_discovery::activate_studio_testnet_gateway(
+        configured_project_root(),
+        &config.package.name,
+    );
+}
+
 fn main() {
     CompleteEnv::with_factory(completion_command).complete();
 
@@ -2146,7 +2168,6 @@ fn main() {
         err
     }).ok();
 
-    dotenv().ok();
     let Cli {
         color,
         manifest_path,
@@ -2158,18 +2179,22 @@ fn main() {
     };
     init_color_mode(color);
 
-    if command_configures_project_roots(&command) {
-        if let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone()) {
-            eprintln!("{} {}", "Error:".red(), err);
-            process::exit(1);
-        }
+    let rpc_project_override = matches!(command, Commands::Rpc { .. })
+        && (manifest_path.is_some() || project_root.is_some());
+    let configure_roots = command_configures_project_roots(&command) || rpc_project_override;
+    if configure_roots && let Err(err) = configure_project_roots(manifest_path, project_root) {
+        eprintln!("{} {}", "Error:".red(), err);
+        process::exit(1);
+    }
 
-        if command_checks_toolchain_version(&command)
-            && let Err(err) = validate_project_toolchain_version()
-        {
-            print_error(&err);
-            process::exit(1);
-        }
+    load_project_dotenv();
+
+    if configure_roots
+        && (command_checks_toolchain_version(&command) || rpc_project_override)
+        && let Err(err) = validate_project_toolchain_version()
+    {
+        print_error(&err);
+        process::exit(1);
     }
 
     if !matches!(
@@ -2181,6 +2206,8 @@ fn main() {
         // we need some better way
     }
 
+    configure_studio_testnet_routing(&command);
+
     let result = match command {
         Commands::Init {
             create_dapp,
@@ -2188,16 +2215,7 @@ fn main() {
         } => init_cmd(create_dapp.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
-        Commands::Rpc { command } => {
-            if manifest_path.is_some() || project_root.is_some() {
-                match configure_project_roots(manifest_path, project_root) {
-                    Ok(()) => validate_project_toolchain_version().and_then(|()| rpc_cmd(command)),
-                    Err(err) => Err(err),
-                }
-            } else {
-                rpc_cmd(command)
-            }
-        }
+        Commands::Rpc { command } => rpc_cmd(command),
         Commands::New {
             path,
             name,

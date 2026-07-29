@@ -63,18 +63,20 @@ export const EnvironmentNavigationActions: FC<EnvironmentNavigationActionsProps>
         </Tooltip>
       ) : undefined}
 
-      <Tooltip content="Environment settings">
-        <button
-          type="button"
-          className={`${styles.sidebarUtilityButton} ${
-            localPathname === "/settings" ? styles.sidebarUtilityButtonActive : ""
-          }`}
-          onClick={() => void navigate(routes.path("/settings"))}
-          aria-label="Environment settings"
-        >
-          <Settings size={18} />
-        </button>
-      </Tooltip>
+      {environment?.lifecycle === "managed" ? (
+        <Tooltip content="Environment settings">
+          <button
+            type="button"
+            className={`${styles.sidebarUtilityButton} ${
+              localPathname === "/settings" ? styles.sidebarUtilityButtonActive : ""
+            }`}
+            onClick={() => void navigate(routes.path("/settings"))}
+            aria-label="Environment settings"
+          >
+            <Settings size={18} />
+          </button>
+        </Tooltip>
+      ) : undefined}
     </>
   )
 }

@@ -8,14 +8,16 @@ import styles from "./EnvironmentConnectPanel.module.css"
 type IntegrationTarget = "acton" | "ton-client" | "rpc"
 
 interface EnvironmentConnectPanelProps {
+  readonly actonNetworkName: string
   readonly apiV2Url?: string
   readonly apiV3Url?: string
+  readonly configureActonNetwork: boolean
   readonly controlUrl?: string
   readonly environmentName: string
   readonly explorerUrl?: string
   readonly integratePath: string
   readonly onDismiss?: () => void
-  readonly settingsPath: string
+  readonly settingsPath?: string
 }
 
 const integrationOptions = [
@@ -45,8 +47,10 @@ const integrationOptions = [
 }[]
 
 export function EnvironmentConnectPanel({
+  actonNetworkName,
   apiV2Url,
   apiV3Url,
+  configureActonNetwork,
   controlUrl,
   environmentName,
   explorerUrl,
@@ -88,25 +92,28 @@ export function EnvironmentConnectPanel({
     }
   }, [availableOptions, target])
 
-  const actonConfig = [
-    "[networks.localnet]",
-    urls.apiV2 ? `api.v2 = "${urls.apiV2}"` : undefined,
-    urls.apiV3 ? `api.v3 = "${urls.apiV3}"` : undefined,
-    urls.explorer ? `explorer = "${urls.explorer}"` : undefined,
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join("\n")
+  const actonConfig = configureActonNetwork
+    ? [
+        `[networks.${actonNetworkName}]`,
+        urls.apiV2 ? `api.v2 = "${urls.apiV2}"` : undefined,
+        urls.apiV3 ? `api.v3 = "${urls.apiV3}"` : undefined,
+        urls.explorer ? `explorer = "${urls.explorer}"` : undefined,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join("\n")
+    : undefined
   const tonClientSetup = `import { TonClient } from "@ton/ton"
 
 const client = new TonClient({
   endpoint: "${withoutTrailingSlash(urls.apiV2 ?? "")}/jsonRPC",
 })`
-  const actonRunCommand = "acton script --net localnet scripts/deploy.tolk"
+  const actonRunCommand = `acton script --net ${actonNetworkName} scripts/deploy.tolk`
   const tonClientRequest = `const masterchain = await client.getMasterchainInfo()
 console.log(masterchain)`
   const integrationPrompt = integrationPromptFor({
     actonConfig,
     actonRunCommand,
+    actonNetworkName,
     environmentName,
     target,
     tonClientSetup,
@@ -124,10 +131,12 @@ console.log(masterchain)`
       <header className={styles.header}>
         <h2 id="connect-environment-title">Connect environment</h2>
         <div className={styles.headerActions}>
-          <Link className={styles.configureLink} to={settingsPath}>
-            <Settings size={15} aria-hidden="true" />
-            Configure
-          </Link>
+          {settingsPath ? (
+            <Link className={styles.configureLink} to={settingsPath}>
+              <Settings size={15} aria-hidden="true" />
+              Configure
+            </Link>
+          ) : undefined}
           <CopyInlineButton
             className={styles.promptButton}
             value={integrationPrompt}
@@ -170,6 +179,10 @@ console.log(masterchain)`
               {availableOptions.map(option => {
                 const Icon = option.icon
                 const selected = target === option.id
+                const description =
+                  option.id === "acton" && !configureActonNetwork
+                    ? `Use Acton's built-in ${actonNetworkName} network`
+                    : option.description
 
                 return (
                   <button
@@ -183,7 +196,7 @@ console.log(masterchain)`
                     <Icon size={17} aria-hidden="true" />
                     <span>
                       <strong>{option.label}</strong>
-                      <small>{option.description}</small>
+                      <small>{description}</small>
                     </span>
                   </button>
                 )
@@ -196,12 +209,26 @@ console.log(masterchain)`
           <span className={styles.stepNumber}>2</span>
           <div className={styles.stepContent}>
             <div className={styles.outputHeader}>
-              <h3>{target === "rpc" ? "Use an endpoint" : "Add this setup"}</h3>
+              <div>
+                <h3>
+                  {target === "rpc"
+                    ? "Use an endpoint"
+                    : target === "acton" && !actonConfig
+                      ? "Run a script on this network"
+                      : "Add this setup"}
+                </h3>
+                {target === "acton" && !actonConfig ? (
+                  <p className={styles.stepDescription}>
+                    Studio routes Acton&apos;s built-in {actonNetworkName} network while it is
+                    running
+                  </p>
+                ) : undefined}
+              </div>
               {target === "acton" ? (
                 <CopyInlineButton
-                  value={actonConfig}
-                  label="Copy Acton configuration"
-                  copiedLabel="Acton configuration copied"
+                  value={actonConfig ?? actonRunCommand}
+                  label={actonConfig ? "Copy Acton configuration" : "Copy Acton command"}
+                  copiedLabel={actonConfig ? "Acton configuration copied" : "Acton command copied"}
                 >
                   Copy
                 </CopyInlineButton>
@@ -222,18 +249,25 @@ console.log(masterchain)`
                   <EndpointRow key={endpoint.label} {...endpoint} />
                 ))}
               </div>
+            ) : target === "acton" && !actonConfig ? (
+              <HighlightedCode
+                className={styles.codeBlock}
+                language="shellscript"
+                value={actonRunCommand}
+                ariaLabel="Acton script command"
+              />
             ) : (
               <HighlightedCode
                 className={styles.codeBlock}
                 language={target === "acton" ? "toml" : "javascript"}
-                value={target === "acton" ? actonConfig : tonClientSetup}
+                value={target === "acton" ? (actonConfig ?? "") : tonClientSetup}
                 ariaLabel={target === "acton" ? "Acton TOML configuration" : "JavaScript setup"}
               />
             )}
           </div>
         </div>
 
-        {target === "acton" ? (
+        {target === "acton" && actonConfig ? (
           <div className={styles.step}>
             <span className={styles.stepNumber}>3</span>
             <div className={styles.stepContent}>
@@ -326,14 +360,16 @@ function EndpointRow({label, value}: {readonly label: string; readonly value: st
 function integrationPromptFor({
   actonConfig,
   actonRunCommand,
+  actonNetworkName,
   environmentName,
   target,
   tonClientSetup,
   tonClientRequest,
   urls,
 }: {
-  readonly actonConfig: string
+  readonly actonConfig?: string
   readonly actonRunCommand: string
+  readonly actonNetworkName: string
   readonly environmentName: string
   readonly target: IntegrationTarget
   readonly tonClientSetup: string
@@ -346,7 +382,13 @@ function integrationPromptFor({
   }
 }): string {
   if (target === "acton") {
-    return `Connect the Acton project to the "${environmentName}" virtual environment by adding this configuration to Acton.toml:
+    if (!actonConfig) {
+      return `Run an Acton script on "${environmentName}". Studio routes the built-in ${actonNetworkName} network while it is running:
+
+${actonRunCommand}`
+    }
+
+    return `Connect the Acton project to "${environmentName}" by adding this configuration to Acton.toml:
 
 ${actonConfig}
 
@@ -356,7 +398,7 @@ ${actonRunCommand}`
   }
 
   if (target === "ton-client") {
-    return `Connect the JavaScript application to the "${environmentName}" virtual environment with @ton/ton:
+    return `Connect the JavaScript application to "${environmentName}" with @ton/ton:
 
 ${tonClientSetup}
 
@@ -372,7 +414,7 @@ ${tonClientRequest}`
     urls.explorer ? `Explorer: ${urls.explorer}` : undefined,
   ].filter((line): line is string => Boolean(line))
 
-  return `Connect the TON application to the "${environmentName}" Acton virtual environment.
+  return `Connect the TON application to "${environmentName}" through Acton Studio.
 
 ${endpointLines.join("\n")}`
 }

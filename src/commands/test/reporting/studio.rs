@@ -5,11 +5,10 @@ use std::time::Duration;
 
 use acton_config::test::TestConfig;
 use acton_studio::{
-    STUDIO_API_VERSION, STUDIO_TEST_RUN_FORMAT_VERSION, STUDIO_TEST_RUNS_PATH, StudioTestDuration,
+    STUDIO_TEST_RUN_FORMAT_VERSION, STUDIO_TEST_RUNS_PATH, StudioTestDuration,
     StudioTestExecutionLogs, StudioTestReport, TestDescriptorSummary, TestIdentity, TestRunEvent,
     TestRunEventEnvelope, TestRunRecord, TestRunSource, TestRunStats, TestRunStatus,
-    is_valid_test_run_id, load_studio_daemon_descriptor, new_test_run_id, persist_test_run,
-    test_trace_dir,
+    is_valid_test_run_id, new_test_run_id, persist_test_run, test_trace_dir,
 };
 use chrono::Utc;
 use crossbeam_channel::{Sender, TrySendError};
@@ -294,19 +293,7 @@ impl Drop for StudioReporter {
 }
 
 fn studio_url(project_root: &Path) -> Option<String> {
-    if let Some(url) = std::env::var("ACTON_STUDIO_URL")
-        .ok()
-        .map(|value| value.trim().trim_end_matches('/').to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        return Some(url);
-    }
-
-    let descriptor = load_studio_daemon_descriptor(project_root).ok()??;
-    if descriptor.protocol_version != STUDIO_API_VERSION {
-        return None;
-    }
-    Some(descriptor.url.trim_end_matches('/').to_owned())
+    crate::studio_discovery::configured_studio_url(project_root)
 }
 
 fn start_event_worker(

@@ -11,8 +11,10 @@ use tokio::sync::Mutex;
 use ton::ton_core::cell::TonHash;
 use uuid::Uuid;
 
-const CONTRACT_REGISTRY_FORMAT_VERSION: u32 = 1;
+const CONTRACT_REGISTRY_FORMAT_VERSION: u32 = 2;
 const CONTRACT_REGISTRY_FILE_NAME: &str = "registry.json";
+const MAX_DEPLOYMENT_CANDIDATES: usize = 128;
+const DEPLOYMENT_CANDIDATE_TTL_MS: u64 = 24 * 60 * 60 * 1_000;
 
 #[derive(Clone)]
 pub struct ContractRegistryStore {
@@ -29,9 +31,16 @@ struct ContractRegistryStoreInner {
 struct ContractRegistry {
     format_version: u32,
     contracts: BTreeMap<String, RegisteredContract>,
+    deployment_candidates: BTreeMap<String, DeploymentCandidate>,
     address_names: BTreeMap<String, String>,
     compiler_abis: BTreeMap<String, SavedCompilerAbi>,
     verified_sources: BTreeMap<String, SavedVerifiedSource>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ContractRegistryFormat {
+    format_version: u32,
 }
 
 impl Default for ContractRegistry {
@@ -39,6 +48,7 @@ impl Default for ContractRegistry {
         Self {
             format_version: CONTRACT_REGISTRY_FORMAT_VERSION,
             contracts: BTreeMap::new(),
+            deployment_candidates: BTreeMap::new(),
             address_names: BTreeMap::new(),
             compiler_abis: BTreeMap::new(),
             verified_sources: BTreeMap::new(),
@@ -50,6 +60,21 @@ impl Default for ContractRegistry {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RegisteredContract {
     pub(crate) address: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct DeploymentCandidate {
+    pub(crate) address: String,
+    pub(crate) code_hash: String,
+    pub(crate) observed_at: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DeploymentCandidateRegistration {
+    pub(crate) canonical_address: String,
+    pub(crate) display_address: String,
+    pub(crate) code_hash: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -74,6 +99,12 @@ pub(crate) struct SavedVerifiedSource {
 pub(crate) struct RegisterContractRequest {
     pub(crate) address: String,
     pub(crate) name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeleteContractRequest {
+    pub(crate) address: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -166,6 +197,8 @@ pub(crate) struct ContractListEntry {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RegistrySnapshot {
     pub(crate) contracts: BTreeMap<String, RegisteredContract>,
+    #[serde(skip)]
+    pub(crate) deployment_candidates: BTreeMap<String, DeploymentCandidate>,
     pub(crate) address_names: BTreeMap<String, String>,
     pub(crate) compiler_abis: BTreeMap<String, SavedCompilerAbi>,
     pub(crate) verified_sources: BTreeMap<String, SavedVerifiedSource>,
@@ -263,8 +296,12 @@ impl ContractRegistryStore {
     ) -> Result<RegistrySnapshot, ContractRegistryError> {
         let mut registries = self.inner.registries.lock().await;
         let registry = self.load_locked(&mut registries, environment_id)?;
+        if prune_deployment_candidates(registry, unix_timestamp()) {
+            self.persist(environment_id, registry)?;
+        }
         let snapshot = RegistrySnapshot {
             contracts: registry.contracts.clone(),
+            deployment_candidates: registry.deployment_candidates.clone(),
             address_names: registry.address_names.clone(),
             compiler_abis: registry.compiler_abis.clone(),
             verified_sources: registry.verified_sources.clone(),
@@ -288,6 +325,7 @@ impl ContractRegistryStore {
             registry
                 .contracts
                 .insert(canonical_address.clone(), registered.clone());
+            registry.deployment_candidates.remove(&canonical_address);
             if let Some(name) = name {
                 registry.address_names.insert(canonical_address, name);
             }
@@ -296,29 +334,44 @@ impl ContractRegistryStore {
         Ok(registered)
     }
 
-    pub(crate) async fn observe_contracts(
+    pub(crate) async fn record_deployment_candidates(
         &self,
         environment_id: &str,
-        contracts: BTreeMap<String, String>,
+        candidates: Vec<DeploymentCandidateRegistration>,
     ) -> Result<usize, ContractRegistryError> {
-        if contracts.is_empty() {
+        if candidates.is_empty() {
             return Ok(0);
         }
 
         let mut registries = self.inner.registries.lock().await;
         let mut registry = self.load_locked(&mut registries, environment_id)?.clone();
         let mut inserted = 0;
-        for (canonical_address, display_address) in contracts {
-            if let std::collections::btree_map::Entry::Vacant(entry) =
-                registry.contracts.entry(canonical_address)
+        let observed_at = unix_timestamp();
+        let mut changed = prune_deployment_candidates(&mut registry, observed_at);
+        for candidate in candidates {
+            if registry
+                .contracts
+                .contains_key(&candidate.canonical_address)
             {
-                entry.insert(RegisteredContract {
-                    address: display_address,
-                });
+                continue;
+            }
+            let saved = DeploymentCandidate {
+                address: candidate.display_address,
+                code_hash: normalize_code_hash(&candidate.code_hash),
+                observed_at,
+            };
+            if registry
+                .deployment_candidates
+                .insert(candidate.canonical_address, saved.clone())
+                .as_ref()
+                != Some(&saved)
+            {
                 inserted += 1;
+                changed = true;
             }
         }
-        if inserted == 0 {
+        changed |= prune_deployment_candidates(&mut registry, observed_at);
+        if !changed {
             return Ok(0);
         }
 
@@ -326,6 +379,44 @@ impl ContractRegistryStore {
         registries.insert(environment_id.to_owned(), registry);
         drop(registries);
         Ok(inserted)
+    }
+
+    pub(crate) async fn delete_contract(
+        &self,
+        environment_id: &str,
+        canonical_address: &str,
+    ) -> Result<(), ContractRegistryError> {
+        self.mutate(environment_id, |registry| {
+            registry.contracts.remove(canonical_address);
+            registry.deployment_candidates.remove(canonical_address);
+            registry.address_names.remove(canonical_address);
+        })
+        .await
+    }
+
+    pub(crate) async fn confirm_deployment_candidates(
+        &self,
+        environment_id: &str,
+        canonical_addresses: &[String],
+    ) -> Result<(), ContractRegistryError> {
+        if canonical_addresses.is_empty() {
+            return Ok(());
+        }
+        self.mutate(environment_id, |registry| {
+            for canonical_address in canonical_addresses {
+                let Some(candidate) = registry.deployment_candidates.remove(canonical_address)
+                else {
+                    continue;
+                };
+                registry
+                    .contracts
+                    .entry(canonical_address.clone())
+                    .or_insert(RegisteredContract {
+                        address: candidate.address,
+                    });
+            }
+        })
+        .await
     }
 
     pub(crate) async fn set_address_name(
@@ -527,18 +618,32 @@ impl ContractRegistryStore {
             path: path.clone(),
             source,
         })?;
-        let registry: ContractRegistry = serde_json::from_slice(&bytes).map_err(|source| {
+        let format: ContractRegistryFormat = serde_json::from_slice(&bytes).map_err(|source| {
             ContractRegistryError::InvalidJson {
                 path: path.clone(),
                 source,
             }
         })?;
-        if registry.format_version != CONTRACT_REGISTRY_FORMAT_VERSION {
+        if format.format_version == 1 {
+            let reset = ContractRegistry::default();
+            self.persist(environment_id, &reset)?;
+            return Ok(reset);
+        }
+        if format.format_version != CONTRACT_REGISTRY_FORMAT_VERSION {
             return Err(ContractRegistryError::UnsupportedFormat {
                 path,
                 expected: CONTRACT_REGISTRY_FORMAT_VERSION,
-                actual: registry.format_version,
+                actual: format.format_version,
             });
+        }
+        let mut registry: ContractRegistry = serde_json::from_slice(&bytes).map_err(|source| {
+            ContractRegistryError::InvalidJson {
+                path: path.clone(),
+                source,
+            }
+        })?;
+        if prune_deployment_candidates(&mut registry, unix_timestamp()) {
+            self.persist(environment_id, &registry)?;
         }
         Ok(registry)
     }
@@ -612,6 +717,30 @@ fn non_empty_text(value: Option<String>) -> Option<String> {
         let value = value.trim();
         (!value.is_empty()).then(|| value.to_owned())
     })
+}
+
+fn prune_deployment_candidates(registry: &mut ContractRegistry, now: u64) -> bool {
+    let original_len = registry.deployment_candidates.len();
+    registry.deployment_candidates.retain(|_, candidate| {
+        now.saturating_sub(candidate.observed_at) <= DEPLOYMENT_CANDIDATE_TTL_MS
+    });
+
+    if registry.deployment_candidates.len() > MAX_DEPLOYMENT_CANDIDATES {
+        let mut oldest = registry
+            .deployment_candidates
+            .iter()
+            .map(|(address, candidate)| (candidate.observed_at, address.clone()))
+            .collect::<Vec<_>>();
+        oldest.sort_unstable();
+        for (_, address) in oldest
+            .into_iter()
+            .take(registry.deployment_candidates.len() - MAX_DEPLOYMENT_CANDIDATES)
+        {
+            registry.deployment_candidates.remove(&address);
+        }
+    }
+
+    registry.deployment_candidates.len() != original_len
 }
 
 fn normalize_code_hash(value: &str) -> String {
@@ -707,15 +836,14 @@ fn unix_timestamp() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use expect_test::expect;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use tempfile::tempdir;
 
     use super::{
         CompilerAbiRegistration, ContractRegistryError, ContractRegistryStore,
-        VerifiedSourceRegistration,
+        DeploymentCandidateRegistration, MAX_DEPLOYMENT_CANDIDATES, VerifiedSourceRegistration,
+        unix_timestamp,
     };
 
     #[tokio::test]
@@ -834,6 +962,255 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legacy_registry_is_reset_instead_of_loading_polluted_contracts() {
+        let project = tempdir().expect("temporary project");
+        let environment_dir = project.path().join(".studio/environments/testnet");
+        std::fs::create_dir_all(&environment_dir).expect("registry directory");
+        let registry_path = environment_dir.join("registry.json");
+        std::fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&json!({
+                "formatVersion": 1,
+                "contracts": {
+                    "0:random": {"address": "EQRandom"}
+                },
+                "addressNames": {},
+                "compilerAbis": {},
+                "verifiedSources": {}
+            }))
+            .expect("legacy registry JSON"),
+        )
+        .expect("legacy registry");
+
+        let snapshot = ContractRegistryStore::for_project(project.path())
+            .snapshot("testnet")
+            .await
+            .expect("reset registry");
+        assert!(snapshot.contracts.is_empty());
+        let persisted: Value = serde_json::from_slice(
+            &std::fs::read(registry_path).expect("reset registry must be persisted"),
+        )
+        .expect("reset registry JSON");
+
+        expect![[r#"
+            {
+              "addressNames": {},
+              "compilerAbis": {},
+              "contracts": {},
+              "deploymentCandidates": {},
+              "formatVersion": 2,
+              "verifiedSources": {}
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&persisted).expect("registry JSON must serialize"),
+        );
+    }
+
+    #[tokio::test]
+    async fn future_registry_is_rejected_without_overwriting_it() {
+        let project = tempdir().expect("temporary project");
+        let environment_dir = project.path().join(".studio/environments/testnet");
+        std::fs::create_dir_all(&environment_dir).expect("registry directory");
+        let registry_path = environment_dir.join("registry.json");
+        let original = serde_json::to_vec_pretty(&json!({
+            "formatVersion": 99,
+            "futureField": "must survive",
+        }))
+        .expect("future registry JSON");
+        std::fs::write(&registry_path, &original).expect("future registry");
+
+        let error = ContractRegistryStore::for_project(project.path())
+            .snapshot("testnet")
+            .await
+            .expect_err("future registry must be rejected");
+        let error = match error {
+            ContractRegistryError::UnsupportedFormat {
+                expected, actual, ..
+            } => format!("unsupported format: expected {expected}, actual {actual}"),
+            error => format!("unexpected error: {error}"),
+        };
+        let current = std::fs::read(&registry_path).expect("future registry must remain readable");
+        let files = std::fs::read_dir(environment_dir)
+            .expect("registry directory")
+            .map(|entry| {
+                entry
+                    .expect("registry entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+
+        expect![[r#"
+            {
+              "error": "unsupported format: expected 2, actual 99",
+              "files": [
+                "registry.json"
+              ],
+              "unchanged": true
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&json!({
+                "error": error,
+                "unchanged": current == original,
+                "files": files,
+            }))
+            .expect("summary JSON"),
+        );
+    }
+
+    #[tokio::test]
+    async fn pending_deployments_are_bounded_and_expire() {
+        let project = tempdir().expect("temporary project");
+        let environment_dir = project.path().join(".studio/environments/testnet");
+        std::fs::create_dir_all(&environment_dir).expect("registry directory");
+        let registry_path = environment_dir.join("registry.json");
+        let observed_at = unix_timestamp();
+        let mut candidates = serde_json::Map::new();
+        candidates.insert(
+            "stale".to_owned(),
+            json!({
+                "address": "EQStale",
+                "codeHash": "00",
+                "observedAt": 0,
+            }),
+        );
+        for index in 0..(MAX_DEPLOYMENT_CANDIDATES + 2) {
+            candidates.insert(
+                format!("candidate-{index:03}"),
+                json!({
+                    "address": format!("EQ{index:03}"),
+                    "codeHash": format!("{index:02x}"),
+                    "observedAt": observed_at,
+                }),
+            );
+        }
+        std::fs::write(
+            &registry_path,
+            serde_json::to_vec_pretty(&json!({
+                "formatVersion": 2,
+                "contracts": {},
+                "deploymentCandidates": candidates,
+                "addressNames": {},
+                "compilerAbis": {},
+                "verifiedSources": {},
+            }))
+            .expect("registry JSON"),
+        )
+        .expect("registry");
+
+        let snapshot = ContractRegistryStore::for_project(project.path())
+            .snapshot("testnet")
+            .await
+            .expect("bounded registry");
+        let persisted: Value =
+            serde_json::from_slice(&std::fs::read(registry_path).expect("persisted registry"))
+                .expect("persisted registry JSON");
+        let keys = snapshot
+            .deployment_candidates
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        expect![[r#"
+            {
+              "containsStale": false,
+              "first": "candidate-002",
+              "last": "candidate-129",
+              "persistedCount": 128,
+              "snapshotCount": 128
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&json!({
+                "snapshotCount": snapshot.deployment_candidates.len(),
+                "persistedCount": persisted["deploymentCandidates"]
+                    .as_object()
+                    .expect("persisted candidates")
+                    .len(),
+                "containsStale": snapshot.deployment_candidates.contains_key("stale"),
+                "first": keys.first(),
+                "last": keys.last(),
+            }))
+            .expect("summary JSON"),
+        );
+    }
+
+    #[tokio::test]
+    async fn deleting_contract_records_preserves_project_artifacts() {
+        let store = ContractRegistryStore::ephemeral();
+        store
+            .register_verified_sources(
+                "testnet",
+                &[VerifiedSourceRegistration {
+                    code_hash: "AA".to_owned(),
+                    source: json!({
+                        "bundle": {
+                            "source_bundle_hash": "counter-source",
+                            "compiler_abi": {
+                                "contract_name": "Counter"
+                            }
+                        }
+                    }),
+                }],
+            )
+            .await
+            .expect("source registration");
+        store
+            .register_contract(
+                "testnet",
+                "0:registered".to_owned(),
+                "EQRegistered".to_owned(),
+                Some("Registered".to_owned()),
+            )
+            .await
+            .expect("contract registration");
+        store
+            .record_deployment_candidates(
+                "testnet",
+                vec![DeploymentCandidateRegistration {
+                    canonical_address: "0:pending".to_owned(),
+                    display_address: "EQPending".to_owned(),
+                    code_hash: "AA".to_owned(),
+                }],
+            )
+            .await
+            .expect("pending deployment");
+        store
+            .set_address_name("testnet", "0:pending".to_owned(), "Pending".to_owned())
+            .await
+            .expect("pending name");
+
+        store
+            .delete_contract("testnet", "0:registered")
+            .await
+            .expect("delete registered contract");
+        store
+            .delete_contract("testnet", "0:pending")
+            .await
+            .expect("delete pending contract");
+
+        let snapshot = store.snapshot("testnet").await.expect("registry snapshot");
+        expect![[r#"
+            {
+              "addressNames": 0,
+              "compilerAbis": 1,
+              "contracts": 0,
+              "pendingDeployments": 0,
+              "verifiedSources": 1
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&json!({
+                "contracts": snapshot.contracts.len(),
+                "pendingDeployments": snapshot.deployment_candidates.len(),
+                "addressNames": snapshot.address_names.len(),
+                "compilerAbis": snapshot.compiler_abis.len(),
+                "verifiedSources": snapshot.verified_sources.len(),
+            }))
+            .expect("summary JSON"),
+        );
+    }
+
+    #[tokio::test]
     async fn clones_share_mutations_without_lost_updates() {
         let store = ContractRegistryStore::ephemeral();
         let first = store.clone();
@@ -884,7 +1261,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn observed_contracts_are_inserted_once_without_replacing_metadata() {
+    async fn deployment_candidates_are_confirmed_without_replacing_metadata() {
         let store = ContractRegistryStore::ephemeral();
         store
             .register_contract(
@@ -896,17 +1273,30 @@ mod tests {
             .await
             .expect("manual contract registration");
 
-        let inserted = store
-            .observe_contracts(
+        let recorded = store
+            .record_deployment_candidates(
                 "environment-1",
-                BTreeMap::from([
-                    ("0:contract".to_owned(), "kQContract".to_owned()),
-                    ("0:second".to_owned(), "EQSecond".to_owned()),
-                ]),
+                vec![
+                    DeploymentCandidateRegistration {
+                        canonical_address: "0:contract".to_owned(),
+                        display_address: "kQContract".to_owned(),
+                        code_hash: "AA".to_owned(),
+                    },
+                    DeploymentCandidateRegistration {
+                        canonical_address: "0:second".to_owned(),
+                        display_address: "EQSecond".to_owned(),
+                        code_hash: "BB".to_owned(),
+                    },
+                ],
             )
             .await
-            .expect("observed contract registration");
-        assert_eq!(inserted, 1);
+            .expect("deployment candidate registration");
+        assert_eq!(recorded, 1);
+
+        store
+            .confirm_deployment_candidates("environment-1", &["0:second".to_owned()])
+            .await
+            .expect("deployment confirmation");
 
         let snapshot = store
             .snapshot("environment-1")
@@ -915,6 +1305,7 @@ mod tests {
         assert_eq!(snapshot.contracts["0:contract"].address, "EQContract");
         assert_eq!(snapshot.address_name("0:contract"), Some("Counter"));
         assert_eq!(snapshot.contracts["0:second"].address, "EQSecond");
+        assert!(snapshot.deployment_candidates.is_empty());
     }
 
     #[tokio::test]

@@ -14,6 +14,7 @@ export interface StudioInfo {
 export type StudioConnectionState = "connecting" | "connected" | "disconnected"
 
 export type EnvironmentStatus = "starting" | "running" | "stopping" | "stopped" | "failed"
+export type EnvironmentLifecycle = "managed" | "external"
 
 export interface ActonLocalnetEnvironmentConfig {
   readonly kind: "actonLocalnet"
@@ -35,7 +36,15 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly validators: number
 }
 
-export type EnvironmentConfig = ActonLocalnetEnvironmentConfig | FullTonNetworkEnvironmentConfig
+export interface RemoteTonNetworkEnvironmentConfig {
+  readonly kind: "remoteTonNetwork"
+  readonly network: "testnet"
+}
+
+export type EnvironmentConfig =
+  | ActonLocalnetEnvironmentConfig
+  | FullTonNetworkEnvironmentConfig
+  | RemoteTonNetworkEnvironmentConfig
 
 export interface CreateActonLocalnetEnvironmentConfig {
   readonly kind: "actonLocalnet"
@@ -95,6 +104,7 @@ export interface StudioEnvironment {
   readonly id: string
   readonly name: string
   readonly status: EnvironmentStatus
+  readonly lifecycle: EnvironmentLifecycle
   readonly rpcUrl: string
   readonly config: EnvironmentConfig
   readonly capabilities: readonly EnvironmentCapability[]

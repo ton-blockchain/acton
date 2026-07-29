@@ -1008,6 +1008,15 @@ export class TonClient {
     })
   }
 
+  async deleteContract(address: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteContract")
+    await this.request(url, "Failed to remove contract from Studio", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address}),
+    })
+  }
+
   async getApiCalls(limit = 1200): Promise<ApiCallLogResponse> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getApiCalls")
     url.searchParams.append("limit", limit.toString())

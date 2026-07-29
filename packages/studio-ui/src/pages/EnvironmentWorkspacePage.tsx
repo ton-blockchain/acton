@@ -31,24 +31,33 @@ export function EnvironmentWorkspacePage({
   const [isRestarting, setIsRestarting] = useState(false)
   const [restartError, setRestartError] = useState<string>()
   const visibleError = loadError ?? restartError
+  const isManaged = environment?.lifecycle === "managed"
 
   useEffect(() => {
     if (environment?.status === "running") return
 
+    const subject = isManaged ? "virtual environment" : "network"
     const pageDescription = visibleError
-      ? "This virtual environment could not be opened"
+      ? `This ${subject} could not be opened`
       : environment?.status === "stopped"
-        ? "Restart this virtual environment to continue"
+        ? `Restart this ${subject} to continue`
         : environment?.status === "failed"
-          ? "This virtual environment needs attention"
-          : "Preparing this virtual environment"
+          ? `This ${subject} needs attention`
+          : `Preparing this ${subject}`
 
     onShellChange({
       pageDescription,
-      pageTitle: environment?.name ?? "Virtual Environment",
+      pageTitle: environment?.name ?? (isManaged ? "Virtual Environment" : "Network"),
       rpcUrl: environment?.rpcUrl,
     })
-  }, [environment?.name, environment?.rpcUrl, environment?.status, onShellChange, visibleError])
+  }, [
+    environment?.name,
+    environment?.rpcUrl,
+    environment?.status,
+    isManaged,
+    onShellChange,
+    visibleError,
+  ])
 
   const handleRestart = async () => {
     if (!environment) return
@@ -76,7 +85,8 @@ export function EnvironmentWorkspacePage({
     )
   }
 
-  const canRestart = environment?.status === "stopped" || environment?.status === "failed"
+  const canRestart =
+    isManaged && (environment?.status === "stopped" || environment?.status === "failed")
   const isStarting =
     environment?.status === "starting" ||
     environment?.status === "stopping" ||

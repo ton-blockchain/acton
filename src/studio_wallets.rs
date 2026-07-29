@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use acton_config::config::ActonConfig;
 use acton_studio::{
-    StudioEnvironment, StudioWallet, WalletRuntime, WalletRuntimeError, WalletRuntimeFuture,
+    EnvironmentConfig, PublicTonNetwork, StudioEnvironment, StudioWallet, WalletRuntime,
+    WalletRuntimeError, WalletRuntimeFuture,
 };
 use ed25519_dalek::{Signer, SigningKey};
 use ton_retrace::Network;
@@ -45,8 +46,14 @@ impl ProjectWalletRuntime {
 
     const fn wallets_for(&self, environment: &StudioEnvironment) -> &BTreeMap<String, Wallet> {
         match &environment.config {
-            acton_studio::EnvironmentConfig::ActonLocalnet { .. } => &self.localnet_wallets,
-            acton_studio::EnvironmentConfig::FullTonNetwork { .. } => &self.mainnet_wallets,
+            EnvironmentConfig::ActonLocalnet { .. }
+            | EnvironmentConfig::RemoteTonNetwork {
+                network: PublicTonNetwork::Testnet,
+            } => &self.localnet_wallets,
+            EnvironmentConfig::FullTonNetwork { .. }
+            | EnvironmentConfig::RemoteTonNetwork {
+                network: PublicTonNetwork::Mainnet,
+            } => &self.mainnet_wallets,
         }
     }
 }
@@ -103,5 +110,40 @@ impl WalletRuntime for ProjectWalletRuntime {
                     Ok(signing_key.sign(&bytes).to_bytes())
                 });
         Box::pin(async move { result })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use acton_studio::{EnvironmentEndpoints, EnvironmentStatus};
+
+    #[test]
+    fn public_networks_use_wallets_with_their_global_id() {
+        let runtime = ProjectWalletRuntime {
+            localnet_wallets: BTreeMap::new(),
+            mainnet_wallets: BTreeMap::new(),
+        };
+        let testnet = remote_environment(PublicTonNetwork::Testnet);
+        let mainnet = remote_environment(PublicTonNetwork::Mainnet);
+
+        assert!(std::ptr::eq(
+            runtime.wallets_for(&testnet),
+            &runtime.localnet_wallets
+        ));
+        assert!(std::ptr::eq(
+            runtime.wallets_for(&mainnet),
+            &runtime.mainnet_wallets
+        ));
+    }
+
+    fn remote_environment(network: PublicTonNetwork) -> StudioEnvironment {
+        StudioEnvironment::new_external(
+            "network",
+            "Network",
+            EnvironmentStatus::Running,
+            EnvironmentConfig::RemoteTonNetwork { network },
+            EnvironmentEndpoints::default(),
+        )
     }
 }

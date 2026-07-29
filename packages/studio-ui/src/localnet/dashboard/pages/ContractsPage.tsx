@@ -9,9 +9,11 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  Dialog,
   InlineAction,
+  useToast,
 } from "@acton/ui"
-import {Box, ExternalLink, Pencil, Plus, Waypoints} from "lucide-react"
+import {Box, ExternalLink, Pencil, Plus, Trash2, Waypoints} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import {useNavigate} from "react-router"
 
@@ -39,6 +41,7 @@ interface ContractsPageProps {
 }
 
 export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageProps) {
+  const {showToast} = useToast()
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
@@ -49,6 +52,8 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>()
   const [contractBeingRenamed, setContractBeingRenamed] = useState<LocalnetContract>()
+  const [contractBeingDeleted, setContractBeingDeleted] = useState<LocalnetContract>()
+  const [deleting, setDeleting] = useState(false)
   const latestLoadId = useRef(0)
 
   const loadContracts = useCallback(
@@ -113,6 +118,34 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
       address: formatAddress(address, false, addressFormat),
     })
     void navigate(`${routes.emulatePath}?${search}`)
+  }
+
+  const deleteContract = async () => {
+    if (!contractBeingDeleted) return
+
+    const contract = contractBeingDeleted
+    setDeleting(true)
+    try {
+      await client.deleteContract(contract.address)
+      setContracts(current =>
+        current.filter(currentContract => currentContract.address !== contract.address),
+      )
+      setContractBeingDeleted(undefined)
+      showToast({
+        title: "Contract removed from Studio",
+        description: `${getContractIdentity(contract).title} was removed from this environment's registry`,
+        variant: "success",
+      })
+    } catch (error) {
+      showToast({
+        title: "Contract not removed",
+        description:
+          error instanceof Error ? error.message : "Failed to remove contract from Studio",
+        variant: "error",
+      })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -216,6 +249,11 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                             onClick={() => openSimulator(contract.address)}
                           />
                         ) : null}
+                        <InlineAction
+                          label="Remove contract from Studio"
+                          icon={<Trash2 />}
+                          onClick={() => setContractBeingDeleted(contract)}
+                        />
                       </span>
                     </DataTableCell>
                   </DataTableRow>
@@ -240,6 +278,40 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
           if (!open) setContractBeingRenamed(undefined)
         }}
       />
+      <Dialog
+        open={contractBeingDeleted !== undefined}
+        onOpenChange={open => {
+          if (!open && !deleting) setContractBeingDeleted(undefined)
+        }}
+        title={
+          contractBeingDeleted
+            ? `Remove ${getContractIdentity(contractBeingDeleted).title} from Studio?`
+            : "Remove contract from Studio?"
+        }
+        description="Only the Studio registry entry will be removed. The on-chain contract, source files, and ABI will not be changed."
+        dismissible={!deleting}
+        maxWidth="30rem"
+      >
+        <div className={styles.dialogActions}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={deleting}
+            onClick={() => setContractBeingDeleted(undefined)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            loading={deleting}
+            leadingIcon={<Trash2 size={15} aria-hidden="true" />}
+            onClick={() => void deleteContract()}
+          >
+            Remove from Studio
+          </Button>
+        </div>
+      </Dialog>
     </>
   )
 }

@@ -22,11 +22,13 @@ interface StudioShellProps {
   readonly pageTitle?: string
   readonly pages: readonly StudioPage[]
   readonly sidebarActiveEnvironmentId?: string
+  readonly sidebarActiveNetworkId?: string
   readonly sidebarContextAction?: {
     readonly label: string
     readonly onSelect: () => void
   }
   readonly sidebarEnvironments?: readonly StudioEnvironment[]
+  readonly sidebarNetworks?: readonly StudioEnvironment[]
   readonly sidebarNavigation?: ReactNode
   readonly sidebarNavigationKey?: string
   readonly sidebarSearch?: ReactNode
@@ -48,8 +50,10 @@ export function StudioShell({
   pageTitle,
   pages,
   sidebarActiveEnvironmentId,
+  sidebarActiveNetworkId,
   sidebarContextAction,
   sidebarEnvironments,
+  sidebarNetworks,
   sidebarNavigation,
   sidebarNavigationKey,
   sidebarSearch,
@@ -196,9 +200,11 @@ export function StudioShell({
           <StudioNavigation
             activePath={activePath}
             activeEnvironmentId={sidebarActiveEnvironmentId}
+            activeNetworkId={sidebarActiveNetworkId}
             className={styles.floatingSidebar}
             contextAction={sidebarContextAction}
             environments={sidebarEnvironments}
+            networks={sidebarNetworks}
             isSidebarCollapsed={isSidebarCollapsed}
             navigationContent={sidebarNavigation}
             navigationKey={sidebarNavigationKey}

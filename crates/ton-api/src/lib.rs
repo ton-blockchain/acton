@@ -15,7 +15,10 @@ use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
+mod deployment;
 pub mod toncenter;
+
+pub use deployment::{DeploymentCandidate, extract_deployment_candidates};
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];

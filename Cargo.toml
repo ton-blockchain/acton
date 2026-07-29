@@ -244,6 +244,7 @@ tvm-ffi = { workspace = true }
 tvm-logs = { workspace = true }
 tasm-core = { workspace = true }
 ton-api = { workspace = true }
+ton-networks = { workspace = true }
 ton-retrace = { workspace = true }
 toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }

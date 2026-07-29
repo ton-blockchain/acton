@@ -853,6 +853,27 @@
   white-space: nowrap;
 }
 
+.networkNavGroup {
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.networkNavLabel {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  color: var(--acton-color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.networkNavLabel svg {
+  flex: 0 0 auto;
+}
+
 .environmentStatusDot {
   width: 7px;
   height: 7px;

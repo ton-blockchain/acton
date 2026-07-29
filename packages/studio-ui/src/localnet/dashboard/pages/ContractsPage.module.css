@@ -68,3 +68,9 @@
   justify-content: flex-end;
   gap: 2px;
 }
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}

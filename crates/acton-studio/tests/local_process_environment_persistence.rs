@@ -25,6 +25,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         &executable,
         workspace.path(),
         ContractRegistryStore::for_project(workspace.path()),
+        Vec::new(),
     )
     .await
     .expect("empty environment runtime must open");
@@ -77,6 +78,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         &executable,
         workspace.path(),
         ContractRegistryStore::for_project(workspace.path()),
+        Vec::new(),
     )
     .await
     .expect("environment runtime must reopen");
@@ -110,6 +112,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         &executable,
         workspace.path(),
         ContractRegistryStore::for_project(workspace.path()),
+        Vec::new(),
     )
     .await
     .expect("stopped environment runtime must reopen");
@@ -143,6 +146,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         &executable,
         workspace.path(),
         ContractRegistryStore::for_project(workspace.path()),
+        Vec::new(),
     )
     .await
     .expect("desired-running environment runtime must reopen");
@@ -180,6 +184,7 @@ async fn local_process_environment_persists_its_full_lifecycle() {
         &executable,
         workspace.path(),
         ContractRegistryStore::for_project(workspace.path()),
+        Vec::new(),
     )
     .await
     .expect("environment runtime must reopen after deletion");

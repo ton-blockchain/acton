@@ -1,11 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::Json;
 use axum::body::to_bytes;
 use axum::extract::Request;
-use axum::http::{Method, StatusCode};
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -17,14 +17,14 @@ use ton_api::toncenter::v3::responses::{AccountStateFull, AccountStatesResponse}
 
 use crate::contract_registry::{
     ArtifactIdRequest, CodeHashRequest, ContractArtifact, ContractListEntry, ContractRegistryError,
-    ContractRegistryStore, ContractSourceKind, GetVerifiedSourceRequest,
+    ContractRegistryStore, ContractSourceKind, DeleteContractRequest, GetVerifiedSourceRequest,
     RegisterCompilerAbisRequest, RegisterContractRequest, RegisterVerifiedSourcesRequest,
     RegistrySnapshot, SavedVerifiedSource, SetAddressNameRequest,
 };
-use crate::{EnvironmentConfig, StudioEnvironment};
+use crate::{EnvironmentConfig, StudioEnvironment, apply_environment_upstream_auth};
 
 const MAX_EXTENSION_BODY_BYTES: usize = 64 * 1024 * 1024;
-const MAX_ACCOUNT_STATES_BATCH_SIZE: usize = 1_000;
+const MAX_ACCOUNT_STATES_BATCH_SIZE: usize = 50;
 
 #[derive(Clone, Copy)]
 enum ContractRoute {
@@ -32,6 +32,7 @@ enum ContractRoute {
     SetAddressName,
     ListContracts,
     RegisterContract,
+    DeleteContract,
     GetCompilerAbi,
     ListCompilerAbis,
     RegisterCompilerAbis,
@@ -54,6 +55,7 @@ impl ContractRoute {
             | Self::ListVerifiedSources => method == Method::GET,
             Self::SetAddressName
             | Self::RegisterContract
+            | Self::DeleteContract
             | Self::RegisterCompilerAbis
             | Self::DeleteCompilerAbi
             | Self::RegisterVerifiedSources
@@ -71,13 +73,23 @@ pub(crate) async fn handle(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
     path: &str,
     request: Request,
 ) -> Response {
     let Some(route) = route(request.method(), path) else {
         return ContractFacadeError::MethodNotAllowed.into_response();
     };
-    match handle_route(store, http_client, environment, route, request).await {
+    match handle_route(
+        store,
+        http_client,
+        environment,
+        testnet_api_key,
+        route,
+        request,
+    )
+    .await
+    {
         Ok(response) => response,
         Err(error) => error.into_response(),
     }
@@ -87,6 +99,7 @@ async fn handle_route(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
     route: ContractRoute,
     request: Request,
 ) -> Result<Response, ContractFacadeError> {
@@ -116,13 +129,16 @@ async fn handle_route(
             Ok(success(Value::Null))
         }
         ContractRoute::ListContracts => {
-            let contracts = list_contracts(store, http_client, environment).await?;
+            let contracts =
+                list_contracts(store, http_client, environment, testnet_api_key).await?;
             Ok(success(contracts))
         }
         ContractRoute::RegisterContract => {
             let payload: RegisterContractRequest = json_body(request).await?;
             let canonical = canonical_address(&payload.address)?;
-            let state = fetch_single_account_state(http_client, environment, &canonical).await?;
+            let state =
+                fetch_single_account_state(http_client, environment, testnet_api_key, &canonical)
+                    .await?;
             ensure_active_contract(&state, &payload.address)?;
             let display_address = display_address(&canonical)?;
             store
@@ -141,6 +157,12 @@ async fn handle_route(
             )?;
             enrich_contract(&mut contract, &snapshot);
             Ok(success(contract))
+        }
+        ContractRoute::DeleteContract => {
+            let payload: DeleteContractRequest = json_body(request).await?;
+            let canonical = canonical_address(&payload.address)?;
+            store.delete_contract(&environment.id, &canonical).await?;
+            Ok(success(Value::Null))
         }
         ContractRoute::GetCompilerAbi => {
             let snapshot = store.snapshot(&environment.id).await?;
@@ -206,13 +228,18 @@ async fn handle_route(
                         )
                     })?;
                     let canonical = canonical_address(address)?;
-                    fetch_single_account_state(http_client, environment, &canonical)
-                        .await?
-                        .code_hash
-                        .as_deref()
-                        .map(normalize_hash)
-                        .transpose()?
-                        .unwrap_or_default()
+                    fetch_single_account_state(
+                        http_client,
+                        environment,
+                        testnet_api_key,
+                        &canonical,
+                    )
+                    .await?
+                    .code_hash
+                    .as_deref()
+                    .map(normalize_hash)
+                    .transpose()?
+                    .unwrap_or_default()
                 }
             };
             let source = snapshot.latest_verified_source(&code_hash).map_or_else(
@@ -270,14 +297,45 @@ async fn list_contracts(
     store: &ContractRegistryStore,
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
 ) -> Result<Vec<ContractListEntry>, ContractFacadeError> {
-    let snapshot = store.snapshot(&environment.id).await?;
-    let registered = snapshot.contracts.keys().cloned().collect::<Vec<_>>();
-    if registered.is_empty() {
+    let mut snapshot = store.snapshot(&environment.id).await?;
+    let addresses = snapshot
+        .contracts
+        .keys()
+        .chain(snapshot.deployment_candidates.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if addresses.is_empty() {
         return Ok(Vec::new());
     }
 
-    let mut states = fetch_registered_account_states(http_client, environment, &registered).await?;
+    let mut states =
+        fetch_registered_account_states(http_client, environment, testnet_api_key, &addresses)
+            .await?;
+    let confirmed = states
+        .iter()
+        .filter_map(|state| {
+            let canonical = canonical_address(&state.address).ok()?;
+            let candidate = snapshot.deployment_candidates.get(&canonical)?;
+            let code_hash = state
+                .code_hash
+                .as_deref()
+                .and_then(|value| normalize_hash(value).ok())?;
+            (state.status == "active"
+                && code_hash == candidate.code_hash
+                && snapshot.latest_verified_source(&code_hash).is_some())
+            .then_some(canonical)
+        })
+        .collect::<Vec<_>>();
+    if !confirmed.is_empty() {
+        store
+            .confirm_deployment_candidates(&environment.id, &confirmed)
+            .await?;
+        snapshot = store.snapshot(&environment.id).await?;
+    }
     states.sort_by(|left, right| {
         account_transaction_lt(right)
             .cmp(&account_transaction_lt(left))
@@ -303,11 +361,13 @@ async fn list_contracts(
 async fn fetch_single_account_state(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
     requested_canonical_address: &str,
 ) -> Result<AccountStateFull, ContractFacadeError> {
     fetch_account_states(
         http_client,
         environment,
+        testnet_api_key,
         &[requested_canonical_address.to_owned()],
     )
     .await?
@@ -328,45 +388,22 @@ async fn fetch_single_account_state(
 async fn fetch_registered_account_states(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
     canonical_addresses: &[String],
 ) -> Result<Vec<AccountStateFull>, ContractFacadeError> {
     let mut states = Vec::new();
     for addresses in canonical_addresses.chunks(MAX_ACCOUNT_STATES_BATCH_SIZE) {
-        states.extend(fetch_account_states_batch(http_client, environment, addresses).await?);
+        states.extend(
+            fetch_account_states(http_client, environment, testnet_api_key, addresses).await?,
+        );
     }
     Ok(states)
-}
-
-async fn fetch_account_states_batch(
-    http_client: &reqwest::Client,
-    environment: &StudioEnvironment,
-    canonical_addresses: &[String],
-) -> Result<Vec<AccountStateFull>, ContractFacadeError> {
-    match fetch_account_states(http_client, environment, canonical_addresses).await {
-        Ok(states) => Ok(states),
-        Err(batch_error) if canonical_addresses.len() > 1 => {
-            let mut states = Vec::new();
-            for address in canonical_addresses {
-                if let Ok(mut account) =
-                    fetch_account_states(http_client, environment, std::slice::from_ref(address))
-                        .await
-                {
-                    states.append(&mut account);
-                }
-            }
-            if states.is_empty() {
-                Err(batch_error)
-            } else {
-                Ok(states)
-            }
-        }
-        Err(error) => Err(error),
-    }
 }
 
 async fn fetch_account_states(
     http_client: &reqwest::Client,
     environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
     canonical_addresses: &[String],
 ) -> Result<Vec<AccountStateFull>, ContractFacadeError> {
     let api_v3 = environment
@@ -385,7 +422,11 @@ async fn fetch_account_states(
         }
         query.append_pair("include_boc", "false");
     }
-    let response = http_client.get(url).send().await.map_err(upstream_error)?;
+    let response =
+        apply_environment_upstream_auth(http_client.get(url), environment, testnet_api_key)
+            .send()
+            .await
+            .map_err(upstream_error)?;
     let status = response.status();
     let body = response.text().await.map_err(upstream_error)?;
     if !status.is_success() {
@@ -490,7 +531,9 @@ fn compiler_abi_name(abi: &Value) -> Option<String> {
 
 const fn registered_source_kind(environment: &StudioEnvironment) -> ContractSourceKind {
     match &environment.config {
-        EnvironmentConfig::FullTonNetwork { .. } => ContractSourceKind::Network,
+        EnvironmentConfig::FullTonNetwork { .. } | EnvironmentConfig::RemoteTonNetwork { .. } => {
+            ContractSourceKind::Network
+        }
         EnvironmentConfig::ActonLocalnet {
             fork_network: Some(_),
             ..
@@ -545,6 +588,7 @@ fn contract_route(path: &str) -> Option<ContractRoute> {
         "acton_setAddressName" => Some(ContractRoute::SetAddressName),
         "acton_listContracts" => Some(ContractRoute::ListContracts),
         "acton_registerContract" => Some(ContractRoute::RegisterContract),
+        "acton_deleteContract" => Some(ContractRoute::DeleteContract),
         "acton_getCompilerAbi" => Some(ContractRoute::GetCompilerAbi),
         "acton_listCompilerAbis" => Some(ContractRoute::ListCompilerAbis),
         "acton_registerCompilerAbis" => Some(ContractRoute::RegisterCompilerAbis),

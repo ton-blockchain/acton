@@ -1,19 +1,18 @@
-use std::collections::BTreeMap;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
-use axum::body::{Body, to_bytes};
+use axum::body::Body;
 use axum::extract::{Path as AxumPath, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
-use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use axum::http::{HeaderMap, HeaderName, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
+use futures::StreamExt;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
@@ -26,6 +25,7 @@ mod contract_facade;
 mod contract_registry;
 mod contract_source_artifact;
 mod environment;
+mod environment_catalog;
 mod environment_store;
 mod full_ton_network;
 mod local_artifacts;
@@ -43,9 +43,11 @@ pub use contract_source_artifact::{
 };
 pub use environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentCapability, EnvironmentConfig,
-    EnvironmentEndpoints, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
+    EnvironmentEndpoints, EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime,
+    EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus, PublicTonNetwork,
+    StudioEnvironment, UpdateEnvironmentRequest,
 };
+pub use environment_catalog::TESTNET_ENVIRONMENT_ID;
 pub use local_process::LocalProcessEnvironmentRuntime;
 pub use local_test_process::LocalProcessTestRunRuntime;
 pub use test_run::{
@@ -71,7 +73,9 @@ pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
 
-const MAX_CONTRACT_OBSERVATION_BODY_BYTES: usize = 1024 * 1024;
+const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
+const TONCENTER_TESTNET_API_KEY_ENV: &str = "TONCENTER_TESTNET_API_KEY";
+const TONCENTER_API_KEY_HEADER: &str = "x-api-key";
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/studio-ui/dist");
@@ -114,10 +118,11 @@ impl StudioWorkspace {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct StudioServerConfig {
     server_version: String,
     workspace: Option<StudioWorkspace>,
+    testnet_api_key: Option<HeaderValue>,
 }
 
 impl StudioServerConfig {
@@ -125,12 +130,21 @@ impl StudioServerConfig {
         Self {
             server_version: server_version.into(),
             workspace: None,
+            testnet_api_key: std::env::var(TONCENTER_TESTNET_API_KEY_ENV)
+                .ok()
+                .and_then(|value| sensitive_header_value(&value)),
         }
     }
 
     #[must_use]
     pub fn with_workspace(mut self, workspace: StudioWorkspace) -> Self {
         self.workspace = Some(workspace);
+        self
+    }
+
+    #[must_use]
+    pub fn with_testnet_api_key(mut self, api_key: impl AsRef<str>) -> Self {
+        self.testnet_api_key = sensitive_header_value(api_key.as_ref());
         self
     }
 }
@@ -147,10 +161,14 @@ pub struct StudioServer {
 impl StudioServer {
     #[must_use]
     pub fn new(config: StudioServerConfig) -> Self {
+        let managed_environment_runtime: Arc<dyn EnvironmentRuntime> =
+            Arc::new(environment::EmptyEnvironmentRuntime);
         Self {
             config,
             contract_registry: ContractRegistryStore::ephemeral(),
-            environment_runtime: Arc::new(environment::EmptyEnvironmentRuntime),
+            environment_runtime: Arc::new(environment_catalog::EnvironmentCatalogRuntime::new(
+                managed_environment_runtime,
+            )),
             test_run_runtime: Arc::new(test_runtime::EmptyTestRunRuntime::new()),
             wallet_runtime: Arc::new(wallet::EmptyWalletRuntime),
         }
@@ -176,7 +194,9 @@ impl StudioServer {
     where
         R: EnvironmentRuntime + 'static,
     {
-        self.environment_runtime = Arc::new(environment_runtime);
+        self.environment_runtime = Arc::new(environment_catalog::EnvironmentCatalogRuntime::new(
+            Arc::new(environment_runtime),
+        ));
         self
     }
 
@@ -213,6 +233,7 @@ impl StudioServer {
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
             http_client: reqwest::Client::new(),
+            testnet_api_key: self.config.testnet_api_key.clone(),
         };
         let api = Router::new()
             .route("/health", get(health))
@@ -302,6 +323,7 @@ pub(crate) struct StudioState {
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
     http_client: reqwest::Client,
+    testnet_api_key: Option<HeaderValue>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -568,28 +590,20 @@ async fn proxy_environment_request(
             &state.contract_registry,
             &state.http_client,
             &environment,
+            state.testnet_api_key.as_ref(),
             &path,
             request,
         )
         .await);
     }
 
+    let submission_kind = deployment_submission_kind(request.method(), &path);
     let (parts, body) = request.into_parts();
-    let mut observed_contracts = BTreeMap::new();
-    collect_form_contract_addresses(parts.uri.query(), &mut observed_contracts);
-    let body = if is_observable_body(&parts.headers) {
-        let bytes = to_bytes(body, MAX_CONTRACT_OBSERVATION_BODY_BYTES)
-            .await
-            .map_err(|error| {
-                StudioApiError(EnvironmentRuntimeError::Internal {
-                    code: "environment_proxy_request_failed",
-                    message: format!("Failed to read the environment request: {error}"),
-                })
-            })?;
-        collect_body_contract_addresses(&parts.headers, &bytes, &mut observed_contracts);
-        Body::from(bytes)
+    let (body, captured_submission_body) = if submission_kind.is_some() {
+        let (body, capture) = capture_request_body(body);
+        (body, Some(capture))
     } else {
-        body
+        (reqwest::Body::wrap_stream(body.into_data_stream()), None)
     };
     let mut upstream_url = environment_upstream_url(&environment, &path)?;
     if let Some(query) = parts.uri.query() {
@@ -597,43 +611,57 @@ async fn proxy_environment_request(
         upstream_url.push_str(query);
     }
 
-    let mut upstream_request = state.http_client.request(parts.method, upstream_url);
-    for (name, value) in &parts.headers {
-        if !is_hop_by_hop_header(name) && name != axum::http::header::HOST {
-            upstream_request = upstream_request.header(name, value);
-        }
-    }
+    let is_testnet = is_external_testnet(&environment);
+    let upstream_request = apply_upstream_headers(
+        state.http_client.request(parts.method, upstream_url),
+        &parts.headers,
+        &environment,
+        state.testnet_api_key.as_ref(),
+    );
 
     let upstream_response = upstream_request
-        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
+        .body(body)
         .send()
         .await
         .map_err(proxy_error)?;
     let status = upstream_response.status();
     let headers = upstream_response.headers().clone();
-    if status.is_success() {
-        observe_contracts(
-            &state.contract_registry,
-            &environment.id,
-            observed_contracts,
-        )
-        .await;
-    }
     let mut response = Response::builder().status(status);
     for (name, value) in &headers {
-        if !is_hop_by_hop_header(name) {
+        if should_forward_upstream_response_header(name, is_testnet) {
             response = response.header(name, value);
         }
     }
 
-    response
-        .body(Body::from_stream(upstream_response.bytes_stream()))
-        .map_err(|error| {
-            StudioApiError(EnvironmentRuntimeError::Internal {
-                code: "environment_proxy_response_failed",
-                message: format!("Failed to build the environment response: {error}"),
-            })
+    let response_body =
+        if let (Some(kind), Some(capture)) = (submission_kind, captured_submission_body) {
+            let bytes = upstream_response.bytes().await.map_err(proxy_error)?;
+            let request_body = capture
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .body();
+            if deployment_submission_accepted(status, &bytes)
+                && let Some(request_body) = request_body
+            {
+                record_deployment_submission(
+                    &state.contract_registry,
+                    &environment.id,
+                    kind,
+                    parts.uri.query(),
+                    &request_body,
+                )
+                .await;
+            }
+            Body::from(bytes)
+        } else {
+            Body::from_stream(upstream_response.bytes_stream())
+        };
+    response.body(response_body).map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Internal {
+            code: "environment_proxy_response_failed",
+            message: format!("Failed to build the environment response: {error}"),
         })
+    })
 }
 
 fn environment_upstream_url(
@@ -709,100 +737,237 @@ fn is_hop_by_hop_header(name: &HeaderName) -> bool {
     )
 }
 
-fn is_observable_body(headers: &HeaderMap) -> bool {
-    let Some(content_length) = headers
-        .get(CONTENT_LENGTH)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<usize>().ok())
+fn is_external_testnet(environment: &StudioEnvironment) -> bool {
+    environment.lifecycle == EnvironmentLifecycle::External
+        && matches!(
+            &environment.config,
+            EnvironmentConfig::RemoteTonNetwork {
+                network: PublicTonNetwork::Testnet,
+            }
+        )
+}
+
+fn is_safe_external_request_header(name: &HeaderName) -> bool {
+    matches!(
+        name.as_str(),
+        "accept"
+            | "accept-encoding"
+            | "cache-control"
+            | "content-encoding"
+            | "content-length"
+            | "content-type"
+            | "if-match"
+            | "if-modified-since"
+            | "if-none-match"
+            | "if-range"
+            | "if-unmodified-since"
+            | "pragma"
+            | "range"
+            | "user-agent"
+    )
+}
+
+fn should_forward_upstream_request_header(name: &HeaderName, is_external_testnet: bool) -> bool {
+    if is_external_testnet {
+        return is_safe_external_request_header(name);
+    }
+    !is_hop_by_hop_header(name) && name != axum::http::header::HOST
+}
+
+fn should_forward_upstream_response_header(name: &HeaderName, is_external_testnet: bool) -> bool {
+    !(is_hop_by_hop_header(name)
+        || is_external_testnet && matches!(name.as_str(), TONCENTER_API_KEY_HEADER | "set-cookie"))
+}
+
+pub(crate) fn apply_environment_upstream_auth(
+    mut request: reqwest::RequestBuilder,
+    environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
+) -> reqwest::RequestBuilder {
+    if is_external_testnet(environment)
+        && let Some(api_key) = testnet_api_key
+    {
+        request = request.header(TONCENTER_API_KEY_HEADER, api_key);
+    }
+    request
+}
+
+fn apply_upstream_headers(
+    mut request: reqwest::RequestBuilder,
+    headers: &HeaderMap,
+    environment: &StudioEnvironment,
+    testnet_api_key: Option<&HeaderValue>,
+) -> reqwest::RequestBuilder {
+    let is_testnet = is_external_testnet(environment);
+    for (name, value) in headers {
+        if should_forward_upstream_request_header(name, is_testnet) {
+            request = request.header(name, value);
+        }
+    }
+    apply_environment_upstream_auth(request, environment, testnet_api_key)
+}
+
+fn sensitive_header_value(value: &str) -> Option<HeaderValue> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let mut value = HeaderValue::from_str(value).ok()?;
+    value.set_sensitive(true);
+    Some(value)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DeploymentSubmissionKind {
+    Direct,
+    JsonRpc,
+}
+
+fn deployment_submission_kind(
+    method: &axum::http::Method,
+    path: &str,
+) -> Option<DeploymentSubmissionKind> {
+    if method != axum::http::Method::POST {
+        return None;
+    }
+    match path.trim_matches('/') {
+        "api/v2/sendBoc"
+        | "api/v2/sendBocReturnHash"
+        | "api/v3/message"
+        | "acton_sendInternalMessage" => Some(DeploymentSubmissionKind::Direct),
+        "api/v2" | "api/v2/jsonRPC" | "api/v2/v2/jsonRPC" => {
+            Some(DeploymentSubmissionKind::JsonRpc)
+        }
+        _ => None,
+    }
+}
+
+#[derive(Debug, Default)]
+struct CapturedSubmissionBody {
+    bytes: Vec<u8>,
+    overflowed: bool,
+}
+
+impl CapturedSubmissionBody {
+    fn extend(&mut self, bytes: &[u8]) {
+        if self.overflowed {
+            return;
+        }
+        if bytes.len() > MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES.saturating_sub(self.bytes.len()) {
+            self.bytes.clear();
+            self.overflowed = true;
+            return;
+        }
+        self.bytes.extend_from_slice(bytes);
+    }
+
+    fn body(&self) -> Option<Vec<u8>> {
+        (!self.overflowed).then(|| self.bytes.clone())
+    }
+}
+
+type SharedSubmissionBody = Arc<StdMutex<CapturedSubmissionBody>>;
+
+fn capture_request_body(body: Body) -> (reqwest::Body, SharedSubmissionBody) {
+    let capture = Arc::new(StdMutex::new(CapturedSubmissionBody::default()));
+    let stream_capture = Arc::clone(&capture);
+    let stream = body.into_data_stream().map(move |chunk| {
+        if let Ok(bytes) = &chunk {
+            stream_capture
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .extend(bytes);
+        }
+        chunk
+    });
+    (reqwest::Body::wrap_stream(stream), capture)
+}
+
+fn deployment_submission_accepted(status: StatusCode, body: &[u8]) -> bool {
+    if !status.is_success() {
+        return false;
+    }
+    let Ok(serde_json::Value::Object(response)) = serde_json::from_slice::<serde_json::Value>(body)
     else {
         return false;
     };
-    if content_length > MAX_CONTRACT_OBSERVATION_BODY_BYTES {
-        return false;
-    }
-
-    headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|content_type| {
-            let media_type = content_type.split(';').next().unwrap_or_default().trim();
-            media_type.eq_ignore_ascii_case("application/json")
-                || media_type.ends_with("+json")
-                || media_type.eq_ignore_ascii_case("application/x-www-form-urlencoded")
-        })
+    !matches!(response.get("ok"), Some(serde_json::Value::Bool(false)))
+        && response.get("error").is_none_or(serde_json::Value::is_null)
 }
 
-fn collect_body_contract_addresses(
-    headers: &HeaderMap,
+fn deployment_submission_boc(
+    kind: DeploymentSubmissionKind,
+    query: Option<&str>,
     body: &[u8],
-    contracts: &mut BTreeMap<String, String>,
-) {
-    let media_type = headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|content_type| content_type.split(';').next())
-        .map(str::trim)
-        .unwrap_or_default();
-    if media_type.eq_ignore_ascii_case("application/x-www-form-urlencoded") {
-        collect_form_contract_addresses(std::str::from_utf8(body).ok(), contracts);
-        return;
-    }
-    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) {
-        collect_json_contract_addresses(&value, contracts);
-    }
-}
-
-fn collect_form_contract_addresses(
-    encoded: Option<&str>,
-    contracts: &mut BTreeMap<String, String>,
-) {
-    let Some(encoded) = encoded else {
-        return;
-    };
-    for (_, value) in url::form_urlencoded::parse(encoded.as_bytes()) {
-        collect_contract_address(&value, contracts);
-    }
-}
-
-fn collect_json_contract_addresses(
-    value: &serde_json::Value,
-    contracts: &mut BTreeMap<String, String>,
-) {
-    match value {
-        serde_json::Value::String(value) => collect_contract_address(value, contracts),
-        serde_json::Value::Array(values) => {
-            for value in values {
-                collect_json_contract_addresses(value, contracts);
+) -> Option<String> {
+    match kind {
+        DeploymentSubmissionKind::Direct => json_boc(body)
+            .or_else(|| form_boc(body))
+            .or_else(|| query.and_then(|query| form_boc(query.as_bytes()))),
+        DeploymentSubmissionKind::JsonRpc => {
+            let value = serde_json::from_slice::<serde_json::Value>(body).ok()?;
+            let method = value.get("method")?.as_str()?;
+            if !matches!(method, "sendBoc" | "sendBocReturnHash") {
+                return None;
             }
+            value.get("params")?.get("boc")?.as_str().map(str::to_owned)
         }
-        serde_json::Value::Object(values) => {
-            for value in values.values() {
-                collect_json_contract_addresses(value, contracts);
-            }
-        }
-        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
     }
 }
 
-fn collect_contract_address(value: &str, contracts: &mut BTreeMap<String, String>) {
-    let Ok(address) = TonAddress::from_str(value.trim()) else {
-        return;
-    };
-    contracts
-        .entry(address.to_hex())
-        .or_insert_with(|| address.to_base64(false, true, true));
+fn json_boc(body: &[u8]) -> Option<String> {
+    serde_json::from_slice::<serde_json::Value>(body)
+        .ok()?
+        .get("boc")?
+        .as_str()
+        .map(str::to_owned)
 }
 
-async fn observe_contracts(
+fn form_boc(encoded: &[u8]) -> Option<String> {
+    url::form_urlencoded::parse(encoded)
+        .find_map(|(name, value)| (name == "boc").then(|| value.into_owned()))
+}
+
+async fn record_deployment_submission(
     store: &ContractRegistryStore,
     environment_id: &str,
-    contracts: BTreeMap<String, String>,
+    kind: DeploymentSubmissionKind,
+    query: Option<&str>,
+    body: &[u8],
 ) {
-    if let Err(error) = store.observe_contracts(environment_id, contracts).await {
+    let Some(boc) = deployment_submission_boc(kind, query, body) else {
+        return;
+    };
+    let candidates = match ton_api::extract_deployment_candidates(&boc) {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            tracing::debug!(
+                environment_id,
+                error = %error,
+                "Ignored an invalid deployment submission observed through Studio RPC"
+            );
+            return;
+        }
+    };
+    let candidates = candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let address = TonAddress::from_str(&candidate.address).ok()?;
+            Some(contract_registry::DeploymentCandidateRegistration {
+                canonical_address: address.to_hex(),
+                display_address: address.to_base64(false, true, true),
+                code_hash: candidate.code_hash,
+            })
+        })
+        .collect();
+    if let Err(error) = store
+        .record_deployment_candidates(environment_id, candidates)
+        .await
+    {
         tracing::warn!(
             environment_id,
             error = %error,
-            "Failed to persist contracts observed through Studio RPC"
+            "Failed to persist deployment candidates observed through Studio RPC"
         );
     }
 }
@@ -941,4 +1106,317 @@ fn ui_file_response(path: &str, contents: &'static [u8]) -> Response {
     };
 
     ([("content-type", content_type)], contents).into_response()
+}
+
+#[cfg(test)]
+mod proxy_header_tests {
+    use std::fmt::Write as _;
+
+    use axum::http::header::{CONTENT_TYPE, HOST, SET_COOKIE};
+    use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+    use expect_test::expect;
+
+    use super::{
+        CapturedSubmissionBody, DeploymentSubmissionKind, MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES,
+        TONCENTER_API_KEY_HEADER, apply_environment_upstream_auth, apply_upstream_headers,
+        deployment_submission_accepted, deployment_submission_boc, sensitive_header_value,
+        should_forward_upstream_response_header,
+    };
+    use crate::{
+        EnvironmentConfig, EnvironmentEndpoints, EnvironmentStatus, PublicTonNetwork,
+        StudioEnvironment,
+    };
+
+    #[test]
+    fn external_testnet_only_forwards_safe_request_headers_and_uses_server_api_key() {
+        let mut incoming = HeaderMap::new();
+        incoming.insert(HOST, HeaderValue::from_static("studio.local"));
+        incoming.insert(
+            TONCENTER_API_KEY_HEADER,
+            HeaderValue::from_static("client-key"),
+        );
+        incoming.insert(
+            "authorization",
+            HeaderValue::from_static("Bearer browser-session"),
+        );
+        incoming.insert("cookie", HeaderValue::from_static("studio=session"));
+        incoming.insert("forwarded", HeaderValue::from_static("for=192.0.2.10"));
+        incoming.insert("x-forwarded-for", HeaderValue::from_static("192.0.2.10"));
+        incoming.insert(
+            "x-forwarded-host",
+            HeaderValue::from_static("studio.example"),
+        );
+        incoming.insert("x-forwarded-proto", HeaderValue::from_static("https"));
+        incoming.insert("origin", HeaderValue::from_static("https://studio.example"));
+        incoming.insert(
+            "referer",
+            HeaderValue::from_static("https://studio.example/testnet"),
+        );
+        incoming.insert(
+            "cf-access-jwt-assertion",
+            HeaderValue::from_static("cloudflare-access-token"),
+        );
+        incoming.insert("x-test-marker", HeaderValue::from_static("forwarded"));
+        incoming.insert("accept", HeaderValue::from_static("application/json"));
+        incoming.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        incoming.insert("content-length", HeaderValue::from_static("12"));
+        incoming.insert("content-encoding", HeaderValue::from_static("gzip"));
+        incoming.insert("user-agent", HeaderValue::from_static("Acton Studio"));
+        incoming.insert("if-none-match", HeaderValue::from_static("\"revision\""));
+        let server_key = sensitive_header_value("server-key").expect("server key must be valid");
+        let client = reqwest::Client::new();
+        let testnet = testnet_environment(true);
+        let managed = testnet_environment(false);
+
+        let testnet_request = apply_upstream_headers(
+            client.get("https://testnet.toncenter.com/api/v2"),
+            &incoming,
+            &testnet,
+            Some(&server_key),
+        )
+        .build()
+        .expect("testnet request must build");
+        let managed_request = apply_upstream_headers(
+            client.get("http://127.0.0.1:5411/api/v2"),
+            &incoming,
+            &managed,
+            Some(&server_key),
+        )
+        .build()
+        .expect("managed request must build");
+
+        let actual = request_headers_snapshot(&testnet_request, &managed_request);
+
+        expect![[r#"TESTNET
+api key: server-key
+api key sensitive: true
+host: <missing>
+authorization: <missing>
+cookie: <missing>
+forwarded: <missing>
+x-forwarded-for: <missing>
+x-forwarded-host: <missing>
+x-forwarded-proto: <missing>
+origin: <missing>
+referer: <missing>
+cf-access-jwt-assertion: <missing>
+marker: <missing>
+accept: application/json
+content-type: application/json
+content-length: 12
+content-encoding: gzip
+user-agent: Acton Studio
+if-none-match: "revision"
+
+MANAGED
+api key: client-key
+host: <missing>
+authorization: Bearer browser-session
+cookie: studio=session
+forwarded: for=192.0.2.10
+x-forwarded-for: 192.0.2.10
+x-forwarded-host: studio.example
+x-forwarded-proto: https
+origin: https://studio.example
+referer: https://studio.example/testnet
+cf-access-jwt-assertion: cloudflare-access-token
+marker: forwarded
+accept: application/json
+content-type: application/json
+content-length: 12
+content-encoding: gzip
+user-agent: Acton Studio
+if-none-match: "revision""#]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn direct_testnet_requests_share_server_side_auth() {
+        let server_key = sensitive_header_value("server-key").expect("server key must be valid");
+        let client = reqwest::Client::new();
+        let testnet = testnet_environment(true);
+        let managed = testnet_environment(false);
+        let testnet_request = apply_environment_upstream_auth(
+            client.get("https://testnet.toncenter.com/api/v3/accountStates"),
+            &testnet,
+            Some(&server_key),
+        )
+        .build()
+        .expect("testnet request must build");
+        let managed_request = apply_environment_upstream_auth(
+            client.get("http://127.0.0.1:5411/api/v3/accountStates"),
+            &managed,
+            Some(&server_key),
+        )
+        .build()
+        .expect("managed request must build");
+        let actual = format!(
+            "testnet api key: {}\ntestnet api key sensitive: {}\nmanaged api key: {}",
+            header(&testnet_request, TONCENTER_API_KEY_HEADER),
+            testnet_request
+                .headers()
+                .get(TONCENTER_API_KEY_HEADER)
+                .is_some_and(HeaderValue::is_sensitive),
+            header(&managed_request, TONCENTER_API_KEY_HEADER),
+        );
+
+        expect![[r"testnet api key: server-key
+testnet api key sensitive: true
+managed api key: <missing>"]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn external_testnet_response_cannot_set_credentials() {
+        let actual = format!(
+            "TESTNET\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}\n\nMANAGED\ncontent-type: {}\nset-cookie: {}\nx-api-key: {}",
+            should_forward_upstream_response_header(&CONTENT_TYPE, true),
+            should_forward_upstream_response_header(&SET_COOKIE, true),
+            should_forward_upstream_response_header(
+                &HeaderName::from_static(TONCENTER_API_KEY_HEADER),
+                true,
+            ),
+            should_forward_upstream_response_header(&CONTENT_TYPE, false),
+            should_forward_upstream_response_header(&SET_COOKIE, false),
+            should_forward_upstream_response_header(
+                &HeaderName::from_static(TONCENTER_API_KEY_HEADER),
+                false,
+            ),
+        );
+
+        expect![[r"TESTNET
+content-type: true
+set-cookie: false
+x-api-key: false
+
+MANAGED
+content-type: true
+set-cookie: true
+x-api-key: true"]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn deployment_acceptance_requires_a_successful_json_envelope() {
+        let actual = [
+            (
+                "success",
+                StatusCode::OK,
+                br#"{"ok":true,"result":{}}"#.as_slice(),
+            ),
+            ("ok false", StatusCode::OK, br#"{"ok":false}"#.as_slice()),
+            (
+                "json-rpc error",
+                StatusCode::OK,
+                br#"{"error":{"code":-32000}}"#.as_slice(),
+            ),
+            (
+                "http error",
+                StatusCode::BAD_REQUEST,
+                br#"{"ok":true}"#.as_slice(),
+            ),
+            ("not json", StatusCode::OK, b"accepted".as_slice()),
+        ]
+        .map(|(label, status, body)| {
+            format!("{label}: {}", deployment_submission_accepted(status, body))
+        })
+        .join("\n");
+
+        expect![[r"success: true
+ok false: false
+json-rpc error: false
+http error: false
+not json: false"]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn deployment_capture_discards_oversized_body_and_json_rpc_reads() {
+        let mut capture = CapturedSubmissionBody {
+            bytes: vec![0; MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES - 1],
+            overflowed: false,
+        };
+        capture.extend(&[1, 2]);
+        assert!(capture.body().is_none());
+        assert!(capture.bytes.is_empty());
+
+        let read_body = br#"{
+            "method":"runGetMethod",
+            "params":{"boc":"not-a-deployment"}
+        }"#;
+        assert_eq!(
+            deployment_submission_boc(DeploymentSubmissionKind::JsonRpc, None, read_body),
+            None
+        );
+    }
+
+    fn testnet_environment(external: bool) -> StudioEnvironment {
+        let config = EnvironmentConfig::RemoteTonNetwork {
+            network: PublicTonNetwork::Testnet,
+        };
+        if external {
+            StudioEnvironment::new_external(
+                "testnet",
+                "Testnet",
+                EnvironmentStatus::Running,
+                config,
+                EnvironmentEndpoints::default(),
+            )
+        } else {
+            StudioEnvironment::new(
+                "managed",
+                "Managed",
+                EnvironmentStatus::Running,
+                config,
+                EnvironmentEndpoints::default(),
+            )
+        }
+    }
+
+    fn request_headers_snapshot(testnet: &reqwest::Request, managed: &reqwest::Request) -> String {
+        const HEADERS: &[(&str, &str)] = &[
+            ("api key", TONCENTER_API_KEY_HEADER),
+            ("host", "host"),
+            ("authorization", "authorization"),
+            ("cookie", "cookie"),
+            ("forwarded", "forwarded"),
+            ("x-forwarded-for", "x-forwarded-for"),
+            ("x-forwarded-host", "x-forwarded-host"),
+            ("x-forwarded-proto", "x-forwarded-proto"),
+            ("origin", "origin"),
+            ("referer", "referer"),
+            ("cf-access-jwt-assertion", "cf-access-jwt-assertion"),
+            ("marker", "x-test-marker"),
+            ("accept", "accept"),
+            ("content-type", "content-type"),
+            ("content-length", "content-length"),
+            ("content-encoding", "content-encoding"),
+            ("user-agent", "user-agent"),
+            ("if-none-match", "if-none-match"),
+        ];
+        let mut output = format!(
+            "TESTNET\napi key: {}\napi key sensitive: {}",
+            header(testnet, TONCENTER_API_KEY_HEADER),
+            testnet
+                .headers()
+                .get(TONCENTER_API_KEY_HEADER)
+                .is_some_and(HeaderValue::is_sensitive),
+        );
+        for (label, name) in &HEADERS[1..] {
+            let _ = write!(output, "\n{label}: {}", header(testnet, name));
+        }
+        output.push_str("\n\nMANAGED");
+        for (label, name) in HEADERS {
+            let _ = write!(output, "\n{label}: {}", header(managed, name));
+        }
+        output
+    }
+
+    fn header<'a>(request: &'a reqwest::Request, name: &str) -> &'a str {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("<missing>")
+    }
 }

@@ -67,6 +67,16 @@ pub enum EnvironmentConfig {
         api_v3_port: u16,
         validators: u16,
     },
+    RemoteTonNetwork {
+        network: PublicTonNetwork,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PublicTonNetwork {
+    Testnet,
+    Mainnet,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -119,12 +129,20 @@ pub enum EnvironmentStatus {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EnvironmentLifecycle {
+    Managed,
+    External,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioEnvironment {
     pub id: String,
     pub name: String,
     pub status: EnvironmentStatus,
+    pub lifecycle: EnvironmentLifecycle,
     pub rpc_url: String,
     pub config: EnvironmentConfig,
     pub capabilities: Vec<EnvironmentCapability>,
@@ -145,12 +163,49 @@ impl StudioEnvironment {
         config: EnvironmentConfig,
         runtime_endpoints: EnvironmentEndpoints,
     ) -> Self {
+        Self::with_lifecycle(
+            id,
+            name,
+            status,
+            EnvironmentLifecycle::Managed,
+            config,
+            runtime_endpoints,
+        )
+    }
+
+    #[must_use]
+    pub fn new_external(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        status: EnvironmentStatus,
+        config: EnvironmentConfig,
+        runtime_endpoints: EnvironmentEndpoints,
+    ) -> Self {
+        Self::with_lifecycle(
+            id,
+            name,
+            status,
+            EnvironmentLifecycle::External,
+            config,
+            runtime_endpoints,
+        )
+    }
+
+    fn with_lifecycle(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        status: EnvironmentStatus,
+        lifecycle: EnvironmentLifecycle,
+        config: EnvironmentConfig,
+        runtime_endpoints: EnvironmentEndpoints,
+    ) -> Self {
         let capabilities = config.capabilities();
         let network = config.network();
         Self {
             id: id.into(),
             name: name.into(),
             status,
+            lifecycle,
             rpc_url: String::new(),
             config,
             capabilities,
@@ -193,6 +248,15 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Simulator,
                 EnvironmentCapability::Contracts,
             ],
+            Self::RemoteTonNetwork { .. } => vec![
+                EnvironmentCapability::ApiV2,
+                EnvironmentCapability::ApiV3,
+                EnvironmentCapability::Explorer,
+                EnvironmentCapability::Integration,
+                EnvironmentCapability::Wallets,
+                EnvironmentCapability::Simulator,
+                EnvironmentCapability::Contracts,
+            ],
         }
     }
 
@@ -223,6 +287,22 @@ impl EnvironmentConfig {
                 label: "Local TON network".to_owned(),
                 chain_id: -239,
                 test_only: true,
+            },
+            Self::RemoteTonNetwork {
+                network: PublicTonNetwork::Testnet,
+            } => EnvironmentNetwork {
+                id: "testnet".to_owned(),
+                label: "Testnet".to_owned(),
+                chain_id: -3,
+                test_only: true,
+            },
+            Self::RemoteTonNetwork {
+                network: PublicTonNetwork::Mainnet,
+            } => EnvironmentNetwork {
+                id: "mainnet".to_owned(),
+                label: "Mainnet".to_owned(),
+                chain_id: -239,
+                test_only: false,
             },
         }
     }

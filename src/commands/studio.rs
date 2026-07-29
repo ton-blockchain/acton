@@ -8,7 +8,7 @@ use acton_config::config::{
 use acton_studio::{
     ContractRegistryStore, LocalProcessEnvironmentRuntime, LocalProcessTestRunRuntime,
     STUDIO_API_VERSION, StudioDaemonDescriptor, StudioServer, StudioServerConfig, StudioWorkspace,
-    persist_studio_daemon_descriptor, remove_studio_daemon_descriptor,
+    TESTNET_ENVIRONMENT_ID, persist_studio_daemon_descriptor, remove_studio_daemon_descriptor,
 };
 use anyhow::Context;
 
@@ -48,6 +48,7 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
         acton_executable.clone(),
         &project_root,
         contract_registry.clone(),
+        vec![TESTNET_ENVIRONMENT_ID.to_owned()],
     )
     .await?;
     let reporter_url = local_reporter_url(address);

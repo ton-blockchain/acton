@@ -73,22 +73,22 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
 }
 
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  "/dashboard": "Localnet status, network activity and runtime controls",
-  "/faucet": "Fund accounts in this virtual environment",
-  "/wallets": "Project wallets available in this environment, ready for TON Connect",
-  "/simulator": "Build and replay messages against this virtual environment",
+  "/dashboard": "Network status and recent activity",
+  "/faucet": "Fund accounts in this environment",
+  "/wallets": "Project wallets available on this network, ready for TON Connect",
+  "/simulator": "Build and replay messages against this network",
   "/cell-inspector": "Decode cells and inspect serialized TON data",
-  "/contracts": "Track deployed contracts and match them with Acton build artifacts",
-  "/contracts/sources": "Manage source artifacts available to contracts in this environment",
+  "/contracts": "Track deployed contracts and match them with source artifacts",
+  "/contracts/sources": "Manage source artifacts available to contracts on this network",
   "/contracts/abi": "Manage ABI used to decode contract state and messages",
-  "/explorer/tokens": "Jettons detected in this virtual environment",
-  "/explorer/nfts": "NFT items indexed from this virtual environment",
+  "/explorer/tokens": "Jettons detected on this network",
+  "/explorer/nfts": "NFT items indexed from this network",
   "/settings": "Manage environment identity, network behavior and mining",
-  "/integrate": "Connect Acton projects, applications and TON-compatible tools",
-  "/api-reference/v2": "Explore the localnet v2 API",
-  "/api-reference/v3": "Explore the localnet v3 API",
-  "/api-reference/control": "Explore localnet management methods",
-  "/api-calls": "Review requests made to this virtual environment",
+  "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
+  "/api-reference/v2": "Explore the v2 API",
+  "/api-reference/v3": "Explore the v3 API",
+  "/api-reference/control": "Explore network management methods",
+  "/api-calls": "Review requests made to this environment",
 }
 
 interface LocalnetWorkspaceProps {
@@ -307,13 +307,17 @@ const AppContent: FC<AppContentProps> = ({
             <Route
               path={path("/settings")}
               element={
-                <DashboardPage>
-                  <SettingsPage
-                    client={client}
-                    onEnvironmentChange={onEnvironmentChange}
-                    onEnvironmentDelete={onEnvironmentDelete}
-                  />
-                </DashboardPage>
+                runtime.environment?.lifecycle === "managed" ? (
+                  <DashboardPage>
+                    <SettingsPage
+                      client={client}
+                      onEnvironmentChange={onEnvironmentChange}
+                      onEnvironmentDelete={onEnvironmentDelete}
+                    />
+                  </DashboardPage>
+                ) : (
+                  fallback
+                )
               }
             />
             <Route

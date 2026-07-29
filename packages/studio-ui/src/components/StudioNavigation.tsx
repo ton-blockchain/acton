@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChevronRight,
   Github,
+  Globe2,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -24,12 +25,14 @@ const NESTED_NAVIGATION_LIMIT = 5
 interface StudioNavigationProps {
   readonly activePath: StudioPath
   readonly activeEnvironmentId?: string
+  readonly activeNetworkId?: string
   readonly className?: string
   readonly contextAction?: {
     readonly label: string
     readonly onSelect: () => void
   }
   readonly environments?: readonly StudioEnvironment[]
+  readonly networks?: readonly StudioEnvironment[]
   readonly isSidebarCollapsed?: boolean
   readonly navigationContent?: ReactNode
   readonly navigationKey?: string
@@ -47,9 +50,11 @@ interface StudioNavigationProps {
 export function StudioNavigation({
   activePath,
   activeEnvironmentId,
+  activeNetworkId,
   className,
   contextAction,
   environments = [],
+  networks = [],
   isSidebarCollapsed = false,
   navigationContent,
   navigationKey = "studio",
@@ -177,6 +182,7 @@ export function StudioNavigation({
                         const Icon = page.icon
                         const isActive =
                           page.path === activePath &&
+                          !activeNetworkId &&
                           !(page.path === "/virtual-environments" && activeEnvironmentId)
                         const showEnvironments =
                           page.path === "/virtual-environments" &&
@@ -266,6 +272,39 @@ export function StudioNavigation({
                           </Fragment>
                         )
                       })}
+                      {networks.length > 0 ? (
+                        <div className={styles.networkNavGroup}>
+                          <div className={styles.networkNavLabel}>
+                            <Globe2 size={18} aria-hidden="true" />
+                            <span>Networks</span>
+                          </div>
+                          <ul className={styles.environmentNavList} aria-label="Networks">
+                            {networks.map(network => (
+                              <li key={network.id}>
+                                <button
+                                  type="button"
+                                  className={`${styles.environmentNavItem} ${
+                                    activeNetworkId === network.id
+                                      ? styles.environmentNavItemActive
+                                      : ""
+                                  }`}
+                                  aria-current={activeNetworkId === network.id ? "page" : undefined}
+                                  onClick={() => openEnvironmentAndClose(network)}
+                                >
+                                  <span className={styles.environmentNavName}>{network.name}</span>
+                                  <span
+                                    className={styles.environmentStatusDot}
+                                    data-status={network.status}
+                                    role="img"
+                                    aria-label={`Status: ${network.status}`}
+                                    title={network.status}
+                                  />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : undefined}
                     </div>
                   </div>
                 </nav>

@@ -1,6 +1,8 @@
 import {isStudioPath, type StudioPath} from "./studioPages"
+import type {StudioEnvironment} from "./studioApi"
 
-const environmentPathPattern = /^\/virtual-environments\/([^/]+)(?:\/.*)?$/
+const managedEnvironmentPathPattern = /^\/virtual-environments\/([^/]+)(?:\/.*)?$/
+const externalNetworkPathPattern = /^\/networks\/([^/]+)(?:\/.*)?$/
 const testRunPathPattern = /^\/tests\/([^/]+)$/
 
 export type StudioRoute =
@@ -12,6 +14,7 @@ export type StudioRoute =
       readonly basePath: string
       readonly environmentId: string
       readonly kind: "environment"
+      readonly section: "virtual-environments" | "networks"
     }
   | {
       readonly kind: "test-run"
@@ -20,15 +23,22 @@ export type StudioRoute =
 
 export function readStudioRoute(pathname = globalThis.location.pathname): StudioRoute {
   const normalizedPath = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname
-  const environmentMatch = environmentPathPattern.exec(normalizedPath)
+  const managedEnvironmentMatch = managedEnvironmentPathPattern.exec(normalizedPath)
+  const externalNetworkMatch = externalNetworkPathPattern.exec(normalizedPath)
+  const environmentMatch = managedEnvironmentMatch ?? externalNetworkMatch
 
   if (environmentMatch) {
     try {
       const environmentId = decodeURIComponent(environmentMatch[1])
+      const section = managedEnvironmentMatch ? "virtual-environments" : "networks"
       return {
-        basePath: environmentStudioPath(environmentId),
+        basePath:
+          section === "virtual-environments"
+            ? environmentStudioPath(environmentId)
+            : networkStudioPath(environmentId),
         environmentId,
         kind: "environment",
+        section,
       }
     } catch {
       return {kind: "page", path: "/"}
@@ -55,6 +65,16 @@ export function readStudioRoute(pathname = globalThis.location.pathname): Studio
 
 export function environmentStudioPath(environmentId: string) {
   return `/virtual-environments/${encodeURIComponent(environmentId)}`
+}
+
+export function networkStudioPath(networkId: string) {
+  return `/networks/${encodeURIComponent(networkId)}`
+}
+
+export function studioEnvironmentPath(environment: StudioEnvironment) {
+  return environment.lifecycle === "external"
+    ? networkStudioPath(environment.id)
+    : environmentStudioPath(environment.id)
 }
 
 export function testRunStudioPath(runId: string) {

@@ -51,6 +51,7 @@ struct LocalProcessRuntimeInner {
     environments: RwLock<Vec<Arc<LocalEnvironment>>>,
     artifact_synchronizer: ProjectArtifactSynchronizer,
     contract_registry: ContractRegistryStore,
+    persistent_artifact_targets: Vec<String>,
     artifact_coordinator_started: AtomicBool,
     artifact_coordinator_wakeup: Notify,
     shutting_down: AtomicBool,
@@ -192,9 +193,13 @@ impl LocalProcessEnvironmentRuntime {
         acton_executable: impl Into<PathBuf>,
         workspace_root: impl Into<PathBuf>,
         contract_registry: ContractRegistryStore,
+        mut persistent_artifact_targets: Vec<String>,
     ) -> Result<Self, EnvironmentRuntimeError> {
         let acton_executable = acton_executable.into();
         let workspace_root = workspace_root.into();
+        persistent_artifact_targets.retain(|environment_id| !environment_id.is_empty());
+        persistent_artifact_targets.sort();
+        persistent_artifact_targets.dedup();
         let LoadedEnvironments { records, next_id } = load_environments(&workspace_root).await?;
         let inner = Arc::new(LocalProcessRuntimeInner {
             artifact_synchronizer: ProjectArtifactSynchronizer::new(
@@ -202,6 +207,7 @@ impl LocalProcessEnvironmentRuntime {
                 workspace_root.clone(),
             ),
             contract_registry,
+            persistent_artifact_targets,
             acton_executable,
             workspace_root,
             next_id: AtomicU64::new(next_id),
@@ -214,6 +220,9 @@ impl LocalProcessEnvironmentRuntime {
 
         for record in records {
             restore_environment(&inner, record).await?;
+        }
+        if !inner.persistent_artifact_targets.is_empty() {
+            schedule_project_artifact_sync(&inner);
         }
 
         Ok(Self { inner })
@@ -575,6 +584,7 @@ async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u
                 ports.push(*api_v2_port);
                 ports.push(*api_v3_port);
             }
+            EnvironmentConfig::RemoteTonNetwork { .. } => {}
         }
     }
     ports
@@ -599,6 +609,7 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
             control: None,
         },
+        EnvironmentConfig::RemoteTonNetwork { .. } => EnvironmentEndpoints::default(),
     }
 }
 
@@ -718,6 +729,13 @@ impl EnvironmentDriver {
             )
             .await
             .map(Self::FullTonNetwork),
+            EnvironmentConfig::RemoteTonNetwork { .. } => {
+                Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "external_environment_not_managed",
+                    message: "External TON networks are not managed by the local process runtime"
+                        .to_owned(),
+                })
+            }
         }
     }
 
@@ -1243,7 +1261,7 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
         if runtime.shutting_down.load(Ordering::Acquire) {
             return;
         }
-        if !has_running_environment(runtime).await {
+        if !has_artifact_publication_target(runtime).await {
             runtime.artifact_coordinator_wakeup.notified().await;
             failed_build_fingerprint = None;
             next_publish_retry = Instant::now();
@@ -1276,7 +1294,7 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
         if fingerprint_is_stable
             && !state.is_current_fingerprint(&fingerprint)
             && failed_build_fingerprint.as_ref() != Some(&fingerprint)
-            && has_running_environment(runtime).await
+            && has_artifact_publication_target(runtime).await
         {
             match runtime.artifact_synchronizer.build_and_store().await {
                 Ok(_) => match runtime.artifact_synchronizer.fingerprint().await {
@@ -1357,25 +1375,20 @@ async fn publish_current_artifact_revision(
         return false;
     };
     let mut had_failures = false;
-    let environments = runtime.environments.read().await.clone();
-    for environment in environments {
-        let details = environment.details.read().await.clone();
-        let generation = environment.generation.load(Ordering::Acquire);
-        if details.status != EnvironmentStatus::Running
-            || !state.needs_publish(&details.id, generation)
-        {
+    for (environment_id, generation) in artifact_publication_targets(runtime).await {
+        if !state.needs_publish(&environment_id, generation) {
             continue;
         }
         let revision = state.current.as_ref().expect("revision exists");
         let result = runtime
             .contract_registry
-            .register_verified_sources(&details.id, &revision.artifacts)
+            .register_verified_sources(&environment_id, &revision.artifacts)
             .await;
         match result {
             Ok(()) => {
-                state.mark_published(details.id.clone(), generation, revision_id);
+                state.mark_published(environment_id.clone(), generation, revision_id);
                 tracing::debug!(
-                    environment_id = %details.id,
+                    environment_id,
                     artifact_count = state
                         .current
                         .as_ref()
@@ -1387,7 +1400,7 @@ async fn publish_current_artifact_revision(
             Err(error) => {
                 had_failures = true;
                 tracing::warn!(
-                    environment_id = %details.id,
+                    environment_id,
                     %error,
                     "Failed to register Acton project artifacts"
                 );
@@ -1397,14 +1410,29 @@ async fn publish_current_artifact_revision(
     had_failures
 }
 
-async fn has_running_environment(runtime: &LocalProcessRuntimeInner) -> bool {
+async fn artifact_publication_targets(runtime: &LocalProcessRuntimeInner) -> Vec<(String, u64)> {
+    let mut targets = runtime
+        .persistent_artifact_targets
+        .iter()
+        .cloned()
+        .map(|environment_id| (environment_id, 0))
+        .collect::<HashMap<_, _>>();
     let environments = runtime.environments.read().await.clone();
     for environment in environments {
-        if environment.details.read().await.status == EnvironmentStatus::Running {
-            return true;
+        let environment_id = {
+            let details = environment.details.read().await;
+            (details.status == EnvironmentStatus::Running).then(|| details.id.clone())
+        };
+        if let Some(environment_id) = environment_id {
+            let generation = environment.generation.load(Ordering::Acquire);
+            targets.insert(environment_id, generation);
         }
     }
-    false
+    targets.into_iter().collect()
+}
+
+async fn has_artifact_publication_target(runtime: &LocalProcessRuntimeInner) -> bool {
+    !artifact_publication_targets(runtime).await.is_empty()
 }
 
 async fn child_exit_status(environment: &LocalEnvironment) -> std::io::Result<Option<ExitStatus>> {
@@ -1750,6 +1778,49 @@ child installed: false"]]
             resume_on_startup: AtomicBool::new(true),
             deleted: AtomicBool::new(false),
         })
+    }
+}
+
+#[cfg(test)]
+mod external_environment_tests {
+    use std::path::Path;
+
+    use expect_test::expect;
+    use tempfile::tempdir;
+
+    use crate::environment::PublicTonNetwork;
+
+    use super::{EnvironmentConfig, EnvironmentDriver, EnvironmentRuntimeError};
+
+    #[tokio::test]
+    async fn external_environment_is_rejected_without_materializing_a_data_directory() {
+        let workspace = tempdir().expect("temporary workspace");
+        let data_dir = workspace.path().join("testnet");
+        let result = EnvironmentDriver::new(
+            Path::new("acton"),
+            workspace.path(),
+            &data_dir,
+            "testnet",
+            &EnvironmentConfig::RemoteTonNetwork {
+                network: PublicTonNetwork::Testnet,
+            },
+        )
+        .await;
+        let error = match result {
+            Ok(_) => "unexpected success".to_owned(),
+            Err(EnvironmentRuntimeError::InvalidRequest { code, message }) => {
+                format!("{code} ({message})")
+            }
+            Err(error) => format!("unexpected error ({error})"),
+        };
+        let actual = format!(
+            "result: {error}\ndata directory exists: {}",
+            data_dir.exists()
+        );
+
+        expect![[r"result: external_environment_not_managed (External TON networks are not managed by the local process runtime)
+data directory exists: false"]]
+        .assert_eq(&actual);
     }
 }
 

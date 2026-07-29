@@ -23,8 +23,8 @@ import {
 } from "./studioApi"
 import {studioFeaturePages, studioPages, type StudioPath} from "./studioPages"
 import {
-  environmentStudioPath,
   readStudioRoute,
+  studioEnvironmentPath,
   type StudioRoute,
   testRunStudioPath,
 } from "./studioRoutes"
@@ -43,7 +43,9 @@ function StudioApp() {
   const environmentsState = useStudioEnvironments()
   const environmentRoute = route.kind === "environment" ? route : undefined
   const environment = environmentsState.environments.find(
-    candidate => candidate.id === environmentRoute?.environmentId,
+    candidate =>
+      candidate.id === environmentRoute?.environmentId &&
+      candidate.lifecycle === (environmentRoute.section === "networks" ? "external" : "managed"),
   )
 
   const navigate = useCallback(
@@ -57,7 +59,7 @@ function StudioApp() {
   const openEnvironment = useCallback(
     (environment: StudioEnvironment) => {
       environmentsState.setEnvironment(environment)
-      void routerNavigate(environmentStudioPath(environment.id))
+      void routerNavigate(studioEnvironmentPath(environment))
       globalThis.scrollTo({top: 0})
     },
     [environmentsState.setEnvironment, routerNavigate],
@@ -121,7 +123,9 @@ function StudioWorkspace({
       ? route.path
       : route.kind === "test-run"
         ? "/tests"
-        : "/virtual-environments"
+        : route.section === "virtual-environments"
+          ? "/virtual-environments"
+          : "/"
   const [testSearchParams, setTestSearchParams] = useSearchParams()
   const selectedTestRunId = route.kind === "test-run" ? route.runId : undefined
   const selectedTestKey =
@@ -230,12 +234,20 @@ function StudioWorkspace({
   }
 
   const environmentRoute = route.kind === "environment" ? route : undefined
+  const managedEnvironments = environmentsState.environments.filter(
+    environment => environment.lifecycle === "managed",
+  )
+  const externalNetworks = environmentsState.environments.filter(
+    environment => environment.lifecycle === "external",
+  )
   const isEnvironmentDashboard =
     environmentRoute !== undefined && location.pathname === `${environmentRoute.basePath}/dashboard`
   const environmentLoadError =
     environmentsState.error ??
     (environmentRoute && !environmentsState.isLoading && !environment
-      ? "Virtual environment not found"
+      ? environmentRoute.section === "networks"
+        ? "Network not found"
+        : "Virtual environment not found"
       : undefined)
   const activeFeaturePage =
     route.kind === "page" && activePath !== "/" ? studioFeaturePages[activePath] : undefined
@@ -321,16 +333,28 @@ function StudioWorkspace({
       }
       pageDescription={
         environmentRoute
-          ? (activeEnvironmentShell?.pageDescription ?? "Preparing this virtual environment")
+          ? (activeEnvironmentShell?.pageDescription ??
+            (environment?.lifecycle === "external"
+              ? "Preparing this network"
+              : "Preparing this virtual environment"))
           : undefined
       }
       pageTitle={
         environmentRoute
-          ? (activeEnvironmentShell?.pageTitle ?? environment?.name ?? "Virtual Environment")
+          ? (activeEnvironmentShell?.pageTitle ??
+            environment?.name ??
+            (environmentRoute.section === "networks" ? "Network" : "Virtual Environment"))
           : undefined
       }
       pages={studioPages}
-      sidebarActiveEnvironmentId={environmentRoute?.environmentId}
+      sidebarActiveEnvironmentId={
+        environmentRoute?.section === "virtual-environments"
+          ? environmentRoute.environmentId
+          : undefined
+      }
+      sidebarActiveNetworkId={
+        environmentRoute?.section === "networks" ? environmentRoute.environmentId : undefined
+      }
       sidebarContextAction={
         environmentRoute && environment && !showEnvironmentNavigation
           ? {
@@ -347,7 +371,8 @@ function StudioWorkspace({
           />
         ) : undefined
       }
-      sidebarEnvironments={environmentsState.environments}
+      sidebarEnvironments={managedEnvironments}
+      sidebarNetworks={externalNetworks}
       sidebarNavigationKey={
         showEnvironmentNavigation && environment ? `environment:${environment.id}` : "studio"
       }
@@ -392,7 +417,7 @@ function StudioWorkspace({
       ) : activePath === "/virtual-environments" ? (
         <VirtualEnvironmentsPage
           createOpen={isEnvironmentCreateOpen}
-          environments={environmentsState.environments}
+          environments={managedEnvironments}
           isLoading={environmentsState.isLoading}
           loadError={environmentsState.error}
           walletNames={studioInfo?.workspace?.walletNames ?? []}
