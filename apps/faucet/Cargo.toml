@@ -15,7 +15,7 @@ version = "0.1.0"
 publish = false
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.94.1"
+rust-version = "1.96.1"
 repository = "https://github.com/ton-blockchain/faucet"
 
 [workspace.dependencies]
