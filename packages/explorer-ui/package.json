@@ -15,7 +15,8 @@
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
     "precommit": "bun fmt && bun lint && bun build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "bun test tests"
   },
   "dependencies": {
     "@acton/explorer-core": "workspace:*",

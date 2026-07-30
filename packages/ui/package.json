@@ -55,6 +55,7 @@
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
+    "test": "bun test test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

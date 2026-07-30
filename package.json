@@ -17,6 +17,7 @@
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
     "lint:fix": "bun --filter '*' lint:fix",
+    "test:unit": "bun --filter '*' test",
     "test:e2e:ui": "playwright test --config packages/ui-e2e/playwright.config.ts",
     "test:e2e:test-ui": "playwright test --config packages/test-ui/playwright.config.ts",
     "doctor": "CI=1 react-doctor"

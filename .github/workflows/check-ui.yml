@@ -1,0 +1,118 @@
+name: Check UI
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui.yml"
+      - "biome.jsonc"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "package.json"
+      - "packages/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-ui.yml"
+      - "biome.jsonc"
+      - "bun.lock"
+      - "bunfig.toml"
+      - "package.json"
+      - "packages/**"
+  workflow_dispatch:
+
+concurrency:
+  group: check-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  check:
+    name: Check UI
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubicloud-standard-16-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install just
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-check-ui-bun-cache-path |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-check-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-check-ui-
+
+      - name: Install UI dependencies
+        run: bun ci
+
+      - name: Run UI checks
+        run: just check-ui-ci
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-check-ui-bun-cache-path
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+
+  unit:
+    name: Test UI units
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Restore Bun cache
+        id: bun-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-test-ui-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-test-ui-
+
+      - name: Install dependencies
+        run: bun ci
+
+      - name: Run UI unit tests
+        run: bun run test:unit
+
+      - name: Save Bun cache
+        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
