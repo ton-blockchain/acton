@@ -168,8 +168,7 @@ jobs:
       - name: Run Explorer UI E2E
         id: explorer-ui-e2e
         env:
-          CC: clang-16
-          CXX: clang++-16
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
         run: just test-explorer-ui-e2e-run
 
       - name: Upload Explorer UI E2E artifacts

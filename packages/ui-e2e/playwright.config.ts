@@ -9,6 +9,7 @@ const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_30
 const tonConnectDappPort = Number(process.env.ACTON_UI_E2E_TONCONNECT_DAPP_PORT ?? 14_308)
 const tonConnectBridgePort = Number(process.env.ACTON_UI_E2E_TONCONNECT_BRIDGE_PORT ?? 14_309)
 const tonConnectBridgeUrl = `http://127.0.0.1:${tonConnectBridgePort}/bridge`
+const actonBinary = process.env.ACTON_E2E_BIN ?? path.join(repositoryRoot, "target/debug/acton")
 
 export default defineConfig({
   testDir: "./e2e",
@@ -46,7 +47,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cargo run --bin acton -- localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
+      command: `${JSON.stringify(actonBinary)} localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
       cwd: repositoryRoot,
       url: `http://127.0.0.1:${localnetNodePort}/acton_nodeInfo`,
       reuseExistingServer: false,
