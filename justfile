@@ -51,6 +51,9 @@ test-ui-e2e-run: install-test-ui-e2e-browsers
 test-explorer-ui-e2e-run: install-test-ui-e2e-browsers
     bun run test:e2e:ui
 
+test-explorer-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
+    CHECK_UI_SNAPSHOTS=1 bun run test:e2e:ui -- --update-snapshots
+
 test-ui-e2e: build-ui build-dev test-ui-e2e-run
 
 test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
