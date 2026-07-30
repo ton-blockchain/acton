@@ -165,6 +165,22 @@ jobs:
           retention-days: 1
           if-no-files-found: ignore
 
+      - name: Run Explorer UI E2E
+        id: explorer-ui-e2e
+        env:
+          CC: clang-16
+          CXX: clang++-16
+        run: just test-explorer-ui-e2e-run
+
+      - name: Upload Explorer UI E2E artifacts
+        if: failure() && steps.explorer-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: explorer-ui-e2e-results
+          path: test-results/acton-ui-e2e
+          retention-days: 1
+          if-no-files-found: ignore
+
       - name: Run tests
         if: steps.changes.outputs.packages_only != 'true'
         run: |

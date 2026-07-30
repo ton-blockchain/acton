@@ -48,6 +48,9 @@ test-ui-e2e-run: install-test-ui-e2e-browsers
     bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     bun run test:e2e:test-ui
 
+test-explorer-ui-e2e-run: install-test-ui-e2e-browsers
+    bun run test:e2e:ui
+
 test-ui-e2e: build-ui build-dev test-ui-e2e-run
 
 test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
