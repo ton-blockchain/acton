@@ -1596,6 +1596,10 @@
     "name": "Rapira Exchange 1"
   },
   {
+    "address": "0:3d7ee4917dc75c195b975a17b8fb7d367978fdc30bd9649200aa1255a93a3e57",
+    "name": "Changelly 2"
+  },
+  {
     "address": "0:3da40403e1e387c49e1370f47cc83aed6b5d16911495942788c6eff94ceec39d",
     "name": "TONAPI gas proxy"
   },
