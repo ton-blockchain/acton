@@ -41,6 +41,10 @@
   font-weight: var(--acton-font-weight-bold);
 }
 
+.mobileHeadline {
+  display: none;
+}
+
 .developerIcon {
   display: block;
   flex: 0 0 auto;
@@ -124,6 +128,14 @@
     align-self: center;
   }
 
+  .desktopHeadline {
+    display: none;
+  }
+
+  .mobileHeadline {
+    display: inline;
+  }
+
   .separator:first-of-type {
     display: none;
   }
@@ -135,6 +147,7 @@
   }
 
   .message {
+    width: 100%;
     flex-wrap: nowrap;
     overflow: hidden;
   }
@@ -144,6 +157,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .link {
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .publicExplorerPrompt,

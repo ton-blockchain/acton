@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 use tolk_compiler::abi::{ABIDeclaration, ContractABI};
 
+const CATALOG_SCHEMA_VERSION: u32 = 1;
 const DATA_ABIS_ZST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/data-abis.json.zst"));
 
 static CATALOG: OnceLock<AbiCatalog> = OnceLock::new();
@@ -16,8 +17,10 @@ pub struct AbiCatalog {
 
 #[derive(Debug, Clone)]
 pub struct CatalogContract {
+    pub id: String,
     pub display_name: String,
     pub code_hashes: Vec<String>,
+    pub known_addresses: Vec<String>,
     pub links: Vec<ContractAbiLink>,
     abi: Arc<ContractABI>,
 }
@@ -27,7 +30,6 @@ pub struct ContractAbiLink {
     pub kind: String,
     pub title: String,
     pub url: String,
-    pub scope: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -41,15 +43,20 @@ pub struct ExtendedContractAbi<T = ContractABI> {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawBundle {
+    schema_version: u32,
     contracts: Vec<RawContract>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawContract {
+    id: String,
     display_name: String,
     hashes: Vec<String>,
+    #[serde(default)]
+    known_addresses: Vec<String>,
     compiler_abi: ContractABI,
     #[serde(default)]
     links: Vec<ContractAbiLink>,
@@ -84,11 +91,17 @@ impl AbiCatalog {
     fn load() -> Result<Self, CatalogLoadError> {
         let json = zstd::stream::decode_all(DATA_ABIS_ZST)?;
         let json = String::from_utf8(json)?;
-        Ok(Self::from_json(&json)?)
+        Self::from_json(&json)
     }
 
-    fn from_json(json: &str) -> serde_json::Result<Self> {
+    fn from_json(json: &str) -> Result<Self, CatalogLoadError> {
         let raw: RawBundle = serde_json::from_str(json)?;
+        if raw.schema_version != CATALOG_SCHEMA_VERSION {
+            return Err(CatalogLoadError::UnsupportedSchemaVersion(
+                raw.schema_version,
+            ));
+        }
+
         let mut contracts = Vec::with_capacity(raw.contracts.len());
         let mut by_code_hash = HashMap::new();
         let mut by_opcode: HashMap<u32, Vec<usize>> = HashMap::new();
@@ -112,8 +125,10 @@ impl AbiCatalog {
             }
 
             contracts.push(CatalogContract {
+                id: raw_contract.id,
                 display_name: raw_contract.display_name,
                 code_hashes,
+                known_addresses: raw_contract.known_addresses,
                 links: raw_contract.links,
                 abi: Arc::new(raw_contract.compiler_abi),
             });
@@ -147,7 +162,8 @@ impl AbiCatalog {
         }
 
         self.contracts.iter().find(|contract| {
-            normalize_contract_name(&contract.display_name) == normalized
+            normalize_contract_name(&contract.id) == normalized
+                || normalize_contract_name(&contract.display_name) == normalized
                 || normalize_contract_name(&contract.abi.contract_name) == normalized
         })
     }
@@ -169,6 +185,7 @@ enum CatalogLoadError {
     Zstd(std::io::Error),
     Utf8(std::string::FromUtf8Error),
     Json(serde_json::Error),
+    UnsupportedSchemaVersion(u32),
 }
 
 impl std::fmt::Display for CatalogLoadError {
@@ -177,6 +194,10 @@ impl std::fmt::Display for CatalogLoadError {
             Self::Zstd(error) => write!(formatter, "failed to decompress catalog: {error}"),
             Self::Utf8(error) => write!(formatter, "catalog is not UTF-8: {error}"),
             Self::Json(error) => write!(formatter, "failed to parse catalog JSON: {error}"),
+            Self::UnsupportedSchemaVersion(version) => write!(
+                formatter,
+                "unsupported catalog schema version {version}; expected {CATALOG_SCHEMA_VERSION}"
+            ),
         }
     }
 }
@@ -293,6 +314,20 @@ mod tests {
 
         assert_eq!(contract.display_name, "Account");
         assert_eq!(contract.abi().contract_name, "AffluentAccount");
+    }
+
+    #[test]
+    fn loads_catalog_identity_and_known_addresses() {
+        let contract = find_contract_by_name("xtr.XtrMaster")
+            .expect("xtr master must be searchable by catalog id");
+
+        assert_eq!(contract.id, "xtr.XtrMaster");
+        assert_eq!(contract.display_name, "XtrMaster");
+        assert_eq!(contract.known_addresses.len(), 1);
+        assert!(
+            !contract.known_addresses[0].is_empty(),
+            "known addresses must be loaded from the catalog"
+        );
     }
 
     #[test]

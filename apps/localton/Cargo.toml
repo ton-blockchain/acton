@@ -1,0 +1,46 @@
+[package]
+name = "localton"
+description = "A complete headless local TON development network"
+version = "0.1.0"
+publish = false
+authors = ["TON Core"]
+edition = "2024"
+rust-version = "1.96.1"
+repository = "https://github.com/ton-blockchain/acton"
+license = "GPL-3.0-or-later"
+
+[workspace]
+members = ["xtask"]
+resolver = "2"
+
+[dependencies]
+anyhow = "1.0"
+axum = { version = "0.8", features = ["json", "query", "tokio", "http1"] }
+base64 = "0.22"
+clap = { version = "4.5", features = ["derive", "env"] }
+dunce = "1.0.5"
+ed25519-dalek = "2.2"
+fs2 = "0.4"
+futures-util = "0.3"
+hex = "0.4"
+nix = { version = "0.30", features = ["process", "signal"] }
+rand = "0.8"
+regex = "1.11"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tokio = { version = "1.47", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tonutils = { version = "1.1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tycho-types = { version = "0.3.5", default-features = false, features = ["models"] }
+utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
+zip = { version = "4.6", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3.20"
+
+[profile.release]
+strip = true
+lto = "thin"

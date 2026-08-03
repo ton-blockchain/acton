@@ -306,6 +306,11 @@
         "explorer": {
           "description": "Base URL used to build transaction links for this network. Acton appends `/tx/<hash>` automatically and derives links from `api.v2` when omitted",
           "type": "string"
+        },
+        "global-id": {
+          "description": "TON network global ID used to derive Wallet V5 IDs. Custom networks default to the testnet value (`-3`)",
+          "type": "integer",
+          "format": "int32"
         }
       },
       "additionalProperties": false

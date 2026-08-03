@@ -197,23 +197,3 @@ fn parse_amount(value: &str, decimals: u32) -> anyhow::Result<u128> {
     }
     Ok(amount)
 }
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    #[test]
-    fn offchain_metadata_client_is_safe_inside_localnet_runtime() {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("test runtime must build");
-        runtime.block_on(async {
-            let content = json!({"uri": "http://["});
-            assert_eq!(
-                ton_indexer::jettons::resolve_jetton_content(content.clone()),
-                content
-            );
-        });
-    }
-}

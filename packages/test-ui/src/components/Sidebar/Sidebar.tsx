@@ -11,7 +11,7 @@ import {
   FiSearch,
   FiX,
 } from "react-icons/fi"
-import {Input, ThemeSwitch, useTheme} from "@acton/ui"
+import {Input, ThemeSwitch, Tooltip, useTheme} from "@acton/ui"
 import {type TestReport, TestStatus} from "../../types/test"
 
 import styles from "./Sidebar.module.css"
@@ -142,15 +142,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
           <div className={styles.headerButtons}>
-            <button
-              type="button"
-              onClick={onCollapse}
-              className={styles.collapseButton}
-              title={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}
-              aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
-            >
-              <PanelLeft aria-hidden="true" />
-            </button>
+            <Tooltip content={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}>
+              <button
+                type="button"
+                onClick={onCollapse}
+                className={styles.collapseButton}
+                aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
+              >
+                <PanelLeft aria-hidden="true" />
+              </button>
+            </Tooltip>
           </div>
         </div>
         <div className={styles.summary}>
@@ -187,17 +188,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div className={styles.filters}>
           {(Object.values(TestStatus) as TestStatus[]).map(status => (
-            <button
-              key={status}
-              type="button"
-              className={`${styles.filterButton} ${statusFilter.has(status) ? styles.activeFilter : ""} ${styles[status.toLowerCase()]}`}
-              onClick={() => toggleStatusFilter(status)}
-              aria-label={`Show ${status} tests`}
-              aria-pressed={statusFilter.has(status)}
-              title={`Show ${status} tests`}
-            >
-              {getStatusIcon(status)}
-            </button>
+            <Tooltip key={status} content={`Show ${status} tests`}>
+              <button
+                type="button"
+                className={`${styles.filterButton} ${statusFilter.has(status) ? styles.activeFilter : ""} ${styles[status.toLowerCase()]}`}
+                onClick={() => toggleStatusFilter(status)}
+                aria-label={`Show ${status} tests`}
+                aria-pressed={statusFilter.has(status)}
+              >
+                {getStatusIcon(status)}
+              </button>
+            </Tooltip>
           ))}
         </div>
       </div>

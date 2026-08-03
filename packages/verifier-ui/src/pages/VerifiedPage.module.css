@@ -1,0 +1,140 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 4px 0 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 40px;
+}
+
+.contractRow {
+  position: relative;
+}
+
+.rowOverlayLink {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  text-decoration: none;
+}
+
+.rowOverlayLink:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.codeHashCell {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.codeHash,
+.sourceName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codeHash {
+  display: block;
+  color: var(--acton-color-accent);
+  font-family: var(--acton-font-mono, monospace);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.codeHash:hover {
+  text-decoration: underline;
+}
+
+.sourceName {
+  display: block;
+}
+
+.statisticsLink {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 4px;
+  border-radius: 6px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  text-decoration: none;
+}
+
+.statisticsLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+}
+
+.statisticsLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.hashCopyButton {
+  flex: 0 0 auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.paginationCell {
+  padding: 0;
+}
+
+.codeHashCell:hover .hashCopyButton,
+.codeHashCell:focus-within .hashCopyButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: var(--acton-font-size-2xl);
+    line-height: 1.2;
+  }
+}

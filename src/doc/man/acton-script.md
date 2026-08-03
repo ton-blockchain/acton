@@ -128,7 +128,12 @@ and keep using the same value for that project.
 {{#option "`--explorer` _name_" }}
 Explorer to use for transaction links.
 
-Possible values: `tonscan`, `toncx`, `dton`, `tonviewer`
+Possible values: `actonscan`, `tonscan`, `toncx`, `dton`, `tonviewer`
+
+Actonscan is the default. For `custom:<name>` networks without an explicit
+`networks.<name>.explorer`, Acton embeds the configured `api.v2` and `api.v3`
+endpoints in an Actonscan shared-network URL. An explicit network explorer
+still takes precedence.
 {{/option}}
 
 {{/options}}

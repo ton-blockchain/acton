@@ -4,6 +4,7 @@ import {type ComponentPropsWithoutRef, useCallback, useEffect, useState} from "r
 
 import {cx} from "../../lib/cx"
 import {useTheme} from "../Theme/ThemeProvider"
+import {Tooltip} from "../Tooltip"
 import {IdeIcon} from "./icons"
 import styles from "./IdeSelector.module.css"
 
@@ -150,14 +151,11 @@ export function IdeSelector({
       </a>
 
       <Menu.Root modal={false}>
-        <Menu.Trigger
-          type="button"
-          className={styles.trigger}
-          aria-label="Change IDE"
-          title="Change IDE"
-        >
-          <ChevronDown aria-hidden="true" />
-        </Menu.Trigger>
+        <Tooltip content="Change IDE">
+          <Menu.Trigger type="button" className={styles.trigger} aria-label="Change IDE">
+            <ChevronDown aria-hidden="true" />
+          </Menu.Trigger>
+        </Tooltip>
 
         <Menu.Portal>
           <Menu.Positioner className={styles.positioner} sideOffset={4} align="end">

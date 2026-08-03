@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {getErrorMessage, isAbortError} from "./request"
 
 interface CoverageReportState {
@@ -9,6 +10,7 @@ interface CoverageReportState {
 }
 
 export function useCoverageReport() {
+  const {url} = useTestUiApi()
   const [state, setState] = useState<CoverageReportState>({
     lcov: undefined,
     error: undefined,
@@ -20,7 +22,7 @@ export function useCoverageReport() {
 
     const loadCoverage = async () => {
       try {
-        const response = await fetch("/api/coverage.lcov", {signal: controller.signal})
+        const response = await fetch(url("/coverage.lcov"), {signal: controller.signal})
         if (response.status === 204) {
           setState({lcov: undefined, error: undefined, loading: false})
           return
@@ -41,7 +43,7 @@ export function useCoverageReport() {
 
     void loadCoverage()
     return () => controller.abort()
-  }, [])
+  }, [url])
 
   return state
 }

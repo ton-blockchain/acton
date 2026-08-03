@@ -26,7 +26,6 @@ use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use path_absolutize::Absolutize;
 use rand::RngCore;
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -526,9 +525,6 @@ fn send_message_impl(
 
         if tonconnect.is_some() || wallet.is_some() {
             let custom_networks = ctx.env.config.custom_networks();
-            if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
-                warn!("Failed to register compiler ABI in localnet: {err:#}");
-            }
 
             if let Some(tonconnect) = tonconnect {
                 let (wallet_ext_in, norm_hash) =
@@ -3285,6 +3281,7 @@ fn transaction_link_from_parts(
     utime: u32,
 ) -> String {
     let network = ctx.network();
+    let explorer = ctx.env.explorer.unwrap_or_default();
     match &network {
         Network::Localnet => {
             if let Some(url) = localnet_transaction_link(ctx, tx_hash_hex) {
@@ -3293,7 +3290,7 @@ fn transaction_link_from_parts(
         }
         Network::Custom(network_name) => {
             if let Some(url) =
-                custom_network_transaction_link(ctx, network_name.as_ref(), tx_hash_hex)
+                custom_network_transaction_link(ctx, network_name.as_ref(), explorer, tx_hash_hex)
             {
                 return url;
             }
@@ -3301,13 +3298,29 @@ fn transaction_link_from_parts(
         Network::Mainnet | Network::Testnet => {}
     }
 
+    public_network_transaction_link(&network, explorer, address_str, tx_hash_hex, lt, utime)
+}
+
+fn public_network_transaction_link(
+    network: &Network,
+    explorer: Explorer,
+    address_str: &str,
+    tx_hash_hex: &str,
+    lt: u64,
+    utime: u32,
+) -> String {
     let network_prefix = if network.uses_testnet_address_format() {
         "testnet."
     } else {
         ""
     };
-    let explorer = ctx.env.explorer.unwrap_or(Explorer::Tonscan);
     match explorer {
+        Explorer::Actonscan if network.uses_testnet_address_format() => {
+            format!("https://actonscan.com/tx/{tx_hash_hex}?network=testnet")
+        }
+        Explorer::Actonscan => {
+            format!("https://actonscan.com/tx/{tx_hash_hex}?network=mainnet")
+        }
         Explorer::Tonscan => format!("https://{network_prefix}tonscan.org/tx/{tx_hash_hex}"),
         Explorer::Toncx => {
             format!("https://{network_prefix}ton.cx/tx/{lt}:{tx_hash_hex}:{address_str}")
@@ -3322,129 +3335,52 @@ fn transaction_link_from_parts(
 fn custom_network_transaction_link(
     ctx: &Context,
     network_name: &str,
+    explorer: Explorer,
     tx_hash_hex: &str,
 ) -> Option<String> {
     let custom_networks = ctx.env.config.custom_networks();
     let network_urls = custom_networks.get(network_name)?;
+    custom_network_transaction_link_from_urls(network_name, network_urls, explorer, tx_hash_hex)
+}
+
+fn custom_network_transaction_link_from_urls(
+    network_name: &str,
+    network_urls: &acton_config::config::CustomNetworkUrls,
+    explorer: Explorer,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    if network_urls.explorer_url.is_none()
+        && explorer == Explorer::Actonscan
+        && let Some(url) =
+            actonscan_custom_network_transaction_link(network_name, network_urls, tx_hash_hex)
+    {
+        return Some(url);
+    }
+
     configured_network_transaction_link(network_urls, tx_hash_hex)
+}
+
+fn actonscan_custom_network_transaction_link(
+    network_name: &str,
+    network_urls: &acton_config::config::CustomNetworkUrls,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    let v3_url = network_urls.v3_url.as_deref()?;
+    let mut url =
+        reqwest::Url::parse("https://actonscan.com").expect("Actonscan URL must be valid");
+    url.set_path(&format!("/tx/{tx_hash_hex}"));
+    url.query_pairs_mut()
+        .append_pair("network.name", network_name)
+        .append_pair("network.v2", network_urls.v2_url.as_ref())
+        .append_pair("network.v3", v3_url)
+        .append_pair("network.testOnly", "0");
+    Some(url.to_string())
 }
 
 fn localnet_transaction_link(ctx: &Context, tx_hash_hex: &str) -> Option<String> {
     let custom_networks = ctx.env.config.custom_networks();
     let localnet_urls = custom_networks.get("localnet")?;
     configured_network_transaction_link(localnet_urls, tx_hash_hex)
-}
-
-#[derive(Serialize)]
-struct RegisterAbiPayload {
-    entries: Vec<RegisterAbiEntry>,
-}
-
-#[derive(Serialize)]
-struct RegisterAbiEntry {
-    abi: serde_json::Value,
-}
-
-fn register_localnet_abis(
-    ctx: &Context,
-    custom_networks: &HashMap<String, acton_config::config::CustomNetworkUrls>,
-) -> anyhow::Result<()> {
-    if !matches!(ctx.network(), Network::Localnet) {
-        return Ok(());
-    }
-
-    let mut entries_by_hash = HashMap::<String, serde_json::Value>::new();
-    for result in ctx.build.build_cache.built.values() {
-        let Some(abi) = result.abi.as_ref() else {
-            continue;
-        };
-        let mut abi = abi.as_ref().clone();
-        if abi.contract_name.is_empty() {
-            abi.contract_name.clone_from(&result.name);
-        }
-        let display_name = abi.contract_name.clone();
-        let code_hash = result.code_hash.to_string();
-        entries_by_hash.entry(code_hash.clone()).or_insert_with(|| {
-            serde_json::json!({
-                "compiler_abi": abi,
-                "display_name": display_name,
-                "code_hashes": [code_hash],
-                "links": [],
-            })
-        });
-    }
-
-    if entries_by_hash.is_empty() {
-        return Ok(());
-    }
-
-    let url = localnet_acton_url(custom_networks, "acton_registerCompilerAbis")?;
-    let payload = RegisterAbiPayload {
-        entries: entries_by_hash
-            .into_values()
-            .map(|abi| RegisterAbiEntry { abi })
-            .collect(),
-    };
-
-    let client = crate::http::blocking_client_builder()
-        .connect_timeout(Duration::from_secs(2))
-        .timeout(Duration::from_secs(5))
-        .user_agent(crate::build_info::user_agent())
-        .build()?;
-    let request = client.post(&url).json(&payload);
-    let response = with_localnet_auth(request)
-        .send()
-        .with_context(|| format!("Failed to POST compiler ABI registry to {url}"))?;
-    let status = response.status();
-    let body = response.text().unwrap_or_default();
-
-    anyhow::ensure!(
-        status.is_success(),
-        "Localnet compiler ABI registration failed with status {status}: {body}"
-    );
-
-    let response_json: serde_json::Value = serde_json::from_str(&body).with_context(|| {
-        format!("Localnet compiler ABI registration returned invalid JSON: {body}")
-    })?;
-    anyhow::ensure!(
-        response_json.get("ok").and_then(serde_json::Value::as_bool) == Some(true),
-        "Localnet compiler ABI registration failed: {}",
-        response_json
-            .get("error")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(body.as_str())
-    );
-
-    Ok(())
-}
-
-fn with_localnet_auth(
-    request: reqwest::blocking::RequestBuilder,
-) -> reqwest::blocking::RequestBuilder {
-    match crate::commands::localnet::resolve_localnet_auth_token(None) {
-        Some(token) => request.bearer_auth(token),
-        None => request,
-    }
-}
-
-fn localnet_acton_url(
-    custom_networks: &HashMap<String, acton_config::config::CustomNetworkUrls>,
-    endpoint: &str,
-) -> anyhow::Result<String> {
-    let v2_url = Network::Localnet.toncenter_v2_url(custom_networks)?;
-    let mut url = reqwest::Url::parse(&v2_url)?;
-    let base_path = url.path().trim_end_matches('/');
-    let acton_base = base_path.strip_suffix("/api/v2").unwrap_or(base_path);
-    let acton_path = if acton_base.is_empty() {
-        format!("/{endpoint}")
-    } else {
-        format!("{acton_base}/{endpoint}")
-    };
-
-    url.set_path(&acton_path);
-    url.set_query(None);
-    url.set_fragment(None);
-    Ok(url.to_string())
 }
 
 fn configured_network_transaction_link(
@@ -3963,6 +3899,112 @@ mod tests {
         let url = configured_network_transaction_link(&urls, "abc123")
             .expect("fallback link should be built");
         assert_eq!(url, "http://127.0.0.1:3010/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn actonscan_custom_network_link_embeds_api_endpoints() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("https://devnet.example/api/v2"),
+            v3_url: Some(Arc::from("https://devnet.example/api/v3")),
+            explorer_url: None,
+        };
+
+        let url = custom_network_transaction_link_from_urls(
+            "my-devnet",
+            &urls,
+            Explorer::default(),
+            "abc123",
+        )
+        .expect("Actonscan custom-network link should be built");
+        let url = reqwest::Url::parse(&url).expect("Actonscan link should be valid");
+        let query_pairs = url.query_pairs().into_owned().collect::<Vec<_>>();
+
+        assert_eq!(
+            url.as_str().split('?').next(),
+            Some("https://actonscan.com/tx/abc123")
+        );
+        assert_eq!(
+            query_pairs,
+            vec![
+                ("network.name".to_string(), "my-devnet".to_string()),
+                (
+                    "network.v2".to_string(),
+                    "https://devnet.example/api/v2".to_string()
+                ),
+                (
+                    "network.v3".to_string(),
+                    "https://devnet.example/api/v3".to_string()
+                ),
+                ("network.testOnly".to_string(), "0".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn custom_network_link_keeps_explicit_explorer_over_actonscan() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("https://devnet.example/api/v2"),
+            v3_url: Some(Arc::from("https://devnet.example/api/v3")),
+            explorer_url: Some(Arc::from("https://explorer.example")),
+        };
+
+        let url = custom_network_transaction_link_from_urls(
+            "my-devnet",
+            &urls,
+            Explorer::default(),
+            "abc123",
+        )
+        .expect("explicit explorer link should be built");
+
+        assert_eq!(url, "https://explorer.example/tx/abc123");
+    }
+
+    #[test]
+    fn custom_network_without_v3_keeps_the_v2_explorer_fallback() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("https://devnet.example/api/v2"),
+            v3_url: None,
+            explorer_url: None,
+        };
+
+        let url = custom_network_transaction_link_from_urls(
+            "my-devnet",
+            &urls,
+            Explorer::default(),
+            "abc123",
+        )
+        .expect("v2-derived explorer link should be built");
+
+        assert_eq!(url, "https://devnet.example/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn actonscan_transaction_links_select_the_network() {
+        let mainnet_url = public_network_transaction_link(
+            &Network::Mainnet,
+            Explorer::default(),
+            "address",
+            "abc123",
+            456,
+            789,
+        );
+        let testnet_url = public_network_transaction_link(
+            &Network::Testnet,
+            Explorer::default(),
+            "address",
+            "abc123",
+            456,
+            789,
+        );
+
+        assert_eq!(
+            mainnet_url,
+            "https://actonscan.com/tx/abc123?network=mainnet"
+        );
+        assert_eq!(
+            testnet_url,
+            "https://actonscan.com/tx/abc123?network=testnet"
+        );
     }
 
     #[test]

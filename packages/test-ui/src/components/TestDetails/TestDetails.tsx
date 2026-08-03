@@ -28,6 +28,7 @@ import {
   getIdeUrl,
   IdeSelector,
   RawDataBlock,
+  Tooltip,
   useIdePreference,
 } from "@acton/ui"
 
@@ -714,21 +715,24 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         hover
       >
         <DataTableCell truncate>
-          <button
-            type="button"
-            className={styles.traceLinkButton}
-            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
-            title={`Open ${summary.traceName} (${summary.firstMessageName}) in Transactions`}
+          <Tooltip
+            content={`Open ${summary.traceName} (${summary.firstMessageName}) in Transactions`}
           >
-            <span>
-              {summary.traceName}
-              <span className={styles.traceMessageSeparator} aria-hidden="true">
-                {" · "}
+            <button
+              type="button"
+              className={styles.traceLinkButton}
+              onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
+            >
+              <span>
+                {summary.traceName}
+                <span className={styles.traceMessageSeparator} aria-hidden="true">
+                  {" · "}
+                </span>
+                <span className={styles.traceMessageName}>{summary.firstMessageName}</span>
               </span>
-              <span className={styles.traceMessageName}>{summary.firstMessageName}</span>
-            </span>
-            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
-          </button>
+              <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </DataTableCell>
         <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
         <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
@@ -1114,15 +1118,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       <div className={styles.header}>
         <div className={styles.titleInfo} data-testid="test-details-title">
           {isSidebarCollapsed && onExpandSidebar && (
-            <button
-              type="button"
-              onClick={onExpandSidebar}
-              className={styles.expandButton}
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <PanelLeft aria-hidden="true" />
-            </button>
+            <Tooltip content="Expand sidebar">
+              <button
+                type="button"
+                onClick={onExpandSidebar}
+                className={styles.expandButton}
+                aria-label="Expand sidebar"
+              >
+                <PanelLeft aria-hidden="true" />
+              </button>
+            </Tooltip>
           )}
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>

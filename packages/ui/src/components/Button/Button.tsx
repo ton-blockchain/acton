@@ -3,6 +3,7 @@ import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
 import {useCopyValue} from "../../lib/useCopyValue"
+import {Tooltip} from "../Tooltip"
 import styles from "./Button.module.css"
 import type {ACTON_BUTTON_VARIANTS} from "./constants"
 
@@ -49,6 +50,7 @@ const sizeClassNames = {
 } satisfies Record<ActonButtonSize, string>
 
 export function Button({
+  "aria-label": ariaLabel,
   children,
   className,
   disabled,
@@ -57,6 +59,7 @@ export function Button({
   ref,
   size = "md",
   trailingIcon,
+  title,
   type = "button",
   variant = "secondary",
   ...props
@@ -71,12 +74,13 @@ export function Button({
     </span>
   ) : undefined
 
-  return (
+  const button = (
     <button
       {...props}
       ref={ref}
       type={type}
       disabled={isDisabled}
+      aria-label={ariaLabel ?? (size === "icon" ? title : undefined)}
       aria-busy={loading || undefined}
       className={cx(styles.button, variantClassNames[variant], sizeClassNames[size], className)}
     >
@@ -91,6 +95,8 @@ export function Button({
       </span>
     </button>
   )
+
+  return <Tooltip content={title}>{button}</Tooltip>
 }
 
 export function CopyButton({

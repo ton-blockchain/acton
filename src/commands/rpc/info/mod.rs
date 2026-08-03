@@ -13,7 +13,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashSet;
-use ton_api::{Network, TonApiClient, toncenter::v2};
+use ton_api::{Network, OffchainJsonResolver, TonApiClient, toncenter::v2};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::dict::Dict;
@@ -111,7 +111,7 @@ pub(super) fn rpc_info_cmd(
         },
         None => None,
     };
-    let inspections = if raw {
+    let mut inspections = if raw {
         Vec::new()
     } else {
         inspect_account(&InspectorContext {
@@ -124,6 +124,18 @@ pub(super) fn rpc_info_cmd(
             get_method_libs: get_method_libs.as_deref(),
         })
     };
+    if !inspections.is_empty() {
+        let metadata_resolver = OffchainJsonResolver::new()
+            .context("Failed to initialize off-chain metadata client")?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .context("Failed to initialize Tokio runtime for off-chain metadata")?;
+        runtime.block_on(jetton::enrich_metadata(
+            &mut inspections,
+            &metadata_resolver,
+        ));
+    }
 
     if json {
         let output = json_report(JsonReportInput {

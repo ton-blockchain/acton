@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
-    "dev": "vite --port 3008",
+    "dev": "vite --port 3020",
     "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
@@ -19,8 +19,8 @@
     "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
     "lucide-react": "^0.474.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

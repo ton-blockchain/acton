@@ -4,6 +4,7 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {KeyboardEvent, ReactNode} from "react"
 
 import {Input} from "../Input/Input"
+import {Tooltip} from "../Tooltip"
 import styles from "./SearchInput.module.css"
 
 export type SearchInputSize = "sm" | "md" | "lg"
@@ -131,7 +132,7 @@ export function SearchInput({
         ref={setPortalContainer}
         className={rootClassName}
         role={variant === "search" ? "search" : undefined}
-        aria-label={ariaLabel}
+        aria-label={variant === "search" ? ariaLabel : undefined}
       >
         <div
           ref={controlRef}
@@ -207,21 +208,22 @@ export function SearchInput({
                       </span>
                     </div>
                     {item.onRemove && (
-                      <button
-                        type="button"
-                        className={styles.removeButton}
-                        aria-label={item.removeLabel ?? "Remove item"}
-                        title={item.removeLabel ?? "Remove item"}
-                        onClick={event => {
-                          event.stopPropagation()
-                          item.onRemove?.()
-                          if (items.length === 1) {
-                            setOpen(false)
-                          }
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
+                      <Tooltip content={item.removeLabel ?? "Remove item"}>
+                        <button
+                          type="button"
+                          className={styles.removeButton}
+                          aria-label={item.removeLabel ?? "Remove item"}
+                          onClick={event => {
+                            event.stopPropagation()
+                            item.onRemove?.()
+                            if (items.length === 1) {
+                              setOpen(false)
+                            }
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </Tooltip>
                     )}
                   </Autocomplete.Item>
                 )}

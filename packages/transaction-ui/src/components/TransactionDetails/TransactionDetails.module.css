@@ -239,6 +239,10 @@
   width: 100%;
 }
 
+.messageOpcodeItem {
+  width: min(100%, 48rem);
+}
+
 .booleanTrue {
   font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-success);

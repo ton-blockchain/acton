@@ -1,0 +1,365 @@
+.panel {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  box-sizing: border-box;
+}
+
+.header {
+  min-height: 52px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--acton-color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.headerActions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.header h2,
+.stepContent h3 {
+  margin: 0;
+  color: var(--acton-color-text);
+}
+
+.header h2 {
+  min-width: 0;
+  margin-right: 4px;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.headerActions {
+  flex: 0 0 auto;
+  gap: 18px;
+}
+
+.promptButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.configureLink {
+  min-height: 24px;
+  color: var(--acton-color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-decoration: none;
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.configureLink:hover {
+  color: var(--acton-color-text);
+}
+
+.configureLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.summary {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.summaryItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryItem dt {
+  color: var(--acton-color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.summaryItem dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--acton-color-text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.summaryItem code,
+.endpointRow code {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--acton-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel[data-dismissible] .setup {
+  padding-bottom: 8px;
+}
+
+.dismissFooter {
+  min-height: 40px;
+  padding: 0 12px 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
+.dismissHint {
+  min-width: 0;
+  color: var(--acton-color-text-subtle);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--acton-font-size-compact);
+  line-height: 1.4;
+}
+
+.dismissHint > svg {
+  flex: 0 0 auto;
+}
+
+.dismissHint a {
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: none;
+}
+
+.dismissHint a:hover {
+  text-decoration: underline;
+}
+
+.dismissHint a:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.step {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.stepNumber {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 50%;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stepContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stepContent h3 {
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 24px;
+}
+
+.stepDescription {
+  margin: -2px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.integrationOptions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.integrationOption {
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px 12px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard),
+    background-color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.integrationOption:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.integrationOption[data-selected] {
+  border-color: var(--acton-color-accent);
+  color: var(--acton-color-accent);
+  background: color-mix(in srgb, var(--acton-color-accent) 5%, var(--acton-color-surface));
+}
+
+.integrationOption:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.integrationOption > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.integrationOption strong {
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.integrationOption small {
+  color: var(--acton-color-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outputHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.endpointList,
+.codeBlock {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  background: var(--acton-color-surface);
+}
+
+.endpointList {
+  overflow: hidden;
+}
+
+.endpointRow {
+  min-height: 40px;
+  padding: 0 12px;
+  border-top: 1px solid var(--acton-color-border);
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.endpointRow:first-child {
+  border-top: 0;
+}
+
+.endpointRow > span {
+  color: var(--acton-color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.endpointRow code {
+  color: var(--acton-color-text);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.codeBlock {
+  color: var(--acton-color-text);
+  font-size: 0.76rem;
+  box-sizing: border-box;
+  --acton-highlighted-code-padding: 12px 14px;
+  --acton-highlighted-code-font-size: 0.76rem;
+  --acton-highlighted-code-line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .header {
+    padding-block: 12px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .integrationOptions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .summaryItem {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .endpointRow {
+    grid-template-columns: 1fr 20px;
+    padding-block: 9px;
+  }
+
+  .endpointRow > span {
+    grid-column: 1 / -1;
+  }
+}

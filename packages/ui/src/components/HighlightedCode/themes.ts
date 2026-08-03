@@ -67,8 +67,24 @@ export const jetbrainsDarculaTheme: ThemeRegistration = {
       settings: {foreground: "#C77DBB"},
     },
     {
+      scope: ["variable.other.key.toml"],
+      settings: {foreground: "#C77DBB"},
+    },
+    {
+      scope: ["entity.name.section.toml"],
+      settings: {foreground: "#56A8F5", fontStyle: "bold"},
+    },
+    {
       scope: ["variable.parameter", "variable", "identifier", "delimiter", "punctuation"],
       settings: {foreground: "#BCBEC4"},
+    },
+    {
+      scope: ["variable.language.this"],
+      settings: {foreground: "#CF8E6D"},
+    },
+    {
+      scope: ["entity.other.attribute-name"],
+      settings: {foreground: "#C77DBB"},
     },
     {
       scope: ["entity.name.tag", "entity.name.namespace"],
@@ -150,8 +166,24 @@ export const jetbrainsLightTheme: ThemeRegistration = {
       settings: {foreground: "#871094"},
     },
     {
+      scope: ["variable.other.key.toml"],
+      settings: {foreground: "#871094"},
+    },
+    {
+      scope: ["entity.name.section.toml"],
+      settings: {foreground: "#0033B3", fontStyle: "bold"},
+    },
+    {
       scope: ["variable.parameter", "variable", "identifier", "delimiter", "punctuation"],
       settings: {foreground: "#000000"},
+    },
+    {
+      scope: ["variable.language.this"],
+      settings: {foreground: "#0033B3"},
+    },
+    {
+      scope: ["entity.other.attribute-name"],
+      settings: {foreground: "#871094"},
     },
     {
       scope: ["entity.name.tag", "entity.name.namespace"],

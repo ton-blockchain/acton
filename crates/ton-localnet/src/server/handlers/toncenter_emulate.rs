@@ -12,7 +12,7 @@ use axum::{
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use ton_api::toncenter::emulate::v1 as emulate;
+use ton_api::{OffchainJsonResolver, toncenter::emulate::v1 as emulate};
 
 macro_rules! parse {
     ($expression:expr) => {
@@ -34,7 +34,11 @@ macro_rules! handle {
     };
 }
 
-pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
+pub async fn emulate_trace_v1(
+    State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
+    body: Bytes,
+) -> Response {
     let payload: emulate::EmulateRequest = parse!(serde_json::from_slice(&body));
 
     let boc = payload.boc;
@@ -45,6 +49,7 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
 
     emulate_boc_v1(
         node.as_ref(),
+        &metadata_resolver,
         boc,
         payload.ignore_chksig,
         payload.mc_block_seqno,
@@ -58,7 +63,11 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
     .await
 }
 
-pub async fn emulate_ton_connect_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
+pub async fn emulate_ton_connect_v1(
+    State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
+    body: Bytes,
+) -> Response {
     let payload: emulate::TonConnectEmulateRequest = parse!(serde_json::from_slice(&body));
     parse!(toncenter_emulate::validate_ton_connect_request(&payload));
 
@@ -74,6 +83,7 @@ pub async fn emulate_ton_connect_v1(State(node): State<Arc<Localnet>>, body: Byt
 
     emulate_boc_v1(
         node.as_ref(),
+        &metadata_resolver,
         boc,
         true,
         payload.mc_block_seqno,
@@ -97,6 +107,7 @@ struct EmulateResponseOptions {
 
 async fn emulate_boc_v1(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     boc: String,
     ignore_chksig: bool,
     mc_block_seqno: Option<u32>,
@@ -109,6 +120,7 @@ async fn emulate_boc_v1(
     let (address_book, metadata) = handle!(
         build_emulate_v1_extra_data(
             node,
+            metadata_resolver,
             &trace.trace,
             options.include_address_book,
             options.include_metadata,
@@ -128,6 +140,7 @@ async fn emulate_boc_v1(
 
 async fn build_emulate_v1_extra_data(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     trace: &TraceNode,
     include_address_book: bool,
     include_metadata: bool,
@@ -143,6 +156,7 @@ async fn build_emulate_v1_extra_data(
     collect_trace_addresses(trace, &mut addresses);
     build_extra_data_for_addresses(
         node,
+        metadata_resolver,
         addresses.into_iter().collect(),
         include_address_book,
         include_metadata,

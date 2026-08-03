@@ -16,6 +16,7 @@ import {cx} from "../../lib/cx"
 import {HighlightedCode} from "../HighlightedCode/HighlightedCode"
 import type {HighlightedCodeLanguage} from "../HighlightedCode/types"
 import {CopyInlineAction} from "../InlineActions/InlineActions"
+import {Tooltip} from "../Tooltip"
 import styles from "./CodeViewer.module.css"
 
 export interface CodeViewerFile {
@@ -27,6 +28,7 @@ export interface CodeViewerProps {
   readonly attachedToTabs?: boolean
   readonly className?: string
   readonly compact?: boolean
+  readonly defaultSelectedPath?: string
   readonly defaultFileTreeVisible?: boolean
   readonly emptyMessage?: string
   readonly entrypoint?: string
@@ -34,6 +36,7 @@ export interface CodeViewerProps {
   readonly externalActionLabel?: string
   readonly externalActionUrl?: string
   readonly files: readonly CodeViewerFile[]
+  readonly onSelectedPathChange?: (path: string) => void
 }
 
 interface FileTreeNode {
@@ -56,6 +59,7 @@ export function CodeViewer({
   attachedToTabs = false,
   className,
   compact = false,
+  defaultSelectedPath,
   defaultFileTreeVisible = true,
   emptyMessage = "No source files",
   entrypoint,
@@ -63,9 +67,10 @@ export function CodeViewer({
   externalActionLabel = "Open source",
   externalActionUrl,
   files,
+  onSelectedPathChange,
 }: CodeViewerProps) {
   const entrypointFile = useMemo(() => findEntrypointFile(files, entrypoint), [entrypoint, files])
-  const [selectedPath, setSelectedPath] = useState<string>()
+  const [selectedPath, setSelectedPath] = useState(defaultSelectedPath)
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set())
   const [isDesktopTreeVisible, setDesktopTreeVisible] = useState(defaultFileTreeVisible)
   const [isMobileTreeOpen, setMobileTreeOpen] = useState(false)
@@ -84,6 +89,7 @@ export function CodeViewer({
   const selectFile = (path: string) => {
     setSelectedPath(path)
     setMobileTreeOpen(false)
+    onSelectedPathChange?.(path)
   }
 
   const toggleFolder = (path: string) => {
@@ -121,30 +127,32 @@ export function CodeViewer({
     >
       {isDesktopTreeVisible && (
         <aside className={cx(styles.fileTree, styles.desktopFileTree)} aria-label="Source files">
-          <button
-            type="button"
-            className={styles.desktopTreeToggle}
-            title="Hide source files"
-            aria-label="Hide source files"
-            onClick={() => setDesktopTreeVisible(false)}
-          >
-            <PanelLeftClose aria-hidden="true" />
-          </button>
+          <Tooltip content="Hide source files">
+            <button
+              type="button"
+              className={styles.desktopTreeToggle}
+              aria-label="Hide source files"
+              onClick={() => setDesktopTreeVisible(false)}
+            >
+              <PanelLeftClose aria-hidden="true" />
+            </button>
+          </Tooltip>
           {fileTree}
         </aside>
       )}
       <div className={styles.codePane}>
         <div className={styles.codePaneHeader}>
           {!isDesktopTreeVisible && (
-            <button
-              type="button"
-              className={styles.desktopTreeExpand}
-              title="Show source files"
-              aria-label="Show source files"
-              onClick={() => setDesktopTreeVisible(true)}
-            >
-              <PanelLeftOpen aria-hidden="true" />
-            </button>
+            <Tooltip content="Show source files">
+              <button
+                type="button"
+                className={styles.desktopTreeExpand}
+                aria-label="Show source files"
+                onClick={() => setDesktopTreeVisible(true)}
+              >
+                <PanelLeftOpen aria-hidden="true" />
+              </button>
+            </Tooltip>
           )}
           <button
             type="button"
@@ -232,7 +240,11 @@ function FileTreeRows({
             <li key={node.path} className={styles.treeItem}>
               <button
                 type="button"
-                className={cx(styles.treeRow, styles.folderRow)}
+                className={cx(
+                  styles.treeRow,
+                  styles.folderRow,
+                  isGeneratedArtifactsFolder(node) && styles.generatedFolderRow,
+                )}
                 style={depthStyle}
                 aria-expanded={expanded}
                 onClick={() => onToggleFolder(node.path)}
@@ -267,19 +279,20 @@ function FileTreeRows({
         const isActive = node.path === activePath
         return (
           <li key={node.path} className={styles.treeItem}>
-            <button
-              type="button"
-              className={cx(styles.treeRow, isActive && styles.activeRow)}
-              style={depthStyle}
-              title={node.path}
-              aria-current={isActive ? "true" : undefined}
-              onClick={() => node.file && onSelect(node.file.path)}
-            >
-              <span className={styles.disclosurePlaceholder} aria-hidden="true" />
-              <FileCode2 className={styles.rowIcon} aria-hidden="true" />
-              <span>{node.name}</span>
-              {node.path === entrypointPath && <span className={styles.entrypoint}>main</span>}
-            </button>
+            <Tooltip content={node.path}>
+              <button
+                type="button"
+                className={cx(styles.treeRow, isActive && styles.activeRow)}
+                style={depthStyle}
+                aria-current={isActive ? "true" : undefined}
+                onClick={() => node.file && onSelect(node.file.path)}
+              >
+                <span className={styles.disclosurePlaceholder} aria-hidden="true" />
+                <FileCode2 className={styles.rowIcon} aria-hidden="true" />
+                <span>{node.name}</span>
+                {node.path === entrypointPath && <span className={styles.entrypoint}>main</span>}
+              </button>
+            </Tooltip>
           </li>
         )
       })}
@@ -333,9 +346,16 @@ function freezeTree(node: FileTreeDraftNode): FileTreeNode {
 
 function sortTree(nodes: readonly FileTreeNode[]): FileTreeNode[] {
   return nodes.toSorted((left, right) => {
+    const leftIsGenerated = isGeneratedArtifactsFolder(left)
+    const rightIsGenerated = isGeneratedArtifactsFolder(right)
+    if (leftIsGenerated !== rightIsGenerated) return leftIsGenerated ? 1 : -1
     if (left.kind !== right.kind) return left.kind === "folder" ? -1 : 1
     return left.name.localeCompare(right.name)
   })
+}
+
+function isGeneratedArtifactsFolder(node: Pick<FileTreeNode, "kind" | "name">): boolean {
+  return node.kind === "folder" && (node.name === "gen" || node.name === "output")
 }
 
 function normalizeFilePath(path: string): string {
@@ -375,6 +395,23 @@ function languageForPath(path: string): HighlightedCodeLanguage | undefined {
   const normalizedPath = path.toLowerCase()
   if (normalizedPath.endsWith(".tolk")) return "tolk"
   if (normalizedPath.endsWith(".fc") || normalizedPath.endsWith(".func")) return "func"
+  if (normalizedPath.endsWith(".tact")) return "tact"
+  if (
+    normalizedPath.endsWith(".js") ||
+    normalizedPath.endsWith(".jsx") ||
+    normalizedPath.endsWith(".mjs") ||
+    normalizedPath.endsWith(".cjs")
+  ) {
+    return "javascript"
+  }
+  if (
+    normalizedPath.endsWith(".sh") ||
+    normalizedPath.endsWith(".bash") ||
+    normalizedPath.endsWith(".zsh")
+  ) {
+    return "shellscript"
+  }
+  if (normalizedPath.endsWith(".toml")) return "toml"
   if (
     normalizedPath.endsWith(".json") ||
     normalizedPath.endsWith(".abi") ||

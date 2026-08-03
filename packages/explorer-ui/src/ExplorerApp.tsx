@@ -1,5 +1,13 @@
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {
+  createVerifierApi,
+  readVerifiedContractsPage,
+  StatisticsPage,
+  verifiedContractsPageSearch,
+  VerifiedContractPage,
+  VerifiedContractsPage,
+} from "@acton/verifier-ui"
+import {
   Check,
   ChevronDown,
   Edit2,
@@ -22,40 +30,45 @@ import {
   Routes,
   useLocation,
   useNavigate,
-} from "react-router-dom"
+  useParams,
+} from "react-router"
 
-import {TonClient} from "../../localnet-ui/src/explorer/api/client"
-import {getBundledCompilerAbis} from "../../localnet-ui/src/explorer/api/compilerAbiCatalog"
-import {AddressBookProvider} from "../../localnet-ui/src/explorer/hooks/useAddressBook"
-import {ExplorerRoutesProvider} from "../../localnet-ui/src/explorer/hooks/useExplorerRoutes"
-import {StaticNetworkInfoProvider} from "../../localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
-import {BrowserMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/browserRegistry"
-import {BundledAbiRegistry} from "../../localnet-ui/src/explorer/metadata/bundledAbiRegistry"
-import {CompositeMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/compositeRegistry"
-import {MetadataRegistryProvider} from "../../localnet-ui/src/explorer/metadata/MetadataRegistryProvider"
-import {VerifierMetadataRegistry} from "../../localnet-ui/src/explorer/metadata/verifierRegistry"
+import {TonClient} from "@acton/explorer-core/api/client"
+import {getBundledCompilerAbis} from "@acton/explorer-core/api/compilerAbiCatalog"
+import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
+import {ExplorerRoutesProvider} from "@acton/explorer-core/hooks/useExplorerRoutes"
+import {StaticNetworkInfoProvider} from "@acton/explorer-core/hooks/StaticNetworkInfoProvider"
+import {BrowserMetadataRegistry} from "@acton/explorer-core/metadata/browserRegistry"
+import {BundledAbiRegistry} from "@acton/explorer-core/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "@acton/explorer-core/metadata/compositeRegistry"
+import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "@acton/explorer-core/metadata/verifierRegistry"
 import type {
   CustomExplorerNetworkId,
   ExplorerApiConfig,
   ExplorerNetworkInfo,
-} from "../../localnet-ui/src/explorer/hooks/useNetworkInfo"
-import {BlockDetailsPage, BlocksPage} from "../../localnet-ui/src/explorer/pages/BlocksPage"
-import {CellInspectorPage} from "../../localnet-ui/src/explorer/pages/CellInspectorPage"
-import {EmulatePage} from "../../localnet-ui/src/explorer/pages/EmulatePage"
-import {AccountPage} from "../../localnet-ui/src/explorer/pages/AccountPage"
-import {AbiCatalogPage, AbiDetailsPage} from "../../localnet-ui/src/explorer/pages/AbiCatalogPage"
-import {SourceCatalogPage} from "../../localnet-ui/src/explorer/pages/SourceCatalogPage"
-import {ExplorerSearch} from "../../localnet-ui/src/explorer/components/ExplorerSearch"
-import {ExplorerDocumentTitle} from "../../localnet-ui/src/explorer/components/ExplorerDocumentTitle"
-import {ExplorerIndexPage} from "../../localnet-ui/src/explorer/pages/ExplorerIndexPage"
-import {FavoriteAccountsPage} from "../../localnet-ui/src/explorer/pages/FavoriteAccountsPage"
-import {TransactionPage} from "../../localnet-ui/src/explorer/pages/TransactionPage"
+} from "@acton/explorer-core/hooks/useNetworkInfo"
+import {TokenCatalogPage} from "@acton/explorer-core/pages/TokenCatalogPage"
+import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
+import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
+import {ExplorerDocumentTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
+import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
+import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddressesPage"
+import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import "@acton/ui/styles/tokens.css"
-import "../../localnet-ui/src/index.css"
+import "@acton/explorer-core/styles.css"
 import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
+import {EXPLORER_NETWORK_QUERY_PARAM, explorerNetworkSearch} from "./explorerNetworkUrl"
+import {FaucetPage} from "./faucet/FaucetPage"
+import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
+import {SourceCatalogPage} from "./pages/SourceCatalogPage"
+import {CellInspectorExplorerPage, EmulateExplorerPage} from "./pages/explorer-tool-pages"
+import {loadNetworkTps} from "./actonscanBackend"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -78,7 +91,9 @@ type NetworkFormMode =
 
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
-const EXPLORER_NETWORK_QUERY_PARAM = "network"
+const ACTON_VERIFIER_API = createVerifierApi({
+  baseUrl: "https://verifier.acton.monster/api/v1",
+})
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
 const SHARED_NETWORK_V2_QUERY_PARAM = "network.v2"
@@ -279,10 +294,11 @@ const serializeCustomExplorerNetwork = (
 const readSelectedExplorerNetwork = (
   networks: readonly SelectableExplorerNetwork[],
 ): SelectableExplorerNetworkId => {
-  if (
-    new URLSearchParams(globalThis.location.search).get(EXPLORER_NETWORK_QUERY_PARAM) === "testnet"
-  ) {
-    return "testnet"
+  const requestedNetwork = new URLSearchParams(globalThis.location.search).get(
+    EXPLORER_NETWORK_QUERY_PARAM,
+  )
+  if (requestedNetwork === "mainnet" || requestedNetwork === "testnet") {
+    return requestedNetwork
   }
 
   const storedNetwork = localStorage.getItem(EXPLORER_NETWORK_STORAGE_KEY)
@@ -822,23 +838,13 @@ const ExplorerNetworkUrlSync: FC<{
   const navigate = useNavigate()
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search)
-    if (networkId === "testnet") {
-      if (searchParams.get(EXPLORER_NETWORK_QUERY_PARAM) === networkId) {
-        return
-      }
-      searchParams.set(EXPLORER_NETWORK_QUERY_PARAM, networkId)
-    } else {
-      if (!searchParams.has(EXPLORER_NETWORK_QUERY_PARAM)) {
-        return
-      }
-      searchParams.delete(EXPLORER_NETWORK_QUERY_PARAM)
-    }
+    const search = explorerNetworkSearch(location.search, networkId)
+    if (search === new URLSearchParams(location.search).toString()) return
 
     void navigate(
       {
         pathname: location.pathname,
-        search: searchParams.toString(),
+        search,
         hash: location.hash,
       },
       {replace: true},
@@ -887,6 +893,18 @@ const DesktopMoreMenu: FC = () => {
       contentClassName={styles.desktopMorePopover}
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Tokens</span>
+              <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Faucet</span>
+              <span className={styles.desktopMoreItemDescription}>Get GRAM for TON Testnet</span>
+            </span>
+          </Link>
           <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
@@ -903,6 +921,14 @@ const DesktopMoreMenu: FC = () => {
               </span>
             </span>
           </Link>
+          <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Browse verified on-chain source code
+              </span>
+            </span>
+          </Link>
         </nav>
       }
     >
@@ -915,6 +941,127 @@ const DesktopMoreMenu: FC = () => {
         <span aria-hidden="true">•••</span>
       </button>
     </Popover>
+  )
+}
+
+interface VerifiedContractsViewState {
+  readonly page: number
+  readonly scrollY: number
+}
+
+interface VerifiedContractsRouteState {
+  readonly verifiedContractsView?: VerifiedContractsViewState
+}
+
+function readVerifiedContractsViewState(value: unknown): VerifiedContractsViewState | undefined {
+  if (typeof value !== "object" || value === null || !("verifiedContractsView" in value)) {
+    return undefined
+  }
+
+  const view = (value as VerifiedContractsRouteState).verifiedContractsView
+  if (
+    !view ||
+    !Number.isFinite(view.page) ||
+    view.page < 0 ||
+    !Number.isFinite(view.scrollY) ||
+    view.scrollY < 0
+  ) {
+    return undefined
+  }
+
+  return {
+    page: Math.trunc(view.page),
+    scrollY: view.scrollY,
+  }
+}
+
+const VerifiedContractsRoute: FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const restoration = readVerifiedContractsViewState(location.state)
+  const initialPage = readVerifiedContractsPage(location.search)
+  const currentPageRef = useRef(initialPage)
+  const restoredScrollRef = useRef(false)
+
+  useEffect(() => {
+    currentPageRef.current = initialPage
+  }, [initialPage])
+
+  return (
+    <VerifiedContractsPage
+      api={ACTON_VERIFIER_API}
+      getContractHref={item => `/verified/${encodeURIComponent(item.code_hash)}`}
+      statisticsHref="/verified/statistics"
+      onOpenStatistics={() => void navigate("/verified/statistics")}
+      page={initialPage}
+      onPageChange={page => {
+        currentPageRef.current = page
+        const nextSearch = verifiedContractsPageSearch(location.search, page)
+        if (nextSearch !== location.search.slice(1)) {
+          void navigate(
+            {
+              pathname: location.pathname,
+              search: nextSearch ? `?${nextSearch}` : "",
+              hash: location.hash,
+            },
+            {replace: true},
+          )
+        }
+      }}
+      onContentReady={() => {
+        if (
+          restoredScrollRef.current ||
+          restoration === undefined ||
+          restoration.page !== initialPage
+        ) {
+          return
+        }
+
+        restoredScrollRef.current = true
+        globalThis.requestAnimationFrame(() => {
+          globalThis.scrollTo({top: restoration.scrollY, behavior: "auto"})
+        })
+      }}
+      onOpenContract={item => {
+        void navigate(
+          {
+            pathname: location.pathname,
+            search: location.search,
+            hash: location.hash,
+          },
+          {
+            replace: true,
+            state: {
+              verifiedContractsView: {
+                page: currentPageRef.current,
+                scrollY: globalThis.scrollY,
+              },
+            } satisfies VerifiedContractsRouteState,
+          },
+        )
+        void navigate(`/verified/${encodeURIComponent(item.code_hash)}`)
+      }}
+    />
+  )
+}
+
+const VerifiedContractRoute: FC = () => {
+  const {target = ""} = useParams<{target: string}>()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const selectedSourcePath = new URLSearchParams(location.search).get("file") ?? undefined
+
+  return (
+    <VerifiedContractPage
+      api={ACTON_VERIFIER_API}
+      target={target}
+      selectedSourcePath={selectedSourcePath}
+      onSelectedSourcePathChange={path => {
+        const params = new URLSearchParams(location.search)
+        params.set("file", path)
+        void navigate(`${location.pathname}?${params.toString()}`, {replace: true})
+      }}
+    />
   )
 }
 
@@ -942,12 +1089,28 @@ export const ExplorerApp: FC = () => {
       new TonClient({
         v2BaseUrl: networkConfig.api.v2BaseUrl,
         v3BaseUrl: networkConfig.api.v3BaseUrl,
+        toncenterProxyV2BaseUrl:
+          networkKind === "custom" ? undefined : `/api/toncenter/${networkKind}/v2`,
+        toncenterProxyV3BaseUrl:
+          networkKind === "custom" ? undefined : `/api/toncenter/${networkKind}/v3`,
         addressNameBaseUrl: "",
         localnetControlEnabled: false,
         toncenterApiCompatible: true,
         toncenterApiKey: networkConfig.api.toncenterApiKey,
       }),
-    [networkConfig],
+    [networkConfig, networkKind],
+  )
+  const testnetClient = useMemo(
+    () =>
+      new TonClient({
+        v2BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v2BaseUrl,
+        v3BaseUrl: EXPLORER_API_CONFIGS.testnet.api.v3BaseUrl,
+        addressNameBaseUrl: "",
+        localnetControlEnabled: false,
+        toncenterApiCompatible: true,
+        toncenterApiKey: EXPLORER_API_CONFIGS.testnet.api.toncenterApiKey,
+      }),
+    [],
   )
   const metadataRegistry = useMemo(
     () =>
@@ -1180,11 +1343,25 @@ export const ExplorerApp: FC = () => {
                               <Link to="/blocks" onClick={closeMobileHeaderPanels}>
                                 Blocks
                               </Link>
+                              <Link to="/tokens" onClick={closeMobileHeaderPanels}>
+                                Tokens
+                              </Link>
+                              {networkId === "mainnet" && (
+                                <Link to="/suspended" onClick={closeMobileHeaderPanels}>
+                                  Suspended addresses
+                                </Link>
+                              )}
                               <Link to="/abi" onClick={closeMobileHeaderPanels}>
                                 ABI
                               </Link>
                               <Link to="/sources" onClick={closeMobileHeaderPanels}>
                                 Sources
+                              </Link>
+                              <Link to="/faucet" onClick={closeMobileHeaderPanels}>
+                                Faucet
+                              </Link>
+                              <Link to="/verified" onClick={closeMobileHeaderPanels}>
+                                Verified contracts
                               </Link>
                               <Link to="/cell" onClick={closeMobileHeaderPanels}>
                                 Cell Inspector
@@ -1219,15 +1396,51 @@ export const ExplorerApp: FC = () => {
                     <Routes>
                       <Route
                         path="/"
-                        element={<ExplorerIndexPage client={client} fillAvailableHeight />}
+                        element={
+                          <ExplorerIndexPage
+                            client={client}
+                            faucetPath={networkId === "testnet" ? "/faucet" : undefined}
+                            fillAvailableHeight
+                          />
+                        }
                       />
-                      <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route
+                        path="/blocks"
+                        element={
+                          <BlocksPage
+                            client={client}
+                            loadNetworkTps={networkId === "mainnet" ? loadNetworkTps : undefined}
+                          />
+                        }
+                      />
+                      <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
-                      <Route path="/sources" element={<SourceCatalogPage />} />
-                      <Route path="/cell" element={<CellInspectorPage />} />
-                      <Route path="/emulate" element={<EmulatePage client={client} />} />
+                      <Route path="/sources" element={<SourceCatalogPage client={client} />} />
+                      <Route
+                        path="/faucet"
+                        element={
+                          <FaucetPage
+                            isTestnetSelected={networkId === "testnet"}
+                            selectedNetworkLabel={networkConfig.label}
+                            testnetClient={testnetClient}
+                            onSwitchToTestnet={() => handleNetworkChange("testnet")}
+                          />
+                        }
+                      />
+                      <Route path="/verified" element={<VerifiedContractsRoute />} />
+                      <Route
+                        path="/verified/statistics"
+                        element={<StatisticsPage api={ACTON_VERIFIER_API} />}
+                      />
+                      <Route path="/verified/:target" element={<VerifiedContractRoute />} />
+                      <Route path="/cell" element={<CellInspectorExplorerPage />} />
+                      <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
+                      <Route
+                        path="/suspended"
+                        element={<SuspendedAddressesPage client={client} />}
+                      />
                       <Route
                         path="/block/last"
                         element={<BlockDetailsPage client={client} latest />}

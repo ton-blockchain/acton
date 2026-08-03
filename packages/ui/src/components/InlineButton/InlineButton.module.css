@@ -38,6 +38,7 @@
   align-items: center;
   min-width: 0;
   gap: var(--acton-space-1-5);
+  pointer-events: none;
 }
 
 .label {
@@ -56,6 +57,8 @@
 .inlineButton svg {
   display: block;
   flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
 }
 
 .variantDefault {

@@ -5,9 +5,9 @@ use crate::storage::{
     MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Seqno};
+use anyhow::Context;
 use core::cmp;
-use rusqlite::{Connection, params};
-use serde_json::Value;
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -19,6 +19,8 @@ pub(crate) struct PersistedNodeState {
     pub latest: LatestState,
     pub history: History,
     pub indexes: Indexes,
+    pub origin_seqno: Option<Seqno>,
+    pub fork_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
 }
 
@@ -50,6 +52,20 @@ impl NodePersistence {
         let mut head_seqno = 0;
 
         let conn = self.conn.lock().expect("Failed to lock DB connection");
+        let origin_seqno = conn
+            .query_row(
+                "SELECT value FROM node_metadata WHERE key = 'origin_seqno'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let fork_seqno = conn
+            .query_row(
+                "SELECT value FROM node_metadata WHERE key = 'fork_seqno'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
 
         let mut stmt = conn.prepare("SELECT data FROM blocks ORDER BY seqno ASC")?;
         let block_iter = stmt.query_map([], |row| {
@@ -59,11 +75,21 @@ impl NodePersistence {
         })?;
         for block in block_iter {
             let block = block?;
-            let expected_seqno = history.blocks.len() as Seqno + 1;
-            anyhow::ensure!(
-                block.seqno == expected_seqno,
-                "SQLite block history is not contiguous at seqno {expected_seqno}"
-            );
+            if let Some(previous) = history.blocks.last() {
+                let expected_seqno = previous
+                    .seqno
+                    .checked_add(1)
+                    .context("SQLite block history seqno overflow")?;
+                anyhow::ensure!(
+                    block.seqno == expected_seqno,
+                    "SQLite block history is not contiguous at seqno {expected_seqno}"
+                );
+            } else {
+                anyhow::ensure!(
+                    block.seqno > 0,
+                    "SQLite block history cannot start at seqno zero"
+                );
+            }
             head_seqno = block.seqno;
             history.blocks.push(block);
         }
@@ -76,6 +102,19 @@ impl NodePersistence {
         })?;
         for block in block_iter {
             history.masterchain_blocks.push(block?);
+        }
+        anyhow::ensure!(
+            history.masterchain_blocks.is_empty()
+                || history.masterchain_blocks.len() == history.blocks.len(),
+            "SQLite masterchain history length does not match basechain history"
+        );
+        for (masterchain, basechain) in history.masterchain_blocks.iter().zip(&history.blocks) {
+            anyhow::ensure!(
+                masterchain.seqno == basechain.seqno,
+                "SQLite masterchain block {} does not match basechain block {}",
+                masterchain.seqno,
+                basechain.seqno
+            );
         }
 
         let mut stmt = conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
@@ -125,6 +164,9 @@ impl NodePersistence {
                 .insert(block.seqno, block.tx_hashes.clone());
         }
 
+        history
+            .deltas_by_seqno
+            .resize(history.blocks.len(), Vec::new());
         let mut stmt = conn.prepare("SELECT seqno, data FROM account_deltas ORDER BY seqno ASC")?;
         let delta_iter = stmt.query_map([], |row| {
             let seqno: Seqno = row.get(0)?;
@@ -135,10 +177,22 @@ impl NodePersistence {
         })?;
         for row in delta_iter {
             let (seqno, deltas) = row?;
-            if seqno == 0 {
-                continue;
-            }
-            history.deltas_by_seqno.resize(seqno as usize, Vec::new());
+            let first_seqno = history
+                .blocks
+                .first()
+                .context("SQLite account deltas exist without block history")?
+                .seqno;
+            let index = seqno
+                .checked_sub(first_seqno)
+                .and_then(|index| usize::try_from(index).ok())
+                .filter(|index| *index < history.deltas_by_seqno.len())
+                .with_context(|| {
+                    format!("SQLite account deltas reference unknown block {seqno}")
+                })?;
+            anyhow::ensure!(
+                history.blocks[index].seqno == seqno,
+                "SQLite account deltas are not aligned with block {seqno}"
+            );
             for delta in &deltas {
                 indexes
                     .account_deltas_by_addr
@@ -146,7 +200,7 @@ impl NodePersistence {
                     .or_default()
                     .insert(seqno, delta.clone());
             }
-            history.deltas_by_seqno[seqno as usize - 1] = deltas;
+            history.deltas_by_seqno[index] = deltas;
         }
 
         let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
@@ -176,37 +230,38 @@ impl NodePersistence {
             history.msg_by_hash.insert(hash, meta);
         }
 
-        let mut stmt = conn.prepare("SELECT code_hash, data FROM compiler_abis")?;
-        let abi_iter = stmt.query_map([], |row| {
-            let hash: Hash256 = row.get(0)?;
-            let data: Vec<u8> = row.get(1)?;
-            let compiler_abi = serde_json::from_slice::<Value>(&data)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            Ok((hash, compiler_abi))
-        })?;
-        for abi in abi_iter {
-            let (hash, compiler_abi) = abi?;
-            history.compiler_abis.insert(hash, compiler_abi);
-        }
-
-        let mut stmt = conn.prepare("SELECT code_hash, data FROM verified_sources")?;
-        let source_iter = stmt.query_map([], |row| {
-            let hash: Hash256 = row.get(0)?;
-            let data: Vec<u8> = row.get(1)?;
-            let source = serde_json::from_slice::<Value>(&data)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            Ok((hash, source))
-        })?;
-        for source in source_iter {
-            let (hash, value) = source?;
-            history.verified_sources.insert(hash, value);
-        }
         Ok(PersistedNodeState {
             latest,
             history,
             indexes,
+            origin_seqno,
+            fork_seqno,
             head_seqno,
         })
+    }
+
+    pub(crate) fn set_chain_origins(
+        &self,
+        origin_seqno: Seqno,
+        fork_seqno: Option<Seqno>,
+    ) -> anyhow::Result<()> {
+        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
+        let tx = conn.transaction()?;
+        tx.execute(
+            "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
+            params![origin_seqno],
+        )?;
+        if let Some(fork_seqno) = fork_seqno {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('fork_seqno', ?1)",
+                params![fork_seqno],
+            )?;
+        } else {
+            tx.execute("DELETE FROM node_metadata WHERE key = 'fork_seqno'", [])?;
+        }
+        tx.commit()?;
+        drop(conn);
+        Ok(())
     }
 
     pub(crate) fn persist_commit(
@@ -313,68 +368,6 @@ impl NodePersistence {
         Ok(())
     }
 
-    pub(crate) fn set_compiler_abi(
-        &self,
-        code_hash: Hash256,
-        compiler_abi: &Value,
-        stale_keys: &[Hash256],
-    ) -> anyhow::Result<()> {
-        let data = serde_json::to_vec(compiler_abi)?;
-        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
-        let tx = conn.transaction()?;
-        for stale_key in stale_keys {
-            tx.execute(
-                "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![stale_key.to_bytes()],
-            )?;
-        }
-        tx.execute(
-            "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-            params![code_hash.to_bytes(), data],
-        )?;
-        tx.commit()?;
-        drop(conn);
-        Ok(())
-    }
-
-    pub(crate) fn delete_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![code_hash.to_bytes()],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn set_verified_source(
-        &self,
-        code_hash: Hash256,
-        source: &Value,
-    ) -> anyhow::Result<()> {
-        let data = serde_json::to_vec(source)?;
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        Ok(())
-    }
-
-    pub(crate) fn delete_verified_source(&self, code_hash: Hash256) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "DELETE FROM verified_sources WHERE code_hash = ?1",
-                params![code_hash.to_bytes()],
-            )?;
-        Ok(())
-    }
-
     #[allow(clippy::significant_drop_tightening)]
     pub(crate) fn export_cas_entries(&self) -> anyhow::Result<Vec<(Hash256, BocBytes)>> {
         let conn = self.conn.lock().expect("Failed to lock DB connection");
@@ -405,8 +398,18 @@ impl NodePersistence {
         tx.execute("DELETE FROM transactions", [])?;
         tx.execute("DELETE FROM messages", [])?;
         tx.execute("DELETE FROM accounts", [])?;
-        tx.execute("DELETE FROM compiler_abis", [])?;
-        tx.execute("DELETE FROM verified_sources", [])?;
+        tx.execute(
+            "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
+            params![snapshot.globals.origin_seqno],
+        )?;
+        if let Some(fork_seqno) = snapshot.globals.fork_seqno {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('fork_seqno', ?1)",
+                params![fork_seqno],
+            )?;
+        } else {
+            tx.execute("DELETE FROM node_metadata WHERE key = 'fork_seqno'", [])?;
+        }
 
         for (hash, boc) in &snapshot.cas_entries {
             tx.execute(
@@ -432,7 +435,7 @@ impl NodePersistence {
         }
 
         for (index, deltas) in snapshot.history_deltas_by_seqno.iter().enumerate() {
-            let seqno = index as Seqno + 1;
+            let seqno = snapshot.history_blocks[index].seqno;
             let data = serde_json::to_vec(deltas)?;
             tx.execute(
                 "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
@@ -470,28 +473,16 @@ impl NodePersistence {
             )?;
         }
 
-        for (code_hash, compiler_abi) in &snapshot.history_compiler_abis {
-            let data = serde_json::to_vec(compiler_abi)?;
-            tx.execute(
-                "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        }
-
-        for (code_hash, source) in &snapshot.history_verified_sources {
-            let data = serde_json::to_vec(source)?;
-            tx.execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.to_bytes(), data],
-            )?;
-        }
-
         tx.commit()?;
         Ok(())
     }
 }
 
 fn init_schema(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS node_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL)",
+        [],
+    )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS cas (hash BLOB PRIMARY KEY, boc BLOB)",
         [],
@@ -518,14 +509,6 @@ fn init_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS accounts (address BLOB PRIMARY KEY, data BLOB)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS compiler_abis (code_hash BLOB PRIMARY KEY, data BLOB)",
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS verified_sources (code_hash BLOB PRIMARY KEY, data BLOB)",
         [],
     )?;
     Ok(())

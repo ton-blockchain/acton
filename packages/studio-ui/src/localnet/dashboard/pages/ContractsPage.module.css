@@ -1,0 +1,76 @@
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-10) var(--acton-space-4);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  margin-bottom: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+}
+
+.emptyState strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.emptyState > span:not(.emptyIcon) {
+  max-width: 30rem;
+  margin-bottom: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.identity,
+.source {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.identityName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source > span:first-child {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}

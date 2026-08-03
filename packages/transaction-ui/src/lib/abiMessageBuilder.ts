@@ -3,6 +3,7 @@ import {
   DynamicCtx,
   packToBuilderDynamic,
   renderTy,
+  unpackFromSliceDynamic,
   type SymTable,
   type ContractABI,
   type Ty,
@@ -10,6 +11,7 @@ import {
 } from "@ton/tolk-abi-to-typescript"
 
 import {
+  abiValueToFormValue,
   createAbiSymbols,
   normalizeAbiDynamicArg,
   sampleAbiValueForTy,
@@ -17,6 +19,7 @@ import {
 } from "./abiValue"
 
 export type AbiMessageTransport = "external" | "internal"
+export type AbiMessageDirection = "incoming" | "outgoing"
 
 export interface AbiMessageBuilderOption {
   readonly id: string
@@ -50,21 +53,74 @@ export interface BuildEmptyMessageBocOptions {
   readonly bounce?: boolean
 }
 
+export interface DecodedAbiMessageBuilderDraft {
+  readonly option: AbiMessageBuilderOption
+  readonly argsJson: string
+}
+
+export const abiMessageBuilderOptionMatchesName = (
+  option: AbiMessageBuilderOption,
+  messageName: string,
+): boolean => option.label === messageName || option.typeLabel === messageName
+
 export function listAbiMessageBuilderOptions(
   abi: ContractABI,
   transport: AbiMessageTransport,
+  direction: AbiMessageDirection = "incoming",
 ): readonly AbiMessageBuilderOption[] {
   const symbols = createAbiMessageSymbols(abi)
   const messages =
-    transport === "external" ? (abi.incoming_external ?? []) : (abi.incoming_messages ?? [])
+    direction === "outgoing"
+      ? (abi.outgoing_messages ?? [])
+      : transport === "external"
+        ? (abi.incoming_external ?? [])
+        : (abi.incoming_messages ?? [])
 
   return messages.flatMap((message, messageIndex) =>
-    expandMessageBodyOptions(symbols, transport, messageIndex, message.body_ty_idx),
+    expandMessageBodyOptions(symbols, transport, direction, messageIndex, message.body_ty_idx),
   )
 }
 
 export function createAbiMessageSymbols(abi: ContractABI): SymTable {
   return createAbiSymbols(abi)
+}
+
+export function decodeAbiMessageBuilderDraft(
+  abi: ContractABI,
+  transport: AbiMessageTransport,
+  body: Message["body"],
+  direction: AbiMessageDirection = "incoming",
+  messageName?: string,
+): DecodedAbiMessageBuilderDraft | undefined {
+  const ctx = new DynamicCtx(abi)
+
+  for (const option of listAbiMessageBuilderOptions(abi, transport, direction)) {
+    if (messageName && !abiMessageBuilderOptionMatchesName(option, messageName)) {
+      continue
+    }
+
+    try {
+      const slice = body.beginParse()
+      const decoded = unpackFromSliceDynamic(ctx, option.bodyTyIdx, slice)
+      if (slice.remainingBits !== 0 || slice.remainingRefs !== 0) {
+        continue
+      }
+
+      const value = extractBuilderInput(option, decoded)
+      if (value === undefined) {
+        continue
+      }
+
+      return {
+        option,
+        argsJson: stringifyAbiJson(abiValueToFormValue(value)),
+      }
+    } catch {
+      // A body may legitimately match another ABI message.
+    }
+  }
+
+  return undefined
 }
 
 export function buildAbiMessageBoc({
@@ -146,9 +202,11 @@ export function formatAbiMessageOptionSummary(option: AbiMessageBuilderOption): 
 function expandMessageBodyOptions(
   symbols: SymTable,
   transport: AbiMessageTransport,
+  direction: AbiMessageDirection,
   messageIndex: number,
   bodyTyIdx: number,
 ): readonly AbiMessageBuilderOption[] {
+  const idPrefix = direction === "incoming" ? transport : `${direction}:${transport}`
   const bodyTy = tryTyByIdx(symbols, bodyTyIdx)
   if (bodyTy?.kind === "union") {
     return createUnionLabels(symbols, bodyTy.variants).map((variant, variantIndex) => {
@@ -157,7 +215,7 @@ function expandMessageBodyOptions(
       const label = variant.labelStr || typeLabel
 
       return {
-        id: `${transport}:${messageIndex}:${variantIndex}`,
+        id: `${idPrefix}:${messageIndex}:${variantIndex}`,
         transport,
         label,
         typeLabel,
@@ -175,7 +233,7 @@ function expandMessageBodyOptions(
   const label = messageLabel(symbols, bodyTyIdx)
   return [
     {
-      id: `${transport}:${messageIndex}`,
+      id: `${idPrefix}:${messageIndex}`,
       transport,
       label,
       typeLabel: safeRenderTy(symbols, bodyTyIdx),
@@ -198,6 +256,22 @@ function buildUnionInput(option: AbiMessageBuilderOption, normalizedInput: unkno
     return {$: union.label, ...normalizedInput}
   }
   return {$: union.label}
+}
+
+function extractBuilderInput(option: AbiMessageBuilderOption, decoded: unknown): unknown {
+  const union = option.union
+  if (!union) {
+    return decoded
+  }
+  if (!isRecord(decoded) || decoded.$ !== union.label) {
+    return undefined
+  }
+  if (union.hasValueField) {
+    return decoded.value
+  }
+
+  const {$: _label, ...value} = decoded
+  return value
 }
 
 function buildInternalMessage({

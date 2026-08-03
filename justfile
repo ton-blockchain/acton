@@ -1,6 +1,7 @@
 NEXTEST_PROFILE_ARGS := if env_var_or_default("CI", "") != "" { "-P ci" } else { "" }
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
+FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
 
 all: precommit
 
@@ -12,6 +13,10 @@ build-dev:
 
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm
+
+build-faucet-pow-wasm:
+    wasm-pack build crates/acton-faucet-pow-wasm --release --target web --out-dir "{{ FAUCET_POW_WASM_OUT }}" --out-name acton_faucet_pow_wasm
+    rm -f "{{ FAUCET_POW_WASM_OUT }}/.gitignore"
 
 sync-artifacts:
     cargo xtask sync-artifacts
@@ -42,6 +47,12 @@ install-test-ui-e2e-browsers:
 test-ui-e2e-run: install-test-ui-e2e-browsers
     bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     bun run test:e2e:test-ui
+
+test-explorer-ui-e2e-run: install-test-ui-e2e-browsers
+    bun run test:e2e:ui
+
+test-explorer-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
+    CHECK_UI_SNAPSHOTS=1 bun run test:e2e:ui -- --update-snapshots
 
 test-ui-e2e: build-ui build-dev test-ui-e2e-run
 
@@ -156,7 +167,8 @@ coverage-clean:
 build-ui:
     bun ci
     cd packages/test-ui && bun ci && bun run build
-    cd packages/localnet-ui && bun ci && bun run build
+    cd packages/explorer-core && bun ci && bun run build
+    cd packages/studio-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint
@@ -181,6 +193,7 @@ precommit: fmt fmt-ui build build-ui check check-ui
 clean:
     cargo clean
     rm -rf packages/test-ui/dist
+    rm -rf packages/studio-ui/dist
 
 generate-schema:
     cargo run -p xtask -- schema --schema acton-toml

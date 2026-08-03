@@ -123,6 +123,11 @@ export function Popover({
             aria-label={ariaLabel}
             className={cx(styles.panel, contentClassName)}
             data-theme={theme}
+            onClick={event => {
+              // Portal events still bubble through the React tree. Keep popover interactions from
+              // activating clickable ancestors such as table rows.
+              event.stopPropagation()
+            }}
           >
             <PopoverBase.Arrow className={styles.arrow}>
               <ArrowSvg />

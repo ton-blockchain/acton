@@ -1,6 +1,7 @@
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
@@ -14,7 +15,12 @@ use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
+mod deployment;
+mod offchain;
 pub mod toncenter;
+
+pub use deployment::{DeploymentCandidate, extract_deployment_candidates};
+pub use offchain::OffchainJsonResolver;
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
@@ -34,6 +40,15 @@ const fn user_agent() -> &'static str {
 
 fn http_client_builder() -> reqwest::blocking::ClientBuilder {
     let builder = reqwest::blocking::Client::builder().user_agent(user_agent());
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn async_http_client_builder() -> reqwest::ClientBuilder {
+    let builder = reqwest::Client::builder().user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {
@@ -149,6 +164,41 @@ impl TonApiClient {
         }
 
         request
+    }
+
+    fn get_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        transport_error_context: &str,
+        response_error_context: &str,
+    ) -> anyhow::Result<T> {
+        let response = self.send_with_retry(|| self.build_request(url), transport_error_context)?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
+        }
+        response.json().context(response_error_context.to_owned())
+    }
+
+    fn get_v2_result<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &impl Serialize,
+    ) -> anyhow::Result<T> {
+        let url = format!(
+            "{}{path}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(query),
+            "Failed to send TonCenter v2 request",
+        )?;
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+        let response: v2::TonlibResponse<T> = response
+            .json()
+            .context("Failed to parse TonCenter v2 response")?;
+        Ok(response.result)
     }
 
     fn send_with_retry<F>(
@@ -436,6 +486,79 @@ impl TonApiClient {
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
         Ok(self.get_masterchain_info()?.result.last.seqno)
+    }
+
+    pub fn get_blocks_v3(&self, raw_query: &str) -> anyhow::Result<v3::BlocksResponse> {
+        let mut url = format!(
+            "{}/blocks",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send blocks request",
+            "Failed to parse blocks response",
+        )
+    }
+
+    pub fn get_transactions_v3(&self, raw_query: &str) -> anyhow::Result<v3::TransactionsResponse> {
+        let mut url = format!(
+            "{}/transactions",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send transactions request",
+            "Failed to parse transactions response",
+        )
+    }
+
+    pub fn get_shards(&self, seqno: u32) -> anyhow::Result<v2::Shards> {
+        let url = format!(
+            "{}/getShards?seqno={seqno}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response: v2::TonlibResponse<v2::Shards> = self.get_json(
+            &url,
+            "Failed to send getShards request",
+            "Failed to parse getShards response",
+        )?;
+        Ok(response.result)
+    }
+
+    pub fn get_block_header_v2(
+        &self,
+        request: &v2::BlockHeaderRequest,
+    ) -> anyhow::Result<v2::BlockHeader> {
+        self.get_v2_result("/getBlockHeader", request)
+    }
+
+    pub fn get_block_transactions_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactions> {
+        self.get_v2_result("/getBlockTransactions", request)
+    }
+
+    pub fn get_block_transactions_ext_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactionsExt> {
+        self.get_v2_result("/getBlockTransactionsExt", request)
+    }
+
+    pub fn lookup_block_v2(
+        &self,
+        request: &v2::LookupBlockRequest,
+    ) -> anyhow::Result<v2::TonBlockIdExt> {
+        self.get_v2_result("/lookupBlock", request)
     }
 
     pub fn get_account_info(

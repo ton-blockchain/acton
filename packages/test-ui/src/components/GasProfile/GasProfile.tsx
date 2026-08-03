@@ -1,5 +1,5 @@
 import type React from "react"
-import {Checkbox} from "@acton/ui"
+import {Checkbox, Tooltip} from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"
 import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
 import {select} from "d3-selection"
@@ -206,7 +206,11 @@ const getRelativePath = (filePath: string, projectRoot?: string) => {
     return "unknown source"
   }
 
-  const normalizedProjectRoot = projectRoot?.replace(/\/+$/, "")
+  let projectRootEnd = projectRoot?.length ?? 0
+  while (projectRoot && projectRootEnd > 0 && projectRoot.charCodeAt(projectRootEnd - 1) === 47) {
+    projectRootEnd -= 1
+  }
+  const normalizedProjectRoot = projectRoot?.slice(0, projectRootEnd)
   if (
     normalizedProjectRoot &&
     (filePath === normalizedProjectRoot || filePath.startsWith(`${normalizedProjectRoot}/`))
@@ -786,15 +790,15 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
           const isSelected = contract.name === selectedContract?.name
 
           return (
-            <button
-              key={contract.name}
-              type="button"
-              className={`${styles.contractButton} ${isSelected ? styles.contractButtonSelected : ""}`}
-              title={contract.name}
-              onClick={() => setSelectedContractName(contract.name)}
-            >
-              {contract.name}
-            </button>
+            <Tooltip key={contract.name} content={contract.name}>
+              <button
+                type="button"
+                className={`${styles.contractButton} ${isSelected ? styles.contractButtonSelected : ""}`}
+                onClick={() => setSelectedContractName(contract.name)}
+              >
+                {contract.name}
+              </button>
+            </Tooltip>
           )
         })}
       </div>
@@ -904,16 +908,16 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                                   const isSelected = instructionStatsScope === scope.value
 
                                   return (
-                                    <button
-                                      key={scope.value}
-                                      type="button"
-                                      className={`${styles.instructionFilterButton} ${isSelected ? styles.instructionFilterButtonActive : ""}`}
-                                      title={scope.title}
-                                      aria-pressed={isSelected}
-                                      onClick={() => setInstructionStatsScope(scope.value)}
-                                    >
-                                      {scope.label}
-                                    </button>
+                                    <Tooltip key={scope.value} content={scope.title}>
+                                      <button
+                                        type="button"
+                                        className={`${styles.instructionFilterButton} ${isSelected ? styles.instructionFilterButtonActive : ""}`}
+                                        aria-pressed={isSelected}
+                                        onClick={() => setInstructionStatsScope(scope.value)}
+                                      >
+                                        {scope.label}
+                                      </button>
+                                    </Tooltip>
                                   )
                                 })}
                               </div>

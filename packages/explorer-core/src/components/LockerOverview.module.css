@@ -1,0 +1,292 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 20px 24px;
+  background: var(--acton-color-surface-raised);
+  border: 0;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 4px 24px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 1rem;
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 24px;
+}
+
+.description {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.scheduleAction {
+  flex: 0 0 auto;
+  min-width: max-content;
+  justify-self: end;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-block: 1px solid var(--acton-color-border);
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-right: 1px solid var(--acton-color-border);
+}
+
+.metric:first-child {
+  padding-left: 0;
+}
+
+.metric:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.metric:nth-child(2) {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.metric:nth-child(-n + 2) {
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.metric:nth-child(3) {
+  padding-left: 0;
+}
+
+.metricLabel,
+.progressLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 16px;
+}
+
+.metricValue {
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-emphasis);
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressHeader,
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressValue {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 16px;
+}
+
+.progressSegments {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+}
+
+.progressSegment {
+  height: 16px;
+  background: var(--acton-color-surface-hover);
+  border-radius: 4px;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    box-shadow var(--acton-duration-fast) var(--acton-ease-standard),
+    transform var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.progressSegmentLocked {
+  background: var(--acton-color-surface-hover);
+}
+
+.progressSegmentUnlocked {
+  background: var(--acton-color-accent);
+}
+
+.progressSegmentInteractive {
+  cursor: help;
+}
+
+.progressSegmentHighlighted {
+  box-shadow:
+    0 0 0 2px var(--acton-color-surface-raised),
+    0 0 0 4px var(--acton-color-accent);
+  transform: translateY(-1px);
+}
+
+.progressSegmentNext {
+  background: color-mix(in srgb, var(--acton-color-accent) 48%, var(--acton-color-surface-hover));
+}
+
+.approvalTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.approvalTooltipTitle {
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.approvalTooltipAddress {
+  color: var(--acton-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.approvalTooltipAddressValueRow {
+  display: inline-flex;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  gap: 4px;
+}
+
+.approvalTooltipAddressValue {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.progressMeta {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.dialogContent {
+  padding: 0;
+}
+
+.status {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+}
+
+.statusLocked {
+  color: var(--acton-color-text-muted);
+}
+
+.statusUnlocked {
+  color: var(--acton-color-status-passed);
+}
+
+.statusNext {
+  color: var(--acton-color-accent);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.errorTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 20px;
+}
+
+.errorMessage {
+  margin-top: 3px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+}
+
+@media (max-width: 560px) {
+  .card {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .header,
+  .error {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .error > button {
+    align-self: flex-start;
+  }
+
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scheduleAction {
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metric,
+  .metric:first-child,
+  .metric:nth-child(3),
+  .metric:last-child {
+    padding: 12px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .metric:last-child {
+    border-bottom: 0;
+  }
+
+  .progressMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+}

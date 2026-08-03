@@ -19,10 +19,11 @@ use axum::{
 use std::{convert::Infallible, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
-use ton_api::toncenter::streaming::v2 as streaming;
+use ton_api::{OffchainJsonResolver, toncenter::streaming::v2 as streaming};
 
 pub async fn streaming_sse(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     State(shutdown): State<ShutdownSignal>,
     body: Bytes,
 ) -> Response {
@@ -48,6 +49,7 @@ pub async fn streaming_sse(
 
     tokio::spawn(stream_sse_notifications(
         node,
+        metadata_resolver,
         subscription,
         tx,
         shutdown.subscribe(),
@@ -64,14 +66,16 @@ pub async fn streaming_sse(
 
 pub async fn streaming_ws(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     State(shutdown): State<ShutdownSignal>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_ws(socket, node, shutdown.subscribe()))
+    ws.on_upgrade(move |socket| handle_ws(socket, node, metadata_resolver, shutdown.subscribe()))
 }
 
 async fn stream_sse_notifications(
     node: Arc<Localnet>,
+    metadata_resolver: OffchainJsonResolver,
     subscription: StreamingSubscription,
     tx: mpsc::Sender<Result<Event, Infallible>>,
     mut shutdown: broadcast::Receiver<()>,
@@ -88,7 +92,14 @@ async fn stream_sse_notifications(
             },
         };
 
-        let notifications = match notifications_for_commit(&node, &subscription, commit).await {
+        let notifications = match notifications_for_commit(
+            &node,
+            &metadata_resolver,
+            &subscription,
+            commit,
+        )
+        .await
+        {
             Ok(notifications) => notifications,
             Err(e) => {
                 tracing::debug!("Failed to build streaming notification: {e:?}");
@@ -111,6 +122,7 @@ async fn stream_sse_notifications(
 async fn handle_ws(
     mut socket: WebSocket,
     node: Arc<Localnet>,
+    metadata_resolver: OffchainJsonResolver,
     mut shutdown: broadcast::Receiver<()>,
 ) {
     let mut subscription = StreamingSubscription::default();
@@ -144,7 +156,12 @@ async fn handle_ws(
                     Err(broadcast::error::RecvError::Closed) => break,
                 };
 
-                let notifications = match notifications_for_commit(&node, &subscription, commit).await {
+                let notifications = match notifications_for_commit(
+                    &node,
+                    &metadata_resolver,
+                    &subscription,
+                    commit,
+                ).await {
                     Ok(notifications) => notifications,
                     Err(e) => {
                         tracing::debug!("Failed to build streaming websocket notification: {e:?}");

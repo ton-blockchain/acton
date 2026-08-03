@@ -3,14 +3,16 @@ use crate::localnet::{
     Localnet, LocalnetJettonWalletsQuery, LocalnetNftItemsOrder, LocalnetNftItemsQuery,
     LocalnetTransaction, convert_to_tx_struct,
 };
+use crate::offchain_metadata::enrich_jetton_masters;
 use crate::storage;
 use crate::storage::TraceNode;
 use crate::types::{Addr, Hash256};
 use anyhow::Context;
 use std::collections::{BTreeSet, HashMap};
+use ton_api::OffchainJsonResolver;
 use ton_api::toncenter::streaming::v2 as streaming;
 use ton_api::toncenter::v3;
-use ton_indexer::categorize_wallet;
+use ton_indexer_contracts::categorize_wallet;
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, Copy, Debug)]
@@ -121,6 +123,7 @@ pub fn validate_unsubscribe_request(req: &streaming::UnsubscribeRequest) -> anyh
 
 pub async fn notifications_for_commit(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     commit: StreamingCommitEvent,
 ) -> anyhow::Result<Vec<streaming::Notification>> {
@@ -146,6 +149,7 @@ pub async fn notifications_for_commit(
 
         if let Some(notification) = transactions_notification(
             node,
+            metadata_resolver,
             subscription,
             &trace_external_hash_norm,
             &transactions,
@@ -158,6 +162,7 @@ pub async fn notifications_for_commit(
 
         if let Some(notification) = actions_notification(
             node,
+            metadata_resolver,
             subscription,
             &trace_external_hash_norm,
             &event_addresses,
@@ -170,6 +175,7 @@ pub async fn notifications_for_commit(
 
         if let Some(notification) = trace_notification(
             node,
+            metadata_resolver,
             subscription,
             &trace_external_hash_norm,
             &trace,
@@ -197,7 +203,8 @@ pub async fn notifications_for_commit(
             }
 
             if let Some(notification) =
-                jettons_notification(node, subscription, account, finality).await?
+                jettons_notification(node, metadata_resolver, subscription, account, finality)
+                    .await?
             {
                 notifications.push(notification);
             }
@@ -308,6 +315,7 @@ fn collect_transaction_addresses(transactions: &[LocalnetTransaction]) -> BTreeS
 
 async fn transactions_notification(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     transactions: &[LocalnetTransaction],
@@ -329,6 +337,7 @@ async fn transactions_notification(
     let response = toncenter_v3::map_transactions_response(&filtered);
     let (address_book, metadata) = build_extra_data(
         node,
+        metadata_resolver,
         subscription,
         &collect_transaction_addresses(&filtered),
     )
@@ -344,6 +353,7 @@ async fn transactions_notification(
 
 async fn actions_notification(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     event_addresses: &BTreeSet<Addr>,
@@ -357,7 +367,8 @@ async fn actions_notification(
         return Ok(None);
     }
 
-    let (address_book, metadata) = build_extra_data(node, subscription, event_addresses).await?;
+    let (address_book, metadata) =
+        build_extra_data(node, metadata_resolver, subscription, event_addresses).await?;
     Ok(Some(streaming::Notification::Actions {
         finality,
         trace_external_hash_norm: trace_external_hash_norm.to_owned(),
@@ -369,6 +380,7 @@ async fn actions_notification(
 
 async fn trace_notification(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     trace_external_hash_norm: &str,
     trace: &TraceNode,
@@ -386,6 +398,7 @@ async fn trace_notification(
     let transactions = collect_trace_transactions(trace)?;
     let (address_book, metadata) = build_extra_data(
         node,
+        metadata_resolver,
         subscription,
         &collect_transaction_addresses(&transactions),
     )
@@ -431,6 +444,7 @@ async fn account_state_notification(
 
 async fn jettons_notification(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     account: Addr,
     finality: streaming::Finality,
@@ -464,6 +478,7 @@ async fn jettons_notification(
 
     let (address_book, metadata) = build_extra_data(
         node,
+        metadata_resolver,
         subscription,
         &BTreeSet::from([wallet.address, wallet.owner_address, wallet.jetton_address]),
     )
@@ -501,6 +516,7 @@ fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> v3::Accou
 
 async fn build_extra_data(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     subscription: &StreamingSubscription,
     addresses: &BTreeSet<Addr>,
 ) -> anyhow::Result<(Option<v3::AddressBook>, Option<v3::Metadata>)> {
@@ -512,7 +528,7 @@ async fn build_extra_data(
     let mut extra_jetton_masters = BTreeSet::new();
 
     for address in addresses {
-        let info = collect_address_info(node, *address).await?;
+        let info = collect_address_info(node, metadata_resolver, *address).await?;
         extra_jetton_masters.extend(info.extra_jetton_masters.iter().copied());
 
         if subscription.include_address_book {
@@ -543,7 +559,7 @@ async fn build_extra_data(
             if metadata.contains_key(&key) {
                 continue;
             }
-            let info = collect_address_info(node, master_address).await?;
+            let info = collect_address_info(node, metadata_resolver, master_address).await?;
             if !info.token_info.is_empty() {
                 metadata.insert(
                     key,
@@ -569,7 +585,11 @@ struct AddressInfo {
     extra_jetton_masters: BTreeSet<Addr>,
 }
 
-async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<AddressInfo> {
+async fn collect_address_info(
+    node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
+    address: Addr,
+) -> anyhow::Result<AddressInfo> {
     let mut info = AddressInfo::default();
     let address_str = address.to_string();
 
@@ -602,9 +622,10 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
         info.extra_jetton_masters.insert(wallet.jetton_address);
     }
 
-    let masters = node
+    let mut masters = node
         .get_jetton_masters(vec![address_str.clone()], Vec::new(), Some(1), Some(0))
         .await?;
+    enrich_jetton_masters(metadata_resolver, &mut masters).await;
     if let Some(master) = masters.first() {
         info.interfaces.insert("jetton_master".to_string());
         info.token_info

@@ -156,8 +156,6 @@ fun main() {
 "#;
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
-const CATALOG_WALLET_V4R2_CODE_HASH: &str =
-    "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 
 fn reserve_localnet_port() -> Option<(TcpListener, String)> {
     let listener = TcpListener::bind("127.0.0.1:0").ok()?;
@@ -955,23 +953,110 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
         .expect("Failed to write wallets.toml");
 
-    let source_node = project.localnet().start();
-    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
-
-    let forked_node = project
+    let source_node = project
         .localnet()
         .args([
-            "--fork-net",
-            "custom:fork-source",
             "--accounts",
             "deployer",
             "--no-mining",
+            "--mine-empty-blocks",
         ])
         .start();
+    let source_fork_block = u64::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
+    let forked_db_path = project.path().join("state/forked.sqlite");
+    fs::create_dir_all(
+        forked_db_path
+            .parent()
+            .expect("forked database must have a parent"),
+    )
+    .expect("failed to create forked database directory");
 
-    let startup_wallets = forked_node.get_json("/acton_getStartupWallets");
-    let startup_wallets_payload = response_payload(&startup_wallets);
-    let wallets = startup_wallets_payload
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+
+    let historical_seqno = source_fork_block.saturating_sub(1);
+    let historical_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={historical_seqno}&limit=1"
+    );
+    let source_recent_transactions = source_node.get_json("/api/v3/transactions?limit=1&sort=desc");
+    let source_transaction = source_recent_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("fork source must expose a startup transaction");
+    let transaction_block = &source_transaction["block_ref"];
+    let transaction_workchain = transaction_block["workchain"]
+        .as_i64()
+        .expect("transaction block must expose workchain");
+    let transaction_shard = transaction_block["shard"]
+        .as_str()
+        .expect("transaction block must expose shard");
+    let transaction_seqno = transaction_block["seqno"]
+        .as_u64()
+        .expect("transaction block must expose seqno");
+    let transaction_account = source_transaction["account"]
+        .as_str()
+        .expect("source transaction must expose account");
+    let transaction_hash = source_transaction["hash"]
+        .as_str()
+        .expect("source transaction must expose hash");
+    let transaction_hash_hex = transaction_hash
+        .parse::<Hash256>()
+        .expect("source transaction hash must parse")
+        .to_hex();
+    let historical_transactions_path = format!(
+        "/api/v3/transactions?workchain={transaction_workchain}&shard={transaction_shard}&seqno={transaction_seqno}&limit=100"
+    );
+    let historical_shards_path = format!("/api/v2/getShards?seqno={historical_seqno}");
+    let fork_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={source_fork_block}&limit=1"
+    );
+    let source_historical_block = source_node.get_json(&historical_block_path);
+    let forked_historical_block = forked_node.get_json(&historical_block_path);
+    let source_fork_block_response = source_node.get_json(&fork_block_path);
+    let forked_fork_block_response = forked_node.get_json(&fork_block_path);
+    let source_historical_transactions = source_node.get_json(&historical_transactions_path);
+    let forked_historical_transactions = forked_node.get_json(&historical_transactions_path);
+    let source_historical_shards = source_node.get_json(&historical_shards_path);
+    let forked_historical_shards = forked_node.get_json(&historical_shards_path);
+    let source_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        source_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("source-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        forked_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("forked-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_unpinned_account = forked_node.get_json(&format!(
+        "/api/v3/transactions?account={transaction_account}&limit=100&sort=desc"
+    ));
+    let forked_unpinned_hash = forked_node.get_json(&format!(
+        "/api/v3/transactions?hash={transaction_hash_hex}&limit=100"
+    ));
+
+    let startup_accounts = forked_node.get_json("/acton_getStartupAccounts");
+    let startup_accounts_payload = response_payload(&startup_accounts);
+    let wallets = startup_accounts_payload
         .as_array()
         .expect("startup wallets response must contain an array");
     let wallet = wallets
@@ -984,6 +1069,10 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     wait_until_address_state_active(&forked_node, address, Duration::from_secs(5));
     let node_info = forked_node.get_json("/acton_nodeInfo");
     let initial_seqno = latest_masterchain_seqno(&forked_node);
+    let local_block_path =
+        format!("/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={initial_seqno}&limit=1");
+    let source_at_local_seqno = source_node.get_json(&local_block_path);
+    let forked_local_block = forked_node.get_json(&local_block_path);
     thread::sleep(Duration::from_millis(250));
     let after_sleep_seqno = latest_masterchain_seqno(&forked_node);
     let mine_response = forked_node.post_json("/acton_mine", &json!({}));
@@ -1000,12 +1089,66 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
         "state_source": {
             "state_source": node_info["result"]["state_source"].as_str(),
             "fork_network": node_info["result"]["fork_network"].as_str(),
-            "fork_block_number": node_info["result"]["fork_block_number"].as_u64(),
+            "fork_block_number": {
+                "present": node_info["result"]["fork_block_number"].as_u64().is_some(),
+                "matches_source_at_fork": node_info["result"]["fork_block_number"].as_u64()
+                    == Some(source_fork_block),
+                "nonzero": node_info["result"]["fork_block_number"]
+                    .as_u64()
+                    .is_some_and(|seqno| seqno > 0),
+            },
+        },
+        "runtime": {
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "block_interval_ms": node_info["result"]["block_interval_ms"].as_u64(),
+            "rate_limit_rps": node_info["result"]["rate_limit_rps"].as_u64(),
+        },
+        "historical_reads": {
+            "requested_before_fork": historical_seqno < source_fork_block,
+            "blocks_match_source":
+                forked_historical_block["blocks"] == source_historical_block["blocks"],
+            "fork_block_matches_source":
+                forked_fork_block_response["blocks"] == source_fork_block_response["blocks"],
+            "transactions_match_source":
+                forked_historical_transactions["transactions"]
+                    == source_historical_transactions["transactions"]
+                    && source_historical_transactions["transactions"]
+                        .as_array()
+                        .is_some_and(|transactions| !transactions.is_empty()),
+            "shards_match_source":
+                forked_historical_shards["result"] == source_historical_shards["result"],
+            "json_rpc_shards_match_source":
+                serde_json::to_value(&forked_historical_shards_rpc.response.result)
+                    .expect("forked shards must serialize")
+                    == serde_json::to_value(&source_historical_shards_rpc.response.result)
+                        .expect("source shards must serialize"),
+            "unpinned_account_includes_remote_transaction":
+                forked_unpinned_account["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
+            "unpinned_hash_includes_remote_transaction":
+                forked_unpinned_hash["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
+            "first_local_block_is_local": forked_local_block["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty())
+                && source_at_local_seqno["blocks"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
         },
         "manual_mining": {
+            "startup_blocks_follow_fork": u64::try_from(initial_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
             "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
             "mine_ok": mine_response["ok"].as_bool(),
             "seqno_delta": after_mine_seqno - after_sleep_seqno,
+            "manual_block_follows_head": after_mine_seqno == after_sleep_seqno + 1,
         }
     });
 
@@ -1013,6 +1156,291 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
         format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
         snapbox::file!(
             "snapshots/localnet/test_localnet_no_mining_startup_accounts_fork.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    let source_advance = source_node.post_json("/acton_mine", &json!({}));
+    let advanced_source_seqno = latest_masterchain_seqno(&source_node);
+    let advanced_source_at_local_seqno = source_node.get_json(&local_block_path);
+    let restarted_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+    let restarted_info = restarted_node.get_json("/acton_nodeInfo");
+    let restarted_local_block = restarted_node.get_json(&local_block_path);
+    let restart_snapshot = json!({
+        "source_advanced": source_advance["ok"].as_bool() == Some(true)
+            && u64::try_from(advanced_source_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
+        "fork_boundary_preserved":
+            restarted_info["result"]["fork_block_number"].as_u64() == Some(source_fork_block),
+        "head_preserved":
+            restarted_info["result"]["last_block_seqno"].as_u64()
+                == u64::try_from(after_mine_seqno).ok(),
+        "source_now_has_same_seqno":
+            advanced_source_at_local_seqno["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty()),
+        "local_block_preserved":
+            restarted_local_block["blocks"] == forked_local_block["blocks"],
+        "local_block_not_replaced_by_source":
+            restarted_local_block["blocks"] != advanced_source_at_local_seqno["blocks"],
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&restart_snapshot, project.path())
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_persisted_fork_boundary.summary.json"),
+    );
+
+    restarted_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_v2_block_history_stays_on_the_correct_side_of_the_fork() {
+    let project = ProjectBuilder::new("localnet-v2-fork-history-routing").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    source_node.post_json("/acton_increaseTime", &json!({ "seconds": 10 }));
+    source_node.post_json("/acton_mine", &json!({}));
+    let fork_seqno = u32::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    assert!(fork_seqno > 0, "fork must have a historical predecessor");
+    let historical_seqno = fork_seqno - 1;
+
+    append_custom_localnet_network(project.path(), "v2-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:v2-fork-source")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .start();
+    let source_initial_masterchain_info = source_node.get_json("/api/v2/getMasterchainInfo");
+    let forked_initial_masterchain_info = forked_node.get_json("/api/v2/getMasterchainInfo");
+    forked_node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
+    forked_node.post_json("/acton_mine", &json!({}));
+    source_node.post_json("/acton_mine", &json!({}));
+    let local_seqno = fork_seqno + 1;
+    assert_eq!(latest_masterchain_seqno(&forked_node), local_seqno as i64);
+    assert_eq!(latest_masterchain_seqno(&source_node), local_seqno as i64);
+
+    let header_path = |seqno| {
+        format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}")
+    };
+    let transactions_path = |seqno, extended| {
+        format!(
+            "/api/v2/getBlockTransactions{}?workchain=0&shard=-9223372036854775808&seqno={seqno}&count=100",
+            if extended { "Ext" } else { "" }
+        )
+    };
+    let lookup_seqno_path =
+        |seqno| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&seqno={seqno}");
+
+    let source_historical_header = source_node.get_json(&header_path(historical_seqno));
+    let forked_historical_header = forked_node.get_json(&header_path(historical_seqno));
+    let source_boundary_header = source_node.get_json(&header_path(fork_seqno));
+    let forked_boundary_header = forked_node.get_json(&header_path(fork_seqno));
+    let source_local_seqno_header = source_node.get_json(&header_path(local_seqno));
+    let forked_local_header = forked_node.get_json(&header_path(local_seqno));
+
+    let source_historical_transactions =
+        source_node.get_json(&transactions_path(historical_seqno, false));
+    let forked_historical_transactions =
+        forked_node.get_json(&transactions_path(historical_seqno, false));
+    let source_boundary_transactions = source_node.get_json(&transactions_path(fork_seqno, false));
+    let forked_boundary_transactions = forked_node.get_json(&transactions_path(fork_seqno, false));
+    let source_local_seqno_transactions =
+        source_node.get_json(&transactions_path(local_seqno, false));
+    let forked_local_transactions = forked_node.get_json(&transactions_path(local_seqno, false));
+    let source_historical_transactions_ext =
+        source_node.get_json(&transactions_path(historical_seqno, true));
+    let forked_historical_transactions_ext =
+        forked_node.get_json(&transactions_path(historical_seqno, true));
+    let source_boundary_transactions_ext =
+        source_node.get_json(&transactions_path(fork_seqno, true));
+    let forked_boundary_transactions_ext =
+        forked_node.get_json(&transactions_path(fork_seqno, true));
+    let source_local_seqno_transactions_ext =
+        source_node.get_json(&transactions_path(local_seqno, true));
+    let forked_local_transactions_ext = forked_node.get_json(&transactions_path(local_seqno, true));
+
+    let source_historical_lookup = source_node.get_json(&lookup_seqno_path(historical_seqno));
+    let forked_historical_lookup = forked_node.get_json(&lookup_seqno_path(historical_seqno));
+    let source_boundary_lookup = source_node.get_json(&lookup_seqno_path(fork_seqno));
+    let forked_boundary_lookup = forked_node.get_json(&lookup_seqno_path(fork_seqno));
+    let source_local_seqno_lookup = source_node.get_json(&lookup_seqno_path(local_seqno));
+    let forked_local_lookup = forked_node.get_json(&lookup_seqno_path(local_seqno));
+
+    let historical_lt = source_historical_header["result"]["start_lt"]
+        .as_str()
+        .expect("historical header must expose start_lt");
+    let historical_time = source_historical_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("historical header must expose gen_utime");
+    let local_lt = forked_local_header["result"]["start_lt"]
+        .as_str()
+        .expect("local header must expose start_lt");
+    let local_time = forked_local_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("local header must expose gen_utime");
+    let lookup_lt_path =
+        |lt: &str| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&lt={lt}");
+    let lookup_time_path = |time| {
+        format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&unixtime={time}")
+    };
+    let source_historical_lt_lookup = source_node.get_json(&lookup_lt_path(historical_lt));
+    let forked_historical_lt_lookup = forked_node.get_json(&lookup_lt_path(historical_lt));
+    let source_historical_time_lookup = source_node.get_json(&lookup_time_path(historical_time));
+    let forked_historical_time_lookup = forked_node.get_json(&lookup_time_path(historical_time));
+    let forked_local_lt_lookup = forked_node.get_json(&lookup_lt_path(local_lt));
+    let forked_local_time_lookup = forked_node.get_json(&lookup_time_path(local_time));
+
+    let snapshot = json!({
+        "initial_masterchain_info": {
+            "fork_boundary_matches_remote":
+                forked_initial_masterchain_info["result"]["last"]
+                    == source_initial_masterchain_info["result"]["last"],
+            "root_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["root_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+            "file_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["file_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+        },
+        "get_block_header": {
+            "pre_fork_matches_remote":
+                forked_historical_header["result"] == source_historical_header["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_header["result"] == source_boundary_header["result"],
+            "post_fork_stays_local":
+                forked_local_header["result"]["id"] != source_local_seqno_header["result"]["id"],
+        },
+        "get_block_transactions": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions["result"]
+                    == source_historical_transactions["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions["result"] == source_boundary_transactions["result"],
+            "post_fork_stays_local":
+                forked_local_transactions["result"]["id"]
+                    != source_local_seqno_transactions["result"]["id"],
+        },
+        "get_block_transactions_ext": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions_ext["result"]
+                    == source_historical_transactions_ext["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions_ext["result"]
+                    == source_boundary_transactions_ext["result"],
+            "post_fork_stays_local":
+                forked_local_transactions_ext["result"]["id"]
+                    != source_local_seqno_transactions_ext["result"]["id"],
+        },
+        "lookup_block": {
+            "pre_fork_seqno_matches_remote":
+                forked_historical_lookup["result"] == source_historical_lookup["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_lookup["result"] == source_boundary_lookup["result"],
+            "post_fork_stays_local":
+                forked_local_lookup["result"] == forked_local_header["result"]["id"]
+                    && forked_local_lookup["result"] != source_local_seqno_lookup["result"],
+            "pre_fork_lt_matches_remote":
+                forked_historical_lt_lookup["result"] == source_historical_lt_lookup["result"],
+            "pre_fork_time_matches_remote":
+                forked_historical_time_lookup["result"] == source_historical_time_lookup["result"],
+            "post_fork_lt_stays_local":
+                forked_local_lt_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+            "post_fork_time_stays_local":
+                forked_local_time_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_fork_history_routing.summary.json"),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
+    let project = ProjectBuilder::new("localnet-auto-mining-fork-remote-account").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    let source_accounts = source_node.get_json("/acton_getStartupAccounts");
+    let source_address = response_payload(&source_accounts)
+        .as_array()
+        .and_then(|wallets| wallets.first())
+        .and_then(|wallet| wallet["address"].as_str())
+        .expect("source startup wallet must expose an address");
+
+    append_custom_localnet_network(project.path(), "auto-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .args(["--fork-net", "custom:auto-fork-source"])
+        .start();
+
+    let (account_status, account_state) = forked_node.get_json_with_status(&format!(
+        "/api/v3/accountStates?address={source_address}&include_boc=false"
+    ));
+    let (node_info_status, node_info) = forked_node.get_json_with_status("/acton_nodeInfo");
+    let snapshot = json!({
+        "remote_account": {
+            "request_finished": account_status > 0,
+            "response_is_json": account_state.is_object(),
+        },
+        "node_after_fetch": {
+            "status": node_info_status,
+            "responded": node_info["ok"].as_bool(),
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_auto_mining_fork_remote_account.summary.json"
         ),
     );
 
@@ -1028,9 +1456,16 @@ fn localnet_records_api_calls_for_dashboard() {
     let mut initial_log = node.get_json("/acton_getApiCalls");
     normalize_api_calls_for_snapshot(&mut initial_log);
 
-    let _admin_wallets = node.get_json("/acton_getStartupWallets");
+    let _startup_accounts = node.get_json("/acton_getStartupAccounts");
     let _admin_status = node.get_json("/acton_nodeInfo");
-    let _v2_status = node.get_json("/api/v2/getMasterchainInfo");
+    let _v2_status = node.get_json("/api/v2/getMasterchainInfo?archival=true&limit=2");
+    Client::new()
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .header("X-Acton-Request-Source", "studio-ui")
+        .send()
+        .expect("Studio UI request must be sent")
+        .error_for_status()
+        .expect("Studio UI request must succeed");
     let _successful_rpc = node.post_json(
         "/api/v2/jsonRPC",
         &json!({
@@ -1047,6 +1482,24 @@ fn localnet_records_api_calls_for_dashboard() {
             "id": "missing",
             "method": "missingMethod",
             "params": {}
+        }),
+    );
+    let (_write_status, _write_rpc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "write",
+            "method": "sendBoc",
+            "params": {
+                "boc": "invalid"
+            }
+        }),
+    );
+    let (_estimate_status, _estimate_response) = node.post_json_with_status(
+        "/api/v3/estimateFee",
+        &json!({
+            "address": "invalid",
+            "body": "invalid"
         }),
     );
 
@@ -1182,46 +1635,6 @@ fn localnet_serves_get_shard_account_cell_for_active_account() {
             "snapshots/localnet/test_localnet_get_shard_account_cell_active.summary.json"
         ),
     );
-
-    node.stop();
-}
-
-#[test]
-fn localnet_serves_embedded_ui_and_spa_routes() {
-    let project = ProjectBuilder::new("localnet-ui-smoke").build();
-    let node = project.localnet().start();
-    let client = Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("Failed to create HTTP client for Localnet UI smoke test");
-
-    for path in ["", "/explorer"] {
-        let url = format!("{}{}", node.base_url(), path);
-        let response = client
-            .get(&url)
-            .send()
-            .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
-        let status = response.status();
-        let body = response
-            .text()
-            .unwrap_or_else(|error| panic!("Failed to read GET {url} response body: {error}"));
-
-        assert!(
-            status.is_success(),
-            "GET {url} failed with status {status}: {body}"
-        );
-        assert!(
-            body.contains("<title>TON Localnet UI</title>"),
-            "Expected Localnet UI HTML from {url}, got:\n{body}"
-        );
-        assert!(
-            body.contains("<div id=\"root\"></div>"),
-            "Expected Localnet UI root container from {url}, got:\n{body}"
-        );
-    }
-
-    let response = node.get_json("/api/v2/getMasterchainInfo");
-    assert_eq!(response["ok"].as_bool(), Some(true));
 
     node.stop();
 }
@@ -1387,41 +1800,6 @@ fn localnet_require_auth_protects_http_api() {
     assertion().eq(
         pretty_json_for_snapshot(&summary, project.path()),
         snapbox::file!("snapshots/localnet/test_localnet_require_auth.summary.json"),
-    );
-
-    node.stop();
-}
-
-#[test]
-fn localnet_batches_address_name_lookup() {
-    let project = ProjectBuilder::new("localnet-address-name-batch").build();
-    let node = project.localnet().start();
-    let named_address = "0:2222222222222222222222222222222222222222222222222222222222222222";
-    let unnamed_address = "0:3333333333333333333333333333333333333333333333333333333333333333";
-
-    node.post_json(
-        "/acton_setAddressName",
-        &json!({
-            "address": named_address,
-            "name": "treasury"
-        }),
-    );
-
-    let mut response = node.get_json(&format!(
-        "/acton_getAddressName?address={}&address={}",
-        encode_query_component(named_address),
-        encode_query_component(unnamed_address)
-    ));
-    normalize_extra_for_snapshot(&mut response);
-    let response_json = format!(
-        "{}\n",
-        serde_json::to_string_pretty(&response)
-            .expect("Failed to serialize address name batch response")
-    );
-
-    assertion().eq(
-        response_json,
-        snapbox::file!("snapshots/localnet/test_localnet_address_name_batch.response.json"),
     );
 
     node.stop();
@@ -3565,8 +3943,8 @@ fn localnet_supports_emulate_v1_emulate_ton_connect() {
         .args(["--accounts", "wallet_v3,wallet_v4,wallet_v5", "--no-mining"])
         .start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallets = response_payload(&startup_wallets)
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallets = response_payload(&startup_accounts)
         .as_array()
         .expect("startup wallets response must contain an array");
     let transactions_before = node.get_json("/api/v3/transactions?limit=100");
@@ -3715,8 +4093,8 @@ fn localnet_supports_v3_estimate_fee_and_top_accounts() {
         .args(["--accounts", "wallet_v4", "--no-mining"])
         .start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallet = response_payload(&startup_wallets)
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet = response_payload(&startup_accounts)
         .as_array()
         .and_then(|wallets| wallets.first())
         .expect("startup wallet must be present");
@@ -5211,8 +5589,8 @@ fn localnet_supports_v3_core_lookup_endpoints() {
         .expect("Failed to write wallets.toml");
     let node = project.localnet().args(["--accounts", "deployer"]).start();
 
-    let startup_wallets = node.get_json("/acton_getStartupWallets");
-    let wallet_address = response_payload(&startup_wallets)[0]["address"]
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet_address = response_payload(&startup_accounts)[0]["address"]
         .as_str()
         .expect("startup wallet must expose address")
         .to_owned();
@@ -6922,159 +7300,6 @@ fn localnet_contracts_can_read_prevblocks_instructions() {
 }
 
 #[test]
-fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
-    let project = ProjectBuilder::new("localnet-compiler-abi-registry")
-        .contract("getter", V3_GETTER_CONTRACT)
-        .script_file("deploy_getter", V3_DEPLOY_GETTER_SCRIPT)
-        .build();
-
-    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
-        .expect("Failed to write wallets.toml");
-
-    let node = project
-        .localnet()
-        .before_start(super::super::support::project::ActonCommand::build)
-        .args(["--accounts", "deployer"])
-        .start();
-    append_localnet_network(project.path(), &node.base_url());
-
-    let script_result = project
-        .acton()
-        .script("scripts/deploy_getter.tolk")
-        .verify_network("localnet")
-        .run();
-    let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
-        .expect("Failed to decode deploy script stdout");
-    let script_stderr = String::from_utf8(script_result.output.get_output().stderr.clone())
-        .expect("Failed to decode deploy script stderr");
-    let script_status = script_result.output.get_output().status.code().unwrap_or(1);
-
-    assert_eq!(
-        script_status, 0,
-        "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
-    );
-
-    let getter_address = extract_marker_value(&script_stdout, "GETTER_CONTRACT=");
-    wait_until_address_state_active(&node, &getter_address, Duration::from_secs(12));
-
-    let account_states = wait_for_ok_response(
-        &node,
-        &format!("/api/v3/accountStates?address={getter_address}&include_boc=false"),
-        Duration::from_secs(12),
-    );
-    let code_hash_b64 = response_payload(&account_states)["accounts"]
-        .as_array()
-        .and_then(|accounts| accounts.first())
-        .and_then(|account| account["code_hash"].as_str())
-        .expect("accountStates must include code_hash for deployed getter");
-    let code_hash_hex = Hash256::from_base64(code_hash_b64)
-        .expect("accountStates code_hash must be valid base64")
-        .to_hex();
-
-    let missing_code_hash = "1111111111111111111111111111111111111111111111111111111111111111";
-    let local_override_alias_hash =
-        "2222222222222222222222222222222222222222222222222222222222222222";
-    let abi_response = wait_for_ok_response(
-        &node,
-        &format!(
-            "/acton_getCompilerAbi?code_hash={}&code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={missing_code_hash}",
-            encode_query_component(&code_hash_hex)
-        ),
-        Duration::from_secs(12),
-    );
-    let abi_payload = response_payload(&abi_response);
-    let abi = &abi_payload[&code_hash_hex]["compiler_abi"];
-    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH]["compiler_abi"];
-
-    let register_override_response = node.post_json(
-        "/acton_registerCompilerAbis",
-        &json!({
-            "entries": [
-                {
-                    "abi": {
-                        "compiler_abi": {
-                            "compiler_name": "tolk",
-                            "contract_name": "LocalOverride"
-                        },
-                        "display_name": "LocalOverride",
-                        "code_hashes": [CATALOG_WALLET_V4R2_CODE_HASH, local_override_alias_hash],
-                        "links": []
-                    }
-                }
-            ]
-        }),
-    );
-    assert_eq!(
-        register_override_response["ok"].as_bool(),
-        Some(true),
-        "registerCompilerAbis failed: {}",
-        serde_json::to_string_pretty(&register_override_response).unwrap_or_default()
-    );
-    let override_response = wait_for_ok_response(
-        &node,
-        &format!(
-            "/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={local_override_alias_hash}"
-        ),
-        Duration::from_secs(12),
-    );
-    let override_payload = response_payload(&override_response);
-    let registered_compiler_abis_response =
-        wait_for_ok_response(&node, "/acton_listCompilerAbis", Duration::from_secs(12));
-    let registered_compiler_abis = response_payload(&registered_compiler_abis_response);
-    let local_override_rows = registered_compiler_abis
-        .as_array()
-        .map(|entries| {
-            entries
-                .iter()
-                .filter(|entry| {
-                    entry["abi"]["compiler_abi"]["contract_name"].as_str() == Some("LocalOverride")
-                })
-                .count()
-        })
-        .unwrap_or_default();
-
-    let abi_summary = json!({
-        "compiler_name": abi["compiler_name"],
-        "contract_name": abi["contract_name"],
-        "has_add_ten_get_method": abi["get_methods"].as_array().is_some_and(|methods| {
-            methods
-                .iter()
-                .any(|method| method["name"].as_str() == Some("addTen"))
-        }),
-        "catalog_contract_name": catalog_abi["contract_name"],
-        "catalog_has_seqno_get_method": catalog_abi["get_methods"].as_array().is_some_and(|methods| {
-            methods
-                .iter()
-                .any(|method| method["name"].as_str() == Some("seqno"))
-        }),
-        "local_registration_overrides_catalog": override_payload[CATALOG_WALLET_V4R2_CODE_HASH]
-            ["compiler_abi"]
-            ["contract_name"]
-            .as_str()
-            == Some("LocalOverride"),
-        "local_registration_alias_resolves": override_payload[local_override_alias_hash]
-            ["compiler_abi"]
-            ["contract_name"]
-            .as_str()
-            == Some("LocalOverride"),
-        "local_registration_is_single_row": local_override_rows == 1,
-        "missing_code_hash_is_null": abi_payload[missing_code_hash].is_null(),
-    });
-    let abi_summary_json = format!(
-        "{}\n",
-        serde_json::to_string_pretty(&abi_summary)
-            .expect("Failed to serialize compiler ABI batch summary")
-    );
-
-    assertion().eq(
-        abi_summary_json,
-        snapbox::file!("snapshots/localnet/test_localnet_compiler_abi_batch.summary.json"),
-    );
-
-    node.stop();
-}
-
-#[test]
 fn localnet_supports_utils_detect_and_pack_endpoints() {
     let project = ProjectBuilder::new("localnet-utils-endpoints").build();
     let node = project.localnet().start();
@@ -8014,7 +8239,30 @@ fn normalize_api_calls_for_snapshot(response: &mut Value) {
             if let Some(duration_ns) = call.get_mut("duration_ns") {
                 *duration_ns = json!("[DURATION_NS]");
             }
+            if let Some(response_body) = call.get_mut("response_body") {
+                normalize_nested_extra_for_snapshot(response_body);
+            }
         }
+    }
+}
+
+fn normalize_nested_extra_for_snapshot(value: &mut Value) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                normalize_nested_extra_for_snapshot(item);
+            }
+        }
+        Value::Object(map) => {
+            for (key, inner) in map {
+                if key == "@extra" {
+                    *inner = json!("[EXTRA]");
+                } else {
+                    normalize_nested_extra_for_snapshot(inner);
+                }
+            }
+        }
+        _ => {}
     }
 }
 

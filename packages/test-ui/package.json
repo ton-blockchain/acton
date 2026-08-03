@@ -5,7 +5,9 @@
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
-  "main": "index.js",
+  "exports": {
+    "./embed": "./src/embed.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
@@ -41,8 +43,8 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.0.16"
   }

@@ -78,6 +78,24 @@
   border-radius: 0 8px 8px;
 }
 
+.shellWithoutTabs .panel,
+.shellWithoutTabs .rawBlock {
+  border-radius: 8px;
+}
+
+.attachedToTabs .panel,
+.attachedToTabs .rawBlock,
+.attachedToTabs.shellWithoutTabs .panel,
+.attachedToTabs.shellWithoutTabs .rawBlock {
+  border: 0;
+  border-radius: 0;
+  background: var(--acton-color-surface-raised);
+}
+
+.attachedToTabs .view {
+  background: var(--acton-color-surface-raised);
+}
+
 .rawBlock > div {
   border-radius: inherit;
 }
@@ -284,6 +302,13 @@
 }
 
 .signatureTypeInteractive {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
   cursor: help;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, currentColor 42%, transparent);
@@ -558,10 +583,14 @@
 }
 
 .errorName {
+  min-width: 0;
+  overflow: hidden;
   color: color-mix(in srgb, var(--acton-color-accent) 72%, var(--acton-color-text));
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .declaration {

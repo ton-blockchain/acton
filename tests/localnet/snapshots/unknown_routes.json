@@ -27,9 +27,9 @@
     }
   },
   "ui": {
-    "content_type": "text/html",
-    "html_shell": true,
-    "status": 200
+    "content_type": "",
+    "html_shell": false,
+    "status": 404
   },
   "unauthorized": {
     "api": {

@@ -256,9 +256,7 @@
 .activeTabTrigger {
   background-color: var(--acton-color-surface);
   color: var(--acton-color-text);
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.1),
-    0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  outline: 1px solid var(--acton-color-border);
 }
 
 .tabContent {

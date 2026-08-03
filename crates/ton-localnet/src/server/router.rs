@@ -1,54 +1,50 @@
 use super::handlers::utils::get_extra;
 use super::handlers::{
-    change_account_state, clear_checkpoints, create_checkpoint, delete_checkpoint,
-    delete_compiler_abi, delete_verified_source, detect_address, detect_hash, dump_state,
-    emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3, export_checkpoint, faucet,
-    get_account_states_v3, get_address_balance, get_address_book_v3, get_address_information,
-    get_address_information_v3, get_address_name, get_address_state, get_adjacent_transactions_v3,
-    get_api_calls, get_block_header, get_block_transactions, get_block_transactions_ext,
-    get_blocks_v3, get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
-    get_dns_records, get_extended_address_information, get_jetton_burns, get_jetton_masters,
-    get_jetton_transfers, get_jetton_wallets, get_libraries, get_masterchain_block_shard_state_v3,
-    get_masterchain_block_shards_v3, get_masterchain_info, get_masterchain_info_v3,
-    get_messages_v3, get_metadata_v3, get_multisig_orders, get_multisig_wallets,
-    get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers, get_out_msg_queue_size,
-    get_pending_actions_v3, get_pending_traces_v3, get_pending_transactions_v3,
-    get_registered_verified_source, get_shard_account_cell, get_shards, get_startup_wallets,
+    change_account_state, clear_checkpoints, create_checkpoint, delete_checkpoint, detect_address,
+    detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3,
+    export_checkpoint, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
+    get_address_information, get_address_information_v3, get_address_state,
+    get_adjacent_transactions_v3, get_api_calls, get_block_header, get_block_transactions,
+    get_block_transactions_ext, get_blocks_v3, get_config_all, get_config_param,
+    get_consensus_block, get_dns_records, get_extended_address_information, get_jetton_burns,
+    get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
+    get_masterchain_block_shard_state_v3, get_masterchain_block_shards_v3, get_masterchain_info,
+    get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_multisig_orders,
+    get_multisig_wallets, get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers,
+    get_out_msg_queue_size, get_pending_actions_v3, get_pending_traces_v3,
+    get_pending_transactions_v3, get_shard_account_cell, get_shards, get_startup_accounts,
     get_status, get_token_data, get_top_accounts_by_balance_v3, get_traces, get_transactions,
     get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
     get_transactions_v3, get_verified_source, get_vesting, get_wallet_information,
     get_wallet_information_v3, get_wallet_states_v3, import_checkpoint, increase_time,
-    jetton_faucet, json_rpc, list_checkpoints, list_compiler_abis, list_verified_sources,
-    load_state, lookup_block, mine_blocks, pack_address, register_compiler_abis,
-    register_verified_sources, restore_checkpoint, run_get_method, run_get_method_std,
-    run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message, send_message_v3,
-    set_address_name, set_mining_mode, set_network_conditions, set_next_block_timestamp,
-    set_shard_account, set_time, source_trace::build_source_trace, streaming_sse, streaming_ws,
-    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
+    jetton_faucet, json_rpc, list_checkpoints, load_state, lookup_block, mine_blocks, pack_address,
+    restore_checkpoint, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
+    send_boc_return_hash, send_internal_message, send_message_v3, set_mining_mode,
+    set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
+    source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
+    try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::{
-    ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
-    NetworkConditions, ServerState,
+    ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallSource, ApiCallType, NetworkConditions,
+    ServerState,
 };
 use axum::{
     Json, Router,
+    body::{Body, BodyDataStream, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Request, State},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-#[cfg(not(debug_assertions))]
-use include_dir::{Dir, include_dir};
 use serde_json::{Value, json};
-#[cfg(debug_assertions)]
-use std::fs;
 use std::num::NonZeroU32;
-#[cfg(debug_assertions)]
-use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_stream::Stream;
 use ton_api::toncenter::{v2::responses::TonlibErrorResponse, v3::responses::RequestError};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
@@ -57,15 +53,19 @@ use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-#[cfg(not(debug_assertions))]
-static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/localnet-ui/dist");
+const MAX_BUFFERED_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
+const MAX_STORED_REQUEST_BODY_BYTES: usize = 64 * 1024;
+const MAX_STORED_RESPONSE_BODY_BYTES: usize = 64 * 1024;
+const REQUEST_SOURCE_HEADER: &str = "x-acton-request-source";
+const STUDIO_UI_REQUEST_SOURCE: &str = "studio-ui";
 
 fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
     let nanoseconds = 1_000_000_000u64.div_ceil(u64::from(requests_per_second.get()));
     Duration::from_nanos(nanoseconds)
 }
 
-pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
+pub fn create_router(state: ServerState) -> Router {
+    let rate_limit_rps = state.rate_limit_rps;
     let mut api_v2_router = Router::new()
         .route("/v2", post(json_rpc))
         .route("/v2/jsonRPC", post(json_rpc))
@@ -197,24 +197,8 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
     let acton_router = Router::new()
         .route("/acton_fundAccount", post(faucet))
         .route("/acton_fundJetton", post(jetton_faucet))
-        .route("/acton_getAddressName", get(get_address_name))
-        .route("/acton_setAddressName", post(set_address_name))
-        .route("/acton_getCompilerAbi", get(get_compiler_abi))
-        .route("/acton_listCompilerAbis", get(list_compiler_abis))
-        .route("/acton_deleteCompilerAbi", post(delete_compiler_abi))
         .route("/acton_getVerifiedSource", get(get_verified_source))
-        .route(
-            "/acton_getRegisteredVerifiedSource",
-            get(get_registered_verified_source),
-        )
-        .route("/acton_listVerifiedSources", get(list_verified_sources))
-        .route("/acton_deleteVerifiedSource", post(delete_verified_source))
         .route("/acton_buildSourceTrace", post(build_source_trace))
-        .route("/acton_registerCompilerAbis", post(register_compiler_abis))
-        .route(
-            "/acton_registerVerifiedSources",
-            post(register_verified_sources),
-        )
         .route("/acton_dumpState", get(dump_state))
         .route(
             "/acton_loadState",
@@ -233,7 +217,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/acton_setShardAccount", post(set_shard_account))
         .route("/acton_changeAccountState", post(change_account_state))
         .route("/acton_sendInternalMessage", post(send_internal_message))
-        .route("/acton_getStartupWallets", get(get_startup_wallets))
+        .route("/acton_getStartupAccounts", get(get_startup_accounts))
         .route("/acton_setNetworkConditions", post(set_network_conditions))
         .route("/acton_setMiningMode", post(set_mining_mode))
         .route("/acton_mine", post(mine_blocks))
@@ -387,28 +371,206 @@ async fn record_api_call(request: Request, next: Next, api_calls: ApiCallLog) ->
     let start = ApiCallLog::start();
     let http_method = request.method().as_str().to_owned();
     let path = request.uri().path().to_owned();
+    let query_params = query_params_value(request.uri().query());
+    let source = request
+        .headers()
+        .get(REQUEST_SOURCE_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| value.eq_ignore_ascii_case(STUDIO_UI_REQUEST_SOURCE))
+        .map_or(ApiCallSource::External, |_| ApiCallSource::StudioUi);
+    let (request, request_body, request_body_truncated) = match capture_request_body(request).await
+    {
+        Ok(captured) => captured,
+        Err(response) => return response,
+    };
+    let mut input = api_call_input(
+        &http_method,
+        &path,
+        source,
+        query_params,
+        request_body,
+        request_body_truncated,
+    );
     let response = next.run(request).await;
 
-    if response
-        .extensions()
-        .get::<ApiCallAlreadyRecorded>()
-        .is_some()
-    {
-        return response;
-    }
-
     let status_code = response.status().as_u16();
-    if let Some(mut input) = api_call_input(&http_method, &path) {
+    if let Some(input) = input.as_mut() {
         input.status_code = status_code;
-        api_calls.record(input, start);
+    }
+    if let Some(input) = input {
+        let sequence = api_calls.record(input, start);
+        return capture_response_body(response, api_calls, sequence, &path);
     }
 
     response
 }
 
-fn api_call_input(http_method: &str, path: &str) -> Option<ApiCallInput> {
+async fn capture_request_body(
+    request: Request,
+) -> Result<(Request, Option<Value>, bool), Response> {
+    let (parts, body) = request.into_parts();
+    let bytes = to_bytes(body, MAX_BUFFERED_REQUEST_BODY_BYTES)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                Json(json!({
+                    "ok": false,
+                    "error": "Request body exceeds the localnet limit",
+                })),
+            )
+                .into_response()
+        })?;
+    let (request_body, request_body_truncated) = request_body_value(&bytes);
+    let request = Request::from_parts(parts, Body::from(bytes));
+
+    Ok((request, request_body, request_body_truncated))
+}
+
+fn request_body_value(bytes: &Bytes) -> (Option<Value>, bool) {
+    if bytes.is_empty() {
+        return (None, false);
+    }
+
+    let truncated = bytes.len() > MAX_STORED_REQUEST_BODY_BYTES;
+    let visible_bytes = &bytes[..bytes.len().min(MAX_STORED_REQUEST_BODY_BYTES)];
+    (stored_body_value(visible_bytes, truncated), truncated)
+}
+
+fn stored_body_value(bytes: &[u8], truncated: bool) -> Option<Value> {
+    if bytes.is_empty() {
+        return None;
+    }
+
+    Some(if truncated {
+        Value::String(String::from_utf8_lossy(bytes).into_owned())
+    } else {
+        serde_json::from_slice(bytes)
+            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(bytes).into_owned()))
+    })
+}
+
+fn capture_response_body(
+    response: Response,
+    api_calls: ApiCallLog,
+    sequence: u64,
+    path: &str,
+) -> Response {
+    if !should_capture_response_body(path) {
+        return response;
+    }
+
+    let (parts, body) = response.into_parts();
+    let stream = ApiCallResponseStream {
+        inner: body.into_data_stream(),
+        capture: Some(ApiCallResponseCapture {
+            api_calls,
+            sequence,
+            bytes: Vec::new(),
+            truncated: false,
+        }),
+    };
+    Response::from_parts(parts, Body::from_stream(stream))
+}
+
+fn should_capture_response_body(path: &str) -> bool {
+    !matches!(path, "/acton_getApiCalls" | "/acton_getStartupAccounts")
+}
+
+struct ApiCallResponseCapture {
+    api_calls: ApiCallLog,
+    sequence: u64,
+    bytes: Vec<u8>,
+    truncated: bool,
+}
+
+impl ApiCallResponseCapture {
+    fn push(&mut self, bytes: &Bytes) {
+        let remaining = MAX_STORED_RESPONSE_BODY_BYTES.saturating_sub(self.bytes.len());
+        let visible_len = bytes.len().min(remaining);
+        self.bytes.extend_from_slice(&bytes[..visible_len]);
+        self.truncated |= visible_len < bytes.len();
+    }
+
+    fn finish(mut self, incomplete: bool) {
+        self.truncated |= incomplete;
+        let response_body = stored_body_value(&self.bytes, self.truncated);
+        self.api_calls
+            .record_response(self.sequence, response_body, self.truncated);
+    }
+}
+
+struct ApiCallResponseStream {
+    inner: BodyDataStream,
+    capture: Option<ApiCallResponseCapture>,
+}
+
+impl ApiCallResponseStream {
+    fn finish(&mut self, incomplete: bool) {
+        if let Some(capture) = self.capture.take() {
+            capture.finish(incomplete);
+        }
+    }
+}
+
+impl Stream for ApiCallResponseStream {
+    type Item = Result<Bytes, axum::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let result = Pin::new(&mut this.inner).poll_next(cx);
+        match &result {
+            Poll::Ready(Some(Ok(bytes))) => {
+                if let Some(capture) = this.capture.as_mut() {
+                    capture.push(bytes);
+                }
+            }
+            Poll::Ready(Some(Err(_))) => this.finish(true),
+            Poll::Ready(None) => this.finish(false),
+            Poll::Pending => {}
+        }
+        result
+    }
+}
+
+impl Drop for ApiCallResponseStream {
+    fn drop(&mut self) {
+        self.finish(true);
+    }
+}
+
+fn query_params_value(query: Option<&str>) -> Option<Value> {
+    let query = query?;
+    let mut params = serde_json::Map::new();
+
+    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+        let value = Value::String(value.into_owned());
+        match params.entry(key.into_owned()) {
+            serde_json::map::Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+            serde_json::map::Entry::Occupied(mut entry) => match entry.get_mut() {
+                Value::Array(values) => values.push(value),
+                previous => {
+                    *previous = Value::Array(vec![std::mem::take(previous), value]);
+                }
+            },
+        }
+    }
+
+    Some(Value::Object(params))
+}
+
+fn api_call_input(
+    http_method: &str,
+    path: &str,
+    source: ApiCallSource,
+    query_params: Option<Value>,
+    request_body: Option<Value>,
+    request_body_truncated: bool,
+) -> Option<ApiCallInput> {
     let normalized_api_path = path.strip_prefix("/api").unwrap_or(path);
-    let (api_family, method) = if path.starts_with("/acton_") {
+    let (api_family, mut method) = if path.starts_with("/acton_") {
         if matches!(path, "/acton_getApiCalls" | "/acton_nodeInfo") {
             return None;
         }
@@ -459,35 +621,57 @@ fn api_call_input(http_method: &str, path: &str) -> Option<ApiCallInput> {
     } else {
         return None;
     };
+    let request_id = if matches!(api_family, ApiCallFamily::JsonRpc)
+        && let Some(body) = request_body.as_ref().and_then(Value::as_object)
+    {
+        if let Some(json_rpc_method) = body.get("method").and_then(Value::as_str) {
+            json_rpc_method.clone_into(&mut method);
+        }
+        body.get("id").cloned().unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
 
     Some(ApiCallInput {
-        call_type: classify_http_call_type(http_method, &method, normalized_api_path),
+        source,
+        call_type: classify_http_call_type(http_method, api_family, &method),
         api_family,
         http_method: http_method.to_owned(),
         path: path.to_owned(),
         method,
-        request_id: Value::Null,
+        request_id,
+        query_params,
+        request_body,
+        request_body_truncated,
         status_code: 0,
     })
 }
 
-fn classify_http_call_type(http_method: &str, method: &str, path: &str) -> ApiCallType {
+fn classify_http_call_type(
+    http_method: &str,
+    api_family: ApiCallFamily,
+    method: &str,
+) -> ApiCallType {
     if matches!(http_method, "GET" | "HEAD" | "OPTIONS") {
         return ApiCallType::Read;
     }
 
-    let method = method.to_ascii_lowercase();
-    let path = path.to_ascii_lowercase();
-    if method.contains("rungetmethod")
-        || method.starts_with("get")
-        || method.starts_with("detect")
-        || method.contains("packaddress")
-        || path.starts_with("/streaming/")
-        || path.starts_with("/emulate/")
-    {
-        ApiCallType::Read
-    } else {
-        ApiCallType::Write
+    match api_family {
+        ApiCallFamily::JsonRpc => classify_json_rpc_call(method),
+        ApiCallFamily::Emulate | ApiCallFamily::Streaming => ApiCallType::Read,
+        ApiCallFamily::V2 if matches!(method, "runGetMethod" | "runGetMethodStd") => {
+            ApiCallType::Read
+        }
+        ApiCallFamily::V3 if matches!(method, "estimateFee" | "runGetMethod") => ApiCallType::Read,
+        ApiCallFamily::Control if method == "acton_buildSourceTrace" => ApiCallType::Read,
+        _ => ApiCallType::Write,
+    }
+}
+
+fn classify_json_rpc_call(method: &str) -> ApiCallType {
+    match method {
+        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
+        _ => ApiCallType::Read,
     }
 }
 
@@ -572,53 +756,5 @@ async fn handle_unknown_route(State(state): State<ServerState>, request: Request
         return tonlib_error_response(StatusCode::NOT_FOUND, "Not Found");
     }
 
-    handle_embedded_ui(request.uri()).await
-}
-
-async fn handle_embedded_ui(uri: &axum::http::Uri) -> Response {
-    let path = uri.path().trim_start_matches('/');
-    let path = if path.is_empty() { "index.html" } else { path };
-
-    if let Some(contents) = load_ui_file(path) {
-        return (([("content-type", ui_content_type(path))]), contents).into_response();
-    }
-
-    if let Some(index) = load_ui_file("index.html") {
-        return (([("content-type", "text/html")]), index).into_response();
-    }
-
     StatusCode::NOT_FOUND.into_response()
-}
-
-fn ui_content_type(path: &str) -> &'static str {
-    match path.split('.').next_back() {
-        Some("html") => "text/html",
-        Some("js") => "application/javascript",
-        Some("css") => "text/css",
-        Some("svg") => "image/svg+xml",
-        Some("png") => "image/png",
-        Some("json") => "application/json",
-        _ => "application/octet-stream",
-    }
-}
-
-#[cfg(debug_assertions)]
-fn load_ui_file(path: &str) -> Option<Vec<u8>> {
-    if path.contains("..") {
-        return None;
-    }
-    let dist_path = PathBuf::from(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../packages/localnet-ui/dist"
-    ));
-    let file_path = dist_path.join(path);
-    if !file_path.is_file() {
-        return None;
-    }
-    fs::read(file_path).ok()
-}
-
-#[cfg(not(debug_assertions))]
-fn load_ui_file(path: &str) -> Option<Vec<u8>> {
-    UI_DIR.get_file(path).map(|file| file.contents().to_vec())
 }

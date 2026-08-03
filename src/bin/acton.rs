@@ -38,6 +38,7 @@ use acton_config::test::{
     BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
     TestConfig,
 };
+use acton_studio::DEFAULT_STUDIO_PORT;
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
@@ -48,10 +49,11 @@ use clap_complete::engine::{
     ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
 };
 use commands::common::error_fmt;
-use dotenvy::dotenv;
+use dotenvy::{dotenv, from_path};
 use human_panic::{Metadata, setup_panic};
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
@@ -678,6 +680,7 @@ enum Commands {
         #[arg(
             value_enum,
             long,
+            default_value = "actonscan",
             help = "Explorer to use for transaction links",
             help_heading = "Broadcasting",
             value_name = "NAME"
@@ -944,6 +947,11 @@ enum Commands {
     Localnet {
         #[command(subcommand)]
         command: LocalnetCommand,
+    },
+    #[command(about = "Manage Acton Studio")]
+    Studio {
+        #[command(subcommand)]
+        command: StudioCommand,
     },
     #[command(
         about = "Format project Tolk source files",
@@ -1310,6 +1318,30 @@ pub enum LocalnetCommand {
     Checkpoint {
         #[command(subcommand)]
         command: LocalnetCheckpointCommand,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum StudioCommand {
+    #[command(about = "Start Acton Studio")]
+    Start {
+        #[arg(
+            long,
+            value_name = "IP",
+            default_value = "127.0.0.1",
+            help = "Address for the Studio server to listen on"
+        )]
+        host: IpAddr,
+        #[arg(
+            long,
+            value_name = "PORT",
+            default_value_t = DEFAULT_STUDIO_PORT,
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "Studio server port"
+        )]
+        port: u16,
+        #[arg(long, help = "Do not open Studio in the default browser")]
+        no_open: bool,
     },
 }
 
@@ -1760,6 +1792,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         // ("localnet", "<COMMAND>"),
+        // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -2071,6 +2104,13 @@ fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<Resolve
                 resolved_project_root.display()
             );
         }
+        let resolved_project_root =
+            dunce::canonicalize(&resolved_project_root).map_err(|error| {
+                anyhow::anyhow!(
+                    "Failed to resolve project root {}: {error}",
+                    resolved_project_root.display()
+                )
+            })?;
 
         return Ok(ResolvedProjectRoot {
             path: resolved_project_root,
@@ -2106,6 +2146,34 @@ fn configure_project_roots(
     Ok(())
 }
 
+fn load_project_dotenv(project_roots_configured: bool) {
+    if project_roots_configured {
+        let project_dotenv = configured_project_root().join(".env");
+        if configured_manifest_path().is_file() && project_dotenv.is_file() {
+            from_path(project_dotenv).ok();
+            return;
+        }
+    }
+
+    dotenv().ok();
+}
+
+fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
+    if !project_roots_configured
+        || matches!(command, Commands::Studio { .. })
+        || !configured_manifest_path().is_file()
+    {
+        return;
+    }
+    let Ok(config) = ActonConfig::load_manifest() else {
+        return;
+    };
+    let _ = acton::studio_discovery::activate_studio_public_network_gateways(
+        configured_project_root(),
+        &config.package.name,
+    );
+}
+
 fn main() {
     CompleteEnv::with_factory(completion_command).complete();
 
@@ -2121,7 +2189,6 @@ fn main() {
         err
     }).ok();
 
-    dotenv().ok();
     let Cli {
         color,
         manifest_path,
@@ -2133,18 +2200,22 @@ fn main() {
     };
     init_color_mode(color);
 
-    if command_configures_project_roots(&command) {
-        if let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone()) {
-            eprintln!("{} {}", "Error:".red(), err);
-            process::exit(1);
-        }
+    let rpc_project_override = matches!(command, Commands::Rpc { .. })
+        && (manifest_path.is_some() || project_root.is_some());
+    let configure_roots = command_configures_project_roots(&command) || rpc_project_override;
+    if configure_roots && let Err(err) = configure_project_roots(manifest_path, project_root) {
+        eprintln!("{} {}", "Error:".red(), err);
+        process::exit(1);
+    }
 
-        if command_checks_toolchain_version(&command)
-            && let Err(err) = validate_project_toolchain_version()
-        {
-            print_error(&err);
-            process::exit(1);
-        }
+    load_project_dotenv(configure_roots);
+
+    if configure_roots
+        && (command_checks_toolchain_version(&command) || rpc_project_override)
+        && let Err(err) = validate_project_toolchain_version()
+    {
+        print_error(&err);
+        process::exit(1);
     }
 
     if !matches!(
@@ -2156,6 +2227,8 @@ fn main() {
         // we need some better way
     }
 
+    configure_studio_public_network_routing(&command, configure_roots);
+
     let result = match command {
         Commands::Init {
             create_dapp,
@@ -2163,16 +2236,7 @@ fn main() {
         } => init_cmd(create_dapp.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
-        Commands::Rpc { command } => {
-            if manifest_path.is_some() || project_root.is_some() {
-                match configure_project_roots(manifest_path, project_root) {
-                    Ok(()) => validate_project_toolchain_version().and_then(|()| rpc_cmd(command)),
-                    Err(err) => Err(err),
-                }
-            } else {
-                rpc_cmd(command)
-            }
-        }
+        Commands::Rpc { command } => rpc_cmd(command),
         Commands::New {
             path,
             name,
@@ -2662,6 +2726,19 @@ fn main() {
             ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Studio { command } => match command {
+            StudioCommand::Start {
+                host,
+                port,
+                no_open,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to initialize tokio runtime for Studio");
+                rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
+            }
+        },
         Commands::Localnet { command } => match command {
             LocalnetCommand::Start {
                 port,
@@ -2955,7 +3032,10 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
     command_configures_project_roots(command)
         && !matches!(
             command,
-            Commands::Up { .. } | Commands::Completions { .. } | Commands::Doctor
+            Commands::Up { .. }
+                | Commands::Completions { .. }
+                | Commands::Doctor
+                | Commands::Studio { .. }
         )
 }
 

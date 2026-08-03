@@ -1,0 +1,43 @@
+.dialogContent {
+  padding: 0;
+}
+
+.form {
+  display: grid;
+  gap: var(--acton-space-5);
+  padding: var(--acton-space-5);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.advancedContent {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.checkboxGroup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
+@media (max-width: 680px) {
+  .formGrid,
+  .checkboxGroup {
+    grid-template-columns: 1fr;
+  }
+
+  .form {
+    padding: var(--acton-space-4);
+  }
+}

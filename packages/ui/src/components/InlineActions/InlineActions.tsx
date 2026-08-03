@@ -3,6 +3,7 @@ import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
 import {useCopyValue} from "../../lib/useCopyValue"
+import {Tooltip} from "../Tooltip"
 import styles from "./InlineActions.module.css"
 import type {ACTON_INLINE_ACTIONS_VISIBILITY, ACTON_INLINE_ACTION_VARIANTS} from "./constants"
 
@@ -68,13 +69,13 @@ export function InlineAction({
   variant = "default",
   ...props
 }: InlineActionProps) {
-  return (
+  const tooltip = title ?? label
+  const button = (
     <button
       {...props}
       ref={ref}
       type={type}
       aria-label={ariaLabel ?? label}
-      title={title ?? label}
       className={cx(
         styles.inlineAction,
         actionVariantClassNames[variant],
@@ -87,6 +88,8 @@ export function InlineAction({
       </span>
     </button>
   )
+
+  return <Tooltip content={tooltip}>{button}</Tooltip>
 }
 
 export function CopyInlineAction({

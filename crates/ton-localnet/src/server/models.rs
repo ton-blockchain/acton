@@ -4,7 +4,6 @@ pub use acton_source_trace::{
     SourceTraceResponse,
 };
 use serde::Deserialize;
-use serde_json::Value;
 
 #[derive(Deserialize)]
 pub struct GetVerifiedSourceRequest {
@@ -59,12 +58,6 @@ pub enum ChangeAccountStatePayload {
 }
 
 #[derive(Deserialize)]
-pub struct SetAddressNameRequest {
-    pub address: String,
-    pub name: String,
-}
-
-#[derive(Deserialize)]
 pub struct SetNetworkConditionsRequest {
     pub response_delay_ms: u64,
 }
@@ -116,30 +109,4 @@ pub struct SetNextBlockTimestampRequest {
 #[derive(Deserialize)]
 pub struct GetApiCallsRequest {
     pub limit: Option<usize>,
-}
-
-#[derive(Deserialize)]
-pub struct CompilerAbiRegistration {
-    pub abi: Value,
-}
-
-#[derive(Deserialize)]
-pub struct RegisterCompilerAbisRequest {
-    pub entries: Vec<CompilerAbiRegistration>,
-}
-
-#[derive(Deserialize)]
-pub struct CodeHashRequest {
-    pub code_hash: String,
-}
-
-#[derive(Deserialize)]
-pub struct VerifiedSourceRegistration {
-    pub code_hash: String,
-    pub source: Value,
-}
-
-#[derive(Deserialize)]
-pub struct RegisterVerifiedSourcesRequest {
-    pub entries: Vec<VerifiedSourceRegistration>,
 }

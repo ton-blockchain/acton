@@ -1,0 +1,11 @@
+{
+  "language": "tolk",
+  "compiler_version": "1.4.1",
+  "entrypoint": "main.tolk",
+  "sources": [
+    {
+      "path": "main.tolk",
+      "content": "fun onInternalMessage(in: InMessage) {\n}\n"
+    }
+  ]
+}

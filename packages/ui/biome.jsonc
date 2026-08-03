@@ -3,7 +3,7 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**"]
+    "includes": ["**", "!!src/components/HighlightedCode/grammars/*.tmLanguage.json"]
   },
   "linter": {
     "rules": {

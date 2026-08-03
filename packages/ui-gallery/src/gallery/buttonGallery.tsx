@@ -65,7 +65,11 @@ function SizeScale() {
             <h4>{size}</h4>
             <p>{sizeUse[size]}</p>
           </div>
-          <Button size={size} aria-label={size === "icon" ? "Icon action" : undefined}>
+          <Button
+            size={size}
+            aria-label={size === "icon" ? "Icon action" : undefined}
+            title={size === "icon" ? "Icon action" : undefined}
+          >
             {size === "icon" ? <DotIcon /> : "Action"}
           </Button>
         </article>
@@ -80,7 +84,7 @@ function ContentPatterns() {
       <Button>Text only</Button>
       <Button leadingIcon={<DotIcon />}>Leading icon</Button>
       <Button trailingIcon={<ArrowIcon />}>Trailing icon</Button>
-      <Button size="icon" aria-label="Icon-only action">
+      <Button size="icon" aria-label="Icon-only action" title="Icon-only action">
         <DotIcon />
       </Button>
     </div>

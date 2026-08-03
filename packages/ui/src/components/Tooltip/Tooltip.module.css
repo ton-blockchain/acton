@@ -1,0 +1,36 @@
+.positioner {
+  z-index: 1000;
+  max-width: min(18rem, var(--available-width));
+}
+
+.popup {
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(18rem, var(--available-width));
+  padding: var(--acton-space-1-5) var(--acton-space-2);
+  border: 1px solid var(--acton-color-popover-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-popover-surface);
+  box-shadow: var(--acton-shadow-tooltip);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  transform-origin: var(--transform-origin);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .popup {
+    transition:
+      opacity var(--acton-duration-fast) var(--acton-ease-standard),
+      transform var(--acton-duration-fast) var(--acton-ease-standard);
+  }
+
+  .popup[data-starting-style],
+  .popup[data-ending-style] {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}

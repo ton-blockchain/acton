@@ -32,7 +32,11 @@ export function formatShardAccountDataBocHex(shardAccountBase64: string): string
 }
 
 export function formatMessageBocHex(message: Message): string {
-  return formatCellBocHex(beginCell().store(storeMessage(message)).endCell())
+  return formatCellBocHex(buildMessageCell(message))
+}
+
+export function formatMessageHashHex(message: Message): string {
+  return buildMessageCell(message).hash().toString("hex")
 }
 
 export function formatMessageRelaxedBocHex(message: MessageRelaxed): string {
@@ -53,4 +57,8 @@ export function formatOutListBocHex(actions: readonly OutAction[]): string {
       .store(storeOutList([...actions]))
       .endCell(),
   )
+}
+
+function buildMessageCell(message: Message): Cell {
+  return beginCell().store(storeMessage(message)).endCell()
 }

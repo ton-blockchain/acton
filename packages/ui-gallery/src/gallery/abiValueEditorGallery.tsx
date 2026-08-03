@@ -10,7 +10,7 @@ import {
   stringifyAbiJson,
   type ContractABI,
 } from "@acton/transaction-ui/abi"
-import {RawDataBlock} from "@acton/ui"
+import {Button, RawDataBlock} from "@acton/ui"
 import {useMemo, useState} from "react"
 
 import styles from "./abiValueEditorGallery.module.css"
@@ -456,6 +456,86 @@ function RoundTripSample() {
   )
 }
 
+function createDecodedInitialValue(preset: "primary" | "alternate") {
+  if (preset === "alternate") {
+    return {
+      summary: {
+        count: 256n,
+        enabled: false,
+        recipient: SAMPLE_ADDRESS,
+        tonAmount: 2_750_000_000n,
+        maybeAddress: SAMPLE_ADDRESS,
+        maybeCount: null,
+        maybeTon: 500_000_000n,
+      },
+      counterAlias: 901n,
+    }
+  }
+
+  return {
+    summary: {
+      count: 128n,
+      enabled: true,
+      recipient: SAMPLE_ADDRESS,
+      tonAmount: 1_500_000_000n,
+      maybeAddress: null,
+      maybeCount: 64n,
+      maybeTon: null,
+    },
+    counterAlias: 900n,
+  }
+}
+
+function InitialValueSample() {
+  const [initialValue, setInitialValue] = useState<unknown>(() =>
+    createDecodedInitialValue("primary"),
+  )
+  const [value, setValue] = useState<unknown>({})
+
+  return (
+    <div className={styles.roundTrip}>
+      <article className={styles.scenario}>
+        <div className={styles.scenarioHeader}>
+          <h4>Decoded value → editable form</h4>
+          <div className={styles.initialValueActions}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setInitialValue(createDecodedInitialValue("primary"))}
+            >
+              Load preset A
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setInitialValue(createDecodedInitialValue("alternate"))}
+            >
+              Load preset B
+            </Button>
+          </div>
+        </div>
+        <AbiValueEditor
+          symbols={matrixSymbols}
+          tyIdx={typeIndex.nestedStruct}
+          value={value}
+          initialValue={initialValue}
+          onChange={setValue}
+          addressSuggestions={addressSuggestions}
+        />
+      </article>
+      <RawDataBlock
+        title="Controlled form value"
+        value={stringifyAbiJson(value)}
+        copyLabel="controlled form value"
+        wrap
+        collapsible
+        defaultExpanded
+        maxHeight={320}
+      />
+    </div>
+  )
+}
+
 export const abiValueEditorGallery = {
   id: "abi-value-editor",
   title: "ABI Value Editor",
@@ -464,10 +544,11 @@ export const abiValueEditorGallery = {
     "Schema-driven editor for Tolk ABI values, including TON addresses, GRAM amounts, dictionaries, and Cell-like values.",
   importStatement: 'import { AbiValueEditor } from "@acton/transaction-ui/abi"',
   agentSummary:
-    "Keep ABI-aware editing and serialization in transaction-ui. Pass a SymTable, type index, controlled form value, and validation state; keep ABI registry loading and network state in the consuming app.",
+    "Keep ABI-aware editing and serialization in transaction-ui. Pass a SymTable, type index, controlled form value, optional decoded initial value, and validation state; keep ABI registry loading and network state in the consuming app.",
   usage: [
     "Use for ABI-described message bodies, storage, and other TON tooling inputs.",
     "Keep the value controlled so form and JSON modes can share one source of truth.",
+    "Pass initialValue when a decoded runtime ABI value must hydrate the controlled form after the editor mounts.",
     "Use transaction-ui serialization helpers for Cell/BoC round-trips instead of rebuilding type switches in a page.",
   ],
   avoid: [
@@ -506,6 +587,13 @@ export const abiValueEditorGallery = {
       title: "Interaction States",
       description: "Disabled controls and an externally invalid editor state.",
       content: <StateSamples />,
+    },
+    {
+      id: "abi-initial-value",
+      title: "Decoded Initial Value",
+      description:
+        "Apply a decoded runtime value after mount, keep editing it, or load another decoded value.",
+      content: <InitialValueSample />,
     },
     {
       id: "abi-round-trip",

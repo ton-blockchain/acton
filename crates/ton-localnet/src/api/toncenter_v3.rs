@@ -27,6 +27,7 @@ use ton_api::toncenter::emulate::v1 as emulate;
 use ton_api::toncenter::v2::StringOrNumber as V2StringOrNumber;
 use ton_api::toncenter::v2::responses as v2_response;
 use ton_api::toncenter::v3 as response;
+use ton_indexer_contracts::methods::parse_contract_methods;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
@@ -1253,7 +1254,17 @@ fn map_account_state_full(
             .then(|| state.code.as_ref().map(BocBytes::to_base64))
             .flatten(),
         code_hash: state.code_hash.as_ref().map(Hash256::to_base64),
-        contract_methods: Vec::new(),
+        // Method discovery is best-effort: custom dispatchers are valid TON
+        // contracts, but do not expose the conventional leading method dict.
+        contract_methods: state
+            .code
+            .as_ref()
+            .and_then(|code| Boc::decode(code.as_ref()).ok())
+            .and_then(|code| parse_contract_methods(&code).ok())
+            .into_iter()
+            .flatten()
+            .filter_map(|method_id| i32::try_from(method_id).ok())
+            .collect(),
         data_boc: include_boc
             .then(|| state.data.as_ref().map(BocBytes::to_base64))
             .flatten(),

@@ -7,6 +7,37 @@ which primitives exist or when to use each visual variant.
 This is not prop documentation. Prefer the TypeScript source for exact API
 details.
 
+## Product Visual Direction
+
+Acton products use a calm, compact application hierarchy similar to Vercel
+Dashboard and Cloudflare Dashboard. Pages should feel like working tools, not
+marketing landing pages.
+
+- Do not use oversized display headings or hero typography in product UI.
+- Do not use landing-page hero composition inside product screens: avoid an
+  eyebrow followed by a marketing sentence as the title and a broad promotional
+  subtitle. Start pages with a compact functional title, a short description,
+  and nearby actions when needed.
+- Do not end headings or subheadings with a period.
+- Avoid decorative eyebrow or overline labels above headings, such as
+  `WORKSPACE`, `TIMELINE`, or `PROJECT`. Use an overline only when it is
+  critical to disambiguate hierarchy or domain and that context cannot be
+  inferred from the heading or surrounding UI.
+- Prefer restrained page titles, compact descriptions, and dense but readable
+  spacing.
+- Let navigation, data, state, and the primary action establish hierarchy
+  instead of decorative scale.
+- Keep surfaces neutral and quiet so technical content remains the visual focus.
+- Do not use box shadows on application headers, panels, cards, or persistent
+  sections. Separate surfaces with borders, spacing, and restrained background
+  contrast. Reserve shadow only for transient overlays or popovers when depth
+  must be communicated.
+- Use the sans-serif product typeface for interface text. Monospace is reserved
+  for content whose shape carries technical meaning, such as code, paths,
+  addresses, hashes, or fixed-width data.
+- Never use monospace for navigation, buttons, labels, status text, metadata
+  captions, headings, or decorative terminal styling.
+
 ## Button
 
 Status: ready
@@ -339,6 +370,63 @@ and forwards native attributes and refs.
   actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
+## MultiValueInput
+
+Status: ready
+
+Import:
+
+```tsx
+import { MultiValueInput } from "@acton/ui"
+```
+
+Use MultiValueInput when a form accepts several values from a searchable,
+caller-provided option set. Selected values become removable chips while the
+remaining inline input filters the available options.
+
+### Composition
+
+```tsx
+<MultiValueInput
+  label="Startup accounts"
+  description="Wallets to create when the environment starts"
+  placeholder="Search wallets"
+  values={accounts}
+  options={walletNames}
+  onValuesChange={setAccounts}
+/>
+```
+
+- `values`: controlled selected strings rendered as chips.
+- `options`: caller-owned available strings. Selected values are removed from
+  the suggestion list.
+- `onValuesChange`: receives the complete next value list after selection,
+  chip removal, or empty-input Backspace.
+- `label` and `description`: optional field context linked to the native input.
+- `invalid`, `required`, and `disabled`: shared form states. Required validation
+  is satisfied by a selected value, not by filter text.
+- Arrow keys move through suggestions; Enter or Tab selects the active option.
+  Escape closes the list so Tab can leave the field. Backspace removes the last
+  chip when the query is empty.
+
+### States To Review Visually
+
+- Empty field with suggestions
+- Filtered suggestions
+- One and several selected chips
+- Long selected values
+- Keyboard selection and chip removal
+- Disabled, invalid, and required
+
+### Agent Guidance
+
+- Keep option loading and domain validation in the caller.
+- Use MultiValueInput for a finite known option set, not arbitrary tag entry.
+- Store selected values as an array. Do not serialize them into a comma-separated
+  input string.
+- Do not add a second completion popup or render chips outside the control.
+- Use Select for one value and SearchInput for navigation or result lookup.
+
 ## Select
 
 Status: ready
@@ -560,6 +648,8 @@ coordinated highlight state.
 - `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
 - `display="full"`: displays `(workchain,shard,seqno)` instead of only the seqno.
 - `href`: renders a native link; without it the chip is read-only.
+- `copyable={false}`: hides the copy action when the surrounding surface already
+  provides its own row actions.
 - `label`: optional display content when the caller needs more context than the
   raw seqno.
 - `highlighted`: applies the coordinated accent highlight used by AddressChip.
@@ -805,6 +895,54 @@ It owns hexadecimal formatting and composes its copy interaction from
 - Do not wrap OpcodeChip in another copy control.
 - Do not duplicate copy state, timers, clipboard calls, or copy/check icons in
   consumers.
+
+## Disclosure
+
+Status: ready
+
+Import:
+
+```tsx
+import { Disclosure } from "@acton/ui"
+```
+
+Use Disclosure for full-width collapsible sections in forms, settings, and
+inspection panels. It keeps native `details` behavior while replacing the
+browser marker with the shared chevron, focus treatment, spacing, and
+open-state motion.
+
+### Composition
+
+```tsx
+<Disclosure
+  label="Network and mining"
+  description="Optional runtime behavior"
+>
+  <NetworkSettings />
+</Disclosure>
+```
+
+- `label`: required visible section name.
+- `description`: optional supporting text in the trigger.
+- `contentClassName`: layout hook for domain content.
+- Native `details` props such as `open`, `name`, and `onToggle` are forwarded.
+
+### States To Review Visually
+
+- Closed and open
+- Keyboard focus
+- Hover in light and dark themes
+- With and without a description
+- Narrow viewport and wrapped labels
+
+### Agent Guidance
+
+- Use Disclosure instead of raw `details` and `summary` for full-width
+  collapsible UI.
+- Let Disclosure own the chevron and marker removal.
+- Keep domain form and inspection content inside the component.
+- Use DisclosureToggle for compact inline Show/Hide controls rather than
+  full-width sections.
 
 ## DisclosureToggle
 
@@ -1147,6 +1285,10 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `files`: minimal `{path, content}` records; domain-specific source metadata
   stays in the caller.
 - `entrypoint`: optional path selected initially and marked as `main`.
+- `defaultSelectedPath`: optional initial file path when the caller restores a
+  selection from navigation or persisted state.
+- `onSelectedPathChange`: optional callback for syncing file selection to URL
+  or application state.
 - `externalActionUrl` and `externalActionLabel`: optional navigation to a
   verifier, repository, artifact, or other source context.
 - `compact`: limits the source height for dense details panels.
@@ -1155,6 +1297,9 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `attachedToTabs`: removes the leading top corner radius when the viewer sits
   directly below a tab bar.
 - `emptyMessage`: caller-provided text for an empty source bundle.
+- Directories named `gen` or `output` receive a generated-artifact accent in
+  the file tree and sort after regular directories and files so compiled files
+  remain visually distinct from source directories.
 
 ### States To Review Visually
 
@@ -1429,6 +1574,49 @@ content that needs multiple lines, links, small actions, or structured detail.
   popover.
 - Do not reuse the popover shadow on other components.
 
+## Tooltip
+
+Status: ready
+
+Import:
+
+```tsx
+import { Tooltip } from "@acton/ui"
+```
+
+Use Tooltip for short, supplementary button labels that appear on hover or
+keyboard focus. It replaces the browser-native `title` popup while preserving
+the button's own accessible name.
+
+### Composition
+
+```tsx
+<Tooltip content="Open transaction debugger">
+  <button type="button" aria-label="Open transaction debugger">
+    <Bug aria-hidden="true" />
+  </button>
+</Tooltip>
+```
+
+- `content`: short visual-only supporting text.
+- `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
+- `delay` and `closeDelay`: hover/focus timing in milliseconds.
+- `offset`: distance between the trigger and popup.
+- Positioning uses Base UI collision handling and a portal.
+
+### Agent Guidance
+
+- Use Tooltip only as supplementary help; the button still needs visible text
+  or an `aria-label`.
+- Prefer the button's existing `title` prop when using `Button`,
+  `InlineButton`, or `InlineAction`; those components render the shared
+  Tooltip automatically.
+- Keep tooltip copy short and action-oriented.
+- Use Popover instead when the content contains links, controls, or structured
+  detail.
+- Do not attach Tooltip to non-button content until the component adoption
+  scope is intentionally expanded.
+
 ## Dialog
 
 Status: ready
@@ -1696,6 +1884,41 @@ loading rows.
   useful context.
 - Keep row click behavior in the caller. DataTable only provides visual row
   states and table semantics.
+
+## Pagination
+
+Status: ready
+
+Import:
+
+```tsx
+import {Pagination, useClientPagination} from "@acton/ui"
+```
+
+Use `Pagination` below a table or list when the full result set is already
+available in the browser. `useClientPagination` clamps the current page when
+items are removed and returns the visible slice.
+
+```tsx
+const pagination = useClientPagination(items)
+
+<>
+  <DataTable>{pagination.currentItems.map(renderRow)}</DataTable>
+  <Pagination
+    currentPage={pagination.currentPage}
+    totalItems={pagination.totalItems}
+    pageSize={pagination.pageSize}
+    onPageChange={pagination.setCurrentPage}
+    label="Contracts pagination"
+  />
+</>
+```
+
+- Keep API-backed pagination in the feature so it can request the correct
+  `limit` and `offset`; use `Pagination` only for its controls.
+- Do not paginate compact previews such as “Last transactions”.
+- Place the control outside a horizontal table scroller so it remains usable
+  on narrow screens.
 
 ## Skeleton
 

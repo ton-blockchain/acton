@@ -306,6 +306,21 @@ export function getTransactionActionPhase(tx: Transaction) {
   return
 }
 
+export function isTransactionSuccessful(tx: Transaction): boolean {
+  const description = tx.description
+  if (description.type !== "generic" && description.type !== "tick-tock") {
+    return false
+  }
+
+  const computePhase = description.computePhase
+  return (
+    !description.aborted &&
+    computePhase.type === "vm" &&
+    computePhase.success &&
+    (description.actionPhase?.success ?? true)
+  )
+}
+
 export function getTransactionTriggerLabel(tx: Transaction): string | undefined {
   const description = tx.description
   if (description.type === "tick-tock") {

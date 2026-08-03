@@ -2,6 +2,7 @@ import type * as React from "react"
 import {PanelLeft} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
+import {Tooltip} from "@acton/ui"
 
 import type {TestReport} from "./types/test"
 
@@ -300,15 +301,16 @@ export const App: React.FC = () => {
       </div>
 
       {isSidebarCollapsed && (activeView !== "tests" || !selectedTest) && (
-        <button
-          type="button"
-          onClick={expandSidebar}
-          className={styles.expandButton}
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
-        >
-          <PanelLeft aria-hidden="true" />
-        </button>
+        <Tooltip content="Expand sidebar">
+          <button
+            type="button"
+            onClick={expandSidebar}
+            className={styles.expandButton}
+            aria-label="Expand sidebar"
+          >
+            <PanelLeft aria-hidden="true" />
+          </button>
+        </Tooltip>
       )}
 
       {/* biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only. */}

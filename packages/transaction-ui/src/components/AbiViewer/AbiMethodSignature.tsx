@@ -43,15 +43,11 @@ function AbiTypeToken({symbols, tyIdx}: {readonly symbols: SymTable; readonly ty
   const hasExpandedDefinition = definition.trim() !== typeName.trim()
   const ty = tryTyByIdx(symbols, tyIdx)
   const isNamedType = ty?.kind === "StructRef" || ty?.kind === "AliasRef" || ty?.kind === "EnumRef"
-  const token = (
-    <span
-      className={`${styles.signatureType} ${isNamedType ? styles.signatureNamedType : ""} ${hasExpandedDefinition ? styles.signatureTypeInteractive : ""}`}
-    >
-      {typeName}
-    </span>
-  )
+  const className = `${styles.signatureType} ${isNamedType ? styles.signatureNamedType : ""}`
 
-  if (!hasExpandedDefinition) return token
+  if (!hasExpandedDefinition) {
+    return <span className={className}>{typeName}</span>
+  }
 
   return (
     <Popover
@@ -61,7 +57,9 @@ function AbiTypeToken({symbols, tyIdx}: {readonly symbols: SymTable; readonly ty
       maxWidth="min(560px, calc(100vw - 32px))"
       ariaLabel={`Definition of ${typeName}`}
     >
-      {token}
+      <button type="button" className={`${className} ${styles.signatureTypeInteractive}`}>
+        {typeName}
+      </button>
     </Popover>
   )
 }

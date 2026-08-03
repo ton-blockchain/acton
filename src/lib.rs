@@ -11,5 +11,7 @@ pub mod http;
 pub mod paths;
 pub mod retrace;
 pub mod stdlib;
+pub mod studio_discovery;
+mod studio_wallets;
 pub mod tonconnect;
 pub mod wallets;

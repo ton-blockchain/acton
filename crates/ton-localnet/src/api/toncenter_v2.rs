@@ -21,6 +21,7 @@ use anyhow::Context;
 use base64::Engine;
 use serde_json::value::Value;
 use ton_api::toncenter::v2 as response;
+use ton_indexer_contracts::{WalletType, categorize_wallet};
 use tvm_ffi::json_stack::{legacy_stack_to_json, std_stack_from_tuple};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -291,28 +292,28 @@ fn map_extended_account_state_kind(
 #[must_use]
 pub fn wallet_type_name_from_code_hash(code_hash: Option<&Hash256>) -> Option<&'static str> {
     let code_hash = code_hash?;
-    let wallet_type = ton_indexer::categorize_wallet(CellHashBytes(code_hash.0));
+    let wallet_type = categorize_wallet(CellHashBytes(code_hash.0));
     match wallet_type {
-        ton_indexer::WalletType::Unknown
-        | ton_indexer::WalletType::WalletHighloadV1R1
-        | ton_indexer::WalletType::WalletHighloadV1R2
-        | ton_indexer::WalletType::WalletHighloadV2
-        | ton_indexer::WalletType::WalletHighloadV2R1
-        | ton_indexer::WalletType::WalletHighloadV2R2
-        | ton_indexer::WalletType::WalletHighloadV3R1
-        | ton_indexer::WalletType::WalletPreprocessedV2
-        | ton_indexer::WalletType::WalletVesting => None,
-        ton_indexer::WalletType::WalletV1R1 => Some("wallet v1 r1"),
-        ton_indexer::WalletType::WalletV1R2 => Some("wallet v1 r2"),
-        ton_indexer::WalletType::WalletV1R3 => Some("wallet v1 r3"),
-        ton_indexer::WalletType::WalletV2R1 => Some("wallet v2 r1"),
-        ton_indexer::WalletType::WalletV2R2 => Some("wallet v2 r2"),
-        ton_indexer::WalletType::WalletV3R1 => Some("wallet v3 r1"),
-        ton_indexer::WalletType::WalletV3R2 => Some("wallet v3 r2"),
-        ton_indexer::WalletType::WalletV4R1 => Some("wallet v4 r1"),
-        ton_indexer::WalletType::WalletV4R2 => Some("wallet v4 r2"),
-        ton_indexer::WalletType::WalletV5Beta => Some("wallet v5 beta"),
-        ton_indexer::WalletType::WalletV5R1 => Some("wallet v5 r1"),
+        WalletType::Unknown
+        | WalletType::WalletHighloadV1R1
+        | WalletType::WalletHighloadV1R2
+        | WalletType::WalletHighloadV2
+        | WalletType::WalletHighloadV2R1
+        | WalletType::WalletHighloadV2R2
+        | WalletType::WalletHighloadV3R1
+        | WalletType::WalletPreprocessedV2
+        | WalletType::WalletVesting => None,
+        WalletType::WalletV1R1 => Some("wallet v1 r1"),
+        WalletType::WalletV1R2 => Some("wallet v1 r2"),
+        WalletType::WalletV1R3 => Some("wallet v1 r3"),
+        WalletType::WalletV2R1 => Some("wallet v2 r1"),
+        WalletType::WalletV2R2 => Some("wallet v2 r2"),
+        WalletType::WalletV3R1 => Some("wallet v3 r1"),
+        WalletType::WalletV3R2 => Some("wallet v3 r2"),
+        WalletType::WalletV4R1 => Some("wallet v4 r1"),
+        WalletType::WalletV4R2 => Some("wallet v4 r2"),
+        WalletType::WalletV5Beta => Some("wallet v5 beta"),
+        WalletType::WalletV5R1 => Some("wallet v5 r1"),
     }
 }
 

@@ -11,13 +11,18 @@ export function abiSymbolAnchorId(
   name: string,
   suffix?: string,
 ): string {
-  const slug = [name, suffix]
+  let slug = [name, suffix]
     .filter((part): part is string => Boolean(part))
     .join("-")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+  if (slug.startsWith("-")) {
+    slug = slug.slice(1)
+  }
+  if (slug.endsWith("-")) {
+    slug = slug.slice(0, -1)
+  }
   return `abi-${kind}-${slug || "symbol"}`
 }
 

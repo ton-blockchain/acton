@@ -6,6 +6,7 @@ import {
   ContractSourcePanel,
   type ContractVerifiedSource,
 } from "../ContractSourcePanel/ContractSourcePanel"
+import {codeLookupHashHex} from "../../lib/codeCell"
 
 import styles from "./CodeCellDetails.module.css"
 
@@ -35,7 +36,7 @@ export function CodeCellDetails({
 
       return {
         bocBase64: codeCell.toBoc({idx: false, crc32: false}).toString("base64"),
-        hash: codeCell.hash().toString("hex"),
+        hash: codeLookupHashHex(codeCell),
       }
     } catch {
       return undefined

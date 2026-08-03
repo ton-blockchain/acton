@@ -1,0 +1,30 @@
+diff --git a/ton-index-go/main.go b/ton-index-go/main.go
+index d2f3cc0..88a2fd3 100644
+--- a/ton-index-go/main.go
++++ b/ton-index-go/main.go
+@@ -21,6 +21,7 @@ import (
+ 	"github.com/toncenter/ton-indexer/ton-index-go/index/emulated"
+ 
+ 	"github.com/gofiber/fiber/v2"
++	"github.com/gofiber/fiber/v2/middleware/cors"
+ 	"github.com/gofiber/fiber/v2/middleware/pprof"
+ 	"github.com/gofiber/fiber/v2/middleware/recover"
+ 	"github.com/gofiber/fiber/v2/middleware/redirect"
+@@ -2277,6 +2278,17 @@ func main() {
+ 		ReadBufferSize: 1048576,
+ 	}
+ 	app := fiber.New(config)
++	app.Use(func(c *fiber.Ctx) error {
++		// Public explorer frontends access the local API from a secure origin.
++		// Chromium's Private Network Access preflight requires this header.
++		c.Set("Access-Control-Allow-Private-Network", "true")
++		return c.Next()
++	})
++	app.Use(cors.New(cors.Config{
++		AllowOrigins: "*",
++		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
++		AllowHeaders: "Origin,Content-Type,Accept,Authorization,X-Api-Key",
++	}))
+ 	app.Use(recover.New())
+ 
+ 	// converters

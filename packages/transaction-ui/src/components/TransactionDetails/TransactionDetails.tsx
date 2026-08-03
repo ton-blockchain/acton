@@ -3,10 +3,12 @@ import {useEffect, useRef, useState} from "react"
 import {
   buildStorageDiff,
   ContractChip,
+  CopyInlineAction,
   CopyInlineButton,
   DisclosureToggle,
   ExitCodeChip,
   InfoPopover,
+  InlineActions,
   OpcodeChip,
   ParsedBodySection,
   type ParsedCodeCell,
@@ -14,6 +16,7 @@ import {
   ParsedValueView,
   RawDataBlock,
   SendModeViewer,
+  Tooltip,
 } from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "../../model/backend"
@@ -51,6 +54,7 @@ import {
 import {
   formatCellBocHex,
   formatMessageBocHex,
+  formatMessageHashHex,
   formatOutListBocHex,
   formatShardAccountDataBocHex,
   formatStateInitBocHex,
@@ -69,7 +73,10 @@ export interface TransactionDetailsProps {
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
-  readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => React.ReactNode
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick?: (
     blockRef: TransactionBlockRef,
@@ -175,7 +182,6 @@ export function TransactionDetails({
   const computePhase = getTransactionComputePhase(tx.transaction)
   const actionPhase = getTransactionActionPhase(tx.transaction)
   const triggerLabel = getTransactionTriggerLabel(tx.transaction)
-  const messageRouteAction = renderMessageRouteAction?.(tx)
   const blockRef = tx.blockRef
   const blockSeqno = blockRef?.seqno
   const blockPath = blockRef ? getBlockPath?.(blockRef) : undefined
@@ -239,6 +245,7 @@ export function TransactionDetails({
     })()
   const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
   const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
+  const messageHashHex = inMessage ? formatMessageHashHex(inMessage) : undefined
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
@@ -280,6 +287,7 @@ export function TransactionDetails({
   const opcode = getTransactionOpcode(tx.transaction, parsedBody)
   const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
   const opcodeDisplayName = parsedBody && opcode === undefined ? parsedBody.name : opcodeName
+  const messageRouteAction = renderMessageRouteAction?.(tx, opcodeDisplayName)
   const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
   const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
 
@@ -510,6 +518,30 @@ export function TransactionDetails({
                   {inMessage.info.createdLt.toString()}
                 </div>
               </div>
+              {messageHashHex && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Hash</div>
+                  <div className={styles.multiColumnItemValue}>
+                    <InlineActions
+                      visibility="always"
+                      actions={
+                        <CopyInlineAction
+                          value={messageHashHex}
+                          label="Copy message hash"
+                          copiedLabel="Message hash copied"
+                          size="compact"
+                        />
+                      }
+                    >
+                      <Tooltip content={messageHashHex}>
+                        <span>
+                          {messageHashHex.slice(0, 3)}…{messageHashHex.slice(-3)}
+                        </span>
+                      </Tooltip>
+                    </InlineActions>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -525,7 +557,7 @@ export function TransactionDetails({
           >
             {messageCopyActions}
             <div className={styles.multiColumnRow}>
-              <div className={styles.multiColumnItem}>
+              <div className={`${styles.multiColumnItem} ${styles.messageOpcodeItem}`}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
                 <div className={styles.multiColumnItemValue}>
                   <OpcodeChip
@@ -921,14 +953,15 @@ export function TransactionDetails({
                   {blockSeqno}
                 </a>
               ) : blockRef && onBlockClick ? (
-                <button
-                  type="button"
-                  className={styles.blockLink}
-                  title={blockTitle}
-                  onClick={event => onBlockClick(blockRef, event)}
-                >
-                  {blockSeqno}
-                </button>
+                <Tooltip content={blockTitle}>
+                  <button
+                    type="button"
+                    className={styles.blockLink}
+                    onClick={event => onBlockClick(blockRef, event)}
+                  >
+                    {blockSeqno}
+                  </button>
+                </Tooltip>
               ) : (
                 <span title={blockTitle}>{blockSeqno}</span>
               )}

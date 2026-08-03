@@ -1,7 +1,8 @@
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import {buildStorageDiff, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {buildStorageDiff, InlineButton, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {GitBranch, Route} from "lucide-react"
 import {
   type CustomNodeElementProps,
   type RawNodeDatum,
@@ -88,15 +89,24 @@ interface TransactionTreeProps {
   readonly allContracts: readonly BackendContractInfo[]
   readonly selectedTransactionId?: string
   readonly highlightedTransactionIds?: ReadonlySet<string>
+  readonly originatingTransaction?: TransactionInfo
+  readonly omittedTransactionCount?: number
+  readonly traceGapActionLabel?: string
+  readonly traceGapLoading?: boolean
+  readonly traceGapError?: string
   readonly onContractClick?: (address: string) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
+  readonly onTraceGapLoad?: () => void
   readonly renderAddressChip?: (
     address: string,
     options: {readonly shorten: boolean},
   ) => React.ReactNode
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => React.ReactNode
-  readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderSelectedTransactionMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => React.ReactNode
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick?: (
     blockRef: TransactionBlockRef,
@@ -272,8 +282,14 @@ export function TransactionTree({
   allContracts,
   selectedTransactionId,
   highlightedTransactionIds,
+  originatingTransaction,
+  omittedTransactionCount,
+  traceGapActionLabel,
+  traceGapLoading = false,
+  traceGapError,
   onContractClick,
   onTransactionSelect,
+  onTraceGapLoad,
   renderAddressChip,
   renderSourceLocation,
   renderSelectedTransactionExtra,
@@ -310,8 +326,11 @@ export function TransactionTree({
     for (const tx of transactions) {
       map.set(tx.id, tx)
     }
+    if (originatingTransaction) {
+      map.set(originatingTransaction.id, originatingTransaction)
+    }
     return map
-  }, [transactions])
+  }, [originatingTransaction, transactions])
 
   const handleNodeClick = (id: string): void => {
     const transaction = transactionMap.get(id)
@@ -396,6 +415,38 @@ export function TransactionTree({
       content: (
         <NodeTransactionTooltipContent
           data={tooltipData}
+          contracts={contracts}
+          onContractClick={onContractClick}
+          renderAddressChip={renderAddressChip}
+        />
+      ),
+    })
+  }
+
+  const showSourceContractTooltip = (event: React.MouseEvent, address: string): void => {
+    const trigger = event.currentTarget as SVGGElement
+    const rect =
+      trigger.querySelector<SVGCircleElement>(":scope > circle")?.getBoundingClientRect() ??
+      trigger.getBoundingClientRect()
+    const contract = contracts.get(address)
+    triggerRectReference.current = rect
+
+    showTooltip({
+      x: rect.left,
+      y: rect.top,
+      content: (
+        <NodeTransactionTooltipContent
+          data={{
+            contract: {
+              typeName: contract?.abi?.contract_name?.trim() || "unknown",
+              address,
+            },
+            account: {
+              isCreated: false,
+              isDestroyed: false,
+            },
+            storageDiff: undefined,
+          }}
           contracts={contracts}
           onContractClick={onContractClick}
           renderAddressChip={renderAddressChip}
@@ -494,7 +545,19 @@ export function TransactionTree({
       } satisfies RawNodeDatum
     }
 
-    if (rootTransactions.length > 0) {
+    const buildCurrentTraceRoot = (): RawNodeDatum => {
+      if (rootTransactions.length === 0) {
+        return {
+          name: "No transactions",
+          attributes: {
+            isRoot: "false",
+            systemTrigger: "",
+            contractLetter: "",
+          },
+          children: [],
+        } satisfies RawNodeDatum
+      }
+
       const rootTransaction = rootTransactions.length === 1 ? rootTransactions[0] : undefined
       const systemTrigger = rootTransaction
         ? getTransactionTriggerLabel(rootTransaction.transaction)
@@ -535,6 +598,7 @@ export function TransactionTree({
             isRoot: isSystemSource ? "system" : "source",
             systemTrigger: "",
             contractLetter: sourceContract?.letter ?? "?",
+            sourceAddress: sharedInternalSource.toString(),
           },
           children: rootTransactions.map(it => convertTransactionToNode(it)),
         } satisfies RawNodeDatum
@@ -551,14 +615,78 @@ export function TransactionTree({
       } satisfies RawNodeDatum
     }
 
-    return {
-      name: "No transactions",
+    const currentTraceRoot = buildCurrentTraceRoot()
+    const isOriginAlreadyVisible =
+      originatingTransaction !== undefined &&
+      transactions.some(transaction => transaction.id === originatingTransaction.id)
+    const omittedLabel =
+      omittedTransactionCount === undefined
+        ? "Trace segment unavailable"
+        : `${omittedTransactionCount.toLocaleString("en-US")} tx omitted`
+    const createTraceGapNode = (children: RawNodeDatum[] = []): RawNodeDatum => ({
+      name: omittedLabel,
       attributes: {
-        isRoot: "false",
+        isTraceGap: true,
+        omittedLabel,
+      },
+      children,
+    })
+
+    if (!originatingTransaction || isOriginAlreadyVisible) {
+      if (omittedTransactionCount === undefined || omittedTransactionCount <= 0) {
+        return currentTraceRoot
+      }
+
+      const traceGapBranch = createTraceGapNode()
+      const currentRootChildren = currentTraceRoot.children ?? []
+      if (currentTraceRoot.attributes?.isRoot === "hidden" && currentRootChildren.length > 0) {
+        const [rootNode, ...otherRoots] = currentRootChildren
+        if (rootNode) {
+          return {
+            ...currentTraceRoot,
+            children: [
+              {
+                ...rootNode,
+                children: [...(rootNode.children ?? []), traceGapBranch],
+              },
+              ...otherRoots,
+            ],
+          } satisfies RawNodeDatum
+        }
+      }
+
+      return {
+        ...currentTraceRoot,
+        children: [...currentRootChildren, traceGapBranch],
+      } satisfies RawNodeDatum
+    }
+
+    if (omittedTransactionCount === 0) {
+      return currentTraceRoot
+    }
+
+    const originNode = convertTransactionToNode(originatingTransaction)
+    const continuationRoot = {
+      ...currentTraceRoot,
+      attributes: {
+        ...currentTraceRoot.attributes,
+        isTraceGapContinuation: true,
+      },
+    } satisfies RawNodeDatum
+
+    return {
+      name: "",
+      attributes: {
+        isRoot: "hidden",
         systemTrigger: "",
         contractLetter: "",
       },
-      children: [],
+      children: [
+        {
+          ...originNode,
+          children: [createTraceGapNode([continuationRoot])],
+        },
+      ],
     } satisfies RawNodeDatum
   }, [
     rootTransactions,
@@ -567,6 +695,9 @@ export function TransactionTree({
     highlightedTransactionIds,
     allContracts,
     compilerAbisByCodeHash,
+    originatingTransaction,
+    omittedTransactionCount,
+    transactions,
   ])
 
   const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
@@ -580,7 +711,9 @@ export function TransactionTree({
       nodeDatum.attributes?.isRoot === "root"
     ) {
       const isSystemSource = nodeDatum.attributes.isRoot === "system"
+      const isTraceGapContinuation = nodeDatum.attributes.isTraceGapContinuation === true
       const systemTrigger = nodeDatum.attributes.systemTrigger as string | undefined
+      const sourceAddress = nodeDatum.attributes.sourceAddress as string | undefined
       const sourceLabel = isSystemSource
         ? `System${systemTrigger ? ` · ${systemTrigger}` : ""}`
         : nodeDatum.name
@@ -588,19 +721,24 @@ export function TransactionTree({
       return (
         // biome-ignore lint/a11y/noStaticElementInteractions: Hover only reveals explanatory context for this SVG node.
         <g
-          className={`${styles.rootNode} ${isSystemSource ? styles.systemRootNode : ""}`}
+          className={`${styles.rootNode} ${isSystemSource ? styles.systemRootNode : ""} ${
+            isTraceGapContinuation ? styles.traceGapContinuationNode : ""
+          }`}
           onMouseEnter={event => {
-            if (!isSystemSource) return
-            const rect = event.currentTarget.getBoundingClientRect()
-            triggerRectReference.current = rect
-            showTooltip({
-              x: rect.left,
-              y: rect.top,
-              content: <SystemSourceTooltipContent trigger={systemTrigger} />,
-            })
+            if (isSystemSource) {
+              const rect = event.currentTarget.getBoundingClientRect()
+              triggerRectReference.current = rect
+              showTooltip({
+                x: rect.left,
+                y: rect.top,
+                content: <SystemSourceTooltipContent trigger={systemTrigger} />,
+              })
+            } else if (isTraceGapContinuation && sourceAddress) {
+              showSourceContractTooltip(event, sourceAddress)
+            }
           }}
           onMouseLeave={() => {
-            if (isSystemSource) hideTooltip()
+            if (isSystemSource || isTraceGapContinuation) hideTooltip()
           }}
         >
           <title>{sourceLabel}</title>
@@ -639,6 +777,113 @@ export function TransactionTree({
               {(nodeDatum.attributes?.contractLetter as string) || "?"}
             </text>
           )}
+          {isTraceGapContinuation && (
+            <foreignObject
+              width={TREE_EDGE_LABEL.width}
+              height={TREE_EDGE_LABEL.height}
+              x={TREE_EDGE_LABEL.x}
+              y={TREE_EDGE_LABEL.y}
+            >
+              <div className={styles.edgeText} role="note">
+                <div className={styles.topText}>
+                  <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
+                    {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+                  </p>
+                  <p className={styles.edgeTextContent}>—</p>
+                </div>
+                <div className={styles.bottomText}>
+                  <p className={styles.edgeTextContent}>—</p>
+                </div>
+              </div>
+            </foreignObject>
+          )}
+        </g>
+      )
+    }
+
+    if (nodeDatum.attributes?.isTraceGap) {
+      const omittedLabel = nodeDatum.attributes.omittedLabel as string
+
+      return (
+        <g className={styles.traceGapNode}>
+          <title>Trace unavailable · {omittedLabel}</title>
+          <circle
+            r={15}
+            fill="var(--acton-color-surface)"
+            stroke="var(--acton-color-warning)"
+            strokeWidth={1.5}
+            strokeDasharray="2 2"
+          />
+          <g>
+            <circle
+              cx={-5}
+              cy={0}
+              r={1.8}
+              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+            />
+            <circle
+              cx={0}
+              cy={0}
+              r={1.8}
+              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+            />
+            <circle
+              cx={5}
+              cy={0}
+              r={1.8}
+              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+            />
+          </g>
+          <foreignObject
+            width={TREE_EDGE_LABEL.width}
+            height={traceGapError ? 96 : TREE_EDGE_LABEL.height}
+            x={TREE_EDGE_LABEL.x}
+            y={TREE_EDGE_LABEL.y}
+          >
+            <div className={`${styles.edgeText} ${styles.traceGapLabel}`}>
+              <div className={styles.topText}>
+                <p className={`${styles.edgeTextTitle} ${styles.traceGapTitle}`}>
+                  Trace unavailable
+                </p>
+                <p className={`${styles.edgeTextContent} ${styles.traceGapCount}`}>
+                  {omittedLabel}
+                </p>
+              </div>
+              {onTraceGapLoad && (
+                <div className={`${styles.bottomText} ${styles.traceGapAction}`}>
+                  <InlineButton
+                    variant="utility"
+                    className={styles.traceGapButton}
+                    leadingIcon={
+                      traceGapActionLabel === "Restore path" ? (
+                        <Route size={11} />
+                      ) : (
+                        <GitBranch size={11} />
+                      )
+                    }
+                    disabled={traceGapLoading}
+                    aria-busy={traceGapLoading || undefined}
+                    title={
+                      traceGapActionLabel === "Restore path"
+                        ? "Restore up to 10 causal transactions from Toncenter"
+                        : "Load up to 10 more transactions from Toncenter"
+                    }
+                    onClick={event => {
+                      event.stopPropagation()
+                      onTraceGapLoad()
+                    }}
+                  >
+                    {traceGapLoading ? "Loading…" : (traceGapActionLabel ?? "Load 10")}
+                  </InlineButton>
+                </div>
+              )}
+              {traceGapError && (
+                <p className={styles.traceGapError} role="alert">
+                  {traceGapError}
+                </p>
+              )}
+            </div>
+          </foreignObject>
         </g>
       )
     }
@@ -881,8 +1126,11 @@ export function TransactionTree({
     )
   }
 
-  const getDynamicPathClass = ({target}: TreeLinkDatum): string => {
+  const getDynamicPathClass = ({source, target}: TreeLinkDatum): string => {
     const attributes = target.data.attributes
+    if (attributes?.isTraceGap || source.data.attributes?.isTraceGap) {
+      return `${styles.edgeStyle} ${styles.edgeStyleTraceGap}`
+    }
     if (attributes?.withInitCode) {
       return `${styles.edgeStyle} ${styles.edgeStyleWithInit}`
     }

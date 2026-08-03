@@ -1,0 +1,9 @@
+services:
+  verifier:
+    build:
+      context: ../..
+      dockerfile: apps/verifier/Dockerfile
+    image: ton-verifier:local
+    environment:
+      VERIFIER_NETWORK: ${VERIFIER_NETWORK:-localnet}
+      VERIFIER_TONCENTER_BASE_URL: ${VERIFIER_TONCENTER_BASE_URL:-http://host.docker.internal:5412}

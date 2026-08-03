@@ -1,0 +1,59 @@
+{
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": "//",
+  "files": {
+    "includes": ["**"]
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noSvgWithoutTitle": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off"
+      },
+      "correctness": {
+        "noNodejsModules": "off",
+        "noSolidDestructuredProps": "off",
+        "noUnresolvedImports": "off",
+        "useImageSize": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off",
+        "noImgElement": "off",
+        "noJsxPropsBind": "off",
+        "noReExportAll": "off",
+        "useSolidForComponent": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noHexColors": "off",
+        "noImplicitBoolean": "off",
+        "noJsxLiterals": "off",
+        "noNestedTernary": "off",
+        "noProcessEnv": "off",
+        "useBlockStatements": "off",
+        "useComponentExportOnlyModules": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off"
+      },
+      "suspicious": {
+        "noBitwiseOperators": "off",
+        "noConsole": "off",
+        "noLeakedRender": "off",
+        "noReactSpecificProps": "off",
+        "noShadow": "off"
+      }
+    }
+  }
+}

@@ -471,11 +471,24 @@ Defines network settings used by `--net` and `--fork-net`.
 - `localnet` is a first-class network and is always available.
 - Extra entries under `[networks.<name>]` are used as `custom:<name>`.
 
+Wallet V5 derives its wallet ID from the network's TON `global-id`. Custom
+networks default to `-3`, matching testnet and localnet; set `global-id = -239`
+for a custom endpoint that is an alias or proxy for mainnet. Localnet always
+keeps `-3`, even when `[localnet].fork-net = "mainnet"`: the fork only provides
+remote state and does not turn the local chain into mainnet.
+
 | Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `global-id` | `integer` | No                                    | TON network global ID used to derive Wallet V5 IDs. Defaults to `-3` for custom networks. Use `-239` for a mainnet-compatible endpoint. This field is ignored for built-in `mainnet`, `testnet`, and `localnet`. |
 | `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
 | `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
-| `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://127.0.0.1:<port>/explorer/tx/<hash>`. |
+| `explorer` | `string` | No                                      | Explicit base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). This network-specific value takes precedence over `--explorer`. For default `localnet`, the derived link is `http://127.0.0.1:<port>/explorer/tx/<hash>`. |
+
+When `explorer` is omitted for `custom:<name>` and both `api.v2` and `api.v3`
+are configured, the default Actonscan link carries the network name and API
+endpoints as shared-network query parameters. If `api.v3` is unavailable,
+Acton keeps the legacy fallback derived from `api.v2`:
+`<scheme>://<host>/explorer/tx/<hash>`.
 
 Example:
 
@@ -484,6 +497,7 @@ Example:
 explorer = "http://127.0.0.1:3006"
 
 [networks.my-custom-net]
+global-id = -3
 api = { v2 = "https://my-custom-net.com/api/v2", v3 = "https://my-custom-net.com/api/v3" }
 explorer = "https://my-custom-net.com/explorer"
 ```

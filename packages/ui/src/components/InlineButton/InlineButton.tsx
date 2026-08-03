@@ -3,6 +3,7 @@ import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
 import {useCopyValue} from "../../lib/useCopyValue"
+import {Tooltip} from "../Tooltip"
 import styles from "./InlineButton.module.css"
 import type {ACTON_INLINE_BUTTON_VARIANTS} from "./constants"
 
@@ -41,22 +42,25 @@ const variantClassNames = {
 } satisfies Record<ActonInlineButtonVariant, string>
 
 export function InlineButton({
+  "aria-label": ariaLabel,
   children,
   className,
   leadingIcon,
   ref,
   trailingIcon,
+  title,
   type = "button",
   variant = "default",
   ...props
 }: InlineButtonProps) {
   const hasChildren = children !== undefined && children !== null
 
-  return (
+  const button = (
     <button
       {...props}
       ref={ref}
       type={type}
+      aria-label={ariaLabel ?? (hasChildren ? undefined : title)}
       className={cx(styles.inlineButton, variantClassNames[variant], className)}
     >
       <span className={styles.content}>
@@ -74,6 +78,8 @@ export function InlineButton({
       </span>
     </button>
   )
+
+  return <Tooltip content={title}>{button}</Tooltip>
 }
 
 export function CopyInlineButton({

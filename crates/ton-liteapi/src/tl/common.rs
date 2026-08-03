@@ -18,11 +18,7 @@ pub struct String(#[derivative(Debug(format_with = "fmt_string"))] Vec<u8>);
 
 impl fmt::Display for String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            std::string::String::from_utf8(self.0.clone()).unwrap()
-        )
+        write!(f, "{}", std::string::String::from_utf8_lossy(&self.0))
     }
 }
 

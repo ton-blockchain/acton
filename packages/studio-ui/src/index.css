@@ -1,0 +1,61 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --litenode-workspace-to: rgb(113, 113, 122);
+  --litenode-workspace-dot: rgba(255, 255, 255, 0.25);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root.dark-theme {
+  --litenode-workspace-dot: rgba(9, 9, 11, 0.36);
+}
+
+html {
+  height: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--acton-color-canvas);
+}
+
+body {
+  height: 100%;
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  color: var(--acton-color-accent-foreground);
+  background: var(--acton-color-accent);
+}
+
+#root {
+  height: 100%;
+  min-height: 100vh;
+}

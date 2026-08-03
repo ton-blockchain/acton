@@ -1,7 +1,8 @@
 import type {MouseEvent} from "react"
 
-import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
 import {cx} from "../../lib/cx"
+import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
+import {Tooltip} from "../Tooltip"
 
 import styles from "./ContractChip.module.css"
 
@@ -71,22 +72,23 @@ export function ContractChip({
   )
 
   const chip = isClickable ? (
-    <button
-      type="button"
-      className={cx(styles.contractChip, styles.clickable)}
-      title="Open contract details"
-      onClick={event => {
-        event.stopPropagation()
-        onContractClick?.(displayAddress, event)
-      }}
-      onAuxClick={event => {
-        if (event.button !== 1) return
-        event.stopPropagation()
-        onContractClick?.(displayAddress, event)
-      }}
-    >
-      {content}
-    </button>
+    <Tooltip content="Open contract details">
+      <button
+        type="button"
+        className={cx(styles.contractChip, styles.clickable)}
+        onClick={event => {
+          event.stopPropagation()
+          onContractClick?.(displayAddress, event)
+        }}
+        onAuxClick={event => {
+          if (event.button !== 1) return
+          event.stopPropagation()
+          onContractClick?.(displayAddress, event)
+        }}
+      >
+        {content}
+      </button>
+    </Tooltip>
   ) : (
     <span className={styles.contractChip}>{content}</span>
   )

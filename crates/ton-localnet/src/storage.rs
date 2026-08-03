@@ -11,7 +11,6 @@ use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub struct CellStore {
     pub conn: Option<Arc<Mutex<Connection>>>,
@@ -613,13 +612,10 @@ pub struct History {
     pub tx_by_hash: HashMap<Hash256, TxMeta>,
     pub msg_by_hash: HashMap<Hash256, MsgMeta>,
     pub msg_to_tx: HashMap<Hash256, Hash256>,
-    pub address_names: HashMap<Addr, String>,
     pub jetton_masters: IndexMap<Addr, JettonMasterMeta>,
     pub jetton_wallets: IndexMap<Addr, JettonWalletMeta>,
     pub nft_items: IndexMap<Addr, NftItemMeta>,
     pub asset_detection_checked: HashSet<Addr>,
-    pub compiler_abis: HashMap<Hash256, Value>,
-    pub verified_sources: HashMap<Hash256, Value>,
 }
 
 impl Default for History {
@@ -631,8 +627,6 @@ impl Default for History {
 impl History {
     #[must_use]
     pub fn new() -> Self {
-        let address_names = Self::build_address_names();
-
         Self {
             blocks: Vec::new(),
             masterchain_blocks: Vec::new(),
@@ -640,138 +634,12 @@ impl History {
             tx_by_hash: HashMap::new(),
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
-            address_names,
             jetton_masters: IndexMap::new(),
             jetton_wallets: IndexMap::new(),
             nft_items: IndexMap::new(),
             asset_detection_checked: HashSet::new(),
-            compiler_abis: HashMap::new(),
-            verified_sources: HashMap::new(),
         }
     }
-
-    fn build_address_names() -> HashMap<Addr, String> {
-        let mut address_names = HashMap::new();
-        if let Ok((addr, _)) = StdAddr::from_str_ext(
-            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
-            StdAddrFormat::any(),
-        ) {
-            address_names.insert(
-                Addr {
-                    workchain: i32::from(addr.workchain),
-                    addr: addr.address.0,
-                },
-                "Faucet".to_string(),
-            );
-        }
-        address_names
-    }
-
-    #[must_use]
-    pub fn compiler_abi_stale_keys(
-        &self,
-        code_hash: Hash256,
-        compiler_abi: &Value,
-    ) -> Vec<Hash256> {
-        let aliases = compiler_abi_code_hashes(compiler_abi, Some(code_hash));
-        self.compiler_abis
-            .iter()
-            .filter_map(|(existing_hash, existing_abi)| {
-                let existing_aliases = compiler_abi_code_hashes(existing_abi, Some(*existing_hash));
-                existing_aliases
-                    .iter()
-                    .any(|alias| aliases.contains(alias))
-                    .then_some(*existing_hash)
-            })
-            .collect()
-    }
-
-    pub fn set_compiler_abi(&mut self, code_hash: Hash256, compiler_abi: Value) {
-        let stale_keys = self.compiler_abi_stale_keys(code_hash, &compiler_abi);
-        self.set_compiler_abi_with_stale_keys(code_hash, compiler_abi, &stale_keys);
-    }
-
-    pub fn set_compiler_abi_with_stale_keys(
-        &mut self,
-        code_hash: Hash256,
-        compiler_abi: Value,
-        stale_keys: &[Hash256],
-    ) {
-        for stale_key in stale_keys {
-            self.compiler_abis.remove(stale_key);
-        }
-        self.compiler_abis.insert(code_hash, compiler_abi);
-    }
-
-    #[must_use]
-    pub fn get_compiler_abi(&self, code_hash: &Hash256) -> Option<Value> {
-        self.compiler_abis.get(code_hash).cloned().or_else(|| {
-            self.compiler_abis.iter().find_map(|(entry_hash, abi)| {
-                compiler_abi_code_hashes(abi, Some(*entry_hash))
-                    .contains(code_hash)
-                    .then(|| abi.clone())
-            })
-        })
-    }
-
-    pub fn replace_compiler_abis(&mut self, compiler_abis: HashMap<Hash256, Value>) {
-        self.compiler_abis = compiler_abis;
-    }
-
-    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) {
-        self.verified_sources.insert(code_hash, source);
-    }
-
-    #[must_use]
-    pub fn get_verified_source(&self, code_hash: &Hash256) -> Option<Value> {
-        self.verified_sources.get(code_hash).cloned()
-    }
-
-    #[must_use]
-    pub fn compiler_abi_delete_key(&self, code_hash: &Hash256) -> Hash256 {
-        self.compiler_abis
-            .iter()
-            .find_map(|(entry_hash, abi)| {
-                compiler_abi_code_hashes(abi, Some(*entry_hash))
-                    .contains(code_hash)
-                    .then_some(*entry_hash)
-            })
-            .unwrap_or(*code_hash)
-    }
-
-    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) {
-        let delete_key = self.compiler_abi_delete_key(code_hash);
-        self.delete_compiler_abi_by_key(&delete_key);
-    }
-
-    pub fn delete_compiler_abi_by_key(&mut self, delete_key: &Hash256) {
-        self.compiler_abis.remove(delete_key);
-    }
-
-    pub fn delete_verified_source(&mut self, code_hash: &Hash256) {
-        self.verified_sources.remove(code_hash);
-    }
-}
-
-fn compiler_abi_code_hashes(compiler_abi: &Value, fallback: Option<Hash256>) -> Vec<Hash256> {
-    let mut code_hashes = fallback.into_iter().collect::<Vec<_>>();
-    if let Some(values) = compiler_abi.get("code_hashes").and_then(Value::as_array) {
-        code_hashes.extend(
-            values
-                .iter()
-                .filter_map(Value::as_str)
-                .filter_map(parse_compiler_abi_code_hash),
-        );
-    }
-    code_hashes.sort();
-    code_hashes.dedup();
-    code_hashes
-}
-
-fn parse_compiler_abi_code_hash(code_hash: &str) -> Option<Hash256> {
-    Hash256::from_hex(code_hash)
-        .or_else(|_| Hash256::from_base64(code_hash))
-        .ok()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -810,6 +678,12 @@ pub enum QueuePolicy {
 }
 
 pub struct Globals {
+    /// Sequence number of the state from which this local history starts.
+    ///
+    /// Clean localnets use zero. Forked localnets use the pinned remote
+    /// masterchain block, while `History` stores only blocks mined locally after
+    /// that point.
+    pub origin_seqno: Seqno,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -823,6 +697,7 @@ impl Globals {
     #[must_use]
     pub const fn new(config_boc_hash: Hash256) -> Self {
         Self {
+            origin_seqno: 0,
             head_seqno: 0,
             global_lt: 0,
             lt_step: 1,

@@ -1,0 +1,100 @@
+name: Check localton
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-localton.yml"
+      - "apps/localton/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-localton.yml"
+      - "apps/localton/**"
+  workflow_dispatch:
+
+concurrency:
+  group: check-localton-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build:
+    name: Build localton
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/localton
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: apps-localton-${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          workspaces: apps/localton -> target
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install just
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Build localton
+        run: just build-ci
+
+  check:
+    name: Check localton
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/localton
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: apps-localton-${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          workspaces: apps/localton -> target
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install check tools
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Test localton
+        run: just test
+
+      - name: Check localton
+        run: just check-ci

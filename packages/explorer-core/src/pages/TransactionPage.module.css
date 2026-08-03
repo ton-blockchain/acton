@@ -1,0 +1,1116 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-6);
+  box-sizing: border-box;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--acton-color-text);
+}
+
+.hash {
+  font-family: var(--acton-font-mono);
+  font-size: 14px;
+  color: var(--acton-color-text-muted);
+  word-break: break-all;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-6);
+  flex: 1;
+  min-height: 0;
+}
+
+.preTreeContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: flex-start;
+  width: 100%;
+  max-width: 1400px;
+}
+
+.traceWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 32%, var(--acton-color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--acton-color-warning) 8%, var(--acton-color-surface-raised));
+  color: var(--acton-color-warning-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.traceWarning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--acton-color-warning);
+}
+
+.overviewCard {
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.overviewMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.favoriteActionActive {
+  color: #d3a416;
+}
+
+.favoriteActionActive:hover:not(:disabled) {
+  color: #d3a416;
+}
+
+.favoriteIconActive {
+  fill: currentColor;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.statusSuccess {
+  color: var(--acton-color-status-passed);
+}
+
+.statusError {
+  color: var(--acton-color-status-failed);
+}
+
+.label {
+  font-size: 12px;
+  color: var(--acton-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 14px;
+  color: var(--acton-color-text-muted);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.valueMono {
+  font-family: var(--acton-font-mono);
+}
+
+.link {
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.selectedRetraceSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 12px;
+}
+
+.messageRouteActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.retraceInlineButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  color: var(--acton-color-accent);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--acton-duration-fast);
+}
+
+.retraceInlineButton:hover,
+.retraceInlineButtonActive {
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
+}
+
+.tabsContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.tabsContainerDetached {
+  gap: 16px;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--acton-color-border);
+  background: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 94%,
+    var(--acton-color-surface-row)
+  );
+  overflow-x: auto;
+  scroll-padding-inline: 8px;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabsContainerDetached .tabs {
+  border: 1px solid var(--acton-color-border);
+  border-radius: 16px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--acton-color-text-muted);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+  flex: 0 0 auto;
+  scroll-margin-inline: 8px;
+}
+
+.tab:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.tab:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.tabActive {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
+}
+
+.tabContent {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--acton-color-surface-raised);
+}
+
+.tabsContainerDetached .tabContent {
+  background: transparent;
+  overflow: visible;
+}
+
+.valueFlowPanel {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.detailsList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  --trace-step: 24px;
+  --trace-connector-offset: 12px;
+  --trace-line-thickness: 1px;
+  --trace-line-color: var(--acton-color-text-subtle);
+}
+
+.skeletonOverviewTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonOverviewRow {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  min-height: 48px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.skeletonOverviewRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonOverviewTitle,
+.skeletonOverviewContent {
+  display: flex;
+  align-items: center;
+  padding: var(--acton-space-1) var(--acton-space-3);
+}
+
+.skeletonOverviewTitle {
+  border-right: 1px solid var(--acton-color-border);
+}
+
+.skeletonOverviewContent {
+  gap: var(--acton-space-4);
+}
+
+.skeletonOverviewLabel {
+  width: 72%;
+  height: 12px;
+}
+
+.skeletonOverviewValue {
+  width: min(8rem, 24%);
+  height: 14px;
+}
+
+@media (max-width: 720px) {
+  .skeletonOverviewRow {
+    grid-template-columns: 1fr;
+  }
+
+  .skeletonOverviewTitle {
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+}
+
+.traceNode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.traceTransaction {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.traceChildren {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-left: var(--trace-step);
+}
+
+.traceConnectorAnchor {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.traceConnectorRail {
+  position: absolute;
+  top: 0;
+  left: var(--trace-connector-offset);
+  width: var(--trace-line-thickness);
+  height: var(--trace-connector-height);
+  background: var(--trace-line-color);
+}
+
+.traceTerminalCurve,
+.traceSiblingCurve {
+  position: absolute;
+  width: var(--trace-connector-offset);
+  height: var(--trace-connector-offset);
+  box-sizing: border-box;
+  border-left: var(--trace-line-thickness) solid var(--trace-line-color);
+  border-bottom: var(--trace-line-thickness) solid var(--trace-line-color);
+  border-radius: 0 0 0 9px;
+  pointer-events: none;
+}
+
+.traceTerminalCurve {
+  top: var(--trace-connector-height);
+  left: var(--trace-connector-offset);
+}
+
+.traceSiblingCurve {
+  top: var(--trace-connector-offset);
+  left: calc(-1 * var(--trace-connector-offset));
+}
+
+.detailCard {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.detailCard > :global(*) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.transactionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListItem {
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListHeader {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.txListBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--acton-color-text-muted);
+}
+
+.treeSection {
+  width: 100%;
+  min-height: 400px;
+  padding-top: 20px;
+  box-sizing: border-box;
+}
+
+.treeSectionWide {
+  width: min(var(--trace-tree-flow-width, 100%), var(--trace-tree-max-width));
+  max-width: min(var(--trace-tree-flow-width, 100%), var(--trace-tree-max-width));
+  margin-left: calc(-1 * var(--trace-tree-flow-offset, 0px));
+  --trace-tree-max-width: 1800px;
+  --transaction-tree-details-inline-offset: var(--trace-tree-flow-offset, 0px);
+  --transaction-tree-details-width: calc(
+    var(--trace-tree-flow-width, 100%) -
+    var(--trace-tree-flow-offset, 0px) -
+    var(--trace-tree-flow-offset, 0px)
+  );
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--acton-color-text);
+}
+
+.contractHeader {
+  padding: 20px;
+  border-bottom: 1px solid var(--acton-color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailsSection {
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+  color: var(--acton-color-text-muted);
+}
+
+.errorIcon {
+  color: var(--acton-color-status-failed);
+  width: 48px;
+  height: 48px;
+}
+
+.errorText {
+  color: var(--acton-color-status-failed);
+  font-weight: 500;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+  background: var(--acton-color-canvas);
+  border: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-sm);
+  cursor: pointer;
+  transition: all var(--acton-duration-fast);
+  font-size: var(--acton-font-size-sm);
+  text-decoration: none;
+  width: fit-content;
+  margin-top: var(--acton-space-4);
+}
+
+.backButton:hover {
+  background: var(--acton-color-surface-row);
+}
+
+.noSelection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--acton-color-text-muted);
+  text-align: center;
+}
+
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
+  );
+  background-size: 220% 100%;
+  animation: traceSkeletonShimmer 1.15s ease-in-out infinite;
+}
+
+.skeletonBreadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 4px;
+}
+
+.skeletonBreadcrumbAddress,
+.skeletonBreadcrumbHash,
+.skeletonStatusText,
+.skeletonTime,
+.skeletonFlowAccountName,
+.skeletonFlowAccountAddress,
+.skeletonFlowAmount,
+.skeletonFlowFee,
+.skeletonFlowTotal,
+.skeletonDetailLabel,
+.skeletonDetailValue,
+.skeletonTreeLabel {
+  border-radius: 999px;
+}
+
+.skeletonBreadcrumbAddress {
+  width: min(240px, 42%);
+  height: 16px;
+}
+
+.skeletonBreadcrumbHash {
+  width: min(420px, 54%);
+  height: 16px;
+}
+
+.skeletonStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skeletonStatusIcon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.skeletonStatusText {
+  width: 172px;
+  height: 18px;
+}
+
+.skeletonTime {
+  width: 176px;
+  height: 18px;
+}
+
+.skeletonFlowCard {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.skeletonFlowHeader,
+.skeletonFlowRow {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  box-sizing: border-box;
+}
+
+.skeletonFlowHeader {
+  min-height: 44px;
+  padding-block: 0;
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.skeletonFlowHeader > span,
+.skeletonFlowRow > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.skeletonFlowHeader > span:nth-child(2),
+.skeletonFlowHeader > span:nth-child(3),
+.skeletonFlowMetric {
+  text-align: right;
+}
+
+.skeletonFlowMetric {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.skeletonFlowRow {
+  min-height: 44px;
+}
+
+.skeletonFlowFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 20px;
+  padding: 8px 0;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.skeletonFlowAccount {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+}
+
+.skeletonFlowAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--acton-color-text-muted);
+  opacity: 0.72;
+  animation: none;
+}
+
+.skeletonFlowAccountText {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.skeletonFlowAccountName {
+  width: min(230px, 42%);
+  height: 14px;
+}
+
+.skeletonFlowAccountAddress {
+  width: min(150px, 28%);
+  height: 12px;
+}
+
+.skeletonFlowAmount,
+.skeletonFlowFee {
+  width: 112px;
+  max-width: 56%;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.skeletonFlowFee {
+  width: 96px;
+}
+
+.skeletonFlowTotal {
+  width: 174px;
+  height: 16px;
+}
+
+.skeletonEventCard {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.skeletonEventHeader,
+.skeletonEventRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 14rem) minmax(220px, 1fr) minmax(120px, 12rem) minmax(
+      150px,
+      13rem
+    );
+  align-items: center;
+  column-gap: 20px;
+  box-sizing: border-box;
+}
+
+.skeletonEventHeader {
+  min-height: 48px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.skeletonEventHeader > span:last-child {
+  text-align: right;
+}
+
+.skeletonEventRow {
+  min-height: 46px;
+  padding: 12px 20px;
+}
+
+.skeletonEventAction,
+.skeletonEventAddress {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.skeletonEventAction {
+  gap: 10px;
+}
+
+.skeletonEventAddress {
+  gap: 12px;
+}
+
+.skeletonEventTechnical {
+  display: flex;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.skeletonEventValue {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.skeletonEventIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.skeletonEventActionText {
+  width: min(132px, 80%);
+  height: 18px;
+}
+
+.skeletonEventDirection {
+  width: 24px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.skeletonEventAddressText {
+  width: min(220px, 72%);
+  height: 18px;
+}
+
+.skeletonEventOpcode {
+  width: min(150px, 70%);
+  height: 16px;
+}
+
+.skeletonEventValueText {
+  width: min(174px, 82%);
+  height: 18px;
+}
+
+.skeletonEventIcon,
+.skeletonEventActionText,
+.skeletonEventDirection,
+.skeletonEventAddressText,
+.skeletonEventOpcode,
+.skeletonEventValueText {
+  border-radius: 999px;
+}
+
+.skeletonStateChanges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+}
+
+.skeletonStateCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.skeletonStateHeader {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.skeletonStateAddress,
+.skeletonStateCell,
+.skeletonStateStorage {
+  border-radius: 999px;
+}
+
+.skeletonStateAddress {
+  width: min(360px, 58%);
+  height: 18px;
+}
+
+.skeletonStateGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--acton-space-3);
+}
+
+.skeletonStateCell {
+  height: 42px;
+}
+
+.skeletonStateStorage {
+  width: min(620px, 88%);
+  height: 34px;
+}
+
+.skeletonDetailCard {
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
+  overflow: hidden;
+}
+
+.skeletonDetailRow {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  min-height: 38px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.skeletonDetailRow:last-child {
+  border-bottom: none;
+}
+
+.skeletonDetailLabel,
+.skeletonDetailValue {
+  align-self: center;
+  height: 14px;
+}
+
+.skeletonDetailLabel {
+  width: 76px;
+  margin-left: var(--acton-space-3);
+}
+
+.skeletonDetailValue {
+  width: min(520px, 72%);
+  margin-left: var(--acton-space-3);
+}
+
+.skeletonTree {
+  position: relative;
+  min-height: 340px;
+  padding: 28px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.skeletonTreeNode {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+}
+
+.skeletonTreeNodeRoot {
+  margin-inline: auto;
+}
+
+.skeletonTreeBranch {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: clamp(56px, 12vw, 140px);
+  margin-top: 84px;
+}
+
+.skeletonTreeRail {
+  position: absolute;
+  top: -52px;
+  left: 50%;
+  width: min(360px, 50vw);
+  height: 52px;
+  border-top: 1px solid var(--acton-color-text-subtle);
+  border-left: 1px solid var(--acton-color-text-subtle);
+  border-right: 1px solid var(--acton-color-text-subtle);
+  opacity: 0.45;
+  transform: translateX(-50%);
+}
+
+.skeletonTreeDot {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.skeletonTreeLabel {
+  width: 132px;
+  height: 18px;
+}
+
+@keyframes traceSkeletonShimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .container {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsSection {
+    height: 500px;
+  }
+}
+
+@media (max-width: 520px) {
+  .container {
+    padding: 12px 8px 28px;
+    gap: 12px;
+  }
+
+  .content {
+    gap: 12px;
+  }
+
+  .preTreeContent {
+    margin-top: -4px;
+  }
+
+  .overviewCard {
+    position: relative;
+    padding: 16px;
+  }
+
+  .overviewHeader {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .status {
+    width: 100%;
+    padding-right: 32px;
+  }
+
+  .overviewMeta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .favoriteAction {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+
+  .overviewMeta .value {
+    word-break: normal;
+    line-height: 1.35;
+  }
+
+  .tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  }
+
+  .skeletonBreadcrumbs {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  .skeletonBreadcrumbAddress,
+  .skeletonBreadcrumbHash {
+    width: 100%;
+  }
+
+  .skeletonTime {
+    display: none;
+  }
+
+  .skeletonFlowHeader,
+  .skeletonFlowRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .skeletonFlowMetric {
+    width: 48%;
+    margin-left: calc(22px + var(--acton-space-2));
+    justify-content: flex-start;
+  }
+
+  .skeletonEventHeader,
+  .skeletonEventRow {
+    grid-template-columns: minmax(140px, 0.9fr) minmax(180px, 1.1fr) minmax(96px, 0.7fr) minmax(
+        120px,
+        0.8fr
+      );
+  }
+
+  .skeletonStateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeletonDetailRow {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .skeletonTree {
+    min-height: 260px;
+    padding-inline: 8px;
+  }
+
+  .skeletonTreeBranch {
+    gap: 28px;
+  }
+
+  .skeletonTreeRail {
+    width: 220px;
+  }
+
+  .skeletonTreeLabel {
+    display: none;
+  }
+}
+
+.container:has(:global(.retraceRoot)) {
+  padding-bottom: 0;
+}

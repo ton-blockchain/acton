@@ -26,7 +26,7 @@ describe("ParsedValueView", () => {
     )
 
     expect(markup).toMatchInlineSnapshot(
-      `"<div><span>map</span><div class="undefined undefined"><div><div><div>Key</div><div><span>0xff</span></div></div><div><div>Value</div><div><span>1</span></div></div></div><div><div><div>Key</div><div><span>255</span></div></div><div><div>Value</div><div><span>2</span></div></div></div></div></div>"`,
+      `"<div><span>map</span><div class="undefined  "><div><div><div>Key</div><div><span>0xff</span></div></div><div><div>Value</div><div><span>1</span></div></div></div><div><div><div>Key</div><div><span>255</span></div></div><div><div>Value</div><div><span>2</span></div></div></div></div></div>"`,
     )
   })
 

@@ -1,6 +1,7 @@
 {
   "version": 2,
   "globals": {
+    "origin_seqno": 0,
     "head_seqno": 2,
     "global_lt": 3,
     "lt_step": 1,

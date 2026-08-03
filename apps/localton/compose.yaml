@@ -1,0 +1,193 @@
+name: localton
+
+services:
+  localton:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    stop_grace_period: 60s
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LOCALTON_CONFIG_API_PORT:-18000}:18000"
+      - "127.0.0.1:${LOCALTON_ADMIN_API_PORT:-18001}:18001"
+      - "127.0.0.1:${LOCALTON_V2_API_PORT:-18002}:18002"
+      - "127.0.0.1:18004:18004"
+    volumes:
+      - localton-state:/var/lib/localton
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --show-error
+        - http://127.0.0.1:18002/api/v2/getMasterchainInfo
+      interval: 10s
+      timeout: 3s
+      start_period: 240s
+      retries: 12
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ton_index
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: postgres
+    command:
+      - postgres
+      - -c
+      - max_connections=128
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_wal_size=1GB
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d ton_index
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    shm_size: 512m
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    command:
+      - redis-server
+      - --maxclients
+      - "1024"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  v3-migrations:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    command:
+      - v3-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: on-failure
+
+  v3-worker:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    user: "0:0"
+    command:
+      - v3-worker
+      - --max-active-tasks
+      - ${TON_INDEXER_WORKERS:-4}
+      - --threads
+      - ${TON_INDEXER_WORKERS:-4}
+      - --max-insert-actors
+      - "2"
+      - --max-queue-blocks
+      - "256"
+      - --max-queue-txs
+      - "4096"
+      - --max-queue-msgs
+      - "8192"
+      - --max-batch-blocks
+      - "64"
+      - --max-batch-txs
+      - "1024"
+      - --max-batch-msgs
+      - "2048"
+    environment:
+      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
+      TON_WORKER_FROM: ${TON_WORKER_FROM:-1}
+      TON_WORKER_WORKDIR: /var/lib/ton-indexer/work
+    depends_on:
+      localton:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      v3-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+    volumes:
+      - localton-state:/var/lib/localton:ro
+      - ton-index-workdir:/var/lib/ton-indexer/work
+
+  v3-api:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    command:
+      - v3-api
+    environment:
+      TON_INDEXER_API_THREADS: ${TON_INDEXER_API_THREADS:-2}
+      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
+      TON_INDEXER_REDIS_DSN: redis://redis:6379
+      TON_INDEXER_IS_TESTNET: ${TON_INDEXER_IS_TESTNET:-1}
+    depends_on:
+      localton:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      v3-migrations:
+        condition: service_completed_successfully
+      v3-worker:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --show-error
+        - http://127.0.0.1:18003/healthcheck
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 24
+    ports:
+      - "127.0.0.1:${LOCALTON_V3_API_PORT:-18003}:18003"
+    restart: unless-stopped
+
+  v3-classifier:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    command:
+      - v3-classifier
+      - --pool-size
+      - ${TON_INDEXER_CLASSIFIER_WORKERS:-1}
+      - --prefetch-size
+      - "1000"
+      - --batch-size
+      - "100"
+    environment:
+      TON_INDEXER_REDIS_DSN: redis://redis:6379
+      TON_INDEXER_IS_TESTNET: ${TON_INDEXER_IS_TESTNET:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      v3-migrations:
+        condition: service_completed_successfully
+      v3-worker:
+        condition: service_started
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+volumes:
+  localton-state:
+  postgres-data:
+  ton-index-workdir:

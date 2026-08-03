@@ -2,6 +2,7 @@ import {useEffect, useState} from "react"
 
 import type {TestReport, Trace} from "../types/test"
 
+import {useTestUiApi} from "../testUiApiContext"
 import {getErrorMessage, isAbortError} from "./request"
 
 interface TestTraceState {
@@ -19,6 +20,7 @@ const EMPTY_TRACE_STATE: TestTraceState = {
 }
 
 export function useTestTrace(test: TestReport | undefined) {
+  const {url} = useTestUiApi()
   const tracePath = test?.trace_path
   const key = tracePath ? `${test.suite_name}:${test.name}:${tracePath}` : undefined
   const [state, setState] = useState<TestTraceState>(EMPTY_TRACE_STATE)
@@ -35,7 +37,7 @@ export function useTestTrace(test: TestReport | undefined) {
 
     const loadTrace = async () => {
       try {
-        const response = await fetch(`/api/trace/${encodeURIComponent(tracePath)}`, {
+        const response = await fetch(url(`/trace/${encodeURIComponent(tracePath)}`), {
           signal: controller.signal,
         })
         const trace = await parseTraceResponse(response, tracePath)
@@ -55,7 +57,7 @@ export function useTestTrace(test: TestReport | undefined) {
 
     void loadTrace()
     return () => controller.abort()
-  }, [key, test?.name, test?.suite_name, tracePath])
+  }, [key, test?.name, test?.suite_name, tracePath, url])
 
   if (key === undefined) return EMPTY_TRACE_STATE
   if (state.key === key) return state

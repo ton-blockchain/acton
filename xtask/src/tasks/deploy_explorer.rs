@@ -5,15 +5,23 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use serde::Deserialize;
 use url::Url;
 
 const DEFAULT_REPOSITORY: &str = "https://github.com/i582/actonscan";
 const DEFAULT_BRANCH: &str = "pages";
 const DEFAULT_CHECKOUT_DIR: &str = "target/actonscan-pages";
+const DEPLOYMENT_POLL_INTERVAL: Duration = Duration::from_secs(5);
+const DEPLOYMENT_WAIT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const EXPLORER_PACKAGE: &str = "@acton/explorer-ui";
 const EXPLORER_PACKAGE_DIR: &str = "packages/explorer-ui";
 const EXPLORER_TONCENTER_API_KEY_ENV: &str = "EXPLORER_TONCENTER_API_KEY";
 const VITE_EXPLORER_TONCENTER_API_KEY_ENV: &str = "VITE_EXPLORER_TONCENTER_API_KEY";
+const CLOUDFLARE_CHECK_NAME: &str = "Cloudflare Pages";
+const CLOUDFLARE_GITHUB_APP: &str = "cloudflare-workers-and-pages";
 
 #[derive(Args)]
 pub(crate) struct DeployExplorerArgs {
@@ -31,6 +39,10 @@ pub(crate) struct DeployExplorerArgs {
 
     #[arg(long, value_name = "MESSAGE", default_value = "Deploy actonscan")]
     message: String,
+
+    /// Wait for the Cloudflare Pages check run on the deployed commit.
+    #[arg(long)]
+    wait_for_deployment: bool,
 }
 
 pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
@@ -68,6 +80,14 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
             println!("Deployed commit: {url}");
         } else {
             println!("Deployed commit: {commit}");
+        }
+        if args.wait_for_deployment {
+            wait_for_deployment(
+                &args.repository,
+                &commit,
+                DEPLOYMENT_WAIT_TIMEOUT,
+                DEPLOYMENT_POLL_INTERVAL,
+            )?;
         }
     }
     Ok(())
@@ -307,6 +327,14 @@ fn current_commit(checkout_dir: &Path) -> Result<String> {
 }
 
 fn github_commit_url(repository: &str, commit: &str) -> Option<String> {
+    let repository_path = github_repository_path(repository)?;
+
+    Some(format!(
+        "https://github.com/{repository_path}/commit/{commit}"
+    ))
+}
+
+fn github_repository_path(repository: &str) -> Option<String> {
     let repository_path = if let Some(path) = repository.strip_prefix("git@github.com:") {
         path.to_owned()
     } else {
@@ -324,9 +352,108 @@ fn github_commit_url(repository: &str, commit: &str) -> Option<String> {
         return None;
     }
 
-    Some(format!(
-        "https://github.com/{repository_path}/commit/{commit}"
-    ))
+    Some(repository_path.to_owned())
+}
+
+fn wait_for_deployment(
+    repository: &str,
+    commit: &str,
+    timeout: Duration,
+    poll_interval: Duration,
+) -> Result<()> {
+    let repository_path = github_repository_path(repository).with_context(|| {
+        format!("cannot wait for deployment of non-GitHub repository `{repository}`")
+    })?;
+    let started_at = Instant::now();
+    let mut check_seen = false;
+
+    println!(
+        "Waiting up to {} seconds for Cloudflare Pages deployment of `{commit}`",
+        timeout.as_secs()
+    );
+
+    loop {
+        match cloudflare_deployment_check(&repository_path, commit)? {
+            None => {}
+            Some(check) if check.status != "completed" => {
+                if !check_seen {
+                    println!(
+                        "Cloudflare Pages deployment started{}",
+                        details_suffix(check.details_url.as_deref())
+                    );
+                    check_seen = true;
+                }
+            }
+            Some(check) if check.conclusion.as_deref() == Some("success") => {
+                println!(
+                    "Cloudflare Pages deployment succeeded{}",
+                    details_suffix(check.details_url.as_deref())
+                );
+                return Ok(());
+            }
+            Some(check) => {
+                let conclusion = check.conclusion.as_deref().unwrap_or("<none>");
+                bail!(
+                    "Cloudflare Pages deployment concluded with `{conclusion}`{}",
+                    details_suffix(check.details_url.as_deref())
+                );
+            }
+        }
+
+        if started_at.elapsed() >= timeout {
+            let state = if check_seen {
+                "to complete"
+            } else {
+                "to appear"
+            };
+            bail!(
+                "timed out after {} seconds waiting for Cloudflare Pages deployment {state} for `{commit}`",
+                timeout.as_secs()
+            );
+        }
+
+        thread::sleep(poll_interval);
+    }
+}
+
+fn cloudflare_deployment_check(repository_path: &str, commit: &str) -> Result<Option<CheckRun>> {
+    let endpoint = format!("repos/{repository_path}/commits/{commit}/check-runs");
+    let output = Command::new("gh")
+        .args([
+            "api",
+            "-H",
+            "Accept: application/vnd.github+json",
+            &endpoint,
+        ])
+        .output()
+        .with_context(|| format!("failed to query GitHub check runs for `{commit}`"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        bail!(
+            "gh api {endpoint} failed with status {}: {stderr}",
+            output.status
+        );
+    }
+
+    let response = serde_json::from_slice::<CheckRunsResponse>(&output.stdout)
+        .context("failed to parse GitHub check runs response")?;
+    Ok(find_cloudflare_deployment_check(response.check_runs))
+}
+
+fn find_cloudflare_deployment_check(check_runs: Vec<CheckRun>) -> Option<CheckRun> {
+    check_runs
+        .into_iter()
+        .filter(|check| {
+            check.name == CLOUDFLARE_CHECK_NAME && check.app.slug == CLOUDFLARE_GITHUB_APP
+        })
+        .max_by_key(|check| check.id)
+}
+
+fn details_suffix(details_url: Option<&str>) -> String {
+    details_url
+        .map(|url| format!(": {url}"))
+        .unwrap_or_default()
 }
 
 fn has_staged_changes(checkout_dir: &Path) -> Result<bool> {
@@ -342,6 +469,26 @@ fn has_staged_changes(checkout_dir: &Path) -> Result<bool> {
         Some(1) => Ok(true),
         _ => bail!("git diff --cached --quiet failed with status {status}"),
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckRunsResponse {
+    check_runs: Vec<CheckRun>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckRun {
+    id: u64,
+    name: String,
+    status: String,
+    conclusion: Option<String>,
+    details_url: Option<String>,
+    app: CheckRunApp,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckRunApp {
+    slug: String,
 }
 
 fn git(checkout_dir: &Path) -> Command {
@@ -373,7 +520,10 @@ fn run_inherited(command: &mut Command) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{github_commit_url, normalize_cname};
+    use super::{
+        CheckRun, CheckRunApp, find_cloudflare_deployment_check, github_commit_url,
+        github_repository_path, normalize_cname,
+    };
 
     #[test]
     fn cname_keeps_bare_domain() {
@@ -416,5 +566,47 @@ mod tests {
             github_commit_url("git@github.com:i582/actonscan.git", "abc123").as_deref(),
             Some("https://github.com/i582/actonscan/commit/abc123")
         );
+    }
+
+    #[test]
+    fn repository_path_rejects_non_github_repository() {
+        assert_eq!(
+            github_repository_path("https://gitlab.com/i582/actonscan"),
+            None
+        );
+    }
+
+    #[test]
+    fn deployment_check_selects_latest_cloudflare_pages_check() {
+        let checks = vec![
+            check_run(1, "build", "github-actions"),
+            check_run(2, "Cloudflare Pages", "cloudflare-workers-and-pages"),
+            check_run(3, "Cloudflare Pages", "cloudflare-workers-and-pages"),
+        ];
+
+        assert_eq!(
+            find_cloudflare_deployment_check(checks).map(|check| check.id),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn deployment_check_ignores_same_name_from_other_app() {
+        let checks = vec![check_run(1, "Cloudflare Pages", "github-actions")];
+
+        assert!(find_cloudflare_deployment_check(checks).is_none());
+    }
+
+    fn check_run(id: u64, name: &str, app: &str) -> CheckRun {
+        CheckRun {
+            id,
+            name: name.to_owned(),
+            status: "completed".to_owned(),
+            conclusion: Some("success".to_owned()),
+            details_url: None,
+            app: CheckRunApp {
+                slug: app.to_owned(),
+            },
+        }
     }
 }

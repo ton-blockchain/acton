@@ -9,9 +9,13 @@ describe("pageOgPreviewForPath", () => {
     ["/blocks/", "blocks"],
     ["/abi", "abi"],
     ["/sources", "sources"],
+    ["/faucet", "faucet"],
+    ["/verified", "verified"],
+    ["/verified/92bf1e3962a54b88", "verified-contract"],
     ["/cell", "cell"],
     ["/emulate", "emulate"],
     ["/favorites", "favorites"],
+    ["/suspended", "suspended"],
     ["/block/-1/8000000000000000/123", "block"],
     ["/tx/abcdef", "transaction"],
     ["/tx/abcdef/trace", "transaction"],
@@ -38,5 +42,32 @@ test("favorites preview describes every supported favorite type", () => {
     title: "Favorites",
     metadataTitle: "TON favorites · actonscan",
     metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
+  })
+})
+
+test("faucet preview makes the Testnet scope explicit", () => {
+  expect(pageOgPreviewForKey("faucet")).toMatchObject({
+    title: "Testnet Faucet",
+    metadataTitle: "TON Testnet Faucet · actonscan",
+  })
+})
+
+test("suspended addresses use dedicated social metadata", () => {
+  expect(pageOgPreviewForKey("suspended")).toMatchObject({
+    title: "Suspended addresses",
+    metadataTitle: "Suspended TON addresses · actonscan",
+    metadataDescription:
+      "Browse TON addresses suspended through validators' voting and check when restrictions expire on actonscan.",
+  })
+})
+
+test("verified routes use dedicated social metadata", () => {
+  expect(pageOgPreviewForKey("verified")).toMatchObject({
+    title: "Verified contracts",
+    metadataTitle: "Verified TON contracts · actonscan",
+  })
+  expect(pageOgPreviewForKey("verified-contract")).toMatchObject({
+    title: "Verified contract",
+    metadataTitle: "Verified TON contract · actonscan",
   })
 })

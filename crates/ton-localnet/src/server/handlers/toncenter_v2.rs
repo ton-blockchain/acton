@@ -1,9 +1,7 @@
 use super::utils::{ToncenterHttpError, get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_wallet::read_v2_wallet_state;
-use crate::localnet::{
-    Localnet, LocalnetBlockHeader, LocalnetBlockTransactions, TransactionLookupKind,
-};
+use crate::localnet::{Localnet, LocalnetBlockTransactions, TransactionLookupKind};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
@@ -11,6 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use std::sync::Arc;
+use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
@@ -18,7 +17,7 @@ use ton_api::toncenter::v2::requests::{
     RunGetMethodStdRequest, SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
 use ton_api::toncenter::v2::requests::{BlockHeaderRequest, BlockTransactionsRequest};
-use tycho_types::models::{StdAddr, StdAddrFormat};
+use tycho_types::models::{ShardIdent, StdAddr, StdAddrFormat};
 
 macro_rules! parse {
     ($expression:expr) => {
@@ -371,7 +370,7 @@ pub async fn get_block_header(
     Query(payload): Query<BlockHeaderRequest>,
 ) -> Response {
     let request = parse!(parse_block_header_request(&payload));
-    handle_result(resolve_block_header(&node, &request), v2::map_block_header).await
+    handle_result(resolve_block_header(&node, &request), Clone::clone).await
 }
 
 pub async fn get_block_transactions_ext_post(
@@ -380,8 +379,8 @@ pub async fn get_block_transactions_ext_post(
 ) -> Response {
     let request = parse!(parse_block_transactions_request(&payload));
     handle_result(
-        resolve_block_transactions(&node, &request),
-        v2::map_block_transactions_ext,
+        resolve_block_transactions_ext(&node, &request),
+        Clone::clone,
     )
     .await
 }
@@ -398,11 +397,7 @@ pub async fn get_block_transactions(
     Query(payload): Query<BlockTransactionsRequest>,
 ) -> Response {
     let request = parse!(parse_block_transactions_request(&payload));
-    handle_result(
-        resolve_block_transactions(&node, &request),
-        v2::map_block_transactions,
-    )
-    .await
+    handle_result(resolve_block_transactions(&node, &request), Clone::clone).await
 }
 
 pub async fn get_block_transactions_ext(
@@ -411,8 +406,8 @@ pub async fn get_block_transactions_ext(
 ) -> Response {
     let request = parse!(parse_block_transactions_request(&payload));
     handle_result(
-        resolve_block_transactions(&node, &request),
-        v2::map_block_transactions_ext,
+        resolve_block_transactions_ext(&node, &request),
+        Clone::clone,
     )
     .await
 }
@@ -434,7 +429,19 @@ pub async fn get_shards(
     Query(payload): Query<SeqnoRequest>,
 ) -> Response {
     let seqno = parse!(parse_required_seqno(&payload.seqno));
-    handle_result(node.get_shards(seqno), |shards| v2::map_shards(shards)).await
+    handle_result(resolve_shards(&node, seqno), Clone::clone).await
+}
+
+pub(super) async fn resolve_shards(
+    node: &Localnet,
+    seqno: u32,
+) -> anyhow::Result<ton_api::toncenter::v2::Shards> {
+    if let Some(shards) = node.get_historical_shards_v2(seqno).await? {
+        return Ok(shards);
+    }
+    node.get_shards(seqno)
+        .await
+        .map(|shards| v2::map_shards(&shards))
 }
 
 pub async fn lookup_block(
@@ -442,17 +449,7 @@ pub async fn lookup_block(
     Query(payload): Query<LookupBlockRequest>,
 ) -> Response {
     let request = parse!(parse_lookup_block_request(&payload));
-    handle_result(
-        node.lookup_block(
-            request.workchain,
-            request.shard,
-            request.seqno,
-            request.lt,
-            request.unixtime,
-        ),
-        v2::map_lookup_block,
-    )
-    .await
+    handle_result(resolve_lookup_block(&node, &request), Clone::clone).await
 }
 
 fn v2_unprocessable_entity(error: impl std::fmt::Display) -> Response {
@@ -566,10 +563,11 @@ fn parse_block_selector(
     if !matches!(workchain, -1 | 0) {
         anyhow::bail!("`workchain` must be -1 or 0");
     }
-    let shard = shard.to_i64()?;
-    if shard != i64::MIN {
-        anyhow::bail!("localnet supports only shard {:#x}", i64::MIN);
-    }
+    let shard = parse_block_shard(shard)?;
+    anyhow::ensure!(
+        ShardIdent::new(workchain, shard as u64).is_some(),
+        "Invalid shard {workchain}:{shard}"
+    );
     let seqno = parse_required_seqno(seqno)?;
 
     Ok(BlockSelector {
@@ -596,14 +594,36 @@ pub(super) fn parse_block_header_request(
 pub(super) async fn resolve_block_header(
     node: &Localnet,
     selector: &BlockSelector,
-) -> anyhow::Result<LocalnetBlockHeader> {
+) -> anyhow::Result<wire::BlockHeader> {
+    if let Some(block) = node
+        .get_historical_block_header_v2(
+            selector.workchain,
+            selector.shard,
+            selector.seqno,
+            block_header_wire_request(selector),
+        )
+        .await?
+    {
+        return Ok(block);
+    }
+
     let block = if selector.workchain == -1 {
         node.get_masterchain_block_header(selector.seqno).await?
     } else {
         node.get_block_header(selector.seqno).await?
     };
     validate_block_id(&block.id, selector)?;
-    Ok(block)
+    Ok(v2::map_block_header(&block))
+}
+
+fn block_header_wire_request(selector: &BlockSelector) -> BlockHeaderRequest {
+    BlockHeaderRequest {
+        workchain: selector.workchain.into(),
+        shard: StringOrNumber::String(selector.shard.to_string()),
+        seqno: selector.seqno.into(),
+        root_hash: selector.root_hash.map(|hash| hash.to_base64()),
+        file_hash: selector.file_hash.map(|hash| hash.to_base64()),
+    }
 }
 
 pub(super) fn parse_block_transactions_request(
@@ -660,6 +680,48 @@ pub(super) fn parse_block_transactions_request(
 pub(super) async fn resolve_block_transactions(
     node: &Localnet,
     request: &ParsedBlockTransactionsRequest,
+) -> anyhow::Result<wire::BlockTransactions> {
+    if let Some(block) = node
+        .get_historical_block_transactions_v2(
+            request.selector.workchain,
+            request.selector.shard,
+            request.selector.seqno,
+            block_transactions_wire_request(request),
+        )
+        .await?
+    {
+        return Ok(block);
+    }
+
+    resolve_local_block_transactions(node, request)
+        .await
+        .map(|block| v2::map_block_transactions(&block))
+}
+
+pub(super) async fn resolve_block_transactions_ext(
+    node: &Localnet,
+    request: &ParsedBlockTransactionsRequest,
+) -> anyhow::Result<wire::BlockTransactionsExt> {
+    if let Some(block) = node
+        .get_historical_block_transactions_ext_v2(
+            request.selector.workchain,
+            request.selector.shard,
+            request.selector.seqno,
+            block_transactions_wire_request(request),
+        )
+        .await?
+    {
+        return Ok(block);
+    }
+
+    resolve_local_block_transactions(node, request)
+        .await
+        .map(|block| v2::map_block_transactions_ext(&block))
+}
+
+async fn resolve_local_block_transactions(
+    node: &Localnet,
+    request: &ParsedBlockTransactionsRequest,
 ) -> anyhow::Result<LocalnetBlockTransactions> {
     let selector = &request.selector;
     let mut block = if selector.workchain == -1 {
@@ -678,6 +740,24 @@ pub(super) async fn resolve_block_transactions(
     validate_block_id(&block.id, selector)?;
     paginate_block_transactions(&mut block, request.count, request.after);
     Ok(block)
+}
+
+fn block_transactions_wire_request(
+    request: &ParsedBlockTransactionsRequest,
+) -> BlockTransactionsRequest {
+    let selector = &request.selector;
+    BlockTransactionsRequest {
+        workchain: selector.workchain.into(),
+        shard: StringOrNumber::String(selector.shard.to_string()),
+        seqno: selector.seqno.into(),
+        root_hash: selector.root_hash.map(|hash| hash.to_base64()),
+        file_hash: selector.file_hash.map(|hash| hash.to_base64()),
+        after_lt: request
+            .after
+            .map(|(after_lt, _)| StringOrNumber::Unsigned(after_lt)),
+        after_hash: request.after.map(|(_, after_hash)| after_hash.to_base64()),
+        count: Some(StringOrNumber::Unsigned(request.count as u64)),
+    }
 }
 
 fn validate_block_id(
@@ -769,6 +849,77 @@ pub(super) fn parse_lookup_block_request(
         lt: lt.map(|lt| lt as u64),
         unixtime: unixtime.map(|unixtime| unixtime as u32),
     })
+}
+
+pub(super) async fn resolve_lookup_block(
+    node: &Localnet,
+    request: &ParsedLookupBlockRequest,
+) -> anyhow::Result<wire::TonBlockIdExt> {
+    if request.seqno.is_some()
+        && let Some(block) = node
+            .get_historical_lookup_block_v2(
+                request.workchain,
+                request.shard,
+                request.seqno,
+                lookup_block_wire_request(request),
+            )
+            .await?
+    {
+        return Ok(block);
+    }
+
+    let local = node
+        .lookup_block(
+            request.workchain,
+            request.shard,
+            request.seqno,
+            request.lt,
+            request.unixtime,
+        )
+        .await;
+    match local {
+        Ok(block) => Ok(v2::map_lookup_block(&block)),
+        Err(local_error) => {
+            if request.seqno.is_none()
+                && let Some(block) = node
+                    .get_historical_lookup_block_v2(
+                        request.workchain,
+                        request.shard,
+                        None,
+                        lookup_block_wire_request(request),
+                    )
+                    .await?
+            {
+                return Ok(block);
+            }
+            Err(local_error)
+        }
+    }
+}
+
+fn lookup_block_wire_request(request: &ParsedLookupBlockRequest) -> LookupBlockRequest {
+    LookupBlockRequest {
+        workchain: request.workchain.into(),
+        shard: StringOrNumber::String(request.shard.to_string()),
+        seqno: request.seqno.map(Into::into),
+        lt: request.lt.map(StringOrNumber::Unsigned),
+        unixtime: request.unixtime.map(Into::into),
+    }
+}
+
+fn parse_block_shard(shard: &StringOrNumber) -> anyhow::Result<i64> {
+    let StringOrNumber::String(shard) = shard else {
+        return shard.to_i64();
+    };
+    let shard = shard.trim();
+    if shard.starts_with('-') {
+        return Ok(shard.parse()?);
+    }
+    let hex = shard
+        .strip_prefix("0x")
+        .or_else(|| shard.strip_prefix("0X"))
+        .unwrap_or(shard);
+    Ok(u64::from_str_radix(hex, 16)? as i64)
 }
 
 pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Option<u32>> {
@@ -898,5 +1049,21 @@ mod tests {
         let parsed =
             parse_libraries_request(&[hash_a, hash_b]).expect("valid repeated hashes must parse");
         assert_eq!(parsed, vec![Hash256([0x11; 32]), Hash256([0x22; 32])]);
+    }
+
+    #[test]
+    fn block_selector_accepts_remote_shard_prefixes() {
+        let selector = parse_block_selector(
+            &0.into(),
+            &StringOrNumber::String("4000000000000000".to_owned()),
+            &70.into(),
+            None,
+            None,
+        )
+        .expect("valid split shard must parse");
+
+        assert_eq!(selector.workchain, 0);
+        assert_eq!(selector.shard as u64, 0x4000_0000_0000_0000);
+        assert_eq!(selector.seqno, 70);
     }
 }

@@ -6,9 +6,14 @@ export type PageOgKey =
   | "block"
   | "abi"
   | "sources"
+  | "faucet"
+  | "verified"
+  | "verified-statistics"
+  | "verified-contract"
   | "cell"
   | "emulate"
   | "favorites"
+  | "suspended"
   | "transaction"
 
 export type PageOgPreview = {
@@ -63,6 +68,41 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataTitle: "Verified TON sources · actonscan",
     metadataDescription: "Browse verified TON smart-contract source code on actonscan.",
   },
+  faucet: {
+    key: "faucet",
+    title: "Testnet Faucet",
+    badge: "Proof of work",
+    description: "Fund a TON Testnet address without leaving the explorer",
+    metadataTitle: "TON Testnet Faucet · actonscan",
+    metadataDescription: "Request testnet GRAM through Acton's proof-of-work protected faucet",
+  },
+  verified: {
+    key: "verified",
+    title: "Verified contracts",
+    badge: "Source registry",
+    description: "Browse reproducible source bundles matched to deployed TON contract code",
+    metadataTitle: "Verified TON contracts · actonscan",
+    metadataDescription:
+      "Browse verified TON smart-contract source bundles, compilers, and code hashes on actonscan.",
+  },
+  "verified-statistics": {
+    key: "verified-statistics",
+    title: "Verification stats",
+    badge: "Source registry",
+    description: "Explore verified contracts by language and compiler version",
+    metadataTitle: "TON verification statistics · actonscan",
+    metadataDescription:
+      "Explore verified TON smart contracts by source language and compiler version on actonscan.",
+  },
+  "verified-contract": {
+    key: "verified-contract",
+    title: "Verified contract",
+    badge: "Source bundle",
+    description: "Review the exact sources and compiler settings matched to on-chain code",
+    metadataTitle: "Verified TON contract · actonscan",
+    metadataDescription:
+      "Review verified source code, compiler metadata, and source bundles for a TON contract on actonscan.",
+  },
   cell: {
     key: "cell",
     title: "Cell Inspector",
@@ -87,6 +127,15 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataTitle: "TON favorites · actonscan",
     metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
   },
+  suspended: {
+    key: "suspended",
+    title: "Suspended addresses",
+    badge: "Validators' voting",
+    description: "Review TON addresses suspended through validators' voting and their balances",
+    metadataTitle: "Suspended TON addresses · actonscan",
+    metadataDescription:
+      "Browse TON addresses suspended through validators' voting and check when restrictions expire on actonscan.",
+  },
   transaction: {
     key: "transaction",
     title: "Transaction",
@@ -108,9 +157,14 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
   if (normalizedPath === "/blocks") return PAGE_OG_PREVIEWS.blocks
   if (normalizedPath === "/abi") return PAGE_OG_PREVIEWS.abi
   if (normalizedPath === "/sources") return PAGE_OG_PREVIEWS.sources
+  if (normalizedPath === "/faucet") return PAGE_OG_PREVIEWS.faucet
+  if (normalizedPath === "/verified") return PAGE_OG_PREVIEWS.verified
+  if (normalizedPath === "/verified/statistics") return PAGE_OG_PREVIEWS["verified-statistics"]
+  if (/^\/verified\/[^/]+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS["verified-contract"]
   if (normalizedPath === "/cell") return PAGE_OG_PREVIEWS.cell
   if (normalizedPath === "/emulate") return PAGE_OG_PREVIEWS.emulate
   if (normalizedPath === "/favorites") return PAGE_OG_PREVIEWS.favorites
+  if (normalizedPath === "/suspended") return PAGE_OG_PREVIEWS.suspended
   if (/^\/block\/-?\d+\/[^/]+\/\d+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS.block
   if (/^\/tx\/[^/]+(?:\/trace)?$/.test(normalizedPath)) return PAGE_OG_PREVIEWS.transaction
   return undefined

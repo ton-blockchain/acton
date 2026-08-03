@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "actonscan",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-06-18",
+  "r2_buckets": [
+    {
+      "binding": "EMULATION_SHARES",
+      "bucket_name": "actonscan-emulation-shares"
+    }
+  ]
+}

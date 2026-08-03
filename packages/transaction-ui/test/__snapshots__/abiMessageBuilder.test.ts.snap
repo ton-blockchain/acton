@@ -30,6 +30,20 @@ exports[`ABI message builder lists internal and external message options with se
       "valueTyIdx": 12,
     },
   ],
+  "outgoing": [
+    {
+      "bodyTyIdx": 12,
+      "id": "outgoing:internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  ],
   "union": [
     {
       "bodyTyIdx": 15,
@@ -102,6 +116,68 @@ exports[`ABI message builder builds external and union messages 1`] = `
     "info": {
       "destination": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
       "type": "external-in",
+    },
+  },
+}
+`;
+
+exports[`ABI message builder decodes ABI message bodies back into editable builder drafts 1`] = `
+{
+  "emptyBody": undefined,
+  "internal": {
+    "args": {
+      "$": "Increment",
+      "value": "7",
+    },
+    "option": {
+      "bodyTyIdx": 12,
+      "id": "internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  },
+  "outgoing": {
+    "args": {
+      "$": "Increment",
+      "value": "7",
+    },
+    "option": {
+      "bodyTyIdx": 12,
+      "id": "outgoing:internal:0",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment",
+      "transport": "internal",
+      "union": undefined,
+      "valueTyIdx": 12,
+    },
+  },
+  "union": {
+    "args": {
+      "value": "13",
+    },
+    "option": {
+      "bodyTyIdx": 15,
+      "id": "external:0:1",
+      "label": "Increment",
+      "sample": {
+        "value": "0",
+      },
+      "summary": "Increment / Increment",
+      "transport": "external",
+      "union": {
+        "hasValueField": false,
+        "label": "Increment",
+      },
+      "valueTyIdx": 12,
     },
   },
 }

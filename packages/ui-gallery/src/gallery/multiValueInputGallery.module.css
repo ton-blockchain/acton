@@ -1,0 +1,12 @@
+.stack {
+  display: grid;
+  max-width: 36rem;
+  gap: var(--acton-space-5);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--acton-space-5);
+  align-items: start;
+}

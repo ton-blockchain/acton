@@ -14,17 +14,17 @@
 
 .value {
   display: inline-flex;
-  align-items: flex-start;
-  flex-direction: column;
+  align-items: baseline;
+  flex-direction: row;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  gap: 0;
+  column-gap: var(--acton-space-1);
 }
 
 .opcodeText {
-  width: 100%;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -34,12 +34,20 @@
 }
 
 .opcodeSubText {
+  flex: 0 0 auto;
   color: var(--acton-color-text-muted);
   white-space: nowrap;
 }
 
 @media (max-width: 768px) {
+  .value {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+
   .opcodeText {
+    width: 100%;
     max-width: min(100%, 26ch);
   }
 }

@@ -100,6 +100,12 @@
   stroke-dasharray: 10;
 }
 
+.edgeStyleTraceGap {
+  stroke: var(--acton-color-warning);
+  stroke-dasharray: 4 5;
+  opacity: 0.72;
+}
+
 .edgeTextTitle {
   font-size: var(--acton-font-size-xs);
   font-weight: bold;
@@ -133,12 +139,93 @@
   cursor: help;
 }
 
+.traceGapContinuationNode {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.traceGapContinuationNode * {
+  cursor: help;
+}
+
 .rootCircle {
   cursor: default;
 }
 
+.traceGapContinuationNode .rootCircle {
+  cursor: help;
+}
+
+.traceGapNode {
+  pointer-events: auto;
+}
+
+.traceGapLabel {
+  justify-content: center;
+  gap: 4px;
+}
+
+.traceGapTitle {
+  color: var(--acton-color-warning-text);
+}
+
+.traceGapLabel .traceGapCount {
+  color: color-mix(in srgb, var(--acton-color-warning-text) 70%, var(--acton-color-warning));
+}
+
+.traceGapAction {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 4px;
+  pointer-events: auto;
+}
+
+.traceGapButton {
+  margin-left: auto;
+  color: var(--acton-color-warning-text);
+  font-size: 0.625rem;
+  white-space: nowrap;
+}
+
+.traceGapAction .traceGapButton:not(:disabled) {
+  cursor: pointer;
+}
+
+.traceGapButton:hover:not(:disabled) {
+  color: var(--acton-color-warning);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.traceGapButton:focus-visible {
+  color: var(--acton-color-warning);
+  outline: 1px solid var(--acton-color-warning);
+  outline-offset: 2px;
+}
+
+.traceGapAction .traceGapButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.traceGapError {
+  max-width: 150px;
+  margin: 0;
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-2xs);
+  line-height: 1.25;
+  text-align: end;
+}
+
 .edgeText * {
   pointer-events: none;
+}
+
+.traceGapAction,
+.traceGapAction * {
+  pointer-events: auto;
 }
 
 .edgeTextContent {

@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react"
 
 import type {GasProfileReport} from "../components/GasProfile/GasProfile"
+import {useTestUiApi} from "../testUiApiContext"
 import {getErrorMessage, isAbortError} from "./request"
 
 interface GasProfileReportState {
@@ -18,6 +19,7 @@ const DISABLED_STATE: GasProfileReportState = {
 }
 
 export function useGasProfileReport(enabled = true) {
+  const {url} = useTestUiApi()
   const [state, setState] = useState<GasProfileReportState>(DISABLED_STATE)
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function useGasProfileReport(enabled = true) {
 
     const loadGasProfile = async () => {
       try {
-        const response = await fetch("/api/gas-profile", {signal: controller.signal})
+        const response = await fetch(url("/gas-profile"), {signal: controller.signal})
         if (response.status === 204) {
           setState({profile: undefined, error: undefined, loading: false, loaded: true})
           return
@@ -52,7 +54,7 @@ export function useGasProfileReport(enabled = true) {
 
     void loadGasProfile()
     return () => controller.abort()
-  }, [enabled])
+  }, [enabled, url])
 
   return enabled ? state : DISABLED_STATE
 }

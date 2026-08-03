@@ -5,11 +5,14 @@ import react from "@vitejs/plugin-react"
 import {defineConfig, type PluginOption} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
+import {themeBootstrap} from "../ui/vite/themeBootstrap"
+
 const require = createRequire(import.meta.url)
 const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin-node-polyfills")))
 
 export default defineConfig({
   plugins: [
+    themeBootstrap(),
     react() as PluginOption,
     nodePolyfills({
       include: ["buffer", "path"],

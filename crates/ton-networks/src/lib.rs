@@ -2,13 +2,28 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+static PUBLIC_NETWORK_URL_OVERRIDES: OnceLock<PublicNetworkUrls> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct CustomNetworkUrls {
     pub v2_url: Arc<str>,
     pub v3_url: Option<Arc<str>>,
     pub explorer_url: Option<Arc<str>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicNetworkUrls {
+    pub mainnet: CustomNetworkUrls,
+    pub testnet: CustomNetworkUrls,
+}
+
+/// Installs process-local endpoints for the built-in public networks.
+///
+/// Explicit `ACTON_TEST_TONCENTER_*` endpoint overrides continue to take precedence.
+pub fn set_runtime_public_network_urls(urls: PublicNetworkUrls) -> Result<(), PublicNetworkUrls> {
+    PUBLIC_NETWORK_URL_OVERRIDES.set(urls)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, JsonSchema)]
@@ -46,24 +61,36 @@ impl Network {
     }
 
     fn mainnet_toncenter_v2_url() -> String {
-        env_value("ACTON_TEST_TONCENTER_MAINNET_V2_URL")
-            .unwrap_or_else(|| "https://toncenter.com/api/v2".to_owned())
+        resolve_public_v2_url(
+            env_value("ACTON_TEST_TONCENTER_MAINNET_V2_URL"),
+            runtime_public_network_urls(&Network::Mainnet),
+            "https://toncenter.com/api/v2",
+        )
     }
 
     fn mainnet_toncenter_v3_url() -> String {
-        env_value("ACTON_TEST_TONCENTER_MAINNET_V3_URL")
-            .unwrap_or_else(|| "https://toncenter.com/api/v3".to_owned())
+        resolve_public_v3_url(
+            env_value("ACTON_TEST_TONCENTER_MAINNET_V3_URL"),
+            runtime_public_network_urls(&Network::Mainnet),
+            "https://toncenter.com/api/v3",
+        )
     }
 
     fn testnet_toncenter_v2_url() -> String {
-        env_value("ACTON_TEST_TONCENTER_TESTNET_V2_URL")
-            .unwrap_or_else(|| "https://testnet.toncenter.com/api/v2".to_owned())
+        resolve_public_v2_url(
+            env_value("ACTON_TEST_TONCENTER_TESTNET_V2_URL"),
+            runtime_public_network_urls(&Network::Testnet),
+            "https://testnet.toncenter.com/api/v2",
+        )
     }
 
     fn testnet_toncenter_v3_url() -> String {
-        env_value("ACTON_TEST_TONCENTER_TESTNET_V3_URL")
-            .or_else(|| env_value("ACTON_TEST_TONCENTER_V3_URL"))
-            .unwrap_or_else(|| "https://testnet.toncenter.com/api/v3".to_owned())
+        resolve_public_v3_url(
+            env_value("ACTON_TEST_TONCENTER_TESTNET_V3_URL")
+                .or_else(|| env_value("ACTON_TEST_TONCENTER_V3_URL")),
+            runtime_public_network_urls(&Network::Testnet),
+            "https://testnet.toncenter.com/api/v3",
+        )
     }
 
     pub fn toncenter_v3_url(
@@ -108,6 +135,39 @@ impl Network {
             }
         }
     }
+}
+
+fn runtime_public_network_urls(network: &Network) -> Option<&CustomNetworkUrls> {
+    let urls = PUBLIC_NETWORK_URL_OVERRIDES.get()?;
+    match network {
+        Network::Mainnet => Some(&urls.mainnet),
+        Network::Testnet => Some(&urls.testnet),
+        Network::Localnet | Network::Custom(_) => None,
+    }
+}
+
+fn resolve_public_v2_url(
+    explicit_override: Option<String>,
+    runtime_override: Option<&CustomNetworkUrls>,
+    default_url: &str,
+) -> String {
+    explicit_override
+        .or_else(|| runtime_override.map(|urls| urls.v2_url.to_string()))
+        .unwrap_or_else(|| default_url.to_owned())
+}
+
+fn resolve_public_v3_url(
+    explicit_override: Option<String>,
+    runtime_override: Option<&CustomNetworkUrls>,
+    default_url: &str,
+) -> String {
+    explicit_override
+        .or_else(|| {
+            runtime_override
+                .and_then(|urls| urls.v3_url.as_ref())
+                .map(ToString::to_string)
+        })
+        .unwrap_or_else(|| default_url.to_owned())
 }
 
 fn env_value(env_name: &str) -> Option<String> {
@@ -191,6 +251,58 @@ mod tests {
                 .toncenter_v3_url(&custom_networks)
                 .expect("v3 url should resolve"),
             "http://127.0.0.1:3010/api/v3"
+        );
+    }
+
+    #[test]
+    fn resolves_public_network_urls_from_runtime_overrides() {
+        let runtime_override = CustomNetworkUrls {
+            v2_url: Arc::from("http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v2"),
+            v3_url: Some(Arc::from(
+                "http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v3",
+            )),
+            explorer_url: None,
+        };
+
+        assert_eq!(
+            resolve_public_v2_url(
+                None,
+                Some(&runtime_override),
+                "https://toncenter.com/api/v2"
+            ),
+            "http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v2"
+        );
+        assert_eq!(
+            resolve_public_v3_url(
+                None,
+                Some(&runtime_override),
+                "https://toncenter.com/api/v3"
+            ),
+            "http://127.0.0.1:3016/api/v1/environments/mainnet/rpc/api/v3"
+        );
+        assert_eq!(
+            resolve_public_v2_url(
+                Some("http://explicit.test/api/v2".to_owned()),
+                Some(&runtime_override),
+                "https://toncenter.com/api/v2"
+            ),
+            "http://explicit.test/api/v2"
+        );
+        assert_eq!(
+            resolve_public_v3_url(
+                Some("http://explicit.test/api/v3".to_owned()),
+                Some(&runtime_override),
+                "https://toncenter.com/api/v3"
+            ),
+            "http://explicit.test/api/v3"
+        );
+        assert_eq!(
+            resolve_public_v2_url(None, None, "https://toncenter.com/api/v2"),
+            "https://toncenter.com/api/v2"
+        );
+        assert_eq!(
+            resolve_public_v3_url(None, None, "https://toncenter.com/api/v3"),
+            "https://toncenter.com/api/v3"
         );
     }
 }

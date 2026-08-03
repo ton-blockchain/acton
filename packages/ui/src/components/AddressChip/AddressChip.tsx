@@ -4,6 +4,7 @@ import type {MouseEvent, ReactNode} from "react"
 import {cx} from "../../lib/cx"
 import {useCopyValue} from "../../lib/useCopyValue"
 import {InlineAction} from "../InlineActions/InlineActions"
+import {Tooltip} from "../Tooltip"
 
 import styles from "./AddressChip.module.css"
 
@@ -71,17 +72,18 @@ export function AddressChip({
 
   const addressNode =
     address !== undefined && onAddressClick !== undefined ? (
-      <button
-        type="button"
-        className={addressClassName}
-        title={displayAddress}
-        onClick={event => {
-          event.stopPropagation()
-          onAddressClick(address, event)
-        }}
-      >
-        {label ?? addressContent}
-      </button>
+      <Tooltip content={displayAddress}>
+        <button
+          type="button"
+          className={addressClassName}
+          onClick={event => {
+            event.stopPropagation()
+            onAddressClick(address, event)
+          }}
+        >
+          {label ?? addressContent}
+        </button>
+      </Tooltip>
     ) : (
       <span className={addressClassName} title={displayAddress || undefined}>
         {label ?? addressContent}

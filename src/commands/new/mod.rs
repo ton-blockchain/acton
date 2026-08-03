@@ -24,6 +24,7 @@ const DEFAULT_PROJECT_LICENSE: &str = "MIT";
 const BASE_GITIGNORE: &str = "
 # Acton main directory
 .acton/
+.studio/
 
 # Build directory
 build/

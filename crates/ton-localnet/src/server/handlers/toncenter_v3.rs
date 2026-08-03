@@ -9,6 +9,7 @@ use crate::localnet::{
     Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery,
     LocalnetNftItemsOrder, LocalnetNftItemsQuery, LocalnetSortOrder, LocalnetTransaction,
 };
+use crate::offchain_metadata::{enrich_jetton_master_map, enrich_jetton_masters};
 use crate::storage::{
     AccountStatus, DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, MultisigMeta,
     MultisigOrderMeta, NftCollectionMeta, NftItemMeta, NftSaleMeta, TraceNode,
@@ -27,7 +28,6 @@ use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
-use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
     BlocksQuery, DnsRecordsQuery, EstimateFeeRequest, JettonBurnsQuery, JettonMastersQuery,
@@ -39,6 +39,7 @@ use ton_api::toncenter::v3::requests::{
     TransactionsByMessageQuery, TransactionsQuery, VestingQuery, WalletInformationQuery,
     WalletStatesQuery,
 };
+use ton_api::{OffchainJsonResolver, toncenter::v3 as v3_types};
 use toncenter_v3 as v3;
 
 const BLOCK_WORKCHAIN: i32 = 0;
@@ -436,6 +437,7 @@ pub async fn get_address_book_v3(
 
 pub async fn get_metadata_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
@@ -444,7 +446,7 @@ pub async fn get_metadata_v3(
         .into_iter()
         .filter_map(|(_, address)| address)
         .collect();
-    match build_metadata_for_addresses(node.as_ref(), addresses).await {
+    match build_metadata_for_addresses(node.as_ref(), &metadata_resolver, addresses).await {
         Ok(metadata) => (StatusCode::OK, Json(metadata)).into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
@@ -493,8 +495,61 @@ pub async fn get_transactions_v3(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = parse!(parse_v3_query::<TransactionsQuery>(raw_query.as_deref()));
-    let parsed = parse!(parse_transactions_v3_query(payload));
+    let raw_query = raw_query.unwrap_or_default();
+    let payload = parse!(parse_v3_query::<TransactionsQuery>(Some(&raw_query)));
+    let parsed = parse!(parse_transactions_v3_query(payload.clone()));
+
+    match node
+        .get_historical_transactions_v3(payload.seqno.or(payload.mc_seqno), raw_query.clone())
+        .await
+    {
+        Ok(Some(response)) => return (StatusCode::OK, Json(response)).into_response(),
+        Ok(None) => {}
+        Err(error) => {
+            return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+        }
+    }
+
+    let historical = if payload.seqno.is_none()
+        && payload.mc_seqno.is_none()
+        && (!payload.account.is_empty() || !payload.hash.is_empty())
+    {
+        let fork_block = match node.get_fork_masterchain_block_v2().await {
+            Ok(block) => block,
+            Err(error) => {
+                return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+            }
+        };
+        if let Some(fork_block) = fork_block {
+            let fork_end_lt = match fork_block.end_lt.parse::<u64>() {
+                Ok(end_lt) => end_lt,
+                Err(error) => {
+                    return request_error(
+                        StatusCode::BAD_GATEWAY,
+                        format!("Remote fork block returned an invalid end_lt: {error}"),
+                    );
+                }
+            };
+            let end_lt = parsed
+                .end_lt
+                .map_or(fork_end_lt, |end_lt| end_lt.min(fork_end_lt));
+            let query = historical_transactions_query(
+                &raw_query,
+                end_lt,
+                parsed.limit.saturating_add(parsed.offset),
+            );
+            match node.get_unpinned_historical_transactions_v3(query).await {
+                Ok(response) => response,
+                Err(error) => {
+                    return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     match transactions_fast_path(&parsed) {
         Some(TransactionsFastPath::Empty) => {
@@ -519,18 +574,54 @@ pub async fn get_transactions_v3(
         None => {}
     }
 
-    handle_v3_result(node.get_all_transactions(), move |txs| {
-        let filtered = filter_transactions_v3(txs, &parsed);
-        v3::map_transactions_response(&filtered)
-    })
-    .await
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(error) => {
+            return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    };
+    if let Some(historical) = historical {
+        let mut unpaged = parsed.clone();
+        unpaged.limit = usize::MAX;
+        unpaged.offset = 0;
+        let local = v3::map_transactions_response(&filter_transactions_v3(&transactions, &unpaged));
+        return (
+            StatusCode::OK,
+            Json(merge_transactions_v3(historical, local, &parsed)),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(v3::map_transactions_response(&filter_transactions_v3(
+            &transactions,
+            &parsed,
+        ))),
+    )
+        .into_response()
 }
 
 pub async fn get_blocks_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlocksQuery>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let parsed = parse!(parse_blocks_v3_query(payload));
+    let payload = parse!(parse_v3_query::<BlocksQuery>(raw_query.as_deref()));
+    let parsed = parse!(parse_blocks_v3_query(payload.clone()));
+
+    match node
+        .get_historical_blocks_v3(
+            payload.seqno.or(payload.mc_seqno),
+            raw_query.unwrap_or_default(),
+        )
+        .await
+    {
+        Ok(Some(response)) => return (StatusCode::OK, Json(response)).into_response(),
+        Ok(None) => {}
+        Err(error) => {
+            return request_error(StatusCode::BAD_GATEWAY, error.to_string());
+        }
+    }
 
     handle_v3_result(node.get_blocks(), move |blocks| {
         let filtered = filter_blocks_v3(blocks, &parsed);
@@ -577,6 +668,7 @@ pub async fn get_transactions_by_masterchain_block_v3(
 
 pub async fn get_messages_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<MessagesQuery>(raw_query.as_deref()));
@@ -586,11 +678,18 @@ pub async fn get_messages_v3(
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
     let (messages, addresses) = collect_messages_v3(&transactions, &parsed);
-    let (address_book, metadata) =
-        match build_extra_data_for_addresses(node.as_ref(), addresses, true, true).await {
-            Ok(extra) => extra,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let (address_book, metadata) = match build_extra_data_for_addresses(
+        node.as_ref(),
+        &metadata_resolver,
+        addresses,
+        true,
+        true,
+    )
+    .await
+    {
+        Ok(extra) => extra,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
 
     (
         StatusCode::OK,
@@ -627,6 +726,7 @@ pub async fn get_adjacent_transactions_v3(
 
 pub async fn get_wallet_states_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<WalletStatesQuery>(raw_query.as_deref()));
@@ -652,11 +752,18 @@ pub async fn get_wallet_states_v3(
         ));
     }
 
-    let (address_book, metadata) =
-        match build_extra_data_for_addresses(node.as_ref(), existing_addresses, true, true).await {
-            Ok(extra) => extra,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let (address_book, metadata) = match build_extra_data_for_addresses(
+        node.as_ref(),
+        &metadata_resolver,
+        existing_addresses,
+        true,
+        true,
+    )
+    .await
+    {
+        Ok(extra) => extra,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
 
     (
         StatusCode::OK,
@@ -690,24 +797,32 @@ pub async fn get_pending_transactions_v3(
 
 pub async fn get_jetton_masters(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonMastersQuery>(raw_query.as_deref()));
     let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
-    handle_v3_result(
-        node.get_jetton_masters(
+    let mut masters = match node
+        .get_jetton_masters(
             payload.address,
             payload.admin_address,
             Some(limit),
             Some(offset),
-        ),
-        |masters| v3::map_jetton_masters(masters),
-    )
-    .await
+        )
+        .await
+    {
+        Ok(masters) => masters,
+        Err(error) => {
+            return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    };
+    enrich_jetton_masters(&metadata_resolver, &mut masters).await;
+    (StatusCode::OK, Json(v3::map_jetton_masters(&masters))).into_response()
 }
 
 pub async fn get_jetton_wallets(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()));
@@ -753,6 +868,7 @@ pub async fn get_jetton_wallets(
             masters_by_jetton.insert(jetton_address, master);
         }
     }
+    enrich_jetton_master_map(&metadata_resolver, &mut masters_by_jetton).await;
 
     (
         StatusCode::OK,
@@ -906,6 +1022,7 @@ fn sort_dns_records(records: &mut [DnsRecordMeta]) {
 
 pub async fn get_jetton_transfers(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonTransfersQuery>(raw_query.as_deref()));
@@ -941,10 +1058,11 @@ pub async fn get_jetton_transfers(
         Ok(transactions) => transactions,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
-        Ok(context) => context,
-        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let (wallets, masters) =
+        match load_jetton_event_context(node.as_ref(), &metadata_resolver, &transactions).await {
+            Ok(context) => context,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
     let wallets_by_address = wallets
         .iter()
         .map(|wallet| (wallet.address, wallet))
@@ -994,6 +1112,7 @@ pub async fn get_jetton_transfers(
 
 pub async fn get_jetton_burns(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonBurnsQuery>(raw_query.as_deref()));
@@ -1024,10 +1143,11 @@ pub async fn get_jetton_burns(
         Ok(transactions) => transactions,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
-        Ok(context) => context,
-        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let (wallets, masters) =
+        match load_jetton_event_context(node.as_ref(), &metadata_resolver, &transactions).await {
+            Ok(context) => context,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
     let wallets_by_address = wallets
         .iter()
         .map(|wallet| (wallet.address, wallet))
@@ -1578,6 +1698,7 @@ async fn discover_contract_data(
 
 async fn load_jetton_event_context(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     transactions: &[LocalnetTransaction],
 ) -> anyhow::Result<(Vec<JettonWalletMeta>, HashMap<Addr, JettonMasterMeta>)> {
     let addresses = transactions
@@ -1611,6 +1732,7 @@ async fn load_jetton_event_context(
             masters.insert(jetton, master);
         }
     }
+    enrich_jetton_master_map(metadata_resolver, &mut masters).await;
     Ok((wallets, masters))
 }
 
@@ -1758,6 +1880,7 @@ enum TransactionsFastPath {
     Recent,
 }
 
+#[derive(Clone)]
 struct ParsedTransactionsV3Query {
     workchain: Option<i32>,
     shard: Option<i64>,
@@ -2087,6 +2210,67 @@ fn filter_transactions_v3(
         .skip(query.offset)
         .take(query.limit)
         .collect()
+}
+
+fn historical_transactions_query(raw_query: &str, end_lt: u64, page_size: usize) -> String {
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+    for (key, value) in url::form_urlencoded::parse(raw_query.as_bytes()) {
+        if !matches!(key.as_ref(), "end_lt" | "limit" | "offset") {
+            serializer.append_pair(&key, &value);
+        }
+    }
+    serializer.append_pair("end_lt", &end_lt.to_string());
+    serializer.append_pair("limit", &page_size.min(1000).to_string());
+    serializer.append_pair("offset", "0");
+    serializer.finish()
+}
+
+fn merge_transactions_v3(
+    mut historical: v3_types::TransactionsResponse,
+    local: v3_types::TransactionsResponse,
+    query: &ParsedTransactionsV3Query,
+) -> v3_types::TransactionsResponse {
+    let mut hashes = historical
+        .transactions
+        .iter()
+        .map(|transaction| transaction.hash.clone())
+        .collect::<HashSet<_>>();
+    historical.transactions.extend(
+        local
+            .transactions
+            .into_iter()
+            .filter(|transaction| hashes.insert(transaction.hash.clone())),
+    );
+    historical.address_book.extend(local.address_book);
+
+    let compare = |left: &v3_types::Transaction, right: &v3_types::Transaction| {
+        let primary = if query.start_utime.is_some() || query.end_utime.is_some() {
+            left.now.cmp(&right.now)
+        } else {
+            transaction_lt_v3(left).cmp(&transaction_lt_v3(right))
+        };
+        primary
+            .then_with(|| transaction_lt_v3(left).cmp(&transaction_lt_v3(right)))
+            .then_with(|| left.account.cmp(&right.account))
+            .then_with(|| left.hash.cmp(&right.hash))
+    };
+    historical
+        .transactions
+        .sort_by(|left, right| match query.sort {
+            SortOrder::Asc => compare(left, right),
+            SortOrder::Desc => compare(right, left),
+        });
+    historical.transactions = historical
+        .transactions
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .collect();
+    historical
+}
+
+fn transaction_lt_v3(transaction: &v3_types::Transaction) -> u64 {
+    transaction.lt.parse().unwrap_or_default()
 }
 
 const fn transactions_fast_path(query: &ParsedTransactionsV3Query) -> Option<TransactionsFastPath> {
@@ -3093,6 +3277,51 @@ mod tests {
             transactions_fast_path(&query),
             Some(TransactionsFastPath::Recent)
         );
+    }
+
+    #[test]
+    fn historical_transactions_query_replaces_remote_pagination_and_fork_bound() {
+        let query = historical_transactions_query(
+            "account=0%3Aabc&limit=10&offset=3&end_lt=99&sort=asc",
+            42,
+            25,
+        );
+        let pairs = url::form_urlencoded::parse(query.as_bytes())
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            pairs,
+            [
+                ("account".to_owned(), "0:abc".to_owned()),
+                ("sort".to_owned(), "asc".to_owned()),
+                ("end_lt".to_owned(), "42".to_owned()),
+                ("limit".to_owned(), "25".to_owned()),
+                ("offset".to_owned(), "0".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn historical_and_local_transactions_are_deduplicated_and_sorted_together() {
+        let remote = transaction_at(1, 1, 10, 10);
+        let local = transaction_at(2, 2, 20, 20);
+        let historical = v3::map_transactions_response(std::slice::from_ref(&remote));
+        let local_response = v3::map_transactions_response(&[local.clone(), remote]);
+        let mut query = transactions_query();
+        query.limit = 10;
+
+        let merged = merge_transactions_v3(historical, local_response, &query);
+
+        assert_eq!(
+            merged
+                .transactions
+                .iter()
+                .map(|transaction| transaction.hash.as_str())
+                .collect::<Vec<_>>(),
+            [local.hash.to_base64(), Hash256([1; 32]).to_base64()]
+        );
+        assert_eq!(merged.address_book.len(), 2);
     }
 
     #[test]

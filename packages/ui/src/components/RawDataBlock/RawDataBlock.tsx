@@ -11,6 +11,7 @@ import {
 
 import {cx} from "../../lib/cx"
 import {SkeletonText} from "../Skeleton"
+import {Tooltip} from "../Tooltip"
 import styles from "./RawDataBlock.module.css"
 
 export type RawDataBlockVariant = "embedded" | "standalone"
@@ -132,18 +133,19 @@ export function RawDataBlock({
   }
 
   const copyButton = canCopy ? (
-    <button
-      type="button"
-      className={cx(
-        styles.copyButton,
-        hasTitle ? styles.headerCopyButton : styles.floatingCopyButton,
-      )}
-      onClick={event => void handleCopy(event)}
-      aria-label={copyTitle}
-      title={copyTitle}
-    >
-      {isCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-    </button>
+    <Tooltip content={copyTitle}>
+      <button
+        type="button"
+        className={cx(
+          styles.copyButton,
+          hasTitle ? styles.headerCopyButton : styles.floatingCopyButton,
+        )}
+        onClick={event => void handleCopy(event)}
+        aria-label={copyTitle}
+      >
+        {isCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+      </button>
+    </Tooltip>
   ) : undefined
 
   const loadingIndicator = loading && canCollapse && (

@@ -3,15 +3,14 @@ use super::toncenter_v2::{
     parse_i32_seqno, parse_libraries_request, parse_lookup_block_request, parse_required_seqno,
     parse_seqno, parse_transactions_request, parse_transactions_std_request,
     parse_try_locate_tx_request, resolve_block_header, resolve_block_transactions,
-    resolve_extended_address_information, resolve_token_data, resolve_wallet_information,
+    resolve_block_transactions_ext, resolve_extended_address_information, resolve_lookup_block,
+    resolve_shards, resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::{Localnet, TransactionLookupKind};
-use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
-use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Serialize;
@@ -34,8 +33,6 @@ macro_rules! validate {
 
 pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
-    State(api_calls): State<ApiCallLog>,
-    OriginalUri(original_uri): OriginalUri,
     Json(payload): Json<JsonRpcIncomingRequest<Value>>,
 ) -> impl IntoResponse {
     tracing::debug!(
@@ -44,36 +41,8 @@ pub async fn json_rpc(
         payload.id
     );
 
-    let start = ApiCallLog::start();
-    let method = payload.method.clone();
-    let call_type = classify_json_rpc_call(&method);
-    let request_id = payload.id.clone().unwrap_or(Value::Null);
-
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
-    let mut response = result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()));
-
-    api_calls.record(
-        ApiCallInput {
-            call_type,
-            api_family: ApiCallFamily::JsonRpc,
-            http_method: "POST".to_owned(),
-            path: original_uri.path().to_owned(),
-            method,
-            request_id,
-            status_code: response.status().as_u16(),
-        },
-        start,
-    );
-    response.extensions_mut().insert(ApiCallAlreadyRecorded);
-
-    response
-}
-
-fn classify_json_rpc_call(method: &str) -> ApiCallType {
-    match method {
-        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
-        _ => ApiCallType::Read,
-    }
+    result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()))
 }
 
 fn normalize_json_rpc_params(params: Option<Value>) -> anyhow::Result<Value> {
@@ -300,28 +269,20 @@ async fn json_rpc_router(
         "getBlockHeader" => {
             let req: BlockHeaderRequest = parse_params(params, method)?;
             let request = validate!(parse_block_header_request(&req));
-            wire::JsonRpcResult::BlockHeader(Box::new(
-                resolve_block_header(&node, &request)
-                    .await
-                    .map(|r| v2::map_block_header(&r))?,
-            ))
+            wire::JsonRpcResult::BlockHeader(Box::new(resolve_block_header(&node, &request).await?))
         }
         "getBlockTransactions" => {
             let req: BlockTransactionsRequest = parse_params(params, method)?;
             let request = validate!(parse_block_transactions_request(&req));
             wire::JsonRpcResult::BlockTransactions(Box::new(
-                resolve_block_transactions(&node, &request)
-                    .await
-                    .map(|r| v2::map_block_transactions(&r))?,
+                resolve_block_transactions(&node, &request).await?,
             ))
         }
         "getBlockTransactionsExt" => {
             let req: BlockTransactionsRequest = parse_params(params, method)?;
             let request = validate!(parse_block_transactions_request(&req));
             wire::JsonRpcResult::BlockTransactionsExt(Box::new(
-                resolve_block_transactions(&node, &request)
-                    .await
-                    .map(|r| v2::map_block_transactions_ext(&r))?,
+                resolve_block_transactions_ext(&node, &request).await?,
             ))
         }
         "getMasterchainInfo" => wire::JsonRpcResult::MasterchainInfo(Box::new(
@@ -342,24 +303,12 @@ async fn json_rpc_router(
         "getShards" => {
             let req: SeqnoRequest = parse_params(params, method)?;
             let seqno = validate!(parse_required_seqno(&req.seqno));
-            wire::JsonRpcResult::Shards(Box::new(
-                node.get_shards(seqno).await.map(|r| v2::map_shards(&r))?,
-            ))
+            wire::JsonRpcResult::Shards(Box::new(resolve_shards(&node, seqno).await?))
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;
             let request = validate!(parse_lookup_block_request(&req));
-            wire::JsonRpcResult::BlockId(Box::new(
-                node.lookup_block(
-                    request.workchain,
-                    request.shard,
-                    request.seqno,
-                    request.lt,
-                    request.unixtime,
-                )
-                .await
-                .map(|r| v2::map_lookup_block(&r))?,
-            ))
+            wire::JsonRpcResult::BlockId(Box::new(resolve_lookup_block(&node, &request).await?))
         }
         _ => {
             return Ok(json_rpc_error(StatusCode::NOT_FOUND, "Method not found"));

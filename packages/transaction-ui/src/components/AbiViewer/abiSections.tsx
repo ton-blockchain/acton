@@ -231,7 +231,9 @@ export function AbiThrownErrorsSection({
                 className={`${styles.errorRow} ${showSymbolAnchors ? "" : styles.errorRowNoAnchor}`}
               >
                 <span className={styles.errorCode}>{error.err_code}</span>
-                <span className={styles.errorName}>{errorName}</span>
+                <span className={styles.errorName} title={errorName}>
+                  {errorName}
+                </span>
                 <span className={styles.muted}>{error.description ?? ""}</span>
                 <AbiSymbolAnchor
                   show={showSymbolAnchors}

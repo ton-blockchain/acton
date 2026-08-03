@@ -806,6 +806,7 @@ fn test_init_creates_gitignore_if_not_exists() {
     let content = fs::read_to_string(&gitignore_path).unwrap();
 
     assert!(content.contains(".acton/"));
+    assert!(content.contains(".studio/"));
     assert!(content.contains("wallets.toml"));
     assert!(content.contains("*.mnemonic"));
     assert!(content.contains("global.wallets.toml"));
@@ -835,6 +836,7 @@ global.wallets.toml
 
     for pattern in [
         ".acton/",
+        ".studio/",
         "gen/",
         "build/",
         "lcov.info",
@@ -866,6 +868,7 @@ fn test_init_does_not_patch_gitignore_when_groups_are_complete() {
     let initial_gitignore = "\
 # Acton related files
 .acton/
+.studio/
 gen/
 build/
 lcov.info

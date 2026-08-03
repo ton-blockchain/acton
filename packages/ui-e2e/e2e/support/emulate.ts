@@ -28,6 +28,7 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       const rawTab = page.getByRole("tab", {name: "Raw", exact: true})
       const emulateButton = getEmulateButton(page)
       const sendButton = getSendToLocalnetButton(page)
+      const shareButton = getShareButton(page)
 
       await expect(builderTab).toHaveAttribute("aria-selected", "true")
       await expect(page.getByRole("combobox", {name: "From", exact: true})).toBeVisible()
@@ -42,8 +43,11 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       if (app === "localnet") {
         await expect(sendButton).toBeVisible()
         await expect(sendButton).toBeDisabled()
+        await expect(shareButton).toHaveCount(0)
       } else {
         await expect(sendButton).toHaveCount(0)
+        await expect(shareButton).toBeVisible()
+        await expect(shareButton).toBeDisabled()
       }
 
       await rawTab.click()
@@ -58,6 +62,8 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       await expect(emulateButton).toBeEnabled()
       if (app === "localnet") {
         await expect(sendButton).toBeEnabled()
+      } else {
+        await expect(shareButton).toBeEnabled()
       }
 
       const resetButton = page.getByRole("button", {name: "Reset transaction fields", exact: true})
@@ -172,6 +178,190 @@ export function describeEmulatePage({app, route}: EmulateSuiteOptions): void {
       await expect(emulateButton).toBeEnabled()
     })
 
+    if (app === "explorer") {
+      test("creates a Cloudflare share for the pinned emulation request", async ({page}) => {
+        let requestBody: unknown
+        await page.route("**/api/toncenter/*/v3/blocks?*", async interceptedRoute => {
+          await interceptedRoute.fulfill({
+            json: {
+              blocks: [{workchain: -1, shard: "-9223372036854775808", seqno: 42, gen_utime: 1000}],
+            },
+          })
+        })
+        await page.route("**/api/emulations", async interceptedRoute => {
+          requestBody = interceptedRoute.request().postDataJSON()
+          await interceptedRoute.fulfill({
+            status: 201,
+            json: {
+              id: "00000000-0000-4000-8000-000000000000",
+              expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+            },
+          })
+        })
+
+        await selectRawMessage(page, EXTERNAL_MESSAGE_BOC)
+        await getShareButton(page).click()
+
+        await expect(page.getByText("Share link copied", {exact: true})).toBeVisible()
+        expect(requestBody).toMatchInlineSnapshot(`
+          {
+            "input": {
+              "bounce": true,
+              "inputMode": "raw",
+              "mcSeqnoInput": "42",
+              "messageTransport": "internal",
+              "messageValue": "0.5",
+              "rawMessage": "te6cckEBAQEAJQAARYgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEuN2rAw==",
+              "sourceAddress": "",
+              "targetAddress": "",
+            },
+            "options": {
+              "ignoreChksig": false,
+            },
+            "version": 1,
+          }
+        `)
+      })
+
+      test("loads a shared request without starting its emulation", async ({page}) => {
+        let shareRequestCount = 0
+        let releaseTonApiRequests = () => {}
+        const tonApiRequestGate = new Promise<void>(resolve => {
+          releaseTonApiRequests = resolve
+        })
+        await page.route(
+          "**/api/emulations/00000000-0000-4000-8000-000000000000",
+          async interceptedRoute => {
+            shareRequestCount += 1
+            await interceptedRoute.fulfill({
+              json: {
+                emulation: {
+                  version: 1,
+                  input: {
+                    inputMode: "raw",
+                    targetAddress: "",
+                    sourceAddress: "",
+                    messageValue: "0.5",
+                    messageTransport: "internal",
+                    bounce: true,
+                    mcSeqnoInput: "42",
+                    rawMessage: EXTERNAL_MESSAGE_BOC,
+                  },
+                  options: {
+                    ignoreChksig: true,
+                    now: 1000,
+                  },
+                },
+                expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+              },
+            })
+          },
+        )
+        await page.route(isTonApiRequest, async interceptedRoute => {
+          await tonApiRequestGate
+          await interceptedRoute.abort("connectionfailed")
+        })
+
+        await page.goto(`${route}?share=00000000-0000-4000-8000-000000000000`)
+
+        await expect(page.getByRole("tab", {name: "Raw", exact: true})).toHaveAttribute(
+          "aria-selected",
+          "true",
+        )
+        await expect(page.getByRole("textbox", {name: "Message BOC", exact: true})).toHaveValue(
+          EXTERNAL_MESSAGE_BOC,
+        )
+        await page.locator('summary[aria-label="Advanced options"]').click()
+        await expect(
+          page.getByRole("textbox", {name: "Masterchain block", exact: true}),
+        ).toHaveValue("42")
+        await expect(page.getByRole("checkbox", {name: /^Ignore CHKSIG/})).toBeChecked()
+        await expect(getEmulateButton(page)).toBeEnabled()
+        await expect(getEmulateButton(page)).not.toHaveAttribute("aria-busy", "true")
+        await expect(page.getByRole("region", {name: "Emulation result"})).toHaveCount(0)
+        expect(shareRequestCount).toBe(1)
+        releaseTonApiRequests()
+      })
+
+      test("restores a shared builder through the emulation handoff payload", async ({page}) => {
+        let sharedEmulation: Record<string, unknown> | undefined
+        await page.route("**/api/toncenter/*/v3/blocks?*", async interceptedRoute => {
+          await interceptedRoute.fulfill({
+            json: {
+              blocks: [{workchain: -1, shard: "-9223372036854775808", seqno: 42, gen_utime: 1000}],
+            },
+          })
+        })
+        await page.route("**/api/emulations", async interceptedRoute => {
+          sharedEmulation = interceptedRoute.request().postDataJSON() as Record<string, unknown>
+          await interceptedRoute.fulfill({
+            status: 201,
+            json: {
+              id: "00000000-0000-4000-8000-000000000000",
+              expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+            },
+          })
+        })
+
+        await page.getByRole("combobox", {name: "From", exact: true}).fill(SOURCE_ADDRESS)
+        await page.getByRole("combobox", {name: "To", exact: true}).fill(TARGET_ADDRESS)
+        await getShareButton(page).click()
+        await expect(page.getByText("Share link copied", {exact: true})).toBeVisible()
+        expect(sharedEmulation).toMatchObject({
+          version: 1,
+          input: {
+            inputMode: "builder",
+            targetAddress: TARGET_ADDRESS,
+            sourceAddress: SOURCE_ADDRESS,
+            messageValue: "0.5",
+            messageTransport: "internal",
+            bounce: true,
+            mcSeqnoInput: "42",
+            rawMessage: expect.any(String),
+            builder: {
+              abiSourceMode: "auto",
+              abiEndpoint: "destination",
+              messageName: "empty",
+              argsJson: "{}",
+            },
+          },
+          options: {
+            ignoreChksig: false,
+          },
+        })
+
+        await page.route(
+          "**/api/emulations/00000000-0000-4000-8000-000000000000",
+          async interceptedRoute => {
+            await interceptedRoute.fulfill({
+              json: {
+                emulation: sharedEmulation,
+                expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+              },
+            })
+          },
+        )
+        await page.route(isTonApiRequest, async interceptedRoute => {
+          await interceptedRoute.abort("connectionfailed")
+        })
+
+        await page.goto(`${route}?share=00000000-0000-4000-8000-000000000000`)
+
+        await expect(page.getByRole("tab", {name: "Builder", exact: true})).toHaveAttribute(
+          "aria-selected",
+          "true",
+        )
+        await expect(page.getByRole("combobox", {name: "From", exact: true})).toHaveValue(
+          SOURCE_ADDRESS,
+        )
+        await expect(page.getByRole("combobox", {name: "To", exact: true})).toHaveValue(
+          TARGET_ADDRESS,
+        )
+        await expect(page.getByRole("textbox", {name: "Value", exact: true})).toHaveValue("0.5")
+        await expect(page.getByRole("textbox", {name: "Message BOC", exact: true})).toHaveCount(0)
+      })
+    }
+
     if (app === "localnet") {
       test("sends a builder message through the localnet internal-message endpoint", async ({
         page,
@@ -254,6 +444,13 @@ function getEmulateButton(page: Page) {
 function getSendToLocalnetButton(page: Page) {
   return page.getByRole("tabpanel").getByRole("button", {
     name: "Send to localnet",
+    exact: true,
+  })
+}
+
+function getShareButton(page: Page) {
+  return page.getByRole("tabpanel").getByRole("button", {
+    name: "Share",
     exact: true,
   })
 }

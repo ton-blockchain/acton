@@ -1,6 +1,7 @@
 import type {MouseEventHandler, ReactEventHandler, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {Tooltip} from "../Tooltip"
 
 import styles from "./NftChip.module.css"
 
@@ -43,15 +44,16 @@ export function NftChip({
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        className={cx(chipClassName, styles.clickable)}
-        aria-label={ariaLabel}
-        title={title}
-        onClick={onClick}
-      >
-        {content}
-      </button>
+      <Tooltip content={title}>
+        <button
+          type="button"
+          className={cx(chipClassName, styles.clickable)}
+          aria-label={ariaLabel}
+          onClick={onClick}
+        >
+          {content}
+        </button>
+      </Tooltip>
     )
   }
 

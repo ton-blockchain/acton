@@ -2,13 +2,14 @@ use super::{
     IndexedAddressJson, InspectionDetails, InspectionReport, InspectorContext,
     MultisigWalletInspection, int_address_json, std_address_json,
 };
+use ton_indexer_contracts::multisigs;
 
 pub(super) fn inspect(ctx: &InspectorContext<'_>, reports: &mut Vec<InspectionReport>) {
     let (Some(code), Some(data)) = (ctx.code, ctx.data) else {
         return;
     };
 
-    let Some(data) = ton_indexer::multisigs::get_multisig_data(
+    let Some(data) = multisigs::get_multisig_data(
         ctx.address.to_string(),
         code.clone(),
         data.clone(),
@@ -20,7 +21,7 @@ pub(super) fn inspect(ctx: &InspectorContext<'_>, reports: &mut Vec<InspectionRe
     reports.push(InspectionReport {
         kind: "multisig_wallet",
         confidence: "high",
-        source: "ton-indexer:get_multisig_data",
+        source: "ton-indexer-contracts:get_multisig_data",
         warnings: Vec::new(),
         details: InspectionDetails::MultisigWallet(Box::new(MultisigWalletInspection {
             address: std_address_json(ctx.address, ctx.network),

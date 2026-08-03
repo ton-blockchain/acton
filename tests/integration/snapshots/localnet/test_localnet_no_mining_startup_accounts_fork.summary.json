@@ -1,8 +1,26 @@
 {
+  "historical_reads": {
+    "blocks_match_source": true,
+    "first_local_block_is_local": true,
+    "fork_block_matches_source": true,
+    "json_rpc_shards_match_source": true,
+    "requested_before_fork": true,
+    "shards_match_source": true,
+    "transactions_match_source": true,
+    "unpinned_account_includes_remote_transaction": true,
+    "unpinned_hash_includes_remote_transaction": true
+  },
   "manual_mining": {
+    "manual_block_follows_head": true,
     "mine_ok": true,
-    "seqno_delta": 0,
-    "seqno_stable_after_start": true
+    "seqno_delta": 1,
+    "seqno_stable_after_start": true,
+    "startup_blocks_follow_fork": true
+  },
+  "runtime": {
+    "auto_mining": false,
+    "block_interval_ms": 50,
+    "rate_limit_rps": null
   },
   "startup_wallet": {
     "address_present": true,
@@ -12,7 +30,11 @@
     "version": "v4r2"
   },
   "state_source": {
-    "fork_block_number": null,
+    "fork_block_number": {
+      "matches_source_at_fork": true,
+      "nonzero": true,
+      "present": true
+    },
     "fork_network": "fork-source",
     "state_source": "remote"
   }

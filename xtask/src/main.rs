@@ -14,6 +14,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
+    ActonscanOpcodes(tasks::actonscan_opcodes::ActonscanOpcodesArgs),
     DeployExplorer(tasks::deploy_explorer::DeployExplorerArgs),
     Dist(tasks::dist::DistArgs),
     GithubCleanup(tasks::github_cleanup::GithubCleanupArgs),
@@ -31,6 +32,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
+        CliCommand::ActonscanOpcodes(args) => tasks::actonscan_opcodes::run(args),
         CliCommand::DeployExplorer(args) => tasks::deploy_explorer::run(args),
         CliCommand::Dist(args) => tasks::dist::run(args),
         CliCommand::GithubCleanup(args) => tasks::github_cleanup::run(args),

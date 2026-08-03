@@ -1,5 +1,6 @@
 # Acton project directories
 .acton/
+.studio/
 /objs
 /build
 .test/
@@ -32,6 +33,7 @@ Thumbs.db
 
 .env
 .worktree/
+apps/actonscan-backend/data/
 
 gen/
 *.mnemonic

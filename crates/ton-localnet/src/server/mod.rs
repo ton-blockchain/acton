@@ -4,38 +4,40 @@ pub mod router;
 
 use crate::liteapi;
 use crate::localnet::Localnet;
+use crate::node::StateSource;
 use acton_config::color::OwoColorize;
 use axum::extract::FromRef;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
+use ton_api::OffchainJsonResolver;
 
-const MAX_API_CALLS: usize = 500;
+const MAX_EXTERNAL_API_CALLS: usize = 1_000;
+const MAX_STUDIO_UI_API_CALLS: usize = 200;
+const MAX_API_CALLS: usize = MAX_EXTERNAL_API_CALLS + MAX_STUDIO_UI_API_CALLS;
 
 #[derive(Clone, Debug, Serialize)]
-pub struct StartupWallet {
+pub struct StartupAccount {
     pub name: String,
-    pub mnemonic: Vec<String>,
     pub version: String,
     pub network: String,
     pub address: String,
-    pub public_key: String,
-    pub wallet_id: i32,
 }
 
 #[derive(Clone)]
 pub struct ServerState {
     pub node: Arc<Localnet>,
-    pub startup_wallets: Arc<Vec<StartupWallet>>,
-    pub state_source: Arc<StateSourceInfo>,
+    pub offchain_metadata: OffchainJsonResolver,
+    pub startup_accounts: Arc<Vec<StartupAccount>>,
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
+    pub rate_limit_rps: Option<u32>,
     pub api_calls: ApiCallLog,
     pub auth_token: Option<Arc<str>>,
 }
@@ -45,6 +47,23 @@ pub struct StateSourceInfo {
     pub state_source: &'static str,
     pub fork_network: Option<String>,
     pub fork_block_number: Option<u64>,
+}
+
+impl From<&StateSource> for StateSourceInfo {
+    fn from(state_source: &StateSource) -> Self {
+        match state_source {
+            StateSource::Local => Self {
+                state_source: "local",
+                fork_network: None,
+                fork_block_number: None,
+            },
+            StateSource::Remote(provider) => Self {
+                state_source: "remote",
+                fork_network: Some(provider.network.to_string()),
+                fork_block_number: provider.fork_block_number,
+            },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -84,8 +103,13 @@ impl NetworkConditions {
 
 #[derive(Clone)]
 pub struct ApiCallLog {
-    entries: Arc<Mutex<VecDeque<ApiCallRecord>>>,
+    entries: Arc<Mutex<ApiCallEntries>>,
     next_sequence: Arc<AtomicU64>,
+}
+
+struct ApiCallEntries {
+    external: VecDeque<ApiCallRecord>,
+    studio_ui: VecDeque<ApiCallRecord>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -93,12 +117,18 @@ pub struct ApiCallRecord {
     pub sequence: u64,
     pub status: ApiCallStatus,
     pub status_code: u16,
+    pub source: ApiCallSource,
     pub call_type: ApiCallType,
     pub api_family: ApiCallFamily,
     pub http_method: String,
     pub path: String,
     pub method: String,
     pub request_id: Value,
+    pub query_params: Option<Value>,
+    pub request_body: Option<Value>,
+    pub request_body_truncated: bool,
+    pub response_body: Option<Value>,
+    pub response_body_truncated: bool,
     pub timestamp_ms: u128,
     pub duration_ns: u128,
 }
@@ -115,6 +145,13 @@ pub enum ApiCallStatus {
 pub enum ApiCallType {
     Read,
     Write,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiCallSource {
+    External,
+    StudioUi,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -143,22 +180,26 @@ pub struct ApiCallStart {
 
 #[derive(Clone, Debug)]
 pub struct ApiCallInput {
+    pub source: ApiCallSource,
     pub call_type: ApiCallType,
     pub api_family: ApiCallFamily,
     pub http_method: String,
     pub path: String,
     pub method: String,
     pub request_id: Value,
+    pub query_params: Option<Value>,
+    pub request_body: Option<Value>,
+    pub request_body_truncated: bool,
     pub status_code: u16,
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct ApiCallAlreadyRecorded;
 
 impl ApiCallLog {
     fn new() -> Self {
         Self {
-            entries: Arc::new(Mutex::new(VecDeque::with_capacity(MAX_API_CALLS))),
+            entries: Arc::new(Mutex::new(ApiCallEntries {
+                external: VecDeque::with_capacity(MAX_EXTERNAL_API_CALLS),
+                studio_ui: VecDeque::with_capacity(MAX_STUDIO_UI_API_CALLS),
+            })),
             next_sequence: Arc::new(AtomicU64::new(1)),
         }
     }
@@ -171,7 +212,8 @@ impl ApiCallLog {
         }
     }
 
-    pub fn record(&self, input: ApiCallInput, start: ApiCallStart) {
+    #[must_use]
+    pub fn record(&self, input: ApiCallInput, start: ApiCallStart) -> u64 {
         let sequence = self.next_sequence.fetch_add(1, Ordering::Relaxed);
         let status = if input.status_code < 400 {
             ApiCallStatus::Success
@@ -187,12 +229,18 @@ impl ApiCallLog {
             sequence,
             status,
             status_code: input.status_code,
+            source: input.source,
             call_type: input.call_type,
             api_family: input.api_family,
             http_method: input.http_method,
             path: input.path,
             method: input.method,
             request_id: input.request_id,
+            query_params: input.query_params,
+            request_body: input.request_body,
+            request_body_truncated: input.request_body_truncated,
+            response_body: None,
+            response_body_truncated: false,
             timestamp_ms,
             duration_ns: start.duration_start.elapsed().as_nanos(),
         };
@@ -201,10 +249,42 @@ impl ApiCallLog {
             .entries
             .lock()
             .expect("API call log lock must not be poisoned");
-        if entries.len() == MAX_API_CALLS {
-            entries.pop_front();
+        let (source_entries, max_entries) = match input.source {
+            ApiCallSource::External => (&mut entries.external, MAX_EXTERNAL_API_CALLS),
+            ApiCallSource::StudioUi => (&mut entries.studio_ui, MAX_STUDIO_UI_API_CALLS),
+        };
+        if source_entries.len() == max_entries {
+            source_entries.pop_front();
         }
-        entries.push_back(record);
+        source_entries.push_back(record);
+        drop(entries);
+
+        sequence
+    }
+
+    pub fn record_response(
+        &self,
+        sequence: u64,
+        response_body: Option<Value>,
+        response_body_truncated: bool,
+    ) {
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("API call log lock must not be poisoned");
+        let ApiCallEntries {
+            external,
+            studio_ui,
+        } = &mut *entries;
+        let call = external
+            .iter_mut()
+            .chain(studio_ui.iter_mut())
+            .find(|call| call.sequence == sequence);
+        if let Some(call) = call {
+            call.response_body = response_body;
+            call.response_body_truncated = response_body_truncated;
+        }
+        drop(entries);
     }
 
     #[must_use]
@@ -213,13 +293,22 @@ impl ApiCallLog {
             .entries
             .lock()
             .expect("API call log lock must not be poisoned");
+        let total_retained = entries.external.len() + entries.studio_ui.len();
         let limit = limit.unwrap_or(MAX_API_CALLS).min(MAX_API_CALLS);
-        let skip = entries.len().saturating_sub(limit);
-        let calls = entries.iter().skip(skip).cloned().collect();
+        let skip = total_retained.saturating_sub(limit);
+        let mut calls = entries
+            .external
+            .iter()
+            .chain(&entries.studio_ui)
+            .cloned()
+            .collect::<Vec<_>>();
+        drop(entries);
+        calls.sort_unstable_by_key(|call| call.sequence);
+        let calls = calls.into_iter().skip(skip).collect();
 
         ApiCallLogSnapshot {
             calls,
-            total_retained: entries.len(),
+            total_retained,
             max_retained: MAX_API_CALLS,
         }
     }
@@ -253,15 +342,15 @@ impl FromRef<ServerState> for Arc<Localnet> {
     }
 }
 
-impl FromRef<ServerState> for Arc<Vec<StartupWallet>> {
+impl FromRef<ServerState> for OffchainJsonResolver {
     fn from_ref(state: &ServerState) -> Self {
-        state.startup_wallets.clone()
+        state.offchain_metadata.clone()
     }
 }
 
-impl FromRef<ServerState> for Arc<StateSourceInfo> {
+impl FromRef<ServerState> for Arc<Vec<StartupAccount>> {
     fn from_ref(state: &ServerState) -> Self {
-        state.state_source.clone()
+        state.startup_accounts.clone()
     }
 }
 
@@ -290,7 +379,7 @@ pub struct ServerArgs {
     pub fork_block_number: Option<u64>,
     pub rate_limit_rps: Option<u32>,
     pub response_delay_ms: Option<u64>,
-    pub startup_wallets: Vec<StartupWallet>,
+    pub startup_accounts: Vec<StartupAccount>,
     pub auth_token: Option<String>,
     pub liteapi: bool,
     pub liteapi_port: Option<u16>,
@@ -304,22 +393,10 @@ pub enum ServerError {
     LiteApiPortOverflow { http_port: u16 },
     #[error("failed to bind localnet LiteAPI to {address}")]
     LiteApiBind { address: String, source: io::Error },
-    #[error("failed to seed startup wallet names")]
-    SeedStartupWalletNames(#[from] SeedStartupWalletNamesError),
     #[error("localnet server stopped with an error")]
     Serve { source: io::Error },
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum SeedStartupWalletNamesError {
-    #[error("failed to read existing startup wallet address names")]
-    ReadExistingNames { source: anyhow::Error },
-    #[error("failed to set startup wallet address name {name} for {address}")]
-    SetAddressName {
-        address: String,
-        name: String,
-        source: anyhow::Error,
-    },
+    #[error("failed to initialize the off-chain metadata HTTP client")]
+    OffchainMetadataClient { source: reqwest::Error },
 }
 
 pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), ServerError> {
@@ -330,39 +407,29 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         fork_block_number,
         rate_limit_rps,
         response_delay_ms,
-        startup_wallets,
+        startup_accounts,
         auth_token,
         liteapi,
         liteapi_port,
     } = args;
     let auth_token = auth_token.map(Arc::<str>::from);
 
-    seed_startup_wallet_names(&node, &startup_wallets).await?;
     let network_conditions = NetworkConditions::new(response_delay_ms);
     let api_calls = ApiCallLog::new();
 
-    let state_source = StateSourceInfo {
-        state_source: if fork_network.is_some() {
-            "remote"
-        } else {
-            "local"
-        },
-        fork_network: fork_network.clone(),
-        fork_block_number,
-    };
     let shutdown = ShutdownSignal::new();
-    let app = router::create_router(
-        ServerState {
-            node: Arc::clone(&node),
-            startup_wallets: Arc::new(startup_wallets),
-            state_source: Arc::new(state_source),
-            shutdown: shutdown.clone(),
-            network_conditions: network_conditions.clone(),
-            api_calls,
-            auth_token: auth_token.clone(),
-        },
+    let offchain_metadata = OffchainJsonResolver::new()
+        .map_err(|source| ServerError::OffchainMetadataClient { source })?;
+    let app = router::create_router(ServerState {
+        node: Arc::clone(&node),
+        offchain_metadata,
+        startup_accounts: Arc::new(startup_accounts),
+        shutdown: shutdown.clone(),
+        network_conditions: network_conditions.clone(),
         rate_limit_rps,
-    );
+        api_calls,
+        auth_token: auth_token.clone(),
+    });
 
     let address = format!("127.0.0.1:{port}");
     let listener = tokio::net::TcpListener::bind(&address)
@@ -445,47 +512,54 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     Ok(())
 }
 
-async fn seed_startup_wallet_names(
-    node: &Localnet,
-    startup_wallets: &[StartupWallet],
-) -> Result<(), SeedStartupWalletNamesError> {
-    let mut seen_addresses = HashSet::new();
-    let mut named_wallets = Vec::new();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for wallet in startup_wallets {
-        let address = wallet.address.trim();
-        let name = wallet.name.trim();
-        if address.is_empty() || name.is_empty() || !seen_addresses.insert(address.to_string()) {
-            continue;
+    #[test]
+    fn api_call_sources_have_independent_retention_limits() {
+        let log = ApiCallLog::new();
+
+        for source in [
+            ApiCallSource::External,
+            ApiCallSource::StudioUi,
+            ApiCallSource::External,
+        ] {
+            let entries = match source {
+                ApiCallSource::External => MAX_EXTERNAL_API_CALLS,
+                ApiCallSource::StudioUi => MAX_STUDIO_UI_API_CALLS,
+            };
+            for _ in 0..entries {
+                let _ = log.record(
+                    ApiCallInput {
+                        source,
+                        call_type: ApiCallType::Read,
+                        api_family: ApiCallFamily::V3,
+                        http_method: "GET".to_owned(),
+                        path: "/api/v3/blocks".to_owned(),
+                        method: "blocks".to_owned(),
+                        request_id: Value::Null,
+                        query_params: None,
+                        request_body: None,
+                        request_body_truncated: false,
+                        status_code: 200,
+                    },
+                    ApiCallLog::start(),
+                );
+            }
         }
-        named_wallets.push((address.to_string(), name.to_string()));
+
+        let snapshot = log.snapshot(None);
+        let external_count = snapshot
+            .calls
+            .iter()
+            .filter(|call| matches!(call.source, ApiCallSource::External))
+            .count();
+        let studio_ui_count = snapshot.calls.len() - external_count;
+
+        assert_eq!(external_count, MAX_EXTERNAL_API_CALLS);
+        assert_eq!(studio_ui_count, MAX_STUDIO_UI_API_CALLS);
+        assert_eq!(snapshot.total_retained, MAX_API_CALLS);
+        assert_eq!(snapshot.max_retained, MAX_API_CALLS);
     }
-
-    if named_wallets.is_empty() {
-        return Ok(());
-    }
-
-    let existing_names = node
-        .get_address_names(
-            named_wallets
-                .iter()
-                .map(|(address, _)| address.clone())
-                .collect(),
-        )
-        .await
-        .map_err(|source| SeedStartupWalletNamesError::ReadExistingNames { source })?;
-
-    for ((address, name), (_, existing_name)) in named_wallets.into_iter().zip(existing_names) {
-        if existing_name.is_none() {
-            node.set_address_name(address.clone(), name.clone())
-                .await
-                .map_err(|source| SeedStartupWalletNamesError::SetAddressName {
-                    address,
-                    name,
-                    source,
-                })?;
-        }
-    }
-
-    Ok(())
 }

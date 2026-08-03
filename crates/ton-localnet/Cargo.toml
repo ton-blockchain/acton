@@ -11,7 +11,6 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-acton-abi-catalog = { workspace = true }
 acton-source-trace = { workspace = true }
 ton-executor = { workspace = true }
 ton-emulator = { workspace = true }
@@ -38,14 +37,13 @@ indexmap = { workspace = true }
 num-bigint = { workspace = true }
 tolk-compiler = { workspace = true }
 axum = { workspace = true }
-tower-http = { workspace = true, features = ["compression-gzip", "cors", "trace", "fs"] }
+tower-http = { workspace = true, features = ["compression-gzip", "cors", "trace"] }
 tower = { workspace = true }
 tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
-ton-indexer = { workspace = true }
+ton-indexer-contracts = { workspace = true }
 url = { workspace = true }
-include_dir = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }

@@ -1,4 +1,4 @@
-use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node};
+use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node, StateSource};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
     MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
@@ -8,7 +8,6 @@ use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -29,17 +28,12 @@ pub(crate) struct NodeStateSnapshot {
     pub history_tx_by_hash: Vec<(Hash256, TxMeta)>,
     pub history_msg_by_hash: Vec<(Hash256, MsgMeta)>,
     pub history_msg_to_tx: Vec<(Hash256, Hash256)>,
-    pub history_address_names: Vec<(Addr, String)>,
     pub history_jetton_masters: Vec<(Addr, JettonMasterMeta)>,
     pub history_jetton_wallets: Vec<(Addr, storage::JettonWalletMeta)>,
     #[serde(default)]
     pub history_nft_items: Vec<(Addr, NftItemMeta)>,
     #[serde(default)]
     pub history_asset_detection_checked: Vec<Addr>,
-    #[serde(default)]
-    pub history_compiler_abis: Vec<(Hash256, Value)>,
-    #[serde(default)]
-    pub history_verified_sources: Vec<(Hash256, Value)>,
     pub cas_entries: Vec<(Hash256, BocBytes)>,
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
@@ -50,6 +44,9 @@ pub(crate) struct NodeStateSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SnapshotGlobals {
+    pub origin_seqno: Seqno,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -110,14 +107,6 @@ impl Node {
             .collect::<Vec<_>>();
         history_msg_to_tx.sort_by_key(|(msg, _)| *msg);
 
-        let mut history_address_names = self
-            .history
-            .address_names
-            .iter()
-            .map(|(addr, name)| (*addr, name.clone()))
-            .collect::<Vec<_>>();
-        history_address_names.sort_by_key(|(addr, _)| *addr);
-
         let history_jetton_masters = self
             .history
             .jetton_masters
@@ -147,26 +136,20 @@ impl Node {
             .collect::<Vec<_>>();
         history_asset_detection_checked.sort();
 
-        let mut history_compiler_abis = self
-            .history
-            .compiler_abis
-            .iter()
-            .map(|(hash, abi)| (*hash, abi.clone()))
-            .collect::<Vec<_>>();
-        history_compiler_abis.sort_by_key(|(hash, _)| *hash);
-
-        let mut history_verified_sources = self
-            .history
-            .verified_sources
-            .iter()
-            .map(|(hash, source)| (*hash, source.clone()))
-            .collect::<Vec<_>>();
-        history_verified_sources.sort_by_key(|(hash, _)| *hash);
-
         let cas_entries = self.export_cas_entries()?;
 
+        let fork_seqno = match &self.state_source {
+            StateSource::Local => None,
+            StateSource::Remote(provider) => provider
+                .fork_block_number
+                .map(Seqno::try_from)
+                .transpose()
+                .context("Fork block seqno does not fit snapshot block numbering")?,
+        };
         let snapshot = NodeStateSnapshot {
             globals: SnapshotGlobals {
+                origin_seqno: self.globals.origin_seqno,
+                fork_seqno,
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
                 lt_step: self.globals.lt_step,
@@ -183,13 +166,10 @@ impl Node {
             history_tx_by_hash,
             history_msg_by_hash,
             history_msg_to_tx,
-            history_address_names,
             history_jetton_masters,
             history_jetton_wallets,
             history_nft_items,
             history_asset_detection_checked,
-            history_compiler_abis,
-            history_verified_sources,
             cas_entries,
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
@@ -255,7 +235,6 @@ impl Node {
         self.history.tx_by_hash = snapshot.history_tx_by_hash.into_iter().collect();
         self.history.msg_by_hash = snapshot.history_msg_by_hash.into_iter().collect();
         self.history.msg_to_tx = snapshot.history_msg_to_tx.into_iter().collect();
-        self.history.address_names = snapshot.history_address_names.into_iter().collect();
         self.history.jetton_masters = snapshot.history_jetton_masters.into_iter().collect();
         self.history.jetton_wallets = snapshot.history_jetton_wallets.into_iter().collect();
         self.history.nft_items = snapshot.history_nft_items.into_iter().collect();
@@ -263,15 +242,13 @@ impl Node {
             .history_asset_detection_checked
             .into_iter()
             .collect();
-        self.history.compiler_abis = snapshot.history_compiler_abis.into_iter().collect();
-        self.history.verified_sources = snapshot.history_verified_sources.into_iter().collect();
-
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;
         self.pool.rr_turn = snapshot.pool_rr_turn;
         self.pending_freeze_current = snapshot.pending_freeze_current;
 
         self.globals = Globals {
+            origin_seqno: snapshot.globals.origin_seqno,
             head_seqno: snapshot.globals.head_seqno,
             global_lt: snapshot.globals.global_lt,
             lt_step: snapshot.globals.lt_step,
@@ -279,6 +256,14 @@ impl Node {
             queue_policy: snapshot.globals.queue_policy,
             checkpoint_every: snapshot.globals.checkpoint_every,
         };
+        if let StateSource::Remote(provider) = &mut self.state_source {
+            provider.fork_block_number = Some(u64::from(
+                snapshot
+                    .globals
+                    .fork_seqno
+                    .unwrap_or(self.globals.origin_seqno),
+            ));
+        }
         self.config_cell = config_cell;
         self.latest_masterchain_state = None;
         self.latest_shard_state = None;
@@ -306,24 +291,58 @@ impl Node {
 
     pub(crate) fn validate_snapshot(snapshot: &NodeStateSnapshot) -> anyhow::Result<Cell> {
         anyhow::ensure!(
-            snapshot.history_blocks.len() == snapshot.globals.head_seqno as usize,
-            "Block history length {} does not match head seqno {}",
+            snapshot.history_blocks.len() == snapshot.history_deltas_by_seqno.len(),
+            "Block history length {} does not match account delta history length {}",
             snapshot.history_blocks.len(),
-            snapshot.globals.head_seqno
+            snapshot.history_deltas_by_seqno.len()
         );
         anyhow::ensure!(
-            snapshot.history_deltas_by_seqno.len() == snapshot.globals.head_seqno as usize,
-            "Account delta history length {} does not match head seqno {}",
-            snapshot.history_deltas_by_seqno.len(),
-            snapshot.globals.head_seqno
+            snapshot.history_masterchain_blocks.is_empty()
+                || snapshot.history_masterchain_blocks.len() == snapshot.history_blocks.len(),
+            "Masterchain history length {} does not match basechain history length {}",
+            snapshot.history_masterchain_blocks.len(),
+            snapshot.history_blocks.len()
         );
         for (index, block) in snapshot.history_blocks.iter().enumerate() {
-            let expected_seqno = index as Seqno + 1;
+            let expected_seqno = snapshot
+                .globals
+                .origin_seqno
+                .checked_add(index as Seqno + 1)
+                .context("Block history seqno overflow")?;
             anyhow::ensure!(
                 block.seqno == expected_seqno,
                 "Block history is not contiguous at seqno {expected_seqno}"
             );
         }
+        for (index, block) in snapshot.history_masterchain_blocks.iter().enumerate() {
+            let expected_seqno = snapshot
+                .globals
+                .origin_seqno
+                .checked_add(index as Seqno + 1)
+                .context("Masterchain block history seqno overflow")?;
+            anyhow::ensure!(
+                block.seqno == expected_seqno,
+                "Masterchain block history is not contiguous at seqno {expected_seqno}"
+            );
+        }
+        let expected_head_seqno = snapshot
+            .globals
+            .origin_seqno
+            .checked_add(
+                snapshot
+                    .history_blocks
+                    .len()
+                    .try_into()
+                    .context("Block history length does not fit localnet block numbering")?,
+            )
+            .context("Block history head seqno overflow")?;
+        anyhow::ensure!(
+            snapshot.globals.head_seqno == expected_head_seqno,
+            "Head seqno {} does not match origin {} and block history length {}",
+            snapshot.globals.head_seqno,
+            snapshot.globals.origin_seqno,
+            snapshot.history_blocks.len()
+        );
 
         let mut cas = HashMap::with_capacity(snapshot.cas_entries.len());
         for (hash, boc) in &snapshot.cas_entries {
@@ -522,7 +541,7 @@ impl Node {
     fn rebuild_indexes(&mut self) {
         self.indexes = Indexes::new();
         for (index, deltas) in self.history.deltas_by_seqno.iter().enumerate() {
-            let seqno = index as Seqno + 1;
+            let seqno = self.history.blocks[index].seqno;
             for delta in deltas {
                 self.indexes
                     .account_deltas_by_addr

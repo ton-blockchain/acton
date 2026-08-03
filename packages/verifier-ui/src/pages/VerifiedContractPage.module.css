@@ -1,0 +1,86 @@
+.page {
+  width: min(100%, 1200px);
+  margin: 0 auto;
+  padding: 20px 24px 42px;
+}
+
+.empty-state,
+.loading-state {
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+}
+
+.empty-state h1,
+.empty-state h2 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-2xl);
+  line-height: 1.25;
+}
+
+.empty-state,
+.loading-state {
+  padding: 28px;
+}
+
+.empty-state p,
+.error-state p {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.6;
+}
+
+.loading-state {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.error-state {
+  border-color: color-mix(in srgb, var(--acton-color-status-failed) 35%, transparent);
+}
+
+.mono-inline {
+  font-family: var(--acton-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.compilerLink {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.compilerLink span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compilerLink svg {
+  flex: 0 0 auto;
+}
+
+.compilerLink:hover,
+.compilerLink:focus-visible {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 18px 14px 28px;
+  }
+
+  .empty-state,
+  .loading-state {
+    padding: 18px;
+  }
+}

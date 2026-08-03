@@ -1,9 +1,12 @@
 use crate::api::toncenter_v3 as v3;
 use crate::localnet::{Localnet, LocalnetAddressInfo};
+use crate::offchain_metadata::{
+    jetton_content_uri, merge_resolved_metadata, resolve_jetton_metadata,
+};
 use crate::types::Addr;
 use std::collections::{BTreeSet, HashMap};
-use ton_api::toncenter::v3 as v3_types;
-use ton_indexer::categorize_wallet;
+use ton_api::{OffchainJsonResolver, toncenter::v3 as v3_types};
+use ton_indexer_contracts::categorize_wallet;
 use tycho_types::cell::HashBytes as CellHashBytes;
 
 #[derive(Clone, Default)]
@@ -26,6 +29,36 @@ pub(super) async fn load_address_infos(
         .collect())
 }
 
+async fn load_enriched_address_infos(
+    node: &Localnet,
+    resolver: &OffchainJsonResolver,
+    addresses: Vec<Addr>,
+) -> anyhow::Result<HashMap<Addr, AddressInfo>> {
+    let mut infos = node.get_address_infos(addresses, None).await?;
+    enrich_address_infos(resolver, &mut infos).await;
+    Ok(infos
+        .into_iter()
+        .map(|info| (info.address, map_address_info(info)))
+        .collect())
+}
+
+async fn enrich_address_infos(resolver: &OffchainJsonResolver, infos: &mut [LocalnetAddressInfo]) {
+    let remote_by_uri = resolve_jetton_metadata(
+        resolver,
+        infos.iter().filter_map(|info| {
+            info.jetton_master
+                .as_ref()
+                .and_then(|master| jetton_content_uri(&master.jetton_content))
+        }),
+    )
+    .await;
+    for info in infos {
+        if let Some(master) = &mut info.jetton_master {
+            merge_resolved_metadata(&mut master.jetton_content, &remote_by_uri);
+        }
+    }
+}
+
 pub(super) fn map_address_book_row(address: Addr, info: &AddressInfo) -> v3_types::AddressBookRow {
     v3_types::AddressBookRow {
         user_friendly: Some(address.as_user_friendly()),
@@ -38,19 +71,25 @@ pub(super) fn map_address_book_row(address: Addr, info: &AddressInfo) -> v3_type
 
 pub(super) async fn build_metadata_for_addresses(
     node: &Localnet,
+    resolver: &OffchainJsonResolver,
     addresses: Vec<Addr>,
 ) -> anyhow::Result<v3_types::Metadata> {
-    let infos = load_address_infos(node, addresses).await?;
-    build_metadata_from_infos(node, &infos).await
+    let infos = load_enriched_address_infos(node, resolver, addresses).await?;
+    build_metadata_from_infos(node, resolver, &infos).await
 }
 
 pub(super) async fn build_extra_data_for_addresses(
     node: &Localnet,
+    resolver: &OffchainJsonResolver,
     addresses: Vec<Addr>,
     include_address_book: bool,
     include_metadata: bool,
 ) -> anyhow::Result<(Option<v3_types::AddressBook>, Option<v3_types::Metadata>)> {
-    let infos = load_address_infos(node, addresses).await?;
+    let infos = if include_metadata {
+        load_enriched_address_infos(node, resolver, addresses).await?
+    } else {
+        load_address_infos(node, addresses).await?
+    };
     let address_book = include_address_book.then(|| {
         infos
             .iter()
@@ -58,7 +97,7 @@ pub(super) async fn build_extra_data_for_addresses(
             .collect()
     });
     let metadata = if include_metadata {
-        Some(build_metadata_from_infos(node, &infos).await?)
+        Some(build_metadata_from_infos(node, resolver, &infos).await?)
     } else {
         None
     };
@@ -67,6 +106,7 @@ pub(super) async fn build_extra_data_for_addresses(
 
 async fn build_metadata_from_infos(
     node: &Localnet,
+    resolver: &OffchainJsonResolver,
     infos: &HashMap<Addr, AddressInfo>,
 ) -> anyhow::Result<v3_types::Metadata> {
     let mut metadata = v3_types::Metadata::new();
@@ -88,7 +128,9 @@ async fn build_metadata_from_infos(
         .into_iter()
         .filter(|address| !metadata.contains_key(&address.to_string()))
         .collect::<Vec<_>>();
-    for (address, info) in load_address_infos(node, missing_master_addresses).await? {
+    for (address, info) in
+        load_enriched_address_infos(node, resolver, missing_master_addresses).await?
+    {
         if !info.token_info.is_empty() {
             metadata.insert(
                 address.to_string(),
