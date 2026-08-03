@@ -130,7 +130,6 @@
 }
 
 .tableRow {
-  position: relative;
   background: var(--acton-color-surface-raised);
   cursor: pointer;
   transition: background-color var(--acton-duration-fast) var(--acton-ease-standard);
@@ -141,34 +140,8 @@
   background: var(--acton-color-surface-row);
 }
 
-.rowOverlayLink {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  text-decoration: none;
-}
-
-.rowOverlayLink:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .nameCell {
   min-width: 0;
-  position: relative;
-  z-index: 2;
   width: fit-content;
 }
 
@@ -201,6 +174,7 @@
 
 .nameText {
   color: var(--acton-color-text);
+  text-decoration: none;
 }
 
 .environmentBadge {

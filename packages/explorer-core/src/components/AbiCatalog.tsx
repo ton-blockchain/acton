@@ -4,7 +4,7 @@ import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import {InlineAction, InlineActions, Input, Pagination, useToast} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
-import {Link} from "react-router"
+import {Link, useNavigate} from "react-router"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {
@@ -39,6 +39,7 @@ export interface AbiCatalogTableEntry {
 
 export const AbiCatalog: FC = () => {
   const routes = useExplorerRoutePaths()
+  const navigate = useNavigate()
   const metadataRegistry = useMetadataRegistry()
   const {showToast} = useToast()
   const [state, setState] = useState<AbiCatalogState>({loading: true, entries: []})
@@ -275,16 +276,14 @@ export const AbiCatalog: FC = () => {
                   const title = abiTitle(entry.abi)
                   const contractName = entry.abi.compiler_abi.contract_name
                   const deleteCodeHash = entry.deleteCodeHash
+                  const detailsPath = routes.abiDetailsPath(entry.slug)
                   return (
-                    <tr key={entry.slug} className={styles.tableRow}>
+                    <tr
+                      key={entry.slug}
+                      className={styles.tableRow}
+                      onClick={() => void navigate(detailsPath)}
+                    >
                       <td>
-                        <Link
-                          className={styles.rowOverlayLink}
-                          to={routes.abiDetailsPath(entry.slug)}
-                          aria-label={`Open ${title} ABI`}
-                        >
-                          <span className={styles.visuallyHidden}>Open {title} ABI</span>
-                        </Link>
                         <InlineActions
                           className={styles.nameCell}
                           visibility="always"
@@ -304,7 +303,14 @@ export const AbiCatalog: FC = () => {
                         >
                           <span className={styles.primaryCell}>
                             <span className={styles.nameLine}>
-                              <span className={styles.nameText}>{title}</span>
+                              <Link
+                                className={styles.nameText}
+                                to={detailsPath}
+                                aria-label={`Open ${title} ABI`}
+                                onClick={event => event.stopPropagation()}
+                              >
+                                {title}
+                              </Link>
                               {entry.source === "environment" && (
                                 <span className={styles.environmentBadge}>environment</span>
                               )}
