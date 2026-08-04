@@ -336,46 +336,9 @@
   stroke: none;
 }
 
-.transactionDetails {
-  margin: 0 0 var(--acton-space-12);
-}
-
-.transactionDetailsCard {
-  width: calc(
-    var(--transaction-tree-details-width, 100%) -
-    var(--acton-space-4) -
-    var(--acton-space-4)
-  );
-  max-width: calc(
-    100% -
-    var(--transaction-tree-details-inline-offset, 0px) -
-    var(--acton-space-4) -
-    var(--acton-space-4)
-  );
-  margin-left: calc(var(--transaction-tree-details-inline-offset, 0px) + var(--acton-space-4));
-  margin-right: var(--acton-space-4);
-  border-radius: 0 0 var(--acton-radius-control-sm) var(--acton-radius-control-sm);
-  box-sizing: border-box;
-}
-
-.transactionDetailsCard > :global(*) {
-  width: 100%;
-  box-sizing: border-box;
-}
-
 @media (max-width: 520px) {
   .treeContainer {
     padding-bottom: 0;
-  }
-
-  .transactionDetails {
-    margin: 0 0 var(--acton-space-8);
-  }
-
-  .transactionDetailsCard {
-    width: 100%;
-    max-width: 100%;
-    margin-inline: 0;
   }
 }
 
@@ -465,8 +428,4 @@
 .contractStateData {
   font-family: var(--acton-font-mono), monospace;
   font-size: var(--acton-font-size-xs);
-}
-
-.transactionDetails:has(:global(.retraceRoot)) {
-  margin-bottom: 0;
 }

@@ -34,6 +34,7 @@ import {
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 
 import {SmartTooltip} from "./SmartTooltip"
+import {TransactionTextTree} from "./TransactionTextTree"
 import styles from "./TransactionTree.module.css"
 import {useTooltip} from "./useTooltip"
 
@@ -341,9 +342,21 @@ export function TransactionTree({
     if (selectedTransactionIdState === id) {
       setSelectedTransactionIdState(undefined)
     } else {
-      setSelectedTransactionIdState(id)
-      onTransactionSelect?.(transaction)
+      handleTransactionSelect(transaction)
     }
+  }
+
+  const handleTransactionSelect = (transaction: TransactionInfo): void => {
+    forceHideTooltip()
+    setSelectedTransactionIdState(transaction.id)
+    onTransactionSelect?.(transaction)
+  }
+
+  const handleTextTransactionSelect = (transaction: TransactionInfo): void => {
+    forceHideTooltip()
+    setSelectedTransactionIdState(current =>
+      current === transaction.id ? undefined : transaction.id,
+    )
   }
 
   const showEdgeTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
@@ -1145,10 +1158,6 @@ export function TransactionTree({
     setSelectedTransactionIdState(selectedTransactionId)
   }, [selectedTransactionId])
 
-  const selectedTransaction = useMemo(() => {
-    return selectedTransactionIdState ? transactionMap.get(selectedTransactionIdState) : undefined
-  }, [selectedTransactionIdState, transactionMap])
-
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
     const treeGroup = wrapper?.querySelector<SVGGElement>(".rd3t-g")
@@ -1346,11 +1355,19 @@ export function TransactionTree({
         </div>
       </div>
 
-      {selectedTransaction && (
-        <div className={styles.transactionDetails}>
-          <div className={styles.transactionDetailsCard}>
+      <TransactionTextTree
+        transactions={transactions}
+        contracts={contracts}
+        compilerAbisByCodeHash={compilerAbisByCodeHash}
+        allContracts={allContracts}
+        selectedTransactionId={selectedTransactionIdState}
+        highlightedTransactionIds={highlightedTransactionIds}
+        onContractClick={onContractClick}
+        onTransactionSelect={handleTextTransactionSelect}
+        renderTransactionDetails={transaction => (
+          <>
             <TransactionDetails
-              tx={selectedTransaction}
+              tx={transaction}
               contracts={contracts}
               compilerAbisByCodeHash={compilerAbisByCodeHash}
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
@@ -1363,10 +1380,10 @@ export function TransactionTree({
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
             />
-          </div>
-          {renderSelectedTransactionExtra?.(selectedTransaction)}
-        </div>
-      )}
+            {renderSelectedTransactionExtra?.(transaction)}
+          </>
+        )}
+      />
     </div>
   )
 }
