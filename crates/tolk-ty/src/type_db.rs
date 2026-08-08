@@ -418,8 +418,11 @@ impl<'a> TypeDb<'a> {
                                 name_node
                                     .map_or_else(|| param.span().start, |name| name.span().start),
                             );
-                            self.intrn
-                                .scoped_type_parameter(local_id, name.to_string(), default_ty)
+                            self.intrn.declare_scoped_type_parameter(
+                                local_id,
+                                name.to_string(),
+                                default_ty,
+                            )
                         })
                         .collect::<Vec<_>>()
                 })
@@ -631,7 +634,7 @@ impl<'a> TypeDb<'a> {
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
                             let default_ty = self.lower_opt_type(file_id, p.default().as_ref());
-                            self.intrn.scoped_type_parameter(
+                            self.intrn.declare_scoped_type_parameter(
                                 LocalDefId::new(
                                     file_id,
                                     name_node
@@ -737,7 +740,7 @@ impl<'a> TypeDb<'a> {
                     return Some(primitive);
                 }
                 let default_ty = self.local_type_parameter_default(file_id, local.def_span);
-                return Some(self.intrn.scoped_type_parameter(
+                return Some(self.intrn.declare_scoped_type_parameter(
                     local.id,
                     local.name.to_string(),
                     default_ty,
@@ -753,7 +756,7 @@ impl<'a> TypeDb<'a> {
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
                     let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
-                    return Some(self.intrn.scoped_type_parameter(
+                    return Some(self.intrn.declare_scoped_type_parameter(
                         local,
                         resolved.name.to_string(),
                         default_ty,

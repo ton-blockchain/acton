@@ -738,12 +738,20 @@ impl<'a> ProjectIndexBuilder<'a> {
         provider: &dyn ProjectSourceProvider,
         path: &Path,
     ) -> anyhow::Result<Arc<crate::file_db::FileInfo>> {
-        if let Some(info) = self.file_db.get_by_path(path) {
-            return Ok(info);
-        }
         let Some(source) = provider.source(path)? else {
             anyhow::bail!("source file is not available: {}", path.display());
         };
+        if let Some(info) = self.file_db.get_by_path(path) {
+            let unchanged = match &source {
+                ProjectSource::Text(text) => info.source().source.as_ref() == text.as_ref(),
+                ProjectSource::Parsed(source_file) => {
+                    info.source().source.as_ref() == source_file.source.as_ref()
+                }
+            };
+            if unchanged {
+                return Ok(info);
+            }
+        }
         match source {
             ProjectSource::Text(text) => self.file_db.process_content(path.to_owned(), &text),
             ProjectSource::Parsed(source_file) => Ok(self

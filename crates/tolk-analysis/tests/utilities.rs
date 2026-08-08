@@ -90,6 +90,38 @@ fn evaluates_constants_and_enum_members() {
 }
 
 #[test]
+fn evaluates_gram_constants_at_the_coins_boundary() {
+    let context = EvaluationContext::new(
+        r#"
+            const BILLION_GRAMS = grams("1000000000");
+            const MAX_COINS = grams("1329227995784915872903807060.280344575");
+            const MIN_COINS = grams("-1329227995784915872903807060.280344575");
+            const OVERFLOW = grams("1329227995784915872903807060.280344576");
+        "#,
+    );
+    let mut evaluator = ConstantEvaluator::new(&context);
+    let evaluated = ["BILLION_GRAMS", "MAX_COINS", "MIN_COINS", "OVERFLOW"]
+        .into_iter()
+        .map(|name| {
+            let value = evaluator.evaluate_constant(context.symbol(name));
+            let value = match value {
+                ConstantValue::Int(value) => value.to_string(),
+                value => value.format(),
+            };
+            format!("{name}: {value}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    expect![[r"
+        BILLION_GRAMS: 1000000000000000000
+        MAX_COINS: 1329227995784915872903807060280344575
+        MIN_COINS: -1329227995784915872903807060280344575
+        OVERFLOW: overflow"]]
+    .assert_eq(&evaluated);
+}
+
+#[test]
 fn formats_constant_values() {
     let values = [
         ConstantValue::Int(BigInt::from(0)),

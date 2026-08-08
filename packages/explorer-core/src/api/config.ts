@@ -148,6 +148,13 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "Set config key",
     description: "Sets the master public key used to authorize configuration contract actions",
   },
+  // https://t.me/tonstatus/175
+  // https://actonscan.com/tx/2d5738520c63a6aeddc8d7ff7f52a19c70b11b9ecbca81acc1408488262358c2?network=mainnet
+  // https://actonscan.com/tx/0ef291123b4ffc82db9b1eea82f675389151d676084a9885df42d2e7bd3ac2fe?network=testnet
+  [-90]: {
+    title: "BTC Teleport governance",
+    description: "Configures validator participation in governance for the BTC Teleport bridge",
+  },
   // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/func/auto-tests/legacy_tests/dns-collection/dns-utils.fc#L7
   [-80]: {
     title: "DNS blacklist",

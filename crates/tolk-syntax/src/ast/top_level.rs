@@ -1313,12 +1313,10 @@ impl AnnotatedDeclaration<'_> {
 
     #[must_use]
     pub fn is_entry_point(&self, source: &str) -> bool {
-        self.name().is_some_and(|name| {
-            matches!(
-                name.text(source),
-                "onInternalMessage" | "onExternalMessage" | "onBouncedMessage"
-            )
-        })
+        self.is_function()
+            && self
+                .name()
+                .is_some_and(|name| CONTRACT_ENTRYPOINTS.contains(&name.text(source)))
     }
 }
 
@@ -1444,4 +1442,48 @@ fn body_impl(node: Node) -> Option<FuncBody> {
         .or_else(|| node.child_by_field_name("asm_body"))
         .or_else(|| node.child_by_field_name("builtin_specifier"))
         .map(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AnnotatedDeclaration, CONTRACT_ENTRYPOINTS};
+    use crate::{AstNode, HasName, TryFromNode, parse};
+
+    #[test]
+    fn entry_point_detection_requires_a_function_and_uses_the_complete_name_set() {
+        let mut source = CONTRACT_ENTRYPOINTS
+            .iter()
+            .map(|name| format!("fun {name}() {{}}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        source.push_str("\nconst onInternalMessage = 0;");
+        let parsed = parse(&source).expect("source must parse");
+        let declarations = parsed
+            .top_levels()
+            .filter_map(|top_level| AnnotatedDeclaration::try_from_node(top_level.syntax()).ok())
+            .map(|declaration| {
+                (
+                    declaration
+                        .name()
+                        .expect("declaration must have a name")
+                        .text(&source)
+                        .to_owned(),
+                    declaration.is_entry_point(&source),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            declarations,
+            vec![
+                ("onInternalMessage".to_owned(), true),
+                ("onExternalMessage".to_owned(), true),
+                ("onRunTickTock".to_owned(), true),
+                ("onSplitPrepare".to_owned(), true),
+                ("onSplitInstall".to_owned(), true),
+                ("onBouncedMessage".to_owned(), true),
+                ("onInternalMessage".to_owned(), false),
+            ]
+        );
+    }
 }

@@ -6184,11 +6184,11 @@ exports[`real network configuration snapshots parses mainnet config at mastercha
       "title": "Set config key",
     },
     {
-      "description": "Negative configuration identifiers are reserved for implementation-specific extension data",
+      "description": "Configures validator participation in governance for the BTC Teleport bridge",
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -90,
-      "title": "Extension parameter",
+      "title": "BTC Teleport governance",
     },
     {
       "description": "Legacy configuration slot used as a fallback by Ethereum bridge contracts",
@@ -7929,11 +7929,11 @@ exports[`real network configuration snapshots parses testnet config at mastercha
       "title": "Extension parameter",
     },
     {
-      "description": "Negative configuration identifiers are reserved for implementation-specific extension data",
+      "description": "Configures validator participation in governance for the BTC Teleport bridge",
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -90,
-      "title": "Extension parameter",
+      "title": "BTC Teleport governance",
     },
     {
       "description": "Testnet configuration slot containing the TON DNS domain blacklist",

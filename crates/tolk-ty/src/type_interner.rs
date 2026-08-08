@@ -35,6 +35,7 @@ impl std::fmt::Display for TyDisplay<'_> {
 pub struct TypeInterner {
     arena: Vec<TyData>,           // TyId -> TyData
     map: FxHashMap<TyData, TyId>, // TyData -> TyId
+    scoped_type_parameters: FxHashMap<LocalDefId, TyId>,
 
     pub ty_undefined: TyId,
     pub ty_unknown: TyId,
@@ -68,6 +69,7 @@ impl TypeInterner {
         let mut this = Self {
             arena: Vec::new(),
             map: FxHashMap::default(),
+            scoped_type_parameters: FxHashMap::default(),
             ty_undefined: TyId(0),
             ty_unknown: TyId(0),
             ty_int: TyId(0),
@@ -307,23 +309,40 @@ impl TypeInterner {
         })
     }
 
+    /// Returns the current type parameter for a scoped declaration identity.
     pub fn scoped_type_parameter(
         &mut self,
         id: LocalDefId,
         name: String,
         default_type: Option<TyId>,
     ) -> TyId {
-        if let Some((index, _)) = self.arena.iter().enumerate().find(|(_, data)| {
-            matches!(data, TyData::TypeParameter { id: Some(existing), .. } if *existing == id)
-        }) {
-            return TyId(index as u32);
+        if let Some(&ty) = self.scoped_type_parameters.get(&id) {
+            return ty;
         }
 
-        self.intern(TyData::TypeParameter {
+        let ty = self.intern(TyData::TypeParameter {
             id: Some(id),
             name,
             default_type,
-        })
+        });
+        self.scoped_type_parameters.insert(id, ty);
+        ty
+    }
+
+    /// Interns the current declaration data and updates identity-based lookups.
+    pub fn declare_scoped_type_parameter(
+        &mut self,
+        id: LocalDefId,
+        name: String,
+        default_type: Option<TyId>,
+    ) -> TyId {
+        let ty = self.intern(TyData::TypeParameter {
+            id: Some(id),
+            name,
+            default_type,
+        });
+        self.scoped_type_parameters.insert(id, ty);
+        ty
     }
 
     /// when `var v = rhs`, `v` is `undefined` before assignment (before rhs->inferred_type is assigned to it);
@@ -1286,6 +1305,33 @@ mod tests {
         assert!(matches!(
             interner.data(interner.ty_unknown),
             TyData::Unknown
+        ));
+    }
+
+    #[test]
+    fn scoped_type_parameters_include_current_declaration_data() {
+        let mut interner = TypeInterner::new();
+        let id = LocalDefId::new(1, 10);
+
+        let original =
+            interner.declare_scoped_type_parameter(id, "T".to_owned(), Some(interner.ty_int));
+        let original_lookup = interner.scoped_type_parameter(id, "T".to_owned(), None);
+        let changed_default =
+            interner.declare_scoped_type_parameter(id, "T".to_owned(), Some(interner.ty_slice));
+        let changed_lookup = interner.scoped_type_parameter(id, "T".to_owned(), None);
+        let removed_default = interner.declare_scoped_type_parameter(id, "T".to_owned(), None);
+
+        assert_eq!(original_lookup, original);
+        assert_ne!(changed_default, original);
+        assert_eq!(changed_lookup, changed_default);
+        assert_ne!(removed_default, changed_default);
+        assert!(matches!(
+            interner.data(changed_default),
+            TyData::TypeParameter {
+                id: Some(existing),
+                name,
+                default_type: Some(default_type),
+            } if *existing == id && name == "T" && *default_type == interner.ty_slice
         ));
     }
 
