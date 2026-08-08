@@ -91,7 +91,7 @@ fn resolves_compiler_provided_builtin() {
         "#,
         |_| {},
         expect![[r"
-            1:13 -> file:///__tolk_stdlib__/builtin.tolk 85:4 resolved"]],
+            1:13 -> file:///__tolk_stdlib__/builtin.tolk 112:4 resolved"]],
     );
 }
 

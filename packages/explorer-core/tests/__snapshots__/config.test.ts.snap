@@ -305,9 +305,9 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     },
   ],
   "extension": {
-    "description": "Negative configuration identifiers are reserved for implementation-specific extension data",
+    "description": "Address of the testnet NFT collection representing ownership of configuration slots",
     "hasRawHex": true,
-    "title": "Extension parameter",
+    "title": "Config ownership collection",
   },
   "extraCurrencies": [
     {

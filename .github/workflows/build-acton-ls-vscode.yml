@@ -39,6 +39,8 @@ jobs:
   build:
     name: Build VS Code Extension
     runs-on: ubicloud-standard-2-ubuntu-2204
+    env:
+      TARGET_NAME: x86_64-unknown-linux-gnu
 
     permissions:
       contents: read
@@ -77,6 +79,20 @@ jobs:
       - name: Run tests
         working-directory: crates/ton-language-server-native/editors/code
         run: bun run test
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          mkdir -p objs
+          gh release download release-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Build Acton language server
         run: cargo build --bin acton

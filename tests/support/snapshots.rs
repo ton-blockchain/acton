@@ -53,13 +53,14 @@ fn normalize_output_internal(
     let content = content.render().expect("came in as a String");
 
     let redactions = build_redactions(project_path);
+    let content = normalize_dynamic_mutation_output(content);
 
     normalize_dynamic_output(redactions.redact(&content))
 }
 
 fn normalize_dynamic_output(content: String) -> String {
-    normalize_dynamic_slice_output(normalize_dynamic_mutation_output(
-        normalize_awaiting_progress_output(normalize_up_snapshot_text(content)),
+    normalize_dynamic_slice_output(normalize_awaiting_progress_output(
+        normalize_up_snapshot_text(content),
     ))
 }
 
@@ -266,5 +267,22 @@ fn redact_json_value(value: &mut serde_json::Value, redactions: &snapbox::Redact
             }
         }
         serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_output;
+    use expect_test::expect;
+    use std::path::Path;
+
+    #[test]
+    fn mutation_session_is_normalized_before_boc_hex() {
+        let output = normalize_output("Session:  69ef0b8b5ee9abcd\n", Path::new("/tmp/project"));
+
+        expect![[r"
+            Session:  [MUTATION_SESSION_ID]
+        "]]
+        .assert_eq(&output);
     }
 }
