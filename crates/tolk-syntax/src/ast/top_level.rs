@@ -18,6 +18,46 @@ pub const CONTRACT_ENTRYPOINTS: &[&str] = &[
     "onBouncedMessage",
 ];
 
+#[must_use]
+pub fn is_declaration_name_node(node: Node<'_>) -> bool {
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+
+    match parent.kind_bytes() {
+        b"contract_declaration"
+        | b"constant_declaration"
+        | b"enum_declaration"
+        | b"function_declaration"
+        | b"global_var_declaration"
+        | b"method_declaration"
+        | b"struct_declaration"
+        | b"type_alias_declaration"
+        | b"get_method_declaration" => TopLevel::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"contract_field" => ContractField::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"enum_member_declaration" => EnumMember::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"parameter_declaration" => Parameter::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"struct_field_declaration" => StructField::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"type_parameter" => TypeParameter::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        b"var_declaration" => crate::ast::expressions::VarDecl::from(parent)
+            .name()
+            .is_some_and(|name| name.syntax() == node),
+        _ => false,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum TopLevel<'tree> {
     TolkRequiredVersion(TolkRequiredVersion<'tree>),
@@ -317,6 +357,19 @@ impl<'tree> ContractField<'tree> {
     pub fn value(&self) -> Option<ContractFieldValue<'tree>> {
         self.0.field("value")
     }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<Contract<'tree>> {
+        let mut node = self.0.parent()?;
+
+        loop {
+            if let Ok(contract) = Contract::try_from_node(node) {
+                return Some(contract);
+            }
+
+            node = node.parent()?;
+        }
+    }
 }
 
 impl<'tree> HasName<'tree> for ContractField<'tree> {
@@ -541,6 +594,33 @@ impl<'tree> StructField<'tree> {
     pub fn default(&self) -> Option<Expr<'tree>> {
         self.0.field("default")
     }
+
+    #[must_use]
+    pub fn has_modifier(&self, modifier: StructFieldModifier) -> bool {
+        self.modifiers()
+            .is_some_and(|modifiers| modifiers.modifiers().contains(&modifier))
+    }
+
+    #[must_use]
+    pub fn has_private(&self) -> bool {
+        self.has_modifier(StructFieldModifier::Private)
+    }
+
+    #[must_use]
+    pub fn has_readonly(&self) -> bool {
+        self.has_modifier(StructFieldModifier::Readonly)
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<Struct<'tree>> {
+        let mut node = self.0.parent()?;
+        loop {
+            if let Ok(structure) = Struct::try_from_node(node) {
+                return Some(structure);
+            }
+            node = node.parent()?;
+        }
+    }
 }
 
 impl<'tree> HasName<'tree> for StructField<'tree> {
@@ -686,15 +766,31 @@ impl<'tree> HasName<'tree> for EnumMember<'tree> {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct ParameterList<'tree>(pub Node<'tree>);
+
+impl_ast_node!(ParameterList, "parameter_list");
+
+impl<'tree> ParameterList<'tree> {
+    #[must_use]
+    pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
+        AstChildren::new(self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct Func<'tree>(pub Node<'tree>);
 
 impl_ast_node!(Func, "function_declaration");
 
 impl<'tree> Func<'tree> {
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
     pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -723,9 +819,8 @@ impl<'tree> FunctionLike<'tree> for Func<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -782,9 +877,15 @@ impl<'tree> Method<'tree> {
         self.receiver().and_then(|r| r.typ())
     }
 
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
     pub fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        let list = self.0.child_by_field_name("parameters");
-        list.map(AstChildren::<Parameter>::new).unwrap_or_default()
+        self.parameter_list()
+            .map(ParameterList::parameters)
+            .unwrap_or_default()
     }
 
     pub fn parameters_ext(
@@ -792,9 +893,9 @@ impl<'tree> Method<'tree> {
         sources: &str,
         skip_self: bool,
     ) -> impl Iterator<Item = Parameter<'tree>> + use<'tree> {
-        let list = self.0.child_by_field_name("parameters");
-        let mut params = list
-            .map(AstChildren::<Parameter>::new)
+        let mut params = self
+            .parameter_list()
+            .map(ParameterList::parameters)
             .into_iter()
             .flatten()
             .peekable();
@@ -857,8 +958,9 @@ impl<'tree> FunctionLike<'tree> for Method<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        let list = self.0.child_by_field_name("parameters");
-        list.map(AstChildren::<Parameter>::new).unwrap_or_default()
+        self.parameter_list()
+            .map(ParameterList::parameters)
+            .unwrap_or_default()
     }
 }
 
@@ -867,11 +969,59 @@ pub struct GetMethod<'tree>(pub Node<'tree>);
 
 impl_ast_node!(GetMethod, "get_method_declaration");
 
+#[must_use]
+pub fn is_test_get_method_name(name: &str) -> bool {
+    name.starts_with("test ") || name.starts_with("test_") || name.starts_with("test-")
+}
+
 impl<'tree> GetMethod<'tree> {
-    pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
+    #[must_use]
+    pub fn get_keyword(&self) -> Option<Node<'tree>> {
+        let mut cursor = self.0.walk();
         self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+            .children(&mut cursor)
+            .find(|child| child.kind_bytes() == b"get")
+    }
+
+    #[must_use]
+    pub fn has_method_id_annotation(&self, source: &'tree str) -> bool {
+        self.annotations().is_some_and(|annotations| {
+            annotations.annotations().any(|annotation| {
+                annotation
+                    .name()
+                    .is_some_and(|name| name.text_matches(source, "method_id"))
+            })
+        })
+    }
+
+    #[must_use]
+    pub fn explicit_method_id(&self, source: &'tree str) -> Option<u32> {
+        let annotation = self.annotations()?.annotations().find(|annotation| {
+            annotation
+                .name()
+                .is_some_and(|name| name.text_matches(source, "method_id"))
+        })?;
+        let Expr::NumberLit(value) = annotation.args()?.args().next()? else {
+            return None;
+        };
+
+        value.parse_u32(source)
+    }
+
+    #[must_use]
+    pub fn is_test_function(&self, source: &'tree str) -> bool {
+        self.name()
+            .is_some_and(|name| is_test_get_method_name(name.normalized_name(source)))
+    }
+
+    pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 
@@ -911,9 +1061,8 @@ impl<'tree> FunctionLike<'tree> for GetMethod<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -1011,6 +1160,26 @@ impl<'tree> TypeParameter<'tree> {
     pub fn default(&self) -> Option<Type<'tree>> {
         self.0.field("default")
     }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<TopLevel<'tree>> {
+        let mut node = self.0.parent()?;
+
+        loop {
+            if matches!(
+                node.kind_bytes(),
+                b"function_declaration"
+                    | b"method_declaration"
+                    | b"get_method_declaration"
+                    | b"struct_declaration"
+                    | b"type_alias_declaration"
+            ) {
+                return TopLevel::try_from_node(node).ok();
+            }
+
+            node = node.parent()?;
+        }
+    }
 }
 
 impl<'tree> HasName<'tree> for TypeParameter<'tree> {
@@ -1026,6 +1195,131 @@ pub enum BaseFunction<'tree> {
     Function(Func<'tree>),
     MethodDeclaration(Method<'tree>),
     GetMethodDeclaration(GetMethod<'tree>),
+}
+
+impl<'tree> TryFromNode<'tree> for BaseFunction<'tree> {
+    type Error = InvalidNodeKindError;
+
+    fn try_from_node(node: Node<'tree>) -> Result<Self, Self::Error> {
+        match node.kind_bytes() {
+            b"function_declaration" => Ok(Self::Function(Func(node))),
+            b"method_declaration" => Ok(Self::MethodDeclaration(Method(node))),
+            b"get_method_declaration" => Ok(Self::GetMethodDeclaration(GetMethod(node))),
+            _ => Err(InvalidNodeKindError {
+                expected: "function_declaration, method_declaration or get_method_declaration",
+                actual: node.kind().to_owned(),
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AnnotatedDeclaration<'tree> {
+    Function(BaseFunction<'tree>),
+    Struct(Struct<'tree>),
+    Field(StructField<'tree>),
+    Global(GlobalVar<'tree>),
+    Constant(Constant<'tree>),
+    TypeAlias(TypeAlias<'tree>),
+    Enum(Enum<'tree>),
+}
+
+impl<'tree> TryFromNode<'tree> for AnnotatedDeclaration<'tree> {
+    type Error = InvalidNodeKindError;
+
+    fn try_from_node(node: Node<'tree>) -> Result<Self, Self::Error> {
+        match node.kind_bytes() {
+            b"function_declaration" | b"method_declaration" | b"get_method_declaration" => {
+                Ok(Self::Function(BaseFunction::try_from_node(node)?))
+            }
+            b"struct_declaration" => Ok(Self::Struct(Struct(node))),
+            b"struct_field_declaration" => Ok(Self::Field(StructField(node))),
+            b"global_var_declaration" => Ok(Self::Global(GlobalVar(node))),
+            b"constant_declaration" => Ok(Self::Constant(Constant(node))),
+            b"type_alias_declaration" => Ok(Self::TypeAlias(TypeAlias(node))),
+            b"enum_declaration" => Ok(Self::Enum(Enum(node))),
+            _ => Err(InvalidNodeKindError {
+                expected: "an annotated Tolk declaration",
+                actual: node.kind().to_owned(),
+            }),
+        }
+    }
+}
+
+impl<'tree> AstNode<'tree> for AnnotatedDeclaration<'tree> {
+    fn syntax(&self) -> Node<'tree> {
+        match self {
+            Self::Function(node) => node.syntax(),
+            Self::Struct(node) => node.syntax(),
+            Self::Field(node) => node.syntax(),
+            Self::Global(node) => node.syntax(),
+            Self::Constant(node) => node.syntax(),
+            Self::TypeAlias(node) => node.syntax(),
+            Self::Enum(node) => node.syntax(),
+        }
+    }
+}
+
+impl<'tree> HasName<'tree> for AnnotatedDeclaration<'tree> {
+    type Name = Ident<'tree>;
+
+    fn name(&self) -> Option<Self::Name> {
+        match self {
+            Self::Function(node) => node.name(),
+            Self::Struct(node) => node.name(),
+            Self::Field(node) => node.name(),
+            Self::Global(node) => node.name(),
+            Self::Constant(node) => node.name(),
+            Self::TypeAlias(node) => node.name(),
+            Self::Enum(node) => node.name(),
+        }
+    }
+}
+
+impl<'tree> HasAnnotations<'tree> for AnnotatedDeclaration<'tree> {
+    fn annotations(&self) -> Option<AnnotationList<'tree>> {
+        match self {
+            Self::Function(node) => node.annotations(),
+            Self::Struct(node) => node.annotations(),
+            Self::Field(node) => node.annotations(),
+            Self::Global(node) => node.annotations(),
+            Self::Constant(node) => node.annotations(),
+            Self::TypeAlias(node) => node.annotations(),
+            Self::Enum(node) => node.annotations(),
+        }
+    }
+}
+
+impl AnnotatedDeclaration<'_> {
+    #[must_use]
+    pub const fn is_function(&self) -> bool {
+        matches!(self, Self::Function(_))
+    }
+
+    #[must_use]
+    pub const fn is_get_method(&self) -> bool {
+        matches!(self, Self::Function(BaseFunction::GetMethodDeclaration(_)))
+    }
+
+    #[must_use]
+    pub const fn is_struct(&self) -> bool {
+        matches!(self, Self::Struct(_))
+    }
+
+    #[must_use]
+    pub const fn is_field(&self) -> bool {
+        matches!(self, Self::Field(_))
+    }
+
+    #[must_use]
+    pub fn is_entry_point(&self, source: &str) -> bool {
+        self.name().is_some_and(|name| {
+            matches!(
+                name.text(source),
+                "onInternalMessage" | "onExternalMessage" | "onBouncedMessage"
+            )
+        })
+    }
 }
 
 impl<'tree> BaseFunction<'tree> {
@@ -1054,6 +1348,20 @@ impl<'tree> BaseFunction<'tree> {
             BaseFunction::MethodDeclaration(m) => m.parameters(),
             BaseFunction::GetMethodDeclaration(g) => g.parameters(),
         }
+    }
+
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        match self {
+            BaseFunction::Function(f) => f.parameter_list(),
+            BaseFunction::MethodDeclaration(m) => m.parameter_list(),
+            BaseFunction::GetMethodDeclaration(g) => g.parameter_list(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_parameters(&self) -> bool {
+        self.parameter_list().is_some()
     }
 
     #[must_use]
