@@ -252,8 +252,12 @@ impl<'a> Checker<'a> {
     }
 
     pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
-        self.analysis_db
-            .use_facts(self.type_db, self.body_types, file_id)
+        self.analysis_db.use_facts(
+            self.type_db.file_db,
+            self.type_db.project_index,
+            self.body_types,
+            file_id,
+        )
     }
 
     pub fn cfg_for_symbol(
