@@ -164,7 +164,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                 <DataTableHeaderCell columnWidth="24%">Address</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="12%">Status</DataTableHeaderCell>
                 <DataTableHeaderCell>Origin and source</DataTableHeaderCell>
-                <DataTableHeaderCell align="right" columnWidth="6.5rem">
+                <DataTableHeaderCell align="center" columnWidth="9rem">
                   Actions
                 </DataTableHeaderCell>
               </DataTableRow>
@@ -230,7 +230,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
                     <DataTableCell>
                       <ContractSource contract={contract} />
                     </DataTableCell>
-                    <DataTableCell align="right">
+                    <DataTableCell align="center">
                       <span className={styles.actions}>
                         <InlineAction
                           label="Edit contract name"

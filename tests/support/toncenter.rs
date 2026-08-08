@@ -15,6 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use ton::ton_core::types::TonAddress;
 use ton_api::toncenter::v2::responses;
+use ton_executor::DEFAULT_CONFIG_DICT;
 use ton_localnet::types::Addr;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -871,6 +872,114 @@ pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> Toncenter
         })
         .to_string(),
     }
+}
+
+pub(crate) fn toncenter_v2_block_header_ok_response(
+    seqno: u64,
+    gen_utime: u32,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "blocks.header",
+                "id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "global_id": -239,
+                "version": 0,
+                "after_merge": false,
+                "after_split": false,
+                "before_split": false,
+                "want_merge": false,
+                "want_split": false,
+                "validator_list_hash_short": 0,
+                "catchain_seqno": 0,
+                "min_ref_mc_seqno": 0,
+                "is_key_block": false,
+                "prev_key_block_seqno": 0,
+                "start_lt": "0",
+                "end_lt": "1",
+                "gen_utime": gen_utime,
+                "prev_blocks": []
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "configInfo",
+                "config": {
+                    "@type": "tvm.cell",
+                    "bytes": config_boc64
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn mocked_global_version_cell(version: u32, capabilities: u64) -> Cell {
+    let mut global_version = CellBuilder::new();
+    global_version
+        .store_u8(0xc4)
+        .expect("must store GlobalVersion tag");
+    global_version
+        .store_u32(version)
+        .expect("must store GlobalVersion version");
+    global_version
+        .store_u64(capabilities)
+        .expect("must store GlobalVersion capabilities");
+
+    global_version
+        .build()
+        .expect("must build GlobalVersion cell")
+}
+
+pub(crate) fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
+    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
+    config
+        .set(8, mocked_global_version_cell(version, capabilities))
+        .expect("must update global version config param");
+    Boc::encode_base64(
+        config
+            .root()
+            .clone()
+            .expect("default blockchain config must have a root"),
+    )
+}
+
+pub(crate) fn toncenter_v2_fork_snapshot_responses(
+    seqno: u64,
+    gen_utime: u32,
+) -> Vec<ToncenterV2MockResponse> {
+    vec![
+        toncenter_v2_block_header_ok_response(seqno, gen_utime),
+        toncenter_v2_config_all_ok_response(ton_executor::DEFAULT_CONFIG),
+    ]
+}
+
+pub(crate) fn toncenter_v2_latest_fork_snapshot_responses(
+    seqno: u64,
+) -> Vec<ToncenterV2MockResponse> {
+    vec![
+        toncenter_v2_masterchain_info_ok_response(seqno),
+        toncenter_v2_config_all_ok_response(ton_executor::DEFAULT_CONFIG),
+    ]
 }
 
 pub(crate) fn toncenter_v2_shard_account_cell_ok_response(

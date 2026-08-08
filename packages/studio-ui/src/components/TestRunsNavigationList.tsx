@@ -1,7 +1,8 @@
+import {DateTime} from "@acton/ui"
 import {Ban, Check, LoaderCircle, X} from "lucide-react"
 
 import type {TestRunStatus, TestRunSummary} from "../studioApi"
-import {testRunLabel, testRunSummary, testRunTime} from "../testRunPresentation"
+import {testRunLabel, testRunSummary} from "../testRunPresentation"
 
 import styles from "./StudioNavigation.module.css"
 
@@ -32,7 +33,7 @@ export function TestRunsNavigationList({
             <span className={styles.testRunNavBody}>
               <span className={styles.testRunNavTop}>
                 <strong>{testRunLabel(run)}</strong>
-                <time dateTime={run.startedAt}>{testRunTime(run.startedAt)}</time>
+                <DateTime value={run.startedAt} display="smart" />
               </span>
               <span className={styles.testRunNavMeta}>
                 {run.source === "studio" ? "Studio" : "CLI"}

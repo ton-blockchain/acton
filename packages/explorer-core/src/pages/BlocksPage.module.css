@@ -73,16 +73,9 @@
   line-height: 1;
 }
 
-.blocksTableScroller {
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 .blockTransactionsLoadMore {
   min-height: 52px;
   padding: 10px 18px;
-  border-top: 1px solid var(--acton-color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,92 +83,13 @@
   box-sizing: border-box;
 }
 
+.blockTransactionsLoadMoreCell {
+  padding: 0 !important;
+}
+
 .blockTransactionsLoadMoreError {
   color: var(--acton-color-danger-text);
   font-size: var(--acton-font-size-sm);
-}
-
-.blocksTable {
-  width: 100%;
-  min-width: 520px;
-  border-collapse: collapse;
-  table-layout: fixed;
-  background: var(--acton-color-surface-raised);
-}
-
-.blocksTable th,
-.blocksTable td {
-  padding: 0 14px;
-  color: var(--acton-color-text);
-  box-sizing: border-box;
-  line-height: 1.35;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.blocksTable th {
-  height: 36px;
-  color: var(--acton-color-text-muted);
-  background: var(--acton-color-surface-row);
-  border-bottom: 1px solid var(--acton-color-border);
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.blocksTable td {
-  height: 46px;
-  border-top: 1px solid var(--acton-color-border);
-  font-size: 0.82rem;
-}
-
-.blocksTable tbody tr:first-child td {
-  border-top: 0;
-}
-
-.blocksTableRow {
-  background: var(--acton-color-surface-raised);
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-
-.blocksTableRow:hover td {
-  background: var(--acton-color-surface-row);
-}
-
-.blocksTableRow:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.blocksPrimaryCell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.blocksLink {
-  color: var(--acton-color-text);
-  font: inherit;
-  font-weight: 500;
-  text-decoration: none;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.blocksLink:hover {
-  color: var(--acton-color-accent);
-  background: var(--acton-color-surface-hover);
-  text-decoration: none;
-}
-
-.blocksLink:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .blocksHashCell {
@@ -208,49 +122,7 @@
   font-size: 0.78rem;
 }
 
-.blockTransactionsTable {
-  min-width: 760px;
-}
-
-.shardBlocksTable {
-  min-width: 0;
-}
-
-.shardBlocksTable th:first-child {
-  width: 20%;
-}
-
-.shardBlocksTable th:nth-child(2),
-.shardBlocksTable th:nth-child(3) {
-  width: 18%;
-}
-
-.shardBlocksTable th:nth-child(n + 4),
-.shardBlocksTable td:nth-child(n + 4) {
-  width: 11%;
-  padding-inline: 6px;
-}
-
-.blockTransactionsTable th:first-child,
-.blockTransactionsTable td:first-child {
-  width: 54px;
-  color: var(--acton-color-text-muted);
-}
-
-.blockTransactionsTable th:nth-child(3),
-.blockTransactionsTable td:nth-child(3),
-.blockTransactionsTable th:nth-child(5),
-.blockTransactionsTable td:nth-child(5) {
-  width: 130px;
-}
-
-.blockTransactionsTable th:nth-child(5),
-.blockTransactionsTable td:nth-child(5),
-.blocksExitCodeCell {
-  text-align: right;
-}
-
-.blocksTable td.blocksExitCodeFailure {
+.blocksExitCodeFailure {
   color: var(--acton-color-danger-text);
 }
 
@@ -467,20 +339,6 @@
   word-break: break-word;
 }
 
-.blockCapabilitiesTrigger {
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--acton-color-accent);
-  font: inherit;
-  line-height: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
-}
-
 .blockDetailDocLink {
   color: var(--acton-color-accent);
   display: inline-flex;
@@ -500,21 +358,9 @@
   top: -1px;
 }
 
-.blockDetailRelativeTime {
+.blockDetailSecondaryValue {
   color: var(--acton-color-text-muted);
-}
-
-.blockCapabilitiesPopover {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--acton-space-2);
-}
-
-.blockCapabilitiesPopoverTitle {
-  color: var(--acton-color-text-muted);
-  font-size: 0.75rem;
-  font-weight: var(--acton-font-weight-emphasis);
+  font-family: var(--acton-font-sans);
 }
 
 .blockDetailInlineActions {
@@ -530,15 +376,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
-}
-
-.blockBooleanTrue {
-  color: var(--acton-color-success);
-  font-weight: var(--acton-font-weight-emphasis);
-}
-
-.blockBooleanFalse {
-  color: var(--acton-color-text-muted);
 }
 
 .blockDetailsPanel .skeletonLine {
@@ -629,58 +466,6 @@
 
 .blockSixColumnGrid .blockDetailSkeletonValue {
   width: 32px;
-}
-
-.blocksSkeletonBlock {
-  width: 52px;
-}
-
-.blocksSkeletonCount {
-  width: 40px;
-}
-
-.blocksSkeletonTime {
-  width: 76px;
-}
-
-.blocksSkeletonFlag {
-  width: 34px;
-}
-
-.blocksSkeletonIndex {
-  width: 18px;
-}
-
-.blocksSkeletonAccount {
-  width: 100%;
-  max-width: 180px;
-}
-
-.blocksSkeletonLt {
-  width: 92px;
-}
-
-.blocksSkeletonHashCell {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.blocksSkeletonHash {
-  width: 100%;
-  max-width: 210px;
-}
-
-.blocksSkeletonCopy {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-}
-
-.blocksSkeletonExitCode {
-  width: 38px;
-  margin-left: auto;
 }
 
 @keyframes skeletonShimmer {

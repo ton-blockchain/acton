@@ -1,9 +1,23 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
+import {Check, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {CopyInlineAction, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
+import {
+  Button,
+  CopyInlineAction,
+  formatCountLabel,
+  GramAmount,
+  humanizeIdentifier,
+  InfoPopover,
+  InlineAction,
+  InlineActions,
+  Input,
+  Popover,
+  shortenMiddle,
+  TokenAmount,
+  Tooltip,
+} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -21,13 +35,7 @@ import {
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
 import {getAccountNameDetails} from "./accountNameDetails"
-import {
-  formatAddress,
-  formatNano,
-  normalizeAddress,
-  toAccountQrAddress,
-  toRawAddress,
-} from "./utils"
+import {formatAddress, normalizeAddress, toAccountQrAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
@@ -60,7 +68,7 @@ interface AccountInfoProps {
   readonly jettonWallets: JettonWallet[]
   readonly accountLoading?: boolean
   readonly assetsLoading?: boolean
-  readonly amount?: string
+  readonly amount?: ReactNode
   readonly amountLoading?: boolean
   readonly details?: readonly AccountInfoDetail[]
   readonly client: TonClient
@@ -70,6 +78,7 @@ interface AccountInfoProps {
   readonly collectiblesLoading?: boolean
   readonly onCollectiblesClick?: () => void
   readonly hasContextCard?: boolean
+  readonly showActonscanLink?: boolean
 }
 
 interface CollectiblePreview {
@@ -101,6 +110,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   collectiblesLoading = false,
   onCollectiblesClick,
   hasContextCard = false,
+  showActonscanLink = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [customName, setCustomName] = useState<string | undefined>()
@@ -124,7 +134,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   >(() => new Map())
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
-  const [copied, setCopied] = useState(false)
   const [hiddenCollectibleAddresses, setHiddenCollectibleAddresses] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -178,13 +187,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   }, [jettonWallets, client])
 
   useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [copied])
-
-  useEffect(() => {
     setCustomName(resolvedName || undefined)
   }, [resolvedName])
 
@@ -224,13 +226,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     }
   }
 
-  const gramBalance = state ? formatNano(state.balance) : undefined
-
-  const copyToClipboard = () => {
-    void navigator.clipboard.writeText(displayAddress)
-    setCopied(true)
-  }
-
   const handleToggleFavorite = () => {
     toggleFavorite(address)
   }
@@ -250,6 +245,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const addressRowText = hasContextCard ? shortAddress : displayAddress
   const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
+  const actonscanUrl = showActonscanLink ? getActonscanUrl(displayAddress, network.id) : undefined
   const unfreezerUrl =
     state?.status === "frozen" ? getUnfreezerUrl(bounceableAddress, network.id) : undefined
   const isNameUnchanged = editValue.trim() === (displayName || "")
@@ -272,7 +268,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     wallet,
     master: wallet.master ?? tokenMastersByAddress.get(toRawAddress(wallet.jetton)),
   }))
-  const firstWalletDecimals = Number(firstMaster?.jetton_content?.decimals || 9)
   const firstWalletSymbol = firstMaster?.jetton_content?.symbol || "tokens"
   const firstWalletImageSources = getImageSources(
     firstMaster?.jetton_content,
@@ -381,23 +376,26 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                       }}
                       placeholder="Name this address"
                     />
-                    <button
-                      type="button"
-                      className={styles.renameSaveButton}
+                    <Button
+                      className={styles.renameAction}
+                      disabled={isNameUnchanged}
+                      loading={renameSaving}
                       onClick={() => {
                         void handleSave()
                       }}
-                      disabled={renameSaving || isNameUnchanged}
+                      size="sm"
+                      variant="primary"
                     >
-                      {renameSaving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.renameCancelButton}
+                      Save
+                    </Button>
+                    <Button
+                      className={styles.renameAction}
                       onClick={() => setIsEditing(false)}
+                      size="sm"
+                      variant="outline"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -422,16 +420,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   ) : (
                     <span className={styles.customName}>{displayNameText}</span>
                   )}
-                  <Tooltip content="Rename address">
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={handleStartEdit}
-                      aria-label="Rename address"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                  </Tooltip>
+                  <InlineAction
+                    className={styles.addressAction}
+                    icon={<Edit2 />}
+                    label="Rename address"
+                    onClick={handleStartEdit}
+                    size="compact"
+                  />
                 </div>
               </div>
             ) : undefined}
@@ -439,62 +434,54 @@ export const AccountInfo: FC<AccountInfoProps> = ({
             <div className={`${styles.infoRow} ${styles.addressInfoRow}`}>
               <div className={styles.label}>Address</div>
               <div className={styles.rowValue}>
-                <Popover
-                  aria-label="Show address formats"
-                  ariaLabel="Address formats"
-                  className={styles.addressPopover}
-                  content={addressFormats}
-                  maxWidth="min(36rem, calc(100vw - 32px))"
-                  openDelay={150}
-                  placement="bottom"
-                >
-                  <span className={styles.addressValue}>
-                    <span className={styles.addressValueDesktop}>{addressRowText}</span>
-                    <span className={styles.addressValueMobile}>{shortAddress}</span>
-                  </span>
-                </Popover>
-                <span className={styles.addressActions}>
-                  <Tooltip content={favorite ? "Remove from favorites" : "Add to favorites"}>
-                    <button
-                      type="button"
-                      className={`${styles.iconButton} ${favorite ? styles.favoriteButtonActive : ""}`}
-                      onClick={handleToggleFavorite}
-                      aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-                      aria-pressed={favorite}
-                    >
-                      <Star
-                        size={16}
-                        className={favorite ? styles.favoriteIconActive : undefined}
+                <InlineActions
+                  className={styles.addressActions}
+                  visibility="always"
+                  actions={
+                    <>
+                      <InlineAction
+                        aria-pressed={favorite}
+                        className={`${styles.addressAction} ${favorite ? styles.favoriteButtonActive : ""}`}
+                        icon={<Star className={favorite ? styles.favoriteIconActive : undefined} />}
+                        label={favorite ? "Remove from favorites" : "Add to favorites"}
+                        onClick={handleToggleFavorite}
+                        size="compact"
                       />
-                    </button>
-                  </Tooltip>
-                  {!displayName && !isEditing && (
-                    <Tooltip content="Rename address">
-                      <button
-                        type="button"
-                        className={styles.iconButton}
-                        onClick={handleStartEdit}
-                        aria-label="Rename address"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </Tooltip>
-                  )}
-                  <Tooltip content={copied ? "Copied" : "Copy address"}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={copyToClipboard}
-                      aria-label={copied ? "Copied" : "Copy address"}
-                    >
-                      {copied ? (
-                        <Check size={16} className={styles.saveIcon} />
-                      ) : (
-                        <Copy size={16} />
+                      {!displayName && !isEditing && (
+                        <InlineAction
+                          className={styles.addressAction}
+                          icon={<Edit2 />}
+                          label="Rename address"
+                          onClick={handleStartEdit}
+                          size="compact"
+                        />
                       )}
-                    </button>
-                  </Tooltip>
-                </span>
+                      <CopyInlineAction
+                        className={styles.addressAction}
+                        copiedIcon={<Check className={styles.saveIcon} />}
+                        copiedLabel="Address copied"
+                        label="Copy address"
+                        size="compact"
+                        value={displayAddress}
+                      />
+                    </>
+                  }
+                >
+                  <Popover
+                    aria-label="Show address formats"
+                    ariaLabel="Address formats"
+                    className={styles.addressPopover}
+                    content={addressFormats}
+                    maxWidth="min(36rem, calc(100vw - 32px))"
+                    openDelay={150}
+                    placement="bottom"
+                  >
+                    <span className={styles.addressValue}>
+                      <span className={styles.addressValueDesktop}>{addressRowText}</span>
+                      <span className={styles.addressValueMobile}>{shortAddress}</span>
+                    </span>
+                  </Popover>
+                </InlineActions>
               </div>
             </div>
 
@@ -504,7 +491,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 {stateLoading ? (
                   <div className={`${styles.skeleton} ${styles.skeletonValue}`} />
                 ) : state ? (
-                  <span className={styles.primaryValue}>{gramBalance} GRAM</span>
+                  <span className={styles.primaryValue}>
+                    <GramAmount value={state.balance} useGrouping />
+                  </span>
                 ) : (
                   <span className={styles.mutedValue}>-</span>
                 )}
@@ -557,8 +546,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                           }
                         />
                         <span className={styles.primaryValue}>
-                          {formatTokenAmount(firstWallet.balance, firstWalletDecimals)}{" "}
-                          {firstWalletSymbol}
+                          <TokenAmount
+                            decimals={firstMaster?.jetton_content.decimals}
+                            symbol={firstWalletSymbol}
+                            tabIndex={-1}
+                            useGrouping
+                            value={firstWallet.balance}
+                          />
                         </span>
                       </button>
                       {tokenPreviewItems.length > 0 && (
@@ -730,7 +724,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                                         rel="noreferrer"
                                       >
                                         <span className={styles.contractDescriptionLinkKind}>
-                                          {formatContractLinkKind(link.kind)}
+                                          {humanizeIdentifier(link.kind)}
                                         </span>
                                         <span className={styles.contractDescriptionLinkTitle}>
                                           {link.url}
@@ -762,9 +756,32 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 {statusInfo.label}
               </span>
             )}
-            <span className={styles.statusAddress} title={rawAddress}>
-              {statusAddress}
-            </span>
+            <Tooltip
+              content={
+                <span className={styles.addressFormatValueRow}>
+                  <code className={styles.addressFormatValue}>{rawAddress}</code>
+                  <CopyInlineAction
+                    copiedLabel="Raw address copied"
+                    label="Copy raw address"
+                    size="compact"
+                    value={rawAddress}
+                  />
+                </span>
+              }
+              width="extra-wide"
+            >
+              <span className={styles.statusAddress}>{statusAddress}</span>
+            </Tooltip>
+            {actonscanUrl && (
+              <a
+                className={styles.externalLink}
+                href={actonscanUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                actonscan.com
+              </a>
+            )}
             {tonscanUrl && (
               <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
                 tonscan.org
@@ -852,7 +869,8 @@ function getInterfaceLabel(value: string): string | undefined {
     case "jetton_wallet": {
       return "Jetton Wallet interface"
     }
-    case "nft_item": {
+    case "nft_item":
+    case "nft_item_simple": {
       return "NFT item interface"
     }
     case "nft_collection": {
@@ -865,7 +883,7 @@ function getInterfaceLabel(value: string): string | undefined {
       return "Multisig order v2"
     }
     default: {
-      return normalizedInterface.replaceAll("_", " ")
+      return humanizeIdentifier(normalizedInterface)
     }
   }
 }
@@ -900,10 +918,6 @@ function normalizeContractAbiLink(link: ContractAbiLink): ContractAbiLink | unde
     url,
     kind: kind || "link",
   }
-}
-
-function formatContractLinkKind(kind: string): string {
-  return kind.replaceAll("_", " ")
 }
 
 function getStatusInfo(state?: AddressInformation): {
@@ -971,6 +985,15 @@ function getTonscanUrl(
   return `https://tonscan.org/address/${encodedAddress}`
 }
 
+function getActonscanUrl(address: string, networkId: ExplorerNetworkId): string | undefined {
+  if (networkId !== "mainnet" && networkId !== "testnet") {
+    return undefined
+  }
+
+  const encodedAddress = encodeURIComponent(address)
+  return `https://actonscan.com/address/${encodedAddress}?network=${networkId}`
+}
+
 function getUnfreezerUrl(address: string, networkId: ExplorerNetworkId): string | undefined {
   if (networkId !== "mainnet" && networkId !== "testnet") {
     return undefined
@@ -991,15 +1014,8 @@ function normalizeForkNetwork(forkNetwork?: string): "mainnet" | "testnet" | und
   return undefined
 }
 
-function formatTokenAmount(value: string, decimals: number): string {
-  const decimalsNumber = Number.isFinite(decimals) ? decimals : 9
-  return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
-    maximumFractionDigits: decimalsNumber,
-  })
-}
-
 function formatCollectibleCount(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? "NFT" : "NFTs"}`
+  return formatCountLabel(count, {singular: "NFT"})
 }
 
 function formatRawAddress(address: string): string {
@@ -1007,8 +1023,5 @@ function formatRawAddress(address: string): string {
   if (!workchain || !hash) {
     return address
   }
-  if (hash.length <= 11) {
-    return `${workchain}:${hash}`
-  }
-  return `${workchain}:${hash.slice(0, 3)}…${hash.slice(-5)}`
+  return `${workchain}:${shortenMiddle(hash, {start: 3, end: 5})}`
 }

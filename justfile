@@ -2,6 +2,8 @@ NEXTEST_PROFILE_ARGS := if env_var_or_default("CI", "") != "" { "-P ci" } else {
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
 FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
+LOCALTON_DEV_IMAGE := env_var_or_default("ACTON_STUDIO_LOCALTON_IMAGE", "localton:dev")
+LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6")
 
 all: precommit
 
@@ -10,6 +12,9 @@ build:
 
 build-dev:
     cargo build
+
+build-localton-dev-image:
+    docker build --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --tag "{{ LOCALTON_DEV_IMAGE }}" apps/localton
 
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm

@@ -16,6 +16,17 @@ export interface AutomaticActionPageResult {
   readonly hasMore: boolean
 }
 
+export interface StreamedActionsResult {
+  readonly actions: V3Action[]
+  readonly collapsedTraceIds: readonly string[]
+}
+
+interface BoundedActionPage {
+  readonly addedActions: V3Action[]
+  readonly collapsedTraceIds: readonly string[]
+  readonly skippedActionIds: ReadonlySet<string>
+}
+
 /**
  * Adds an account-actions page while keeping large traces bounded.
  *
@@ -31,9 +42,58 @@ export function mergeAutomaticActionPage(
   pageSize: number,
   maxActionsPerTrace = MAX_AUTO_LOADED_ACTIONS_PER_TRACE,
 ): AutomaticActionPageResult {
-  const actions = [...current]
+  const {addedActions, collapsedTraceIds, skippedActionIds} = collectBoundedActionPage(
+    current,
+    page,
+    maxActionsPerTrace,
+  )
+  const actions = [...current, ...addedActions]
+  const hasMore = page.length === pageSize
+  const lastAction = page.at(-1)
+  const nextCursor =
+    hasMore &&
+    lastAction !== undefined &&
+    skippedActionIds.has(lastAction.action_id) &&
+    normalizedTraceId(lastAction)
+      ? (cursorAfterTrace(lastAction, sort) ?? {
+          ...cursor,
+          offset: cursor.offset + page.length,
+        })
+      : {...cursor, offset: cursor.offset + page.length}
+
+  return {
+    actions,
+    collapsedTraceIds,
+    cursor: nextCursor,
+    hasMore,
+  }
+}
+
+export function mergeStreamedActions(
+  current: readonly V3Action[],
+  streamed: readonly V3Action[],
+  sort: AccountHistorySortOrder,
+  maxActionsPerTrace = MAX_AUTO_LOADED_ACTIONS_PER_TRACE,
+): StreamedActionsResult {
+  const {addedActions, collapsedTraceIds} = collectBoundedActionPage(
+    current,
+    streamed,
+    maxActionsPerTrace,
+  )
+  return {
+    actions: sort === "desc" ? [...addedActions, ...current] : [...current, ...addedActions],
+    collapsedTraceIds,
+  }
+}
+
+function collectBoundedActionPage(
+  current: readonly V3Action[],
+  page: readonly V3Action[],
+  maxActionsPerTrace: number,
+): BoundedActionPage {
   const seenActionIds = new Set(current.map(action => action.action_id))
   const traceCounts = countActionsByTrace(current)
+  const addedActions: V3Action[] = []
   const collapsedTraceIds = new Set<string>()
   const skippedActionIds = new Set<string>()
 
@@ -54,27 +114,13 @@ export function mergeAutomaticActionPage(
       traceCounts.set(traceId, count + 1)
     }
 
-    actions.push(action)
+    addedActions.push(action)
   }
 
-  const hasMore = page.length === pageSize
-  const lastAction = page.at(-1)
-  const nextCursor =
-    hasMore &&
-    lastAction !== undefined &&
-    skippedActionIds.has(lastAction.action_id) &&
-    normalizedTraceId(lastAction)
-      ? (cursorAfterTrace(lastAction, sort) ?? {
-          ...cursor,
-          offset: cursor.offset + page.length,
-        })
-      : {...cursor, offset: cursor.offset + page.length}
-
   return {
-    actions,
+    addedActions,
     collapsedTraceIds: [...collapsedTraceIds],
-    cursor: nextCursor,
-    hasMore,
+    skippedActionIds,
   }
 }
 

@@ -75,7 +75,14 @@ test runs.
 Pinned fork runs also store fetched remote accounts in this directory under
 `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. `acton test`
 and `acton script` reuse those files when the same fork network, block number,
-and account address are requested again.
+and account address are requested again. Fork runs without an explicit block
+use the same cache after they resolve the latest sequence number.
+
+Fork commands store the network configuration and, for explicit historical
+forks, block time under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`. These entries have a
+24-hour TTL. The `--no-fork-cache` option affects account and library entries
+only. Use `--clear-cache` to remove every cache type.
 
 Clear the cache to force a full rebuild:
 

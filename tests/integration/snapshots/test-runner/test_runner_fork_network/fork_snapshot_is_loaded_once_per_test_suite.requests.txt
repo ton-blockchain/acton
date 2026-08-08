@@ -1,0 +1,2 @@
+GET /api/v2/getBlockHeader?workchain=-1&shard=-9223372036854775808&seqno=654321
+GET /api/v2/getConfigAll?seqno=654321

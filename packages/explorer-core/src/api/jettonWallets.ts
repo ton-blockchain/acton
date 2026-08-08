@@ -35,21 +35,29 @@ export function sortJettonWalletsByAmount(wallets: readonly JettonWallet[]): Jet
 }
 
 function compareJettonWalletAmount(left: JettonWallet, right: JettonWallet): number {
-  const leftAmount = normalizeJettonAmount(left)
-  const rightAmount = normalizeJettonAmount(right)
-  if (leftAmount === rightAmount) {
-    return 0
+  const leftAmount = parseJettonBalance(left.balance)
+  const rightAmount = parseJettonBalance(right.balance)
+  const leftDecimals = parseJettonDecimals(left.master)
+  const rightDecimals = parseJettonDecimals(right.master)
+  const leftScaled = leftAmount * 10n ** BigInt(rightDecimals)
+  const rightScaled = rightAmount * 10n ** BigInt(leftDecimals)
+  if (leftScaled === rightScaled) {
+    const leftSymbol = left.master?.jetton_content.symbol ?? ""
+    const rightSymbol = right.master?.jetton_content.symbol ?? ""
+    return leftSymbol.localeCompare(rightSymbol)
   }
-  return leftAmount > rightAmount ? -1 : 1
+  return leftScaled > rightScaled ? -1 : 1
 }
 
-function normalizeJettonAmount(wallet: JettonWallet): number {
-  const decimals = parseJettonDecimals(wallet.master)
-  const amount = Number(wallet.balance) / 10 ** decimals
-  return Number.isFinite(amount) ? amount : 0
+function parseJettonBalance(value: string): bigint {
+  try {
+    return BigInt(value)
+  } catch {
+    return 0n
+  }
 }
 
 function parseJettonDecimals(master: JettonMasterMetadata | undefined): number {
   const decimals = Number(master?.jetton_content.decimals)
-  return Number.isFinite(decimals) ? decimals : 9
+  return Number.isInteger(decimals) && decimals >= 0 && decimals <= 36 ? decimals : 9
 }

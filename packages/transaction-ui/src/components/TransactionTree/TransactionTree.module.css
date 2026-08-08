@@ -13,7 +13,7 @@
   --transaction-tree-action-highlight-fill: color-mix(
     in srgb,
     var(--acton-color-accent) 18%,
-    transparent
+    var(--acton-color-surface)
   );
   --transaction-tree-action-highlight-stroke: var(--acton-color-accent);
   --transaction-tree-action-highlight-text: var(--acton-color-accent);
@@ -452,10 +452,6 @@
 .nodeCircle:focus {
   outline-width: 1px;
   border-radius: 50%;
-}
-
-.nodeCircleDefault {
-  cursor: default;
 }
 
 .nodeText {

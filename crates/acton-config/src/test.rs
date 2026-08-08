@@ -196,6 +196,7 @@ pub struct TestConfig {
     pub fuzz_max_test_rejects: Option<usize>,
     pub fuzz_seed: Option<u64>,
     pub fail_fast: bool,
+    pub studio_reporting: bool,
     pub ui: bool,
     pub ui_port: u16,
 }
@@ -248,6 +249,7 @@ impl Default for TestConfig {
             fuzz_max_test_rejects: None,
             fuzz_seed: None,
             fail_fast: false,
+            studio_reporting: true,
             ui: false,
             ui_port: 0,
         }

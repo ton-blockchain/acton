@@ -42,11 +42,6 @@
   border-color: color-mix(in srgb, var(--acton-color-status-failed) 35%, transparent);
 }
 
-.mono-inline {
-  font-family: var(--acton-font-mono);
-  overflow-wrap: anywhere;
-}
-
 .compilerLink {
   min-width: 0;
   width: fit-content;

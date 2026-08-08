@@ -1,12 +1,12 @@
 import {describe, expect, test} from "bun:test"
 
-import {truncateMiddle} from "../src/lib/format"
+import {shortenMiddle} from "@acton/ui"
 
 describe("transaction UI formatting", () => {
   test("truncates long labels in the middle", () => {
     expect([
-      truncateMiddle("short-name.ton", 20),
-      truncateMiddle("blackmarket-dot-tg-exch.ton", 20),
+      shortenMiddle("short-name.ton", {maxLength: 20}),
+      shortenMiddle("blackmarket-dot-tg-exch.ton", {maxLength: 20}),
     ]).toMatchInlineSnapshot(`
       [
         "short-name.ton",

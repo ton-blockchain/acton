@@ -5,7 +5,7 @@ import process from "node:process"
 import react from "@vitejs/plugin-react"
 import {defineConfig} from "vite"
 
-import {themeBootstrap} from "../ui/vite/themeBootstrap"
+import {themeBootstrap} from "../ui/vite/themeBootstrap.ts"
 
 const backendTarget = process.env.VITE_BACKEND_PROXY_TARGET || "http://127.0.0.1:3000"
 const contractHtml = resolve(import.meta.dirname, "contract.html")

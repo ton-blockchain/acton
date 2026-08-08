@@ -1,0 +1,131 @@
+---
+title: "Getting Started"
+description: "Start Acton Studio for a project and complete a first test and local environment workflow"
+---
+
+This guide starts Studio for an existing Acton project, runs a test suite, creates a Simulated
+localnet, and connects the project to that network.
+
+## Prerequisites
+
+- [Acton installed](/docs/installation)
+- an Acton project with an `Acton.toml` file
+- Docker only if you plan to create a Full localnet
+
+If you do not have a project yet, create one first:
+
+```bash
+acton new first_counter --template counter
+cd first_counter
+```
+
+## 1. Start Studio
+
+Run Studio from the project root:
+
+```bash
+acton studio start
+```
+
+Studio listens on `127.0.0.1:3015` by default and opens the workspace in the default browser. Keep
+the command running while you use the UI.
+
+Use another port when `3015` is already occupied:
+
+```bash
+acton studio start --port 3020
+```
+
+Prevent the browser from opening automatically when starting Studio from an IDE or another process:
+
+```bash
+acton studio start --no-open
+```
+
+Studio accepts only a loopback host. It is intended for use on the same machine as the Acton project
+and local runtimes.
+
+## 2. Review the Studio Overview
+
+The status strip confirms three things:
+
+- which project Studio opened
+- whether the Studio server is connected
+- how many managed environments are running
+
+The **Tests** panel shows the latest result and actionable failures. The **Environments** panel shows
+the status distribution and links to recently used environments.
+
+Use the global **Find** field to open Studio pages, environments, contracts, addresses, blocks, and
+transactions without navigating each section manually.
+
+## 3. Run the project tests
+
+Open **Tests**, then select **Run tests**. Leave all fields empty and keep **Save traces** enabled.
+Studio discovers the project test files and starts the same runner used by `acton test`.
+
+After the run finishes:
+
+1. open the run from the table
+2. select a test in the left panel
+3. use **Info**, **Transactions**, and **Logs** to inspect the result
+4. open **Runner output** when the suite failed before producing test reports
+
+You can also run `acton test` in another terminal. Studio records the run automatically while the
+daemon for this project is available.
+
+## 4. Create a Simulated localnet
+
+Open **Virtual Environments**, select **Create environment**, and keep **Simulated localnet** selected.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/create-environment-light.png"
+    alt="Create environment dialog in light theme configured for a Simulated localnet"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/create-environment-dark.png"
+    alt="Create environment dialog in dark theme configured for a Simulated localnet"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+For the first environment, use these defaults:
+
+- **Name:** keep the generated name or choose a project-specific name
+- **Local port:** leave empty so Studio selects an available environment runtime port; this is
+  separate from the Studio port such as `3015`
+- **Initial state:** choose **Clean network**
+- **Startup accounts:** select project wallets that should exist when the network starts
+
+Select **Create environment**. Studio starts the runtime and opens it when it becomes ready.
+
+## 5. Connect the project
+
+The environment **Home** page begins with **Connect environment**. Select **Acton project** and copy
+the generated `[networks.localnet]` configuration into `Acton.toml`.
+
+The page also shows the matching script command. Use it to run an existing script against this
+environment:
+
+```bash
+acton script --net localnet scripts/deploy.tolk
+```
+
+Use the **JavaScript app** option for a `@ton/ton` client example or **RPC endpoints** when another
+TON-compatible tool needs the raw V2, V3, or control URL. See [Integrate](/docs/studio/workspace#integrate)
+for the complete setup and [API Calls](/docs/studio/workspace#api-calls) to verify requests from the
+connected application.
+
+## Next steps
+
+- [Understand test history and reporting](/docs/studio/tests)
+- [Choose and configure environments](/docs/studio/environments)
+- [Work inside an environment](/docs/studio/workspace)
+
+## 6. When you are finished
+
+Return to the terminal and press <kbd>Ctrl</kbd>+<kbd>C</kbd>. Studio stores workspace metadata and
+managed environment data under `.studio/` in the project. Starting Studio from the same project
+restores the catalog and saved history.

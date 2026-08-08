@@ -30,14 +30,6 @@ export const NFT_CARD_IMAGE_SOURCE_KEYS = [
   "_image_small",
 ] as const
 
-export const NFT_COLLECTION_IMAGE_SOURCE_KEYS = [
-  "collection_image_small",
-  "collection_image_medium",
-  "collection_image_big",
-  "collection_image",
-  ...NFT_IMAGE_SOURCE_KEYS,
-] as const
-
 export const NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS = [
   "collection_image_medium",
   "collection_image_big",

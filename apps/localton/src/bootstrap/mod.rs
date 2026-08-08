@@ -20,4 +20,5 @@ mod validator;
 mod zerostate;
 
 pub use control::LauncherControl;
+pub(crate) use persistence::{acquire_lock, validate_persisted_state};
 pub use pipeline::{run, status};

@@ -1,7 +1,8 @@
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {
   Activity,
+  Archive,
   Binary,
   Box,
   Brackets,
@@ -85,6 +86,7 @@ const standaloneItems: SidebarItem[] = [
 const environmentItems: SidebarItem[] = [
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
+  {label: "Snapshots", icon: Archive, path: "/snapshots"},
 ]
 
 const apiCallsItem: SidebarItem = {
@@ -102,6 +104,8 @@ const integrateItem: SidebarItem = {
 const apiReferenceItems: NestedSidebarItem[] = [
   {label: "v2 API", path: "/api-reference/v2"},
   {label: "v3 API", path: "/api-reference/v3"},
+  {label: "Admin API", path: "/api-reference/admin"},
+  {label: "Config API", path: "/api-reference/config"},
   {label: "Control API", path: "/api-reference/control"},
 ]
 
@@ -200,27 +204,28 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const navigate = useNavigate()
   const routes = useLocalnetRoutes()
   const {environment} = useLocalnetRuntime()
-  const {forkNetwork, network} = useNetworkInfo()
+  const {forkNetwork} = useNetworkInfo()
+  const navigationRef = useRef<HTMLElement>(null)
   const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
-  const forkBadgeLabel = useMemo(
-    () =>
-      formatForkNetworkLabel(forkNetwork) ??
-      (network.id === "localnet" ? undefined : network.label),
-    [forkNetwork, network.id, network.label],
-  )
+  const forkBadgeLabel =
+    environment?.config.kind === "actonLocalnet" ? formatForkNetworkLabel(forkNetwork) : undefined
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
   const visibleEnvironmentItems = environmentItems.filter(item =>
     item.path === "/wallets"
       ? supports(environment, "wallets")
-      : supportsAny(environment, "gramFaucet", "jettonFaucet"),
+      : item.path === "/snapshots"
+        ? supports(environment, "snapshots")
+        : supportsAny(environment, "gramFaucet", "jettonFaucet"),
   )
-  const visibleApiReferenceItems = apiReferenceItems.filter(item =>
-    item.path === "/api-reference/v2"
-      ? supports(environment, "apiV2")
-      : item.path === "/api-reference/v3"
-        ? supports(environment, "apiV3")
-        : supports(environment, "controlApi"),
-  )
+  const visibleApiReferenceItems = apiReferenceItems.filter(item => {
+    if (item.path === "/api-reference/v2") return supports(environment, "apiV2")
+    if (item.path === "/api-reference/v3") return supports(environment, "apiV3")
+    if (item.path === "/api-reference/config") return supports(environment, "configApi")
+    if (item.path === "/api-reference/admin") {
+      return environment?.config.kind === "fullTonNetwork" && supports(environment, "controlApi")
+    }
+    return environment?.config.kind !== "fullTonNetwork" && supports(environment, "controlApi")
+  })
   const localPathname = location.pathname.slice(routes.basePath.length) || "/"
   const isExplorerActive =
     localPathname.startsWith("/explorer") || localPathname.startsWith("/block/")
@@ -249,6 +254,15 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   }, [isApiReferenceActive])
 
   useEffect(() => {
+    const frame = globalThis.requestAnimationFrame(() => {
+      navigationRef.current
+        ?.querySelector<HTMLElement>('[aria-current="page"]')
+        ?.scrollIntoView({block: "nearest", inline: "nearest"})
+    })
+    return () => globalThis.cancelAnimationFrame(frame)
+  }, [isApiReferenceOpen, isContractsOpen, isExplorerOpen, localPathname])
+
+  useEffect(() => {
     if (
       !localPathname.startsWith("/explorer") ||
       localPathname === "/explorer/blocks" ||
@@ -265,7 +279,11 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   }, [localPathname, location.hash, location.search])
 
   return (
-    <nav className={styles.environmentNavigation} aria-label={`${environmentName} navigation`}>
+    <nav
+      ref={navigationRef}
+      className={styles.environmentNavigation}
+      aria-label={`${environmentName} navigation`}
+    >
       <button
         type="button"
         className={styles.environmentContext}

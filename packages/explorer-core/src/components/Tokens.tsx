@@ -8,6 +8,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  TokenAmount,
 } from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
@@ -96,8 +97,6 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
           ) : (
             wallets.map(wallet => {
               const master = wallet.master ?? mastersByAddress.get(toRawAddress(wallet.jetton))
-              const decimals = Number(master?.jetton_content?.decimals || 9)
-              const balance = Number(wallet.balance) / 10 ** decimals
               const symbol = master?.jetton_content?.symbol || "UNKNOWN"
               const name = master?.jetton_content?.name || "Unknown Jetton"
               const imageSources = getImageSources(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
@@ -135,14 +134,13 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
                     </div>
                   </DataTableCell>
                   <DataTableCell tone="strong">
-                    <span className={styles.amount}>
-                      <span className={styles.balanceValue}>
-                        {balance.toLocaleString(undefined, {
-                          maximumFractionDigits: decimals,
-                        })}
-                      </span>
-                      <span className={styles.jettonSymbol}>{symbol}</span>
-                    </span>
+                    <TokenAmount
+                      className={styles.amount}
+                      decimals={master?.jetton_content.decimals}
+                      symbol={symbol}
+                      useGrouping
+                      value={wallet.balance}
+                    />
                   </DataTableCell>
                   <DataTableCell align="right">
                     <ExplorerAddressChip

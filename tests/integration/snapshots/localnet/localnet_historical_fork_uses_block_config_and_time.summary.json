@@ -1,0 +1,9 @@
+{
+  "config": {
+    "matches_fork_block": true,
+    "request_ok": true
+  },
+  "time": {
+    "mined_block_uses_fork_clock": true
+  }
+}

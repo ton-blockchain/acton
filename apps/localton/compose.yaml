@@ -2,7 +2,7 @@ name: localton
 
 services:
   localton:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     stop_grace_period: 60s
     restart: unless-stopped
     ports:
@@ -26,6 +26,26 @@ services:
       timeout: 3s
       start_period: 240s
       retries: 12
+
+  v3-basechain-bootstrap:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
+    command:
+      - indexer
+      - bootstrap-basechain
+      - --state-dir
+      - /var/lib/localton
+      - --endpoint
+      - http://localton:18002/api/v2
+      - --seqno-file
+      - /var/lib/ton-indexer/account-scan/target-seqno
+    depends_on:
+      localton:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    volumes:
+      - localton-state:/var/lib/localton
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
 
   postgres:
     image: postgres:17-alpine
@@ -70,7 +90,7 @@ services:
     restart: unless-stopped
 
   v3-migrations:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-migrate
     depends_on:
@@ -81,7 +101,7 @@ services:
     restart: on-failure
 
   v3-worker:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     user: "0:0"
     command:
       - v3-worker
@@ -125,8 +145,42 @@ services:
       - localton-state:/var/lib/localton:ro
       - ton-index-workdir:/var/lib/ton-indexer/work
 
+  v3-account-scanner:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
+    user: "0:0"
+    command:
+      - v3-account-scan
+    environment:
+      TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
+      TON_INDEXER_IS_TESTNET: ${TON_INDEXER_IS_TESTNET:-1}
+      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
+      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
+    depends_on:
+      localton:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      v3-basechain-bootstrap:
+        condition: service_completed_successfully
+      v3-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/bin/localton-container-entrypoint
+        - v3-account-scan-health
+      interval: 10s
+      timeout: 3s
+      start_period: 240s
+      start_interval: 1s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - localton-state:/var/lib/localton:ro
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
+
   v3-api:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-api
     environment:
@@ -143,6 +197,8 @@ services:
         condition: service_healthy
       v3-migrations:
         condition: service_completed_successfully
+      v3-account-scanner:
+        condition: service_healthy
       v3-worker:
         condition: service_started
     healthcheck:
@@ -162,7 +218,7 @@ services:
     restart: unless-stopped
 
   v3-classifier:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-classifier
       - --pool-size
@@ -190,4 +246,5 @@ services:
 volumes:
   localton-state:
   postgres-data:
+  ton-account-scan:
   ton-index-workdir:

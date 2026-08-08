@@ -4,6 +4,7 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {KeyboardEvent, ReactNode} from "react"
 
 import {Input} from "../Input/Input"
+import {useTheme} from "../Theme/ThemeProvider"
 import {Tooltip} from "../Tooltip"
 import styles from "./SearchInput.module.css"
 
@@ -57,8 +58,8 @@ export function SearchInput({
   value,
   variant = "search",
 }: SearchInputProps) {
+  const {theme} = useTheme()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
-  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null)
   const controlRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const highlightedItemRef = useRef<SearchInputItem | undefined>(undefined)
@@ -129,7 +130,6 @@ export function SearchInput({
       }}
     >
       <div
-        ref={setPortalContainer}
         className={rootClassName}
         role={variant === "search" ? "search" : undefined}
         aria-label={variant === "search" ? ariaLabel : undefined}
@@ -166,72 +166,71 @@ export function SearchInput({
           />
         </div>
       </div>
-      {portalContainer && (
-        <Autocomplete.Portal container={portalContainer}>
-          <Autocomplete.Positioner
-            align="start"
-            anchor={controlRef}
-            className={styles.positioner}
-            sideOffset={size === "sm" ? 6 : 8}
+      <Autocomplete.Portal>
+        <Autocomplete.Positioner
+          align="start"
+          anchor={controlRef}
+          className={styles.positioner}
+          data-theme={theme}
+          sideOffset={size === "sm" ? 6 : 8}
+        >
+          <Autocomplete.Popup
+            className={`${styles.dropdown} ${size === "sm" ? styles.dropdownSm : styles.dropdownLg}`}
           >
-            <Autocomplete.Popup
-              className={`${styles.dropdown} ${size === "sm" ? styles.dropdownSm : styles.dropdownLg}`}
-            >
-              <Autocomplete.List className={styles.list}>
-                {(item: SearchInputItem) => (
-                  <Autocomplete.Item
-                    key={item.id}
-                    className={styles.item}
-                    value={item}
-                    onClick={() => {
-                      item.onSelect()
-                      inputRef.current?.blur()
-                    }}
+            <Autocomplete.List className={styles.list}>
+              {(item: SearchInputItem) => (
+                <Autocomplete.Item
+                  key={item.id}
+                  className={styles.item}
+                  value={item}
+                  onClick={() => {
+                    item.onSelect()
+                    inputRef.current?.blur()
+                  }}
+                >
+                  <div
+                    className={`${styles.itemButton} ${item.icon ? styles.itemButtonWithIcon : ""}`}
                   >
-                    <div
-                      className={`${styles.itemButton} ${item.icon ? styles.itemButtonWithIcon : ""}`}
-                    >
-                      {item.icon && (
-                        <span className={styles.itemIcon} aria-hidden="true">
-                          {item.icon}
-                        </span>
-                      )}
-                      <span className={styles.itemText}>
-                        <span
-                          className={item.description ? styles.itemLabelStrong : styles.itemLabel}
-                        >
-                          {item.label}
-                        </span>
-                        {item.description && (
-                          <span className={styles.itemDescription}>{item.description}</span>
-                        )}
+                    {item.icon && (
+                      <span className={styles.itemIcon} aria-hidden="true">
+                        {item.icon}
                       </span>
-                    </div>
-                    {item.onRemove && (
-                      <Tooltip content={item.removeLabel ?? "Remove item"}>
-                        <button
-                          type="button"
-                          className={styles.removeButton}
-                          aria-label={item.removeLabel ?? "Remove item"}
-                          onClick={event => {
-                            event.stopPropagation()
-                            item.onRemove?.()
-                            if (items.length === 1) {
-                              setOpen(false)
-                            }
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                      </Tooltip>
                     )}
-                  </Autocomplete.Item>
-                )}
-              </Autocomplete.List>
-            </Autocomplete.Popup>
-          </Autocomplete.Positioner>
-        </Autocomplete.Portal>
-      )}
+                    <span className={styles.itemText}>
+                      <span
+                        className={item.description ? styles.itemLabelStrong : styles.itemLabel}
+                      >
+                        {item.label}
+                      </span>
+                      {item.description && (
+                        <span className={styles.itemDescription}>{item.description}</span>
+                      )}
+                    </span>
+                  </div>
+                  {item.onRemove && (
+                    <Tooltip content={item.removeLabel ?? "Remove item"}>
+                      <button
+                        type="button"
+                        className={styles.removeButton}
+                        aria-label={item.removeLabel ?? "Remove item"}
+                        onClick={event => {
+                          event.stopPropagation()
+                          item.onRemove?.()
+                          if (items.length === 1) {
+                            setOpen(false)
+                          }
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </Tooltip>
+                  )}
+                </Autocomplete.Item>
+              )}
+            </Autocomplete.List>
+          </Autocomplete.Popup>
+        </Autocomplete.Positioner>
+      </Autocomplete.Portal>
     </Autocomplete.Root>
   )
 }

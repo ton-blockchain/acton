@@ -26,15 +26,6 @@ export interface LockerSchedule {
   readonly payments: readonly LockerPayment[]
 }
 
-const LOCKER_CODE_HASHES = new Set([
-  "830c99a447d0974db6d86ed7d89fe4f2d2ec22358cb64287e2d31e563ebde547",
-  "6a05d82d45c933dd2ddf7b338db7f6fbce6d5e2ec3b142e5fc53a94395dca252",
-])
-
-export function isLockerCodeHash(value: string | undefined): boolean {
-  return value !== undefined && LOCKER_CODE_HASHES.has(value.replace(/^0x/i, "").toLowerCase())
-}
-
 export function parseLockerData(response: V3RunGetMethodResponse): LockerData {
   if (response.exit_code !== 0) {
     throw new Error(`get_locker_data exited with code ${response.exit_code}.`)

@@ -1,0 +1,16 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "contract": "ExplicitJsonCounter",
+  "exitCode": 0,
+  "method": "currentCounter",
+  "network": "mock",
+  "rawAddress": "0:2222222222222222222222222222222222222222222222222222222222222222",
+  "rawStack": [
+    [
+      "num",
+      "0x2a"
+    ]
+  ],
+  "result": "42",
+  "signature": "currentCounter(): int"
+}

@@ -1,12 +1,13 @@
 import {Search} from "lucide-react"
 import {createPortal} from "react-dom"
-import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 import type {CSSProperties, FC} from "react"
 
 import type {TonClient} from "@acton/explorer-core/api/client"
 
 import {isTextEntryTarget} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
+import {DashboardSearchOverlay} from "./DashboardSearchOverlay"
 
 interface DashboardSearchProps {
   readonly client: TonClient
@@ -18,11 +19,6 @@ type SearchOriginStyle = Readonly<CSSProperties> & {
   readonly "--search-origin-width"?: string
   readonly "--search-origin-height"?: string
 }
-
-const DashboardSearchOverlay = lazy(async () => {
-  const module = await import("./DashboardSearchOverlay")
-  return {default: module.DashboardSearchOverlay}
-})
 
 export const DashboardSearch: FC<DashboardSearchProps> = ({client}) => {
   const [isSearchMounted, setIsSearchMounted] = useState(false)
@@ -141,50 +137,15 @@ export const DashboardSearch: FC<DashboardSearchProps> = ({client}) => {
 
       {isSearchMounted
         ? createPortal(
-            <Suspense
-              fallback={
-                <SearchOverlayFallback
-                  isOpen={isSearchOpen}
-                  style={searchOriginStyle}
-                  onClose={closeSearch}
-                />
-              }
-            >
-              <DashboardSearchOverlay
-                client={client}
-                isOpen={isSearchOpen}
-                onClose={closeSearch}
-                originStyle={searchOriginStyle}
-              />
-            </Suspense>,
+            <DashboardSearchOverlay
+              client={client}
+              isOpen={isSearchOpen}
+              onClose={closeSearch}
+              originStyle={searchOriginStyle}
+            />,
             document.body,
           )
         : undefined}
     </>
   )
 }
-
-const SearchOverlayFallback: FC<{
-  readonly isOpen: boolean
-  readonly onClose: () => void
-  readonly style: SearchOriginStyle
-}> = ({isOpen, onClose, style}) => (
-  <div
-    className={`${styles.searchOverlay} ${isOpen ? styles.searchOverlayOpen : ""}`}
-    aria-hidden={!isOpen}
-    style={style}
-  >
-    <button
-      type="button"
-      className={styles.searchBackdrop}
-      aria-label="Close search"
-      onClick={onClose}
-    />
-    <section className={styles.searchPanel} role="dialog" aria-modal="true" aria-label="Search">
-      <div className={styles.searchInputRow}>
-        <Search size={17} className={styles.searchInputIcon} />
-        <div className={styles.searchInput}>Loading search...</div>
-      </div>
-    </section>
-  </div>
-)

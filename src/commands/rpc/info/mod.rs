@@ -1,8 +1,8 @@
 use super::{
-    decode_storage, find_local_contract_match, format_account_status, format_hash,
-    format_int_address, format_std_address, load_rpc_config, print_get_method_hint,
-    print_get_methods, print_indented_block, print_kv, print_section, print_section_title,
-    resolve_rpc_network,
+    ContractMatchSource, decode_storage, find_contract_match_for_code, format_account_status,
+    format_hash, format_int_address, format_std_address, load_explicit_contract_match,
+    load_rpc_config, print_get_method_hint, print_get_methods, print_indented_block, print_kv,
+    print_section, print_section_title, resolve_rpc_network,
 };
 use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::code_lookup_hash;
@@ -13,6 +13,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashSet;
+use std::path::Path;
 use ton_api::{Network, OffchainJsonResolver, TonApiClient, toncenter::v2};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
@@ -26,6 +27,7 @@ const EXOTIC_LIBRARY_TAG: u8 = 2;
 
 pub(super) fn rpc_info_cmd(
     address_input: &str,
+    abi_path: Option<&Path>,
     net: Option<String>,
     block_number: Option<u64>,
     json: bool,
@@ -37,6 +39,7 @@ pub(super) fn rpc_info_cmd(
 
     let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
+    let explicit_contract_match = load_explicit_contract_match(abi_path, &config)?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
     let remote = client
@@ -47,55 +50,59 @@ pub(super) fn rpc_info_cmd(
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
     let data = TonApiClient::decode_optional_cell(&remote.data)?;
 
-    let matched_contract = code
+    let matched_contract = match explicit_contract_match {
+        Some(contract_match) => Some(contract_match),
+        None => code
+            .as_ref()
+            .map(|code| find_contract_match_for_code(code, &config))
+            .transpose()?
+            .flatten(),
+    };
+    let abi = matched_contract
         .as_ref()
-        .map(|code| find_local_contract_match(code.repr_hash(), &config))
-        .transpose()?
-        .flatten();
-    let catalog_contract = code.as_ref().and_then(|code| {
-        acton_abi_catalog::find_contract_by_code_hash(&code_lookup_hash(code).to_string())
-    });
-    let local_abi = matched_contract
-        .as_ref()
-        .and_then(|contract| contract.abi.clone());
-    let catalog_abi = catalog_contract.map(acton_abi_catalog::CatalogContract::abi);
-    let contract_name = match (
-        matched_contract.as_ref(),
-        local_abi.is_some(),
-        catalog_contract,
-    ) {
-        (Some(contract), true, _) => contract.contract_name.green().to_string(),
-        (_, _, Some(contract)) => contract.display_name.green().to_string(),
+        .and_then(|contract| contract.abi.as_deref());
+    let has_abi = abi.is_some();
+    let contract_name = match matched_contract.as_ref() {
+        Some(contract) if has_abi => contract.contract_name.green().to_string(),
         _ => "unknown".dimmed().to_string(),
     };
-    let has_abi = local_abi.is_some() || catalog_abi.is_some();
-    let contract_name_plain = match (
-        matched_contract.as_ref(),
-        local_abi.is_some(),
-        catalog_contract,
-    ) {
-        (Some(contract), true, _) => contract.contract_name.clone(),
-        (_, _, Some(contract)) => contract.display_name.clone(),
+    let contract_name_plain = match matched_contract.as_ref() {
+        Some(contract) if has_abi => contract.contract_name.clone(),
         _ => "unknown".to_owned(),
     };
-    let contract_source = match (
-        matched_contract.as_ref(),
-        local_abi.is_some(),
-        catalog_contract,
-    ) {
-        (Some(_), true, _) => "local",
-        (_, _, Some(_)) => "catalog",
-        (Some(_), false, _) => "local_code_hash",
+    let contract_source = match matched_contract.as_ref() {
+        Some(contract) if has_abi => contract.source.as_str(),
+        Some(_) => "local_code_hash",
         _ => "none",
     };
-    let doc_abi_command = has_abi.then(|| format_doc_abi_command(&contract_name_plain));
+    let doc_abi_command = matched_contract.as_ref().and_then(|contract| {
+        contract.abi.as_ref()?;
+        if contract.source == ContractMatchSource::Explicit {
+            return None;
+        }
+        let query = if contract.source == ContractMatchSource::Verifier {
+            format!("0x{}", code_lookup_hash(code.as_ref()?))
+        } else {
+            contract.contract_name.clone()
+        };
+        Some(format_doc_abi_command(&query))
+    });
 
-    let decoded_storage = match (&data, local_abi.as_deref(), catalog_abi.as_deref()) {
-        (Some(data), Some(abi), _) => Some(decode_storage(data, abi, &network)?),
-        (Some(data), None, Some(abi)) => match decode_storage(data, abi, &network) {
+    let decoded_storage = match (&data, abi) {
+        (Some(data), Some(abi))
+            if matched_contract.as_ref().is_some_and(|contract| {
+                matches!(
+                    contract.source,
+                    ContractMatchSource::Explicit | ContractMatchSource::Local
+                )
+            }) =>
+        {
+            Some(decode_storage(data, abi, &network)?)
+        }
+        (Some(data), Some(abi)) => match decode_storage(data, abi, &network) {
             Ok(decoded_storage) => Some(decoded_storage),
             Err(err) => {
-                warn!("Skipping bundled ABI storage decode: {err:#}");
+                warn!("Skipping {contract_source} ABI storage decode: {err:#}");
                 None
             }
         },
@@ -210,7 +217,7 @@ pub(super) fn rpc_info_cmd(
         None => {}
     }
 
-    if let Some(abi) = local_abi.as_deref().or(catalog_abi.as_deref()) {
+    if let Some(abi) = abi {
         print_section("Get Methods");
         print_get_methods(abi);
     }

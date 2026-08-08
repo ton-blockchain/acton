@@ -9,6 +9,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use ton::ton_core::cell::TonHash;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 const CONTRACT_REGISTRY_FORMAT_VERSION: u32 = 2;
@@ -77,75 +78,86 @@ pub(crate) struct DeploymentCandidateRegistration {
     pub(crate) code_hash: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ContractRegistration {
+    pub(crate) canonical_address: String,
+    pub(crate) display_address: String,
+    pub(crate) name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct SavedCompilerAbi {
     pub(crate) code_hash: String,
+    #[schema(value_type = Object)]
     pub(crate) abi: Value,
     pub(crate) saved_at: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct SavedVerifiedSource {
     pub(crate) artifact_id: String,
     pub(crate) code_hash: String,
+    #[schema(value_type = Object)]
     pub(crate) source: Value,
     pub(crate) saved_at: u64,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegisterContractRequest {
     pub(crate) address: String,
     pub(crate) name: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DeleteContractRequest {
     pub(crate) address: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SetAddressNameRequest {
     pub(crate) address: String,
     pub(crate) name: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegisterCompilerAbisRequest {
     pub(crate) entries: Vec<CompilerAbiRegistration>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CompilerAbiRegistration {
+    #[schema(value_type = Object)]
     pub(crate) abi: Value,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegisterVerifiedSourcesRequest {
     pub(crate) entries: Vec<VerifiedSourceRegistration>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VerifiedSourceRegistration {
     pub(crate) code_hash: String,
+    #[schema(value_type = Object)]
     pub(crate) source: Value,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CodeHashRequest {
     pub(crate) code_hash: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ArtifactIdRequest {
     pub(crate) artifact_id: String,
@@ -158,7 +170,7 @@ pub(crate) struct GetVerifiedSourceRequest {
     pub(crate) code_hash: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ContractArtifact {
     pub(crate) artifact_id: String,
@@ -170,7 +182,7 @@ pub(crate) struct ContractArtifact {
     pub(crate) compiler_version: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum ContractSourceKind {
     Local,
@@ -178,7 +190,7 @@ pub(crate) enum ContractSourceKind {
     Network,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ContractListEntry {
     pub(crate) address: String,
@@ -317,17 +329,52 @@ impl ContractRegistryStore {
         display_address: String,
         name: Option<String>,
     ) -> Result<RegisteredContract, ContractRegistryError> {
-        let name = non_empty_text(name);
-        let registered = RegisteredContract {
-            address: display_address,
-        };
+        let mut registered = self
+            .register_contracts(
+                environment_id,
+                vec![ContractRegistration {
+                    canonical_address,
+                    display_address,
+                    name,
+                }],
+            )
+            .await?;
+        Ok(registered
+            .pop()
+            .expect("one contract registration produces one result"))
+    }
+
+    pub(crate) async fn register_contracts(
+        &self,
+        environment_id: &str,
+        registrations: Vec<ContractRegistration>,
+    ) -> Result<Vec<RegisteredContract>, ContractRegistryError> {
+        let changes = registrations
+            .into_iter()
+            .map(|registration| {
+                let registered = RegisteredContract {
+                    address: registration.display_address,
+                };
+                (
+                    registration.canonical_address,
+                    non_empty_text(registration.name),
+                    registered,
+                )
+            })
+            .collect::<Vec<_>>();
+        let registered = changes
+            .iter()
+            .map(|(_, _, contract)| contract.clone())
+            .collect();
         self.mutate(environment_id, |registry| {
-            registry
-                .contracts
-                .insert(canonical_address.clone(), registered.clone());
-            registry.deployment_candidates.remove(&canonical_address);
-            if let Some(name) = name {
-                registry.address_names.insert(canonical_address, name);
+            for (canonical_address, name, contract) in changes {
+                registry
+                    .contracts
+                    .insert(canonical_address.clone(), contract);
+                registry.deployment_candidates.remove(&canonical_address);
+                if let Some(name) = name {
+                    registry.address_names.insert(canonical_address, name);
+                }
             }
         })
         .await?;

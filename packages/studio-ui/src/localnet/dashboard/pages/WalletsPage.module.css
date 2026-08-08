@@ -26,22 +26,6 @@
   gap: 10px;
 }
 
-.walletTableWrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--acton-color-border);
-  box-sizing: border-box;
-  border-radius: 12px;
-  background: var(--acton-color-surface-raised);
-  -webkit-overflow-scrolling: touch;
-}
-
-.walletsTableWrap .walletTableTitleBar,
-.walletsTable {
-  min-width: 860px;
-}
-
 .radio,
 .addressCopyButton,
 .messageIndex {
@@ -58,152 +42,6 @@
   gap: 12px;
 }
 
-.walletTableTitleBar {
-  min-width: 720px;
-  min-height: 52px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--acton-color-border);
-  background: var(--acton-color-surface-raised);
-  color: var(--acton-color-text);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.walletTableTitle {
-  margin: 0;
-  font-size: 0.86rem;
-  font-weight: 750;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.walletTableTitleMeta {
-  min-width: 0;
-  color: var(--acton-color-text-muted);
-  overflow: hidden;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.78rem;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.refreshButton.refreshButton,
-.tableActionButton.tableActionButton {
-  min-height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--acton-color-accent);
-  gap: 6px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.refreshButton.refreshButton:hover:not(:disabled),
-.tableActionButton.tableActionButton:hover:not(:disabled) {
-  background: transparent;
-  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
-}
-
-.refreshButton.refreshButton:focus-visible,
-.tableActionButton.tableActionButton:focus-visible {
-  outline: none;
-  background: transparent;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.refreshButton.refreshButton:disabled,
-.tableActionButton.tableActionButton:disabled {
-  background: transparent;
-  box-shadow: none;
-  opacity: 0.5;
-}
-
-.refreshButton svg,
-.tableActionButton svg {
-  color: currentColor;
-}
-
-.walletTable {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  table-layout: fixed;
-  background: var(--acton-color-surface-raised);
-}
-
-.walletTable th,
-.walletTable td {
-  padding: 0 14px;
-  color: var(--acton-color-text);
-  box-sizing: border-box;
-  line-height: 1.35;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.walletTable th {
-  height: 36px;
-  color: var(--acton-color-text-muted);
-  background: var(--acton-color-surface-row);
-  border-bottom: 1px solid var(--acton-color-border);
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.walletTable td {
-  height: 46px;
-  border-top: 1px solid var(--acton-color-border);
-  font-size: 0.82rem;
-}
-
-.walletTable tbody tr:first-child td {
-  border-top: 0;
-}
-
-.walletTableRow {
-  background: var(--acton-color-surface-raised);
-  transition: background-color 120ms ease;
-}
-
-.walletTableRow:hover td {
-  background: var(--acton-color-surface-row);
-}
-
-.walletNameHeader,
-.walletNameCell {
-  width: 150px;
-  padding-left: 18px !important;
-}
-
-.walletAddressHeader,
-.walletAddressCell {
-  width: 310px;
-}
-
-.walletVersionHeader,
-.walletVersionCell {
-  width: 92px;
-}
-
-.walletBalanceHeader,
-.walletBalanceCell {
-  padding-right: 18px !important;
-  text-align: right !important;
-  white-space: nowrap;
-}
-
 .walletAddressCell,
 .sessionDappCell {
   min-width: 0;
@@ -214,21 +52,16 @@
   max-width: 100%;
 }
 
-.walletName,
+.walletBalanceCell > * {
+  display: flex;
+}
+
 .sessionTitle,
 .pickerTitle,
 .permissionTitle,
 .messageAddress {
   color: var(--acton-color-text);
   font-weight: 600;
-}
-
-.walletName {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.86rem;
 }
 
 .unsupportedItem {
@@ -240,16 +73,6 @@
   line-height: 1;
   padding: 4px 8px;
   white-space: nowrap;
-}
-
-.walletVersion {
-  display: block;
-  color: var(--acton-color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.82rem;
-  font-weight: 600;
 }
 
 .sessionDomain,
@@ -266,8 +89,7 @@
 .sessionTitle,
 .sessionDomain,
 .metaValue,
-.sessionWalletCell,
-.sessionActivityCell {
+.sessionWalletCell {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -316,16 +138,7 @@
   font-weight: 500;
 }
 
-.walletTableEmpty {
-  margin: 18px;
-}
-
-.sessionDappCell {
-  padding-left: 18px !important;
-}
-
 .sessionWalletCell {
-  width: 170px;
   color: var(--acton-color-text);
   font-weight: 600;
 }
@@ -335,57 +148,8 @@
   font-weight: 500;
 }
 
-.sessionActivityHeader,
-.sessionActivityCell {
-  width: 230px;
-  color: var(--acton-color-text-muted) !important;
-  white-space: nowrap;
-}
-
-.sessionActionsHeader,
-.sessionActionsCell {
-  width: 150px;
-  padding-right: 18px !important;
-  text-align: right !important;
-}
-
-.sessionActionsCell > * {
-  justify-content: center;
-}
-
-.sessionEmptyCell,
 .connectFooterCell {
-  height: auto !important;
   padding: 0 !important;
-}
-
-.connectFooterCell {
-  border-top: 1px solid var(--acton-color-border) !important;
-  background: var(--acton-color-surface-raised);
-}
-
-.walletNameSkeleton,
-.walletVersionSkeleton,
-.walletAddressSkeleton,
-.walletBalanceSkeleton {
-  display: block;
-}
-
-.walletNameSkeleton {
-  width: min(120px, 80%);
-}
-
-.walletVersionSkeleton {
-  width: 48px;
-}
-
-.walletAddressSkeleton {
-  width: min(260px, 70%);
-}
-
-.walletBalanceSkeleton {
-  width: 100px;
-  margin-left: auto;
 }
 
 .unsupportedBlock {
@@ -406,13 +170,14 @@
 }
 
 .connectControlForm {
-  min-width: 720px;
+  width: 100%;
+  min-width: 0;
   min-height: 58px;
   padding: 11px 18px;
   box-sizing: border-box;
   background: var(--acton-color-surface-raised);
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) 148px;
+  grid-template-columns: 128px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 14px;
 }
@@ -426,7 +191,7 @@
   text-transform: uppercase;
 }
 
-.connectControlForm .tableActionButton {
+.connectAction {
   justify-self: end;
 }
 
@@ -736,16 +501,6 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
   }
 }
 

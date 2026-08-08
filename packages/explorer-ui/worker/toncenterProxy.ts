@@ -1,11 +1,12 @@
 export type ToncenterNetwork = "mainnet" | "testnet"
 type ToncenterProxyTarget =
-  | {version: "v2"; endpoint: "getShards"}
+  | {version: "v2"; endpoint: "getBlockTransactions" | "getShards"}
   | {version: "v3"; endpoint: "blocks" | "traces" | "transactions"}
 
 export const HISTORICAL_DATA_CACHE_CONTROL = "public, max-age=300, s-maxage=604800, immutable"
 export const INT32_MIN = -2_147_483_648n
 export const INT32_MAX = 2_147_483_647n
+export const INT64_MIN = -9_223_372_036_854_775_808n
 export const INT64_MAX = 9_223_372_036_854_775_807n
 
 export type Env = {

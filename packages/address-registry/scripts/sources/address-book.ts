@@ -6,16 +6,10 @@ import {parseSourceAddresses, readSource, readText} from "./shared.ts"
 const ADDRESS_BOOK_BASE_URL =
   "https://raw.githubusercontent.com/catchain/address-book/master/source"
 
-const ADDRESS_BOOK_FILES = [
-  "community.yaml",
-  "exchanges.yaml",
-  "people.yaml",
-  "system.yaml",
-  "validators.yaml",
-] as const
+const ADDRESS_BOOK_FILES = ["community", "exchanges", "people", "system", "validators"] as const
 
 export const ADDRESS_BOOK_URLS = ADDRESS_BOOK_FILES.map(
-  fileName => `${ADDRESS_BOOK_BASE_URL}/${fileName}`,
+  fileName => `${ADDRESS_BOOK_BASE_URL}/${fileName}.yaml`,
 )
 
 export const parseAddressBook = (text: string, sourcePath: string) => {

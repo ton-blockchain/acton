@@ -213,6 +213,12 @@ Defaults to `[test].junit-path`, or `test-results` when it is not configured.
 Merge all test suites into a single JUnit XML file.
 {{/option}}
 
+{{#option "`--no-studio-reporting`" }}
+Do not send test run data to Acton Studio for this run.
+
+This overrides `[test].studio-reporting = true`.
+{{/option}}
+
 {{#option "`--ui`" }}
 Open test results in a browser UI.
 {{/option}}
@@ -243,6 +249,10 @@ Defaults to `false`.
 
 {{#option "`--fork-net` _network_" }}
 Fork remote blockchain state for account resolution.
+
+Acton also uses the network configuration from the resolved masterchain block.
+With an explicit historical block, it uses that block's Unix time; otherwise,
+it uses the current system Unix time.
 {{/option}}
 
 {{#option "`--fork-block-number` _seqno_" }}
@@ -251,14 +261,17 @@ Historical block sequence number to fork from.
 When a fork block number is set, Acton caches resolved remote accounts under
 `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later test
 runs with the same fork network, block number, and address read that file before
-calling the remote API.
+calling the remote API. Fork runs without an explicit block use the same account
+cache after they resolve the latest sequence number. Acton caches the matching
+network configuration and, for explicit historical forks, block time for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`.
 {{/option}}
 
 {{#option "`--no-fork-cache`" }}
-Disable persistent account cache for pinned fork block numbers. Use this when
-you want every test run to fetch forked accounts from the remote API. The
-regular `--clear-cache` flag removes this cache together with the rest of
-`build/cache`.
+Disable persistent account and library cache. Use this when you want every test
+run to fetch forked accounts and libraries from the remote API. This option does
+not disable the 24-hour masterchain snapshot cache. The regular `--clear-cache`
+flag removes this cache together with the rest of `build/cache`.
 {{/option}}
 
 {{/options}}
@@ -401,6 +414,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 ## Reporting And Artifacts
 
 - `--reporter` on the CLI overrides `[test].reporter` for the current run
+- `--no-studio-reporting` disables Studio reporting for the current run even
+  when `[test].studio-reporting` is enabled and Studio is running
 - `--ui` adds the browser UI in addition to text reporters
 - `--coverage --ui` adds a `Coverage` tab to the browser UI for browsing
   coverage summaries, files, and annotated source
@@ -534,6 +549,7 @@ CLI flags override config values for the current invocation.
 - `--coverage-minimum-percent` and `[test.coverage].minimum-percent` are ignored
   when `--ui` is enabled
 - `--fork-net` keeps execution local while resolving blockchain state remotely
+- fork state and configuration come from the same masterchain block; an explicit historical fork also uses that block's time
 - `--mutation-diff worktree` is intended for uncommitted local changes
 - `--mutation-diff ref` requires `--mutation-diff-ref`
 - `--mutation-diff branch` uses the upstream branch merge-base by default

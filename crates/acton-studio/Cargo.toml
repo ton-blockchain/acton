@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 axum = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true }
 dunce = { workspace = true }
 futures = { workspace = true }
@@ -31,6 +32,7 @@ tower-http = { workspace = true, features = ["fs"] }
 tracing = { workspace = true }
 url = { workspace = true }
 urlencoding = { workspace = true }
+utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 uuid = { workspace = true }
 xxhash-rust = { workspace = true }
 

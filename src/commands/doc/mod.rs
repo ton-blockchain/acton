@@ -1,5 +1,6 @@
 use crate::commands::rpc::{
-    find_local_contract_by_abi_name, find_local_contract_by_config_name, load_rpc_config,
+    find_local_contract_by_abi_name, find_local_contract_by_config_name,
+    find_verifier_abi_by_code_hash, load_rpc_config,
 };
 use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, anyhow};
@@ -111,40 +112,44 @@ pub fn doc_tvm_cmd(
     Ok(())
 }
 
-pub fn doc_abi_cmd(contract_name: &str) -> Result<()> {
-    let contract_name = contract_name.trim();
-    if contract_name.is_empty() {
-        anyhow::bail!("Contract name cannot be empty");
+pub fn doc_abi_cmd(contract_query: &str) -> Result<()> {
+    let contract_query = contract_query.trim();
+    if contract_query.is_empty() {
+        anyhow::bail!("Contract name or code hash cannot be empty");
     }
 
     let config = load_rpc_config()?;
-    if let Some(local_contract) = find_local_contract_by_config_name(contract_name, &config)? {
-        if let Some(abi) = local_contract.abi.as_deref() {
-            return print_abi_json(abi);
-        }
+    let local_contract = find_local_contract_by_config_name(contract_query, &config)?;
+    if let Some(abi) = local_contract
+        .as_ref()
+        .and_then(|contract| contract.abi.as_deref())
+    {
+        return print_abi_json(abi);
+    }
 
-        if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_name) {
-            return print_abi_json(catalog_contract.abi().as_ref());
-        }
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_query) {
+        return print_abi_json(catalog_contract.abi().as_ref());
+    }
 
+    if let Some(local_contract) = find_local_contract_by_abi_name(contract_query, &config)?
+        && let Some(abi) = local_contract.abi.as_deref()
+    {
+        return print_abi_json(abi);
+    }
+
+    if let Some(abi) = find_verifier_abi_by_code_hash(contract_query)? {
+        return print_abi_json(abi.as_ref());
+    }
+
+    if let Some(local_contract) = local_contract {
         anyhow::bail!(
             "Local contract '{}' was found, but it does not declare ABI",
             local_contract.contract_name
         );
     }
 
-    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_name) {
-        return print_abi_json(catalog_contract.abi().as_ref());
-    }
-
-    if let Some(local_contract) = find_local_contract_by_abi_name(contract_name, &config)?
-        && let Some(abi) = local_contract.abi.as_deref()
-    {
-        return print_abi_json(abi);
-    }
-
     anyhow::bail!(
-        "Contract ABI '{contract_name}' not found in local Acton.toml contracts or bundled ABI catalog"
+        "Contract ABI '{contract_query}' not found in local Acton.toml contracts, bundled ABI catalog, or verifier"
     );
 }
 

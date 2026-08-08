@@ -4,7 +4,7 @@ use super::handlers::{
     detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3,
     export_checkpoint, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
     get_address_information, get_address_information_v3, get_address_state,
-    get_adjacent_transactions_v3, get_api_calls, get_block_header, get_block_transactions,
+    get_adjacent_transactions_v3, get_block_header, get_block_transactions,
     get_block_transactions_ext, get_blocks_v3, get_config_all, get_config_param,
     get_consensus_block, get_dns_records, get_extended_address_information, get_jetton_burns,
     get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
@@ -24,27 +24,20 @@ use super::handlers::{
     source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
     try_locate_source_tx, try_locate_tx, unpack_address,
 };
-use crate::server::{
-    ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallSource, ApiCallType, NetworkConditions,
-    ServerState,
-};
+use crate::server::{NetworkConditions, ServerState};
 use axum::{
     Json, Router,
-    body::{Body, BodyDataStream, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Request, State},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use std::num::NonZeroU32;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::time::sleep;
-use tokio_stream::Stream;
 use ton_api::toncenter::{v2::responses::TonlibErrorResponse, v3::responses::RequestError};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
@@ -52,12 +45,6 @@ use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-
-const MAX_BUFFERED_REQUEST_BODY_BYTES: usize = 256 * 1024 * 1024;
-const MAX_STORED_REQUEST_BODY_BYTES: usize = 64 * 1024;
-const MAX_STORED_RESPONSE_BODY_BYTES: usize = 64 * 1024;
-const REQUEST_SOURCE_HEADER: &str = "x-acton-request-source";
-const STUDIO_UI_REQUEST_SOURCE: &str = "studio-ui";
 
 fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
     let nanoseconds = 1_000_000_000u64.div_ceil(u64::from(requests_per_second.get()));
@@ -193,7 +180,6 @@ pub fn create_router(state: ServerState) -> Router {
         .merge(emulate_router)
         .merge(streaming_router)
         .fallback(handle_unknown_api);
-    let api_calls_for_admin = state.api_calls.clone();
     let acton_router = Router::new()
         .route("/acton_fundAccount", post(faucet))
         .route("/acton_fundJetton", post(jetton_faucet))
@@ -227,11 +213,7 @@ pub fn create_router(state: ServerState) -> Router {
             "/acton_setNextBlockTimestamp",
             post(set_next_block_timestamp),
         )
-        .route("/acton_getApiCalls", get(get_api_calls))
-        .route("/acton_nodeInfo", get(get_status))
-        .layer(middleware::from_fn(move |request, next| {
-            record_api_call(request, next, api_calls_for_admin.clone())
-        }));
+        .route("/acton_nodeInfo", get(get_status));
 
     if let Some(limit) = rate_limit_rps.and_then(NonZeroU32::new) {
         let period = rate_limit_period(limit);
@@ -248,11 +230,6 @@ pub fn create_router(state: ServerState) -> Router {
             .error_handler(move |error| governor_error_response(error, limit));
         api_router = api_router.layer(governor_layer);
     }
-
-    let api_calls_for_api = state.api_calls.clone();
-    api_router = api_router.layer(middleware::from_fn(move |request, next| {
-        record_api_call(request, next, api_calls_for_api.clone())
-    }));
 
     let mut api_entry_router = Router::new().nest("/api", api_router);
     let mut control_router = acton_router;
@@ -365,314 +342,6 @@ fn websocket_query_token_matches(request: &Request, auth_token: &str) -> bool {
         url::form_urlencoded::parse(query.as_bytes())
             .any(|(key, value)| key == "token" && value == auth_token)
     })
-}
-
-async fn record_api_call(request: Request, next: Next, api_calls: ApiCallLog) -> Response {
-    let start = ApiCallLog::start();
-    let http_method = request.method().as_str().to_owned();
-    let path = request.uri().path().to_owned();
-    let query_params = query_params_value(request.uri().query());
-    let source = request
-        .headers()
-        .get(REQUEST_SOURCE_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| value.eq_ignore_ascii_case(STUDIO_UI_REQUEST_SOURCE))
-        .map_or(ApiCallSource::External, |_| ApiCallSource::StudioUi);
-    let (request, request_body, request_body_truncated) = match capture_request_body(request).await
-    {
-        Ok(captured) => captured,
-        Err(response) => return response,
-    };
-    let mut input = api_call_input(
-        &http_method,
-        &path,
-        source,
-        query_params,
-        request_body,
-        request_body_truncated,
-    );
-    let response = next.run(request).await;
-
-    let status_code = response.status().as_u16();
-    if let Some(input) = input.as_mut() {
-        input.status_code = status_code;
-    }
-    if let Some(input) = input {
-        let sequence = api_calls.record(input, start);
-        return capture_response_body(response, api_calls, sequence, &path);
-    }
-
-    response
-}
-
-async fn capture_request_body(
-    request: Request,
-) -> Result<(Request, Option<Value>, bool), Response> {
-    let (parts, body) = request.into_parts();
-    let bytes = to_bytes(body, MAX_BUFFERED_REQUEST_BODY_BYTES)
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::PAYLOAD_TOO_LARGE,
-                Json(json!({
-                    "ok": false,
-                    "error": "Request body exceeds the localnet limit",
-                })),
-            )
-                .into_response()
-        })?;
-    let (request_body, request_body_truncated) = request_body_value(&bytes);
-    let request = Request::from_parts(parts, Body::from(bytes));
-
-    Ok((request, request_body, request_body_truncated))
-}
-
-fn request_body_value(bytes: &Bytes) -> (Option<Value>, bool) {
-    if bytes.is_empty() {
-        return (None, false);
-    }
-
-    let truncated = bytes.len() > MAX_STORED_REQUEST_BODY_BYTES;
-    let visible_bytes = &bytes[..bytes.len().min(MAX_STORED_REQUEST_BODY_BYTES)];
-    (stored_body_value(visible_bytes, truncated), truncated)
-}
-
-fn stored_body_value(bytes: &[u8], truncated: bool) -> Option<Value> {
-    if bytes.is_empty() {
-        return None;
-    }
-
-    Some(if truncated {
-        Value::String(String::from_utf8_lossy(bytes).into_owned())
-    } else {
-        serde_json::from_slice(bytes)
-            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(bytes).into_owned()))
-    })
-}
-
-fn capture_response_body(
-    response: Response,
-    api_calls: ApiCallLog,
-    sequence: u64,
-    path: &str,
-) -> Response {
-    if !should_capture_response_body(path) {
-        return response;
-    }
-
-    let (parts, body) = response.into_parts();
-    let stream = ApiCallResponseStream {
-        inner: body.into_data_stream(),
-        capture: Some(ApiCallResponseCapture {
-            api_calls,
-            sequence,
-            bytes: Vec::new(),
-            truncated: false,
-        }),
-    };
-    Response::from_parts(parts, Body::from_stream(stream))
-}
-
-fn should_capture_response_body(path: &str) -> bool {
-    !matches!(path, "/acton_getApiCalls" | "/acton_getStartupAccounts")
-}
-
-struct ApiCallResponseCapture {
-    api_calls: ApiCallLog,
-    sequence: u64,
-    bytes: Vec<u8>,
-    truncated: bool,
-}
-
-impl ApiCallResponseCapture {
-    fn push(&mut self, bytes: &Bytes) {
-        let remaining = MAX_STORED_RESPONSE_BODY_BYTES.saturating_sub(self.bytes.len());
-        let visible_len = bytes.len().min(remaining);
-        self.bytes.extend_from_slice(&bytes[..visible_len]);
-        self.truncated |= visible_len < bytes.len();
-    }
-
-    fn finish(mut self, incomplete: bool) {
-        self.truncated |= incomplete;
-        let response_body = stored_body_value(&self.bytes, self.truncated);
-        self.api_calls
-            .record_response(self.sequence, response_body, self.truncated);
-    }
-}
-
-struct ApiCallResponseStream {
-    inner: BodyDataStream,
-    capture: Option<ApiCallResponseCapture>,
-}
-
-impl ApiCallResponseStream {
-    fn finish(&mut self, incomplete: bool) {
-        if let Some(capture) = self.capture.take() {
-            capture.finish(incomplete);
-        }
-    }
-}
-
-impl Stream for ApiCallResponseStream {
-    type Item = Result<Bytes, axum::Error>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-        let result = Pin::new(&mut this.inner).poll_next(cx);
-        match &result {
-            Poll::Ready(Some(Ok(bytes))) => {
-                if let Some(capture) = this.capture.as_mut() {
-                    capture.push(bytes);
-                }
-            }
-            Poll::Ready(Some(Err(_))) => this.finish(true),
-            Poll::Ready(None) => this.finish(false),
-            Poll::Pending => {}
-        }
-        result
-    }
-}
-
-impl Drop for ApiCallResponseStream {
-    fn drop(&mut self) {
-        self.finish(true);
-    }
-}
-
-fn query_params_value(query: Option<&str>) -> Option<Value> {
-    let query = query?;
-    let mut params = serde_json::Map::new();
-
-    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
-        let value = Value::String(value.into_owned());
-        match params.entry(key.into_owned()) {
-            serde_json::map::Entry::Vacant(entry) => {
-                entry.insert(value);
-            }
-            serde_json::map::Entry::Occupied(mut entry) => match entry.get_mut() {
-                Value::Array(values) => values.push(value),
-                previous => {
-                    *previous = Value::Array(vec![std::mem::take(previous), value]);
-                }
-            },
-        }
-    }
-
-    Some(Value::Object(params))
-}
-
-fn api_call_input(
-    http_method: &str,
-    path: &str,
-    source: ApiCallSource,
-    query_params: Option<Value>,
-    request_body: Option<Value>,
-    request_body_truncated: bool,
-) -> Option<ApiCallInput> {
-    let normalized_api_path = path.strip_prefix("/api").unwrap_or(path);
-    let (api_family, mut method) = if path.starts_with("/acton_") {
-        if matches!(path, "/acton_getApiCalls" | "/acton_nodeInfo") {
-            return None;
-        }
-        (
-            ApiCallFamily::Control,
-            path.trim_start_matches('/').to_owned(),
-        )
-    } else if normalized_api_path == "/v2"
-        || normalized_api_path == "/v2/jsonRPC"
-        || normalized_api_path == "/v2/v2/jsonRPC"
-    {
-        (ApiCallFamily::JsonRpc, "jsonRPC".to_owned())
-    } else if normalized_api_path.starts_with("/v2/") {
-        (
-            ApiCallFamily::V2,
-            normalized_api_path
-                .trim_start_matches("/v2/")
-                .split('/')
-                .next()
-                .unwrap_or("v2")
-                .to_owned(),
-        )
-    } else if normalized_api_path.starts_with("/v3/") {
-        (
-            ApiCallFamily::V3,
-            normalized_api_path
-                .trim_start_matches("/v3/")
-                .split('/')
-                .next()
-                .unwrap_or("v3")
-                .to_owned(),
-        )
-    } else if normalized_api_path.starts_with("/emulate/") {
-        (
-            ApiCallFamily::Emulate,
-            normalized_api_path
-                .trim_start_matches('/')
-                .split('/')
-                .next_back()
-                .unwrap_or("emulate")
-                .to_owned(),
-        )
-    } else if normalized_api_path.starts_with("/streaming/") {
-        (
-            ApiCallFamily::Streaming,
-            normalized_api_path.trim_start_matches('/').to_owned(),
-        )
-    } else {
-        return None;
-    };
-    let request_id = if matches!(api_family, ApiCallFamily::JsonRpc)
-        && let Some(body) = request_body.as_ref().and_then(Value::as_object)
-    {
-        if let Some(json_rpc_method) = body.get("method").and_then(Value::as_str) {
-            json_rpc_method.clone_into(&mut method);
-        }
-        body.get("id").cloned().unwrap_or(Value::Null)
-    } else {
-        Value::Null
-    };
-
-    Some(ApiCallInput {
-        source,
-        call_type: classify_http_call_type(http_method, api_family, &method),
-        api_family,
-        http_method: http_method.to_owned(),
-        path: path.to_owned(),
-        method,
-        request_id,
-        query_params,
-        request_body,
-        request_body_truncated,
-        status_code: 0,
-    })
-}
-
-fn classify_http_call_type(
-    http_method: &str,
-    api_family: ApiCallFamily,
-    method: &str,
-) -> ApiCallType {
-    if matches!(http_method, "GET" | "HEAD" | "OPTIONS") {
-        return ApiCallType::Read;
-    }
-
-    match api_family {
-        ApiCallFamily::JsonRpc => classify_json_rpc_call(method),
-        ApiCallFamily::Emulate | ApiCallFamily::Streaming => ApiCallType::Read,
-        ApiCallFamily::V2 if matches!(method, "runGetMethod" | "runGetMethodStd") => {
-            ApiCallType::Read
-        }
-        ApiCallFamily::V3 if matches!(method, "estimateFee" | "runGetMethod") => ApiCallType::Read,
-        ApiCallFamily::Control if method == "acton_buildSourceTrace" => ApiCallType::Read,
-        _ => ApiCallType::Write,
-    }
-}
-
-fn classify_json_rpc_call(method: &str) -> ApiCallType {
-    match method {
-        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
-        _ => ApiCallType::Read,
-    }
 }
 
 fn public_api_cors() -> CorsLayer {

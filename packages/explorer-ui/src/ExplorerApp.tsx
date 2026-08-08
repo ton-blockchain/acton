@@ -37,6 +37,7 @@ import {TonClient} from "@acton/explorer-core/api/client"
 import {getBundledCompilerAbis} from "@acton/explorer-core/api/compilerAbiCatalog"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "@acton/explorer-core/hooks/useExplorerRoutes"
+import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {StaticNetworkInfoProvider} from "@acton/explorer-core/hooks/StaticNetworkInfoProvider"
 import {BrowserMetadataRegistry} from "@acton/explorer-core/metadata/browserRegistry"
 import {BundledAbiRegistry} from "@acton/explorer-core/metadata/bundledAbiRegistry"
@@ -50,6 +51,7 @@ import type {
 } from "@acton/explorer-core/hooks/useNetworkInfo"
 import {TokenCatalogPage} from "@acton/explorer-core/pages/TokenCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
+import {ConfigPage} from "@acton/explorer-core/pages/ConfigPage"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
 import {ExplorerDocumentTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
@@ -868,6 +870,7 @@ const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigat
 }
 
 const DesktopMoreMenu: FC = () => {
+  const routes = useExplorerRoutePaths()
   const [open, setOpen] = useState(false)
   const closeMenu = () => setOpen(false)
 
@@ -897,6 +900,14 @@ const DesktopMoreMenu: FC = () => {
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Tokens</span>
               <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Network config</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Read protocol parameters and limits
+              </span>
             </span>
           </Link>
           <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
@@ -1346,6 +1357,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/tokens" onClick={closeMobileHeaderPanels}>
                                 Tokens
                               </Link>
+                              <Link to="/config" onClick={closeMobileHeaderPanels}>
+                                Network config
+                              </Link>
                               {networkId === "mainnet" && (
                                 <Link to="/suspended" onClick={closeMobileHeaderPanels}>
                                   Suspended addresses
@@ -1414,6 +1428,8 @@ export const ExplorerApp: FC = () => {
                         }
                       />
                       <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
+                      <Route path="/config/:seqno" element={<ConfigPage client={client} />} />
+                      <Route path="/config" element={<ConfigPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage client={client} />} />

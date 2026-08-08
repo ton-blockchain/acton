@@ -36,7 +36,7 @@ Show the service state:
 
 ```bash
 docker compose ps
-docker compose logs -f localton v3-worker v3-api
+docker compose logs -f localton v3-account-scanner v3-worker v3-api
 ```
 
 The first run can take several minutes. The node must create the network before the V3 worker can index blocks.
@@ -57,6 +57,7 @@ curl 'http://127.0.0.1:18003/api/v3/blocks?workchain=-1&limit=8&sort=desc'
 | `postgres` | Stores the indexed blockchain data. |
 | `redis` | Stores data for API V3 and the event classifier. |
 | `v3-migrations` | Creates the PostgreSQL schema. |
+| `v3-account-scanner` | Indexes every account present in the initial network state. |
 | `v3-worker` | Reads the validator database and indexes blocks. |
 | `v3-api` | Serves TON Center API V3. |
 | `v3-classifier` | Classifies indexed actions. |
@@ -522,6 +523,15 @@ docker build -t localton:dev .
 LOCALTON_IMAGE=localton:dev docker compose up -d
 ```
 
+For launcher development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
+
+```bash
+just build-localton-dev-image
+ACTON_STUDIO_LOCALTON_IMAGE=localton:dev cargo run -- studio start
+```
+
+Set `LOCALTON_BASE_IMAGE` to use another base image. Set `ACTON_STUDIO_LOCALTON_IMAGE` to build and run another local tag. The environment variable applies when Studio creates a new full TON network environment. Existing environments keep the image recorded in their runtime configuration.
+
 GitHub Actions publishes `ghcr.io/ton-blockchain/localton` for `linux/amd64` and `linux/arm64`. The workflow publishes `latest`, branch, tag, semantic-version, and commit tags.
 
 ## Development checks
@@ -547,4 +557,4 @@ The project does not include an explorer or contract editor. Use API V2, API V3,
 
 ## License
 
-localton uses the GNU General Public License, version 3 or later. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+localton uses the GNU General Public License, version 3 or later. See [NOTICE.md](NOTICE.md) for third-party notices.

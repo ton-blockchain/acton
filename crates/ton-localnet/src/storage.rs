@@ -684,6 +684,8 @@ pub struct Globals {
     /// masterchain block, while `History` stores only blocks mined locally after
     /// that point.
     pub origin_seqno: Seqno,
+    /// Unix time of the pinned remote masterchain block for forked localnets.
+    pub origin_gen_utime: u32,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -698,6 +700,7 @@ impl Globals {
     pub const fn new(config_boc_hash: Hash256) -> Self {
         Self {
             origin_seqno: 0,
+            origin_gen_utime: 0,
             head_seqno: 0,
             global_lt: 0,
             lt_step: 1,

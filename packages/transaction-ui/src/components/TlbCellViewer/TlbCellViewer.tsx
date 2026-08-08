@@ -1,7 +1,14 @@
-import {HighlightedCode, ParsedValueView, RawDataBlock, type ParsedValue} from "@acton/ui"
+import {
+  formatGramAmount,
+  HighlightedCode,
+  ParsedValueView,
+  RawDataBlock,
+  shortenMiddle,
+  type ParsedValue,
+} from "@acton/ui"
 import {Box} from "lucide-react"
 import {parseTLB, replacer, type ParsedCell} from "@ton-community/tlb-runtime"
-import {Address, Cell, fromNano} from "@ton/core"
+import {Address, Cell} from "@ton/core"
 import {useMemo} from "react"
 
 import styles from "./TlbCellViewer.module.css"
@@ -147,7 +154,7 @@ function toParsedValue(value: ParsedCell, fieldName: string): ParsedValue {
         return {
           kind: "scalar",
           typeName: "Cell",
-          value: `Cell ${shortenHash(cell.hash().toString("hex"))} (${cell.bits.length} bits, ${cell.refs.length} refs)`,
+          value: `Cell ${shortenMiddle(cell.hash().toString("hex"), {start: 10, end: 10})} (${cell.bits.length} bits, ${cell.refs.length} refs)`,
           rawValue: cell.toBoc().toString("hex"),
         }
       }
@@ -183,7 +190,7 @@ function toParsedValue(value: ParsedCell, fieldName: string): ParsedValue {
 function formatScalar(fieldName: string, value: ParsedCell): string {
   if (typeof value === "bigint") {
     if (looksLikeAmount(fieldName)) {
-      return `${fromNano(value)} GRAM (${value.toString()} nano)`
+      return `${formatGramAmount(value)} (${value.toString()} nano)`
     }
 
     if (looksLikeHash(fieldName)) {
@@ -253,10 +260,6 @@ function looksLikeAmount(fieldName: string): boolean {
 
 function looksLikeHash(fieldName: string): boolean {
   return /hash|digest/i.test(fieldName)
-}
-
-function shortenHash(hash: string): string {
-  return hash.length <= 20 ? hash : `${hash.slice(0, 10)}…${hash.slice(-10)}`
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

@@ -1,13 +1,15 @@
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use reqwest::blocking::Response;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub use ton_networks::{CustomNetworkUrls, Network};
 use toncenter::{v2, v3};
 use toncenter_keys::api_key as toncenter_api_key;
@@ -31,6 +33,9 @@ const TEST_TONCENTER_RETRY_BACKOFF_MS_ENV: &str = "ACTON_TEST_TONCENTER_RETRY_BA
 const TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV: &str =
     "ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
+pub const MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR: &str = "masterchain-snapshots";
+const MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION: u32 = 2;
+const MASTERCHAIN_SNAPSHOT_CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
 
@@ -114,6 +119,113 @@ pub struct TonApiClient {
     network: Network,
     api_key: Option<String>,
     custom_networks: HashMap<String, CustomNetworkUrls>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MasterchainSnapshot {
+    pub seqno: u64,
+    pub gen_utime: u32,
+    pub config: Cell,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MasterchainSnapshotCacheEntry {
+    schema_version: u32,
+    network: Network,
+    v2_url: String,
+    seqno: u64,
+    fetched_at: u64,
+    gen_utime: Option<u32>,
+    config_boc64: String,
+}
+
+struct CachedMasterchainSnapshot {
+    fetched_at: u64,
+    gen_utime: Option<u32>,
+    config: Cell,
+}
+
+impl MasterchainSnapshotCacheEntry {
+    fn new(
+        network: &Network,
+        v2_url: String,
+        snapshot: &MasterchainSnapshot,
+        gen_utime: Option<u32>,
+        fetched_at: u64,
+    ) -> Self {
+        Self {
+            schema_version: MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION,
+            network: network.clone(),
+            v2_url,
+            seqno: snapshot.seqno,
+            fetched_at,
+            gen_utime,
+            config_boc64: Boc::encode_base64(&snapshot.config),
+        }
+    }
+
+    fn into_cached_snapshot(self) -> anyhow::Result<CachedMasterchainSnapshot> {
+        Ok(CachedMasterchainSnapshot {
+            fetched_at: self.fetched_at,
+            gen_utime: self.gen_utime,
+            config: Boc::decode_base64(&self.config_boc64)
+                .context("Failed to decode cached blockchain config BOC")?,
+        })
+    }
+}
+
+fn masterchain_snapshot_cache_path(cache_dir: &Path, network: &Network, seqno: u64) -> PathBuf {
+    let network = match network {
+        Network::Mainnet => "mainnet".to_owned(),
+        Network::Testnet => "testnet".to_owned(),
+        Network::Localnet => "localnet".to_owned(),
+        Network::Custom(name) => format!("custom-{}", urlencoding::encode(name)),
+    };
+    cache_dir.join(network).join(format!("{seqno}.json"))
+}
+
+fn read_masterchain_snapshot_cache(
+    path: &Path,
+    network: &Network,
+    v2_url: &str,
+    seqno: u64,
+) -> Option<CachedMasterchainSnapshot> {
+    let entry =
+        serde_json::from_slice::<MasterchainSnapshotCacheEntry>(&fs::read(path).ok()?).ok()?;
+    if entry.schema_version != MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION
+        || entry.network != *network
+        || entry.v2_url != v2_url
+        || entry.seqno != seqno
+    {
+        return None;
+    }
+
+    entry.into_cached_snapshot().ok()
+}
+
+fn write_masterchain_snapshot_cache(
+    path: &Path,
+    entry: &MasterchainSnapshotCacheEntry,
+) -> anyhow::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("Masterchain snapshot cache path has no parent"))?;
+    fs::create_dir_all(parent)?;
+    fs::write(path, serde_json::to_vec_pretty(entry)?)?;
+    Ok(())
+}
+
+fn masterchain_snapshot_cache_entry_is_fresh(fetched_at: u64, now: u64) -> bool {
+    fetched_at
+        .checked_add(MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs())
+        .is_some_and(|expires_at| now < expires_at)
+}
+
+fn unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 impl TonApiClient {
@@ -488,6 +600,130 @@ impl TonApiClient {
         Ok(self.get_masterchain_info()?.result.last.seqno)
     }
 
+    pub fn get_masterchain_snapshot(
+        &self,
+        seqno: Option<u64>,
+    ) -> anyhow::Result<MasterchainSnapshot> {
+        let use_current_time = seqno.is_none();
+        let seqno = seqno.map_or_else(|| self.get_last_block_seqno(), Ok)?;
+        let gen_utime = if use_current_time {
+            u32::try_from(unix_timestamp()).context("Current Unix time does not fit u32")?
+        } else {
+            self.get_masterchain_block_time(seqno)?
+        };
+        let config = self.get_config_all(Some(seqno))?;
+
+        Ok(MasterchainSnapshot {
+            seqno,
+            gen_utime,
+            config,
+        })
+    }
+
+    fn get_masterchain_block_time(&self, seqno: u64) -> anyhow::Result<u32> {
+        let request_seqno =
+            u32::try_from(seqno).context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let header = self.get_block_header_v2(&v2::BlockHeaderRequest {
+            workchain: (-1).into(),
+            shard: v2::StringOrNumber::String(i64::MIN.to_string()),
+            seqno: request_seqno.into(),
+            root_hash: None,
+            file_hash: None,
+        })?;
+        Ok(header.gen_utime)
+    }
+
+    pub fn get_masterchain_snapshot_cached(
+        &self,
+        seqno: Option<u64>,
+        cache_dir: &Path,
+    ) -> anyhow::Result<MasterchainSnapshot> {
+        let use_current_time = seqno.is_none();
+        let seqno = seqno.map_or_else(|| self.get_last_block_seqno(), Ok)?;
+        let now = unix_timestamp();
+        let current_gen_utime = use_current_time
+            .then(|| u32::try_from(now).context("Current Unix time does not fit u32"))
+            .transpose()?;
+        let v2_url = self.network.toncenter_v2_url(&self.custom_networks)?;
+        let cache_path = masterchain_snapshot_cache_path(cache_dir, &self.network, seqno);
+        let cached = read_masterchain_snapshot_cache(&cache_path, &self.network, &v2_url, seqno);
+        if let Some(cached) = cached.as_ref()
+            && masterchain_snapshot_cache_entry_is_fresh(cached.fetched_at, now)
+        {
+            let gen_utime = match current_gen_utime.or(cached.gen_utime) {
+                Some(gen_utime) => gen_utime,
+                None => self.get_masterchain_block_time(seqno)?,
+            };
+            let snapshot = MasterchainSnapshot {
+                seqno,
+                gen_utime,
+                config: cached.config.clone(),
+            };
+            if cached.gen_utime.is_none() && !use_current_time {
+                let entry = MasterchainSnapshotCacheEntry::new(
+                    &self.network,
+                    v2_url,
+                    &snapshot,
+                    Some(gen_utime),
+                    cached.fetched_at,
+                );
+                if let Err(error) = write_masterchain_snapshot_cache(&cache_path, &entry) {
+                    log::debug!(
+                        "Failed to update masterchain snapshot cache {}: {error:#}",
+                        cache_path.display()
+                    );
+                }
+            }
+            return Ok(snapshot);
+        }
+
+        let snapshot = if let Some(gen_utime) = current_gen_utime {
+            self.get_config_all(Some(seqno))
+                .map(|config| MasterchainSnapshot {
+                    seqno,
+                    gen_utime,
+                    config,
+                })
+        } else {
+            self.get_masterchain_snapshot(Some(seqno))
+        };
+        match snapshot {
+            Ok(snapshot) => {
+                let entry = MasterchainSnapshotCacheEntry::new(
+                    &self.network,
+                    v2_url,
+                    &snapshot,
+                    (!use_current_time).then_some(snapshot.gen_utime),
+                    now,
+                );
+                if let Err(error) = write_masterchain_snapshot_cache(&cache_path, &entry) {
+                    log::debug!(
+                        "Failed to write masterchain snapshot cache {}: {error:#}",
+                        cache_path.display()
+                    );
+                }
+                Ok(snapshot)
+            }
+            Err(error) => {
+                if let Some(cached) = cached {
+                    let Some(gen_utime) = current_gen_utime.or(cached.gen_utime) else {
+                        return Err(error);
+                    };
+                    log::debug!(
+                        "Failed to refresh masterchain snapshot for {} at seqno {seqno}: {error:#}; using stale cache",
+                        self.network
+                    );
+                    return Ok(MasterchainSnapshot {
+                        seqno,
+                        gen_utime,
+                        config: cached.config,
+                    });
+                }
+                Err(error)
+            }
+        }
+    }
+
     pub fn get_blocks_v3(&self, raw_query: &str) -> anyhow::Result<v3::BlocksResponse> {
         let mut url = format!(
             "{}/blocks",
@@ -656,26 +892,19 @@ impl TonApiClient {
         Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
     }
 
-    pub fn get_config_all(&self) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getConfigAll",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send request to TonCenter for blockchain config",
+    pub fn get_config_all(&self, seqno: Option<u64>) -> anyhow::Result<Cell> {
+        let seqno = seqno
+            .map(u32::try_from)
+            .transpose()
+            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let data: v2::ConfigInfo = self.get_v2_result(
+            "/getConfigAll",
+            &v2::ConfigAllRequest {
+                seqno: seqno.map(Into::into),
+            },
         )?;
 
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        let data: v2::TonlibResponse<v2::ConfigInfo> = response
-            .json()
-            .context("Failed to parse TonCenter getConfigAll response")?;
-
-        Boc::decode_base64(&data.result.config.bytes)
+        Boc::decode_base64(&data.config.bytes)
             .context("Failed to decode blockchain config BOC data")
     }
 
@@ -895,8 +1124,9 @@ impl TonApiClient {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_toncenter_error_message, proxy_enabled_from_value};
+    use super::*;
     use std::ffi::OsStr;
+    use std::sync::Arc;
 
     #[test]
     fn acton_use_proxy_is_disabled_by_default() {
@@ -951,5 +1181,80 @@ mod tests {
             normalize_toncenter_error_message("mock toncenter failure"),
             None,
         );
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_round_trips() {
+        let temp_dir = tempfile::tempdir().expect("temporary cache directory");
+        let network = Network::Custom(Arc::from("snapshot-test"));
+        let snapshot = MasterchainSnapshot {
+            seqno: 123_456,
+            gen_utime: 1_700_000_000,
+            config: Cell::default(),
+        };
+        let entry = MasterchainSnapshotCacheEntry::new(
+            &network,
+            "http://127.0.0.1:8080/api/v2".to_owned(),
+            &snapshot,
+            Some(snapshot.gen_utime),
+            100,
+        );
+        let path = masterchain_snapshot_cache_path(temp_dir.path(), &network, snapshot.seqno);
+
+        write_masterchain_snapshot_cache(&path, &entry).expect("write snapshot cache");
+        let cached = read_masterchain_snapshot_cache(
+            &path,
+            &network,
+            "http://127.0.0.1:8080/api/v2",
+            snapshot.seqno,
+        )
+        .expect("read snapshot cache");
+
+        assert_eq!(cached.gen_utime, Some(snapshot.gen_utime));
+        assert_eq!(cached.config.repr_hash(), snapshot.config.repr_hash());
+        let latest_cached = MasterchainSnapshotCacheEntry::new(
+            &network,
+            "http://127.0.0.1:8080/api/v2".to_owned(),
+            &snapshot,
+            None,
+            100,
+        )
+        .into_cached_snapshot()
+        .expect("decode latest snapshot cache");
+        assert_eq!(latest_cached.gen_utime, None);
+        assert!(
+            read_masterchain_snapshot_cache(
+                &path,
+                &network,
+                "http://127.0.0.1:8081/api/v2",
+                snapshot.seqno,
+            )
+            .is_none(),
+            "cache from another endpoint must not be reused"
+        );
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_expires_after_ttl() {
+        assert!(masterchain_snapshot_cache_entry_is_fresh(
+            100,
+            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs() - 1
+        ));
+        assert!(!masterchain_snapshot_cache_entry_is_fresh(
+            100,
+            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs()
+        ));
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_separates_builtin_and_custom_networks() {
+        let root = Path::new("/tmp/acton-project/build/cache/masterchain-snapshots");
+        let builtin = masterchain_snapshot_cache_path(root, &Network::Mainnet, 42);
+        let custom =
+            masterchain_snapshot_cache_path(root, &Network::Custom(Arc::from("mainnet")), 42);
+
+        assert_ne!(builtin, custom);
+        assert_eq!(builtin, root.join("mainnet").join("42.json"));
+        assert_eq!(custom, root.join("custom-mainnet").join("42.json"));
     }
 }

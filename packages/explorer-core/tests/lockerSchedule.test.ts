@@ -1,11 +1,7 @@
 import {describe, expect, test} from "bun:test"
 
 import type {V3RunGetMethodResponse} from "../src/api/types"
-import {
-  buildLockerSchedule,
-  isLockerCodeHash,
-  parseLockerData,
-} from "../src/components/lockerSchedule"
+import {buildLockerSchedule, parseLockerData} from "../src/components/lockerSchedule"
 
 const lockerResponse = {
   gas_used: 1,
@@ -22,16 +18,6 @@ const lockerResponse = {
 } satisfies V3RunGetMethodResponse
 
 describe("Locker schedule", () => {
-  test("recognizes both known Locker code hashes", () => {
-    expect(
-      isLockerCodeHash("830C99A447D0974DB6D86ED7D89FE4F2D2EC22358CB64287E2D31E563EBDE547"),
-    ).toBe(true)
-    expect(
-      isLockerCodeHash("0x6a05d82d45c933dd2ddf7b338db7f6fbce6d5e2ec3b142e5fc53a94395dca252"),
-    ).toBe(true)
-    expect(isLockerCodeHash("00".repeat(32))).toBe(false)
-  })
-
   test("parses the six-value get_locker_data stack", () => {
     expect(parseLockerData(lockerResponse)).toEqual({
       totalCoinsLocked: 1_033_647_045_271_012_809n,

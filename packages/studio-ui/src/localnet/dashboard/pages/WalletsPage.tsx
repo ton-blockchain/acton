@@ -1,7 +1,22 @@
+import type {FC, FormEvent} from "react"
 import {useCallback, useEffect, useRef, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
-import {Button, Input} from "@acton/ui"
+import {
+  Button,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableFooter,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  DateTime,
+  InlineButton,
+  Input,
+} from "@acton/ui"
 
 import type {TonClient} from "@acton/explorer-core/api/client"
 import {
@@ -12,19 +27,18 @@ import type {JettonWallet} from "@acton/explorer-core/api/types"
 import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
 import {WalletAccountSummary} from "@acton/explorer-core/components/WalletAccountSummary"
 import {
+  type AddressFormatOptions,
   normalizeAddress,
   toRawAddress,
-  type AddressFormatOptions,
 } from "@acton/explorer-core/components/utils"
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {
-  useOpenExplorerPath,
   type ExplorerNavigationClickEvent,
+  useOpenExplorerPath,
 } from "@acton/explorer-core/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
 import {useWalletRuntime} from "../../wallet/useWalletRuntime"
-import dashboardStyles from "../DashboardPage.module.css"
 
 import styles from "./WalletsPage.module.css"
 
@@ -132,19 +146,14 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
     <>
       <section className={styles.walletLayout}>
         <div className={styles.mainColumn}>
-          <section
-            className={`${styles.walletTableWrap} ${styles.walletsTableWrap}`}
+          <DataTable
+            title="Project wallets"
+            titleId="wallets-table-title"
+            minWidth="62rem"
             aria-labelledby="wallets-table-title"
-          >
-            <div className={styles.walletTableTitleBar}>
-              <h2 id="wallets-table-title" className={styles.walletTableTitle}>
-                Project wallets
-              </h2>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                className={styles.refreshButton}
+            actions={
+              <InlineButton
+                variant="accent"
                 leadingIcon={
                   <RefreshCw
                     size={14}
@@ -157,38 +166,42 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                 }
               >
                 Refresh
-              </Button>
-            </div>
-
-            {isBusy ? (
-              <WalletRowsSkeleton />
-            ) : runtimeWallets.length === 0 ? (
-              <div className={`${dashboardStyles.emptyState} ${styles.walletTableEmpty}`}>
-                No supported project wallets are configured in Acton.toml
-              </div>
-            ) : (
-              <table className={`${styles.walletTable} ${styles.walletsTable}`}>
-                <thead>
-                  <tr>
-                    <th className={styles.walletNameHeader}>Name</th>
-                    <th className={styles.walletAddressHeader}>Address</th>
-                    <th className={styles.walletVersionHeader}>Version</th>
-                    <th className={styles.walletBalanceHeader}>Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runtimeWallets.map(wallet => {
+              </InlineButton>
+            }
+          >
+            <DataTableTable aria-label="Project wallets">
+              <DataTableHead>
+                <DataTableRow>
+                  <DataTableHeaderCell columnWidth="16rem">Name</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="21rem">Address</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="8rem">Version</DataTableHeaderCell>
+                  <DataTableHeaderCell align="right">Balance</DataTableHeaderCell>
+                </DataTableRow>
+              </DataTableHead>
+              <DataTableBody>
+                {isBusy ? (
+                  <DataTableSkeletonRows
+                    columns={4}
+                    rows={4}
+                    rowKeyPrefix="wallet-row-skeleton"
+                    alignments={["left", "left", "left", "right"]}
+                    widths={["10rem", "16rem", "3rem", "7rem"]}
+                  />
+                ) : runtimeWallets.length === 0 ? (
+                  <DataTableEmpty colSpan={4}>
+                    No supported project wallets are configured in Acton.toml
+                  </DataTableEmpty>
+                ) : (
+                  runtimeWallets.map(wallet => {
                     const balanceState = walletBalances[wallet.id]
                     const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
 
                     return (
-                      <tr key={wallet.id} className={styles.walletTableRow}>
-                        <td className={styles.walletNameCell}>
-                          <span className={styles.walletName} title={wallet.record.name}>
-                            {wallet.record.name}
-                          </span>
-                        </td>
-                        <td className={styles.walletAddressCell}>
+                      <DataTableRow key={wallet.id} hover>
+                        <DataTableCell tone="strong" truncate title={wallet.record.name}>
+                          {wallet.record.name}
+                        </DataTableCell>
+                        <DataTableCell className={styles.walletAddressCell}>
                           <ExplorerAddressChip
                             address={walletAddress}
                             fallback="Account"
@@ -199,13 +212,11 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                             }
                             onCopyAddress={handleCopyAddress}
                           />
-                        </td>
-                        <td className={styles.walletVersionCell}>
-                          <span className={styles.walletVersion}>
-                            {wallet.record.version.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className={styles.walletBalanceCell}>
+                        </DataTableCell>
+                        <DataTableCell tone="strong" truncate>
+                          {wallet.record.version.toUpperCase()}
+                        </DataTableCell>
+                        <DataTableCell align="right" className={styles.walletBalanceCell}>
                           <WalletAccountSummary
                             address={walletAddress}
                             tokens={walletTokensById[wallet.id] ?? []}
@@ -215,13 +226,13 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                               openPath(`${routes.addressPath(address)}#tokens`, event)
                             }
                           />
-                        </td>
-                      </tr>
+                        </DataTableCell>
+                      </DataTableRow>
                     )
-                  })}
-                </tbody>
-              </table>
-            )}
+                  })
+                )}
+              </DataTableBody>
+            </DataTableTable>
 
             {unsupportedWallets.length > 0 && (
               <div className={styles.unsupportedBlock}>
@@ -235,41 +246,35 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                 </div>
               </div>
             )}
-          </section>
+          </DataTable>
 
-          <section className={styles.walletTableWrap} aria-labelledby="wallet-sessions-title">
-            <div className={styles.walletTableTitleBar}>
-              <h2 id="wallet-sessions-title" className={styles.walletTableTitle}>
-                Sessions
-              </h2>
-              <span className={styles.walletTableTitleMeta}>
-                {pendingRequestCount === 0
-                  ? "No pending approvals"
-                  : `${pendingRequestCount} pending approval${pendingRequestCount === 1 ? "" : "s"}`}
-              </span>
-            </div>
-            <table className={`${styles.walletTable} ${styles.sessionsTable}`}>
-              <thead>
-                <tr>
-                  <th>dApp</th>
-                  <th>Wallet</th>
-                  <th className={styles.sessionActivityHeader}>Last activity</th>
-                  <th className={styles.sessionActionsHeader} aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
+          <DataTable
+            title="Sessions"
+            titleId="wallet-sessions-title"
+            minWidth="56rem"
+            aria-labelledby="wallet-sessions-title"
+            meta={
+              pendingRequestCount === 0
+                ? "No pending approvals"
+                : `${pendingRequestCount} pending approval${pendingRequestCount === 1 ? "" : "s"}`
+            }
+          >
+            <DataTableTable aria-label="TON Connect sessions">
+              <DataTableHead>
+                <DataTableRow>
+                  <DataTableHeaderCell>dApp</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="18rem">Wallet</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="15rem">Last activity</DataTableHeaderCell>
+                  <DataTableHeaderCell align="right" columnWidth="10rem" aria-label="Actions" />
+                </DataTableRow>
+              </DataTableHead>
+              <DataTableBody>
                 {sessions.length === 0 ? (
-                  <tr>
-                    <td className={styles.sessionEmptyCell} colSpan={4}>
-                      <div className={`${dashboardStyles.emptyState} ${styles.walletTableEmpty}`}>
-                        No active TON Connect sessions
-                      </div>
-                    </td>
-                  </tr>
+                  <DataTableEmpty colSpan={4}>No active TON Connect sessions</DataTableEmpty>
                 ) : (
                   sessions.map(session => (
-                    <tr key={session.sessionId} className={styles.walletTableRow}>
-                      <td className={styles.sessionDappCell}>
+                    <DataTableRow key={session.sessionId} hover>
+                      <DataTableCell className={styles.sessionDappCell}>
                         <span className={styles.sessionDappLine}>
                           <span className={styles.sessionTitle}>
                             {getDappName(session.dAppName)}
@@ -277,8 +282,8 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           <span className={styles.sessionDappSeparator}>·</span>
                           <span className={styles.sessionDomain}>{session.domain}</span>
                         </span>
-                      </td>
-                      <td className={styles.sessionWalletCell}>
+                      </DataTableCell>
+                      <DataTableCell className={styles.sessionWalletCell}>
                         <SessionWalletCell
                           wallets={runtimeWallets}
                           walletId={session.walletId}
@@ -289,34 +294,30 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           }
                           onCopyAddress={handleCopyAddress}
                         />
-                      </td>
-                      <td
-                        className={styles.sessionActivityCell}
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
-                      >
-                        {formatDateTime(session.lastActivityAt)}
-                      </td>
-                      <td className={styles.sessionActionsCell}>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className={styles.tableActionButton}
+                      </DataTableCell>
+                      <DataTableCell tone="muted" truncate>
+                        <DateTime
+                          fallback={session.lastActivityAt}
+                          value={session.lastActivityAt}
+                        />
+                      </DataTableCell>
+                      <DataTableCell align="right">
+                        <InlineButton
+                          variant="danger"
                           leadingIcon={<Unplug size={14} />}
                           onClick={() => void handleDisconnectSession(session.sessionId)}
                           disabled={isSubmitting}
                         >
                           Disconnect
-                        </Button>
-                      </td>
-                    </tr>
+                        </InlineButton>
+                      </DataTableCell>
+                    </DataTableRow>
                   ))
                 )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td className={styles.connectFooterCell} colSpan={4}>
+              </DataTableBody>
+              <DataTableFooter>
+                <DataTableRow>
+                  <DataTableCell className={styles.connectFooterCell} colSpan={4}>
                     <form
                       className={styles.connectControlForm}
                       onSubmit={event => void handleConnectUrlSubmit(event)}
@@ -337,7 +338,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                         type="submit"
                         variant="outline"
                         size="sm"
-                        className={styles.tableActionButton}
+                        className={styles.connectAction}
                         leadingIcon={<Link2 size={14} />}
                         disabled={
                           runtimeWallets.length === 0 ||
@@ -348,57 +349,15 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                         Handle request
                       </Button>
                     </form>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </section>
+                  </DataTableCell>
+                </DataTableRow>
+              </DataTableFooter>
+            </DataTableTable>
+          </DataTable>
         </div>
       </section>
     </>
   )
-}
-
-function WalletRowsSkeleton(): JSX.Element {
-  return (
-    <table className={`${styles.walletTable} ${styles.walletsTable}`} aria-label="Loading wallets">
-      <thead>
-        <tr>
-          <th className={styles.walletNameHeader}>Name</th>
-          <th className={styles.walletAddressHeader}>Address</th>
-          <th className={styles.walletVersionHeader}>Version</th>
-          <th className={styles.walletBalanceHeader}>Balance</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({length: 4}, (_, index) => (
-          <tr key={`wallet-row-skeleton-${index}`} className={styles.walletTableRow}>
-            <td className={styles.walletNameCell}>
-              <span className={`${dashboardStyles.skeletonLine} ${styles.walletNameSkeleton}`} />
-            </td>
-            <td className={styles.walletAddressCell}>
-              <span className={`${dashboardStyles.skeletonLine} ${styles.walletAddressSkeleton}`} />
-            </td>
-            <td className={styles.walletVersionCell}>
-              <span className={`${dashboardStyles.skeletonLine} ${styles.walletVersionSkeleton}`} />
-            </td>
-            <td className={styles.walletBalanceCell}>
-              <span className={`${dashboardStyles.skeletonLine} ${styles.walletBalanceSkeleton}`} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString()
 }
 
 function getDappName(name: string | undefined): string {
@@ -422,7 +381,7 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
   onAddressClick,
   onCopyAddress,
 }) => {
-  const wallet = findRuntimeWallet(wallets, walletId)
+  const wallet = wallets.find(wallet => wallet.id === walletId)
   if (!wallet) {
     return <span className={styles.sessionWalletFallback}>Unknown wallet</span>
   }
@@ -437,11 +396,4 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
       onCopyAddress={onCopyAddress}
     />
   )
-}
-
-function findRuntimeWallet(
-  wallets: readonly RuntimeWallet[],
-  walletId: string,
-): RuntimeWallet | undefined {
-  return wallets.find(wallet => wallet.id === walletId)
 }

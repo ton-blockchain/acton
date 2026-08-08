@@ -6,6 +6,7 @@ use crate::support::toncenter::{
     append_localnet_network, spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture,
     toncenter_v2_account_info_with_code_ok_response, toncenter_v2_run_get_method_ok_response,
 };
+use crate::support::verifier::{VerifierMockResponse, abi_response, spawn_verifier_mock};
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
@@ -303,6 +304,178 @@ fun main() {
     println("COUNTER_ADDRESS={}", counterAddress);
 }
 "#;
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_call_uses_verifier_abi_and_cache() {
+    let (source_project, _, code_boc64) =
+        build_rpc_call_project("rpc-call-verifier-abi-source", RPC_CALL_COUNTER_CONTRACT);
+    let code = Boc::decode_base64(&code_boc64).expect("code BoC must decode");
+    let code_hash = code.repr_hash().to_string();
+    let abi = fs::read_to_string(source_project.path().join("build/abi/counter.json"))
+        .expect("ABI artifact must exist");
+    let abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid json");
+
+    let project = ProjectBuilder::new("rpc-call-verifier-abi").build();
+    let log_dir = prepare_log_dir(project.path());
+    let mut toncenter_responses = Vec::new();
+    for _ in 0..4 {
+        toncenter_responses.extend([
+            toncenter_v2_account_info_with_code_ok_response(
+                1_234_000_000,
+                &code_boc64,
+                &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+                "active",
+                "",
+                "999",
+                "c0ffee",
+            ),
+            toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 0),
+        ]);
+    }
+    let (toncenter_url, toncenter_handle, toncenter_captured) =
+        spawn_toncenter_v2_mock_with_capture(toncenter_responses);
+    let (verifier_url, verifier_handle, verifier_captured) = spawn_verifier_mock(vec![
+        VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({ "items": [] }).to_string(),
+            headers: vec![],
+        },
+        abi_response(&code_hash, &abi),
+        VerifierMockResponse {
+            status: 500,
+            body: serde_json::json!({ "error": "offline" }).to_string(),
+            headers: vec![],
+        },
+    ]);
+    let verifier_backend = format!("  {verifier_url}/  ");
+    append_custom_network(project.path(), "mock", &format!("{toncenter_url}/api/v2"));
+    let cache_path = project
+        .path()
+        .join(format!("build/cache/verifier-abi/{code_hash}.json"));
+
+    let rpc_call = || {
+        project
+            .acton()
+            .current_dir(project.path())
+            .arg("rpc")
+            .arg("call")
+            .arg(MATCHED_INFO_ADDRESS)
+            .arg("currentCounter")
+            .arg("--net")
+            .arg("custom:mock")
+            .arg("--json")
+            .env("ACTON_NEW_VERIFY_BACKEND", &verifier_backend)
+            .env("ACTON_LOG_DIR", &log_dir)
+            .run()
+            .success()
+    };
+
+    rpc_call().assert_snapshot_matches(
+        "integration/snapshots/rpc/test_rpc_call_verifier_abi_miss.stdout.txt",
+    );
+    assert!(
+        !cache_path.exists(),
+        "a verifier miss must not create a cache entry"
+    );
+
+    rpc_call()
+        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_call_verifier_abi.stdout.txt");
+    assert!(cache_path.is_file(), "verifier ABI cache file must exist");
+
+    rpc_call()
+        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_call_verifier_abi.stdout.txt");
+
+    let mut cached: JsonValue = serde_json::from_slice(
+        &fs::read(&cache_path).expect("verifier ABI cache file must be readable"),
+    )
+    .expect("verifier ABI cache file must be valid json");
+    cached["fetched_at"] = JsonValue::from(0);
+    fs::write(
+        &cache_path,
+        serde_json::to_vec_pretty(&cached).expect("verifier ABI cache must serialize"),
+    )
+    .expect("verifier ABI cache file must be writable");
+
+    rpc_call()
+        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_call_verifier_abi.stdout.txt");
+
+    toncenter_handle
+        .join()
+        .expect("TonCenter mock server thread must finish");
+    verifier_handle
+        .join()
+        .expect("verifier mock server thread must finish");
+
+    let verifier_captured = verifier_captured
+        .lock()
+        .expect("captured verifier requests mutex should not be poisoned");
+    assert_eq!(
+        verifier_captured.len(),
+        3,
+        "a miss should be retried, a fresh ABI cached, and an expired ABI should trigger one refresh request"
+    );
+    for request in verifier_captured.iter() {
+        assert_eq!(request.method, "GET");
+        assert_eq!(request.path, format!("/api/v1/abi?code_hash={code_hash}"),);
+    }
+
+    let toncenter_captured = toncenter_captured
+        .lock()
+        .expect("captured TonCenter requests mutex should not be poisoned");
+    assert_eq!(toncenter_captured.len(), 8);
+}
+
+#[test]
+fn test_rpc_call_uses_explicit_json_abi() {
+    let (project, log_dir, code_boc64) = build_rpc_call_project(
+        "rpc-call-explicit-json-abi-source",
+        RPC_CALL_COUNTER_CONTRACT,
+    );
+    let abi = fs::read_to_string(project.path().join("build/abi/counter.json"))
+        .expect("ABI artifact must exist");
+    let mut abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid JSON");
+    abi["contract_name"] = JsonValue::String("ExplicitJsonCounter".to_owned());
+    fs::write(
+        project.path().join("counter.abi.json"),
+        serde_json::to_vec_pretty(&abi).expect("explicit ABI must serialize"),
+    )
+    .expect("explicit ABI must be writable");
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 0),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("currentCounter")
+        .arg("--abi")
+        .arg("counter.abi.json")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--json")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_explicit_json_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
 
 #[test]
 fn test_rpc_call_runs_counter_methods_from_localnet() {

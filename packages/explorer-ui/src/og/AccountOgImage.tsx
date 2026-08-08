@@ -86,7 +86,7 @@ export function AccountOgImage({
               whiteSpace: "nowrap",
             }}
           >
-            {truncateText(preview.title, 21)}
+            {truncateEnd(preview.title, 21)}
           </div>
           {(preview.status || preview.type) && (
             <div
@@ -113,7 +113,7 @@ export function AccountOgImage({
                 whiteSpace: "nowrap",
               }}
             >
-              {truncateText(preview.detail, 43)}
+              {truncateEnd(preview.detail, 43)}
             </div>
           )}
           {preview.detail && (preview.detailLines ?? 1) > 1 && (
@@ -236,10 +236,6 @@ export function Badge({label, variant}: {label: string; variant: "success" | "mu
   )
 }
 
-function truncateText(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
-}
-
 function wrapText(value: string, maxLines: number, lineLength: number) {
   const words = value.trim().split(/\s+/)
   const lines: string[] = []
@@ -269,8 +265,9 @@ function wrapText(value: string, maxLines: number, lineLength: number) {
   const lastIndex = lines.length - 1
   const usedWords = lines.join(" ").split(/\s+/).length
   if (lastIndex >= 0 && usedWords < words.length) {
-    lines[lastIndex] = truncateText(lines[lastIndex], Math.max(2, lineLength - 1))
+    lines[lastIndex] = truncateEnd(lines[lastIndex], Math.max(2, lineLength - 1))
   }
 
   return lines
 }
+import {truncateEnd} from "@acton/ui"

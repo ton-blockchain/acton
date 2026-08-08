@@ -22,9 +22,13 @@ import {
   ContentTabs,
   CopyButton,
   Dialog,
+  DateTime,
+  formatDateTime,
+  formatGramAmount,
   InlineAction,
   InlineButton,
   Input,
+  parseGramAmount,
   Select,
   useToast,
 } from "@acton/ui"
@@ -53,15 +57,7 @@ import {
 } from "@acton/transaction-ui"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {
-  Address,
-  Cell,
-  fromNano,
-  loadMessage,
-  loadShardAccount,
-  toNano,
-  type ShardAccount,
-} from "@ton/core"
+import {Address, Cell, loadMessage, loadShardAccount, type ShardAccount} from "@ton/core"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -1172,9 +1168,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       await navigator.clipboard.writeText(shareUrl)
       showToast({
         title: "Share link copied",
-        description: `Anyone with the link can open this emulation until ${new Date(
-          expiresAt,
-        ).toLocaleDateString()}.`,
+        description: `Anyone with the link can open this emulation until ${formatDateTime(expiresAt, {display: "date-numeric"})}`,
         variant: "success",
       })
     } catch (error) {
@@ -1576,9 +1570,17 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
           previewUnixTime !== undefined &&
           previewUnixTime <= MAX_UINT32 && (
             <div className={styles.timeOverridePreview}>
-              <span>{formatEmulationUnixTime(baseBlockUnixTime)}</span>
+              <DateTime
+                display="date-time-numeric-seconds"
+                unit="seconds"
+                value={baseBlockUnixTime}
+              />
               <span aria-hidden="true">→</span>
-              <span>{formatEmulationUnixTime(previewUnixTime)}</span>
+              <DateTime
+                display="date-time-numeric-seconds"
+                unit="seconds"
+                value={previewUnixTime}
+              />
             </div>
           )}
       </div>
@@ -2154,17 +2156,6 @@ async function loadEmulationBlockInfo(
   return {mcSeqno: resolvedMcSeqno, unixTime}
 }
 
-function formatEmulationUnixTime(value: number): string {
-  return new Date(value * 1000).toLocaleString(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
 function parseManualAbi(value: string): {readonly abi?: ContractABI; readonly error?: string} {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -2227,7 +2218,9 @@ function accountStateOverrideDraftsFromShare(
     return {
       ...draft,
       loadState: {type: "ready"},
-      balance: override.balance ? fromNano(override.balance) : "",
+      balance: override.balance
+        ? formatGramAmount(override.balance, {fallback: "", showUnit: false})
+        : "",
       stateKind: state?.type ?? "keep",
       codeBoc: activeState?.codeBoc ?? "",
       storageEnabled: Boolean(activeState?.dataBoc),
@@ -2265,7 +2258,7 @@ function hydrateAccountStateOverrideDraft(
     abi,
     loadedAddress: address,
     loadState: {type: "ready"},
-    balance: fromNano(account?.storage.balance.coins ?? 0n),
+    balance: formatGramAmount(account?.storage.balance.coins ?? 0n, {showUnit: false}),
     stateKind: entry.stateKind,
     currentStateKind,
     codeBoc,
@@ -2368,11 +2361,11 @@ function buildAccountStateOverrides({
     const normalizedLastTransactionLt = entry.lastTransactionLt.trim()
     const normalizedLastTransactionHash = entry.lastTransactionHash.trim()
     if (normalizedBalance) {
-      try {
-        override.balance = toNano(normalizedBalance).toString()
-      } catch {
+      const balance = parseGramAmount(normalizedBalance)
+      if (balance === undefined) {
         throw new Error("Override balance must be a valid GRAM amount")
       }
+      override.balance = balance.toString()
     }
     if (normalizedLastTransactionLt) {
       override.lastTransactionLt = normalizedLastTransactionLt

@@ -784,6 +784,14 @@ Use [`acton rpc`](/docs/commands/rpc) to query remote blockchain account and con
 acton rpc info <CONTRACT_ADDRESS> --net testnet
 ```
 
+If automatic ABI matching is unavailable, pass compiler ABI JSON or a Tolk
+interface explicitly:
+
+```bash
+acton rpc info <CONTRACT_ADDRESS> --abi build/abi/counter.json --net testnet
+acton rpc call <CONTRACT_ADDRESS> currentCounter --abi contracts/Counter.types.tolk --net testnet
+```
+
 Fetch the latest masterchain block sequence number with `rpc block-number`:
 
 ```bash

@@ -25,9 +25,15 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  Duration,
+  formatCountLabel,
+  formatOpcode,
+  formatSourceLocation,
+  GramAmount,
   getIdeUrl,
   IdeSelector,
   RawDataBlock,
+  SourceLocationValue,
   Tooltip,
   useIdePreference,
 } from "@acton/ui"
@@ -99,14 +105,6 @@ const formatTraceName = (name: string | undefined, index: number): string => {
   return `Trace #${index + 1}`
 }
 
-const formatSkippedTraceCount = (count: number): string => {
-  return count === 1 ? "1 trace skipped" : `${count} traces skipped`
-}
-
-const formatTreasuryDeployTraceCount = (count: number): string => {
-  return count === 1 ? "1 treasury deploy" : `${count} treasury deploys`
-}
-
 const isExternalMessageNotAcceptedError = (error: string): boolean => {
   const normalized = error.toLowerCase()
   const mentionsExternal = normalized.includes("external")
@@ -145,13 +143,6 @@ const getStatusDescription = (test: TestReport): string | undefined => {
 
 const stringifyError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
-
-const formatDuration = (duration: {secs: number; nanos: number}): string => {
-  const ms = duration.secs * 1000 + duration.nanos / 1_000_000
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
-  if (ms < 1000) return `${ms.toFixed(1)}ms`
-  return `${(ms / 1000).toFixed(2)}s`
-}
 
 export const TestDetails: React.FC<TestDetailsProps> = ({
   test,
@@ -231,20 +222,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return {filePath: test.file_path, row: test.row, column: test.column}
   }, [test, projectRoot])
 
-  const getRelativePath = (path: string) => {
-    if (projectRoot && path.startsWith(projectRoot)) {
-      const rel = path.slice(projectRoot.length)
-      return rel || path
-    }
-    const parts = path.split("/")
-    if (parts.length > 3) {
-      return `.../${parts.slice(-3).join("/")}`
-    }
-    return path
-  }
-
   const renderSourceLocation = (location: SourceLocation) => {
-    const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
+    const label = formatSourceLocation(location, {maxSegments: 3, projectRoot})
 
     return (
       <a
@@ -268,7 +247,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       ? "trace load failed"
       : `${transactionCount} transactions`
   const skippedTracesCount = trace?.skipped_traces_count ?? 0
-  const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
+  const skippedTraceLabel = `${formatCountLabel(skippedTracesCount, {singular: "trace"})} skipped`
   const traceEntries = useMemo(() => {
     return (trace?.traces ?? []).map((traceItem, index) => ({
       traceItem,
@@ -283,7 +262,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy !== true),
     [traceEntries],
   )
-  const treasuryDeployTraceLabel = formatTreasuryDeployTraceCount(treasuryDeployTraceEntries.length)
+  const treasuryDeployTraceLabel = formatCountLabel(treasuryDeployTraceEntries.length, {
+    singular: "treasury deploy",
+  })
   const isSelectedTraceTreasuryDeploy =
     trace?.traces[selectedTraceIndex]?.is_treasury_deploy === true
   const shouldShowTreasuryDeployTraces =
@@ -390,7 +371,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         }
       }
 
-      return opcodeName ?? `0x${opcode.toString(16)}`
+      return opcodeName ?? formatOpcode(opcode) ?? "unknown"
     }
 
     return parsedTraceTransactionsWithBodies.map((transactions, traceIndex) => {
@@ -736,9 +717,15 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         </DataTableCell>
         <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
         <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalGasFees)}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalForwardFees)}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalFees)}</DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalGasFees} />
+        </DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalForwardFees} />
+        </DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalFees} />
+        </DataTableCell>
       </DataTableRow>
     )
   }
@@ -766,18 +753,25 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Location</div>
               <div className={styles.infoValue}>
-                <span title={errorLocation.filePath}>
-                  {getRelativePath(errorLocation.filePath)}:{errorLocation.row + 1}:
-                  {errorLocation.column + 1}
-                </span>
+                <SourceLocationValue
+                  maxSegments={3}
+                  projectRoot={projectRoot}
+                  value={{
+                    file: errorLocation.filePath,
+                    line: errorLocation.row + 1,
+                    column: errorLocation.column + 1,
+                  }}
+                />
               </div>
             </div>
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Stats</div>
               <div className={styles.infoValue}>
-                <span data-visual-dynamic="duration" data-visual-placeholder="<duration>">
-                  {formatDuration(test.duration)}
-                </span>{" "}
+                <Duration
+                  display="precise"
+                  unit="milliseconds"
+                  value={test.duration.secs * 1000 + test.duration.nanos / 1_000_000}
+                />{" "}
                 • {transactionStats}
               </div>
             </div>

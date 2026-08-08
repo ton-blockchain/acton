@@ -3,14 +3,13 @@ use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
     ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
-    CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest,
-    ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest,
-    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
-    SetShardAccountRequest, SetTimeRequest,
+    CreateCheckpointRequest, FaucetRequest, GetVerifiedSourceRequest, ImportCheckpointQuery,
+    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetMiningModeRequest,
+    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
+    SetTimeRequest,
 };
 use crate::server::{
-    ApiCallLog, NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount,
-    StateSourceInfo,
+    NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount, StateSourceInfo,
 };
 use crate::types::Hash256;
 use axum::{
@@ -258,17 +257,6 @@ pub async fn set_next_block_timestamp(
     handle_result(node.set_next_block_timestamp(payload.timestamp), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
-    .await
-}
-
-pub async fn get_api_calls(
-    State(api_calls): State<ApiCallLog>,
-    Query(payload): Query<GetApiCallsRequest>,
-) -> Response {
-    handle_result(
-        async move { Ok::<_, anyhow::Error>(api_calls.snapshot(payload.limit)) },
-        |res| serde_json::to_value(res).unwrap_or(Value::Null),
-    )
     .await
 }
 

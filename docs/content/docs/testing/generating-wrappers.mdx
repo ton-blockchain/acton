@@ -227,11 +227,22 @@ test-output-dir = "tests/generated-tests"
 
 [wrappers.typescript]
 output-dir = "./wrappers-ts"
+
+[contracts.Counter.wrappers.tolk]
+output-dir = "tests/counter-wrappers"
+generate-test = false
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
 ```
 
 With this configuration:
 
-- `acton wrapper Counter` would write `tests/generated-wrappers/Counter.gen.tolk` and `tests/generated-tests/Counter.test.tolk`
-- `acton wrapper Counter --ts` would write to `wrappers-ts/Counter.gen.ts` (by default)
+- `acton wrapper Counter` writes `tests/counter-wrappers/Counter.gen.tolk` without a test stub because the contract overrides those two Tolk fields
+- `acton wrapper Counter --ts` writes `app/src/wrappers/counter/Counter.gen.ts`
+- contracts without nested wrapper settings continue to use `tests/generated-wrappers`, `tests/generated-tests`, and `wrappers-ts`
+
+Per-contract settings use the same fields as the project defaults and inherit
+any fields they omit. CLI path and test flags override both levels.
 
 See the [`acton wrapper` command reference](/docs/commands/wrapper) for more details on CLI options.

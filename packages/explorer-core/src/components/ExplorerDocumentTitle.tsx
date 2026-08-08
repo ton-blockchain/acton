@@ -1,4 +1,5 @@
 import {useLocation} from "react-router"
+import {shortenMiddle} from "@acton/ui"
 
 import {useAddressName} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -50,7 +51,7 @@ export function useExplorerPageTitle(): string | undefined {
   if (abiSlug) return `${abiSlug} ABI`
 
   const transactionHash = matchPathSegment(relativePath, /^\/tx\/([^/]+)(?:\/trace)?$/)
-  if (transactionHash) return `Transaction ${shortenIdentifier(transactionHash)}`
+  if (transactionHash) return `Transaction ${shortenMiddle(transactionHash, {start: 6, end: 6})}`
 
   const blockMatch = relativePath.match(/^\/block\/-?\d+\/[^/]+\/(\d+)$/)
   if (blockMatch?.[1]) return `Block ${blockMatch[1]}`
@@ -84,8 +85,4 @@ function pageTitleFromState(state: unknown): string | undefined {
   if (!state || typeof state !== "object") return undefined
   const title = (state as ExplorerPageTitleState).explorerPageTitle
   return typeof title === "string" && title.trim() ? title.trim() : undefined
-}
-
-function shortenIdentifier(value: string): string {
-  return value.length > 13 ? `${value.slice(0, 6)}…${value.slice(-6)}` : value
 }

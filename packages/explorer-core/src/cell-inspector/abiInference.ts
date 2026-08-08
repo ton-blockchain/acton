@@ -1,4 +1,5 @@
 import {decodeCellWithAbi} from "@acton/transaction-ui"
+import {formatOpcode} from "@acton/ui"
 import type {Cell} from "@ton/core"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -51,7 +52,7 @@ export function inferAbiByOpcode(
   const selected = ranked[0]
   if (!selected || (ranked[1]?.count ?? 0) === selected.count) return {}
 
-  const opcodeLabel = `0x${opcode.toString(16).padStart(8, "0")}`
+  const opcodeLabel = formatOpcode(opcode) ?? "unknown opcode"
   return {
     abi: {...selected.candidate.abi, display_name: "ABI catalog"},
     confidenceScore: 0.7,

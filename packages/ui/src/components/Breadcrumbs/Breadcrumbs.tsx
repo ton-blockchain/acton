@@ -2,6 +2,7 @@ import {ChevronRight} from "lucide-react"
 import type {ComponentPropsWithRef, CSSProperties, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {shortenMiddle} from "../../lib/formatting"
 import {Skeleton} from "../Skeleton"
 import styles from "./Breadcrumbs.module.css"
 
@@ -136,7 +137,7 @@ function renderLabel(item: BreadcrumbsItem) {
 
   return (
     <span className={styles.label} title={text} aria-label={text}>
-      {text.slice(0, preserveStart)}...{text.slice(-preserveEnd)}
+      {shortenMiddle(text, {start: preserveStart, end: preserveEnd, separator: "..."})}
     </span>
   )
 }

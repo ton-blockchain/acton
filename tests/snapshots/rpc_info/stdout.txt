@@ -6,11 +6,12 @@ Arguments:
   <ADDRESS>  Contract address in friendly or raw format
 
 Options:
-      --block-number <BLOCK_NUMBER>  Masterchain block seqno to query account state at
+      --abi <PATH>                   Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching
       --color <WHEN>                 Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --block-number <BLOCK_NUMBER>  Masterchain block seqno to query account state at
       --manifest-path <PATH>         Path to Acton.toml
       --net <NET>                    Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
-      --json                         Print machine-readable JSON output
       --project-root <PATH>          Path to project root
+      --json                         Print machine-readable JSON output
       --raw                          Skip domain inspectors such as jetton detection
   -h, --help                         Print help

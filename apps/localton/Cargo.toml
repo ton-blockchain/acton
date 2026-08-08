@@ -39,6 +39,7 @@ utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+expect-test = "1.5.0"
 tempfile = "3.20"
 
 [profile.release]

@@ -4,6 +4,8 @@
 //! shared by CLI commands, HTTP handlers, and periodic runtime maintenance.
 
 pub(crate) mod hardfork;
+pub(crate) mod indexer;
 pub(crate) mod nodes;
+pub(crate) mod snapshots;
 pub(crate) mod validators;
 pub(crate) mod wallets;

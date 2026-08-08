@@ -243,6 +243,8 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                 .arg(&self.inner.project_root)
                 .args(&args)
                 .env("ACTON_STUDIO_URL", &self.inner.studio_url)
+                .env("ACTON_STUDIO_RUN_ID", &run_id)
+                .env("ACTON_STUDIO_RUN_SOURCE", "studio")
                 .env("ACTON_INTERNAL_SKIP_BROWSER", "1")
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())

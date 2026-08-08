@@ -1,15 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 237 237" fill="none">
-  <title>Acton</title>
-  <style>
-    path {
-      fill: rgb(77 184 255);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      path {
-        fill: rgb(236 235 235);
-      }
-    }
-  </style>
-  <path d="M118.204 0.000292436C183.486 0.000292436 236.408 52.9224 236.408 118.205C236.408 183.487 183.486 236.408 118.204 236.408C52.9216 236.408 0.000184007 183.487 0 118.205C0 52.9225 52.9215 0.000452012 118.204 0.000292436ZM74.1011 62.1965C57.6799 62.1965 47.268 79.912 55.5308 94.2347L109.964 188.582C113.619 194.922 122.781 194.922 126.436 188.582L180.88 94.2347C189.132 79.9343 178.72 62.1966 162.31 62.1965H74.1011ZM162.288 78.8412C166.031 78.8412 168.234 82.8121 166.45 85.9075L137.856 137.091L137.851 137.099L126.506 159.046V78.8412H162.288ZM109.872 78.8517V159.024L98.5376 137.088L98.5334 137.08L69.9294 85.9215L69.8468 85.7725C68.2134 82.6997 70.405 78.8517 74.0899 78.8517H109.872Z" />
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Acton Studio</title>
+  <path opacity="0.45" d="M24 92C27.2754 85.2372 32.3895 79.5337 38.7565 75.543C45.1234 71.5522 52.4857 69.4356 60 69.4356C67.5143 69.4356 74.8766 71.5522 81.2435 75.543C87.6105 79.5337 92.7246 85.2372 96 92" stroke="url(#studio-favicon-back)" stroke-width="17" stroke-linecap="round"/>
+  <path opacity="0.85" d="M32 92C34.7673 86.9984 38.8239 82.8293 43.748 79.9262C48.672 77.0231 54.2838 75.4919 60 75.4919C65.7162 75.4919 71.328 77.0231 76.252 79.9262C81.1761 82.8293 85.2327 86.9984 88 92" stroke="url(#studio-favicon-middle)" stroke-width="17" stroke-linecap="round"/>
+  <path d="M36 92L64 26L92 92" stroke="url(#studio-favicon-front)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="studio-favicon-back" x1="24" y1="69.4356" x2="36.8783" y2="110.528" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D83EC"/>
+      <stop offset="1" stop-color="#1AC9FF"/>
+    </linearGradient>
+    <linearGradient id="studio-favicon-middle" x1="32" y1="75.4919" x2="40.9546" y2="105.868" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D83EC"/>
+      <stop offset="1" stop-color="#1AC9FF"/>
+    </linearGradient>
+    <linearGradient id="studio-favicon-front" x1="36" y1="26" x2="101.119" y2="81.2525" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D83EC"/>
+      <stop offset="1" stop-color="#1AC9FF"/>
+    </linearGradient>
+  </defs>
 </svg>

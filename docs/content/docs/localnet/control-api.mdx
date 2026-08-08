@@ -90,8 +90,8 @@ _openapi:
       title: Send a raw internal message
       url: '#send-a-raw-internal-message'
     - depth: 2
-      title: List startup wallets
-      url: '#list-startup-wallets'
+      title: List startup accounts
+      url: '#list-startup-accounts'
     - depth: 2
       title: Mine localnet blocks
       url: '#mine-localnet-blocks'
@@ -162,8 +162,8 @@ _openapi:
         id: change-account-state
       - content: Send a raw internal message
         id: send-a-raw-internal-message
-      - content: List startup wallets
-        id: list-startup-wallets
+      - content: List startup accounts
+        id: list-startup-accounts
       - content: Mine localnet blocks
         id: mine-localnet-blocks
       - content: Increase virtual time
@@ -257,8 +257,10 @@ _openapi:
           queue. TonCenter-compatible message endpoints accept external-in
           messages only.
         heading: send-a-raw-internal-message
-      - content: Returns wallets selected when the localnet server started.
-        heading: list-startup-wallets
+      - content: >-
+          Returns public account descriptors selected when the localnet server
+          started.
+        heading: list-startup-accounts
       - content: >-
           Manually mines queued and/or empty localnet blocks. When the request
           body is omitted or blocks is not provided, one block is mined.

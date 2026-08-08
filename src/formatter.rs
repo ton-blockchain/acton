@@ -41,6 +41,40 @@ use tycho_types::num::Tokens;
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
 
+const fn preferred_opcode_message_name(opcode: u32) -> Option<&'static str> {
+    match opcode {
+        0x0f8a_7ea5 => Some("JettonTransfer"),
+        0x178d_4519 => Some("JettonInternalTransfer"),
+        0x595f_07bc => Some("JettonBurn"),
+        0x7362_d09c => Some("JettonTransferNotification"),
+        0x7bdd_97de => Some("JettonBurnNotification"),
+        0xd532_76db => Some("JettonExcesses"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod preferred_opcode_message_name_tests {
+    use super::preferred_opcode_message_name;
+
+    #[test]
+    fn maps_standard_jetton_opcodes_to_canonical_messages() {
+        let expected = [
+            (0x0f8a_7ea5, "JettonTransfer"),
+            (0x178d_4519, "JettonInternalTransfer"),
+            (0x595f_07bc, "JettonBurn"),
+            (0x7362_d09c, "JettonTransferNotification"),
+            (0x7bdd_97de, "JettonBurnNotification"),
+            (0xd532_76db, "JettonExcesses"),
+        ];
+
+        for (opcode, message_name) in expected {
+            assert_eq!(preferred_opcode_message_name(opcode), Some(message_name));
+        }
+        assert_eq!(preferred_opcode_message_name(0), None);
+    }
+}
+
 #[derive(Debug, Clone)]
 struct SendResult {
     tx: Transaction,
@@ -1192,7 +1226,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             return abis;
         }
 
-        for abi in acton_abi_catalog::find_abis_by_opcode(opcode) {
+        let mut fallback_abis = acton_abi_catalog::find_abis_by_opcode(opcode);
+        if let Some(preferred_name) = preferred_opcode_message_name(opcode) {
+            fallback_abis
+                .sort_by_key(|abi| abi.find_message_name_by_opcode(opcode) != Some(preferred_name));
+        }
+        for abi in fallback_abis {
             if abis
                 .iter()
                 .any(|existing| existing.contract_name == abi.contract_name)

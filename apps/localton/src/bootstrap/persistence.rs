@@ -19,7 +19,7 @@ use crate::{
 /// Two launchers sharing databases and fixed ports would corrupt runtime state
 /// and compete for the same sockets. The returned open file owns the advisory
 /// lock; dropping it releases the directory for the next invocation.
-pub(super) fn acquire_lock(path: &Path) -> Result<File> {
+pub(crate) fn acquire_lock(path: &Path) -> Result<File> {
     let file = File::options()
         .read(true)
         .write(true)
@@ -41,7 +41,7 @@ pub(super) fn acquire_lock(path: &Path) -> Result<File> {
 /// The manifest alone is insufficient: validator and DHT databases, global
 /// config, and both console credentials must exist. The global-config path is
 /// also checked against this state directory to prevent mixing two networks.
-pub(super) fn validate_persisted_state(layout: &Layout, manifest: &Manifest) -> Result<()> {
+pub(crate) fn validate_persisted_state(layout: &Layout, manifest: &Manifest) -> Result<()> {
     for path in [
         &layout.global_config,
         &layout.validator_db.join("config.json"),

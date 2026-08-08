@@ -8,10 +8,13 @@ use crate::support::localnet::{
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use crate::support::toncenter::{
-    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG,
+    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG, append_custom_network,
     append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
-    extract_canonical_addr_marker, jetton_v1_action_project, nft_v1_action_project,
-    run_localnet_action_project, test_std_addr, with_nft_v1_action_fixtures,
+    extract_canonical_addr_marker, format_captured_requests, jetton_v1_action_project,
+    mocked_config_boc64, mocked_global_version_cell, nft_v1_action_project,
+    run_localnet_action_project, spawn_toncenter_v2_mock_with_capture, test_std_addr,
+    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
+    with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -122,6 +125,22 @@ fun main() {
     });
 
     println(net.send(wallet.address, deployChild));
+}
+"#;
+
+const EXTERNAL_IS_ACCEPTED_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val result = net.sendExternal(
+        net.createExternalMessage(wallet.address, createEmptyCell()),
+    );
+
+    net.disableBroadcast();
+    println(result.isAccepted());
 }
 "#;
 
@@ -948,6 +967,98 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
 }
 
 #[test]
+fn localnet_historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    const GLOBAL_VERSION: u32 = 777;
+    const GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+    let config_boc64 = mocked_config_boc64(GLOBAL_VERSION, GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+    ]);
+    let project = ProjectBuilder::new("localnet-historical-fork-snapshot").build();
+    append_custom_network(
+        project.path(),
+        "historical-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let start_fork = |db_path: &str| {
+        project
+            .localnet()
+            .args([
+                "--fork-net",
+                "custom:historical-snapshot",
+                "--fork-block-number",
+            ])
+            .arg(FORK_SEQNO.to_string())
+            .args(["--no-mining", "--mine-empty-blocks", "--db-path"])
+            .arg(db_path)
+            .ready_timeout(Duration::from_secs(5))
+            .start()
+    };
+    let node = start_fork("state/first.sqlite");
+    let config_param = node.get_json("/api/v2/getConfigParam?param=8");
+    let config_param_cell = Boc::decode_base64(
+        config_param["result"]["config"]["bytes"]
+            .as_str()
+            .expect("getConfigParam must return config bytes"),
+    )
+    .expect("config param must be a valid cell");
+    let mine = node.post_json("/acton_mine", &json!({}));
+    let mined_seqno = response_payload(&mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let mined_header = node.get_json(&format!(
+        "/api/v2/getBlockHeader?workchain=-1&shard=-9223372036854775808&seqno={mined_seqno}"
+    ));
+    let mined_gen_utime = response_payload(&mined_header)["gen_utime"]
+        .as_u64()
+        .expect("masterchain block header must expose gen_utime") as u32;
+
+    let snapshot = json!({
+        "config": {
+            "request_ok": config_param["ok"].as_bool(),
+            "matches_fork_block": config_param_cell.repr_hash()
+                == mocked_global_version_cell(GLOBAL_VERSION, GLOBAL_CAPABILITIES).repr_hash(),
+        },
+        "time": {
+            "mined_block_uses_fork_clock": (FORK_GEN_UTIME..=FORK_GEN_UTIME + 10).contains(&mined_gen_utime),
+        }
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.summary.json"
+        ),
+    );
+
+    node.stop();
+    let restarted_node = start_fork("state/second.sqlite");
+    restarted_node.stop();
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("localnet-fork-snapshot-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write localnet fork snapshot request log");
+    assertion().eq(
+        fs::read_to_string(project.path().join("localnet-fork-snapshot-requests.txt"))
+            .expect("failed to read localnet fork snapshot request log"),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.requests.txt"
+        ),
+    );
+}
+
+#[test]
 fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     let project = ProjectBuilder::new("localnet-no-mining-startup-accounts-fork").build();
     fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
@@ -1446,78 +1557,6 @@ fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
 
     forked_node.stop();
     source_node.stop();
-}
-
-#[test]
-fn localnet_records_api_calls_for_dashboard() {
-    let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
-    let node = project.localnet().start();
-
-    let mut initial_log = node.get_json("/acton_getApiCalls");
-    normalize_api_calls_for_snapshot(&mut initial_log);
-
-    let _startup_accounts = node.get_json("/acton_getStartupAccounts");
-    let _admin_status = node.get_json("/acton_nodeInfo");
-    let _v2_status = node.get_json("/api/v2/getMasterchainInfo?archival=true&limit=2");
-    Client::new()
-        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
-        .header("X-Acton-Request-Source", "studio-ui")
-        .send()
-        .expect("Studio UI request must be sent")
-        .error_for_status()
-        .expect("Studio UI request must succeed");
-    let _successful_rpc = node.post_json(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getMasterchainInfo",
-            "params": {}
-        }),
-    );
-    let (failed_status, _failed_rpc) = node.post_json_with_status(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": "missing",
-            "method": "missingMethod",
-            "params": {}
-        }),
-    );
-    let (_write_status, _write_rpc) = node.post_json_with_status(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": "write",
-            "method": "sendBoc",
-            "params": {
-                "boc": "invalid"
-            }
-        }),
-    );
-    let (_estimate_status, _estimate_response) = node.post_json_with_status(
-        "/api/v3/estimateFee",
-        &json!({
-            "address": "invalid",
-            "body": "invalid"
-        }),
-    );
-
-    let mut logged_calls = node.get_json("/acton_getApiCalls?limit=10");
-    normalize_api_calls_for_snapshot(&mut logged_calls);
-
-    let snapshot = json!({
-        "initial_log": initial_log,
-        "failed_status": failed_status,
-        "logged_calls": logged_calls,
-    });
-
-    assertion().eq(
-        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
-        snapbox::file!("snapshots/localnet/test_localnet_api_calls_dashboard.response.json"),
-    );
-
-    node.stop();
 }
 
 #[test]
@@ -2745,6 +2784,32 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_snapshot_matches(
             "integration/snapshots/localnet/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
         );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_is_accepted_rejects_unknown_broadcast_status() {
+    let project = ProjectBuilder::new("localnet-external-is-accepted")
+        .script_file("external_is_accepted", EXTERNAL_IS_ACCEPTED_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/external_is_accepted.tolk")
+        .verify_network("localnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/localnet/test_localnet_script_is_accepted_rejects_unknown_broadcast_status.stdout.txt",
+    );
 
     node.stop();
 }
@@ -8219,50 +8284,6 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 }
             }
         }
-    }
-}
-
-fn normalize_api_calls_for_snapshot(response: &mut Value) {
-    normalize_extra_for_snapshot(response);
-
-    if let Some(calls) = response
-        .pointer_mut("/result/calls")
-        .and_then(Value::as_array_mut)
-    {
-        for call in calls {
-            if let Some(timestamp_ms) = call.get_mut("timestamp_ms") {
-                *timestamp_ms = json!("[TIMESTAMP_MS]");
-            }
-            if let Some(duration_ms) = call.get_mut("duration_ms") {
-                *duration_ms = json!("[DURATION_MS]");
-            }
-            if let Some(duration_ns) = call.get_mut("duration_ns") {
-                *duration_ns = json!("[DURATION_NS]");
-            }
-            if let Some(response_body) = call.get_mut("response_body") {
-                normalize_nested_extra_for_snapshot(response_body);
-            }
-        }
-    }
-}
-
-fn normalize_nested_extra_for_snapshot(value: &mut Value) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                normalize_nested_extra_for_snapshot(item);
-            }
-        }
-        Value::Object(map) => {
-            for (key, inner) in map {
-                if key == "@extra" {
-                    *inner = json!("[EXTRA]");
-                } else {
-                    normalize_nested_extra_for_snapshot(inner);
-                }
-            }
-        }
-        _ => {}
     }
 }
 

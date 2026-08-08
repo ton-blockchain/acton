@@ -10,11 +10,59 @@ use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use futures::stream;
 use serde::{Deserialize, Serialize};
+use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    StartTestRunRequest, StudioState, StudioTestExecutionLogs, StudioTestReport,
-    TestRunEventEnvelope, TestRunRuntimeError, test_contract_artifact_file_name,
+    StartTestRunRequest, StudioApiErrorBody, StudioState, StudioTestExecutionLogs,
+    StudioTestReport, TestRunEventEnvelope, TestRunRuntimeError, test_contract_artifact_file_name,
 };
+
+pub(super) fn openapi() -> utoipa::openapi::OpenApi {
+    TestApiDoc::openapi()
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        list_test_runs,
+        start_test_run,
+        test_run_events,
+        get_test_run,
+        cancel_test_run,
+        ingest_test_run_event,
+        get_test_run_output,
+        get_test_reports,
+        get_test_logs,
+        get_test_trace,
+        get_test_contract,
+        get_test_source_file,
+        coverage_artifact,
+        gas_profile_artifact,
+        get_test_artifact_config,
+        test_artifact_health
+    ),
+    components(schemas(
+        StartTestRunRequest,
+        crate::StudioTestDuration,
+        StudioTestExecutionLogs,
+        StudioTestReport,
+        crate::TestDescriptorSummary,
+        crate::TestIdentity,
+        crate::TestOutputStream,
+        crate::TestRunEvent,
+        TestRunEventEnvelope,
+        crate::TestRunOutput,
+        crate::TestRunRecord,
+        crate::TestRunSource,
+        crate::TestRunStats,
+        crate::TestRunStatus,
+        crate::TestRunStreamEvent,
+        crate::TestRunSummary,
+        TestArtifactConfig,
+        StudioApiErrorBody
+    ))
+)]
+struct TestApiDoc;
 
 pub(super) fn router() -> Router<StudioState> {
     Router::new()
@@ -62,6 +110,15 @@ pub(super) fn router() -> Router<StudioState> {
         )
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs",
+    responses(
+        (status = 200, description = "Saved and active test runs", body = [crate::TestRunSummary]),
+        (status = 500, description = "Failed to list test runs", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn list_test_runs(
     State(state): State<StudioState>,
 ) -> Result<Json<Vec<crate::TestRunSummary>>, TestRunApiError> {
@@ -73,6 +130,18 @@ async fn list_test_runs(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/test-runs",
+    request_body = StartTestRunRequest,
+    responses(
+        (status = 201, description = "Test run started", body = crate::TestRunRecord),
+        (status = 400, description = "Invalid test run request", body = StudioApiErrorBody),
+        (status = 409, description = "Test run conflicts with current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to start the test run", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn start_test_run(
     State(state): State<StudioState>,
     Json(request): Json<StartTestRunRequest>,
@@ -85,6 +154,17 @@ async fn start_test_run(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 200, description = "Test run details", body = crate::TestRunRecord),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the test run", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn get_test_run(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -97,6 +177,18 @@ async fn get_test_run(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/test-runs/{run_id}/cancel",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 200, description = "Test run cancelled", body = crate::TestRunRecord),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 409, description = "Test run cannot be cancelled", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to cancel the test run", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn cancel_test_run(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -109,6 +201,20 @@ async fn cancel_test_run(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/test-runs/{run_id}/events",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    request_body = TestRunEventEnvelope,
+    responses(
+        (status = 200, description = "Updated test run", body = crate::TestRunRecord),
+        (status = 400, description = "Invalid event", body = StudioApiErrorBody),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 409, description = "Event conflicts with the current run", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to ingest the event", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn ingest_test_run_event(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -128,6 +234,17 @@ async fn ingest_test_run_event(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/output",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 200, description = "Captured standard output and error", body = crate::TestRunOutput),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read test output", body = StudioApiErrorBody)
+    ),
+    tag = "test runs"
+)]
 async fn get_test_run_output(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -140,6 +257,17 @@ async fn get_test_run_output(
         .map_err(TestRunApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/events",
+    responses((
+        status = 200,
+        description = "Test run event stream. Each event uses the test-run event name.",
+        body = crate::TestRunStreamEvent,
+        content_type = "text/event-stream"
+    )),
+    tag = "test runs"
+)]
 async fn test_run_events(
     State(state): State<StudioState>,
 ) -> Sse<impl futures::Stream<Item = Result<Event, Infallible>>> {
@@ -166,6 +294,17 @@ async fn test_run_events(
     )
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/reports",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 200, description = "Test reports", body = [StudioTestReport]),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read reports", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_reports(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -186,6 +325,23 @@ struct TestLogsQuery {
     column: usize,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/test-logs",
+    params(
+        ("run_id" = String, Path, description = "Test run ID"),
+        ("file_path" = String, Query, description = "Test source file path"),
+        ("name" = String, Query, description = "Test name"),
+        ("row" = usize, Query, description = "Test row"),
+        ("column" = usize, Query, description = "Test column")
+    ),
+    responses(
+        (status = 200, description = "Logs for one test", body = StudioTestExecutionLogs),
+        (status = 404, description = "Test run or test not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read test logs", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_logs(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -213,6 +369,21 @@ async fn get_test_logs(
     Ok(Json(report.execution_logs.clone()))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/trace/{name}",
+    params(
+        ("run_id" = String, Path, description = "Test run ID"),
+        ("name" = String, Path, description = "Trace artifact path")
+    ),
+    responses(
+        (status = 200, description = "Trace artifact", body = Object),
+        (status = 204, description = "Trace artifact is not available"),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the trace artifact", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_trace(
     State(state): State<StudioState>,
     AxumPath((run_id, name)): AxumPath<(String, String)>,
@@ -230,6 +401,21 @@ async fn get_test_trace(
     read_json_artifact(&trace_dir, Path::new(&name), true).await
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/contract/{name}",
+    params(
+        ("run_id" = String, Path, description = "Test run ID"),
+        ("name" = String, Path, description = "Contract name")
+    ),
+    responses(
+        (status = 200, description = "Contract artifact", body = Object),
+        (status = 204, description = "Contract artifact is not available"),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the contract artifact", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_contract(
     State(state): State<StudioState>,
     AxumPath((run_id, name)): AxumPath<(String, String)>,
@@ -253,6 +439,21 @@ struct FileQuery {
     path: PathBuf,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/file",
+    params(
+        ("run_id" = String, Path, description = "Test run ID"),
+        ("path" = String, Query, description = "Source file path inside the project")
+    ),
+    responses(
+        (status = 200, description = "Source file", body = String, content_type = "text/plain"),
+        (status = 403, description = "The source path is outside the project", body = StudioApiErrorBody),
+        (status = 404, description = "Test run or source file not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the source file", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_source_file(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -275,13 +476,24 @@ async fn get_test_source_file(
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct TestArtifactConfig {
     project_root: String,
     coverage_available: bool,
     gas_profile_available: bool,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/config",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 200, description = "Artifact capabilities for the test run", body = TestArtifactConfig),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read artifact configuration", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn get_test_artifact_config(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -302,6 +514,17 @@ async fn get_test_artifact_config(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/health",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses(
+        (status = 204, description = "Test artifacts are available"),
+        (status = 404, description = "Test run not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to check test artifacts", body = StudioApiErrorBody)
+    ),
+    tag = "test artifacts"
+)]
 async fn test_artifact_health(
     State(state): State<StudioState>,
     AxumPath(run_id): AxumPath<String>,
@@ -317,6 +540,26 @@ async fn test_artifact_health(
 async fn no_optional_artifact() -> StatusCode {
     StatusCode::NO_CONTENT
 }
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/coverage.lcov",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses((status = 204, description = "Coverage data is not available")),
+    tag = "test artifacts"
+)]
+#[allow(dead_code, reason = "documentation-only OpenAPI path")]
+const fn coverage_artifact() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/test-runs/{run_id}/artifacts/gas-profile",
+    params(("run_id" = String, Path, description = "Test run ID")),
+    responses((status = 204, description = "Gas profile data is not available")),
+    tag = "test artifacts"
+)]
+#[allow(dead_code, reason = "documentation-only OpenAPI path")]
+const fn gas_profile_artifact() {}
 
 async fn read_json_artifact(
     root: &Path,
@@ -350,17 +593,6 @@ async fn resolve_existing_path(root: &Path, requested: &Path) -> Option<PathBuf>
 
 struct TestRunApiError(TestRunRuntimeError);
 
-#[derive(Serialize)]
-struct TestRunApiErrorBody {
-    error: TestRunApiErrorDetails,
-}
-
-#[derive(Serialize)]
-struct TestRunApiErrorDetails {
-    code: &'static str,
-    message: String,
-}
-
 impl IntoResponse for TestRunApiError {
     fn into_response(self) -> Response {
         let (status, code) = match &self.0 {
@@ -373,8 +605,8 @@ impl IntoResponse for TestRunApiError {
         };
         (
             status,
-            Json(TestRunApiErrorBody {
-                error: TestRunApiErrorDetails {
+            Json(StudioApiErrorBody {
+                error: crate::StudioApiErrorDetails {
                     code,
                     message: self.0.to_string(),
                 },

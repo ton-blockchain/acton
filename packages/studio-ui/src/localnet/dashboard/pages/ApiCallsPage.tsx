@@ -9,7 +9,10 @@ import {
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
+  DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  Duration,
   HighlightedCode,
   InlineAction,
   RawDataBlock,
@@ -18,13 +21,17 @@ import {
 import {Fragment, useCallback, useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 
-import type {TonClient} from "@acton/explorer-core/api/client"
-import type {ApiCallRecord, ApiCallStatus, ApiCallType} from "@acton/explorer-core/api/types"
+import {
+  fetchStudioApiCalls,
+  type ApiCallRecord,
+  type ApiCallStatus,
+  type ApiCallType,
+} from "../../../studioApi"
 
 import styles from "../DashboardPage.module.css"
 
 interface ApiCallsPageProps {
-  readonly client: TonClient
+  readonly environmentId: string
 }
 
 type StatusFilter = Readonly<Record<ApiCallStatus, boolean>>
@@ -43,10 +50,7 @@ const DEFAULT_CALLS_PER_PAGE = 20
 const CALLS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 500] as const
 const CALLS_PER_PAGE_STORAGE_KEY = "acton-studio.api-calls-per-page"
 
-const NANOSECONDS_PER_MICROSECOND = 1000
-const NANOSECONDS_PER_MILLISECOND = NANOSECONDS_PER_MICROSECOND * 1000
-
-export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
+export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
   const [calls, setCalls] = useState<readonly ApiCallRecord[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS_FILTER)
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>(DEFAULT_CALL_TYPE_FILTER)
@@ -69,7 +73,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
       setError(undefined)
 
       try {
-        const response = await client.getApiCalls()
+        const response = await fetchStudioApiCalls(environmentId)
         setCalls(response.calls)
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load API calls")
@@ -78,7 +82,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
         setIsRefreshing(false)
       }
     },
-    [client],
+    [environmentId],
   )
 
   useEffect(() => {
@@ -227,296 +231,286 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
           </Button>
         </div>
 
-        {error ? (
-          <div className={styles.emptyState}>{error}</div>
-        ) : isLoading ? (
-          <div className={styles.emptyState}>Loading API calls</div>
-        ) : (
-          <>
-            <DataTable className={styles.rpcCallsTable} minWidth="46.875rem">
-              <DataTableTable aria-label="API calls" layout="fixed">
-                <DataTableHead>
-                  <DataTableRow>
-                    <DataTableHeaderCell
-                      aria-label="Details"
-                      className={styles.rpcExpandHeader}
-                      columnWidth="1.875rem"
-                    />
-                    <DataTableHeaderCell align="center" columnWidth="4rem">
-                      Status
-                    </DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth="7rem">Status Code</DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth="7rem">Type</DataTableHeaderCell>
-                    <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth="7rem">Duration</DataTableHeaderCell>
-                    <DataTableHeaderCell columnWidth="12rem">Timestamp</DataTableHeaderCell>
-                  </DataTableRow>
-                </DataTableHead>
-                <DataTableBody>
-                  {filteredCalls.length === 0 ? (
-                    <DataTableEmpty colSpan={7}>
-                      {calls.length === 0
-                        ? "No API calls yet"
-                        : "No calls match the selected filters"}
-                    </DataTableEmpty>
-                  ) : (
-                    paginatedCalls.map(call => {
-                      const expanded = expandedCalls.has(call.sequence)
-                      const queryParams = formatRequestData(call.query_params)
-                      const requestBody = formatRequestData(call.request_body)
-                      const responseBody = formatRequestData(call.response_body)
-                      return (
-                        <Fragment key={call.sequence}>
-                          <DataTableRow
-                            hover
-                            interactive
-                            selected={expanded}
-                            tabIndex={0}
-                            onClick={() => toggleCallDetails(call.sequence)}
-                            onKeyDown={event => {
-                              if (
-                                event.target === event.currentTarget &&
-                                (event.key === "Enter" || event.key === " ")
-                              ) {
-                                event.preventDefault()
-                                toggleCallDetails(call.sequence)
-                              }
-                            }}
+        <DataTable
+          aria-busy={isLoading}
+          aria-label={isLoading ? "Loading API calls" : undefined}
+          className={styles.rpcCallsTable}
+          minWidth="46.875rem"
+        >
+          <DataTableTable aria-label="API calls" layout="fixed">
+            <DataTableHead>
+              <DataTableRow>
+                <DataTableHeaderCell
+                  aria-label="Details"
+                  className={styles.rpcExpandHeader}
+                  columnWidth="1.875rem"
+                />
+                <DataTableHeaderCell align="center" columnWidth="4rem">
+                  Status
+                </DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="7rem">Status Code</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="7rem">Type</DataTableHeaderCell>
+                <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="7rem">Duration</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="12rem">Timestamp</DataTableHeaderCell>
+              </DataTableRow>
+            </DataTableHead>
+            <DataTableBody>
+              {error ? (
+                <DataTableEmpty colSpan={7}>
+                  <span role="alert">{error}</span>
+                </DataTableEmpty>
+              ) : isLoading ? (
+                <DataTableSkeletonRows
+                  alignments={["center", "center", "left", "left", "left", "left", "left"]}
+                  columns={7}
+                  rowKeyPrefix="api-call-row-skeleton"
+                  rows={5}
+                  widths={["1.875rem", "4rem", "7rem", "7rem", "16rem", "7rem", "12rem"]}
+                />
+              ) : filteredCalls.length === 0 ? (
+                <DataTableEmpty colSpan={7}>
+                  {calls.length === 0 ? "No API calls yet" : "No calls match the selected filters"}
+                </DataTableEmpty>
+              ) : (
+                paginatedCalls.map(call => {
+                  const expanded = expandedCalls.has(call.sequence)
+                  const queryParams = formatRequestData(call.query_params)
+                  const requestBody = formatRequestData(
+                    call.request_body,
+                    call.request_body_truncated,
+                  )
+                  const responseBody = formatRequestData(
+                    call.response_body,
+                    call.response_body_truncated,
+                  )
+                  return (
+                    <Fragment key={call.sequence}>
+                      <DataTableRow
+                        hover
+                        interactive
+                        selected={expanded}
+                        tabIndex={0}
+                        onClick={() => toggleCallDetails(call.sequence)}
+                        onKeyDown={event => {
+                          if (
+                            event.target === event.currentTarget &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault()
+                            toggleCallDetails(call.sequence)
+                          }
+                        }}
+                      >
+                        <DataTableCell align="center" className={styles.rpcExpandCell}>
+                          <InlineAction
+                            aria-controls={`api-call-details-${call.sequence}`}
+                            aria-expanded={expanded}
+                            className={styles.rpcExpandAction}
+                            icon={expanded ? <ChevronDown /> : <ChevronRight />}
+                            label={expanded ? "Hide API call details" : "Show API call details"}
+                            size="compact"
+                          />
+                        </DataTableCell>
+                        <DataTableCell align="center">
+                          <span
+                            aria-label={call.status === "success" ? "Success" : "Failed"}
+                            className={`${styles.rpcStatusIcon} ${
+                              call.status === "success"
+                                ? styles.rpcStatusSuccess
+                                : styles.rpcStatusFailed
+                            }`}
+                            role="img"
+                            title={call.status === "success" ? "Success" : "Failed"}
                           >
-                            <DataTableCell align="center" className={styles.rpcExpandCell}>
-                              <InlineAction
-                                aria-controls={`api-call-details-${call.sequence}`}
-                                aria-expanded={expanded}
-                                className={styles.rpcExpandAction}
-                                icon={expanded ? <ChevronDown /> : <ChevronRight />}
-                                label={expanded ? "Hide API call details" : "Show API call details"}
-                                size="compact"
-                              />
-                            </DataTableCell>
-                            <DataTableCell align="center">
-                              <span
-                                aria-label={call.status === "success" ? "Success" : "Failed"}
-                                className={`${styles.rpcStatusIcon} ${
-                                  call.status === "success"
-                                    ? styles.rpcStatusSuccess
-                                    : styles.rpcStatusFailed
-                                }`}
-                                role="img"
-                                title={call.status === "success" ? "Success" : "Failed"}
-                              >
-                                {call.status === "success" ? (
-                                  <Check size={17} />
-                                ) : (
-                                  <CircleAlert size={17} />
-                                )}
-                              </span>
-                            </DataTableCell>
-                            <DataTableCell tone="subtle">{call.status_code}</DataTableCell>
-                            <DataTableCell tone="muted">
-                              {call.call_type === "read" ? "Read" : "Write"}
-                            </DataTableCell>
-                            <DataTableCell truncate title={call.method}>
-                              {call.method}
-                            </DataTableCell>
-                            <DataTableCell className={styles.rpcDurationCell} tone="muted">
-                              {formatApiCallDuration(call.duration_ns)}
-                            </DataTableCell>
-                            <DataTableCell
-                              className={styles.rpcTimestampCell}
-                              tone="muted"
-                              data-visual-dynamic="time"
-                              data-visual-placeholder="<time>"
-                            >
-                              {formatTimestamp(call.timestamp_ms)}
-                            </DataTableCell>
-                          </DataTableRow>
-                          {expanded ? (
-                            <DataTableRow className={styles.rpcDetailsRow} groupChild>
-                              <DataTableCell
-                                className={styles.rpcDetailsCell}
-                                colSpan={7}
-                                id={`api-call-details-${call.sequence}`}
-                              >
-                                <div className={styles.rpcDetails}>
-                                  <div className={styles.rpcRequestMeta}>
-                                    <span>{call.http_method}</span>
-                                    <span className={styles.rpcRequestPath}>{call.path}</span>
-                                  </div>
-                                  {queryParams === undefined ? undefined : (
-                                    <RawDataBlock
-                                      copyLabel="Copy query parameters"
-                                      customContent={
-                                        <HighlightedCode
-                                          className={styles.rpcRequestCode}
-                                          language="json"
-                                          maxHeight="18rem"
-                                          value={queryParams}
-                                          wrap
-                                        />
-                                      }
-                                      title="Query parameters"
+                            {call.status === "success" ? (
+                              <Check size={17} />
+                            ) : (
+                              <CircleAlert size={17} />
+                            )}
+                          </span>
+                        </DataTableCell>
+                        <DataTableCell tone="subtle">{call.status_code}</DataTableCell>
+                        <DataTableCell tone="muted">
+                          {call.call_type === "read" ? "Read" : "Write"}
+                        </DataTableCell>
+                        <DataTableCell truncate title={call.method}>
+                          {call.method}
+                        </DataTableCell>
+                        <DataTableCell className={styles.rpcDurationCell} tone="muted">
+                          <Duration
+                            display="latency"
+                            fallback="Unknown"
+                            unit="nanoseconds"
+                            value={
+                              Number.isFinite(call.duration_ns) && call.duration_ns >= 0
+                                ? call.duration_ns
+                                : undefined
+                            }
+                          />
+                        </DataTableCell>
+                        <DataTableCell className={styles.rpcTimestampCell} tone="muted">
+                          <DateTime
+                            display="date-time-seconds"
+                            fallback="Unknown"
+                            value={
+                              Number.isFinite(call.timestamp_ms) && call.timestamp_ms > 0
+                                ? call.timestamp_ms
+                                : undefined
+                            }
+                          />
+                        </DataTableCell>
+                      </DataTableRow>
+                      {expanded ? (
+                        <DataTableRow className={styles.rpcDetailsRow} groupChild>
+                          <DataTableCell
+                            className={styles.rpcDetailsCell}
+                            colSpan={7}
+                            id={`api-call-details-${call.sequence}`}
+                          >
+                            <div className={styles.rpcDetails}>
+                              <div className={styles.rpcRequestMeta}>
+                                <span>{call.http_method}</span>
+                                <span className={styles.rpcRequestPath}>{call.path}</span>
+                              </div>
+                              {queryParams === undefined ? undefined : (
+                                <RawDataBlock
+                                  copyLabel="Copy query parameters"
+                                  customContent={
+                                    <HighlightedCode
+                                      className={styles.rpcRequestCode}
+                                      language="json"
+                                      maxHeight="18rem"
                                       value={queryParams}
+                                      wrap
                                     />
-                                  )}
-                                  {requestBody === undefined ? undefined : (
-                                    <RawDataBlock
-                                      copyLabel="Copy request body"
-                                      customContent={
-                                        <HighlightedCode
-                                          className={styles.rpcRequestCode}
-                                          language="json"
-                                          maxHeight="18rem"
-                                          value={requestBody}
-                                          wrap
-                                        />
-                                      }
-                                      title="Request body"
+                                  }
+                                  title="Query parameters"
+                                  value={queryParams}
+                                />
+                              )}
+                              {requestBody === undefined ? undefined : (
+                                <RawDataBlock
+                                  copyLabel="Copy request body"
+                                  customContent={
+                                    <HighlightedCode
+                                      className={styles.rpcRequestCode}
+                                      language="json"
+                                      maxHeight="18rem"
                                       value={requestBody}
+                                      wrap
                                     />
-                                  )}
-                                  {queryParams === undefined && requestBody === undefined ? (
-                                    <div className={styles.rpcEmptyRequest}>
-                                      This request has no parameters
-                                    </div>
-                                  ) : undefined}
-                                  {call.request_body_truncated ? (
-                                    <p className={styles.rpcBodyNotice}>
-                                      Request body preview is limited to 64 KB
-                                    </p>
-                                  ) : undefined}
-                                  {responseBody === undefined ? undefined : (
-                                    <RawDataBlock
-                                      copyLabel="Copy response body"
-                                      customContent={
-                                        <HighlightedCode
-                                          className={styles.rpcRequestCode}
-                                          language="json"
-                                          maxHeight="18rem"
-                                          value={responseBody}
-                                          wrap
-                                        />
-                                      }
-                                      title="Response"
-                                      value={responseBody}
-                                    />
-                                  )}
-                                  {call.response_body_truncated ? (
-                                    <p className={styles.rpcBodyNotice}>
-                                      Response preview is limited to 64 KB
-                                    </p>
-                                  ) : undefined}
+                                  }
+                                  title="Request body"
+                                  value={requestBody}
+                                />
+                              )}
+                              {queryParams === undefined && requestBody === undefined ? (
+                                <div className={styles.rpcEmptyRequest}>
+                                  This request has no parameters
                                 </div>
-                              </DataTableCell>
-                            </DataTableRow>
-                          ) : undefined}
-                        </Fragment>
-                      )
-                    })
-                  )}
-                </DataTableBody>
-              </DataTableTable>
-            </DataTable>
-            {filteredCalls.length > 0 ? (
-              <div className={styles.rpcCallsPagination}>
-                <div className={styles.rpcCallsPaginationOverview}>
-                  <span className={styles.rpcCallsPaginationSummary}>
-                    {firstCallIndex + 1}–
-                    {Math.min(firstCallIndex + callsPerPage, orderedCalls.length)} of{" "}
-                    {orderedCalls.length}
-                  </span>
-                  <div className={styles.rpcCallsPageSize}>
-                    <Select
-                      aria-label="Calls per page"
-                      size="sm"
-                      value={callsPerPage}
-                      onChange={event => {
-                        setCallsPerPage(Number(event.target.value))
-                        setCurrentPage(1)
-                      }}
-                    >
-                      {CALLS_PER_PAGE_OPTIONS.map(option => (
-                        <option key={option} value={option}>
-                          {option} per page
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-                <div className={styles.rpcCallsPaginationActions}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    leadingIcon={<ChevronLeft size={14} />}
-                    disabled={safeCurrentPage === 1}
-                    onClick={() => setCurrentPage(safeCurrentPage - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className={styles.rpcCallsPaginationPage}>
-                    Page {safeCurrentPage} of {totalPages}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    trailingIcon={<ChevronRight size={14} />}
-                    disabled={safeCurrentPage === totalPages}
-                    onClick={() => setCurrentPage(safeCurrentPage + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
+                              ) : undefined}
+                              {call.request_body_truncated ? (
+                                <p className={styles.rpcBodyNotice}>
+                                  Request body preview is limited to 64 KB
+                                </p>
+                              ) : undefined}
+                              {responseBody === undefined ? undefined : (
+                                <RawDataBlock
+                                  copyLabel="Copy response body"
+                                  customContent={
+                                    <HighlightedCode
+                                      className={styles.rpcRequestCode}
+                                      language="json"
+                                      maxHeight="18rem"
+                                      value={responseBody}
+                                      wrap
+                                    />
+                                  }
+                                  title="Response"
+                                  value={responseBody}
+                                />
+                              )}
+                              {call.response_body_truncated ? (
+                                <p className={styles.rpcBodyNotice}>
+                                  Response preview is limited to 64 KB
+                                </p>
+                              ) : undefined}
+                            </div>
+                          </DataTableCell>
+                        </DataTableRow>
+                      ) : undefined}
+                    </Fragment>
+                  )
+                })
+              )}
+            </DataTableBody>
+          </DataTableTable>
+        </DataTable>
+        {!error && !isLoading && filteredCalls.length > 0 ? (
+          <div className={styles.rpcCallsPagination}>
+            <div className={styles.rpcCallsPaginationOverview}>
+              <span className={styles.rpcCallsPaginationSummary}>
+                {firstCallIndex + 1}–{Math.min(firstCallIndex + callsPerPage, orderedCalls.length)}{" "}
+                of {orderedCalls.length}
+              </span>
+              <div className={styles.rpcCallsPageSize}>
+                <Select
+                  aria-label="Calls per page"
+                  size="sm"
+                  value={callsPerPage}
+                  onChange={event => {
+                    setCallsPerPage(Number(event.target.value))
+                    setCurrentPage(1)
+                  }}
+                >
+                  {CALLS_PER_PAGE_OPTIONS.map(option => (
+                    <option key={option} value={option}>
+                      {option} per page
+                    </option>
+                  ))}
+                </Select>
               </div>
-            ) : undefined}
-          </>
-        )}
+            </div>
+            <div className={styles.rpcCallsPaginationActions}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leadingIcon={<ChevronLeft size={14} />}
+                disabled={safeCurrentPage === 1}
+                onClick={() => setCurrentPage(safeCurrentPage - 1)}
+              >
+                Previous
+              </Button>
+              <span className={styles.rpcCallsPaginationPage}>
+                Page {safeCurrentPage} of {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                trailingIcon={<ChevronRight size={14} />}
+                disabled={safeCurrentPage === totalPages}
+                onClick={() => setCurrentPage(safeCurrentPage + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : undefined}
       </section>
     </>
   )
 }
 
-function formatTimestamp(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
-    return "Unknown"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(timestampMs))
-}
-
-function formatApiCallDuration(durationNs: number): string {
-  if (!Number.isFinite(durationNs) || durationNs < 0) {
-    return "Unknown"
-  }
-
-  if (durationNs < NANOSECONDS_PER_MICROSECOND) {
-    return `${Math.round(durationNs)} ns`
-  }
-
-  if (durationNs < NANOSECONDS_PER_MILLISECOND) {
-    return `${formatDurationValue(durationNs / NANOSECONDS_PER_MICROSECOND)} µs`
-  }
-
-  const durationMs = durationNs / NANOSECONDS_PER_MILLISECOND
-  if (durationMs < 10) {
-    return `${formatDurationValue(durationMs)} ms`
-  }
-
-  return `${Math.round(durationMs)} ms`
-}
-
-function formatDurationValue(value: number): string {
-  return value.toLocaleString(undefined, {
-    maximumFractionDigits: value < 10 ? 2 : value < 100 ? 1 : 0,
-  })
-}
-
-function formatRequestData(data: unknown | null): string | undefined {
+function formatRequestData(data: unknown | null, truncated = false): string | undefined {
   if (data === null || data === undefined) {
     return undefined
+  }
+
+  if (truncated && typeof data === "string") {
+    return data
   }
 
   return JSON.stringify(data, null, 2)

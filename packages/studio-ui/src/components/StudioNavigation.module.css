@@ -197,17 +197,10 @@
 }
 
 .workspaceMark {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
-  background:
-    radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, var(--acton-color-primary), var(--litenode-workspace-to));
-  background-size:
-    4px 4px,
-    auto;
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: 999px;
+  display: block;
 }
 
 .workspaceBody {
@@ -853,12 +846,6 @@
   white-space: nowrap;
 }
 
-.networkNavGroup {
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--acton-color-border);
-}
-
 .networkNavLabel {
   display: flex;
   min-height: 36px;
@@ -879,20 +866,6 @@
   min-width: 0;
   align-items: center;
   gap: 7px;
-}
-
-.networkNavBadge {
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  color: var(--acton-color-warning-text);
-  font-size: 0.59rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  background: color-mix(in srgb, var(--acton-color-warning) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--acton-color-warning) 28%, var(--acton-color-border));
-  border-radius: 5px;
 }
 
 .environmentStatusDot {
@@ -1312,8 +1285,8 @@
   }
 
   .workspaceMark {
-    width: 20px;
-    height: 20px;
+    width: 26px;
+    height: 26px;
   }
 
   .workspaceMeta {

@@ -203,6 +203,11 @@ struct ExternalSendError {
 /// `transactions` is `null` and `error` contains emulator metadata such as VM
 /// exit code and an opaque diagnostic id.
 ///
+/// After a network broadcast, submission success does not tell Acton whether
+/// the destination contract accepted the message. In that case,
+/// `acceptanceKnown` is `false`; use [ExternalSendResult.waitForFirstTransaction]
+/// or [ExternalSendResult.waitForTrace] to look for the transaction on-chain.
+///
 /// In tests, prefer `expect(result).toBeAccepted()`,
 /// `expect(result).toBeNotAccepted()`, and
 /// `expect(result).toHaveExternalVmExitCode(...)` for diagnostics.
@@ -217,6 +222,8 @@ struct ExternalSendResult {
     error: ExternalSendError?
     /// Destination account extracted from the original external-in message.
     destination: address
+    /// Whether Acton knows if the destination contract accepted the message.
+    acceptanceKnown: bool = true
 }
 
 /// Returns the send result at the given index.
@@ -224,10 +231,28 @@ fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
 }
 
-/// Returns `true` when the external-in message produced a transaction trace.
+/// Returns whether a locally emulated external-in message was accepted.
+///
+/// After a network broadcast, Acton only knows that the message was submitted.
+/// Calling this method then fails with an actionable error because returning
+/// either `true` or `false` would be misleading. Use
+/// [ExternalSendResult.waitForFirstTransaction] or
+/// [ExternalSendResult.waitForTrace] to look for the transaction on-chain.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
 ///
 /// Available since Acton 1.1.
-fun ExternalSendResult.isAccepted(self): bool {
+fun ExternalSendResult.isAccepted(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): bool {
+    if (!self.acceptanceKnown) {
+        Assert.fail(
+            "ExternalSendResult.isAccepted() is unavailable after broadcasting because submission does not report contract acceptance; use waitForFirstTransaction() to check whether the message appears on-chain",
+            location,
+        );
+    }
     return self.transactions != null;
 }
 
@@ -856,7 +881,10 @@ fun net.createExternalMessage<TBody>(
 /// message instead of an internal message sent from a wallet-like address.
 ///
 /// In broadcast mode without `--tonconnect`, Acton sends the external-in message to
-/// the network and returns a single pseudo transaction placeholder. With
+/// the network and returns a single pseudo transaction placeholder. This only
+/// confirms submission, not whether the destination contract accepted the message.
+/// Call [ExternalSendResult.waitForFirstTransaction] or
+/// [ExternalSendResult.waitForTrace] to look for the transaction on-chain. With
 /// `--tonconnect`, `net.sendExternal` is rejected; use [net.send] with an
 /// internal wallet message so the connected wallet can approve it.
 ///
@@ -885,6 +913,7 @@ fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
         transactions: result.get(0) as SendResultList?,
         error: error == null ? null : error as ExternalSendError,
         destination: msg.dest,
+        acceptanceKnown: result.get(2) as bool,
     };
 }
 

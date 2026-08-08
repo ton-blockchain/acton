@@ -14,6 +14,8 @@ describe("explorer account routes", () => {
     })
 
     expect({
+      config: mainnetRoutes.configPath(),
+      historicalConfig: testnetRoutes.configPath(123),
       mainnet: mainnetRoutes.addressPath(RAW_ADDRESS),
       testnet: testnetRoutes.addressPath(RAW_ADDRESS),
       unbounceable: unbounceableRoutes.addressPath(RAW_ADDRESS),
@@ -21,6 +23,8 @@ describe("explorer account routes", () => {
       invalidPreserved: mainnetRoutes.addressPath("not an address"),
     }).toMatchInlineSnapshot(`
       {
+        "config": "/config",
+        "historicalConfig": "/explorer/config/123",
         "invalidPreserved": "/address/not%20an%20address",
         "mainnet": "/address/Ef9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVbxn",
         "networkChanged": "/address/Ef9VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVbxn",

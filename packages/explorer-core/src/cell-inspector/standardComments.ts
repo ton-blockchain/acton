@@ -1,4 +1,5 @@
 import type {Cell, Slice} from "@ton/core"
+import {formatNumberValue, formatOpcode} from "@acton/ui"
 
 import {confidence, type ParserProvenance, type ParserWarning} from "./model"
 
@@ -139,7 +140,7 @@ function readSnakeBytes(slice: Slice, options: StandardCommentOptions): SnakeByt
       warnings.push(
         withPath(options, {
           code: "snake-size-limit",
-          message: `Comment payload was truncated at ${maxPayloadBytes.toLocaleString()} bytes`,
+          message: `Comment payload was truncated at ${formatNumberValue(maxPayloadBytes)} bytes`,
         }),
       )
       break
@@ -184,7 +185,7 @@ function commentProvenance(label: string, reasons: readonly string[]): ParserPro
 }
 
 function opcodeHex(opcode: number): string {
-  return `0x${opcode.toString(16).padStart(8, "0")}`
+  return formatOpcode(opcode) ?? "unknown opcode"
 }
 
 function boundedPositiveInteger(value: number | undefined, fallback: number): number {

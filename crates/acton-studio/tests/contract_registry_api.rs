@@ -251,12 +251,15 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
             api_v2_port: 18080,
             api_v3_port: 18081,
             admin_port: 18082,
+            config_port: 18083,
             validators: 1,
+            imported_accounts: Vec::new(),
         },
         EnvironmentEndpoints {
             api_v2: Some(format!("{base_url}/api/v2")),
             api_v3: Some(format!("{base_url}/api/v3")),
-            control: None,
+            config: Some(format!("{base_url}/config")),
+            control: Some(base_url.to_owned()),
         },
     )
 }
@@ -280,6 +283,7 @@ fn localnet_environment(base_url: &str) -> StudioEnvironment {
         EnvironmentEndpoints {
             api_v2: Some(format!("{base_url}/api/v2")),
             api_v3: Some(format!("{base_url}/api/v3")),
+            config: None,
             control: Some(base_url.to_owned()),
         },
     )

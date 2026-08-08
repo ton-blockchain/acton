@@ -136,10 +136,14 @@ Available fields:
 
 Override rules:
 
-- Tolk wrapper path: `--output` -> `--output-dir` -> `[wrappers.tolk].output-dir` -> `@wrappers` mapping -> wrapper command built-in default.
-- TypeScript wrapper path: `--output` -> `--output-dir` -> `[wrappers.typescript].output-dir` -> wrapper command built-in default.
-- Test stub path: `--test-output` -> `--test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
-- `[wrappers.tolk].generate-test` only affects non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
+- Tolk wrapper path: `--output` -> `--output-dir` -> `[contracts.<name>.wrappers.tolk].output-dir` -> `[wrappers.tolk].output-dir` -> `@wrappers` mapping -> wrapper command built-in default.
+- TypeScript wrapper path: `--output` -> `--output-dir` -> `[contracts.<name>.wrappers.typescript].output-dir` -> `[wrappers.typescript].output-dir` -> wrapper command built-in default.
+- Test stub path: `--test-output` -> `--test-output-dir` -> `[contracts.<name>.wrappers.tolk].test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
+- `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both only affect non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
+
+The same fields are available below each contract's `wrappers` table. Missing
+per-contract fields inherit their project-level values. `acton wrapper --all`
+resolves the effective settings separately for every contract.
 
 Configured wrapper paths are project-root-relative. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` remain cwd-relative unless absolute.
 
@@ -153,6 +157,9 @@ display-name = "MyContract"
 src = "contracts/MyContract.tolk"
 output = "build/MyContract.boc"
 depends = []
+
+[contracts.MyContract.wrappers.tolk]
+output-dir = "generated/my-contract"
 ```
 
 #### Contract fields
@@ -164,6 +171,7 @@ depends = []
 | `types`        | string | No       | Tolk interface file used to produce ABI for a precompiled `.boc` contract                                          |
 | `output`       | string | No       | Optional path where the compiled binary `.boc` file should be saved in addition to the normal JSON build artifact  |
 | `depends`      | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
+| `wrappers`     | table  | No       | Per-contract `tolk` and `typescript` overrides for the project-level wrapper settings                              |
 
 #### Contract names
 

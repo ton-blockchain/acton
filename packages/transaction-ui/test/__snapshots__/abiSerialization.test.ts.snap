@@ -208,18 +208,13 @@ exports[`ABI value serialization parses JSON and converts GRAM values at their p
     "empty": true,
   },
   "formatted": "1.25",
-  "fractional": "1000000001",
   "invalidJsonFallback": {
     "invalid": true,
   },
   "json": {
     "value": "7",
   },
-  "leadingFraction": "500000000",
   "malformedNano": "",
-  "negative": undefined,
-  "tooPrecise": undefined,
-  "zero": "0",
 }
 `;
 

@@ -2,7 +2,14 @@ import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {FiSearch} from "react-icons/fi"
 
-import {highlightCodeToTokens, type HighlightedCodeToken, useTheme} from "@acton/ui"
+import {
+  formatSourcePath,
+  highlightCodeToTokens,
+  Percentage,
+  SourceLocationValue,
+  type HighlightedCodeToken,
+  useTheme,
+} from "@acton/ui"
 
 import {useCoverageReport} from "../../hooks/useCoverageReport"
 import {useFileContent} from "../../hooks/useFileContent"
@@ -16,28 +23,6 @@ interface CoverageProps {
 
 interface CoverageContentProps extends CoverageProps {
   readonly lcov: string
-}
-
-const getRelativePath = (filePath: string, projectRoot?: string) => {
-  if (projectRoot && filePath.startsWith(projectRoot)) {
-    const relativePath = filePath.slice(projectRoot.length)
-    return relativePath || filePath
-  }
-
-  const pathSegments = filePath.split("/")
-  if (pathSegments.length > 4) {
-    return `.../${pathSegments.slice(-4).join("/")}`
-  }
-
-  return filePath
-}
-
-const formatPercentage = (value: number | undefined) => {
-  if (value === undefined) {
-    return "n/a"
-  }
-
-  return `${value.toFixed(1)}%`
 }
 
 const formatBranchCoverage = (file: CoverageFile) => {
@@ -127,7 +112,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
       const matchesQuery =
         normalizedQuery.length === 0 ||
         file.filePath.toLowerCase().includes(normalizedQuery) ||
-        getRelativePath(file.filePath, projectRoot).toLowerCase().includes(normalizedQuery)
+        formatSourcePath(file.filePath, {projectRoot}).toLowerCase().includes(normalizedQuery)
 
       return matchesQuery
     })
@@ -215,20 +200,39 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Overall Score</div>
           <div className={`${styles.summaryValue} ${getScoreTone(coverage.combinedScore)}`}>
-            {formatPercentage(coverage.combinedScore)}
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.combinedScore}
+            />
           </div>
           <div className={styles.summaryMeta}>Weighted across lines and branches</div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Line Coverage</div>
-          <div className={styles.summaryValue}>{formatPercentage(coverage.linePercentage)}</div>
+          <div className={styles.summaryValue}>
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.linePercentage}
+            />
+          </div>
           <div className={styles.summaryMeta}>
             {coverage.totalLinesHit}/{coverage.totalLinesFound} executable lines
           </div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Branch Coverage</div>
-          <div className={styles.summaryValue}>{formatPercentage(coverage.branchPercentage)}</div>
+          <div className={styles.summaryValue}>
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.branchPercentage}
+            />
+          </div>
           <div className={styles.summaryMeta}>
             {coverage.totalBranchesFound > 0
               ? `${coverage.totalBranchesHit}/${coverage.totalBranchesFound} branches`
@@ -263,8 +267,6 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
           <div className={styles.fileList}>
             {filteredFiles.map(file => {
               const isSelected = file.filePath === selectedFile?.filePath
-              const relativePath = getRelativePath(file.filePath, projectRoot)
-
               return (
                 <button
                   key={file.filePath}
@@ -273,13 +275,20 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
                   onClick={() => setSelectedFilePath(file.filePath)}
                 >
                   <div className={styles.fileRow}>
-                    <span className={styles.filePath} title={file.filePath}>
-                      {relativePath}
-                    </span>
+                    <SourceLocationValue
+                      className={styles.filePath}
+                      projectRoot={projectRoot}
+                      value={{file: file.filePath}}
+                    />
                     <span
                       className={`${styles.filePercentage} ${getScoreTone(file.combinedScore)}`}
                     >
-                      {formatPercentage(file.combinedScore)}
+                      <Percentage
+                        fallback="n/a"
+                        maximumFractionDigits={1}
+                        minimumFractionDigits={1}
+                        value={file.combinedScore}
+                      />
                     </span>
                   </div>
                   <div className={styles.fileMeta}>
@@ -311,14 +320,22 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
             <>
               <div className={styles.viewerHeader}>
                 <div>
-                  <div className={styles.viewerPath} title={selectedFile.filePath}>
-                    {getRelativePath(selectedFile.filePath, projectRoot)}
-                  </div>
+                  <SourceLocationValue
+                    className={styles.viewerPath}
+                    projectRoot={projectRoot}
+                    value={{file: selectedFile.filePath}}
+                  />
                   <div className={styles.viewerMeta}>
                     <span
                       className={`${styles.viewerScore} ${getScoreTone(selectedFile.combinedScore)}`}
                     >
-                      Score {formatPercentage(selectedFile.combinedScore)}
+                      Score{" "}
+                      <Percentage
+                        fallback="n/a"
+                        maximumFractionDigits={1}
+                        minimumFractionDigits={1}
+                        value={selectedFile.combinedScore}
+                      />
                     </span>
                     <span>
                       {selectedFile.linesHit}/{selectedFile.linesFound} executable lines

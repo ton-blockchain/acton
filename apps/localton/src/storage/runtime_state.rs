@@ -12,15 +12,24 @@ use utoipa::ToSchema;
 
 pub const RUNTIME_SCHEMA_VERSION: u32 = 1;
 
+/// Current launcher, node, and service state
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct RuntimeState {
+    /// Version of this runtime state format
     pub schema_version: u32,
+    /// Process ID of the Localton launcher
     pub launcher_pid: Option<u32>,
+    /// Unix time when the launcher started
     pub started_at: Option<u64>,
+    /// `true` when the network can process requests
     pub ready: bool,
+    /// Latest masterchain block number that the launcher observed
     pub masterchain_seqno: Option<u32>,
+    /// Unix time when the launcher observed the latest block
     pub last_block_at: Option<u64>,
+    /// Runtime state for each configured node
     pub nodes: BTreeMap<String, NodeRuntime>,
+    /// Runtime state for each HTTP service
     pub services: BTreeMap<String, ServiceRuntime>,
 }
 
@@ -119,30 +128,50 @@ impl RuntimeState {
     }
 }
 
+/// Current state of one Localton node
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeRuntime {
+    /// `true` when Localton initialized the node files
     pub initialized: bool,
+    /// `true` when the node process is running
     pub running: bool,
+    /// Process ID of the node
     pub pid: Option<u32>,
+    /// Current node status
     pub status: String,
+    /// Last node error
     pub last_error: Option<String>,
+    /// Public key for the validator console
     pub console_public_key: Option<String>,
+    /// Public key for the liteserver
     pub liteserver_public_key: Option<String>,
+    /// Public validator key
     pub validator_public_key: Option<String>,
+    /// Validator ADNL address
     pub validator_adnl: Option<String>,
+    /// Current election identifier
     pub election_id: Option<u32>,
+    /// Unix time when the current election ends
     pub election_end: Option<u32>,
+    /// Path of the validator participation message
     #[schema(value_type = Option<String>)]
     pub participation_message: Option<PathBuf>,
+    /// Total validator rewards in nanotons
     pub total_rewards_nano: String,
+    /// Latest validator reward in nanotons
     pub last_reward_nano: String,
 }
 
+/// Current state of one Localton service
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct ServiceRuntime {
+    /// `true` when the service is running
     pub running: bool,
+    /// Process ID of the service
     pub pid: Option<u32>,
+    /// Public service URL
     pub endpoint: Option<String>,
+    /// Last service error
     pub last_error: Option<String>,
 }
 

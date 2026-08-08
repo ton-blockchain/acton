@@ -1,5 +1,16 @@
-import {Button, CodeViewer, CopyInlineAction, HighlightedCode} from "@acton/ui"
-import {useEffect, useMemo, useState} from "react"
+import {
+  Button,
+  CodeViewer,
+  CountValue,
+  CopyInlineAction,
+  DateTime,
+  HighlightedCode,
+  NumberValue,
+  SourceLocationValue,
+  TechnicalValue,
+  shortenMiddle,
+} from "@acton/ui"
+import {useEffect, useMemo, useState, type ReactNode} from "react"
 import {Download, ExternalLink} from "lucide-react"
 
 import {StatusPill} from "../components/StatusPill"
@@ -13,7 +24,7 @@ import verificationPaperIcon from "../assets/ton-verifier-icons/verification-pap
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
 import type {VerificationSourceResponse, VerifierApi} from "../lib/api"
 import {downloadSourceArchive} from "../lib/source-archive"
-import {parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
+import {parseLookupTarget, type LookupTarget} from "../lib/target"
 import detailsStyles from "./ContractDetails.module.css"
 import summaryStyles from "./ContractSummary.module.css"
 import styles from "./VerifiedContractPage.module.css"
@@ -22,19 +33,15 @@ function DetailRow({
   label,
   value,
   href,
-  monospace = false,
   copyable = true,
 }: {
   readonly label: string
-  readonly value: string
+  readonly value: ReactNode
   readonly href?: string
-  readonly monospace?: boolean
   readonly copyable?: boolean
 }) {
   return (
-    <div
-      className={`${detailsStyles.detailRow} ${monospace ? detailsStyles.detailRowMonospace : ""}`}
-    >
+    <div className={detailsStyles.detailRow}>
       <dt>{label}</dt>
       <dd>
         {href ? (
@@ -48,10 +55,14 @@ function DetailRow({
             <span>{value}</span>
             <ExternalLink size={13} aria-hidden="true" />
           </a>
+        ) : typeof value === "string" ? (
+          <span className={detailsStyles.detailText} title={value}>
+            {value}
+          </span>
         ) : (
-          <span title={value}>{value}</span>
+          value
         )}
-        {copyable && (
+        {copyable && typeof value === "string" && value && (
           <CopyInlineAction value={value} label={`Copy ${label}`} copiedLabel={`${label} copied`} />
         )}
       </dd>
@@ -113,17 +124,6 @@ function CompilerVersionLink({
       <ExternalLink size={13} aria-hidden="true" />
     </a>
   )
-}
-
-function formatVerifiedAt(timestamp: number): string | undefined {
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return undefined
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(timestamp * 1000))
 }
 
 function PanelHeading({
@@ -221,7 +221,8 @@ function VerifiedContract({
     )
   }
 
-  const verifiedAt = formatVerifiedAt(bundle.verified_at)
+  const verifiedAt =
+    Number.isFinite(bundle.verified_at) && bundle.verified_at > 0 ? bundle.verified_at : undefined
   const compactCompilerParams = JSON.stringify(bundle.compiler.params)
   const readableCompilerParams =
     compactCompilerParams.length <= 96
@@ -242,7 +243,7 @@ function VerifiedContract({
           <PanelHeading
             icon={contractIcon}
             label="Contract"
-            title={address ? shortenMiddle(address, 18, 12) : "Verified code hash"}
+            title={address ? shortenMiddle(address, {start: 18, end: 12}) : "Verified code hash"}
             titleLevel="h1"
           />
           <div className={summaryStyles.summaryStatusRow}>
@@ -264,7 +265,9 @@ function VerifiedContract({
             </div>
             <div className={summaryStyles.summaryFact}>
               <span>Files</span>
-              <strong>{bundle.files.length}</strong>
+              <strong>
+                <NumberValue value={bundle.files.length} />
+              </strong>
             </div>
           </div>
           <div className={summaryStyles.hashCard}>
@@ -287,21 +290,79 @@ function VerifiedContract({
             <h2 id="verification-metadata-title">Verification metadata</h2>
           </div>
           <dl>
-            {address && <DetailRow label="Address" value={address} monospace />}
-            {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
-            <DetailRow label="Code hash" value={data.code_hash} monospace />
-            <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} monospace />
-            {bundle.storage_revision && (
-              <DetailRow label="Storage revision" value={bundle.storage_revision} monospace />
+            {address && (
+              <DetailRow
+                label="Address"
+                value={
+                  <TechnicalValue
+                    copyLabel="address"
+                    copyVisibility="always"
+                    shorten={false}
+                    value={address}
+                  />
+                }
+              />
             )}
-            <DetailRow label="Language" value={bundle.compiler.language} />
+            {verifiedAt && (
+              <DetailRow
+                label="Verified at"
+                value={<DateTime display="date-time-seconds" unit="seconds" value={verifiedAt} />}
+                copyable={false}
+              />
+            )}
+            <DetailRow
+              label="Code hash"
+              value={
+                <TechnicalValue
+                  copyLabel="code hash"
+                  copyVisibility="always"
+                  shorten={false}
+                  value={data.code_hash}
+                />
+              }
+            />
+            <DetailRow
+              label="Bundle hash"
+              value={
+                <TechnicalValue
+                  copyLabel="bundle hash"
+                  copyVisibility="always"
+                  shorten={false}
+                  value={bundle.source_bundle_hash}
+                />
+              }
+            />
+            {bundle.storage_revision && (
+              <DetailRow
+                label="Storage revision"
+                value={
+                  <TechnicalValue
+                    copyLabel="storage revision"
+                    copyVisibility="always"
+                    shorten={false}
+                    value={bundle.storage_revision}
+                  />
+                }
+              />
+            )}
+            <DetailRow label="Language" value={bundle.compiler.language} copyable={false} />
             <DetailRow
               label="Compiler"
               value={bundle.compiler.version}
               href={compilerVersionUrl(bundle.compiler.language, bundle.compiler.version)}
               copyable={false}
             />
-            <DetailRow label="Entrypoint" value={bundle.entrypoint} />
+            <DetailRow
+              label="Entrypoint"
+              value={
+                <SourceLocationValue
+                  copyable
+                  copyVisibility="always"
+                  maxSegments={Number.MAX_SAFE_INTEGER}
+                  value={{file: bundle.entrypoint}}
+                />
+              }
+            />
           </dl>
           <div className={detailsStyles.metadataJson}>
             <div className={detailsStyles.metadataJsonTitle}>Compile params</div>
@@ -324,7 +385,9 @@ function VerifiedContract({
               />
               <div>
                 <h2>Source bundle</h2>
-                <span className={detailsStyles.fileCount}>{bundle.files.length} files</span>
+                <span className={detailsStyles.fileCount}>
+                  <CountValue singular="file" value={bundle.files.length} />
+                </span>
               </div>
             </div>
             <div className={detailsStyles.sectionActions}>
@@ -368,12 +431,15 @@ function UnverifiedContract({
       <h1>Contract is not verified</h1>
       <p>
         This target resolves to code hash{" "}
-        <span className={styles["mono-inline"]}>{data.code_hash}</span>, but there is no stored
-        source bundle for it.
+        <TechnicalValue copyLabel="code hash" value={data.code_hash} />, but there is no stored
+        source bundle for it
       </p>
       {address && (
         <dl className={detailsStyles.summaryGrid}>
-          <DetailRow label="Address" value={address} monospace />
+          <DetailRow
+            label="Address"
+            value={<TechnicalValue copyLabel="address" value={address} />}
+          />
         </dl>
       )}
     </section>

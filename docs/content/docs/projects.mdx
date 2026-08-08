@@ -263,6 +263,20 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
+For a multi-contract project, nest the same tables below a contract to give it
+a different layout while keeping the project defaults for every other contract:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Only fields present in the contract table override project defaults. This also
+works with `acton wrapper --all`, which resolves settings contract by contract.
+
 The `@wrappers` in `import "@wrappers/..."` always resolves to the Tolk wrapper directory, regardless of existence of non-Tolk wrappers.
 
 See the [`acton wrapper` command reference](/docs/commands/wrapper) for more.

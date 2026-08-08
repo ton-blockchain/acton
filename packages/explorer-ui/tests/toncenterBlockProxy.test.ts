@@ -1,9 +1,73 @@
 import {expect, mock, test} from "bun:test"
 
+import {onRequest as onGetBlockTransactionsRequest} from "../functions/api/toncenter/[network]/v2/getBlockTransactions"
 import {onRequest as onGetShardsRequest} from "../functions/api/toncenter/[network]/v2/getShards"
 import {onRequest as onBlocksRequest} from "../functions/api/toncenter/[network]/v3/blocks"
 import {onRequest as onTransactionsRequest} from "../functions/api/toncenter/[network]/v3/transactions"
 import {installMemoryEdgeCache} from "./toncenterProxyTestUtils"
+
+test("V2 block transaction fallback is normalized, validated, and cached", async () => {
+  const originalFetch = globalThis.fetch
+  const cache = installMemoryEdgeCache()
+  const backgroundTasks: Promise<unknown>[] = []
+  const upstreamRequests: string[] = []
+
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    upstreamRequests.push(input.toString())
+    return Promise.resolve(
+      Response.json({
+        ok: true,
+        result: {
+          "@type": "blocks.transactions",
+          id: {},
+          req_count: 100,
+          incomplete: false,
+          transactions: [{account: `0:${"a".repeat(64)}`, lt: "7", hash: "tx"}],
+        },
+      }),
+    )
+  }) as typeof fetch
+
+  const context = (requestUrl: string) => ({
+    request: new Request(requestUrl),
+    env: {},
+    params: {network: "mainnet"},
+    waitUntil(promise: Promise<unknown>) {
+      backgroundTasks.push(promise)
+    },
+  })
+  const fallbackUrl =
+    "https://actonscan.example/api/toncenter/mainnet/v2/getBlockTransactions?" +
+    "count=0100&seqno=00042&shard=-9223372036854775808&workchain=-1&" +
+    `root_hash=${"r".repeat(43)}%3D&file_hash=${"f".repeat(43)}%3D&` +
+    `after_lt=0007&after_hash=${"a".repeat(64)}`
+
+  try {
+    const first = await onGetBlockTransactionsRequest(context(fallbackUrl))
+    await Promise.all(backgroundTasks)
+    const second = await onGetBlockTransactionsRequest(context(fallbackUrl))
+    const invalidCursor = await onGetBlockTransactionsRequest(
+      context(
+        "https://actonscan.example/api/toncenter/mainnet/v2/getBlockTransactions?workchain=0&shard=1&seqno=42&after_lt=7",
+      ),
+    )
+
+    expect(first.headers.get("cache-control")).toBe(
+      "public, max-age=300, s-maxage=604800, immutable",
+    )
+    expect(second.headers.get("x-actonscan-cache")).toBe("HIT")
+    expect(invalidCursor.status).toBe(400)
+    expect(await invalidCursor.json()).toEqual({
+      error: "after_lt and after_hash must be provided together",
+    })
+    expect(upstreamRequests).toEqual([
+      `https://toncenter.com/api/v2/getBlockTransactions?workchain=-1&shard=-9223372036854775808&seqno=42&root_hash=${"r".repeat(43)}%3D&file_hash=${"f".repeat(43)}%3D&count=100&after_lt=7&after_hash=${"a".repeat(64)}`,
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+    cache.restore()
+  }
+})
 
 test("historical Toncenter blocks are normalized and cached for seven days", async () => {
   const originalFetch = globalThis.fetch

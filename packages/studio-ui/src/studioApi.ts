@@ -34,7 +34,15 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly apiV2Port: number
   readonly apiV3Port: number
   readonly adminPort: number
+  readonly configPort: number
   readonly validators: number
+  readonly importedAccounts: readonly FullTonAccountImport[]
+}
+
+export interface FullTonAccountImport {
+  readonly sourceEnvironmentId: string
+  readonly address: string
+  readonly name?: string
 }
 
 export interface RemoteTonNetworkEnvironmentConfig {
@@ -65,7 +73,9 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly apiV2Port?: number
   readonly apiV3Port?: number
   readonly adminPort?: number
+  readonly configPort?: number
   readonly validators?: number
+  readonly importedAccounts: readonly FullTonAccountImport[]
 }
 
 export type CreateEnvironmentConfig =
@@ -75,6 +85,7 @@ export type CreateEnvironmentConfig =
 export type EnvironmentCapability =
   | "apiV2"
   | "apiV3"
+  | "configApi"
   | "explorer"
   | "integration"
   | "controlApi"
@@ -92,6 +103,7 @@ export type EnvironmentCapability =
 export interface EnvironmentEndpoints {
   readonly apiV2?: string
   readonly apiV3?: string
+  readonly config?: string
   readonly control?: string
 }
 
@@ -100,6 +112,7 @@ export interface EnvironmentNetwork {
   readonly label: string
   readonly chainId: number
   readonly testOnly: boolean
+  readonly supportsActions: boolean
 }
 
 export interface StudioEnvironment {
@@ -113,6 +126,38 @@ export interface StudioEnvironment {
   readonly endpoints: EnvironmentEndpoints
   readonly network: EnvironmentNetwork
   readonly error?: string
+  readonly startupTimings?: EnvironmentStartupTimings
+}
+
+export type ApiCallStatus = "success" | "failed"
+export type ApiCallType = "read" | "write"
+export type ApiCallSource = "external" | "studio_ui"
+export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
+
+export interface ApiCallRecord {
+  readonly sequence: number
+  readonly status: ApiCallStatus
+  readonly status_code: number
+  readonly source: ApiCallSource
+  readonly call_type: ApiCallType
+  readonly api_family: ApiCallFamily
+  readonly http_method: string
+  readonly path: string
+  readonly method: string
+  readonly request_id: unknown
+  readonly query_params: unknown | null
+  readonly request_body: unknown | null
+  readonly request_body_truncated: boolean
+  readonly response_body: unknown | null
+  readonly response_body_truncated: boolean
+  readonly timestamp_ms: number
+  readonly duration_ns: number
+}
+
+export interface ApiCallLogResponse {
+  readonly calls: readonly ApiCallRecord[]
+  readonly total_retained: number
+  readonly max_retained: number
 }
 
 export type StudioWalletVersion = "v4r2" | "v5r1"
@@ -135,6 +180,47 @@ export interface CreateEnvironmentRequest {
 
 export interface UpdateEnvironmentRequest {
   readonly name: string
+}
+
+export interface EnvironmentSnapshot {
+  readonly formatVersion: number
+  readonly id: string
+  readonly name?: string
+  readonly createdAt: number
+  readonly archiveSizeBytes: number
+  readonly stateSizeBytes: number
+  readonly stateSchemaVersion: number
+  readonly tonRelease: string
+  readonly masterchainSeqno?: number
+}
+
+export type EnvironmentSnapshotOperationKind = "create" | "restore"
+export type EnvironmentSnapshotOperationPhase =
+  | "preparing"
+  | "stopping"
+  | "creatingArchive"
+  | "restoringState"
+  | "resettingIndexer"
+  | "starting"
+  | "completed"
+  | "failed"
+
+export interface EnvironmentStartupTimings {
+  readonly composeMs?: number
+  readonly tonReadyMs?: number
+  readonly indexerReadyMs?: number
+  readonly apiReadyMs?: number
+}
+
+export interface EnvironmentSnapshotOperation {
+  readonly kind: EnvironmentSnapshotOperationKind
+  readonly phase: EnvironmentSnapshotOperationPhase
+  readonly startedAt: string
+  readonly finishedAt?: string
+  readonly snapshotId?: string
+  readonly snapshotName?: string
+  readonly startupTimings?: EnvironmentStartupTimings
+  readonly error?: string
 }
 
 export type TestRunSource = "manual" | "studio"
@@ -283,6 +369,60 @@ export async function deleteStudioEnvironment(environmentId: string): Promise<vo
   })
 }
 
+export function fetchStudioEnvironmentSnapshots(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<EnvironmentSnapshot[]> {
+  return requestJson<EnvironmentSnapshot[]>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots`,
+    {headers: {accept: "application/json"}, signal},
+  )
+}
+
+export function createStudioEnvironmentSnapshot(
+  environmentId: string,
+  name?: string,
+): Promise<EnvironmentSnapshotOperation> {
+  return requestJson<EnvironmentSnapshotOperation>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots`,
+    {
+      method: "POST",
+      headers: {accept: "application/json", "content-type": "application/json"},
+      body: JSON.stringify({name}),
+    },
+  )
+}
+
+export function restoreStudioEnvironmentSnapshot(
+  environmentId: string,
+  snapshotId: string,
+): Promise<EnvironmentSnapshotOperation> {
+  return requestJson<EnvironmentSnapshotOperation>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
+    {method: "POST", headers: {accept: "application/json"}},
+  )
+}
+
+export async function deleteStudioEnvironmentSnapshot(
+  environmentId: string,
+  snapshotId: string,
+): Promise<void> {
+  await request(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+    {method: "DELETE", headers: {accept: "application/json"}},
+  )
+}
+
+export function fetchStudioEnvironmentSnapshotOperation(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<EnvironmentSnapshotOperation | null> {
+  return requestJson<EnvironmentSnapshotOperation | null>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshot-operation`,
+    {headers: {accept: "application/json"}, signal},
+  )
+}
+
 export function fetchStudioWallets(
   environmentId: string,
   signal?: AbortSignal,
@@ -310,6 +450,21 @@ export function signWithStudioWallet(
         "content-type": "application/json",
       },
       body: JSON.stringify({bytes}),
+    },
+  )
+}
+
+export function fetchStudioApiCalls(
+  environmentId: string,
+  limit = 1200,
+  signal?: AbortSignal,
+): Promise<ApiCallLogResponse> {
+  const query = new URLSearchParams({limit: String(limit)})
+  return requestJson<ApiCallLogResponse>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/api-calls?${query}`,
+    {
+      headers: {accept: "application/json"},
+      signal,
     },
   )
 }

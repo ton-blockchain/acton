@@ -1,4 +1,4 @@
-import {useEffect, useState, type FC} from "react"
+import {useEffect, useState, type FC, type ReactNode} from "react"
 
 import {
   Button,
@@ -9,7 +9,11 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  DateTime,
   Dialog,
+  formatSchedulePeriod,
+  formatTimeUntil,
+  GramAmount,
   InlineButton,
   Skeleton,
 } from "@acton/ui"
@@ -17,18 +21,17 @@ import {
 import type {TonClient} from "../api/client"
 import styles from "./LockerOverview.module.css"
 import {
-  capitalize,
-  formatGramAmount,
-  formatScheduleDate,
-  formatSchedulePeriod,
-  formatTimeUntil,
-} from "./scheduleFormatting"
-import {
   buildVestingSchedule,
   parseVestingData,
   type VestingData,
   type VestingPeriod,
 } from "./vestingSchedule"
+
+const VESTING_STATUS_LABELS = {
+  locked: "Locked",
+  next: "Next",
+  unlocked: "Unlocked",
+} as const
 
 interface VestingOverviewProps {
   readonly address: string
@@ -131,15 +134,26 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
           </InlineButton>
           <p className={styles.description}>
             {schedule.totalPeriods} periods over {formatSchedulePeriod(data.vestingTotalDuration)},
-            from {formatScheduleDate(data.vestingStartTime)} to {formatScheduleDate(vestingEndTime)}
+            from <DateTime display="date-day-month" unit="seconds" value={data.vestingStartTime} />{" "}
+            to <DateTime display="date-day-month" unit="seconds" value={vestingEndTime} />
             {"; cliff ends "}
-            {formatScheduleDate(cliffEndTime)}.
+            <DateTime display="date-day-month" unit="seconds" value={cliffEndTime} />.
           </p>
         </div>
 
         <div className={styles.metrics}>
-          <VestingMetric label="Total vested" value={formatGramAmount(data.vestingTotalAmount)} />
-          <VestingMetric label="Unlocked" value={formatGramAmount(schedule.unlockedAmount)} />
+          <VestingMetric
+            label="Total vested"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={data.vestingTotalAmount} />
+            }
+          />
+          <VestingMetric
+            label="Unlocked"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />
+            }
+          />
           <VestingMetric label="Cliff period" value={formatSchedulePeriod(data.cliffDuration)} />
           <VestingMetric label="Unlock period" value={formatSchedulePeriod(data.unlockPeriod)} />
         </div>
@@ -165,14 +179,17 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
             {schedule.periods.map(period => (
               <span
                 key={period.number}
-                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(period.status)}`]}`}
-                title={`Period ${period.number}: ${capitalize(period.status)}`}
+                className={`${styles.progressSegment} ${styles[`progressSegment${VESTING_STATUS_LABELS[period.status]}`]}`}
+                title={`Period ${period.number}: ${VESTING_STATUS_LABELS[period.status]}`}
                 aria-hidden="true"
               />
             ))}
           </div>
           <div className={styles.progressMeta}>
-            <span>{formatGramAmount(schedule.unlockedAmount)} unlocked</span>
+            <span>
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />{" "}
+              unlocked
+            </span>
             <span>
               {schedule.nextPayoutTime
                 ? `Next unlock ${formatTimeUntil(schedule.nextPayoutTime, nowSeconds)}`
@@ -215,7 +232,7 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
   )
 }
 
-function VestingMetric({label, value}: {readonly label: string; readonly value: string}) {
+function VestingMetric({label, value}: {readonly label: string; readonly value: ReactNode}) {
   return (
     <div className={styles.metric}>
       <div className={styles.metricLabel}>{label}</div>
@@ -225,19 +242,25 @@ function VestingMetric({label, value}: {readonly label: string; readonly value: 
 }
 
 function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
+  const statusLabel = VESTING_STATUS_LABELS[period.status]
+
   return (
     <DataTableRow selected={period.status === "next"}>
       <DataTableCell tone="muted">{period.number}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(period.startTime)}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(period.payoutTime)}</DataTableCell>
-      <DataTableCell align="right" tone="strong">
-        {formatGramAmount(period.amount)}
-      </DataTableCell>
-      <DataTableCell align="right">{formatGramAmount(period.cumulativeAmount)}</DataTableCell>
       <DataTableCell>
-        <span className={`${styles.status} ${styles[`status${capitalize(period.status)}`]}`}>
-          {capitalize(period.status)}
-        </span>
+        <DateTime display="date-day-month" unit="seconds" value={period.startTime} />
+      </DataTableCell>
+      <DataTableCell>
+        <DateTime display="date-day-month" unit="seconds" value={period.payoutTime} />
+      </DataTableCell>
+      <DataTableCell align="right" tone="strong">
+        <GramAmount maximumFractionDigits={2} useGrouping value={period.amount} />
+      </DataTableCell>
+      <DataTableCell align="right">
+        <GramAmount maximumFractionDigits={2} useGrouping value={period.cumulativeAmount} />
+      </DataTableCell>
+      <DataTableCell>
+        <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>{statusLabel}</span>
       </DataTableCell>
     </DataTableRow>
   )

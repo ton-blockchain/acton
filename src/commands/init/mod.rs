@@ -248,6 +248,7 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
             types: None,
             depends: Some(vec![]),
             output: None,
+            wrappers: None,
         };
 
         contracts.insert(contract_key, contract_config);

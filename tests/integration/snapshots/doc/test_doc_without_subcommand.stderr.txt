@@ -3,7 +3,7 @@ Look up reference documentation and contract ABIs
 Usage: acton[EXE] doc [OPTIONS] <COMMAND>
 
 Commands:
-  abi  Print compiler ABI for a local or bundled contract
+  abi  Print compiler ABI for a contract name or verifier code hash
   tvm  Lookup an instruction in the TVM specification
 
 Options:

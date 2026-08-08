@@ -1,0 +1,14 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`shared value formatting renders semantic value components 1`] = `
+{
+  "boolean": "<data data-visual-dynamic="boolean" data-visual-placeholder="&lt;boolean&gt;" class="" value="true">Yes</data>",
+  "bytes": "<data data-visual-dynamic="byte-size" data-visual-placeholder="&lt;size&gt;" value="1536">1.5 KB</data>",
+  "count": "<span data-visual-dynamic="count" data-visual-placeholder="&lt;count&gt;"><data data-visual-dynamic="number" data-visual-placeholder="&lt;number&gt;" value="2">2</data> transactions</span>",
+  "number": "<data data-visual-dynamic="number" data-visual-placeholder="&lt;number&gt;" value="12345678901234567">12,345,678,901,234,567</data>",
+  "percentage": "<data data-visual-dynamic="percentage" data-visual-placeholder="&lt;percent&gt;" value="12.5">12.5%</data>",
+  "percentageRatio": "<data data-visual-dynamic="percentage" data-visual-placeholder="&lt;percent&gt;" data-total="8" value="1">12.5%</data>",
+  "source": "<span data-visual-dynamic="technical-value" data-visual-placeholder="&lt;value&gt;" class=""><span><code id="base-ui-_R_1l_" data-base-ui-tooltip-trigger="">…/tests/a.tolk:2:4</code></span></span>",
+  "technical": "<span data-visual-dynamic="technical-value" data-visual-placeholder="&lt;value&gt;" class=""><span><code>1234567890abcdef</code></span><span><button type="button" aria-label="Copy technical value" id="base-ui-_R_1m_" data-base-ui-tooltip-trigger=""><span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span></button></span></span>",
+}
+`;

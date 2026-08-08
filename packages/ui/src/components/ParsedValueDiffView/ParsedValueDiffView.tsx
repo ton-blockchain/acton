@@ -3,6 +3,7 @@ import type React from "react"
 import {ArrowRight} from "lucide-react"
 
 import type {ContractReferenceOptions} from "../ContractChip/ContractChip"
+import {CountValue} from "../CountValue/CountValue"
 import {InlineButton} from "../InlineButton/InlineButton"
 import {ParsedValueView, type ParsedValueViewProps} from "../ParsedValueView/ParsedValueView"
 import type {ParsedValueLeaf} from "../ParsedValueView/types"
@@ -215,7 +216,7 @@ export function ParsedValueDiffView({
         <div className={styles.collectionHeader}>
           <span className={styles.typeLabel}>{collectionLabel}</span>
           <span className={styles.collectionCount}>
-            {diff.entries.length} {diff.entries.length === 1 ? "item" : "items"}
+            <CountValue singular="item" value={diff.entries.length} />
           </span>
           {unchangedCount > 0 && (
             <div className={styles.collectionActions}>

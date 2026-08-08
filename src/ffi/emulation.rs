@@ -38,7 +38,7 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient, toncenter::v3};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use ton_emulator::world_state::WorldState;
+use ton_emulator::world_state::{AccountsState, WorldState};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
@@ -614,6 +614,7 @@ fn send_external_message_impl(
         stack.push(external_send_result_tuple(
             broadcast_external_message(ctx, msg)?,
             None,
+            false,
         ));
         return Ok(());
     }
@@ -658,7 +659,7 @@ fn send_external_message_impl(
         TupleItem::big_array_from_items(transaction_cells)
     };
 
-    let result = external_send_result_tuple(transactions, error);
+    let result = external_send_result_tuple(transactions, error, true);
     stack.push(result);
     Ok(())
 }
@@ -693,10 +694,12 @@ fn broadcast_external_message(ctx: &mut Context, msg: Cell) -> anyhow::Result<Tu
 fn external_send_result_tuple(
     transactions: TupleItem,
     error: Option<&FailedSendMessageResult>,
+    acceptance_known: bool,
 ) -> TupleItem {
     TupleItem::Tuple(Tuple(vec![
         transactions,
         error.map_or(TupleItem::Null, external_send_error_tuple),
+        bool_tuple_item(acceptance_known),
     ]))
 }
 
@@ -3418,11 +3421,15 @@ fn explorer_transaction_link(explorer_base: &str, tx_hash_hex: &str) -> Option<S
 
 extension!(get_config in (Context) using get_config_impl);
 fn get_config_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
-    if ctx.can_broadcast_to_network() {
+    let has_pinned_fork = matches!(
+        ctx.chain.world_state.state(),
+        AccountsState::Remote(remote) if remote.fork_block_number.is_some()
+    );
+    if ctx.can_broadcast_to_network() && !has_pinned_fork {
         let network = ctx.network();
         let custom_networks = ctx.env.config.custom_networks();
         let api_client = TonApiClient::new(network, custom_networks)?;
-        let config = api_client.get_config_all()?;
+        let config = api_client.get_config_all(None)?;
         stack.push(TupleItem::Cell(config));
         return Ok(());
     }

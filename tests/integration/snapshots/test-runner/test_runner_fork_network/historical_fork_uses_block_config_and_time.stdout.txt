@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/fork_snapshot.test.tolk (1 test)
+  ✓ historical fork snapshot [TIME]
+    └─ Test output:
+       version=777, capabilities=4660
+       testing-now=1700000320, blockchain-now=1700000320
+
+ ✓ 1 passed in 1 file

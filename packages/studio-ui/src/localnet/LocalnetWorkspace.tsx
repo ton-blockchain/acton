@@ -16,7 +16,6 @@ import type {FC, ReactNode} from "react"
 import {supports} from "../environmentCapabilities"
 import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
-import {useExplorerPageTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
@@ -30,11 +29,13 @@ import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRe
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {AbiCatalogPage, AbiDetailsPage} from "./dashboard/pages/AbiCatalogPage"
+import {ApiCallsPage} from "./dashboard/pages/ApiCallsPage"
 import {IntegratePage} from "./dashboard/pages/IntegratePage"
 import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
+import {SnapshotsPage} from "./dashboard/pages/SnapshotsPage"
 import {SourceCatalogPage} from "./dashboard/pages/SourceCatalogPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
 import {WalletsPage} from "./dashboard/pages/WalletsPage"
@@ -49,11 +50,6 @@ const ApiReferencePage = lazy(async () => {
   const module = await import("./dashboard/pages/ApiReferencePage")
   return {default: module.ApiReferencePage}
 })
-const ApiCallsPage = lazy(async () => {
-  const module = await import("./dashboard/pages/ApiCallsPage")
-  return {default: module.ApiCallsPage}
-})
-
 const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/faucet": "Faucet",
@@ -67,9 +63,12 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/explorer/nfts": "NFTs",
   "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
+  "/snapshots": "Snapshots",
   "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
+  "/api-reference/admin": "Admin API Reference",
+  "/api-reference/config": "Config API Reference",
   "/api-reference/control": "Control API Reference",
   "/api-calls": "API Calls",
 }
@@ -87,9 +86,12 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/nfts": "NFT items indexed from this network",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
+  "/snapshots": "Create and restore persistent network snapshots",
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
   "/api-reference/v3": "Explore the v3 API",
+  "/api-reference/admin": "Inspect and manage Full localnet services",
+  "/api-reference/config": "Read Full localnet configuration and connection endpoints",
   "/api-reference/control": "Explore network management methods",
   "/api-calls": "Review requests made to this environment",
 }
@@ -109,7 +111,7 @@ export interface LocalnetWorkspaceShellState {
 }
 
 export interface LocalnetWorkspaceShellAction {
-  readonly icon: "plus"
+  readonly icon: "archive" | "plus"
   readonly label: string
   readonly onClick: () => void
 }
@@ -134,7 +136,7 @@ export const LocalnetWorkspace: FC<LocalnetWorkspaceProps> = ({
   return (
     <MetadataRegistryProvider registry={runtime.metadataRegistry}>
       <AddressBookProvider>
-        {environment && supports(environment, "wallets") ? (
+        {environment?.status === "running" && supports(environment, "wallets") ? (
           <WalletRuntimeProvider
             key={environment.id}
             apiBaseUrl={runtime.rpcBaseUrl}
@@ -171,13 +173,18 @@ const AppContent: FC<AppContentProps> = ({
   const client = runtime.client
   const {pathname} = useLocation()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
-  const explorerPageTitle = useExplorerPageTitle()
+  const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
   const localPathname = pathname.slice(basePath.length) || "/"
-  const pageTitle =
-    explorerPageTitle ??
-    LOCALNET_PAGE_TITLES[localPathname] ??
-    contractDetailsPageTitle(localPathname) ??
-    "Virtual Environment"
+  const allowsOverflow = localPathname === "/faucet"
+  const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
+  const isAbiDetailsPage = /^\/contracts\/abi\/[^/]+$/.test(localPathname)
+  const pageTitle = isExplorerPage
+    ? "Explorer"
+    : isAbiDetailsPage
+      ? "ABI"
+      : (LOCALNET_PAGE_TITLES[localPathname] ??
+        contractDetailsPageTitle(localPathname) ??
+        "Virtual Environment")
   const pageDescription =
     LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
     contractDetailsPageDescription(localPathname) ??
@@ -186,14 +193,18 @@ const AppContent: FC<AppContentProps> = ({
   const fallback = <Navigate to={path("/dashboard")} replace />
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
     supports(runtime.environment, capability) ? page : fallback
+  const isFullLocalnet = runtime.environment?.config.kind === "fullTonNetwork"
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
-  const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(
-    () =>
-      localPathname === "/contracts" && supports(runtime.environment, "contracts")
-        ? {icon: "plus", label: "Add contract", onClick: openAddContract}
-        : undefined,
-    [localPathname, openAddContract, runtime.environment],
-  )
+  const openCreateSnapshot = useCallback(() => setIsCreateSnapshotOpen(true), [])
+  const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(() => {
+    if (localPathname === "/contracts" && supports(runtime.environment, "contracts")) {
+      return {icon: "plus", label: "Add contract", onClick: openAddContract}
+    }
+    if (localPathname === "/snapshots" && supports(runtime.environment, "snapshots")) {
+      return {icon: "archive", label: "Create snapshot", onClick: openCreateSnapshot}
+    }
+    return undefined
+  }, [localPathname, openAddContract, openCreateSnapshot, runtime.environment])
   const primaryEndpoint =
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
@@ -210,6 +221,7 @@ const AppContent: FC<AppContentProps> = ({
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
+    if (localPathname !== "/snapshots") setIsCreateSnapshotOpen(false)
   }, [localPathname])
 
   return (
@@ -218,8 +230,8 @@ const AppContent: FC<AppContentProps> = ({
         environmentName={runtime.environment?.name ?? "Virtual Environment"}
         pageTitle={pageTitle}
       />
-      <div className={styles.app}>
-        <main className={styles.main}>
+      <div className={`${styles.app} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
+        <main className={`${styles.main} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
           <Routes>
             <Route path={basePath} element={<Navigate to={path("/dashboard")} replace />} />
             <Route
@@ -322,6 +334,23 @@ const AppContent: FC<AppContentProps> = ({
                   fallback
                 )
               }
+            />
+            <Route
+              path={path("/snapshots")}
+              element={withCapability(
+                "snapshots",
+                <DashboardPage>
+                  {runtime.environment ? (
+                    <SnapshotsPage
+                      createOpen={isCreateSnapshotOpen}
+                      environment={runtime.environment}
+                      onCreateOpenChange={setIsCreateSnapshotOpen}
+                    />
+                  ) : (
+                    fallback
+                  )}
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/integrate")}
@@ -447,20 +476,64 @@ const AppContent: FC<AppContentProps> = ({
               )}
             />
             <Route
-              path={path("/api-reference/control")}
+              path={path("/api-reference/admin")}
+              element={
+                isFullLocalnet
+                  ? withCapability(
+                      "controlApi",
+                      <DashboardPage embedded>
+                        <RouteSuspense>
+                          <ApiReferencePage
+                            apiBaseUrl={
+                              runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl
+                            }
+                            localnetApiToken={runtime.localnetApiToken}
+                            onUnauthorized={runtime.requireAuthToken}
+                            version="admin"
+                          />
+                        </RouteSuspense>
+                      </DashboardPage>,
+                    )
+                  : fallback
+              }
+            />
+            <Route
+              path={path("/api-reference/config")}
               element={withCapability(
-                "controlApi",
+                "configApi",
                 <DashboardPage embedded>
                   <RouteSuspense>
                     <ApiReferencePage
-                      apiBaseUrl={runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl}
+                      apiBaseUrl={runtime.environment?.endpoints.config ?? runtime.rpcBaseUrl}
                       localnetApiToken={runtime.localnetApiToken}
                       onUnauthorized={runtime.requireAuthToken}
-                      version="control"
+                      version="config"
                     />
                   </RouteSuspense>
                 </DashboardPage>,
               )}
+            />
+            <Route
+              path={path("/api-reference/control")}
+              element={
+                isFullLocalnet
+                  ? fallback
+                  : withCapability(
+                      "controlApi",
+                      <DashboardPage embedded>
+                        <RouteSuspense>
+                          <ApiReferencePage
+                            apiBaseUrl={
+                              runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl
+                            }
+                            localnetApiToken={runtime.localnetApiToken}
+                            onUnauthorized={runtime.requireAuthToken}
+                            version="control"
+                          />
+                        </RouteSuspense>
+                      </DashboardPage>,
+                    )
+              }
             />
             <Route
               path={path("/dashboard/faucet")}
@@ -487,9 +560,11 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "apiCalls",
                 <DashboardPage>
-                  <RouteSuspense>
-                    <ApiCallsPage client={client} />
-                  </RouteSuspense>
+                  {runtime.environment ? (
+                    <ApiCallsPage environmentId={runtime.environment.id} />
+                  ) : (
+                    fallback
+                  )}
                 </DashboardPage>,
               )}
             />
@@ -547,6 +622,7 @@ const AppContent: FC<AppContentProps> = ({
                     client={client}
                     enableJettonMint={runtime.jettonFaucetEnabled}
                     jettonMintPath={path("/faucet")}
+                    showActonscanLink
                     enableTransactionStreaming={
                       runtime.environment?.status === "running" &&
                       supports(runtime.environment, "controlApi")
@@ -560,7 +636,9 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <TransactionPage client={client} openRetraceOnLoad />
+                  <div className={styles.transactionDebugPage}>
+                    <TransactionPage client={client} openRetraceOnLoad />
+                  </div>
                 </DashboardPage>,
               )}
             />
@@ -569,7 +647,9 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <TransactionPage client={client} />
+                  <div className={styles.transactionDebugPage}>
+                    <TransactionPage client={client} />
+                  </div>
                 </DashboardPage>,
               )}
             />
@@ -616,13 +696,8 @@ const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
 )
 
 function contractDetailsPageTitle(localPathname: string): string | undefined {
-  const abiMatch = localPathname.match(/^\/contracts\/abi\/([^/]+)$/)
-  if (abiMatch?.[1]) {
-    try {
-      return `${decodeURIComponent(abiMatch[1])} ABI`
-    } catch {
-      return `${abiMatch[1]} ABI`
-    }
+  if (/^\/contracts\/abi\/[^/]+$/.test(localPathname)) {
+    return "ABI"
   }
 
   return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname) ? "Contract" : undefined

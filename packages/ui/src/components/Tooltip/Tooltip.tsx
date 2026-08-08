@@ -13,6 +13,7 @@ export interface TooltipProps {
   readonly disabled?: boolean
   readonly offset?: number
   readonly placement?: TooltipPlacement
+  readonly width?: "default" | "wide" | "extra-wide"
 }
 
 export function Tooltip({
@@ -23,6 +24,7 @@ export function Tooltip({
   disabled = false,
   offset = 8,
   placement = "top",
+  width = "default",
 }: TooltipProps) {
   const hasContent =
     content !== null &&
@@ -36,8 +38,15 @@ export function Tooltip({
     <TooltipBase.Root disabled={disabled}>
       <TooltipBase.Trigger render={children} delay={delay} closeDelay={closeDelay} />
       <TooltipBase.Portal>
-        <TooltipBase.Positioner className={styles.positioner} side={placement} sideOffset={offset}>
-          <TooltipBase.Popup className={styles.popup}>{content}</TooltipBase.Popup>
+        <TooltipBase.Positioner
+          className={styles.positioner}
+          data-width={width}
+          side={placement}
+          sideOffset={offset}
+        >
+          <TooltipBase.Popup className={styles.popup} data-width={width}>
+            {content}
+          </TooltipBase.Popup>
         </TooltipBase.Positioner>
       </TooltipBase.Portal>
     </TooltipBase.Root>

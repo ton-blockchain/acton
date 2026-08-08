@@ -335,15 +335,3 @@
     pointer-events: auto;
   }
 }
-
-.booleanTrue {
-  font-weight: var(--acton-font-weight-emphasis);
-  color: var(--acton-color-success);
-  font-size: var(--acton-font-size-sm);
-}
-
-.booleanFalse {
-  font-weight: var(--acton-font-weight-emphasis);
-  color: var(--acton-color-danger-text);
-  font-size: var(--acton-font-size-sm);
-}

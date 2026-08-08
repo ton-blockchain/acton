@@ -8,8 +8,10 @@ use axum::{Json, http::StatusCode, response::IntoResponse};
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// JSON error response from a Localton HTTP API
 #[derive(Debug, Serialize, ToSchema)]
 pub(super) struct ErrorResponse {
+    /// Error message for the request
     error: String,
 }
 

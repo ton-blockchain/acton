@@ -20,6 +20,10 @@ interface SuspendedAccountsCacheEntry extends SuspendedAccountsConfig {
 }
 
 export function parseSuspendedAccountsConfig(configBoc: string): SuspendedAccountsConfig {
+  if (configBoc.trim().length === 0) {
+    return {rawAddresses: [], suspendedUntil: 0}
+  }
+
   const config = loadSuspendedAddressList(Cell.fromBase64(configBoc).beginParse())
   return {
     rawAddresses: config.addresses.keys().map(suspendedAddressKeyToRawAddress),

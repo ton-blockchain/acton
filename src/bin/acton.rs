@@ -376,6 +376,12 @@ enum Commands {
             help_heading = "Reporting"
         )]
         junit_merge: bool,
+        #[arg(
+            long,
+            help = "Do not send test run data to Acton Studio",
+            help_heading = "Reporting"
+        )]
+        no_studio_reporting: bool,
 
         // Cache
         #[arg(
@@ -1589,10 +1595,11 @@ pub enum LibraryCommand {
 
 #[derive(Subcommand, Clone)]
 pub enum DocCommand {
-    #[command(about = "Print compiler ABI for a local or bundled contract")]
+    #[command(about = "Print compiler ABI for a contract name or verifier code hash")]
     Abi {
         #[arg(
-            help = "Contract name, local contract id, or bundled catalog name",
+            value_name = "CONTRACT_OR_CODE_HASH",
+            help = "Local or bundled contract name, local contract id, or verifier code hash",
             add = ArgValueCompleter::new(complete_contracts)
         )]
         contract: String,
@@ -2281,6 +2288,7 @@ fn main() {
             clear_cache,
             junit_path,
             junit_merge,
+            no_studio_reporting,
             snapshot,
             baseline_snapshot,
             fail_on_diff,
@@ -2360,6 +2368,7 @@ fn main() {
                     mutation_disable_rules,
                     fuzz_seed,
                     fail_fast,
+                    no_studio_reporting,
                     ui,
                     ui_port,
                 ) {
@@ -3348,6 +3357,7 @@ fn create_test_config(
     disable_rules: Vec<String>,
     fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
+    no_studio_reporting: bool,
     ui: bool,
     ui_port: Option<u16>,
 ) -> anyhow::Result<TestConfig> {
@@ -3423,6 +3433,9 @@ fn create_test_config(
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
+        if no_studio_reporting {
+            config.studio_reporting = false;
+        }
         apply_ui_trace_default(&mut config);
         validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
         return Ok(config);
@@ -3473,6 +3486,7 @@ fn create_test_config(
         fuzz_max_test_rejects: None,
         fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
+        studio_reporting: !no_studio_reporting,
         ui,
         ui_port: ui_port.unwrap_or(12344),
         fork_net,

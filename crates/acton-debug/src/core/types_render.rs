@@ -288,8 +288,17 @@ impl RenderedValue {
 
     #[must_use]
     pub fn to_pretty_string(&self, options: PrettyRenderOptions) -> String {
+        self.to_pretty_string_with_comments(options, &|_, _| None)
+    }
+
+    #[must_use]
+    pub fn to_pretty_string_with_comments(
+        &self,
+        options: PrettyRenderOptions,
+        field_comment: &dyn Fn(&str, &str) -> Option<String>,
+    ) -> String {
         let mut out = String::new();
-        self.write_pretty(&mut out, 0, &options)
+        self.write_pretty(&mut out, 0, &options, field_comment)
             .expect("writing to String should not fail");
         out
     }
@@ -299,6 +308,7 @@ impl RenderedValue {
         out: &mut String,
         indent: usize,
         options: &PrettyRenderOptions,
+        field_comment: &dyn Fn(&str, &str) -> Option<String>,
     ) -> fmt::Result {
         match self {
             RenderedValue::Leaf { value, type_field } => {
@@ -338,9 +348,13 @@ impl RenderedValue {
                     pretty_dimmed("{", options)
                 )?;
                 for (name, value) in fields {
+                    if let Some(comment) = field_comment(type_name, name) {
+                        write_indent(out, indent + 4)?;
+                        writeln!(out, "// {comment}")?;
+                    }
                     write_indent(out, indent + 4)?;
                     write!(out, "{name}: ")?;
-                    value.write_pretty(out, indent + 4, options)?;
+                    value.write_pretty(out, indent + 4, options, field_comment)?;
                     writeln!(out, ",")?;
                 }
                 write_indent(out, indent)?;
@@ -364,7 +378,7 @@ impl RenderedValue {
             } => match fields.iter().find(|(name, _)| name == "value") {
                 Some((_, value)) => {
                     write!(out, "{} ", pretty_magenta(variant_name, options))?;
-                    value.write_pretty(out, indent, options)
+                    value.write_pretty(out, indent, options, field_comment)
                 }
                 None => write!(out, "{}", pretty_magenta(variant_name, options)),
             },
@@ -389,31 +403,36 @@ impl RenderedValue {
                     pretty_dimmed("{", options)
                 )?;
                 for (name, value) in fields {
+                    if let Some(comment) = field_comment(type_name, name) {
+                        write_indent(out, indent + 4)?;
+                        writeln!(out, "// {comment}")?;
+                    }
                     write_indent(out, indent + 4)?;
-                    let name = pretty_field_name(type_name, name, options);
+                    let field_name = name;
+                    let name = pretty_field_name(type_name, field_name, options);
                     let name = pretty_map_key(type_name, &name, options);
                     write!(out, "{name}: ")?;
-                    value.write_pretty(out, indent + 4, options)?;
+                    value.write_pretty(out, indent + 4, options, field_comment)?;
                     writeln!(out, ",")?;
                 }
                 write_indent(out, indent)?;
                 write!(out, "{}", pretty_dimmed("}", options))
             }
             RenderedValue::Tensor { items, .. } => {
-                write_collection_pretty(out, indent, items, '(', ')', options)
+                write_collection_pretty(out, indent, items, '(', ')', options, field_comment)
             }
             RenderedValue::ArrayOf { items, .. } => {
-                write_collection_pretty(out, indent, items, '[', ']', options)
+                write_collection_pretty(out, indent, items, '[', ']', options, field_comment)
             }
             RenderedValue::LastSeen { inner } => {
-                inner.write_pretty(out, indent, options)?;
+                inner.write_pretty(out, indent, options, field_comment)?;
                 write!(out, " (last seen)")
             }
             RenderedValue::OptimizedOut => {
                 write!(out, "{}", pretty_dimmed("<optimized out>", options))
             }
             RenderedValue::LazyNotYetLoaded { preview } => {
-                preview.write_pretty(out, indent, options)?;
+                preview.write_pretty(out, indent, options, field_comment)?;
                 write!(out, " (not loaded)")
             }
             RenderedValue::LazyCantParseSlice => {
@@ -821,6 +840,7 @@ fn write_collection_pretty(
     open: char,
     close: char,
     options: &PrettyRenderOptions,
+    field_comment: &dyn Fn(&str, &str) -> Option<String>,
 ) -> fmt::Result {
     if items.is_empty() {
         return write!(out, "{open}{close}");
@@ -832,7 +852,7 @@ fn write_collection_pretty(
             if i > 0 {
                 write!(out, ", ")?;
             }
-            item.write_pretty(out, indent, options)?;
+            item.write_pretty(out, indent, options, field_comment)?;
         }
         return write!(out, "{close}");
     }
@@ -840,7 +860,7 @@ fn write_collection_pretty(
     writeln!(out, "{open}")?;
     for item in items {
         write_indent(out, indent + 4)?;
-        item.write_pretty(out, indent + 4, options)?;
+        item.write_pretty(out, indent + 4, options, field_comment)?;
         writeln!(out, ",")?;
     }
     write_indent(out, indent)?;

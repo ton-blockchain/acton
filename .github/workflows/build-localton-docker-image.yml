@@ -55,7 +55,7 @@ jobs:
 
       - name: Restore TON HTTP API compiler cache
         id: http-api-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: localton-cache-mount
           key: localton-ton-http-api-ccache-v1-${{ matrix.arch }}-${{ hashFiles('apps/localton/Dockerfile', 'apps/localton/Cargo.lock', 'apps/localton/xtask/Cargo.toml', 'apps/localton/xtask/src/**/*.rs') }}
@@ -64,7 +64,7 @@ jobs:
 
       - name: Restore Rust compiler cache
         id: rust-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             localton-cargo-registry-cache
@@ -75,7 +75,7 @@ jobs:
 
       - name: Restore TON Indexer compiler caches
         id: ton-indexer-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             localton-ton-indexer-ccache

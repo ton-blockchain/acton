@@ -1,8 +1,8 @@
 use super::{
-    format_nanograms, format_std_address, load_local_contract_candidates, load_rpc_config,
-    print_kv, resolve_rpc_network,
+    find_fallback_contract_match, format_nanograms, format_std_address,
+    load_local_contract_candidates, load_rpc_config, print_kv, resolve_rpc_network,
 };
-use crate::context::{BuildCache, KnownAddresses};
+use crate::context::{BuildCache, KnownAddresses, code_lookup_hash};
 use crate::ffi::emulation::{
     V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions, v3_message_hash,
 };
@@ -13,9 +13,10 @@ use anyhow::{Context, anyhow};
 use chrono::{TimeZone, Utc};
 use log::warn;
 use num_bigint::BigInt;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
@@ -78,7 +79,7 @@ pub(super) fn rpc_trace_cmd(
         println!();
         println!(
             "{}",
-            "Hint: pass --show-bodies to include decoded message bodies when local ABI matches."
+            "Hint: pass --show-bodies to include decoded message bodies when an ABI matches"
                 .dimmed()
         );
     }
@@ -93,10 +94,8 @@ fn rpc_trace_formatter(
     config: &ActonConfig,
     show_bodies: bool,
 ) -> anyhow::Result<FormatterContext<'static>> {
-    let build_cache = load_local_build_cache(config)?;
-    let accounts = if build_cache.built.is_empty() {
-        FxHashMap::default()
-    } else {
+    let mut build_cache = load_local_build_cache(config)?;
+    let accounts = if show_bodies || !build_cache.built.is_empty() {
         match fetch_trace_accounts(trace_txs, client) {
             Ok(accounts) => accounts,
             Err(err) => {
@@ -104,7 +103,12 @@ fn rpc_trace_formatter(
                 FxHashMap::default()
             }
         }
+    } else {
+        FxHashMap::default()
     };
+    if show_bodies {
+        add_fallback_abi_matches(&mut build_cache, &accounts);
+    }
 
     let mut formatter = FormatterContext::empty();
     formatter.accounts = Cow::Owned(accounts);
@@ -544,4 +548,60 @@ fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
         );
     }
     Ok(build_cache)
+}
+
+fn add_fallback_abi_matches(
+    build_cache: &mut BuildCache,
+    accounts: &FxHashMap<StdAddr, ShardAccount>,
+) {
+    let mut checked_hashes = FxHashSet::default();
+    for account in accounts.values() {
+        let Some(code) = trace_account_code(account) else {
+            continue;
+        };
+        let code_hash = code_lookup_hash(&code);
+        if !checked_hashes.insert(code_hash) {
+            continue;
+        }
+        let existing_path = build_cache.built.iter().find_map(|(path, result)| {
+            (result.code_hash == code_hash).then(|| (path.clone(), result.abi.is_some()))
+        });
+        if existing_path.as_ref().is_some_and(|(_, has_abi)| *has_abi) {
+            continue;
+        }
+
+        let Some(contract) = find_fallback_contract_match(&code_hash) else {
+            continue;
+        };
+        let Some(abi) = contract.abi else {
+            continue;
+        };
+
+        if let Some((path, _)) = existing_path {
+            if let Some(result) = build_cache.built.get_mut(&path) {
+                result.abi = Some(abi);
+            }
+            continue;
+        }
+
+        let cache_name = format!("rpc:{code_hash}");
+        let cache_path = PathBuf::from(format!("<rpc:{code_hash}>"));
+        build_cache.memoize(
+            &cache_name,
+            &contract.contract_name,
+            &cache_path,
+            &Boc::encode_base64(&code),
+            code_hash,
+            Arc::new(SourceMap::without_debug_info()),
+            Some(abi),
+        );
+    }
+}
+
+fn trace_account_code(account: &ShardAccount) -> Option<tycho_types::cell::Cell> {
+    let state = account.account.load().ok()?.0.map(|account| account.state);
+    let Some(TychoAccountState::Active(state)) = state else {
+        return None;
+    };
+    state.code
 }

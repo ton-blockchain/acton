@@ -261,19 +261,6 @@
   font-size: 0.78rem;
 }
 
-.hashCopyButton {
-  flex: 0 0 auto;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-}
-
-.codeHashCell:hover .hashCopyButton,
-.codeHashCell:focus-within .hashCopyButton {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .empty {
   box-sizing: border-box;
   display: flex;

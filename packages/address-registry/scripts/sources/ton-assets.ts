@@ -7,20 +7,20 @@ const TON_ASSETS_ACCOUNTS_BASE_URL =
   "https://raw.githubusercontent.com/tonkeeper/ton-assets/main/accounts"
 
 const TON_ASSETS_ACCOUNT_FILES = [
-  "bridges.yaml",
-  "celebrities.yaml",
-  "custodians.yaml",
-  "dapps.yaml",
-  "defi.yaml",
-  "givers.yaml",
-  "infrastructure.yaml",
-  "notcoin.yaml",
-  "ston.yaml",
-  "validators.yaml",
+  "bridges",
+  "celebrities",
+  "custodians",
+  "dapps",
+  "defi",
+  "givers",
+  "infrastructure",
+  "notcoin",
+  "ston",
+  "validators",
 ] as const
 
 export const TON_ASSETS_ACCOUNT_URLS = TON_ASSETS_ACCOUNT_FILES.map(
-  fileName => `${TON_ASSETS_ACCOUNTS_BASE_URL}/${fileName}`,
+  fileName => `${TON_ASSETS_ACCOUNTS_BASE_URL}/${fileName}.yaml`,
 )
 
 export const parseTonAssets = (text: string, sourcePath: string) => {

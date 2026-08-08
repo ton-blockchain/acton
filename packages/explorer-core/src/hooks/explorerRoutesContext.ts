@@ -5,6 +5,7 @@ import {normalizeAddress, type AddressFormatOptions} from "../components/utils"
 export interface ExplorerRoutes {
   readonly rootPath: string
   readonly blocksPath: string
+  readonly configPath: (seqno?: number) => string
   readonly abiPath: string
   readonly contractsPath?: string
   readonly cellPath: string
@@ -42,6 +43,7 @@ export const createExplorerRoutes = (
   return {
     rootPath: path(),
     blocksPath: path("/blocks"),
+    configPath: seqno => path(seqno === undefined ? "/config" : `/config/${seqno}`),
     abiPath,
     contractsPath: overrides.contractsPath,
     cellPath: overrides.cellPath ?? path("/cell"),

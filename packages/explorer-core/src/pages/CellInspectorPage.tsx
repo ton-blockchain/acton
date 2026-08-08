@@ -1,9 +1,11 @@
 import {
   Checkbox,
+  CountValue,
   CopyInlineAction,
   HighlightedCode,
   Input,
   ParsedValueView,
+  Percentage,
   PillTab,
   PillTabs,
   RawDataBlock,
@@ -392,9 +394,13 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         value={rootIndex}
         onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
         description={
-          rootCount === undefined
-            ? "0-based index"
-            : `${rootCount} ${rootCount === 1 ? "root" : "roots"} available`
+          rootCount === undefined ? (
+            "0-based index"
+          ) : (
+            <>
+              <CountValue singular="root" value={rootCount} /> available
+            </>
+          )
         }
       />
       <Input
@@ -654,9 +660,11 @@ function ResultOutput({
               className={styles.confidence}
               data-level={verifiedCodeAvailable ? "exact" : confidence.level}
             >
-              {verifiedCodeAvailable
-                ? "exact · 100%"
-                : `${confidence.level} · ${Math.round(confidence.score * 100)}%`}
+              {verifiedCodeAvailable ? "exact" : confidence.level} ·{" "}
+              <Percentage
+                maximumFractionDigits={0}
+                value={verifiedCodeAvailable ? 100 : confidence.score * 100}
+              />
             </span>
           </div>
         </div>

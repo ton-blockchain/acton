@@ -13,6 +13,9 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  formatGramAmount,
+  NumberValue,
   ParsedBodySection,
   type ParsedTransactionBody,
   type ParsedValue,
@@ -41,7 +44,6 @@ import {
   isMultisigSignerApproved,
   multisigAddressKey,
 } from "./multisigApprovals"
-import {capitalize, formatGramAmount} from "./scheduleFormatting"
 import {formatAddress} from "./utils"
 
 export type MultisigDetailsState =
@@ -91,6 +93,11 @@ interface MultisigOrdersTabProps extends MultisigTabProps {
 }
 
 const MULTISIG_ORDERS_BATCH_SIZE = 25
+const ORDER_STATUS_LABELS = {
+  executed: "Executed",
+  expired: "Expired",
+  pending: "Pending",
+} as const
 
 export function MultisigOverview({
   state,
@@ -218,7 +225,11 @@ export function MultisigSignersTab({
                         {approved ? "Approved" : "Not approved"}
                       </DataTableCell>
                       <DataTableCell tone="muted">
-                        {formatTimestamp(approvedAt ?? null)}
+                        <DateTime
+                          display="date-time-day-month"
+                          unit="seconds"
+                          value={positiveTimestamp(approvedAt)}
+                        />
                       </DataTableCell>
                     </>
                   )}
@@ -344,7 +355,11 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
                     {formatApprovals(order)}
                   </DataTableCell>
                   <DataTableCell tone="muted">
-                    {formatTimestamp(order.expiration_date)}
+                    <DateTime
+                      value={positiveTimestamp(order.expiration_date)}
+                      unit="seconds"
+                      display="date-time-day-month"
+                    />
                   </DataTableCell>
                 </DataTableRow>
               )
@@ -357,7 +372,8 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
         {hasMoreOrders && (
           <div ref={loadMoreRef} className={styles.ordersLoadMore}>
             <span className={styles.ordersLoadMoreSummary}>
-              Showing {visibleOrders.length.toLocaleString()} of {orders.length.toLocaleString()}
+              Showing <NumberValue value={visibleOrders.length} /> of{" "}
+              <NumberValue value={orders.length} />
             </span>
             <Button
               type="button"
@@ -436,15 +452,15 @@ function MultisigWalletOverview({wallet}: {readonly wallet: V3Multisig}) {
           Multisig wallet
         </h2>
         <p className={overviewStyles.description}>
-          Requires {threshold.toLocaleString()} of {signerCount.toLocaleString()} signers to approve
-          an order before execution.
+          Requires <NumberValue value={threshold} /> of <NumberValue value={signerCount} /> signers
+          to approve an order before execution.
         </p>
       </div>
       <div className={overviewStyles.metrics}>
         <OverviewMetric label="Threshold" value={`${threshold} of ${signerCount}`} />
-        <OverviewMetric label="Contributors" value={totalContributors.toLocaleString()} />
-        <OverviewMetric label="Orders" value={wallet.orders.length.toLocaleString()} />
-        <OverviewMetric label="Pending" value={pendingOrders.toLocaleString()} />
+        <OverviewMetric label="Contributors" value={<NumberValue value={totalContributors} />} />
+        <OverviewMetric label="Orders" value={<NumberValue value={wallet.orders.length} />} />
+        <OverviewMetric label="Pending" value={<NumberValue value={pendingOrders} />} />
       </div>
     </section>
   )
@@ -488,9 +504,18 @@ function MultisigOrderOverview({
       </div>
       <div className={overviewStyles.metrics}>
         <OverviewMetric label="Approvals" value={`${approvals} of ${threshold}`} />
-        <OverviewMetric label="Signers" value={order.signers.length.toLocaleString()} />
-        <OverviewMetric label="Expires" value={formatTimestamp(order.expiration_date)} />
-        <OverviewMetric label="Actions" value={actionCount.toLocaleString()} />
+        <OverviewMetric label="Signers" value={<NumberValue value={order.signers.length} />} />
+        <OverviewMetric
+          label="Expires"
+          value={
+            <DateTime
+              display="date-time-day-month"
+              unit="seconds"
+              value={positiveTimestamp(order.expiration_date)}
+            />
+          }
+        />
+        <OverviewMetric label="Actions" value={<NumberValue value={actionCount} />} />
       </div>
       <ApprovalProgress
         approved={approvals}
@@ -515,12 +540,14 @@ function OverviewMetric({label, value}: {readonly label: string; readonly value:
 }
 
 function OrderStatus({status}: {readonly status: ReturnType<typeof getOrderStatus>}) {
+  const statusLabel = ORDER_STATUS_LABELS[status]
+
   return (
-    <span className={`${styles.status} ${styles[`status${capitalize(status)}`]}`}>
+    <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>
       {status === "executed" && <Check size={14} aria-hidden="true" />}
       {status === "expired" && <X size={14} aria-hidden="true" />}
       {status === "pending" && <Clock3 size={14} aria-hidden="true" />}
-      {capitalize(status)}
+      {statusLabel}
     </span>
   )
 }
@@ -626,7 +653,12 @@ function ApprovedSignerTooltip({signer}: {readonly signer: ApprovedSigner}) {
       </span>
       {signer.approvedAt !== undefined && (
         <span className={overviewStyles.approvalTooltipAddress}>
-          Approved {formatTimestamp(signer.approvedAt)}
+          Approved{" "}
+          <DateTime
+            display="date-time-day-month"
+            unit="seconds"
+            value={positiveTimestamp(signer.approvedAt)}
+          />
         </span>
       )}
     </span>
@@ -664,7 +696,12 @@ function MultisigOrderActionDetails({
               "None"
             )}
           </ActionSummaryItem>
-          <ActionSummaryItem label="Value">{formatActionValue(action.value)}</ActionSummaryItem>
+          <ActionSummaryItem label="Value">
+            {formatGramAmount(action.value, {
+              fallback: action.value ?? "—",
+              useGrouping: true,
+            })}
+          </ActionSummaryItem>
           <ActionSummaryItem label="Send mode">
             <SendModeViewer mode={action.send_mode} />
           </ActionSummaryItem>
@@ -783,18 +820,13 @@ function formatApprovals(order: V3MultisigOrder): string {
   return `${order.approvals_num ?? 0} of ${order.threshold ?? 0}`
 }
 
-function formatTimestamp(timestamp: number | null): string {
-  if (timestamp === null || !Number.isFinite(timestamp) || timestamp <= 0) {
-    return "—"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(timestamp * 1000))
+function positiveTimestamp(timestamp: number | null | undefined): number | undefined {
+  return timestamp !== null &&
+    timestamp !== undefined &&
+    Number.isFinite(timestamp) &&
+    timestamp > 0
+    ? timestamp
+    : undefined
 }
 
 function formatActionType(value: string): string {
@@ -808,19 +840,8 @@ function formatActionType(value: string): string {
   return normalized
     .split("_")
     .filter(Boolean)
-    .map(part => capitalize(part))
+    .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ")
-}
-
-function formatActionValue(value: string | null): string {
-  if (value === null) {
-    return "—"
-  }
-  try {
-    return formatGramAmount(BigInt(value), 9)
-  } catch {
-    return value
-  }
 }
 
 function formatRawValue(value: unknown): string {

@@ -1,4 +1,4 @@
-import {Skeleton} from "@acton/ui"
+import {formatSchedulePeriod, Skeleton} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
 
@@ -74,7 +74,7 @@ export const NetworkTpsPanel: FC<NetworkTpsPanelProps> = ({loadNetworkTps}) => {
         <div className={styles.grid}>
           {snapshot.windows.map(window => (
             <div className={styles.metric} key={window.window_seconds}>
-              <span className={styles.period}>{formatPeriod(window.window_seconds)}</span>
+              <span className={styles.period}>{formatSchedulePeriod(window.window_seconds)}</span>
               <strong className={styles.value}>{tpsFormatter.format(window.tps)}</strong>
               <span className={styles.detail}>
                 {countFormatter.format(window.transactions)} transactions
@@ -96,12 +96,4 @@ export const NetworkTpsPanel: FC<NetworkTpsPanelProps> = ({loadNetworkTps}) => {
       )}
     </section>
   )
-}
-
-function formatPeriod(seconds: number): string {
-  if (seconds % 60 === 0) {
-    const minutes = seconds / 60
-    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
-  }
-  return `${seconds} seconds`
 }

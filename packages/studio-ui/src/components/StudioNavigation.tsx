@@ -15,6 +15,7 @@ import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {StudioEnvironment, TestRunSummary} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
+import actonStudioLogo from "../assets/acton-studio-logo.svg"
 import {StudioSearch} from "./StudioSearch"
 import {TestRunsNavigationList} from "./TestRunsNavigationList"
 
@@ -107,7 +108,7 @@ export function StudioNavigation({
 
   const renderWorkspaceHeader = () => (
     <div className={styles.workspaceHeader}>
-      <span className={styles.workspaceMark} />
+      <img className={styles.workspaceMark} src={actonStudioLogo} alt="" />
       <span className={styles.workspaceBody}>
         <span className={styles.workspaceTitleRow}>
           <span className={styles.workspaceName}>Acton Studio</span>
@@ -253,6 +254,45 @@ export function StudioNavigation({
                                 </div>
                               </div>
                             ) : undefined}
+                            {page.path === "/virtual-environments" && networks.length > 0 ? (
+                              <div>
+                                <div className={styles.networkNavLabel}>
+                                  <Globe2 size={18} aria-hidden="true" />
+                                  <span>Networks</span>
+                                </div>
+                                <ul className={styles.environmentNavList} aria-label="Networks">
+                                  {networks.map(network => (
+                                    <li key={network.id}>
+                                      <button
+                                        type="button"
+                                        className={`${styles.environmentNavItem} ${
+                                          activeNetworkId === network.id
+                                            ? styles.environmentNavItemActive
+                                            : ""
+                                        }`}
+                                        aria-current={
+                                          activeNetworkId === network.id ? "page" : undefined
+                                        }
+                                        onClick={() => openEnvironmentAndClose(network)}
+                                      >
+                                        <span className={styles.networkNavIdentity}>
+                                          <span className={styles.environmentNavName}>
+                                            {network.name}
+                                          </span>
+                                        </span>
+                                        <span
+                                          className={styles.environmentStatusDot}
+                                          data-status={network.status}
+                                          role="img"
+                                          aria-label={`Status: ${network.status}`}
+                                          title={network.status}
+                                        />
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : undefined}
                             {page.path === "/tests" && navigationTestRuns.length > 0 ? (
                               <div
                                 className={`${styles.environmentNavDisclosure} ${
@@ -272,51 +312,6 @@ export function StudioNavigation({
                           </Fragment>
                         )
                       })}
-                      {networks.length > 0 ? (
-                        <div className={styles.networkNavGroup}>
-                          <div className={styles.networkNavLabel}>
-                            <Globe2 size={18} aria-hidden="true" />
-                            <span>Networks</span>
-                          </div>
-                          <ul className={styles.environmentNavList} aria-label="Networks">
-                            {networks.map(network => (
-                              <li key={network.id}>
-                                <button
-                                  type="button"
-                                  className={`${styles.environmentNavItem} ${
-                                    activeNetworkId === network.id
-                                      ? styles.environmentNavItemActive
-                                      : ""
-                                  }`}
-                                  aria-current={activeNetworkId === network.id ? "page" : undefined}
-                                  onClick={() => openEnvironmentAndClose(network)}
-                                >
-                                  <span className={styles.networkNavIdentity}>
-                                    <span className={styles.environmentNavName}>
-                                      {network.name}
-                                    </span>
-                                    {!network.network.testOnly && (
-                                      <span
-                                        className={styles.networkNavBadge}
-                                        title="Live production network"
-                                      >
-                                        Live
-                                      </span>
-                                    )}
-                                  </span>
-                                  <span
-                                    className={styles.environmentStatusDot}
-                                    data-status={network.status}
-                                    role="img"
-                                    aria-label={`Status: ${network.status}`}
-                                    title={network.status}
-                                  />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : undefined}
                     </div>
                   </div>
                 </nav>

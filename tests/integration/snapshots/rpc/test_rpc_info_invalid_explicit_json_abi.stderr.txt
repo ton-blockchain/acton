@@ -1,0 +1,4 @@
+Error: Failed to parse compiler ABI JSON from interfaces/broken.abi.json
+
+Caused by:
+  EOF while parsing an object at line 1 column 1

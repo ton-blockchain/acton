@@ -185,7 +185,6 @@
   align-items: center;
   min-height: 16px;
   padding: 0 5px;
-  border: 1px solid color-mix(in srgb, #16a34a 34%, var(--acton-color-border));
   border-radius: 999px;
   background: color-mix(in srgb, #16a34a 13%, var(--acton-color-surface-raised));
   color: color-mix(in srgb, #16a34a 78%, var(--acton-color-text));

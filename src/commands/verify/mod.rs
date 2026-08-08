@@ -805,8 +805,7 @@ fn verify_with_new_verifier(
 ) -> anyhow::Result<()> {
     println!("  {} Using new Acton verifier", "→".blue().bold());
 
-    let backend = parse_backend_env(NEW_VERIFY_BACKEND_ENV)
-        .unwrap_or_else(|| NEW_VERIFIER_BACKEND.to_string());
+    let backend = new_verifier_backend();
     let verify_url = format!("{backend}/api/v1/verify");
 
     println!(
@@ -1064,6 +1063,10 @@ fn parse_backend_env(var_name: &str) -> Option<String> {
     std::env::var(var_name)
         .ok()
         .and_then(|s| normalize_backend_url(&s))
+}
+
+pub(crate) fn new_verifier_backend() -> String {
+    parse_backend_env(NEW_VERIFY_BACKEND_ENV).unwrap_or_else(|| NEW_VERIFIER_BACKEND.to_string())
 }
 
 fn parse_backend_list_env(var_name: &str) -> Option<Vec<String>> {

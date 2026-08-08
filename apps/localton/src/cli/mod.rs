@@ -46,10 +46,20 @@ pub enum Command {
         #[command(subcommand)]
         command: WalletCommand,
     },
+    /// Prepare local chain state for indexer services.
+    Indexer {
+        #[command(subcommand)]
+        command: IndexerCommand,
+    },
     /// Manage full nodes and validators.
     Node {
         #[command(subcommand)]
         command: NodeCommand,
+    },
+    /// Save and restore persistent network state.
+    Snapshot {
+        #[command(subcommand)]
+        command: SnapshotCommand,
     },
     /// Manage validator elections, keys, stakes, and rewards.
     Validator {
@@ -65,6 +75,45 @@ pub struct StateArgs {
     /// Persistent network state.
     #[arg(long, default_value = ".localton", global = true)]
     pub state_dir: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SnapshotArgs {
+    #[command(flatten)]
+    pub state: StateArgs,
+
+    /// Snapshot storage. Defaults to a sibling of the state directory.
+    #[arg(long, global = true)]
+    pub snapshot_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum SnapshotCommand {
+    /// Save a compressed cold snapshot.
+    Create {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        /// Optional label shown in snapshot listings.
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// List saved snapshots as JSON.
+    List {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+    },
+    /// Restore a snapshot into the state directory.
+    Restore {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        id: String,
+    },
+    /// Delete a saved snapshot.
+    Delete {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        id: String,
+    },
 }
 
 #[derive(Debug, Clone, Args)]
@@ -309,6 +358,30 @@ pub enum WalletCommand {
         #[command(flatten)]
         state: StateArgs,
         wallet: String,
+    },
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum IndexerCommand {
+    /// Ensure the basechain has a block and save a masterchain seqno for account scanning.
+    BootstrapBasechain {
+        #[command(flatten)]
+        state: StateArgs,
+        /// TON HTTP API V2 endpoint.
+        #[arg(long, default_value = "http://127.0.0.1:18002/api/v2")]
+        endpoint: String,
+        /// Managed workchain 0 wallet used only to create the first basechain block.
+        #[arg(long, default_value = "studio-indexer-bootstrap")]
+        wallet: String,
+        /// Grams transferred from the genesis faucet when the basechain is empty.
+        #[arg(long, default_value = "1")]
+        amount: String,
+        /// File that receives the indexable masterchain seqno.
+        #[arg(long)]
+        seqno_file: Option<PathBuf>,
+        /// Maximum time to wait for the first basechain block.
+        #[arg(long, default_value_t = 120)]
+        timeout: u64,
     },
 }
 

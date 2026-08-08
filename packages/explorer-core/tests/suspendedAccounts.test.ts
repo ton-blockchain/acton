@@ -14,6 +14,11 @@ const ACCOUNT_ID_BITS = 256n
 const WORKCHAIN_MODULUS = 1n << 32n
 
 describe("suspended accounts config", () => {
+  test("treats an absent ConfigParam 44 as no suspended accounts", () => {
+    expect(parseSuspendedAccountsConfig("")).toEqual({rawAddresses: [], suspendedUntil: 0})
+    expect(parseSuspendedAccountsConfig(" \n\t")).toEqual({rawAddresses: [], suspendedUntil: 0})
+  })
+
   test("decodes basechain and masterchain addresses from ConfigParam 44", () => {
     const addresses = Dictionary.empty<bigint, Unit>()
     addresses.set(suspendedAddressKey(Address.parseRaw(`0:${"0".repeat(64)}`)), {kind: "Unit"})

@@ -15,6 +15,7 @@ interface ExplorerNetworkIdentity {
   readonly id: string
   readonly label: string
   readonly testOnly: boolean
+  readonly supportsActions?: boolean
 }
 
 interface NetworkInfoProviderProps {
@@ -69,9 +70,9 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
     const id = explorerNetworkId(networkIdentity?.id)
     return {
       id,
-      label: networkIdentity?.label ?? "Localnet",
+      label: networkIdentity?.label ?? "Simulated localnet",
       testOnly: networkIdentity?.testOnly ?? true,
-      supportsActions: id === "mainnet" || id === "testnet",
+      supportsActions: networkIdentity?.supportsActions ?? (id === "mainnet" || id === "testnet"),
       api,
     }
   }, [api, networkIdentity])

@@ -3,6 +3,7 @@
 ARG RUST_VERSION=1.96.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
+ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
 
 FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
 WORKDIR /src
@@ -17,12 +18,22 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
 COPY src ./src
 COPY xtask ./xtask
 COPY assets ./assets
-COPY LICENSE NOTICE.md README.md ./
+COPY NOTICE.md README.md ./
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=localton-cargo-target,target=/src/target \
     cargo build --locked --release --workspace \
     && install -Dm755 target/release/localton /out/localton \
     && install -Dm755 target/release/xtask /out/xtask
+
+# Development target: reuse the native TON and indexer layers from the published
+# image and replace only the localton launcher built from this checkout.
+FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
+USER root
+COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
+COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
+RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
+    && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
+USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
 ARG TARGETARCH
@@ -236,6 +247,7 @@ ENV CC=clang \
 COPY docker/ton-indexer-cors.patch /tmp/ton-indexer-cors.patch
 COPY docker/ton-indexer-classifier-cpu.patch /tmp/ton-indexer-classifier-cpu.patch
 COPY docker/ton-indexer-v3-catchup.patch /tmp/ton-indexer-v3-catchup.patch
+COPY docker/ton-indexer-localton-scanner.patch /tmp/ton-indexer-localton-scanner.patch
 
 RUN git init -q /src/ton-indexer \
     && git -C /src/ton-indexer remote add origin "${TON_INDEXER_REPOSITORY}" \
@@ -246,7 +258,8 @@ RUN git init -q /src/ton-indexer \
     && git -C /src/ton-indexer apply \
         /tmp/ton-indexer-cors.patch \
         /tmp/ton-indexer-classifier-cpu.patch \
-        /tmp/ton-indexer-v3-catchup.patch
+        /tmp/ton-indexer-v3-catchup.patch \
+        /tmp/ton-indexer-localton-scanner.patch
 
 RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
     cmake \
@@ -263,6 +276,7 @@ RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
         --target \
             ton-index-postgres \
             ton-index-postgres-migrate \
+            ton-smc-scanner \
             ton-marker \
             ton-marker-cli \
             ton-marker-core \
@@ -270,6 +284,7 @@ RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
     && install -m 0755 \
         /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres \
         /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres-migrate \
+        /src/ton-indexer/build-worker/ton-smc-scanner/ton-smc-scanner \
         /out/ton-indexer/bin/ \
     && cp -a \
         /src/ton-indexer/build-worker/ton-marker/libton-marker* \
@@ -342,6 +357,8 @@ RUN apt-get update \
         --shell /usr/sbin/nologin \
         localton \
     && install -d -o localton -g localton -m 0700 /var/lib/localton \
+    && install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
+    && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan \
     && install -d -m 0755 /usr/share/doc/localton
 
 COPY --from=launcher-builder /out/localton /usr/local/bin/localton
@@ -350,6 +367,7 @@ COPY --from=http-api-builder /opt/ton-http-api-v2 /opt/ton-http-api-v2
 COPY --from=ton-indexer-builder \
     /out/ton-indexer/bin/ton-index-postgres \
     /out/ton-indexer/bin/ton-index-postgres-migrate \
+    /out/ton-indexer/bin/ton-smc-scanner \
     /opt/ton-indexer/bin/
 COPY --from=ton-indexer-builder /out/ton-indexer/lib /opt/ton-indexer/lib
 COPY --from=ton-index-api-builder \
@@ -363,7 +381,7 @@ COPY --from=ton-index-classifier-builder \
     /opt/ton-indexer/classifier
 COPY --from=ton-indexer-builder /src/ton-indexer/LICENSE /usr/share/doc/localton/TON-INDEXER-LICENSE
 COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
-COPY LICENSE NOTICE.md /usr/share/doc/localton/
+COPY NOTICE.md /usr/share/doc/localton/
 
 ENV HOME=/var/lib/localton \
     APPIMAGE_EXTRACT_AND_RUN=1 \

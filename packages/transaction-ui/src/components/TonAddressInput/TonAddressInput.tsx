@@ -14,6 +14,7 @@ export interface TonAddressSuggestion {
 export interface TonAddressInputProps {
   readonly value: string
   readonly onValueChange: (value: string) => void
+  readonly onSuggestionSelect?: (suggestion: TonAddressSuggestion) => void
   readonly kind?: TonAddressKind
   readonly suggestions?: readonly TonAddressSuggestion[]
   readonly label?: string
@@ -30,6 +31,7 @@ export interface TonAddressInputProps {
 export function TonAddressInput({
   value,
   onValueChange,
+  onSuggestionSelect,
   kind = "internal",
   suggestions = [],
   label,
@@ -57,9 +59,12 @@ export function TonAddressInput({
           id: `${suggestion.address}:${index}`,
           label: suggestion.label ?? suggestion.address,
           description: suggestion.description,
-          onSelect: () => onValueChange(suggestion.address),
+          onSelect: () => {
+            onValueChange(suggestion.address)
+            onSuggestionSelect?.(suggestion)
+          },
         })),
-    [onValueChange, query, suggestions],
+    [onSuggestionSelect, onValueChange, query, suggestions],
   )
   const hasInvalidAddress = value.trim().length > 0 ? !isTonAddress(value, kind) : required
 

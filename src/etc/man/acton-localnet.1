@@ -25,11 +25,18 @@ Localnet server port.
 \fB\-\-fork\-net\fR \fInetwork\fR
 .RS 4
 Remote network to use for forked account resolution.
+.sp
+The fork also uses the network configuration from the resolved masterchain
+block. With an explicit historical block, it uses that block\[cq]s Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
 .RE
 .sp
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
 .RS 4
 Historical block sequence number to fork from.
+.sp
+The selected block provides the local network configuration and virtual\-clock
+origin.
 .RE
 .sp
 \fB\-\-accounts\fR \fIname\fR[,\fIname\fR\[u2026]]_

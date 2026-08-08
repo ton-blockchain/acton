@@ -1,4 +1,5 @@
 import {Address} from "@ton/core"
+import {shortenMiddle} from "@acton/ui"
 import {toUnicode} from "punycode/"
 
 import type {AddressInformation} from "../api/types"
@@ -101,10 +102,6 @@ export function toDisplayAddress(
   return parsed ? parsed.toString(getAddressFormatOptions(options)) : undefined
 }
 
-export function toTestnetAddress(address: string): string | undefined {
-  return toDisplayAddress(address, {testOnly: true})
-}
-
 export function normalizeAddress(address: string, options?: AddressFormatOptions): string {
   return toDisplayAddress(address, options) ?? address
 }
@@ -126,8 +123,10 @@ export function toAccountQrAddress(
 
 export function toRawAddress(address: string): string {
   const parsed = parseAddress(address)
-  const rawString = (parsed as {toRawString?: () => string} | undefined)?.toRawString
-  return typeof rawString === "function" ? rawString.call(parsed) : address
+  if (parsed === undefined) {
+    return address
+  }
+  return parsed.toRawString()
 }
 
 export function isSameAddress(a: string, b: string): boolean {
@@ -136,75 +135,6 @@ export function isSameAddress(a: string, b: string): boolean {
   const parsedB = parseAddress(b)
   if (parsedA && parsedB) return parsedA.equals(parsedB)
   return a === b
-}
-
-export function formatNano(nano: string | number, maximumFractionDigits = 9): string {
-  const n = typeof nano === "string" ? BigInt(nano) : BigInt(nano)
-  const ton = Number(n) / 1e9
-  return ton.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  })
-}
-
-export function formatTimeAgo(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const diff = Math.max(0, nowSeconds - utime)
-
-  if (diff === 0) return "right now"
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
-
-  return formatAbsoluteTime(utime, nowSeconds)
-}
-
-export function formatRelativeTime(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const diff = Math.max(0, nowSeconds - utime)
-
-  if (diff === 0) return "right now"
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
-  if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`
-  if (diff < 2_629_800) return `${Math.floor(diff / 604_800)}w ago`
-  if (diff < 31_557_600) return `${Math.floor(diff / 2_629_800)}mo ago`
-  return `${Math.floor(diff / 31_557_600)}y ago`
-}
-
-export function formatAbsoluteTime(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const date = new Date(utime * 1000)
-  const currentYear = new Date(nowSeconds * 1000).getFullYear()
-  const day = date.getDate()
-  const month = date.toLocaleString("default", {month: "short"})
-  const year = date.getFullYear() === currentYear ? "" : ` ${date.getFullYear()}`
-  const time = date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-  return `${day} ${month}${year}, ${time}`
-}
-
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86_400)}d`
-}
-
-export function shortenIdentifier(value: string, edgeLength = 6): string {
-  return value.length > edgeLength * 2
-    ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`
-    : value
 }
 
 export function formatAddress(
@@ -225,11 +155,11 @@ export function formatAddress(
 
   if (displayAddress.includes(":")) {
     const [workchain, hash] = displayAddress.split(":")
-    return `${workchain}:${hash.slice(0, 6)}…${hash.slice(-6)}`
+    return `${workchain}:${shortenMiddle(hash, {start: 6, end: 6})}`
   }
 
   if (displayAddress.length > 12) {
-    return shortenIdentifier(displayAddress)
+    return shortenMiddle(displayAddress, {start: 6, end: 6})
   }
   return displayAddress
 }

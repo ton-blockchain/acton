@@ -3,7 +3,7 @@
   "contract_name": "WalletV1r1",
   "author": "TON Core",
   "version": "1.1",
-  "description": "Wallet V1 R1 is a TON wallet for holding TON and sending signed transfers, using simple seqno replay protection.",
+  "description": "Wallet V1 R1 is a TON wallet for holding GRAM and sending signed transfers, using simple seqno replay protection.",
   "unique_types": [
     {
       "kind": "void"

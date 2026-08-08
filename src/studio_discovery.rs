@@ -32,14 +32,17 @@ pub fn activate_studio_public_network_gateways(
     project_root: &Path,
     expected_workspace_name: &str,
 ) -> bool {
-    let Some(studio_url) = configured_studio_url(project_root) else {
+    let Some(studio_url) = running_studio_url(project_root, expected_workspace_name) else {
         return false;
     };
-    if !is_matching_studio_running(&studio_url, expected_workspace_name) {
-        return false;
-    }
 
     set_runtime_public_network_urls(public_network_gateway_urls(&studio_url)).is_ok()
+}
+
+#[must_use]
+pub fn running_studio_url(project_root: &Path, expected_workspace_name: &str) -> Option<String> {
+    let studio_url = configured_studio_url(project_root)?;
+    is_matching_studio_running(&studio_url, expected_workspace_name).then_some(studio_url)
 }
 
 fn is_matching_studio_running(studio_url: &str, expected_workspace_name: &str) -> bool {

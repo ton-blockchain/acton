@@ -3860,6 +3860,7 @@ mod tests {
             StateSource::Remote(RemoteProvider {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+                fork_snapshot: None,
             }),
         )
         .expect("must create forked test node");

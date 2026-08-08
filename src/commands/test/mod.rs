@@ -9,6 +9,7 @@ use crate::commands::test::coverage::{
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
+use crate::commands::test::reporting::studio::StudioReporter;
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
 use crate::commands::test::reporting::ui::{UiReporter, reserve_ui_listener, start_ui_server};
 use crate::commands::test::reporting::{
@@ -23,6 +24,7 @@ use crate::context::{
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::paths::build_cache_dir;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -51,6 +53,7 @@ use std::{fs, process};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
+use ton_api::{MasterchainSnapshot, TonApiClient};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteLibraryCache, RemoteSnapshotCache,
@@ -116,6 +119,8 @@ pub struct TestRunner<'a> {
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
     remote_library_cache: RemoteLibraryCache,
+    fork_snapshot: Option<MasterchainSnapshot>,
+    fork_config_b64: Option<String>,
     fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
@@ -138,6 +143,21 @@ impl<'a> TestRunner<'a> {
         };
         let project_root = configured_project_root().to_path_buf();
         let fuzz_seed = config.fuzz_seed.unwrap_or_else(rand::random);
+        let fork_snapshot = config
+            .fork_net
+            .as_ref()
+            .map(|network| {
+                TonApiClient::new(network.clone(), acton_config.custom_networks())?
+                    .get_masterchain_snapshot_cached(
+                        config.fork_block_number,
+                        &build_cache_dir(configured_project_root())
+                            .join(ton_api::MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR),
+                    )
+            })
+            .transpose()?;
+        let fork_config_b64 = fork_snapshot
+            .as_ref()
+            .map(|snapshot| Boc::encode_base64(&snapshot.config));
 
         let mut ref_contracts = BTreeMap::new();
         if let Some(contracts) = acton_config.contracts() {
@@ -200,6 +220,8 @@ impl<'a> TestRunner<'a> {
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
             remote_library_cache: RemoteLibraryCache::new(),
+            fork_snapshot,
+            fork_config_b64,
             fuzz_seed,
         })
     }
@@ -287,8 +309,13 @@ impl<'a> TestRunner<'a> {
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.effective_log_verbosity();
 
-        let now = std::time::SystemTime::now();
-        let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let execution_unixtime = if let Some(snapshot) = &self.fork_snapshot {
+            i64::from(snapshot.gen_utime)
+        } else {
+            let now = std::time::SystemTime::now();
+            let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+            duration_since_epoch.as_secs().try_into()?
+        };
 
         let params = RunGetMethodArgs {
             code: Boc::encode_base64(code_cell),
@@ -296,7 +323,7 @@ impl<'a> TestRunner<'a> {
             verbosity,
             libs: Default::default(),
             address: dest_address.to_owned(),
-            unixtime: duration_since_epoch.as_secs().try_into()?,
+            unixtime: execution_unixtime,
             balance: "10".to_owned(),
             rand_seed: "0000000000000000000000000000000000000000000000000000000000000000"
                 .to_owned(),
@@ -306,14 +333,14 @@ impl<'a> TestRunner<'a> {
             extra_currencies: HashMap::new(),
             prev_blocks_info: None,
         };
-        let config_b64: Option<&str> = None;
+        let config_b64 = self.fork_config_b64.as_deref().unwrap_or(DEFAULT_CONFIG);
 
-        let mut emulator = Emulator::new(verbosity, config_b64)?;
+        let mut emulator = Emulator::new(verbosity, Some(config_b64))?;
         let state = match &self.config.fork_net {
             Some(net) => {
                 let remote = RemoteAccountState::new(
                     net.clone(),
-                    self.config.fork_block_number,
+                    self.fork_snapshot.as_ref().map(|snapshot| snapshot.seqno),
                     self.remote_cache.clone(),
                     self.remote_library_cache.clone(),
                     self.config.fork_cache_enabled,
@@ -322,7 +349,10 @@ impl<'a> TestRunner<'a> {
             }
             None => AccountsState::Local(LocalAccountsState::new()),
         };
-        let mut world_state = WorldState::new(state, config_b64)?;
+        let mut world_state = WorldState::new(state, Some(config_b64))?;
+        if let Some(snapshot) = &self.fork_snapshot {
+            world_state.set_now(snapshot.gen_utime);
+        }
 
         // Register all ref dependency to correct work
         for cell in self.ref_contracts.values() {
@@ -387,7 +417,7 @@ impl<'a> TestRunner<'a> {
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
+                let mut executor = StepGetExecutor::new(&stack, &params, Some(config_b64))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
                 let mut replayer =
@@ -416,7 +446,7 @@ impl<'a> TestRunner<'a> {
                 let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let get_result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
+                let get_result = executor.run_get_method(&stack, &params, Some(config_b64))?;
 
                 dump_trace_if_available(test, &self.config, &mut ctx)?;
 
@@ -560,6 +590,10 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
 
+    let acton_config = ActonConfig::load()?;
+    let studio_reporter =
+        StudioReporter::prepare(project_root, &acton_config.package.name, &mut config);
+
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
     if need_to_build() {
@@ -573,7 +607,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
 
     let test_files = collect_test_files(&paths, project_root, &config)?;
 
-    let acton_config = ActonConfig::load()?;
     let debug_listener = if config.debug {
         Some(reserve_dap_listener(config.debug_port)?)
     } else {
@@ -595,6 +628,10 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
 
     let mut global_reporter = ReporterManager::new();
+    if let Some(studio_reporter) = studio_reporter {
+        global_reporter.add_reporter(Box::new(studio_reporter));
+    }
+
     let reporter_project_root =
         dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
     TestRunner::setup_reporters(
@@ -666,6 +703,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
     if let Some(message) = empty_test_selection_message(&test_files, &config, total_tests) {
+        runner.reporter_manager.on_run_finished(false)?;
         runner.reporter_manager.finalize()?;
         println!("\n{message}");
         process::exit(1);
@@ -755,8 +793,6 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
         }
     }
 
-    runner.reporter_manager.finalize()?;
-
     if config.snapshot.is_some()
         || config.baseline_snapshot.is_some()
         || config.gas_profile.is_some()
@@ -782,6 +818,10 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
             println!("\n{} {skipped_outputs}", "Note:".yellow(),);
         }
     }
+
+    let run_succeeded = total_failed == 0 && !coverage_threshold_failed;
+    runner.reporter_manager.on_run_finished(run_succeeded)?;
+    runner.reporter_manager.finalize()?;
 
     if config.ui
         && let Some(reports) = reports_for_ui
@@ -999,6 +1039,7 @@ pub fn find_test_files_recursively(
         "**/.git/**",
         "**/target/**",
         "**/.acton/**",
+        "**/.studio/**",
         "**/.codex/**",
         "**/.claude/**",
     ] {

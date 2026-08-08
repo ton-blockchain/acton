@@ -2,10 +2,12 @@ use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
     ToncenterV2MockResponse, ToncenterV3MockResponse, append_custom_network,
-    append_custom_network_with_urls, format_captured_requests, spawn_toncenter_v2_mock,
-    spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
-    toncenter_v2_account_info_ok_response, toncenter_v2_error_response,
-    toncenter_v2_get_libraries_ok_response, toncenter_v2_send_boc_ok_response,
+    append_custom_network_with_urls, format_captured_requests, mocked_config_boc64,
+    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
+    toncenter_v2_account_info_ok_response, toncenter_v2_block_header_ok_response,
+    toncenter_v2_config_all_ok_response, toncenter_v2_error_response,
+    toncenter_v2_fork_snapshot_responses, toncenter_v2_get_libraries_ok_response,
+    toncenter_v2_latest_fork_snapshot_responses, toncenter_v2_send_boc_ok_response,
     toncenter_v2_seqno_ok_response, toncenter_v2_shard_account_cell_ok_response,
     write_fork_account_cache_summary,
 };
@@ -16,7 +18,6 @@ use std::fs;
 use std::net::TcpListener;
 use std::thread;
 use std::time::{Duration, Instant};
-use ton_executor::DEFAULT_CONFIG_DICT;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
 use tycho_types::models::{
@@ -25,6 +26,7 @@ use tycho_types::models::{
 };
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";
 const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
 const AUTO_LOAD_LIBRARY_REMOTE_ADDRESS: &str = "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ";
 
@@ -461,32 +463,6 @@ fun main() {
 const REMOTE_GLOBAL_VERSION: u32 = 777;
 const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
 
-fn build_global_version_cell(version: u32, capabilities: u64) -> Cell {
-    let mut builder = CellBuilder::new();
-    builder
-        .store_u8(0xc4)
-        .expect("must store GlobalVersion tag");
-    builder
-        .store_u32(version)
-        .expect("must store GlobalVersion version");
-    builder
-        .store_u64(capabilities)
-        .expect("must store GlobalVersion capabilities");
-    builder.build().expect("must build GlobalVersion cell")
-}
-
-fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
-    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
-    config
-        .set(8, build_global_version_cell(version, capabilities))
-        .expect("must update global version config param");
-    let root = config
-        .root()
-        .clone()
-        .expect("default blockchain config must have a root");
-    Boc::encode_base64(root)
-}
-
 fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
@@ -500,16 +476,6 @@ fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2Moc
                     "bytes": config_boc64
                 }
             }
-        })
-        .to_string(),
-    }
-}
-
-fn localnet_acton_ok_response() -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "ok": true,
         })
         .to_string(),
     }
@@ -3224,7 +3190,8 @@ fn auto_load_library_responses(
 ) -> Vec<ToncenterV2MockResponse> {
     let code_ref = CellBuilder::build_library(library_code.repr_hash());
     let shard_account = shard_account_with_code_ref(code_ref);
-    let mut responses = vec![toncenter_v2_shard_account_cell_ok_response(&shard_account)];
+    let mut responses = toncenter_v2_latest_fork_snapshot_responses(123_456);
+    responses.push(toncenter_v2_shard_account_cell_ok_response(&shard_account));
     if include_library {
         responses.push(toncenter_v2_get_libraries_ok_response(&Boc::encode_base64(
             library_code,
@@ -3937,7 +3904,6 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
         build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-localnet");
 
     let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
-        localnet_acton_ok_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_error_response(
             400,
@@ -4113,13 +4079,75 @@ fun main() {{
 }
 
 #[test]
+fn test_script_historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    let config_boc64 = mocked_config_boc64(REMOTE_GLOBAL_VERSION, REMOTE_GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+    ]);
+
+    let project = ProjectBuilder::new("script-historical-fork-snapshot")
+        .script_file(
+            "show_fork_snapshot",
+            r#"
+import "../../lib/emulation/config"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val version = testing.getConfig().getGlobalVersion();
+    println("version={}, capabilities={}", version.version, version.capabilities);
+    println("testing-now={}, blockchain-now={}", testing.getNow(), blockchain.now());
+}
+"#,
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-fork-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/show_fork_snapshot.tolk")
+        .fork_net("custom:script-fork-snapshot")
+        .arg("--fork-block-number")
+        .arg(&FORK_SEQNO.to_string())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_historical_fork_uses_block_config_and_time.stdout.txt",
+    );
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("script-fork-snapshot-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured fork snapshot requests");
+    output.assert_file_snapshot_matches(
+        "script-fork-snapshot-requests.txt",
+        "integration/snapshots/script/test_script_historical_fork_uses_block_config_and_time.requests.txt",
+    );
+}
+
+#[test]
 fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
     let last_hash_bytes = [0x33_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
-    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+    let mut responses = toncenter_v2_fork_snapshot_responses(654_321, 1_700_000_321);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 202, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
 
     let project = ProjectBuilder::new("script-fork-block-number-forwarded")
         .script_file("fork_block_query", &remote_shard_account_script_source())
@@ -4163,10 +4191,13 @@ fn test_script_fork_block_number_reuses_persistent_account_cache_between_runs() 
     let last_hash_bytes = [0x88_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
     let fork_block_number = 765432_u64;
-    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+    let mut responses = toncenter_v2_fork_snapshot_responses(fork_block_number, 1_700_000_432);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 707, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
 
     let project = ProjectBuilder::new("script-fork-block-cache")
         .script_file(
@@ -4192,8 +4223,6 @@ fn test_script_fork_block_number_reuses_persistent_account_cache_between_runs() 
             "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.first.stdout.txt",
         );
 
-    mock_handle.join().expect("mock toncenter must finish");
-
     let output = project
         .acton()
         .script("scripts/fork_block_cache_query.tolk")
@@ -4206,6 +4235,8 @@ fn test_script_fork_block_number_reuses_persistent_account_cache_between_runs() 
     output.assert_snapshot_matches(
         "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.second.stdout.txt",
     );
+
+    mock_handle.join().expect("mock toncenter must finish");
 
     let captured_requests = captured_requests
         .lock()
@@ -4832,6 +4863,8 @@ fn test_script_address_print_default() {
 
 #[test]
 fn test_script_address_print_fork_testnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("script-simple")
         .script_file(
             "hello",
@@ -4847,16 +4880,23 @@ fn test_script_address_print_fork_testnet() {
 
     let output = project
         .acton()
+        .env(
+            TEST_TONCENTER_TESTNET_V2_URL_ENV,
+            &format!("{mock_url}/api/v2"),
+        )
         .script("scripts/hello.tolk")
         .fork_net("testnet")
         .run()
         .success();
 
     output.assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
 fn test_script_address_print_fork_mainnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("script-simple")
         .script_file(
             "hello",
@@ -4872,12 +4912,17 @@ fn test_script_address_print_fork_mainnet() {
 
     let output = project
         .acton()
+        .env(
+            TEST_TONCENTER_MAINNET_V2_URL_ENV,
+            &format!("{mock_url}/api/v2"),
+        )
         .script("scripts/hello.tolk")
         .fork_net("mainnet")
         .run()
         .success();
 
     output.assert_contains("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]

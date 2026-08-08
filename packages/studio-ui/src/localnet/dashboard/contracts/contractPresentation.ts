@@ -40,19 +40,3 @@ export function entrypointName(entrypoint: string | undefined): string | undefin
     .at(-1)
     ?.replace(/\.(?:tolk|func?|fc)$/i, "")
 }
-
-export function formatContractCompiler(
-  compiler: {readonly language: string; readonly version: string} | undefined,
-): string {
-  if (!compiler) return "Unavailable"
-
-  const language = compiler.language.trim() || "Unknown compiler"
-  const version = compiler.version.trim()
-  return version ? `${language} ${version}` : language
-}
-
-export function shortenTechnicalValue(value: string, edgeLength = 8): string {
-  return value.length > edgeLength * 2
-    ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`
-    : value
-}

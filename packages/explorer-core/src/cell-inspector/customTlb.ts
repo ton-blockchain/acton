@@ -1,5 +1,6 @@
 import {parseTLB} from "@ton-community/tlb-runtime"
 import type {Cell} from "@ton/core"
+import {formatNumberValue} from "@acton/ui"
 
 import {
   confidence,
@@ -47,7 +48,7 @@ export function tryParseCustomTlb(
 
   const maxSchemaChars = options.maxSchemaChars ?? DEFAULT_MAX_SCHEMA_CHARS
   if (trimmedSchema.length > maxSchemaChars) {
-    const message = `TL-B schema exceeds the ${maxSchemaChars.toLocaleString()} character limit`
+    const message = `TL-B schema exceeds the ${formatNumberValue(maxSchemaChars)} character limit`
     return customTlbFailure(message)
   }
 

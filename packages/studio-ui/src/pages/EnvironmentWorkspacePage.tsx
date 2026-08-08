@@ -1,7 +1,10 @@
-import {Button} from "@acton/ui"
+import {Button, RawDataBlock} from "@acton/ui"
 import {CircleAlert, LoaderCircle, Play} from "lucide-react"
 import {useEffect, useState} from "react"
+import {useLocation} from "react-router"
 
+import {EnvironmentStartupProgress} from "../components/EnvironmentStartupProgress"
+import {supports} from "../environmentCapabilities"
 import {LocalnetWorkspace, type LocalnetWorkspaceShellState} from "../localnet/LocalnetWorkspace"
 import {type StudioEnvironment, restartStudioEnvironment} from "../studioApi"
 
@@ -28,13 +31,21 @@ export function EnvironmentWorkspacePage({
   onRetry,
   onShellChange,
 }: EnvironmentWorkspacePageProps) {
+  const location = useLocation()
   const [isRestarting, setIsRestarting] = useState(false)
   const [restartError, setRestartError] = useState<string>()
-  const visibleError = loadError ?? restartError
+  const requestError = loadError ?? restartError
+  const environmentError = environment?.error?.trim()
+  const visibleError = requestError ?? environmentError
+  const hasFailure = Boolean(visibleError || environment?.status === "failed")
   const isManaged = environment?.lifecycle === "managed"
+  const isSnapshotsPage =
+    location.pathname === `${basePath}/snapshots` && supports(environment, "snapshots")
+  const isSettingsPage = location.pathname === `${basePath}/settings` && isManaged
+  const canOpenWorkspace = environment?.status === "running" || isSnapshotsPage || isSettingsPage
 
   useEffect(() => {
-    if (environment?.status === "running") return
+    if (canOpenWorkspace) return
 
     const subject = isManaged ? "virtual environment" : "network"
     const pageDescription = visibleError
@@ -54,6 +65,7 @@ export function EnvironmentWorkspacePage({
     environment?.name,
     environment?.rpcUrl,
     environment?.status,
+    canOpenWorkspace,
     isManaged,
     onShellChange,
     visibleError,
@@ -74,7 +86,7 @@ export function EnvironmentWorkspacePage({
     }
   }
 
-  if (environment?.status === "running") {
+  if (canOpenWorkspace) {
     return (
       <LocalnetWorkspace
         basePath={basePath}
@@ -95,45 +107,64 @@ export function EnvironmentWorkspacePage({
   return (
     <div className={styles.statePage}>
       <main className={styles.stateContent}>
-        <span className={styles.stateIcon} data-error={visibleError ? "true" : undefined}>
-          {visibleError ? (
-            <CircleAlert size={21} aria-hidden="true" />
-          ) : isStarting ? (
-            <LoaderCircle className={styles.loadingIcon} size={21} aria-hidden="true" />
-          ) : (
-            <Play size={20} aria-hidden="true" />
-          )}
-        </span>
-        <strong>
-          {visibleError
-            ? "Unable to open environment"
-            : isStarting
-              ? environment?.status === "stopping"
-                ? "Environment is stopping"
-                : "Environment is starting"
-              : "Environment is stopped"}
-        </strong>
-        <span>
-          {visibleError ??
-            (isStarting
-              ? "The workspace will open when the localnet is ready"
-              : "Restart the environment to continue working with it")}
-        </span>
-        {canRestart ? (
-          <Button
-            variant="primary"
-            size="sm"
-            leadingIcon={<Play size={15} aria-hidden="true" />}
-            loading={isRestarting}
-            onClick={() => void handleRestart()}
-          >
-            Restart environment
-          </Button>
-        ) : visibleError ? (
-          <Button variant="outline" size="sm" onClick={() => void onRetry()}>
-            Retry
-          </Button>
+        <div className={styles.stateMessage}>
+          <span className={styles.stateIcon} data-error={hasFailure ? "true" : undefined}>
+            {hasFailure ? (
+              <CircleAlert size={21} aria-hidden="true" />
+            ) : isStarting ? (
+              <LoaderCircle className={styles.loadingIcon} size={21} aria-hidden="true" />
+            ) : (
+              <Play size={20} aria-hidden="true" />
+            )}
+          </span>
+          <strong className={styles.stateTitle}>
+            {hasFailure
+              ? environmentError && !requestError
+                ? "Environment failed"
+                : "Unable to open environment"
+              : isStarting
+                ? environment?.status === "stopping"
+                  ? "Environment is stopping"
+                  : "Environment is starting"
+                : "Environment is stopped"}
+          </strong>
+          <span className={styles.stateDescription}>
+            {hasFailure
+              ? "Review the error details below, then restart the environment"
+              : isStarting
+                ? "The workspace will open when the localnet is ready"
+                : "Restart the environment to continue working with it"}
+          </span>
+        </div>
+        {isStarting && environment?.startupTimings ? (
+          <EnvironmentStartupProgress timings={environment.startupTimings} />
         ) : undefined}
+        {visibleError ? (
+          <RawDataBlock
+            className={styles.errorDetails}
+            title={environmentError && !requestError ? "Docker output" : "Error details"}
+            value={visibleError}
+            copyLabel="error details"
+            maxHeight="24rem"
+          />
+        ) : undefined}
+        <div className={styles.stateActions}>
+          {canRestart ? (
+            <Button
+              variant="primary"
+              size="sm"
+              leadingIcon={<Play size={15} aria-hidden="true" />}
+              loading={isRestarting}
+              onClick={() => void handleRestart()}
+            >
+              Restart environment
+            </Button>
+          ) : visibleError ? (
+            <Button variant="outline" size="sm" onClick={() => void onRetry()}>
+              Retry
+            </Button>
+          ) : undefined}
+        </div>
       </main>
     </div>
   )

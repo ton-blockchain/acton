@@ -12,6 +12,7 @@ import {
   DataTableTable,
   InlineButton,
   Input,
+  shortenMiddle,
 } from "@acton/ui"
 import {ExternalLink, Link2, RefreshCw, Unplug} from "lucide-react"
 import {useEffect, useRef, useState} from "react"
@@ -147,7 +148,9 @@ function StartupWalletsSample() {
                 {wallet.name}
               </DataTableCell>
               <DataTableCell truncate>
-                <span className={styles.linkValue}>{compactMiddle(wallet.address)}</span>
+                <span className={styles.linkValue}>
+                  {shortenMiddle(wallet.address, {start: 6, end: 6, separator: "..."})}
+                </span>
               </DataTableCell>
               <DataTableCell tone="strong">{wallet.version}</DataTableCell>
               <DataTableCell align="right" tone="strong">
@@ -334,11 +337,6 @@ function TraceFeeRow({
       <DataTableCell tone="strong">{row.totalFee}</DataTableCell>
     </DataTableRow>
   )
-}
-
-function compactMiddle(value: string) {
-  if (value.length <= 18) return value
-  return `${value.slice(0, 6)}...${value.slice(-6)}`
 }
 
 export const dataTableGallery = {

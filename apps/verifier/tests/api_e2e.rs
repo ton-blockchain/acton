@@ -816,6 +816,53 @@ async fn verify_passes_uploaded_file_contents_to_compiler() {
 }
 
 #[tokio::test]
+async fn verify_treats_link_multipart_parts_as_regular_file_contents() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"symlink.tolk","is_entrypoint":true},
+                  {"path":"hardlink.tolk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "symlink.tolk", "inode/symlink", "../target.tolk"),
+            file_part(
+                "files",
+                "hardlink.tolk",
+                "application/x-hardlink",
+                "symlink.tolk",
+            ),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert_eq!(bundle.files.len(), 2);
+    assert_eq!(bundle.files[0].path, "hardlink.tolk");
+    assert_eq!(bundle.files[0].content, "symlink.tolk");
+    assert_eq!(bundle.files[1].path, "symlink.tolk");
+    assert_eq!(bundle.files[1].content, "../target.tolk");
+}
+
+#[tokio::test]
 async fn verify_passes_import_mappings_to_compiler() {
     let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
     let response = post_verify(
@@ -1382,6 +1429,56 @@ async fn verify_rejects_multiple_entrypoint_sources() {
 }
 
 #[tokio::test]
+async fn verify_compares_source_path_duplicates_case_insensitively() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"Contracts/Aa.tolk","is_entrypoint":true},
+                  {"path":"contracts/aa.tolk","is_entrypoint":false},
+                  {"path":"CONTRACTS/aA.TOLK","is_entrypoint":false},
+                  {"path":"CoNtRaCtS/AA.ToLk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "Contracts/Aa.tolk", "text/plain", "source one"),
+            file_part("files", "contracts/aa.tolk", "text/plain", "source two"),
+            file_part("files", "CONTRACTS/aA.TOLK", "text/plain", "source three"),
+            file_part("files", "CoNtRaCtS/AA.ToLk", "text/plain", "source four"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "duplicate source paths").await;
+
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"one/main.tolk","is_entrypoint":true},
+                  {"path":"two/main.tolk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "one/main.tolk", "text/plain", "source one"),
+            file_part("files", "two/main.tolk", "text/plain", "source two"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn verify_rejects_uploaded_file_without_source_metadata() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
@@ -1419,6 +1516,128 @@ async fn verify_rejects_source_metadata_without_uploaded_file() {
 }
 
 #[tokio::test]
+async fn verify_accepts_source_path_at_length_limit() {
+    let path = format!("path/to/large{}/file.tolk", "a".repeat(105));
+    assert_eq!(path.chars().count(), 128);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_rejects_source_path_over_length_limit() {
+    let path = format!("path/to/large{}/file.tolk", "a".repeat(106));
+    assert_eq!(path.chars().count(), 129);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "no longer than 128 characters").await;
+}
+
+#[tokio::test]
+async fn verify_rejects_non_ascii_source_paths() {
+    for path in [
+        concat!("ca", "f", "\u{e9}.tolk"),
+        concat!("ca", "f", "e\u{301}.tolk"),
+        "contracts/🚀.tolk",
+        "contracts/👩‍💻.tolk",
+        "contracts/👍🏽.tolk",
+        "contracts/✈️.tolk",
+        "contracts/\u{fb01}.tolk",
+        "contracts/Ａ.tolk",
+        "contracts/контракт.tolk",
+        "contracts/foo\u{a0}bar.tolk",
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "non-ASCII path should be rejected: {path:?}"
+        );
+        assert_error_contains(response, "only ASCII letters").await;
+    }
+}
+
+#[tokio::test]
+async fn verify_rejects_control_characters_in_source_paths() {
+    for path in [
+        "contracts/file\0.tolk",
+        "contracts/file\n.tolk",
+        "contracts/file\r.tolk",
+        "contracts/file\t.tolk",
+        "contracts/file\u{7f}.tolk",
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "control character should be rejected: {path:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn verify_rejects_unsafe_source_paths() {
     let cases = [
         ("../main.tolk", "invalid component"),
@@ -1434,6 +1653,18 @@ async fn verify_rejects_unsafe_source_paths() {
         (".git/main.tolk", "reserved '.git' component"),
         (" main.tolk", "leading or trailing whitespace"),
         ("main.tolk ", "leading or trailing whitespace"),
+        ("main.tolk.", "must not end with '.'"),
+        ("contracts./main.tolk", "must not end with '.'"),
+        ("contracts/file name.tolk", "only ASCII letters"),
+        ("contracts/file@name.tolk", "only ASCII letters"),
+        ("contracts/file+name.tolk", "only ASCII letters"),
+        ("contracts/file=name.tolk", "only ASCII letters"),
+        ("contracts/file,name.tolk", "only ASCII letters"),
+        ("contracts/file:name.tolk", "only ASCII letters"),
+        ("contracts/file<name>.tolk", "only ASCII letters"),
+        ("contracts/file|name.tolk", "only ASCII letters"),
+        ("contracts/file?name.tolk", "only ASCII letters"),
+        ("contracts/file*name.tolk", "only ASCII letters"),
     ];
 
     for (path, expected_error) in cases {
@@ -1460,6 +1691,69 @@ async fn verify_rejects_unsafe_source_paths() {
             "path should be rejected: {path}"
         );
         assert_error_contains(response, expected_error).await;
+    }
+}
+
+#[tokio::test]
+async fn verify_accepts_portable_ascii_source_path() {
+    let path = "Contracts_123/lib-name.v1.tolk";
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_rejects_git_control_paths() {
+    for path in [
+        ".git",
+        ".git/config",
+        ".git/main.tolk",
+        ".gitignore",
+        ".gitattributes",
+        ".gitmodules",
+        "contracts/.gitignore",
+        "contracts/.gitattributes",
+        "contracts/.gitmodules",
+        ".mailmap",
+        ".gitconfig",
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                owned_file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "Git control path should be rejected: {path}"
+        );
     }
 }
 
@@ -1565,6 +1859,63 @@ async fn verify_rejects_source_extensions_that_do_not_match_language() {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_error_contains(response, expected_extensions).await;
     }
+}
+
+#[tokio::test]
+async fn verify_rejects_multiple_source_extensions() {
+    for (language, compile_params, path) in [
+        ("func", COMPILE_PARAMS_FUNC, "main.tolk.fc"),
+        ("func", COMPILE_PARAMS_FUNC, "main.func.fc"),
+        ("tolk", COMPILE_PARAMS_TOLK, "main.fc.tolk"),
+        ("tact", EMPTY_COMPILE_PARAMS, "contract.tact.pkg"),
+        ("tolk", COMPILE_PARAMS_TOLK, "main.FC.ToLk"),
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "source"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "multiple source extensions should be rejected: {path}"
+        );
+        assert_error_contains(response, "multiple source extensions").await;
+    }
+
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[{"path":"contracts/my.contract.tolk","is_entrypoint":true}]"#,
+            ),
+            file_part(
+                "files",
+                "contracts/my.contract.tolk",
+                "text/plain",
+                "fun main() {}",
+            ),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]

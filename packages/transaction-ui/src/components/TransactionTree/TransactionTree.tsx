@@ -1,7 +1,17 @@
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import {buildStorageDiff, InlineButton, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {
+  buildStorageDiff,
+  formatOpcode,
+  formatGramAmount,
+  formatNumberValue,
+  GramAmount,
+  InlineButton,
+  shortenMiddle,
+  type ParsedValueDiff,
+  ParsedValueDiffView,
+} from "@acton/ui"
 import {GitBranch, Route} from "lucide-react"
 import {
   type CustomNodeElementProps,
@@ -19,7 +29,6 @@ import type {
 } from "../../model/transaction"
 import type {ContractVerifiedSource} from "../ContractSourcePanel/ContractSourcePanel"
 import type {ResolveVerifiedSourceByCodeHash} from "../CodeCellDetails/CodeCellDetails"
-import * as fmt from "../../lib/format"
 import {decodeTransactionMessageBody} from "../../lib/messageBody"
 import {
   getTransactionActionPhase,
@@ -194,13 +203,15 @@ function EdgeTransactionTooltipContent({
       <div className={styles.tooltipField}>
         <div className={styles.tooltipFieldLabel}>Money</div>
         <div className={styles.tooltipFieldValue}>
-          <div>Sent Total: {fmt.formatCurrency(data.sentTotal)}</div>
+          <div>
+            Sent Total: <GramAmount value={data.sentTotal} />
+          </div>
           <div className={styles.tooltipSubValue}>
-            Total Fees: {fmt.formatCurrency(data.fees.totalFees)}
+            Total Fees: <GramAmount value={data.fees.totalFees} />
           </div>
           {data.fees.gasFees !== undefined && (
             <div className={styles.tooltipSubValue}>
-              Gas Fees: {fmt.formatCurrency(data.fees.gasFees)}
+              Gas Fees: <GramAmount value={data.fees.gasFees} />
             </div>
           )}
         </div>
@@ -346,6 +357,15 @@ export function TransactionTree({
     }
   }
 
+  const handleExternalOutClick = (parentId: string): void => {
+    const parentTransaction = transactionMap.get(parentId)
+    if (!parentTransaction) return
+
+    forceHideTooltip()
+    setSelectedTransactionIdState(parentId)
+    onTransactionSelect?.(parentTransaction)
+  }
+
   const showEdgeTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     triggerRectReference.current = rect
@@ -475,7 +495,7 @@ export function TransactionTree({
       const value =
         inMessage?.info.type === "external-in"
           ? "—"
-          : fmt.formatCurrency(
+          : formatGramAmount(
               inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
             )
 
@@ -494,7 +514,7 @@ export function TransactionTree({
           ? parsedBody.name
           : opcode === undefined
             ? "empty"
-            : `0x${opcode.toString(16)}`)
+            : (formatOpcode(opcode) ?? "unknown"))
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
@@ -622,7 +642,7 @@ export function TransactionTree({
     const omittedLabel =
       omittedTransactionCount === undefined
         ? "Trace segment unavailable"
-        : `${omittedTransactionCount.toLocaleString("en-US")} tx omitted`
+        : `${formatNumberValue(omittedTransactionCount, {locale: "en-US"})} tx omitted`
     const createTraceGapNode = (children: RawNodeDatum[] = []): RawNodeDatum => ({
       name: omittedLabel,
       attributes: {
@@ -787,7 +807,7 @@ export function TransactionTree({
               <div className={styles.edgeText} role="note">
                 <div className={styles.topText}>
                   <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                    {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+                    {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
                   </p>
                   <p className={styles.edgeTextContent}>—</p>
                 </div>
@@ -891,6 +911,7 @@ export function TransactionTree({
     if (nodeDatum.attributes?.isExternalOut) {
       const parentId = nodeDatum.attributes.parentId as string
       const parentTx = transactionMap.get(parentId)
+      const externalOutAriaLabel = `External-out message from transaction ${parentId}`
 
       const externalOutMessage = [...(parentTx?.transaction.outMessages.values() ?? [])].find(
         message => message.info.type === "external-out",
@@ -930,10 +951,21 @@ export function TransactionTree({
 
           <circle
             r={15}
+            role="button"
+            tabIndex={0}
+            aria-label={externalOutAriaLabel}
             fill="transparent"
             stroke="var(--acton-color-border)"
             strokeWidth={1}
-            className={styles.nodeCircleDefault}
+            className={styles.nodeCircle}
+            onClick={() => {
+              handleExternalOutClick(parentId)
+            }}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                handleExternalOutClick(parentId)
+              }
+            }}
           />
 
           <foreignObject
@@ -1106,7 +1138,7 @@ export function TransactionTree({
           >
             <div className={styles.topText}>
               <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+                {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
               </p>
               {nodeDatum.attributes?.value && (
                 <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
@@ -1386,7 +1418,7 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
     }
   }
 
-  return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
+  return shortenMiddle(displayAddress, {start: 5, end: 5, separator: "..."})
 }
 
 function getSharedInternalSource(

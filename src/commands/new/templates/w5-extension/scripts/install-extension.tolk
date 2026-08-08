@@ -42,11 +42,6 @@ fun main() {
     );
 
     val extResult = wallet.sendAnyExternal(signedBody.toCell());
-    if (!extResult.isAccepted()) {
-        println("External message was not accepted");
-        return;
-    }
-
     val result = extResult.waitForFirstTransaction();
     if (result == null) {
         println("External message did not produce a transaction");

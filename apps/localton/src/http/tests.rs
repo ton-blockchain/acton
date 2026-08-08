@@ -21,6 +21,7 @@ use axum::{
     middleware,
     routing::{get, post},
 };
+use expect_test::expect;
 use serde_json::{Value, json};
 use tokio::{net::TcpListener, task::JoinHandle};
 
@@ -137,6 +138,75 @@ fn openapi_documents_config_and_admin_routes() {
             "administrative OpenAPI is missing {schema}"
         );
     }
+
+    let documented_operations = [
+        ("CONFIG /", &config_document["paths"]["/"]["get"]),
+        (
+            "CONFIG /add-validator",
+            &config_document["paths"]["/add-validator"]["get"],
+        ),
+        (
+            "ADMIN /v1/status",
+            &admin_document["paths"]["/v1/status"]["get"],
+        ),
+        (
+            "ADMIN /v1/nodes/{name}/start",
+            &admin_document["paths"]["/v1/nodes/{name}/start"]["post"],
+        ),
+        (
+            "ADMIN /acton_fundAccount",
+            &admin_document["paths"]["/acton_fundAccount"]["post"],
+        ),
+    ]
+    .map(|(name, operation)| {
+        format!(
+            "{name}\nsummary: {}\ndescription: {}",
+            operation["summary"].as_str().unwrap_or("<missing>"),
+            operation["description"].as_str().unwrap_or("<missing>"),
+        )
+    })
+    .join("\n\n");
+    let documented_fields = format!(
+        "ConfigDocument.ready: {}\nRuntimeState.ready: {}\nFundAccountRequest.address: {}",
+        config_document["components"]["schemas"]["ConfigDocument"]["properties"]["ready"]
+            ["description"]
+            .as_str()
+            .unwrap_or("<missing>"),
+        admin_document["components"]["schemas"]["RuntimeState"]["properties"]["ready"]
+            ["description"]
+            .as_str()
+            .unwrap_or("<missing>"),
+        admin_document["components"]["schemas"]["FundAccountRequest"]["properties"]["address"]
+            ["description"]
+            .as_str()
+            .unwrap_or("<missing>"),
+    );
+
+    expect![[r#"
+        CONFIG /
+        summary: Get network status and service URLs
+        description: Use this endpoint to find the enabled Localton services
+
+        CONFIG /add-validator
+        summary: Create and start a validator node
+        description: By default, the new validator enters elections automatically
+
+        ADMIN /v1/status
+        summary: Get the current launcher and network state
+        description: The response shows readiness, the latest masterchain block, node states, and service states
+
+        ADMIN /v1/nodes/{name}/start
+        summary: Start a configured validator node
+        description: The node must exist in the persistent settings
+
+        ADMIN /acton_fundAccount
+        summary: Fund an account from the genesis wallet
+        description: Localton sends a signed transfer and waits for the destination message
+
+        ConfigDocument.ready: `true` when the local network can process requests
+        RuntimeState.ready: `true` when the network can process requests
+        FundAccountRequest.address: TON address that receives the funds"#]]
+    .assert_eq(&format!("{documented_operations}\n\n{documented_fields}"));
 }
 
 #[test]

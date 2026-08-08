@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -6,12 +7,13 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{Path as AxumPath, Request, State};
+use axum::extract::{Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
+use base64::Engine;
 use futures::StreamExt;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
@@ -21,6 +23,7 @@ use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
+mod api_calls;
 mod contract_facade;
 mod contract_registry;
 mod contract_source_artifact;
@@ -31,27 +34,34 @@ mod full_ton_network;
 mod local_artifacts;
 mod local_process;
 mod local_test_process;
+mod openapi;
 mod test_api;
 mod test_run;
 mod test_runtime;
 mod wallet;
 
+pub use api_calls::{
+    ApiCallFamily, ApiCallLogSnapshot, ApiCallRecord, ApiCallSource, ApiCallStatus, ApiCallType,
+};
 pub use contract_registry::ContractRegistryStore;
 pub use contract_source_artifact::{
     CONTRACT_SOURCE_HISTORY_PATH, ContractSourceArtifact, ContractSourceArtifactError,
     ContractSourceArtifactStore,
 };
 pub use environment::{
-    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentCapability, EnvironmentConfig,
-    EnvironmentEndpoints, EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime,
-    EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus, PublicTonNetwork,
-    StudioEnvironment, UpdateEnvironmentRequest,
+    CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
+    EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
+    EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
+    EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
+    EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
+    FullTonAccountImport, PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
 };
 pub use local_process::LocalProcessEnvironmentRuntime;
 pub use local_test_process::LocalProcessTestRunRuntime;
+pub use openapi::openapi;
 pub use test_run::{
     STUDIO_TEST_RUN_FORMAT_VERSION, STUDIO_TEST_RUNS_PATH, StartTestRunRequest,
     StudioDaemonDescriptor, StudioTestDuration, StudioTestExecutionLogs, StudioTestReport,
@@ -73,6 +83,7 @@ pub const STUDIO_API_VERSION: u32 = 1;
 pub const STUDIO_ENVIRONMENTS_PATH: &str = "/api/v1/environments";
 pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
+pub const STUDIO_OPENAPI_PATH: &str = "/api/v1/openapi.json";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
 
 const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
@@ -194,6 +205,7 @@ impl PublicToncenterApiKeys {
 pub struct StudioServer {
     config: StudioServerConfig,
     contract_registry: ContractRegistryStore,
+    api_calls: api_calls::ApiCallLog,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -207,6 +219,7 @@ impl StudioServer {
         Self {
             config,
             contract_registry: ContractRegistryStore::ephemeral(),
+            api_calls: api_calls::ApiCallLog::default(),
             environment_runtime: Arc::new(environment_catalog::EnvironmentCatalogRuntime::new(
                 managed_environment_runtime,
             )),
@@ -270,6 +283,7 @@ impl StudioServer {
                     }),
             },
             contract_registry: self.contract_registry.clone(),
+            api_calls: self.api_calls.clone(),
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
@@ -277,6 +291,7 @@ impl StudioServer {
             toncenter_api_keys: self.config.toncenter_api_keys.clone(),
         };
         let api = Router::new()
+            .route("/openapi.json", get(openapi::handler))
             .route("/health", get(health))
             .route("/info", get(info))
             .route(
@@ -297,10 +312,30 @@ impl StudioServer {
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
             )
+            .route(
+                "/environments/{environment_id}/snapshots",
+                get(list_environment_snapshots).post(create_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}",
+                axum::routing::delete(delete_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}/restore",
+                post(restore_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshot-operation",
+                get(get_environment_snapshot_operation),
+            )
             .route("/environments/{environment_id}/wallets", get(list_wallets))
             .route(
                 "/environments/{environment_id}/wallets/{wallet_name}/sign",
                 post(sign_wallet),
+            )
+            .route(
+                "/environments/{environment_id}/api-calls",
+                get(get_environment_api_calls),
             )
             .route(
                 "/environments/{environment_id}/rpc",
@@ -360,6 +395,7 @@ impl StudioServer {
 pub(crate) struct StudioState {
     info: StudioInfo,
     contract_registry: ContractRegistryStore,
+    api_calls: api_calls::ApiCallLog,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -367,7 +403,7 @@ pub(crate) struct StudioState {
     toncenter_api_keys: PublicToncenterApiKeys,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioInfo {
     pub protocol_version: u32,
@@ -375,7 +411,7 @@ pub struct StudioInfo {
     pub workspace: Option<WorkspaceInfo>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
     pub name: String,
@@ -393,14 +429,35 @@ pub enum StudioServerError {
     TestRunShutdown { source: TestRunRuntimeError },
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/health",
+    responses((status = 204, description = "Studio is ready")),
+    tag = "system"
+)]
 async fn health() -> StatusCode {
     StatusCode::NO_CONTENT
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/info",
+    responses((status = 200, description = "Studio server information", body = StudioInfo)),
+    tag = "system"
+)]
 async fn info(State(state): State<StudioState>) -> Json<StudioInfo> {
     Json(state.info)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments",
+    responses(
+        (status = 200, description = "Available environments", body = [StudioEnvironment]),
+        (status = 500, description = "Failed to list environments", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn list_environments(
     State(state): State<StudioState>,
 ) -> Result<Json<Vec<StudioEnvironment>>, StudioApiError> {
@@ -412,10 +469,23 @@ async fn list_environments(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments",
+    request_body = CreateEnvironmentRequest,
+    responses(
+        (status = 201, description = "Environment created", body = StudioEnvironment),
+        (status = 400, description = "Invalid environment configuration", body = StudioApiErrorBody),
+        (status = 409, description = "Environment conflicts with existing state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to create the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn create_environment(
     State(state): State<StudioState>,
-    Json(request): Json<CreateEnvironmentRequest>,
+    Json(mut request): Json<CreateEnvironmentRequest>,
 ) -> Result<(StatusCode, Json<StudioEnvironment>), StudioApiError> {
+    resolve_full_ton_account_imports(&state, &mut request).await?;
     state
         .environment_runtime
         .create(request)
@@ -424,6 +494,168 @@ async fn create_environment(
         .map_err(StudioApiError)
 }
 
+async fn resolve_full_ton_account_imports(
+    state: &StudioState,
+    request: &mut CreateEnvironmentRequest,
+) -> Result<(), StudioApiError> {
+    let CreateEnvironmentConfig::FullTonNetwork {
+        imported_accounts, ..
+    } = &mut request.config
+    else {
+        return Ok(());
+    };
+
+    let mut addresses = BTreeSet::new();
+    for account in imported_accounts {
+        let source_environment_id = account.source_environment_id.trim().to_owned();
+        account.source_environment_id = source_environment_id;
+        account.name = account
+            .name
+            .take()
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty());
+        if account.source_environment_id.is_empty() {
+            return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_source_required",
+                message: "An import source environment is required".to_owned(),
+            }));
+        }
+
+        let address = TonAddress::from_str(account.address.trim()).map_err(|_| {
+            StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_address_invalid",
+                message: format!("Invalid TON address {}", account.address),
+            })
+        })?;
+        let canonical_address = address.to_hex();
+        if !addresses.insert(canonical_address.clone()) {
+            return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_address_duplicate",
+                message: format!("Account {canonical_address} was selected more than once"),
+            }));
+        }
+        account.address = address.to_base64(false, true, true);
+
+        let source = state
+            .environment_runtime
+            .get(&account.source_environment_id)
+            .await
+            .map_err(StudioApiError)?;
+        if source.status != EnvironmentStatus::Running {
+            return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "full_ton_import_source_not_running",
+                message: format!("{} must be running to import contracts", source.name),
+            }));
+        }
+        account.shard_account_boc_hex =
+            Some(fetch_shard_account_boc_hex(state, &source, &canonical_address).await?);
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct ShardAccountCellResponse {
+    ok: bool,
+    result: Option<ShardAccountCell>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ShardAccountCell {
+    bytes: String,
+}
+
+async fn fetch_shard_account_boc_hex(
+    state: &StudioState,
+    source: &StudioEnvironment,
+    address: &str,
+) -> Result<String, StudioApiError> {
+    let mut url = reqwest::Url::parse(&environment_upstream_url(
+        source,
+        "/api/v2/getShardAccountCell",
+    )?)
+    .map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Internal {
+            code: "full_ton_import_source_invalid",
+            message: format!("{} has an invalid V2 API endpoint: {error}", source.name),
+        })
+    })?;
+    url.query_pairs_mut().append_pair("address", address);
+    let response = apply_environment_upstream_auth(
+        state.http_client.get(url),
+        source,
+        state.toncenter_api_keys.for_environment(source),
+    )
+    .send()
+    .await
+    .map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("Failed to load {address} from {}: {error}", source.name),
+        })
+    })?;
+    let status = response.status();
+    let body = response.text().await.map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("Failed to read {address} from {}: {error}", source.name),
+        })
+    })?;
+    if !status.is_success() {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!(
+                "Failed to load {address} from {}: upstream returned {status}",
+                source.name
+            ),
+        }));
+    }
+
+    let payload = serde_json::from_str::<ShardAccountCellResponse>(&body).map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!(
+                "Failed to parse {address} from {} as a shard account: {error}",
+                source.name
+            ),
+        })
+    })?;
+    if !payload.ok {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: payload
+                .error
+                .unwrap_or_else(|| format!("{} could not export account {address}", source.name)),
+        }));
+    }
+    let bytes = payload.result.ok_or_else(|| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("{} returned no state for {address}", source.name),
+        })
+    })?;
+    let boc = base64::engine::general_purpose::STANDARD
+        .decode(bytes.bytes)
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "full_ton_import_failed",
+                message: format!("{} returned an invalid account BoC: {error}", source.name),
+            })
+        })?;
+    Ok(hex::encode(boc))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment details", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn get_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -436,6 +668,20 @@ async fn get_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    request_body = UpdateEnvironmentRequest,
+    responses(
+        (status = 200, description = "Environment updated", body = StudioEnvironment),
+        (status = 400, description = "Invalid update", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be updated in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to update the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn update_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -449,6 +695,18 @@ async fn update_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 204, description = "Environment deleted"),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be deleted in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to delete the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn delete_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -457,10 +715,23 @@ async fn delete_environment(
         .environment_runtime
         .delete(&environment_id)
         .await
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(StudioApiError)
+        .map_err(StudioApiError)?;
+    state.api_calls.remove(&environment_id);
+    Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/stop",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment stopped", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be stopped in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to stop the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn stop_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -473,6 +744,18 @@ async fn stop_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/restart",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment restarted", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be restarted in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to restart the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn restart_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -485,6 +768,150 @@ async fn restart_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshots",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Saved environment snapshots", body = [EnvironmentSnapshot]),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Snapshots are not available", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to list snapshots", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn list_environment_snapshots(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Vec<EnvironmentSnapshot>>, StudioApiError> {
+    state
+        .environment_runtime
+        .list_snapshots(&environment_id)
+        .await
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    request_body = CreateEnvironmentSnapshotRequest,
+    responses(
+        (status = 202, description = "Snapshot creation started", body = EnvironmentSnapshotOperation),
+        (status = 400, description = "Invalid snapshot name", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to start snapshot creation", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn create_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(request): Json<CreateEnvironmentSnapshotRequest>,
+) -> Result<(StatusCode, Json<EnvironmentSnapshotOperation>), StudioApiError> {
+    state
+        .environment_runtime
+        .create_snapshot(&environment_id, request)
+        .await
+        .map(|operation| (StatusCode::ACCEPTED, Json(operation)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}/restore",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 202, description = "Snapshot restore started", body = EnvironmentSnapshotOperation),
+        (status = 400, description = "Invalid snapshot ID", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or snapshot not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to start snapshot restore", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn restore_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<(StatusCode, Json<EnvironmentSnapshotOperation>), StudioApiError> {
+    state
+        .environment_runtime
+        .restore_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map(|operation| (StatusCode::ACCEPTED, Json(operation)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 204, description = "Snapshot deleted"),
+        (status = 400, description = "Invalid snapshot ID", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or snapshot not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to delete snapshot", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn delete_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<StatusCode, StudioApiError> {
+    state
+        .environment_runtime
+        .delete_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map_err(StudioApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshot-operation",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Latest snapshot operation", body = Option<EnvironmentSnapshotOperation>),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Snapshots are not available", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read snapshot operation", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn get_environment_snapshot_operation(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Option<EnvironmentSnapshotOperation>>, StudioApiError> {
+    state
+        .environment_runtime
+        .snapshot_operation(&environment_id)
+        .await
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/wallets",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment wallets", body = [StudioWallet]),
+        (status = 400, description = "Wallets are not available", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment is not running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to list wallets", body = StudioApiErrorBody)
+    ),
+    tag = "wallets"
+)]
 async fn list_wallets(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -498,6 +925,23 @@ async fn list_wallets(
         .map_err(WalletApiError::Wallet)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/wallets/{wallet_name}/sign",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("wallet_name" = String, Path, description = "Wallet name")
+    ),
+    request_body = SignWalletRequest,
+    responses(
+        (status = 200, description = "Signature", body = SignWalletResponse),
+        (status = 400, description = "Invalid signing request", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or wallet not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment is not running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to sign the payload", body = StudioApiErrorBody)
+    ),
+    tag = "wallets"
+)]
 async fn sign_wallet(
     State(state): State<StudioState>,
     AxumPath((environment_id, wallet_name)): AxumPath<(String, String)>,
@@ -535,6 +979,33 @@ async fn sign_wallet(
             })
         })
         .map_err(WalletApiError::Wallet)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/api-calls",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("limit" = Option<usize>, Query, description = "Maximum number of retained calls to return")
+    ),
+    responses(
+        (status = 200, description = "API calls observed through the Studio environment proxy", body = ApiCallLogSnapshot),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environment RPC"
+)]
+async fn get_environment_api_calls(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Query(query): Query<api_calls::GetApiCallsQuery>,
+) -> Result<Json<ApiCallLogSnapshot>, StudioApiError> {
+    state
+        .environment_runtime
+        .get(&environment_id)
+        .await
+        .map_err(StudioApiError)?;
+    Ok(Json(state.api_calls.snapshot(&environment_id, query.limit)))
 }
 
 async fn wallet_environment(
@@ -583,6 +1054,11 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
             .api_v3
             .as_ref()
             .map(|_| format!("{proxy_root}/api/v3")),
+        config: environment
+            .runtime_endpoints
+            .config
+            .as_ref()
+            .map(|_| format!("{proxy_root}/config")),
         control: (environment
             .capabilities
             .contains(&EnvironmentCapability::ControlApi)
@@ -596,29 +1072,43 @@ async fn proxy_environment_rpc_root(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    proxy_environment_request(state, environment_id, String::new(), request).await
+) -> Response {
+    proxy_environment_request_with_capture(state, environment_id, String::new(), request).await
 }
 
 async fn proxy_environment_rpc(
     State(state): State<StudioState>,
     AxumPath((environment_id, path)): AxumPath<(String, String)>,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    proxy_environment_request(state, environment_id, path, request).await
+) -> Response {
+    proxy_environment_request_with_capture(state, environment_id, path, request).await
 }
 
-async fn proxy_environment_request(
+async fn proxy_environment_request_with_capture(
     state: StudioState,
     environment_id: String,
     path: String,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    let environment = state
-        .environment_runtime
-        .get(&environment_id)
+) -> Response {
+    let environment = match state.environment_runtime.get(&environment_id).await {
+        Ok(environment) => environment,
+        Err(error) => return StudioApiError(error).into_response(),
+    };
+    let (request, capture) = state
+        .api_calls
+        .capture(environment_id.clone(), path.clone(), request);
+    let response = proxy_environment_request(state, environment, path, request)
         .await
-        .map_err(StudioApiError)?;
+        .into_response();
+    capture.finish(response)
+}
+
+async fn proxy_environment_request(
+    state: StudioState,
+    environment: StudioEnvironment,
+    path: String,
+    request: Request,
+) -> Result<Response, StudioApiError> {
     if environment.status != EnvironmentStatus::Running {
         return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
             code: "environment_not_running",
@@ -722,6 +1212,11 @@ fn environment_upstream_url(
                 environment.runtime_endpoints.api_v3.as_deref(),
                 remaining_path,
             )
+        } else if let Some(remaining_path) = endpoint_relative_path(path, "config") {
+            (
+                environment.runtime_endpoints.config.as_deref(),
+                remaining_path,
+            )
         } else {
             (environment.runtime_endpoints.control.as_deref(), path)
         };
@@ -779,7 +1274,6 @@ fn is_safe_external_request_header(name: &HeaderName) -> bool {
     matches!(
         name.as_str(),
         "accept"
-            | "accept-encoding"
             | "cache-control"
             | "content-encoding"
             | "content-length"
@@ -799,7 +1293,10 @@ fn should_forward_upstream_request_header(name: &HeaderName, is_public_toncenter
     if is_public_toncenter {
         return is_safe_external_request_header(name);
     }
-    !is_hop_by_hop_header(name) && name != axum::http::header::HOST
+    !is_hop_by_hop_header(name)
+        && name != axum::http::header::HOST
+        && name != axum::http::header::ACCEPT_ENCODING
+        && name.as_str() != api_calls::REQUEST_SOURCE_HEADER
 }
 
 fn should_forward_upstream_response_header(name: &HeaderName, is_public_toncenter: bool) -> bool {
@@ -1018,15 +1515,15 @@ enum WalletApiError {
     Wallet(WalletRuntimeError),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct StudioApiErrorBody {
-    error: StudioApiErrorDetails,
+    pub(crate) error: StudioApiErrorDetails,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct StudioApiErrorDetails {
-    code: &'static str,
-    message: String,
+    pub(crate) code: &'static str,
+    pub(crate) message: String,
 }
 
 impl IntoResponse for StudioApiError {
@@ -1240,6 +1737,7 @@ referer: <missing>
 cf-access-jwt-assertion: <missing>
 marker: <missing>
 accept: application/json
+accept-encoding: <missing>
 content-type: application/json
 content-length: 12
 content-encoding: gzip
@@ -1260,6 +1758,7 @@ referer: https://studio.example/testnet
 cf-access-jwt-assertion: cloudflare-access-token
 marker: forwarded
 accept: application/json
+accept-encoding: <missing>
 content-type: application/json
 content-length: 12
 content-encoding: gzip
@@ -1451,6 +1950,7 @@ not json: false"]]
             ("cf-access-jwt-assertion", "cf-access-jwt-assertion"),
             ("marker", "x-test-marker"),
             ("accept", "accept"),
+            ("accept-encoding", "accept-encoding"),
             ("content-type", "content-type"),
             ("content-length", "content-length"),
             ("content-encoding", "content-encoding"),

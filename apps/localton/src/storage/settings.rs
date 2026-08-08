@@ -16,14 +16,21 @@ use crate::storage::{
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 pub const MAX_LOCAL_NODES: usize = 7;
 
+/// Persistent settings for one Full localnet
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(default)]
 pub struct Settings {
+    /// Version of this settings format
     pub schema_version: u32,
+    /// TON network parameters
     pub network: NetworkSettings,
+    /// Configured TON nodes
     pub nodes: Vec<NodeSettings>,
+    /// Localton HTTP services
     pub services: ServiceSettings,
+    /// Validator automation settings
     pub validation: ValidationSettings,
+    /// Runtime monitoring settings
     pub monitoring: MonitoringSettings,
 }
 
@@ -177,38 +184,62 @@ impl Settings {
     }
 }
 
+/// TON protocol parameters for the local network
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(default)]
 pub struct NetworkSettings {
+    /// Negative TON global network identifier
     pub global_id: i32,
+    /// `true` when the base workchain is enabled
     pub workchain_enabled: bool,
+    /// Initial network balance
     pub initial_balance: u64,
+    /// Base gas price for the workchain
     pub gas_price: u64,
+    /// Base gas price for the masterchain
     pub gas_price_masterchain: u64,
+    /// Base cell storage price for the workchain
     pub cell_price: u64,
+    /// Base cell storage price for the masterchain
     pub cell_price_masterchain: u64,
+    /// Maximum number of validators
     pub max_validators: u32,
+    /// Maximum number of masterchain validators
     pub max_masterchain_validators: u32,
+    /// Minimum number of validators
     pub min_validators: u32,
+    /// Minimum validator stake
     pub min_validator_stake: u64,
+    /// Maximum validator stake
     pub max_validator_stake: u64,
+    /// Minimum total validator stake
     pub min_total_validator_stake: u64,
+    /// Maximum stake ratio for one validator
     pub max_stake_factor: u32,
+    /// Validator-set lifetime in seconds
     pub elected_for_seconds: u32,
+    /// Time before the validator-set change when elections start
     pub election_start_before_seconds: u32,
+    /// Time before the validator-set change when elections end
     pub election_end_before_seconds: u32,
+    /// Stake freeze time in seconds
     pub stakes_frozen_for_seconds: u32,
+    /// Original validator-set lifetime in seconds
     pub original_validator_set_valid_for_seconds: u32,
+    /// Target Simplex block rate in milliseconds
     pub simplex_target_rate_ms: u32,
+    /// Number of slots in one Simplex leader window
     pub simplex_slots_per_leader_window: u32,
+    /// Timeout for the first block in milliseconds
     pub simplex_first_block_timeout_ms: u32,
+    /// Maximum Simplex leader-window desynchronization in milliseconds
     pub simplex_max_leader_window_desync_ms: u32,
 }
 
 impl Default for NetworkSettings {
     fn default() -> Self {
         Self {
-            global_id: -239,
+            global_id: -3,
             workchain_enabled: true,
             initial_balance: 4_999_990_000,
             gas_price: 26_214_400,
@@ -269,29 +300,50 @@ impl NetworkSettings {
     }
 }
 
+/// Persistent settings for one TON node
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct NodeSettings {
+    /// Stable node name
     pub name: String,
+    /// `true` when Localton starts the node
     pub enabled: bool,
+    /// `true` when the node validates blocks
     pub validator: bool,
+    /// `true` when the node provides a liteserver
     pub liteserver: bool,
+    /// Public IPv4 address that Localton writes to the network config
     #[schema(value_type = String, format = "ipv4")]
     pub public_ip: Ipv4Addr,
+    /// TCP port for the validator console
     pub console_port: u16,
+    /// UDP port for validator ADNL
     pub adnl_port: u16,
+    /// TCP port for the liteserver
     pub liteserver_port: u16,
+    /// UDP port for outbound ADNL traffic
     pub out_port: u16,
+    /// UDP port for DHT traffic
     pub dht_port: u16,
+    /// Number of validator-engine threads
     pub threads: u16,
+    /// Validator-engine log level
     pub verbosity: u8,
+    /// Block time range that the node synchronizes before startup
     pub sync_before_seconds: u64,
+    /// State lifetime in seconds
     pub state_ttl_seconds: u64,
+    /// Block lifetime in seconds
     pub block_ttl_seconds: u64,
+    /// Archive lifetime in seconds
     pub archive_ttl_seconds: u64,
+    /// Validator key-proof lifetime in seconds
     pub key_proof_ttl_seconds: u64,
+    /// Initial wallet balance in nanotons
     pub initial_wallet_amount_nano: u64,
+    /// Validator stake in nanotons
     pub validator_stake_nano: u64,
+    /// `true` when Localton enters this validator into elections
     pub participate_in_elections: bool,
 }
 
@@ -366,11 +418,15 @@ fn default_nodes() -> Vec<NodeSettings> {
     (0..MAX_LOCAL_NODES).map(NodeSettings::for_index).collect()
 }
 
+/// Settings for Localton HTTP services
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct ServiceSettings {
+    /// Config API settings
     pub config_http: HttpServiceSettings,
+    /// Admin API settings
     pub admin_http: HttpServiceSettings,
+    /// TON HTTP API v2 settings
     pub ton_http_api: TonHttpApiSettings,
 }
 
@@ -408,12 +464,16 @@ impl ServiceSettings {
     }
 }
 
+/// Bind settings for one HTTP service
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct HttpServiceSettings {
+    /// `true` when Localton starts the service
     pub enabled: bool,
+    /// IPv4 address that accepts service connections
     #[schema(value_type = String, format = "ipv4")]
     pub bind: Ipv4Addr,
+    /// TCP port for the service
     pub port: u16,
 }
 
@@ -438,17 +498,22 @@ impl HttpServiceSettings {
     }
 }
 
+/// Settings for the TON HTTP API v2 service
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct TonHttpApiSettings {
+    /// `true` when Localton starts the TON HTTP API
     pub enabled: bool,
-    /// Browser-facing endpoint served by the Rust CORS/PNA proxy.
+    /// Browser-facing port for the Rust CORS and PNA proxy
     pub port: u16,
-    /// Loopback-only port used by the TON HTTP API V2 backend.
+    /// Loopback-only port for the TON HTTP API v2 backend
     pub backend_port: u16,
+    /// Port for the TON HTTP API monitor
     pub monitor_port: u16,
+    /// Path of the TON HTTP API executable
     #[schema(value_type = Option<String>)]
     pub command: Option<PathBuf>,
+    /// Path of the static TON HTTP API config
     #[schema(value_type = Option<String>)]
     pub static_config: Option<PathBuf>,
 }
@@ -489,13 +554,19 @@ impl TonHttpApiSettings {
     }
 }
 
+/// Settings for validator automation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(default)]
 pub struct ValidationSettings {
+    /// `true` when Localton enters enabled validators into elections
     pub auto_participate: bool,
+    /// `true` when Localton withdraws available validator funds
     pub auto_reap: bool,
+    /// Validator state poll interval in seconds
     pub poll_interval_seconds: u64,
+    /// Maximum stake factor that Localton sends to elections
     pub max_factor: f64,
+    /// Amount that Localton leaves in the elector contract, in nanotons
     pub reap_value_nano: u64,
 }
 
@@ -525,10 +596,13 @@ impl ValidationSettings {
     }
 }
 
+/// Settings for runtime monitoring
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct MonitoringSettings {
+    /// `true` when Localton monitors node state
     pub enabled: bool,
+    /// Node-state poll interval in seconds
     pub poll_interval_seconds: u64,
 }
 
@@ -559,6 +633,7 @@ mod tests {
     fn defaults_cover_all_local_node_slots() {
         let settings = Settings::default();
         settings.validate().unwrap();
+        assert_eq!(settings.network.global_id, -3);
         assert_eq!(settings.nodes.len(), 7);
         assert!(settings.nodes[0].participate_in_elections);
         assert_eq!(settings.nodes[6].name, "node7");

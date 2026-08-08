@@ -1,6 +1,7 @@
 import {Address, BitString, Builder, Cell, Dictionary, Slice} from "@ton/core"
 import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {renderTy} from "@ton/tolk-abi-to-typescript"
+import {shortenMiddle} from "@acton/ui"
 
 import type {ParsedValue} from "../model/transaction"
 
@@ -28,11 +29,7 @@ const isCellWrapperObject = (value: Record<string, unknown>): value is {ref: unk
 }
 
 const formatHexPreview = (hex: string): string => {
-  if (hex.length <= HEX_PREVIEW_HEAD_LENGTH + HEX_PREVIEW_TAIL_LENGTH) {
-    return hex
-  }
-
-  return `${hex.slice(0, HEX_PREVIEW_HEAD_LENGTH)}…${hex.slice(-HEX_PREVIEW_TAIL_LENGTH)}`
+  return shortenMiddle(hex, {start: HEX_PREVIEW_HEAD_LENGTH, end: HEX_PREVIEW_TAIL_LENGTH})
 }
 
 const formatSerializedCellPreview = (

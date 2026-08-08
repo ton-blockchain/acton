@@ -21,6 +21,16 @@
   transform-origin: var(--transform-origin);
 }
 
+.positioner[data-width="wide"],
+.popup[data-width="wide"] {
+  max-width: min(30rem, var(--available-width));
+}
+
+.positioner[data-width="extra-wide"],
+.popup[data-width="extra-wide"] {
+  max-width: min(40rem, var(--available-width));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .popup {
     transition:

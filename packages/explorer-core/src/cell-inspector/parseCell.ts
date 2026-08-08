@@ -1,4 +1,4 @@
-import type {ParsedValue} from "@acton/ui"
+import {formatPercentage, type ParsedValue} from "@acton/ui"
 import {decodeCellWithAbi, type ExtendedContractABI} from "@acton/transaction-ui"
 import type {Cell} from "@ton/core"
 
@@ -266,7 +266,7 @@ export function parseCell(
         confidence: confidence(block.confidence, [
           block.consumption.complete
             ? "This TON block format used the entire root cell"
-            : `This TON block format used ${Math.round(block.consumption.coverage * 100)}% of the root cell`,
+            : `This TON block format used ${formatPercentage(block.consumption.coverage * 100, {maximumFractionDigits: 0})} of the root cell`,
         ]),
         details: {
           type: block.name,

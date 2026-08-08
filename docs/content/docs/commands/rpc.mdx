@@ -23,15 +23,24 @@ Query blockchain account state through a configured network endpoint.
 - inspect balance, last transaction metadata, and state hashes
 - render a TonCenter v3 trace as a decoded transaction tree
 - match deployed code against a local Acton project by `code_hash`
-- decode account storage and get-method results through local or bundled ABI
-  metadata when a match is found
+- decode account storage and get-method results through local, bundled, or
+  verifier ABI metadata when a match is found
+
+For one-off inspection, `rpc info` and `rpc call` also accept `--abi`. The path
+can point to compiler ABI JSON emitted by `acton build` or `acton compile`, or
+to a `.tolk` interface file such as `contract.types.tolk`. An explicit ABI has
+priority over code-hash matching.
 
 The command works without a project manifest for raw remote inspection.
 
 When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI. If no local match exists, Acton
-falls back to its bundled ABI catalog.
+falls back to the bundled ABI catalog and then the Acton verifier API.
+Successful verifier ABI responses are cached in `build/cache/verifier-abi` for
+24 hours. If the verifier is unavailable, an expired cache entry is still used
+when available. Set `ACTON_NEW_VERIFY_BACKEND` to override the verifier backend,
+for example when running the verifier locally.
 
 ## Subcommands
 
@@ -56,6 +65,20 @@ _address_
 </CommandOptionTitle>
 
 Contract address in friendly or raw format.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--abi` _path_
+
+</CommandOptionTitle>
+
+Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
+Tolk sources are compiled with entrypoints disabled, so standalone
+`*.types.tolk` interface files are accepted.
 
 </CommandOption>
 
@@ -90,8 +113,8 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 - remote account metadata such as status, balance, last transaction LT and
   hashes
 - code and data hashes when the account has deployed state
-- ABI match information when a project contract or bundled catalog entry has
-  the same `code_hash`
+- ABI match information when a project contract, bundled catalog entry, or
+  verifier response has the same `code_hash`
 - decoded storage in a YAML-like view when compiler ABI metadata is available
 
 If no ABI match is found, Acton still prints the raw remote account information
@@ -155,6 +178,20 @@ May be passed multiple times.
 <CommandOption>
 <CommandOptionTitle>
 
+`--abi` _path_
+
+</CommandOptionTitle>
+
+Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
+The explicit ABI controls method lookup, argument parsing, result decoding,
+field comments, and custom exit-code descriptions.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
 `--net` _network_
 
 </CommandOptionTitle>
@@ -188,11 +225,38 @@ Print machine-readable JSON output.
 <CommandOption>
 <CommandOptionTitle>
 
+`--with-comments`
+
+</CommandOptionTitle>
+
+Include field comments from ABI metadata in the result. In JSON mode, a
+described field is returned as an object with `value` and `comment` keys. In
+the default human-readable mode, the comment is printed on the line before the
+field value.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--raw`
+
+</CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
 `--raw`
 
 </CommandOptionTitle>
 
 Print the raw TonCenter stack without ABI decoding.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--with-comments`
+
+</CommandOptionMeta>
 
 </CommandOption>
 
@@ -201,8 +265,16 @@ Print the raw TonCenter stack without ABI decoding.
 
 #### ABI Arguments
 
-When Acton finds local or bundled ABI metadata for the remote contract,
-get-method arguments are parsed against that ABI.
+When `--abi` is provided, Acton loads that file before making the RPC request
+and uses it without comparing the remote code hash. Otherwise, Acton searches
+local, bundled, and verifier ABI metadata for the remote contract. Get-method
+arguments are parsed against the selected ABI.
+
+Accepted explicit ABI formats are:
+
+- compiler ABI JSON, including files emitted under `build/abi`
+- `.tolk` source or interface files, including `*.types.tolk`; these are
+  compiled with no contract entrypoint requirement
 
 The _method_ argument can be either an ABI get-method name or a numeric TVM
 method id. When the numeric id is present in the ABI, Acton still uses ABI
@@ -443,9 +515,9 @@ Print decoded message bodies in the transaction tree.
 - total transaction and message counts
 
 Tree and verbose modes then reuse the same transaction tree formatter as Acton
-tests. When current account code matches a local contract or bundled catalog
-entry, Acton prints the matched contract name. Add `--show-bodies` to print
-decoded inbound message bodies.
+tests. When current account code matches a local contract, bundled catalog
+entry, or verifier response, Acton prints the matched contract name. Add
+`--show-bodies` to print decoded inbound message bodies.
 
 ## Display Options
 
@@ -560,19 +632,24 @@ one-off overrides or CI.
 ## ABI Matching
 
 Storage decoding, get-method argument parsing, and get-method result decoding
-are best-effort and depend on local project context or the bundled ABI catalog.
+are best-effort and depend on local project context, the bundled ABI catalog,
+or the verifier API.
 
 Acton attempts to:
 
-1. fetch the remote account code cell
-2. compute its `code_hash`
-3. compare that hash with locally configured contracts
-4. fall back to the bundled ABI catalog when there is no local ABI
-5. decode storage and get-method results with the matched compiler ABI
+1. use `--abi` directly when it is provided to `rpc info` or `rpc call`
+2. otherwise fetch the remote account code cell
+3. compute its `code_hash`
+4. compare that hash with locally configured contracts
+5. fall back to the bundled ABI catalog when there is no local ABI
+6. query the verifier API when no local or bundled ABI matches
+7. cache successful verifier responses for 24 hours and use stale entries
+   during verifier outages
+8. decode storage and get-method results with the selected compiler ABI
 
 This means decoding is robust for contracts you control in the current Acton
-project, and available for known third-party deployments in the bundled
-catalog.
+project, available for known third-party deployments in the bundled catalog,
+and extendable to verified deployments through the verifier API.
 
 For `acton rpc call`, missing ABI metadata does not prevent a get-method call.
 Acton sends raw stack arguments instead and prints the raw result stack.
@@ -581,8 +658,9 @@ Acton sends raw stack arguments instead and prints the raw result stack.
 
 - `0`: The selected RPC query completed successfully.
 - `1`: The address was invalid, the network could not be resolved, the remote
-  request failed, raw or ABI argument parsing failed, a named get-method was not
-  found in ABI metadata, or the get-method returned a non-zero exit code.
+  request failed, an explicit ABI could not be read, parsed, or compiled, raw
+  or ABI argument parsing failed, a named get-method was not found in ABI
+  metadata, or the get-method returned a non-zero exit code.
 
 ## Examples
 
@@ -604,49 +682,61 @@ Acton sends raw stack arguments instead and prints the raw result stack.
    acton rpc info EQC... --net localnet
    ```
 
-4. Call a get-method with ABI-parsed arguments:
+4. Decode account storage with an explicit Tolk interface:
+
+   ```bash
+   acton rpc info EQC... --abi contracts/Counter.types.tolk --net mainnet
+   ```
+
+5. Call a get-method with an explicit compiler ABI JSON file:
+
+   ```bash
+   acton rpc call EQC... get_wallet_data --abi build/abi/counter.json --net mainnet
+   ```
+
+6. Call a get-method with automatically matched ABI metadata:
 
    ```bash
    acton rpc call EQC... get_wallet_data --net mainnet
    ```
 
-5. Call a get-method by numeric TVM method id:
+7. Call a get-method by numeric TVM method id:
 
    ```bash
    acton rpc call EQC... 85143 --net mainnet
    ```
 
-6. Call a get-method without ABI metadata by passing raw stack arguments:
+8. Call a get-method without ABI metadata by passing raw stack arguments:
 
    ```bash
    acton rpc call EQC... 85143 0xff true cell:B5EE9C... --net mainnet
    ```
 
-7. Pass `addr_none` to an `any_address` get-method argument:
+9. Pass `addr_none` to an `any_address` get-method argument:
 
    ```bash
    acton rpc call EQC... accepts_any_address addr_none --net localnet
    ```
 
-8. Use a custom network defined in another manifest:
+10. Use a custom network defined in another manifest:
 
    ```bash
    acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
    ```
 
-9. Print the latest mainnet masterchain block JSON:
+11. Print the latest mainnet masterchain block JSON:
 
    ```bash
    acton rpc block --net mainnet
    ```
 
-10. Print the latest mainnet masterchain block number:
+12. Print the latest mainnet masterchain block number:
 
    ```bash
    acton rpc block-number --net mainnet
    ```
 
-11. Print a transaction trace from localnet:
+13. Print a transaction trace from localnet:
 
    ```bash
    acton rpc trace <tx-hash> --net localnet

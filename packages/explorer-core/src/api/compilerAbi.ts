@@ -1,5 +1,6 @@
 import type {ABIStruct, ContractABI, Ty} from "@ton/tolk-abi-to-typescript"
 import {SymTable} from "@ton/tolk-abi-to-typescript"
+import {formatOpcode} from "@acton/ui"
 
 import {toRawAddress} from "../components/utils"
 
@@ -30,7 +31,8 @@ export function buildMessageNamesByOpcodeHex(
 ): Map<string, string> {
   const out = new Map<string, string>()
   for (const [opcode, name] of buildMessageNamesByOpcodeNumber(abi, messageKey)) {
-    out.set(formatOpcode(opcode), name)
+    const formattedOpcode = formatOpcode(opcode)
+    if (formattedOpcode) out.set(formattedOpcode, name)
   }
   return out
 }
@@ -180,8 +182,4 @@ function normalizeOpcodePrefix(prefixNum?: number, prefixLen?: number): number |
     return undefined
   }
   return prefixNum
-}
-
-function formatOpcode(opcode: number): string {
-  return `0x${opcode.toString(16).padStart(8, "0")}`
 }

@@ -102,6 +102,12 @@
   place-items: center;
 }
 
+/* Recharts focuses internal SVG layers on pointer clicks; hide that outline without removing keyboard focus. */
+.chart :global(.recharts-wrapper :focus:not(:focus-visible)),
+.historyChart :global(.recharts-wrapper :focus:not(:focus-visible)) {
+  outline: none;
+}
+
 .chartCenter {
   position: absolute;
   inset: 50% auto auto 50%;

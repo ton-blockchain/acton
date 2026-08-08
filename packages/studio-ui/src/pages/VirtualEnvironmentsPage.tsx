@@ -19,7 +19,11 @@ import {useState} from "react"
 
 import {TablePage} from "../components/TablePage"
 import {
-  type EnvironmentConfig,
+  environmentStatusLabels,
+  formatEnvironmentNetwork,
+  formatEnvironmentType,
+} from "../environmentPresentation"
+import {
   type EnvironmentStatus,
   type StudioEnvironment,
   restartStudioEnvironment,
@@ -33,6 +37,7 @@ import styles from "./VirtualEnvironmentsPage.module.css"
 interface VirtualEnvironmentsPageProps {
   readonly createOpen: boolean
   readonly environments: readonly StudioEnvironment[]
+  readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly isLoading: boolean
   readonly loadError?: string
   readonly walletNames: readonly string[]
@@ -42,17 +47,10 @@ interface VirtualEnvironmentsPageProps {
   readonly onRefresh: () => Promise<void>
 }
 
-const statusLabels = {
-  starting: "Starting",
-  running: "Running",
-  stopping: "Stopping",
-  stopped: "Stopped",
-  failed: "Failed",
-} satisfies Record<EnvironmentStatus, string>
-
 export function VirtualEnvironmentsPage({
   createOpen,
   environments,
+  importSourceEnvironments,
   isLoading,
   loadError,
   walletNames,
@@ -216,7 +214,9 @@ export function VirtualEnvironmentsPage({
                       <DataTableCell tone="muted">
                         {formatEnvironmentType(environment.config)}
                       </DataTableCell>
-                      <DataTableCell tone="muted">{environment.network.label}</DataTableCell>
+                      <DataTableCell tone="muted">
+                        {formatEnvironmentNetwork(environment)}
+                      </DataTableCell>
                       <DataTableCell>
                         {primaryEndpoint(environment) ? (
                           <InlineActions
@@ -267,6 +267,7 @@ export function VirtualEnvironmentsPage({
 
       <CreateEnvironmentDialog
         environmentCount={environments.length}
+        importSourceEnvironments={importSourceEnvironments}
         open={createOpen}
         walletNames={walletNames}
         onCreated={handleCreated}
@@ -286,15 +287,9 @@ function EnvironmentStatusLabel({status}: {readonly status: EnvironmentStatus}) 
   return (
     <span className={styles.status} data-status={status}>
       <span className={styles.statusDot} aria-hidden="true" />
-      {statusLabels[status]}
+      {environmentStatusLabels[status]}
     </span>
   )
-}
-
-function formatEnvironmentType(config: EnvironmentConfig) {
-  if (config.kind === "actonLocalnet") return "Fast local network"
-  if (config.kind === "fullTonNetwork") return "Full TON network"
-  return config.network === "mainnet" ? "Mainnet" : "Testnet"
 }
 
 function primaryEndpoint(environment: StudioEnvironment): string | undefined {

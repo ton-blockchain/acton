@@ -45,6 +45,8 @@ pub(crate) struct NodeStateSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SnapshotGlobals {
     pub origin_seqno: Seqno,
+    #[serde(default)]
+    pub origin_gen_utime: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fork_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
@@ -149,6 +151,7 @@ impl Node {
         let snapshot = NodeStateSnapshot {
             globals: SnapshotGlobals {
                 origin_seqno: self.globals.origin_seqno,
+                origin_gen_utime: self.globals.origin_gen_utime,
                 fork_seqno,
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
@@ -249,6 +252,7 @@ impl Node {
 
         self.globals = Globals {
             origin_seqno: snapshot.globals.origin_seqno,
+            origin_gen_utime: snapshot.globals.origin_gen_utime,
             head_seqno: snapshot.globals.head_seqno,
             global_lt: snapshot.globals.global_lt,
             lt_step: snapshot.globals.lt_step,

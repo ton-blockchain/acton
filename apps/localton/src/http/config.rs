@@ -35,7 +35,7 @@ use super::{
 #[openapi(
     info(
         title = "localton Configuration API",
-        description = "Network discovery, generated TON global config, health, and validator creation."
+        description = "Network discovery, generated TON global config, health, and validator creation"
     ),
     paths(
         root_handler,
@@ -52,29 +52,45 @@ struct ApiDoc;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub(super) struct ConfigDocument {
+    /// Service name
     pub service: String,
+    /// `true` when the local network can process requests
     pub ready: bool,
+    /// Latest masterchain block number that the launcher observed
     pub masterchain_seqno: Option<u32>,
+    /// URLs of the services that Localton enabled
     pub endpoints: ConfigEndpoints,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub(super) struct ConfigEndpoints {
+    /// URL of the TON global config for local clients
     pub global_config: String,
+    /// Short URL of the same TON global config
     pub config: String,
+    /// Readiness probe URL
     pub live: String,
+    /// Health probe URL
     pub healthz: String,
+    /// URL that creates a validator node
     pub add_validator: String,
+    /// Admin API URL, if the service is enabled
     pub admin: Option<String>,
+    /// Account funding URL, if the TON HTTP API is enabled
     pub fund_account: Option<String>,
+    /// TON HTTP API v2 URL, if the service is enabled
     pub ton_http_api: Option<String>,
+    /// TON HTTP API monitor URL, if the service is enabled
     pub ton_http_api_monitor: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 struct AddValidatorResponse {
+    /// Name of the new node
     node: String,
+    /// `true` because the new node is a validator
     validator: bool,
+    /// `true` when the node enters elections automatically
     participate: bool,
 }
 
@@ -123,6 +139,9 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     ApiDoc::openapi()
 }
 
+/// Get network status and service URLs
+///
+/// Use this endpoint to find the enabled Localton services
 #[utoipa::path(
     get,
     path = "/",
@@ -184,6 +203,9 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
     }
 }
 
+/// Get the TON global config for local clients
+///
+/// The response contains the liteserver and DHT entries for this network
 #[utoipa::path(
     get,
     path = "/localhost.global.config.json",
@@ -199,6 +221,9 @@ async fn localhost_global_config_handler(
     read_global_config(&state).await
 }
 
+/// Get the TON global config
+///
+/// This endpoint returns the same document as `/localhost.global.config.json`
 #[utoipa::path(
     get,
     path = "/config",
@@ -221,6 +246,9 @@ async fn read_global_config(state: &ConfigState) -> Result<Json<Value>, HttpErro
     ))
 }
 
+/// Get the network readiness state
+///
+/// The endpoint returns `200` only when the launcher and the network are ready
 #[utoipa::path(
     get,
     path = "/live",
@@ -235,6 +263,9 @@ async fn live_handler(State(state): State<ConfigState>) -> Response {
     live_response(&state).await
 }
 
+/// Get the network health state
+///
+/// This endpoint has the same readiness rules as `/live`
 #[utoipa::path(
     get,
     path = "/healthz",
@@ -266,7 +297,7 @@ async fn live_response(state: &ConfigState) -> Response {
 #[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 struct AddValidatorQuery {
-    /// Whether the new validator should enter elections immediately.
+    /// Whether the new validator should enter elections immediately
     #[serde(default = "default_true")]
     participate: bool,
 }
@@ -275,6 +306,9 @@ fn default_true() -> bool {
     true
 }
 
+/// Create and start a validator node
+///
+/// By default, the new validator enters elections automatically
 #[utoipa::path(
     get,
     path = "/add-validator",

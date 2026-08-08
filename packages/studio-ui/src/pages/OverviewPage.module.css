@@ -1,11 +1,11 @@
 .page {
   display: grid;
-  gap: var(--acton-space-8);
+  gap: var(--acton-space-6);
 }
 
 .signalStrip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(14rem, 1.4fr) repeat(2, minmax(10rem, 1fr));
   overflow: hidden;
   background: var(--acton-color-surface);
   border: 1px solid var(--acton-color-border);
@@ -13,16 +13,33 @@
 }
 
 .signal {
-  display: grid;
-  align-content: center;
-  gap: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
   min-width: 0;
-  min-height: 6rem;
-  padding: var(--acton-space-5);
+  min-height: 5.75rem;
+  padding: var(--acton-space-4) var(--acton-space-5);
 }
 
 .signal + .signal {
   border-left: 1px solid var(--acton-color-border);
+}
+
+.signalIcon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.signalCopy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .signal strong {
@@ -48,7 +65,8 @@
   gap: var(--acton-space-2);
 }
 
-.statusDot {
+.statusDot,
+.environmentStatusDot {
   width: 0.45rem;
   height: 0.45rem;
   flex: 0 0 auto;
@@ -56,27 +74,33 @@
   border-radius: var(--acton-radius-round);
 }
 
-.statusDotConnected {
+.statusDotConnected,
+.environmentStatusDot[data-status="running"] {
   background: var(--acton-color-success);
 }
 
-.statusDotDisconnected {
+.statusDotDisconnected,
+.environmentStatusDot[data-status="failed"] {
   background: var(--acton-color-danger-text);
+}
+
+.environmentStatusDot[data-status="starting"],
+.environmentStatusDot[data-status="stopping"] {
+  background: var(--acton-color-warning);
 }
 
 .technicalValue {
   font-family: var(--acton-font-mono);
 }
 
-.contentGrid {
+.dashboardGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.8fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 0.85fr);
   gap: var(--acton-space-6);
   align-items: start;
 }
 
-.workspaceSection,
-.activitySection {
+.panel {
   overflow: hidden;
   background: var(--acton-color-surface);
   border: 1px solid var(--acton-color-border);
@@ -85,7 +109,7 @@
 
 .sectionHeader {
   display: flex;
-  min-height: 4.5rem;
+  min-height: 4.75rem;
   align-items: center;
   justify-content: space-between;
   gap: var(--acton-space-4);
@@ -93,130 +117,542 @@
   border-bottom: 1px solid var(--acton-color-border);
 }
 
+.sectionHeader > div {
+  min-width: 0;
+}
+
 .sectionHeader h2 {
   margin: 0;
   color: var(--acton-color-text);
-  font-size: var(--acton-font-size-xl);
+  font-size: var(--acton-font-size-lg);
   font-weight: var(--acton-font-weight-semibold);
   letter-spacing: -0.02em;
 }
 
-.toolList {
-  display: grid;
+.sectionHeader p {
+  margin: 0.2rem 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
 }
 
-.toolRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  gap: var(--acton-space-4);
+.sectionHeader a {
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  min-height: 5rem;
-  padding: var(--acton-space-3) var(--acton-space-5);
-  color: var(--acton-color-text);
+  gap: var(--acton-space-2);
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
   text-decoration: none;
-  transition: background var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
-.toolRow + .toolRow {
-  border-top: 1px solid var(--acton-color-border);
+.sectionHeader a:hover {
+  color: var(--acton-color-accent-hover);
 }
 
-.toolRow:hover {
-  background: var(--acton-color-surface-hover);
-}
-
-.toolRow:focus-visible {
+.sectionHeader a:focus-visible,
+.latestRun:focus-visible,
+.runRow:focus-visible,
+.environmentRow:focus-visible {
   outline: 2px solid var(--acton-color-accent);
   outline-offset: -2px;
 }
 
-.toolIcon {
+.latestRun {
   display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 100%;
+  min-height: 9rem;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-5);
+  color: var(--acton-color-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.latestRun:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.latestRunIcon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
-  color: var(--acton-color-accent);
+  color: var(--acton-color-text-muted);
   background: var(--acton-color-surface-group);
   border-radius: var(--acton-radius-control-sm);
 }
 
-.toolCopy {
-  display: grid;
-  gap: 0.125rem;
-  min-width: 0;
+.latestRunIcon[data-status="passed"] {
+  color: var(--acton-color-success);
 }
 
-.toolCopy strong {
-  font-size: var(--acton-font-size-sm);
+.latestRunIcon[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.latestRunIcon[data-status="running"],
+.latestRunIcon[data-status="queued"] {
+  color: var(--acton-color-warning-text);
+}
+
+.latestRunCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.latestRunKicker,
+.latestRunMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.latestRunKicker span:first-child {
   font-weight: var(--acton-font-weight-semibold);
 }
 
-.toolCopy small {
+.latestRunKicker span[data-status="passed"] {
+  color: var(--acton-color-success);
+}
+
+.latestRunKicker span[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.latestRunKicker span[data-status="running"],
+.latestRunKicker span[data-status="queued"] {
+  color: var(--acton-color-warning-text);
+}
+
+.latestRunCopy > strong {
   overflow: hidden;
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latestRunCopy > code {
+  overflow: hidden;
+  color: var(--acton-color-text-subtle);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failures,
+.outcomeNotice,
+.recentRunsHeader {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failuresHeader,
+.recentRunsHeader {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) var(--acton-space-5);
+}
+
+.recentRunsHeader {
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.failuresHeader strong,
+.recentRunsHeader strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.failuresHeader span,
+.recentRunsHeader span {
   color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureList,
+.recentRuns,
+.environmentList {
+  display: grid;
+}
+
+.environmentList {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failureRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failureRow > svg {
+  margin-top: 0.15rem;
+  color: var(--acton-color-danger-text);
+}
+
+.failureCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.failureCopy strong,
+.failureCopy code,
+.failureCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failureCopy strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.failureCopy code {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureCopy small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureLoading {
+  display: grid;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-4) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.moreFailures {
+  padding: var(--acton-space-3) var(--acton-space-5);
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-medium);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.outcomeNotice {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4) var(--acton-space-5);
+}
+
+.outcomeNotice > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+}
+
+.outcomeNotice[data-status="passed"] > svg {
+  color: var(--acton-color-success);
+}
+
+.outcomeNotice[data-status="failed"] > svg {
+  color: var(--acton-color-danger-text);
+}
+
+.outcomeNotice[data-status="running"] > svg,
+.outcomeNotice[data-status="queued"] > svg {
+  color: var(--acton-color-warning-text);
+}
+
+.outcomeNotice > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.outcomeNotice strong,
+.outcomeNotice small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outcomeNotice strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.outcomeNotice small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.spinner {
+  animation: overview-spin 900ms linear infinite;
+}
+
+@keyframes overview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.environmentSummary small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.environmentLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.environmentLegend span::before {
+  width: 0.45rem;
+  height: 0.45rem;
+  content: "";
+  background: var(--acton-color-text-subtle);
+  border-radius: var(--acton-radius-round);
+}
+
+.environmentLegend span[data-status="running"]::before {
+  background: var(--acton-color-success);
+}
+
+.environmentLegend span[data-status="failed"]::before {
+  background: var(--acton-color-danger-text);
+}
+
+.environmentLegend span[data-status="starting"]::before,
+.environmentLegend span[data-status="stopping"]::before {
+  background: var(--acton-color-warning);
+}
+
+.runRow,
+.environmentRow {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) var(--acton-space-5);
+  color: var(--acton-color-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.runRow {
+  grid-template-columns: 5.75rem minmax(0, 1fr) 4rem 5rem auto;
+}
+
+.runRow + .runRow,
+.environmentRow + .environmentRow {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.runRow:hover,
+.environmentRow:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.runStatus,
+.environmentStatusLabel {
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.runStatus[data-status="passed"],
+.environmentStatusLabel[data-status="running"] {
+  color: var(--acton-color-success);
+}
+
+.runStatus[data-status="failed"],
+.environmentStatusLabel[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.runStatus[data-status="running"],
+.runStatus[data-status="queued"],
+.environmentStatusLabel[data-status="starting"],
+.environmentStatusLabel[data-status="stopping"] {
+  color: var(--acton-color-warning-text);
+}
+
+.runDescription {
+  overflow: hidden;
   font-size: var(--acton-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.toolState {
+.runDuration,
+.runTime {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+  white-space: nowrap;
+}
+
+.environmentSummary {
+  padding: var(--acton-space-5);
+}
+
+.environmentSummary > strong {
+  display: block;
+  font-size: var(--acton-font-size-2xl);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: -0.035em;
+}
+
+.environmentSummary > strong span {
   color: var(--acton-color-text-subtle);
+  font-weight: var(--acton-font-weight-regular);
+}
+
+.environmentRail {
+  display: flex;
+  height: 0.55rem;
+  overflow: hidden;
+  gap: 2px;
+  margin-top: var(--acton-space-4);
+  background: var(--acton-color-surface-group);
+  border-radius: var(--acton-radius-round);
+}
+
+.environmentRail span {
+  min-width: 0.35rem;
+  background: var(--acton-color-text-subtle);
+}
+
+.environmentRail span[data-status="running"] {
+  background: var(--acton-color-success);
+}
+
+.environmentRail span[data-status="starting"],
+.environmentRail span[data-status="stopping"] {
+  background: var(--acton-color-warning);
+}
+
+.environmentRail span[data-status="failed"] {
+  background: var(--acton-color-danger-text);
+}
+
+.environmentLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--acton-space-3) var(--acton-space-4);
+  margin-top: var(--acton-space-3);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-3xs);
 }
 
-.toolArrow {
-  color: var(--acton-color-text-subtle);
-  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+.environmentRow {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  min-height: 4.4rem;
 }
 
-.toolRow:hover .toolArrow {
-  color: var(--acton-color-text);
+.environmentCopy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
-.emptyActivity {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--acton-space-4);
-  min-height: 15rem;
+.environmentCopy strong,
+.environmentCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.environmentCopy strong {
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.environmentCopy small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.panelMessage {
+  display: grid;
+  min-height: 20rem;
+  align-content: center;
+  justify-items: center;
   padding: var(--acton-space-8) var(--acton-space-5);
+  text-align: center;
 }
 
-.activityIcon {
+.panelMessageIcon {
   display: grid;
   width: 2.5rem;
   height: 2.5rem;
-  flex: 0 0 auto;
+  margin-bottom: var(--acton-space-3);
   place-items: center;
   color: var(--acton-color-text-muted);
   background: var(--acton-color-surface-group);
   border-radius: var(--acton-radius-round);
 }
 
-.emptyActivity strong {
+.panelMessage strong {
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-semibold);
 }
 
-.emptyActivity p {
+.panelMessage p {
+  max-width: 24rem;
   margin: var(--acton-space-2) 0 0;
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
-@media (max-width: 1050px) {
-  .contentGrid {
-    grid-template-columns: 1fr;
-  }
+.loadingPanel {
+  display: grid;
+  gap: var(--acton-space-5);
+  min-height: 24rem;
+  align-content: start;
+  padding: var(--acton-space-5);
+}
 
-  .emptyActivity {
-    min-height: 10rem;
+.loadingLatestRun {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-4);
+}
+
+.loadingLatestRun > div {
+  display: grid;
+  flex: 1;
+  gap: var(--acton-space-2);
+}
+
+@media (max-width: 1120px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 680px) {
   .page {
-    gap: var(--acton-space-6);
+    gap: var(--acton-space-4);
   }
 
   .signalStrip {
@@ -224,7 +660,8 @@
   }
 
   .signal {
-    min-height: 5.25rem;
+    min-height: 4.75rem;
+    padding-inline: var(--acton-space-4);
   }
 
   .signal + .signal {
@@ -232,17 +669,43 @@
     border-left: 0;
   }
 
-  .toolRow {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--acton-space-3);
+  .sectionHeader,
+  .latestRun,
+  .failuresHeader,
+  .failureRow,
+  .failureLoading,
+  .moreFailures,
+  .outcomeNotice,
+  .recentRunsHeader,
+  .environmentSummary,
+  .runRow,
+  .environmentRow {
     padding-inline: var(--acton-space-4);
   }
 
-  .toolState {
+  .sectionHeader p {
     display: none;
   }
 
-  .sectionHeader {
-    padding-inline: var(--acton-space-4);
+  .latestRun {
+    min-height: 8rem;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .latestRun > svg {
+    display: none;
+  }
+
+  .runRow {
+    grid-template-columns: 4.75rem minmax(0, 1fr) auto;
+  }
+
+  .runDuration,
+  .runTime {
+    display: none;
+  }
+
+  .environmentStatusLabel {
+    display: none;
   }
 }

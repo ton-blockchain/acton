@@ -54,8 +54,8 @@
 .tabActive {
   position: relative;
   z-index: 1;
-  background: var(--acton-color-canvas);
-  border-bottom-color: var(--acton-color-canvas);
+  background: var(--acton-color-surface);
+  border-bottom-color: var(--acton-color-surface);
 }
 
 .tab:focus-visible,
@@ -70,7 +70,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--acton-color-border);
-  background: var(--acton-color-canvas);
+  background: var(--acton-color-surface);
 }
 
 .panel,

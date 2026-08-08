@@ -8,6 +8,7 @@ use crate::support::toncenter::{
     toncenter_v2_account_info_with_code_ok_response as toncenter_v2_account_info_ok_response,
     toncenter_v2_masterchain_info_ok_response,
 };
+use crate::support::verifier::{abi_response, spawn_verifier_mock};
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
@@ -185,6 +186,21 @@ contract Precompiled {
     storage: Storage
 }
 ";
+const EXPLICIT_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    owner: address
+    counter: uint32
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+
+contract ExplicitCounter {
+    storage: Storage
+}
+";
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_rpc_info_prints_remote_account_without_local_abi_match() {
@@ -237,6 +253,67 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
         Some("custom-mock-api-key"),
         "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
     );
+}
+
+#[test]
+fn test_rpc_info_uses_explicit_tolk_abi() {
+    let project = ProjectBuilder::new("rpc-info-explicit-tolk-abi")
+        .raw_file("interfaces/counter.types.tolk", EXPLICIT_COUNTER_TYPES)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+    let (mock_url, mock_handle, _) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            &test_cell_boc64(0xdead_beef),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("--abi")
+        .arg("interfaces/counter.types.tolk")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_explicit_tolk_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_info_rejects_invalid_explicit_json_abi() {
+    let project = ProjectBuilder::new("rpc-info-invalid-explicit-json-abi")
+        .raw_file("interfaces/broken.abi.json", "{")
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(RAW_INFO_ADDRESS)
+        .arg("--abi")
+        .arg("interfaces/broken.abi.json")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_invalid_explicit_json_abi.stderr.txt",
+        );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -341,6 +418,97 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         );
 
     mock_handle.join().expect("mock server thread must finish");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_info_decodes_storage_from_verifier_abi() {
+    let source_project = ProjectBuilder::new("rpc-info-verifier-abi-source")
+        .file_from_path(
+            "contracts/types",
+            "src/commands/new/templates/counter/contracts/types.tolk",
+        )
+        .contract_from_path(
+            "counter",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
+        )
+        .build();
+    source_project
+        .acton()
+        .build()
+        .contract("counter")
+        .run()
+        .success();
+
+    let artifact = fs::read_to_string(source_project.path().join("build/counter.json"))
+        .expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64")
+        .to_owned();
+    let code = Boc::decode_base64(&code_boc64).expect("code BoC must decode");
+    let code_hash = code.repr_hash().to_string();
+    let abi = fs::read_to_string(source_project.path().join("build/abi/counter.json"))
+        .expect("ABI artifact must exist");
+    let abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid json");
+
+    let project = ProjectBuilder::new("rpc-info-verifier-abi")
+        .contract_from_boc("counter", Boc::encode(&code))
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+    let (toncenter_url, toncenter_handle, toncenter_captured) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    let (verifier_url, verifier_handle, verifier_captured) =
+        spawn_verifier_mock(vec![abi_response(&code_hash, &abi)]);
+    append_custom_network(project.path(), "mock", &format!("{toncenter_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--raw")
+        .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_decodes_storage_from_verifier_abi.stdout.txt",
+        );
+
+    toncenter_handle
+        .join()
+        .expect("TonCenter mock server thread must finish");
+    verifier_handle
+        .join()
+        .expect("verifier mock server thread must finish");
+
+    let verifier_captured = verifier_captured
+        .lock()
+        .expect("captured verifier requests mutex should not be poisoned");
+    assert_eq!(verifier_captured.len(), 1);
+    assert_eq!(
+        verifier_captured[0].path,
+        format!("/api/v1/abi?code_hash={code_hash}"),
+    );
+
+    let toncenter_captured = toncenter_captured
+        .lock()
+        .expect("captured TonCenter requests mutex should not be poisoned");
+    assert_eq!(toncenter_captured.len(), 1);
 }
 
 #[test]
@@ -926,6 +1094,100 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
             captured[request_idx].path
         );
     }
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_trace_show_bodies_uses_verifier_abi_for_local_boc_without_abi() {
+    let source_project = ProjectBuilder::new("rpc-trace-verifier-abi-source")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", TRACE_COUNTER_CONTRACT)
+        .build();
+    source_project
+        .acton()
+        .build()
+        .contract("counter")
+        .run()
+        .success();
+
+    let artifact = fs::read_to_string(source_project.path().join("build/counter.json"))
+        .expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64")
+        .to_owned();
+    let code = Boc::decode_base64(&code_boc64).expect("code BoC must decode");
+    let code_hash = code.repr_hash().to_string();
+    let abi = fs::read_to_string(source_project.path().join("build/abi/counter.json"))
+        .expect("ABI artifact must exist");
+    let abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid json");
+
+    let project = ProjectBuilder::new("rpc-trace-verifier-abi")
+        .contract_from_boc("counter", Boc::encode(&code))
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+    let (toncenter_url, toncenter_handle, toncenter_captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v3_trace_ok_response(
+            MATCHED_INFO_ADDRESS,
+            MATCHED_INFO_OWNER_ADDRESS,
+            &counter_increase_body_boc64(5),
+        ),
+        toncenter_v3_account_states_ok_response(
+            MATCHED_INFO_ADDRESS,
+            MATCHED_INFO_OWNER_ADDRESS,
+            &code_boc64,
+        ),
+    ]);
+    let (verifier_url, verifier_handle, verifier_captured) =
+        spawn_verifier_mock(vec![abi_response(&code_hash, &abi)]);
+    append_custom_network_with_urls(
+        project.path(),
+        "mock",
+        &format!("{toncenter_url}/api/v2"),
+        &format!("{toncenter_url}/api/v3"),
+    );
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("--color")
+        .arg("never")
+        .arg("rpc")
+        .arg("trace")
+        .arg(TRACE_ROOT_HASH)
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--show-bodies")
+        .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_trace_v3_tree_show_bodies_verifier_abi.stdout.txt",
+        );
+
+    toncenter_handle
+        .join()
+        .expect("TonCenter mock server thread must finish");
+    verifier_handle
+        .join()
+        .expect("verifier mock server thread must finish");
+
+    let verifier_captured = verifier_captured
+        .lock()
+        .expect("captured verifier requests mutex should not be poisoned");
+    assert_eq!(verifier_captured.len(), 1);
+    assert_eq!(
+        verifier_captured[0].path,
+        format!("/api/v1/abi?code_hash={code_hash}"),
+    );
+
+    let toncenter_captured = toncenter_captured
+        .lock()
+        .expect("captured TonCenter requests mutex should not be poisoned");
+    assert_eq!(toncenter_captured.len(), 2);
 }
 
 #[allow(clippy::significant_drop_tightening)]

@@ -4,6 +4,7 @@ import type {V3Action} from "../src/api/types"
 import {
   MAX_AUTO_LOADED_ACTIONS_PER_TRACE,
   mergeAutomaticActionPage,
+  mergeStreamedActions,
 } from "../src/pages/accountActionPagination"
 
 function action(traceId: string, index: number, traceEndLt = "1000"): V3Action {
@@ -60,4 +61,18 @@ test("a partial final trace continues with an offset so its size can be detected
 
   expect(result.collapsedTraceIds).toEqual(["first"])
   expect(result.cursor).toEqual({offset: 60, endLt: "4000"})
+})
+
+test("streamed actions keep the selected order, remove duplicates, and cap large traces", () => {
+  const current = [action("old", 0, "3000")]
+  const streamed = [
+    action("new", 0, "4000"),
+    action("old", 0, "3000"),
+    ...Array.from({length: 12}, (_, index) => action("bulk", index, "5000")),
+  ]
+
+  expect({
+    ascending: mergeStreamedActions(current, streamed, "asc"),
+    descending: mergeStreamedActions(current, streamed, "desc"),
+  }).toMatchSnapshot()
 })

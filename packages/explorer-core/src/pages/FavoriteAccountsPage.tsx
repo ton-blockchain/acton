@@ -3,9 +3,11 @@ import type {FC} from "react"
 import {Link} from "react-router"
 import {
   BlockChip,
+  DateTime,
   InlineAction,
   InlineActions,
   Pagination,
+  shortenMiddle,
   useClientPagination,
   useToast,
 } from "@acton/ui"
@@ -17,7 +19,7 @@ import type {JettonWallet} from "../api/types"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
-import {normalizeAddress, shortenIdentifier, toRawAddress} from "../components/utils"
+import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteAccounts, type FavoriteAccount} from "../hooks/useFavoriteAccounts"
@@ -260,12 +262,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                         }
                       />
                     </td>
-                    <td
-                      className={styles.savedAtCell}
-                      data-visual-dynamic="time"
-                      data-visual-placeholder="<time>"
-                    >
-                      {formatSavedAt(favorite.savedAt)}
+                    <td className={styles.savedAtCell}>
+                      <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                     </td>
                   </tr>
                 ))}
@@ -323,19 +321,15 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           />
                         </div>
                       </td>
-                      <td
-                        className={styles.blockTimeCell}
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
-                      >
-                        {formatBlockGeneratedAt(favorite.generatedAt)}
+                      <td className={styles.blockTimeCell}>
+                        <DateTime
+                          fallback="Unknown"
+                          unit="seconds"
+                          value={positiveTime(favorite.generatedAt)}
+                        />
                       </td>
-                      <td
-                        className={styles.blockTimeCell}
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
-                      >
-                        {formatSavedAt(favorite.savedAt)}
+                      <td className={styles.blockTimeCell}>
+                        <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                       </td>
                     </tr>
                   )
@@ -388,7 +382,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           to={routes.transactionPath(favorite.hash)}
                           title={favorite.hash}
                         >
-                          {shortenIdentifier(favorite.hash)}
+                          {shortenMiddle(favorite.hash, {start: 6, end: 6})}
                         </Link>
                       </InlineActions>
                     </td>
@@ -407,12 +401,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                       )}
                     </td>
                     <td className={styles.ltCell}>{favorite.lt ?? "—"}</td>
-                    <td
-                      className={styles.savedAtCell}
-                      data-visual-dynamic="time"
-                      data-visual-placeholder="<time>"
-                    >
-                      {formatSavedAt(favorite.savedAt)}
+                    <td className={styles.savedAtCell}>
+                      <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                     </td>
                   </tr>
                 ))}
@@ -432,22 +422,6 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   )
 }
 
-function formatBlockGeneratedAt(generatedAt: number | undefined): string {
-  if (!generatedAt) {
-    return "Unknown"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(generatedAt * 1000))
-}
-
-function formatSavedAt(savedAt: number): string {
-  if (!savedAt) {
-    return "Unknown"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(savedAt))
+function positiveTime(value: number | undefined): number | undefined {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
 }

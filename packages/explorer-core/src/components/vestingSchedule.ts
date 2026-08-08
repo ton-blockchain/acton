@@ -30,12 +30,6 @@ export interface VestingSchedule {
   readonly periods: readonly VestingPeriod[]
 }
 
-const VESTING_CODE_HASH = "b48b531abec3b714638291f7d77ed6dc9f6a2729efca20477137374d4ae8b590"
-
-export function isVestingCodeHash(value: string | undefined): boolean {
-  return value?.replace(/^0x/i, "").toLowerCase() === VESTING_CODE_HASH
-}
-
 export function parseVestingData(response: V3RunGetMethodResponse): VestingData {
   if (response.exit_code !== 0) {
     throw new Error(`get_vesting_data exited with code ${response.exit_code}.`)

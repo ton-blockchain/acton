@@ -1,4 +1,11 @@
-import {Button, SearchInput, useToast} from "@acton/ui"
+import {
+  Button,
+  formatDateTime,
+  formatNumberValue,
+  formatRecurringPeriod,
+  SearchInput,
+  useToast,
+} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {Address} from "@ton/core"
 import {
@@ -78,11 +85,6 @@ const GITHUB_RETURN_STATE_TTL_MS = 30 * 60 * 1000
 const MAX_GITHUB_RETURN_ADDRESS_LENGTH = 512
 const MAX_GITHUB_RETURN_NETWORK_LENGTH = 128
 const MAX_ADDRESS_HISTORY_ITEMS = 5
-const REQUEST_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-})
 
 const STEPS: readonly {
   readonly phase: FaucetPhase
@@ -376,7 +378,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           const progressDescription =
             progress.attempts === 0
               ? statusDescription("solving")
-              : `${formatHashRate(progress)} · ${progress.attempts.toLocaleString()} attempts`
+              : `${formatHashRate(progress)} · ${formatNumberValue(progress.attempts)} attempts`
           updateToast(toastId, {
             variant: "loading",
             title: statusTitle("solving"),
@@ -625,8 +627,8 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
           <h2>{session ? `Connected as @${session.login}` : "Higher limits"}</h2>
           <p>
             {session
-              ? `${tierLabel(session)} tier · ${session.maxRequests} requests ${requestWindowSuffix(props.requestWindowMs)}`
-              : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${requestWindowSuffix(props.requestWindowMs)}`}
+              ? `${tierLabel(session)} tier · ${session.maxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`
+              : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`}
           </p>
         </div>
       </div>
@@ -779,29 +781,18 @@ function faucetUsageCopy(
   requestWindowMs: number,
 ): string {
   if (usage.limitReached && usage.availableAgainAt !== undefined) {
-    return `${usage.used} of ${requestLimit} requests used · available again at ${formatRequestTime(usage.availableAgainAt)}`
+    return `${usage.used} of ${requestLimit} requests used · available again at ${formatDateTime(usage.availableAgainAt, {display: "time"})}`
   }
   if (usage.used > 0 && usage.lastRequestAt !== undefined) {
-    return `${usage.used} of ${requestLimit} requests used · last request at ${formatRequestTime(usage.lastRequestAt)}`
+    return `${usage.used} of ${requestLimit} requests used · last request at ${formatDateTime(usage.lastRequestAt, {display: "time"})}`
   }
-  return `Maximum of ${requestLimit} requests ${requestWindowSuffix(requestWindowMs)}`
+  return `Maximum of ${requestLimit} requests ${formatRecurringPeriod(requestWindowMs)}`
 }
 
 function rateLimitButtonLabel(usage: FaucetUsage): string {
   return usage.availableAgainAt === undefined
     ? "Hourly limit reached"
-    : `Available again at ${formatRequestTime(usage.availableAgainAt)}`
-}
-
-function formatRequestTime(timestamp: number): string {
-  return REQUEST_TIME_FORMATTER.format(new Date(timestamp))
-}
-
-function requestWindowSuffix(windowMs: number): string {
-  if (windowMs === 60 * 60 * 1000) return "per hour"
-  if (windowMs === 24 * 60 * 60 * 1000) return "per day"
-  const minutes = Math.max(1, Math.round(windowMs / 60_000))
-  return `every ${minutes} minutes`
+    : `Available again at ${formatDateTime(usage.availableAgainAt, {display: "time"})}`
 }
 
 interface GitHubRedirectParams {

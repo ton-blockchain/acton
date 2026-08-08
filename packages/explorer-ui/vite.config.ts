@@ -5,14 +5,14 @@ import react from "@vitejs/plugin-react"
 import {defineConfig, loadEnv, type ProxyOptions} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
-import {themeBootstrap} from "../ui/vite/themeBootstrap"
+import {themeBootstrap} from "../ui/vite/themeBootstrap.ts"
 
 const require = createRequire(import.meta.url)
 const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin-node-polyfills")))
 
 const toncenterDevProxy = (
   prefix: string,
-  endpoint: "blocks" | "getShards" | "traces" | "transactions",
+  endpoint: "blocks" | "getBlockTransactions" | "getShards" | "traces" | "transactions",
   apiUrl: string,
   apiKey?: string,
 ): ProxyOptions => {
@@ -33,6 +33,7 @@ const toncenterNetworkDevProxies = (
   apiKey?: string,
 ): Record<string, ProxyOptions> => {
   const endpoints = [
+    ["v2", "getBlockTransactions", apiV2Url],
     ["v2", "getShards", apiV2Url],
     ["v3", "blocks", apiV3Url],
     ["v3", "traces", apiV3Url],

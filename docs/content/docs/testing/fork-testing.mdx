@@ -5,6 +5,11 @@ description: "Learn how to test contracts against blockchain state by forking te
 
 Fork testing runs tests against blockchain state by loading accounts and libraries from TON testnet or TON mainnet. Use it to test contract interactions with deployed contracts without complex local environment setup.
 
+Acton resolves one masterchain block when the fork starts. Account state and
+the network configuration come from that block. With an explicit
+`--fork-block-number`, Unix time also comes from the selected block. A latest
+fork uses the current system Unix time.
+
 ## What fork testing is
 
 Fork testing keeps a local view (fork) of remote chain state. When test code reads an account that exists on testnet or mainnet while fork mode is on, the runner:
@@ -46,9 +51,9 @@ acton test --fork-net mainnet --fork-block-number 54321000
     If you rerun the same fork tests often, pass `--fork-block-number` instead
     of using a live fork. Pinned fork runs persist fetched accounts under
     `build/cache/<network>/<seqno>/`, so the next CLI run can load the same
-    accounts from disk before calling the remote API. Live fork runs without a
-    block number only use the in-memory cache for the current `acton test`
-    process and will fetch accounts again on the next run.
+    accounts from disk before calling the remote API. Fork runs without a block
+    number resolve the latest block on every CLI run and reuse persisted
+    accounts only when that block has the same sequence number.
 </Callout>
 
 You can also set defaults in `Acton.toml`:
@@ -101,10 +106,14 @@ acton test tests/wallet.test.tolk --fork-net custom:archive-rpc
 
 ## Execution model
 
-When fork testing is enabled and a test touches an account:
+When fork testing is enabled, Acton first resolves the selected or latest
+masterchain block and loads the network configuration for the same sequence
+number. An explicit historical fork also loads that block's time. A latest
+fork uses the current system time and does not request the block header. When a
+test touches an account:
 
 1. The system first checks if the account was already loaded in the local cache.
-2. If `--fork-block-number` is set, it checks the persistent fork account cache.
+2. It checks the persistent fork account cache.
 3. If the account is still not cached and `--fork-net` is specified, it queries
    the configured API endpoint.
 4. Account state, i.e., balance, code, data, status, is downloaded and deserialized.
@@ -123,21 +132,25 @@ Fork testing uses two layers of account state:
 
 - Local account changes are scoped to the current test.
 - The remote snapshot cache is shared by tests in the same `acton test` run.
-- When a fork block number is pinned, fetched remote snapshots are also saved to
+- Fetched remote snapshots are also saved to
   disk under `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`.
+
+Acton separately caches the masterchain configuration and, for explicit
+historical forks, block time under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json` for 24 hours. An
+explicit block number can use a fresh entry without a network request. A fork
+without a block number first resolves the latest sequence number and then checks
+for a matching configuration entry.
 
 The shared remote cache stores only fetched remote snapshots:
 
-- The cache key is the tuple of fork network, optional pinned block number, and
+- The cache key is the tuple of fork network, pinned or resolved block number, and
   account address.
 - The second test that touches the same remote account reuses the cached remote
   snapshot instead of re-fetching it.
 - A fresh `acton test --fork-net ...` run starts with an empty in-memory cache.
-- If `--fork-block-number` is set, a fresh run can reuse the persistent account
-  cache before making a network request.
-- Live fork runs without `--fork-block-number` are not persisted across CLI runs.
-- Pass `--no-fork-cache` to skip persistent cache reads and writes for the
-  current run.
+- A fresh run can reuse the persistent account cache before making a network request when its resolved block number matches.
+- Pass `--no-fork-cache` to skip persistent account and library cache reads and writes for the current run. This option does not disable the masterchain snapshot TTL cache.
 - Pass `--clear-cache` to remove persistent fork account entries together with
   the rest of `build/cache`.
 - Failed lookups are not cached. If a request errors, the next access can try the network again.
@@ -148,9 +161,9 @@ account. Other tests do not inherit that local mutation; they start from a fresh
 local state and, if they touch the same account, reuse the shared remote snapshot
 that was fetched earlier in the run.
 
-To refetch remote snapshots from the same network and pinned block, run with
-`--no-fork-cache` once or clear `build/cache`. Changing `--fork-net` or
-`--fork-block-number` also uses a different cache key.
+To refetch remote account and library snapshots, run with `--no-fork-cache`
+once. To also refetch the masterchain snapshot, clear `build/cache`. Changing
+`--fork-net` or `--fork-block-number` also uses a different cache key.
 
 Fork testing only loads accounts that are not already present in the current
 test's local account state. Accounts deployed or changed during a test are not

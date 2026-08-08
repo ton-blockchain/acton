@@ -4,6 +4,7 @@ import type {Dispatch, SetStateAction} from "react"
 
 import {cx} from "../../lib/cx"
 import {Button} from "../Button"
+import {NumberValue} from "../NumberValue"
 import styles from "./Pagination.module.css"
 
 export const DEFAULT_PAGE_SIZE = 20
@@ -58,7 +59,8 @@ export function Pagination({
       aria-label={label}
     >
       <span className={styles.summary}>
-        {state.startIndex + 1}–{state.endIndex} of {state.totalItems.toLocaleString()}
+        <NumberValue value={state.startIndex + 1} />–<NumberValue value={state.endIndex} /> of{" "}
+        <NumberValue value={state.totalItems} />
       </span>
       <div className={styles.controls}>
         <Button

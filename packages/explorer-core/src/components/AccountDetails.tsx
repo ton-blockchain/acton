@@ -17,7 +17,7 @@ import type {
   MouseEvent,
   ReactNode,
 } from "react"
-import {AbiGetMethods, fmt} from "@acton/transaction-ui"
+import {AbiGetMethods} from "@acton/transaction-ui"
 import {
   Button,
   DataTable,
@@ -27,10 +27,20 @@ import {
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
+  DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  formatOpcode,
+  formatGramAmount,
+  formatNumberValue,
+  formatTokenAmount,
+  GramAmount,
   NftChip,
   Pagination,
   Popover,
+  RelativeTime,
+  shortenMiddle,
+  TokenAmount,
   Tooltip,
 } from "@acton/ui"
 import {
@@ -112,17 +122,7 @@ import {
 import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {
-  formatAbsoluteTime,
-  formatAddress,
-  formatNano,
-  formatRelativeTime,
-  formatTimeAgo,
-  hashToHex,
-  isSameAddress,
-  parseAddress,
-  shortenIdentifier,
-} from "./utils"
+import {formatAddress, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
@@ -249,6 +249,14 @@ interface HistoryTextValueLine {
   readonly fullLabel?: string
   readonly unitLabel?: string
   readonly tone: HistoryValueTone
+  readonly amount?: {
+    readonly decimals: number
+    readonly kind: "gram" | "token"
+    readonly maximumFractionDigits?: number
+    readonly rawValue: string
+    readonly signDisplay: "except-zero" | "never"
+    readonly symbol?: string
+  }
 }
 
 interface HistoryNftValueLine {
@@ -1177,16 +1185,15 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 ) : (
                   displayedTransactionRows.map(({tx, info}) => {
                     const transactionHash = tx.hash
-                    const valueStr = formatNano(info.displayValue.toString())
                     const isEmptyValue = info.displayValue === 0n
                     const valuePrefix = isEmptyValue ? "" : info.isIncoming ? "+ " : "- "
-                    const valueLabel = isEmptyValue
-                      ? "empty"
-                      : `${valuePrefix}${Number.parseFloat(valueStr).toLocaleString()} GRAM`
-                    const formattedTime = formatTransactionTime(
-                      tx.now,
-                      nowSeconds,
-                      transactionFilters.timeFormat,
+                    const valueLabel = isEmptyValue ? (
+                      "empty"
+                    ) : (
+                      <>
+                        {valuePrefix}
+                        <GramAmount value={info.displayValue} useGrouping />
+                      </>
                     )
                     const isAddressHovered =
                       hoveredAddress && info.address
@@ -1221,13 +1228,11 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         }
                       >
                         <td className={`${styles.time} ${styles.timeColumn}`}>
-                          <span
-                            title={formattedTime.title}
-                            data-visual-dynamic="time"
-                            data-visual-placeholder="<time>"
-                          >
-                            {formattedTime.label}
-                          </span>
+                          <TransactionTime
+                            nowSeconds={nowSeconds}
+                            timeFormat={transactionFilters.timeFormat}
+                            utime={tx.now}
+                          />
                         </td>
                         <td className={styles.actionColumn}>
                           <div className={styles.action}>
@@ -1426,25 +1431,26 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
           {holdersLoading ? (
             <HoldersSkeleton />
           ) : (
-            <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead className={styles.historyHeaderGroup}>
-                  <tr className={styles.historyHeaderRow}>
-                    <th className={styles.tableHeader}>Owner</th>
-                    <th className={styles.tableHeader}>Wallet</th>
-                    <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <DataTable className={styles.embeddedTable} minWidth="42rem">
+              <DataTableTable aria-label="Jetton holders">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth="38%">Owner</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="38%">Wallet</DataTableHeaderCell>
+                    <DataTableHeaderCell align="right" columnWidth="24%">
+                      Balance
+                    </DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
                   {(holders || []).map(holder => {
-                    const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
-                    const balance = Number(holder.balance) / 10 ** decimals
                     const symbol = jettonMaster?.jetton_content?.symbol || ""
 
                     return (
-                      <tr
+                      <DataTableRow
                         key={holder.address}
-                        className={`${styles.row} ${styles.clickableRow}`}
+                        hover
+                        interactive={onAddressClick !== undefined}
                         tabIndex={onAddressClick ? 0 : undefined}
                         onClick={event => onAddressClick?.(holder.owner, event)}
                         onKeyDown={
@@ -1459,37 +1465,37 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                             : undefined
                         }
                       >
-                        <td>
+                        <DataTableCell truncate>
                           <ExplorerAddressChip
                             address={holder.owner}
                             onAddressClick={onAddressClick}
                           />
-                        </td>
-                        <td>
+                        </DataTableCell>
+                        <DataTableCell truncate>
                           <ExplorerAddressChip
                             address={holder.address}
                             onAddressClick={onAddressClick}
                           />
-                        </td>
-                        <td className={styles.valueContainer}>
+                        </DataTableCell>
+                        <DataTableCell align="right" tone="strong">
                           <div className={styles.valuePositive}>
-                            {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
-                            {symbol}
+                            <TokenAmount
+                              decimals={jettonMaster?.jetton_content?.decimals}
+                              symbol={symbol}
+                              useGrouping
+                              value={holder.balance}
+                            />
                           </div>
-                        </td>
-                      </tr>
+                        </DataTableCell>
+                      </DataTableRow>
                     )
                   })}
                   {(!holders || holders.length === 0) && (
-                    <tr className={styles.emptyRow}>
-                      <td colSpan={3} className={styles.emptyCell}>
-                        <div className={styles.emptyState}>No holders found</div>
-                      </td>
-                    </tr>
+                    <DataTableEmpty colSpan={3}>No holders found</DataTableEmpty>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
           )}
           {showLoadMoreHolders && onLoadMoreHolders && (
             <div ref={holdersLoadMoreRef} className={styles.listLoadMore}>
@@ -1554,32 +1560,28 @@ function isBuiltInTab(value: string): value is Tabs {
 
 function HoldersSkeleton(): JSX.Element {
   return (
-    <div className={styles.tableWrapper}>
-      <table className={styles.table} aria-label="Loading holders">
-        <thead className={styles.historyHeaderGroup}>
-          <tr className={styles.historyHeaderRow}>
-            <th className={styles.tableHeader}>Owner</th>
-            <th className={styles.tableHeader}>Wallet</th>
-            <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: 4}, (_, index) => (
-            <tr key={`holders-skeleton-${index}`} className={styles.skeletonRow}>
-              <td>
-                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-              </td>
-              <td>
-                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-              </td>
-              <td className={styles.valueContainer}>
-                <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable className={styles.embeddedTable} minWidth="42rem">
+      <DataTableTable aria-label="Loading holders">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="38%">Owner</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="38%">Wallet</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="24%">
+              Balance
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          <DataTableSkeletonRows
+            alignments={["left", "left", "right"]}
+            columns={3}
+            rowKeyPrefix="holders"
+            rows={4}
+            widths={["11rem", "11rem", "8rem"]}
+          />
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -1739,7 +1741,25 @@ function HistoryTextValue({
 
   return (
     <span className={className} title={line.fullLabel}>
-      {line.label}
+      {line.amount === undefined ? (
+        line.label
+      ) : line.amount.kind === "gram" ? (
+        <GramAmount
+          maximumFractionDigits={line.amount.maximumFractionDigits}
+          signDisplay={line.amount.signDisplay}
+          useGrouping
+          value={line.amount.rawValue}
+        />
+      ) : (
+        <TokenAmount
+          decimals={line.amount.decimals}
+          maximumFractionDigits={line.amount.maximumFractionDigits}
+          signDisplay={line.amount.signDisplay}
+          symbol={line.amount.symbol}
+          useGrouping
+          value={line.amount.rawValue}
+        />
+      )}
       {line.unitLabel ? (
         <>
           {" "}
@@ -1784,9 +1804,6 @@ export function ActionHistoryRows({
   return (
     <>
       {rows.map(({action, info}, index) => {
-        const formattedTime = showTimeColumn
-          ? formatTransactionTime(info.utime, nowSeconds, timeFormat)
-          : undefined
         const isAddressHovered =
           hoveredAddress && info.address ? isSameAddress(info.address, hoveredAddress) : false
         const isHighlighted =
@@ -1802,14 +1819,12 @@ export function ActionHistoryRows({
           <>
             {showTimeColumn && (
               <Cell className={`${styles.time} ${styles.timeColumn}`} data-mobile-area="time">
-                {!continuesFromTrace && formattedTime && (
-                  <span
-                    title={formattedTime.title}
-                    data-visual-dynamic="time"
-                    data-visual-placeholder="<time>"
-                  >
-                    {formattedTime.label}
-                  </span>
+                {!continuesFromTrace && (
+                  <TransactionTime
+                    nowSeconds={nowSeconds}
+                    timeFormat={timeFormat}
+                    utime={info.utime}
+                  />
                 )}
               </Cell>
             )}
@@ -2096,7 +2111,7 @@ function getHistoryTransactionInfo(
     : outMsgs.find(message => message.destination) ||
       outMsgs.find(message => message.opcode) ||
       outMsgs[0]
-  const opcode = normalizeOpcode(displayMessage?.opcode)
+  const opcode = formatOpcode(displayMessage?.opcode)
   const normalizedOpcode = opcode
   const actionLabel =
     resolveMessageName(displayMessage, messageNamesByAddress) ||
@@ -2482,7 +2497,7 @@ function opcodeTechnicalLabel(
   destination: string | null | undefined,
   messageNamesByAddress: MessageNamesByAddress,
 ): HistoryTechnicalLabel | undefined {
-  const normalizedOpcode = normalizeOpcode(opcode)
+  const normalizedOpcode = formatOpcode(opcode)
   if (!normalizedOpcode) {
     return undefined
   }
@@ -3383,13 +3398,25 @@ function tonValueLine(
   }
 
   const signlessAmount = amount.trim().replace(/^[+-]/, "")
-  const readableAmount = formatNano(signlessAmount, options.maximumFractionDigits)
+  const readableAmount = formatGramAmount(signlessAmount, {
+    fallback: signlessAmount,
+    maximumFractionDigits: options.maximumFractionDigits,
+    showUnit: false,
+    useGrouping: true,
+  })
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
   return {
     kind: "text",
     label: `${sign}${readableAmount} GRAM`,
     tone: displayTone,
+    amount: {
+      decimals: 9,
+      kind: "gram",
+      maximumFractionDigits: options.maximumFractionDigits,
+      rawValue: displayTone === "negative" ? `-${signlessAmount}` : signlessAmount,
+      signDisplay: sign ? "except-zero" : "never",
+    },
   }
 }
 
@@ -3418,21 +3445,31 @@ function assetValueLine(
   }
 
   const tokenInfo = getMetadataTokenInfo(metadata, asset, "jetton_masters")
-  const decimals = metadataTokenDecimals(tokenInfo)
+  const decimals = metadataTokenDecimals(tokenInfo) ?? 0
   const symbol = metadataTokenString(tokenInfo, "symbol")
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
-  const formattedAmount =
-    decimals === undefined ? normalizedAmount : fmt.formatDecimalAmount(normalizedAmount, decimals)
-  const readableAmount = formatReadableNumber(formattedAmount, options.maximumFractionDigits)
+  const readableAmount = formatTokenAmount(normalizedAmount, decimals, {
+    fallback: normalizedAmount,
+    maximumFractionDigits: options.maximumFractionDigits,
+    showSymbol: false,
+    useGrouping: true,
+  })
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
   const fullAssetLabel = symbol ?? formatAddress(asset, false)
-  const assetLabel = symbol ?? shortenIdentifier(fullAssetLabel, 3)
+  const assetLabel = symbol ?? shortenMiddle(fullAssetLabel, {start: 3, end: 3})
   return {
     kind: "text",
     label: `${sign}${readableAmount}`,
     ...(symbol ? {} : {fullLabel: `${sign}${readableAmount} ${fullAssetLabel}`}),
-    unitLabel: assetLabel,
+    amount: {
+      decimals,
+      kind: "token",
+      maximumFractionDigits: options.maximumFractionDigits,
+      rawValue: displayTone === "negative" ? `-${normalizedAmount}` : normalizedAmount,
+      signDisplay: sign ? "except-zero" : "never",
+      symbol: assetLabel,
+    },
     tone: displayTone,
   }
 }
@@ -3459,7 +3496,7 @@ function rawValueLine(
   }
 
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
-  const readableAmount = formatReadableNumber(normalizedAmount)
+  const readableAmount = formatNumberValue(normalizedAmount, {maximumFractionDigits: 9})
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   return {
     kind: "text",
@@ -3491,7 +3528,8 @@ function actionNftValueLine(
   const fullLabel = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
   if (!fullLabel && !itemAddress) return undefined
   const label =
-    name ?? (isNonEmptyString(itemIndex) ? `NFT #${shortenIdentifier(itemIndex)}` : "NFT")
+    name ??
+    (isNonEmptyString(itemIndex) ? `NFT #${shortenMiddle(itemIndex, {start: 6, end: 6})}` : "NFT")
 
   const imageSources = getImageSources(tokenInfo, NFT_IMAGE_SOURCE_KEYS)
   return {
@@ -3523,13 +3561,6 @@ function tonToNftValueLine(
   }
 
   return ton ?? nft
-}
-
-function formatReadableNumber(value: string, maximumFractionDigits = 9): string {
-  const numeric = Number(value)
-  return Number.isFinite(numeric) && value.length < 18
-    ? numeric.toLocaleString(undefined, {maximumFractionDigits})
-    : value
 }
 
 function valueSign(tone: HistoryValueTone): string {
@@ -3600,25 +3631,35 @@ function compareBigIntStrings(left: string, right: string): number {
   }
 }
 
-function formatTransactionTime(
-  utime: number,
-  nowSeconds: number,
-  timeFormat: AccountTimeFormat,
-): {label: string; title: string} {
+function TransactionTime({
+  utime,
+  nowSeconds,
+  timeFormat,
+}: {
+  readonly utime: number
+  readonly nowSeconds: number
+  readonly timeFormat: AccountTimeFormat
+}): JSX.Element | string {
   if (utime <= 0) {
-    return {label: "-", title: "Unknown time"}
+    return (
+      <span data-visual-dynamic="time" data-visual-placeholder="<time>" title="Unknown time">
+        -
+      </span>
+    )
   }
 
-  const absolute = formatAbsoluteTime(utime, nowSeconds)
   if (timeFormat === "absolute") {
-    return {label: absolute, title: absolute}
+    return <DateTime display="compact" now={nowSeconds} unit="seconds" value={utime} />
   }
 
-  if (timeFormat === "relative") {
-    return {label: formatRelativeTime(utime, nowSeconds), title: absolute}
-  }
-
-  return {label: formatTimeAgo(utime, nowSeconds), title: absolute}
+  return (
+    <RelativeTime
+      mode={timeFormat === "relative" ? "relative" : "hybrid"}
+      now={nowSeconds}
+      unit="seconds"
+      value={Math.min(utime, nowSeconds)}
+    />
+  )
 }
 
 function resolveMessageName(
@@ -3629,7 +3670,7 @@ function resolveMessageName(
     return undefined
   }
 
-  const opcode = normalizeOpcode(message.opcode)
+  const opcode = formatOpcode(message.opcode)
   if (!opcode) {
     return undefined
   }
@@ -3649,34 +3690,6 @@ function resolveOpcodeName(
   const sourceNames = source ? messageNamesByAddress.get(addressKey(source)) : undefined
 
   return destinationNames?.incoming.get(opcode) ?? sourceNames?.outgoing.get(opcode) ?? undefined
-}
-
-function normalizeOpcode(opcode: string | number | null | undefined): string | undefined {
-  if (opcode === null || opcode === undefined) {
-    return undefined
-  }
-
-  const normalized = typeof opcode === "string" ? opcode.trim() : opcode
-  if (normalized === "") {
-    return undefined
-  }
-
-  try {
-    const value =
-      typeof normalized === "number"
-        ? normalized
-        : normalized.startsWith("0x") || normalized.startsWith("0X")
-          ? Number.parseInt(normalized.slice(2), 16)
-          : Number.parseInt(normalized, 10)
-
-    if (!Number.isInteger(value) || value < 0 || value > 0xff_ff_ff_ff) {
-      return undefined
-    }
-
-    return `0x${value.toString(16).padStart(8, "0")}`
-  } catch {
-    return undefined
-  }
 }
 
 const ContractCode = lazy(async () => {

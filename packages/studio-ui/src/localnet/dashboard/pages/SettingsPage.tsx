@@ -1,7 +1,18 @@
-import {Button, Checkbox, CopyInlineButton, Input, Tooltip, useToast} from "@acton/ui"
+import {
+  Button,
+  Checkbox,
+  CopyInlineButton,
+  Duration,
+  formatDuration,
+  formatNumberValue,
+  Input,
+  NumberValue,
+  Tooltip,
+  useToast,
+} from "@acton/ui"
 import {CircleHelp, Trash2} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
-import type {FC} from "react"
+import type {FC, ReactNode} from "react"
 
 import {supports} from "../../../environmentCapabilities"
 import {deleteStudioEnvironment, updateStudioEnvironment} from "../../../studioApi"
@@ -30,8 +41,9 @@ export const SettingsPage: FC<SettingsPageProps> = ({
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
   const fullNetworkConfig =
     environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
-  const hasControlApi = supports(environment, "controlApi")
-  const hasMining = supports(environment, "mining")
+  const runtimeAvailable = environment?.status === "running"
+  const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
+  const hasMining = runtimeAvailable && supports(environment, "mining")
   const [miningMode, setMiningMode] = useState<LocalnetMiningMode>()
   const [autoMining, setAutoMining] = useState<boolean>()
   const [blockIntervalMs, setBlockIntervalMs] = useState<number>()
@@ -120,7 +132,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
         description:
           conditions.response_delay_ms === 0
             ? "Artificial response delay is disabled"
-            : `Responses are delayed by ${conditions.response_delay_ms.toLocaleString()} ms`,
+            : `Responses are delayed by ${formatDuration(conditions.response_delay_ms, {display: "runtime", unit: "milliseconds"})}`,
       })
     } catch (error) {
       showToast({
@@ -266,10 +278,10 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             description="The runtime used by this environment"
             value={
               environment?.config.kind === "fullTonNetwork"
-                ? "Full TON network"
+                ? "Full localnet"
                 : environment?.config.kind === "remoteTonNetwork"
                   ? "Remote TON network"
-                  : "Fast local network"
+                  : "Simulated localnet"
             }
           />
 
@@ -320,7 +332,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             <SettingsValueRow
               label="Validators"
               description="Validator nodes configured for this network"
-              value={(fullNetworkConfig.validators ?? 1).toLocaleString()}
+              value={<NumberValue value={fullNetworkConfig.validators ?? 1} />}
             />
           ) : undefined}
 
@@ -364,13 +376,17 @@ export const SettingsPage: FC<SettingsPageProps> = ({
                 label="Rate limit"
                 description="Maximum number of requests this environment accepts per second"
                 value={
-                  isLoading
-                    ? "Loading"
-                    : rateLimitRps === undefined
-                      ? "Unavailable"
-                      : rateLimitRps === null
-                        ? "Unlimited"
-                        : `${rateLimitRps.toLocaleString()} requests/s`
+                  isLoading ? (
+                    "Loading"
+                  ) : rateLimitRps === undefined ? (
+                    "Unavailable"
+                  ) : rateLimitRps === null ? (
+                    "Unlimited"
+                  ) : (
+                    <>
+                      <NumberValue value={rateLimitRps} /> requests/s
+                    </>
+                  )
                 }
               />
             </>
@@ -425,13 +441,15 @@ export const SettingsPage: FC<SettingsPageProps> = ({
               label="Block interval"
               description="Time between automatic block creation attempts"
               value={
-                isLoading
-                  ? "Loading"
-                  : autoMining === false
-                    ? "Not applicable"
-                    : blockIntervalMs === undefined
-                      ? "Unavailable"
-                      : `${blockIntervalMs.toLocaleString()} ms`
+                isLoading ? (
+                  "Loading"
+                ) : autoMining === false ? (
+                  "Not applicable"
+                ) : blockIntervalMs === undefined ? (
+                  "Unavailable"
+                ) : (
+                  <Duration display="runtime" unit="milliseconds" value={blockIntervalMs} />
+                )
               }
             />
 
@@ -513,7 +531,7 @@ function formatForkState(environment?: StudioEnvironment): string {
   if (!network) return "Clean network"
 
   const block = environment.config.forkBlockNumber
-  return block ? `${network} at block ${block.toLocaleString()}` : `${network} latest`
+  return block ? `${network} at block ${formatNumberValue(block)}` : `${network} latest`
 }
 
 function absoluteUrl(value: string): string {
@@ -554,7 +572,7 @@ interface SettingsValueRowProps {
   readonly description: string
   readonly label: string
   readonly technical?: boolean
-  readonly value: string
+  readonly value: ReactNode
 }
 
 const SettingsValueRow: FC<SettingsValueRowProps> = ({

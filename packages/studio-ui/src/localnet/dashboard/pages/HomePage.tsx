@@ -1,4 +1,4 @@
-import {CircleDot, FastForward, GitBranch, Network} from "lucide-react"
+import {CircleDot, CircleHelp, FastForward, GitBranch, Network} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -10,8 +10,15 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
   Dialog,
+  Duration,
+  formatDuration,
+  formatNumberValue,
+  humanizeIdentifier,
   Input,
+  DAY_SECONDS,
+  Tooltip,
   useToast,
 } from "@acton/ui"
 import {useNavigate} from "react-router"
@@ -36,7 +43,6 @@ import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
 } from "@acton/explorer-core/components/DeveloperTransactionList"
-import {formatDuration} from "@acton/explorer-core/components/utils"
 import {useAddressBook} from "@acton/explorer-core/hooks/useAddressBook"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "@acton/explorer-core/hooks/useOpenExplorerPath"
@@ -55,19 +61,9 @@ const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
 const DEFAULT_TIME_ADVANCE_SECONDS = "0"
 const MINUTE_SECONDS = 60
 const HOUR_SECONDS = 3600
-const DAY_SECONDS = 86_400
 const WEEK_SECONDS = 604_800
 const MONTH_SECONDS = 2_592_000
 const YEAR_SECONDS = 31_536_000
-const TIME_UNITS = [
-  {seconds: YEAR_SECONDS, compact: "y", name: "year"},
-  {seconds: MONTH_SECONDS, compact: "mo", name: "month"},
-  {seconds: WEEK_SECONDS, compact: "w", name: "week"},
-  {seconds: DAY_SECONDS, compact: "d", name: "day"},
-  {seconds: HOUR_SECONDS, compact: "h", name: "hour"},
-  {seconds: MINUTE_SECONDS, compact: "min", name: "minute"},
-  {seconds: 1, compact: "s", name: "second"},
-] as const
 const TIME_ADVANCE_PRESET_SECONDS = [
   MINUTE_SECONDS,
   HOUR_SECONDS,
@@ -77,7 +73,7 @@ const TIME_ADVANCE_PRESET_SECONDS = [
   YEAR_SECONDS,
 ] as const
 const TIME_ADVANCE_PRESETS = TIME_ADVANCE_PRESET_SECONDS.map(seconds => ({
-  label: formatReadableDuration(seconds),
+  label: formatDuration(seconds, {display: "readable", sign: "always"}),
   seconds,
 }))
 
@@ -106,8 +102,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const remoteNetworkConfig =
     environment?.config.kind === "remoteTonNetwork" ? environment.config : undefined
-  const hasControlApi = supports(environment, "controlApi")
-  const hasNetworkNodeInfo = !hasControlApi && supports(environment, "apiV3")
+  const hasSimulatedControlApi = localnetConfig !== undefined && supports(environment, "controlApi")
+  const hasNetworkNodeInfo = !hasSimulatedControlApi && supports(environment, "apiV3")
   const hasIntegration = supports(environment, "integration")
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
@@ -127,26 +123,26 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     isLoading: true,
   })
   const parsedTimeAdvanceSeconds = parseTimeAdvanceSeconds(timeAdvanceSeconds)
-  const timeAdvanceShiftValue = formatReadableDuration(parsedTimeAdvanceSeconds ?? 0)
-  const timeAdvanceCurrentValue = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : "—"
-  const timeAdvanceTargetValue = nodeInfo
-    ? formatNodeDateTime(nodeInfo.current_unix_time + (parsedTimeAdvanceSeconds ?? 0))
-    : "—"
+  const timeAdvanceShiftValue = formatDuration(parsedTimeAdvanceSeconds ?? 0, {
+    display: "readable",
+    sign: "always",
+  })
   const forkNetwork = nodeInfo === undefined ? localnetConfig?.forkNetwork : nodeInfo.fork_network
   const forkBlockNumber =
     nodeInfo === undefined ? localnetConfig?.forkBlockNumber : nodeInfo.fork_block_number
   const hasFork = Boolean(forkNetwork?.trim())
-  const showUptime = hasControlApi && !fullNetworkConfig
+  const showUptime = hasSimulatedControlApi
   const nodeInfoColumnCount = hasFork ? 6 : remoteNetworkConfig ? 3 : 4
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
-  const networkSummary = hasControlApi
+  const networkSummary = hasSimulatedControlApi
     ? forkSummary
     : (environment?.network.label ?? "Virtual environment")
-  const forkBadgeLabel =
-    formatForkNetworkLabel(forkNetwork) ??
-    (environment?.network.id === "localnet"
-      ? "Local genesis"
-      : (environment?.network.label ?? "Local genesis"))
+  const forkBadgeLabel = remoteNetworkConfig
+    ? undefined
+    : (formatForkNetworkLabel(forkNetwork) ??
+      (environment?.network.id === "localnet"
+        ? "Local genesis"
+        : (environment?.network.label ?? "Local genesis")))
   const connectPanelStorageKey = runtime.environment?.id
     ? `${CONNECT_PANEL_DISMISSED_STORAGE_PREFIX}${runtime.environment.id}`
     : undefined
@@ -156,16 +152,19 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       globalThis.localStorage.getItem(connectPanelStorageKey) === "true",
   )
   const latestBlockSeqno = nodeInfo?.last_block_seqno ?? networkNodeInfo?.lastBlockSeqno
-  const nodeTime = nodeInfo
-    ? formatNodeDateTime(nodeInfo.current_unix_time)
+  const nodeUnixTime = nodeInfo
+    ? nodeInfo.current_unix_time
     : networkNodeInfo
-      ? formatNodeDateTime(networkNodeInfo.latestBlockUnixTime)
+      ? networkNodeInfo.latestBlockUnixTime
       : undefined
   const nodeTimeOffset =
     nodeInfo && nodeInfo.time_offset_seconds !== 0
-      ? formatTimeOffset(nodeInfo.time_offset_seconds)
+      ? formatDuration(nodeInfo.time_offset_seconds, {
+          display: "parts",
+          maxParts: 4,
+          sign: "always",
+        })
       : undefined
-  const nodeTimeTitle = nodeTime && nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime
   const forkBlockExplorerUrl = getActonscanForkBlockUrl(forkNetwork, forkBlockNumber)
   const localBlockCount =
     nodeInfo && forkBlockNumber !== undefined && forkBlockNumber !== null
@@ -196,7 +195,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   }, [connectPanelStorageKey])
 
   useEffect(() => {
-    if (!hasControlApi) {
+    if (!hasSimulatedControlApi) {
       setNodeInfo(undefined)
       return
     }
@@ -229,7 +228,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client, hasControlApi])
+  }, [client, hasSimulatedControlApi])
 
   useEffect(() => {
     if (!hasNetworkNodeInfo) {
@@ -383,7 +382,10 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         showToast({
           variant: "success",
           title: "Time advanced",
-          description: `Node time moved by ${formatReadableDuration(seconds)}.`,
+          description: `Node time moved by ${formatDuration(seconds, {
+            display: "readable",
+            sign: "always",
+          })}`,
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to advance node time."
@@ -407,9 +409,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           <h1 className={styles.environmentHomeName}>
             {runtime.environment?.name ?? "Virtual environment"}
           </h1>
-          <span className={styles.workspaceForkBadge} title={networkSummary}>
-            {forkBadgeLabel}
-          </span>
+          {forkBadgeLabel ? (
+            <span className={styles.workspaceForkBadge} title={networkSummary}>
+              {forkBadgeLabel}
+            </span>
+          ) : undefined}
         </div>
         <EnvironmentActions
           client={client}
@@ -420,6 +424,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}
           onSend={() => void navigate(localnetRoutes.path("/simulator"))}
+          onSnapshots={() => void navigate(localnetRoutes.path("/snapshots"))}
           onStateChanged={() => setNodeInfo(undefined)}
         />
       </header>
@@ -438,7 +443,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               />
             )}
 
-            {hasControlApi || hasNetworkNodeInfo ? (
+            {hasSimulatedControlApi || hasNetworkNodeInfo ? (
               <DataTable title="Node info" minWidth="42rem">
                 <DataTableTable aria-label="Node info">
                   <DataTableHead>
@@ -468,7 +473,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                     </DataTableRow>
                   </DataTableHead>
                   <DataTableBody>
-                    {latestBlockSeqno !== undefined && nodeTime ? (
+                    {latestBlockSeqno !== undefined && nodeUnixTime !== undefined ? (
                       <DataTableRow>
                         <DataTableCell>
                           <BlockChip
@@ -492,20 +497,35 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                                 <Network size={15} aria-hidden="true" />
                                 <span>{environment?.network.label ?? "Remote network"}</span>
                               </>
-                            ) : fullNetworkConfig ? (
-                              <>
-                                <Network size={15} aria-hidden="true" />
-                                <span>Validator network</span>
-                              </>
-                            ) : nodeInfo?.fork_network ? (
-                              <>
-                                <GitBranch size={15} aria-hidden="true" />
-                                <span>Fork</span>
-                              </>
                             ) : (
                               <>
-                                <CircleDot size={15} aria-hidden="true" />
-                                <span>Local genesis</span>
+                                {fullNetworkConfig ? (
+                                  <Network size={15} aria-hidden="true" />
+                                ) : nodeInfo?.fork_network ? (
+                                  <GitBranch size={15} aria-hidden="true" />
+                                ) : (
+                                  <CircleDot size={15} aria-hidden="true" />
+                                )}
+                                <span>
+                                  {fullNetworkConfig ? "Full localnet" : "Simulated localnet"}
+                                </span>
+                                <Tooltip
+                                  content={
+                                    fullNetworkConfig
+                                      ? "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+                                      : nodeInfo?.fork_network
+                                        ? "Uses the Acton emulator and starts from a TON network snapshot, supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                                        : "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                                  }
+                                >
+                                  <button
+                                    type="button"
+                                    className={styles.settingsSectionHelp}
+                                    aria-label={`About ${fullNetworkConfig ? "Full localnet" : "Simulated localnet"}`}
+                                  >
+                                    <CircleHelp size={14} aria-hidden="true" />
+                                  </button>
+                                </Tooltip>
                               </>
                             )}
                           </span>
@@ -535,20 +555,17 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         {fullNetworkConfig ? (
                           <DataTableCell>{fullNetworkConfig.validators}</DataTableCell>
                         ) : showUptime ? (
-                          <DataTableCell
-                            data-visual-dynamic="time"
-                            data-visual-placeholder="<uptime>"
-                          >
-                            {nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : "—"}
+                          <DataTableCell>
+                            <Duration value={nodeInfo?.uptime_seconds} />
                           </DataTableCell>
                         ) : undefined}
-                        <DataTableCell align="right" title={nodeTimeTitle}>
-                          <span
-                            className={styles.nodeInfoTime}
-                            data-visual-dynamic="time"
-                            data-visual-placeholder="<time>"
-                          >
-                            <span>{nodeTime}</span>
+                        <DataTableCell align="right">
+                          <span className={styles.nodeInfoTime}>
+                            <DateTime
+                              display="date-time-numeric-seconds"
+                              unit="seconds"
+                              value={nodeUnixTime}
+                            />
                             {nodeTimeOffset && (
                               <span className={styles.nodeInfoValueMeta}>{nodeTimeOffset}</span>
                             )}
@@ -683,11 +700,27 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               </div>
               <div className={styles.timeAdvancePreviewRow}>
                 <span>Current</span>
-                <strong>{timeAdvanceCurrentValue}</strong>
+                <strong>
+                  <DateTime
+                    display="date-time-numeric-seconds"
+                    unit="seconds"
+                    value={nodeInfo?.current_unix_time}
+                  />
+                </strong>
               </div>
               <div className={styles.timeAdvancePreviewRow}>
                 <span>After</span>
-                <strong>{timeAdvanceTargetValue}</strong>
+                <strong>
+                  <DateTime
+                    display="date-time-numeric-seconds"
+                    unit="seconds"
+                    value={
+                      nodeInfo
+                        ? nodeInfo.current_unix_time + (parsedTimeAdvanceSeconds ?? 0)
+                        : undefined
+                    }
+                  />
+                </strong>
               </div>
             </div>
 
@@ -722,29 +755,20 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   )
 }
 
-function formatNodeInfoValue(value: string): string {
-  const normalized = value.trim()
-  if (normalized.length === 0) {
-    return "—"
-  }
-
-  return normalized.replace(/_/g, " ")
-}
-
 function formatForkSummary(
   network: string | null | undefined,
   block: number | null | undefined,
 ): string {
   const networkValue = network?.trim()
   const networkLabel = networkValue
-    ? `${networkValue.charAt(0).toUpperCase()}${formatNodeInfoValue(networkValue).slice(1)} fork`
+    ? `${humanizeIdentifier(networkValue, {capitalize: true})} fork`
     : undefined
 
   if (block === undefined || block === null) {
     return networkLabel ?? "Clean network"
   }
 
-  const blockLabel = `Block ${block.toLocaleString()}`
+  const blockLabel = `Block ${formatNumberValue(block)}`
   return networkLabel ? `${networkLabel} · ${blockLabel}` : `Fork · ${blockLabel}`
 }
 
@@ -765,20 +789,6 @@ function getActonscanForkBlockUrl(
   return networkId === "testnet" ? `${blockUrl}?network=testnet` : blockUrl
 }
 
-function formatNodeDateTime(unixSeconds: number): string {
-  const date = new Date(unixSeconds * 1000)
-
-  return `${formatDateTimePart(date.getDate())}.${formatDateTimePart(
-    date.getMonth() + 1,
-  )}.${date.getFullYear()}, ${formatDateTimePart(date.getHours())}:${formatDateTimePart(
-    date.getMinutes(),
-  )}:${formatDateTimePart(date.getSeconds())}`
-}
-
-function formatDateTimePart(value: number): string {
-  return value.toString().padStart(2, "0")
-}
-
 function parseTimeAdvanceSeconds(value: string): number | undefined {
   const seconds = Number(value)
   if (!Number.isSafeInteger(seconds) || seconds <= 0) {
@@ -791,49 +801,6 @@ function parseTimeAdvanceSeconds(value: string): number | undefined {
 function addTimeAdvanceSeconds(currentValue: string, secondsToAdd: number): string {
   const currentSeconds = parseTimeAdvanceSeconds(currentValue) ?? 0
   return (currentSeconds + secondsToAdd).toString()
-}
-
-function formatReadableDuration(totalSeconds: number): string {
-  return formatDurationWithTimeUnits(totalSeconds, {style: "readable"})
-}
-
-function formatTimeOffset(offsetSeconds: number): string {
-  return formatDurationWithTimeUnits(offsetSeconds, {
-    style: "compact",
-    maxParts: 4,
-  })
-}
-
-function formatDurationWithTimeUnits(
-  totalSeconds: number,
-  options: {
-    readonly style: "compact" | "readable"
-    readonly maxParts?: number
-  },
-): string {
-  const sign = totalSeconds < 0 ? "-" : "+"
-  let remainingSeconds = Math.abs(totalSeconds)
-  const parts: string[] = []
-
-  for (const unit of TIME_UNITS) {
-    const value = Math.floor(remainingSeconds / unit.seconds)
-    if (value === 0) {
-      continue
-    }
-
-    parts.push(
-      options.style === "compact"
-        ? `${value}${unit.compact}`
-        : `${value} ${value === 1 ? unit.name : `${unit.name}s`}`,
-    )
-    remainingSeconds %= unit.seconds
-    if (options.maxParts !== undefined && parts.length === options.maxParts) {
-      break
-    }
-  }
-
-  const zeroValue = options.style === "compact" ? "0s" : "0 seconds"
-  return `${sign}${parts.length > 0 ? parts.join(" ") : zeroValue}`
 }
 
 function getMasterchainBlockPath(seqno: number): string {

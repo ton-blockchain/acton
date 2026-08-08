@@ -3,6 +3,116 @@ import {beginCell} from "@ton/core"
 
 import {TonClient} from "../src/api/client"
 
+test("address information falls back to the node when the index has no account", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url.toString())
+    if (url.pathname.endsWith("/addressInformation")) {
+      return Response.json({
+        balance: "0",
+        code: null,
+        data: null,
+        frozen_hash: null,
+        last_transaction_hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        last_transaction_lt: "0",
+        status: "uninit",
+      })
+    }
+    return Response.json({
+      ok: true,
+      result: {
+        balance: "99885000",
+        code: "code-boc",
+        data: "data-boc",
+        frozen_hash: null,
+        last_transaction_hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        last_transaction_lt: "0",
+        state: "active",
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect({
+      result: await client.getAddressInformation("EQImportedAccount"),
+      requests,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/addressInformation?address=EQImportedAccount&include_boc=true",
+          "https://toncenter.example/api/v2/getAddressInformation?address=EQImportedAccount",
+        ],
+        "result": {
+          "balance": "99885000",
+          "code": "code-boc",
+          "data": "data-boc",
+          "frozen_hash": null,
+          "last_transaction_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "last_transaction_lt": "0",
+          "status": "active",
+        },
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("address information does not query the node when indexed state is present", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(input.toString())
+    return Response.json({
+      balance: "42",
+      code: "code-boc",
+      data: "data-boc",
+      frozen_hash: null,
+      last_transaction_hash: "transaction-hash",
+      last_transaction_lt: "10",
+      status: "active",
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect({
+      result: await client.getAddressInformation("EQIndexedAccount"),
+      requests,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/addressInformation?address=EQIndexedAccount&include_boc=true",
+        ],
+        "result": {
+          "balance": "42",
+          "code": "code-boc",
+          "data": "data-boc",
+          "frozen_hash": null,
+          "last_transaction_hash": "transaction-hash",
+          "last_transaction_lt": "10",
+          "status": "active",
+        },
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("raw blocks are loaded from the selected TonAPI LiteServer", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
@@ -422,6 +532,186 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("account action metadata resolves type-only jetton masters", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    if (url.pathname.endsWith("/actions")) {
+      return Response.json({
+        actions: [
+          {
+            type: "jetton_mint",
+            details: {asset: "0:master", amount: "1000000000"},
+          },
+        ],
+        address_book: {},
+        metadata: {
+          "0:master": {
+            token_info: [{type: "jetton_masters"}],
+          },
+        },
+      })
+    }
+
+    return Response.json({
+      jetton_masters: [
+        {
+          address: "0:master",
+          admin_address: null,
+          code_hash: "code",
+          data_hash: "data",
+          jetton_content: {name: "Acton Token", symbol: "ACT", decimals: "9"},
+          jetton_wallet_code_hash: "wallet-code",
+          last_transaction_lt: "1",
+          mintable: true,
+          total_supply: "1000000000",
+        },
+      ],
+      metadata: {},
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const response = await client.getAccountActions("EQAddress")
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      tokenInfo: response.metadata["0:master"]?.token_info,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/actions?account=EQAddress&limit=20&sort=desc",
+          "https://toncenter.example/api/v3/jetton/masters?address=0%3Amaster&limit=1",
+        ],
+        "tokenInfo": [
+          {
+            "decimals": "9",
+            "mintable": true,
+            "name": "Acton Token",
+            "symbol": "ACT",
+            "total_supply": "1000000000",
+            "type": "jetton_masters",
+          },
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("account action metadata skips master lookup when the symbol is present", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    return Response.json({
+      actions: [
+        {
+          type: "jetton_mint",
+          details: {asset: "0:master", amount: "1000000000"},
+        },
+      ],
+      address_book: {},
+      metadata: {
+        "0:master": {
+          token_info: [{type: "jetton_masters", name: "Acton Token", symbol: "ACT"}],
+        },
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const response = await client.getAccountActions("EQAddress")
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      tokenInfo: response.metadata["0:master"]?.token_info,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/actions?account=EQAddress&limit=20&sort=desc",
+        ],
+        "tokenInfo": [
+          {
+            "name": "Acton Token",
+            "symbol": "ACT",
+            "type": "jetton_masters",
+          },
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("account history streaming subscribes to and dispatches transactions and actions", async () => {
+  const originalFetch = globalThis.fetch
+  let subscriptionBody = ""
+  const streamEvents = [
+    {
+      type: "transactions",
+      finality: "confirmed",
+      transactions: [{hash: "transaction-hash"}],
+    },
+    {
+      type: "actions",
+      finality: "confirmed",
+      actions: [{action_id: "action-id"}],
+      address_book: {"0:account": {user_friendly: "EQAccount"}},
+      metadata: {"0:account": {token_info: []}},
+    },
+  ]
+  globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    subscriptionBody = String(init?.body ?? "")
+    return new Response(streamEvents.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""), {
+      headers: {"Content-Type": "text/event-stream"},
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const receivedEvents: unknown[] = []
+
+    const receivedActions = new Promise<void>((resolve, reject) => {
+      client.subscribeAccountHistory("EQAddress", {
+        onTransactions: event => receivedEvents.push(event),
+        onActions: event => {
+          receivedEvents.push(event)
+          resolve()
+        },
+        onError: reject,
+      })
+    })
+    await receivedActions
+
+    expect({
+      receivedEvents,
+      subscription: JSON.parse(subscriptionBody) as unknown,
+    }).toMatchSnapshot()
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("jetton wallet requests forward pagination options", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
@@ -448,6 +738,66 @@ test("jetton wallet requests forward pagination options", async () => {
       "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner&limit=100&offset=200",
       "https://toncenter.example/api/v3/jetton/wallets?jetton_address=EQJetton&limit=100&offset=300&sort=desc",
     ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("jetton wallet metadata without content stays unresolved for master lookup", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({
+      jetton_wallets: [
+        {
+          address: "0:wallet",
+          balance: "100",
+          owner: "0:owner",
+          jetton: "0:master",
+          last_transaction_lt: "1",
+          code_hash: "code",
+          data_hash: "data",
+        },
+      ],
+      metadata: {
+        "0:master": {
+          is_indexed: false,
+          token_info: [{type: "jetton_masters"}],
+        },
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const wallets = await client.getJettonWallets(["EQOwner"])
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      wallets: wallets.map(wallet => ({
+        balance: wallet.balance,
+        jetton: wallet.jetton,
+        master: wallet.master ?? null,
+      })),
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner",
+        ],
+        "wallets": [
+          {
+            "balance": "100",
+            "jetton": "0:master",
+            "master": null,
+          },
+        ],
+      }
+    `)
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -567,6 +917,52 @@ test("trace and block lookups can use their same-origin proxies", async () => {
         },
       ]
     `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("block transaction fallback uses the V2 proxy and signed shard cursor", async () => {
+  const originalFetch = globalThis.fetch
+  let requestUrl = ""
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    requestUrl = input.toString()
+    return Promise.resolve(
+      Response.json({
+        ok: true,
+        result: {
+          "@type": "blocks.transactions",
+          id: {},
+          req_count: 100,
+          incomplete: false,
+          transactions: [],
+        },
+      }),
+    )
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      toncenterProxyV2BaseUrl: "https://actonscan.example/api/toncenter/mainnet/v2",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await client.getBlockTransactionsV2({
+      workchain: -1,
+      shard: "8000000000000000",
+      seqno: 42,
+      rootHash: "root/hash=",
+      fileHash: "file/hash=",
+      count: 100,
+      afterLt: "123",
+      afterHash: "f".repeat(64),
+    })
+
+    expect(requestUrl).toBe(
+      "https://actonscan.example/api/toncenter/mainnet/v2/getBlockTransactions?workchain=-1&shard=-9223372036854775808&seqno=42&root_hash=root%2Fhash%3D&file_hash=file%2Fhash%3D&count=100&after_lt=123&after_hash=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -848,6 +1244,32 @@ test("localnet state and checkpoint methods transfer JSON through the control AP
     for (const request of requests) {
       expect(new Headers(request.init?.headers).get("Authorization")).toBe("Bearer test-token")
     }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("account funding sends exact nanograms beyond the safe integer range", async () => {
+  const originalFetch = globalThis.fetch
+  let requestBody: string | undefined
+  globalThis.fetch = mock(async (_input, init) => {
+    requestBody = String(init?.body)
+    return Response.json({success: true, hash: "message-hash"})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "http://localhost:8081/api/v2",
+      v3BaseUrl: "http://localhost:8081/api/v3",
+      addressNameBaseUrl: "http://localhost:8081",
+    })
+
+    await expect(
+      client.fundAccount("EQExactRecipient", 123_456_789_012_345_678_901_234_567_890n),
+    ).resolves.toBe("message-hash")
+    expect(requestBody).toBe(
+      '{"address":"EQExactRecipient","amount":123456789012345678901234567890}',
+    )
   } finally {
     globalThis.fetch = originalFetch
   }

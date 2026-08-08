@@ -4,6 +4,7 @@ import {visualSnapshotsEnabled} from "../support/visual"
 
 const previews = [
   {key: "home", route: "/"},
+  {key: "config", route: "/config"},
   {key: "blocks", route: "/blocks"},
   {key: "block", route: "/block/-1/8000000000000000/123"},
   {key: "abi", route: "/abi"},
@@ -18,6 +19,8 @@ const previews = [
   {key: "transaction", route: `/tx/${"0".repeat(64)}`},
 ] as const
 
+const historicalConfigRoutes = ["/config/123"] as const
+
 test.describe("Explorer Open Graph previews", () => {
   test("serves route-specific metadata", async ({request}) => {
     for (const preview of previews) {
@@ -26,6 +29,16 @@ test.describe("Explorer Open Graph previews", () => {
 
       const html = await response.text()
       expect(html).toContain(`/og/page.png?page=${preview.key}&amp;v=7`)
+    }
+  })
+
+  test("serves metadata for historical config routes", async ({request}) => {
+    for (const route of historicalConfigRoutes) {
+      const response = await request.get(route)
+      expect(response.ok(), route).toBeTruthy()
+
+      const html = await response.text()
+      expect(html).toContain("/og/page.png?page=config&amp;v=7")
     }
   })
 

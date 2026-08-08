@@ -4,9 +4,10 @@ use acton_config::config;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
-use ton_api::TonApiClient;
 use ton_api::toncenter::{v2, v3};
+use ton_api::{MasterchainSnapshot, TonApiClient};
 use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -24,26 +25,47 @@ struct RemoteShardBoundary {
 pub struct RemoteProvider {
     pub network: Network,
     pub fork_block_number: Option<u64>,
+    #[serde(skip)]
+    pub(crate) fork_snapshot: Option<MasterchainSnapshot>,
 }
 
 impl RemoteProvider {
     pub async fn pinned(network: Network, fork_block_number: Option<u64>) -> anyhow::Result<Self> {
-        let fork_block_number = match fork_block_number {
-            Some(fork_block_number) => fork_block_number,
-            None => {
-                let network = network.clone();
-                tokio::task::spawn_blocking(move || {
-                    create_api_client(network)?.get_last_block_seqno()
-                })
-                .await
-                .context("Failed to resolve latest fork block")??
-            }
-        };
+        let request_network = network.clone();
+        let fork_snapshot = tokio::task::spawn_blocking(move || {
+            create_api_client(request_network)?.get_masterchain_snapshot_cached(
+                fork_block_number,
+                &masterchain_snapshot_cache_dir(),
+            )
+        })
+        .await
+        .context("Failed to resolve fork snapshot")??;
 
         Ok(Self {
             network,
-            fork_block_number: Some(fork_block_number),
+            fork_block_number: Some(fork_snapshot.seqno),
+            fork_snapshot: Some(fork_snapshot),
         })
+    }
+
+    pub(crate) fn snapshot_at(
+        &mut self,
+        seqno: u64,
+    ) -> anyhow::Result<Option<MasterchainSnapshot>> {
+        let Some(snapshot) = &self.fork_snapshot else {
+            return Ok(None);
+        };
+        if snapshot.seqno == seqno {
+            return Ok(Some(snapshot.clone()));
+        }
+
+        let snapshot = with_api_client(self, move |api_client| {
+            api_client
+                .get_masterchain_snapshot_cached(Some(seqno), &masterchain_snapshot_cache_dir())
+        })?;
+        self.fork_block_number = Some(snapshot.seqno);
+        self.fork_snapshot = Some(snapshot.clone());
+        Ok(Some(snapshot))
     }
 
     pub async fn contains_historical_block(
@@ -109,6 +131,13 @@ impl RemoteProvider {
             .insert(key, Arc::clone(&shards));
         Ok(shards)
     }
+}
+
+fn masterchain_snapshot_cache_dir() -> PathBuf {
+    config::project_root()
+        .join("build")
+        .join("cache")
+        .join(ton_api::MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR)
 }
 
 type RemoteForkKey = (String, u64);
@@ -371,20 +400,12 @@ pub(crate) fn account_meta_from_shard_account(
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn explicit_fork_block_is_preserved() {
-        let provider = RemoteProvider::pinned(Network::Mainnet, Some(81_000_000))
-            .await
-            .unwrap();
-
-        assert_eq!(provider.fork_block_number, Some(81_000_000));
-    }
-
     #[tokio::test(flavor = "current_thread")]
     async fn synchronous_api_client_request_is_safe_inside_runtime() {
         let provider = RemoteProvider {
             network: Network::Mainnet,
             fork_block_number: Some(81_000_000),
+            fork_snapshot: None,
         };
 
         with_api_client(&provider, |_| Ok(())).unwrap();

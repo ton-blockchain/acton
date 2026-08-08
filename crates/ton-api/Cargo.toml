@@ -27,6 +27,7 @@ tvm-ffi = { workspace = true }
 [dev-dependencies]
 ton = { workspace = true }
 tungstenite = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

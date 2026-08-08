@@ -16,7 +16,7 @@ async fn local_runtime_owns_the_cli_process_and_captures_its_output() {
     let executable = workspace.path().join("fake-acton");
     std::fs::write(
         &executable,
-        "#!/bin/sh\nprintf 'running the shared acton test path\\n'\nprintf 'diagnostic output\\n' >&2\n",
+        "#!/bin/sh\nprintf 'running the shared acton test path\\n'\nprintf 'studio url: %s\\n' \"$ACTON_STUDIO_URL\"\nprintf 'studio run id: %s\\n' \"$ACTON_STUDIO_RUN_ID\"\nprintf 'studio source: %s\\n' \"$ACTON_STUDIO_RUN_SOURCE\"\nprintf 'diagnostic output\\n' >&2\n",
     )
     .expect("fake Acton executable must be written");
     let mut permissions = std::fs::metadata(&executable)
@@ -91,6 +91,9 @@ invalid ID: Test run ID contains unsupported characters
 command: acton test tests/counter.test.tolk --filter increments --include **/counter* --exclude **/slow/** --fail-fast --save-test-trace /WORKSPACE/.studio/tests/traces/RUN_ID
 trace dir: .studio/tests/traces/RUN_ID
 stdout: running the shared acton test path
+studio url: http://127.0.0.1:3016
+studio run id: RUN_ID
+studio source: studio
 stderr: diagnostic output
 "]]
     .assert_eq(

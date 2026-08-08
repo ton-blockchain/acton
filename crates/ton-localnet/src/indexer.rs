@@ -629,6 +629,7 @@ mod tests {
         StateSource::Remote(RemoteProvider {
             network,
             fork_block_number: Some(1),
+            fork_snapshot: None,
         })
     }
 

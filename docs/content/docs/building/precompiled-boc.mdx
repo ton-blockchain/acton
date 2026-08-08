@@ -105,6 +105,20 @@ Keep this file honest. If a message opcode, field type, storage layout, or get
 method signature does not match the BoC, generated helpers will be typed but
 wrong.
 
+## Inspect a deployed contract with the interface
+
+Pass the interface directly when the deployed code is not available in the
+current project or does not have verifier ABI metadata:
+
+```bash
+acton rpc info <ADDRESS> --abi contracts/Precompiled.types.tolk --net mainnet
+acton rpc call <ADDRESS> currentCounter --abi contracts/Precompiled.types.tolk --net mainnet
+```
+
+`--abi` also accepts compiler ABI JSON, for example
+`build/abi/precompiled.json`. Explicit ABI files take priority over automatic
+local, catalog, and verifier matching.
+
 ## Generate wrappers
 
 After adding `types`, generate a Tolk wrapper the same way you would for a

@@ -33,10 +33,17 @@ Localnet server port.
 
 {{#option "`--fork-net` _network_" }}
 Remote network to use for forked account resolution.
+
+The fork also uses the network configuration from the resolved masterchain
+block. With an explicit historical block, it uses that block's Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
 {{/option}}
 
 {{#option "`--fork-block-number` _seqno_" }}
 Historical block sequence number to fork from.
+
+The selected block provides the local network configuration and virtual-clock
+origin.
 {{/option}}
 
 {{#option "`--accounts` _name_[,_name_...]_" }}

@@ -8,19 +8,11 @@ use crate::node::StateSource;
 use acton_config::color::OwoColorize;
 use axum::extract::FromRef;
 use serde::Serialize;
-use serde_json::Value;
-use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 use ton_api::OffchainJsonResolver;
-
-const MAX_EXTERNAL_API_CALLS: usize = 1_000;
-const MAX_STUDIO_UI_API_CALLS: usize = 200;
-const MAX_API_CALLS: usize = MAX_EXTERNAL_API_CALLS + MAX_STUDIO_UI_API_CALLS;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct StartupAccount {
@@ -38,7 +30,6 @@ pub struct ServerState {
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
     pub rate_limit_rps: Option<u32>,
-    pub api_calls: ApiCallLog,
     pub auth_token: Option<Arc<str>>,
 }
 
@@ -102,219 +93,6 @@ impl NetworkConditions {
 }
 
 #[derive(Clone)]
-pub struct ApiCallLog {
-    entries: Arc<Mutex<ApiCallEntries>>,
-    next_sequence: Arc<AtomicU64>,
-}
-
-struct ApiCallEntries {
-    external: VecDeque<ApiCallRecord>,
-    studio_ui: VecDeque<ApiCallRecord>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct ApiCallRecord {
-    pub sequence: u64,
-    pub status: ApiCallStatus,
-    pub status_code: u16,
-    pub source: ApiCallSource,
-    pub call_type: ApiCallType,
-    pub api_family: ApiCallFamily,
-    pub http_method: String,
-    pub path: String,
-    pub method: String,
-    pub request_id: Value,
-    pub query_params: Option<Value>,
-    pub request_body: Option<Value>,
-    pub request_body_truncated: bool,
-    pub response_body: Option<Value>,
-    pub response_body_truncated: bool,
-    pub timestamp_ms: u128,
-    pub duration_ns: u128,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiCallStatus {
-    Success,
-    Failed,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiCallType {
-    Read,
-    Write,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiCallSource {
-    External,
-    StudioUi,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiCallFamily {
-    Control,
-    Emulate,
-    JsonRpc,
-    Streaming,
-    V2,
-    V3,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct ApiCallLogSnapshot {
-    pub calls: Vec<ApiCallRecord>,
-    pub total_retained: usize,
-    pub max_retained: usize,
-}
-
-#[derive(Clone, Debug)]
-pub struct ApiCallStart {
-    pub started_at: SystemTime,
-    pub duration_start: Instant,
-}
-
-#[derive(Clone, Debug)]
-pub struct ApiCallInput {
-    pub source: ApiCallSource,
-    pub call_type: ApiCallType,
-    pub api_family: ApiCallFamily,
-    pub http_method: String,
-    pub path: String,
-    pub method: String,
-    pub request_id: Value,
-    pub query_params: Option<Value>,
-    pub request_body: Option<Value>,
-    pub request_body_truncated: bool,
-    pub status_code: u16,
-}
-
-impl ApiCallLog {
-    fn new() -> Self {
-        Self {
-            entries: Arc::new(Mutex::new(ApiCallEntries {
-                external: VecDeque::with_capacity(MAX_EXTERNAL_API_CALLS),
-                studio_ui: VecDeque::with_capacity(MAX_STUDIO_UI_API_CALLS),
-            })),
-            next_sequence: Arc::new(AtomicU64::new(1)),
-        }
-    }
-
-    #[must_use]
-    pub fn start() -> ApiCallStart {
-        ApiCallStart {
-            started_at: SystemTime::now(),
-            duration_start: Instant::now(),
-        }
-    }
-
-    #[must_use]
-    pub fn record(&self, input: ApiCallInput, start: ApiCallStart) -> u64 {
-        let sequence = self.next_sequence.fetch_add(1, Ordering::Relaxed);
-        let status = if input.status_code < 400 {
-            ApiCallStatus::Success
-        } else {
-            ApiCallStatus::Failed
-        };
-        let timestamp_ms = start
-            .started_at
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |duration| duration.as_millis());
-
-        let record = ApiCallRecord {
-            sequence,
-            status,
-            status_code: input.status_code,
-            source: input.source,
-            call_type: input.call_type,
-            api_family: input.api_family,
-            http_method: input.http_method,
-            path: input.path,
-            method: input.method,
-            request_id: input.request_id,
-            query_params: input.query_params,
-            request_body: input.request_body,
-            request_body_truncated: input.request_body_truncated,
-            response_body: None,
-            response_body_truncated: false,
-            timestamp_ms,
-            duration_ns: start.duration_start.elapsed().as_nanos(),
-        };
-
-        let mut entries = self
-            .entries
-            .lock()
-            .expect("API call log lock must not be poisoned");
-        let (source_entries, max_entries) = match input.source {
-            ApiCallSource::External => (&mut entries.external, MAX_EXTERNAL_API_CALLS),
-            ApiCallSource::StudioUi => (&mut entries.studio_ui, MAX_STUDIO_UI_API_CALLS),
-        };
-        if source_entries.len() == max_entries {
-            source_entries.pop_front();
-        }
-        source_entries.push_back(record);
-        drop(entries);
-
-        sequence
-    }
-
-    pub fn record_response(
-        &self,
-        sequence: u64,
-        response_body: Option<Value>,
-        response_body_truncated: bool,
-    ) {
-        let mut entries = self
-            .entries
-            .lock()
-            .expect("API call log lock must not be poisoned");
-        let ApiCallEntries {
-            external,
-            studio_ui,
-        } = &mut *entries;
-        let call = external
-            .iter_mut()
-            .chain(studio_ui.iter_mut())
-            .find(|call| call.sequence == sequence);
-        if let Some(call) = call {
-            call.response_body = response_body;
-            call.response_body_truncated = response_body_truncated;
-        }
-        drop(entries);
-    }
-
-    #[must_use]
-    pub fn snapshot(&self, limit: Option<usize>) -> ApiCallLogSnapshot {
-        let entries = self
-            .entries
-            .lock()
-            .expect("API call log lock must not be poisoned");
-        let total_retained = entries.external.len() + entries.studio_ui.len();
-        let limit = limit.unwrap_or(MAX_API_CALLS).min(MAX_API_CALLS);
-        let skip = total_retained.saturating_sub(limit);
-        let mut calls = entries
-            .external
-            .iter()
-            .chain(&entries.studio_ui)
-            .cloned()
-            .collect::<Vec<_>>();
-        drop(entries);
-        calls.sort_unstable_by_key(|call| call.sequence);
-        let calls = calls.into_iter().skip(skip).collect();
-
-        ApiCallLogSnapshot {
-            calls,
-            total_retained,
-            max_retained: MAX_API_CALLS,
-        }
-    }
-}
-
-#[derive(Clone)]
 pub struct ShutdownSignal {
     tx: broadcast::Sender<()>,
 }
@@ -366,12 +144,6 @@ impl FromRef<ServerState> for NetworkConditions {
     }
 }
 
-impl FromRef<ServerState> for ApiCallLog {
-    fn from_ref(state: &ServerState) -> Self {
-        state.api_calls.clone()
-    }
-}
-
 pub struct ServerArgs {
     pub port: u16,
     pub db_path: Option<String>,
@@ -415,8 +187,6 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     let auth_token = auth_token.map(Arc::<str>::from);
 
     let network_conditions = NetworkConditions::new(response_delay_ms);
-    let api_calls = ApiCallLog::new();
-
     let shutdown = ShutdownSignal::new();
     let offchain_metadata = OffchainJsonResolver::new()
         .map_err(|source| ServerError::OffchainMetadataClient { source })?;
@@ -427,7 +197,6 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         shutdown: shutdown.clone(),
         network_conditions: network_conditions.clone(),
         rate_limit_rps,
-        api_calls,
         auth_token: auth_token.clone(),
     });
 
@@ -457,7 +226,7 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         None
     };
     println!(
-        "    {} Localnet server and UI on http://{address}",
+        "    {} Localnet server on http://{address}",
         "Starting".green().bold(),
     );
     if let Some(liteapi_endpoint) = liteapi_endpoint {
@@ -510,56 +279,4 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
         .await
         .map_err(|source| ServerError::Serve { source })?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn api_call_sources_have_independent_retention_limits() {
-        let log = ApiCallLog::new();
-
-        for source in [
-            ApiCallSource::External,
-            ApiCallSource::StudioUi,
-            ApiCallSource::External,
-        ] {
-            let entries = match source {
-                ApiCallSource::External => MAX_EXTERNAL_API_CALLS,
-                ApiCallSource::StudioUi => MAX_STUDIO_UI_API_CALLS,
-            };
-            for _ in 0..entries {
-                let _ = log.record(
-                    ApiCallInput {
-                        source,
-                        call_type: ApiCallType::Read,
-                        api_family: ApiCallFamily::V3,
-                        http_method: "GET".to_owned(),
-                        path: "/api/v3/blocks".to_owned(),
-                        method: "blocks".to_owned(),
-                        request_id: Value::Null,
-                        query_params: None,
-                        request_body: None,
-                        request_body_truncated: false,
-                        status_code: 200,
-                    },
-                    ApiCallLog::start(),
-                );
-            }
-        }
-
-        let snapshot = log.snapshot(None);
-        let external_count = snapshot
-            .calls
-            .iter()
-            .filter(|call| matches!(call.source, ApiCallSource::External))
-            .count();
-        let studio_ui_count = snapshot.calls.len() - external_count;
-
-        assert_eq!(external_count, MAX_EXTERNAL_API_CALLS);
-        assert_eq!(studio_ui_count, MAX_STUDIO_UI_API_CALLS);
-        assert_eq!(snapshot.total_retained, MAX_API_CALLS);
-        assert_eq!(snapshot.max_retained, MAX_API_CALLS);
-    }
 }

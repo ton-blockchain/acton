@@ -1,5 +1,6 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import type {LucideIcon} from "lucide-react"
 import {
   Boxes,
   Cable,
@@ -10,7 +11,6 @@ import {
   Search,
   Wallet,
 } from "lucide-react"
-import type {LucideIcon} from "lucide-react"
 import {useNavigate} from "react-router"
 
 import type {TonClient} from "@acton/explorer-core/api/client"
@@ -24,10 +24,11 @@ import type {EnvironmentCapability} from "../../studioApi"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
 import {useLocalnetRoutes} from "../routes"
 
-import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
-import {NFT_PLACEHOLDER_IMAGE, TOKEN_PLACEHOLDER_IMAGE} from "./constants"
-import {contentString, matchesQuery, shortHash} from "./dashboardUtils"
+import {type ApiSearchIndexEntry, loadApiSearchIndex} from "./apiSearchIndex"
+import {contentString, matchesQuery} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
+import {shortenMiddle} from "@acton/ui"
+import {TOKEN_PLACEHOLDER_IMAGE} from "@acton/explorer-core/components/imageFallbacks"
 
 interface DashboardSearchOverlayProps {
   readonly client: TonClient
@@ -179,7 +180,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
       results.push({
         id: `transaction-${transactionHash}`,
         title: "Open transaction",
-        description: shortHash(transactionHash),
+        description: shortenMiddle(transactionHash, {start: 8, end: 8}),
         href: routes.transactionPath(transactionHash),
         icon: ChartNoAxesColumn,
       })
@@ -257,7 +258,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           href: routes.addressPath(item.address),
           icon: Image,
           image: contentString(item.content, "image"),
-          fallbackImage: NFT_PLACEHOLDER_IMAGE,
+          fallbackImage: TOKEN_PLACEHOLDER_IMAGE,
           collectionName,
           isScam: item.is_scam === true,
         })

@@ -44,12 +44,15 @@ impl State {
 
 #[derive(Deserialize, ToSchema)]
 pub(super) struct FundAccountRequest {
+    /// TON address that receives the funds
     address: String,
+    /// Transfer amount in nanotons
     amount: u128,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub(super) struct FundAccountResponse {
+    /// `true` when Localton confirms the transfer
     ok: bool,
     #[schema(inline)]
     result: FundAccountResult,
@@ -57,15 +60,20 @@ pub(super) struct FundAccountResponse {
 
 #[derive(Debug, Serialize, ToSchema)]
 struct FundAccountResult {
+    /// TON Center response type
     #[serde(rename = "@type")]
     kind: String,
+    /// Base64 hash of the confirmed internal message
     hash: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub(super) struct FundAccountErrorResponse {
+    /// Always `false` for an error response
     ok: bool,
+    /// Error message for the request
     error: String,
+    /// HTTP status code for the error
     code: u16,
 }
 
@@ -119,6 +127,9 @@ const CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(30);
 const CONFIRMATION_INTERVAL: Duration = Duration::from_millis(500);
 pub(super) const TRANSACTION_LOOKBACK: &str = "16";
 
+/// Fund an account from the genesis wallet
+///
+/// Localton sends a signed transfer and waits for the destination message
 #[utoipa::path(
     post,
     path = "/acton_fundAccount",

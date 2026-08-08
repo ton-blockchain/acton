@@ -1,4 +1,5 @@
 import {Cell} from "@ton/core"
+import {formatCountLabel, formatNumberValue} from "@acton/ui"
 
 import type {
   CellInputError,
@@ -49,7 +50,7 @@ export function normalizeCellInput(
   if (rawInput.length > maxEncodedChars) {
     return normalizeFailure(
       "input-too-large",
-      `Cell input exceeds the ${maxEncodedChars.toLocaleString()} character limit`,
+      `Cell input exceeds the ${formatNumberValue(maxEncodedChars)} character limit`,
     )
   }
 
@@ -100,7 +101,7 @@ export function decodeCellInput(
   if (bytes.length > maxInputBytes) {
     return decodeFailure(
       "input-too-large",
-      `Decoded BoC exceeds the ${maxInputBytes.toLocaleString()} byte limit`,
+      `Decoded BoC exceeds the ${formatNumberValue(maxInputBytes)} byte limit`,
       input,
     )
   }
@@ -125,7 +126,7 @@ export function decodeCellInput(
   if (roots.length > maxRoots) {
     return decodeFailure(
       "too-many-roots",
-      `The BoC contains ${roots.length.toLocaleString()} roots; the limit is ${maxRoots.toLocaleString()}`,
+      `The BoC contains ${formatNumberValue(roots.length)} roots; the limit is ${formatNumberValue(maxRoots)}`,
       input,
     )
   }
@@ -134,7 +135,7 @@ export function decodeCellInput(
   if (!Number.isSafeInteger(rootIndex) || rootIndex < 0 || rootIndex >= roots.length) {
     return decodeFailure(
       "root-out-of-range",
-      `Root ${String(rootIndex)} is unavailable. This BoC contains ${roots.length} ${roots.length === 1 ? "root cell" : "root cells"}`,
+      `Root ${String(rootIndex)} is unavailable. This BoC contains ${formatCountLabel(roots.length, {singular: "root cell"})}`,
       input,
     )
   }

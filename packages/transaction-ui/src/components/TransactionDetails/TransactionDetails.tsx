@@ -2,13 +2,15 @@ import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {
   buildStorageDiff,
+  BooleanValue,
   ContractChip,
-  CopyInlineAction,
   CopyInlineButton,
+  DateTime,
   DisclosureToggle,
   ExitCodeChip,
+  GramAmount,
   InfoPopover,
-  InlineActions,
+  NumberValue,
   OpcodeChip,
   ParsedBodySection,
   type ParsedCodeCell,
@@ -16,6 +18,7 @@ import {
   ParsedValueView,
   RawDataBlock,
   SendModeViewer,
+  TechnicalValue,
   Tooltip,
 } from "@acton/ui"
 
@@ -34,7 +37,6 @@ import {
   ContractSourcePanel,
   type ContractVerifiedSource,
 } from "../ContractSourcePanel/ContractSourcePanel"
-import * as fmt from "../../lib/format"
 import {
   decodeStateInitData,
   decodeTransactionMessageBody,
@@ -201,9 +203,6 @@ export function TransactionDetails({
     )
   }
 
-  const formatBoolean = (v: boolean): React.JSX.Element => (
-    <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
-  )
   const formatStatusChange = (value: "unchanged" | "frozen" | "deleted"): string => {
     switch (value) {
       case "unchanged": {
@@ -456,13 +455,13 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Aborted</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(tickTockDescription?.aborted ?? false)}
+                  <BooleanValue value={tickTockDescription?.aborted ?? false} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Destroyed</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(tickTockDescription?.destroyed ?? false)}
+                  <BooleanValue value={tickTockDescription?.destroyed ?? false} />
                 </div>
               </div>
             </div>
@@ -479,7 +478,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Value</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {fmt.formatCurrency(inMessage.info.value.coins)}
+                  <GramAmount value={inMessage.info.value.coins} />
                 </div>
               </div>
               {sendMode !== undefined && (
@@ -493,24 +492,25 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Bounced</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(inMessage.info.bounced)}
+                  <BooleanValue value={inMessage.info.bounced} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Bounce</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(inMessage.info.bounce)}
+                  <BooleanValue value={inMessage.info.bounce} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Created At</div>
-                <div
+                <DateTime
                   className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
                   data-visual-dynamic="timestamp"
                   data-visual-placeholder="<timestamp>"
-                >
-                  {formatDetailedTimestamp(inMessage.info.createdAt, false)}
-                </div>
+                  display="date-time-numeric-seconds"
+                  unit="seconds"
+                  value={inMessage.info.createdAt}
+                />
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Created Lt</div>
@@ -522,23 +522,13 @@ export function TransactionDetails({
                 <div className={styles.multiColumnItem}>
                   <div className={styles.multiColumnItemTitle}>Hash</div>
                   <div className={styles.multiColumnItemValue}>
-                    <InlineActions
-                      visibility="always"
-                      actions={
-                        <CopyInlineAction
-                          value={messageHashHex}
-                          label="Copy message hash"
-                          copiedLabel="Message hash copied"
-                          size="compact"
-                        />
-                      }
-                    >
-                      <Tooltip content={messageHashHex}>
-                        <span>
-                          {messageHashHex.slice(0, 3)}…{messageHashHex.slice(-3)}
-                        </span>
-                      </Tooltip>
-                    </InlineActions>
+                    <TechnicalValue
+                      copyLabel="message hash"
+                      endLength={3}
+                      startLength={3}
+                      value={messageHashHex}
+                      copyVisibility="always"
+                    />
                   </div>
                 </div>
               )}
@@ -748,26 +738,26 @@ export function TransactionDetails({
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Amount Sent (Total)</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {fmt.formatCurrency(sentTotal)}
+                <GramAmount value={sentTotal} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>End Balance</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {endBalance === undefined ? "—" : fmt.formatCurrency(endBalance)}
+                <GramAmount value={endBalance} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Total Fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {fmt.formatCurrency(tx.transaction.totalFees.coins)}
+                <GramAmount value={tx.transaction.totalFees.coins} />
               </div>
             </div>
             {actionPhase && (
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Action Fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {actionFee === undefined ? "—" : fmt.formatCurrency(actionFee)}
+                  <GramAmount value={actionFee} />
                 </div>
               </div>
             )}
@@ -775,7 +765,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Forward Fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {fmt.formatCurrency(tx.transaction.inMessage.info.forwardFee)}
+                  <GramAmount value={tx.transaction.inMessage.info.forwardFee} />
                 </div>
               </div>
             )}
@@ -791,15 +781,13 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Storage Fee</div>
                 <div className={styles.multiColumnItemValue}>
-                  {fmt.formatCurrency(tickTockDescription.storagePhase.storageFeesCollected)}
+                  <GramAmount value={tickTockDescription.storagePhase.storageFeesCollected} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Storage Due</div>
                 <div className={styles.multiColumnItemValue}>
-                  {typeof tickTockStorageFeesDue === "bigint"
-                    ? fmt.formatCurrency(tickTockStorageFeesDue)
-                    : "—"}
+                  <GramAmount value={tickTockStorageFeesDue} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -823,7 +811,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Success</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(computePhase.success)}
+                  <BooleanValue value={computePhase.success} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -845,7 +833,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Gas Fee</div>
                 <div className={styles.multiColumnItemValue}>
-                  {fmt.formatCurrency(computePhase.gasFees)}
+                  <GramAmount value={computePhase.gasFees} />
                 </div>
               </div>
             </div>
@@ -865,10 +853,8 @@ export function TransactionDetails({
             <div className={`${styles.multiColumnRow} ${styles.actionPhaseSummaryRow}`}>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Success</div>
-                <div
-                  className={`${styles.multiColumnItemValue} ${actionPhase.success ? styles.booleanTrue : styles.booleanFalse}`}
-                >
-                  {formatBoolean(actionPhase.success)}
+                <div className={styles.multiColumnItemValue}>
+                  <BooleanValue value={actionPhase.success} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -882,7 +868,7 @@ export function TransactionDetails({
                 <div
                   className={`${styles.multiColumnItemValue} ${styles.numberValue} ${styles.actionsCountValue}`}
                 >
-                  {fmt.formatNumber(actionPhase.totalActions)}
+                  <NumberValue value={actionPhase.totalActions} />
                   {canToggleActions && (
                     <DisclosureToggle
                       expanded={showActions}
@@ -926,7 +912,20 @@ export function TransactionDetails({
             data-visual-dynamic="timestamp"
             data-visual-placeholder="<timestamp>"
           >
-            {formatDetailedTimestamp(tx.transaction.now)}
+            <DateTime
+              display="date-time-numeric-seconds"
+              unit="seconds"
+              value={tx.transaction.now}
+            />
+            <span className={styles.timestampDetailSecondary}>
+              {" — "}
+              <DateTime
+                display="date-time-day-month-short"
+                tooltip={false}
+                unit="seconds"
+                value={tx.transaction.now}
+              />
+            </span>
           </span>
           <span className={styles.timeInlineItem}>
             <span className={styles.timeInlineLabel}>LT:</span>
@@ -991,48 +990,4 @@ function formatAccountStatus(status: string): string {
       return status
     }
   }
-}
-
-function formatDetailedTimestamp(
-  timestampInput: number | string | undefined,
-  showShort = true,
-): React.JSX.Element | string {
-  if (timestampInput === undefined) return "—"
-
-  const date =
-    typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
-
-  const pad = (number: number): string => number.toString().padStart(2, "0")
-  const monthAbbrs = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ]
-
-  const day = date.getDate()
-  const monthIndex = date.getMonth()
-  const monthNumber = monthIndex + 1
-  const year = date.getFullYear()
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  const seconds = date.getSeconds()
-
-  const fullPart = `${pad(day)}.${pad(monthNumber)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
-
-  return (
-    <>
-      {fullPart}
-      {showShort && <span className={styles.timestampDetailSecondary}> — {shortPart}</span>}
-    </>
-  )
 }

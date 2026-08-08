@@ -8,13 +8,16 @@ services:
       - --ton-http-api
       - --validators
       - "__LOCALTON_VALIDATORS__"
+__LOCALTON_IMPORTED_ACCOUNTS__
     stop_grace_period: 60s
     restart: unless-stopped
     ports:
+      - "127.0.0.1:__LOCALTON_CONFIG_PORT__:18000"
       - "127.0.0.1:__LOCALTON_ADMIN_PORT__:18001"
       - "127.0.0.1:__LOCALTON_V2_PORT__:18002"
     volumes:
       - localton-state:/var/lib/localton
+      - localton-snapshots:/var/lib/localton-snapshots
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -28,7 +31,28 @@ services:
       interval: 10s
       timeout: 3s
       start_period: 240s
+      start_interval: 1s
       retries: 12
+
+  v3-basechain-bootstrap:
+    image: "__LOCALTON_IMAGE__"
+    command:
+      - indexer
+      - bootstrap-basechain
+      - --state-dir
+      - /var/lib/localton
+      - --endpoint
+      - http://localton:18002/api/v2
+      - --seqno-file
+      - /var/lib/ton-indexer/account-scan/target-seqno
+    depends_on:
+      localton:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    volumes:
+      - localton-state:/var/lib/localton
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
 
   postgres:
     image: postgres:17-alpine
@@ -50,6 +74,8 @@ services:
         - pg_isready -U postgres -d ton_index
       interval: 5s
       timeout: 5s
+      start_period: 30s
+      start_interval: 1s
       retries: 12
     shm_size: 512m
     restart: unless-stopped
@@ -69,6 +95,8 @@ services:
         - ping
       interval: 5s
       timeout: 5s
+      start_period: 30s
+      start_interval: 1s
       retries: 12
     restart: unless-stopped
 
@@ -128,6 +156,40 @@ services:
       - localton-state:/var/lib/localton:ro
       - ton-index-workdir:/var/lib/ton-indexer/work
 
+  v3-account-scanner:
+    image: "__LOCALTON_IMAGE__"
+    user: "0:0"
+    command:
+      - v3-account-scan
+    environment:
+      TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
+      TON_INDEXER_IS_TESTNET: "1"
+      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
+      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
+    depends_on:
+      localton:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      v3-basechain-bootstrap:
+        condition: service_completed_successfully
+      v3-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/bin/localton-container-entrypoint
+        - v3-account-scan-health
+      interval: 10s
+      timeout: 3s
+      start_period: 240s
+      start_interval: 1s
+      retries: 12
+    restart: unless-stopped
+    volumes:
+      - localton-state:/var/lib/localton:ro
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
+
   v3-api:
     image: "__LOCALTON_IMAGE__"
     command:
@@ -146,6 +208,8 @@ services:
         condition: service_healthy
       v3-migrations:
         condition: service_completed_successfully
+      v3-account-scanner:
+        condition: service_healthy
       v3-worker:
         condition: service_started
     healthcheck:
@@ -159,6 +223,7 @@ services:
       interval: 5s
       timeout: 3s
       start_period: 30s
+      start_interval: 1s
       retries: 24
     ports:
       - "127.0.0.1:__LOCALTON_V3_PORT__:18003"
@@ -192,5 +257,7 @@ services:
 
 volumes:
   localton-state:
+  localton-snapshots:
   postgres-data:
+  ton-account-scan:
   ton-index-workdir:

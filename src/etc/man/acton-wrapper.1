@@ -162,7 +162,26 @@ output\-dir = "wrappers\-ts"
 .fi
 .RE
 .sp
-CLI flags override config values for the current invocation.
+Each contract can override the same settings without changing the defaults for
+other contracts:
+.sp
+.RS 4
+.nf
+[contracts.Counter.wrappers.tolk]
+output\-dir = "generated/counter"
+generate\-test = false
+test\-output\-dir = "tests/generated/counter"
+[contracts.Counter.wrappers.typescript]
+output\-dir = "app/src/wrappers/counter"
+.fi
+.RE
+.sp
+Settings are resolved field by field. CLI flags have the highest priority,
+then \fB[contracts.<name>.wrappers.*]\fR, then \fB[wrappers.*]\fR, and finally the
+wrapper command defaults. An omitted per\-contract field inherits the
+project\-wide value. An explicit per\-contract \fBgenerate\-test = false\fR overrides
+a project\-wide \fBtrue\fR\&. With \fB\-\-all\fR, Acton resolves these settings separately
+for every contract.
 .sp
 For a precompiled \fB\&.boc\fR contract, configure \fBtypes\fR next to \fBsrc\fR so wrapper
 generation can read ABI from the Tolk interface file:

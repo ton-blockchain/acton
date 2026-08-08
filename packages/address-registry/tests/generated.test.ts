@@ -28,5 +28,22 @@ test("generated addresses are unique within each network", () => {
   for (const registry of [mainnetJson, testnetJson]) {
     expect(registry.length).toBeGreaterThan(0)
     expect(new Set(registry.map(({address}) => address)).size).toBe(registry.length)
+    expect(registry.map(({address}) => address)).toEqual(
+      registry.map(({address}) => address).toSorted(),
+    )
   }
+})
+
+test("testnet.json contains discovered mainnet entries", () => {
+  const mainnetEntries = new Map(mainnetJson.map(entry => [entry.address, entry] as const))
+  let discovered = 0
+
+  for (const entry of testnetJson) {
+    if (mainnetEntries.has(entry.address)) {
+      expect(mainnetEntries.get(entry.address)).toEqual(entry)
+      discovered += 1
+    }
+  }
+
+  expect(discovered).toBeGreaterThan(0)
 })

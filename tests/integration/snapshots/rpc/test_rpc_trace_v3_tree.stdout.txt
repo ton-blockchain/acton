@@ -11,4 +11,4 @@ N/A -> kQAzMz..MzMw8H A
   Total Txs:         3
   Total Messages:    3
 
-Hint: pass --show-bodies to include decoded message bodies when local ABI matches.
+Hint: pass --show-bodies to include decoded message bodies when an ABI matches

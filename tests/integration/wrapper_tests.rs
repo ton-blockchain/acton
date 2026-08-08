@@ -663,6 +663,109 @@ fn test_wrapper_generation_uses_tolk_config_defaults() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn test_wrapper_generation_uses_per_contract_settings() {
+    let project = ProjectBuilder::new("wrapper_per_contract_settings")
+        .without_acton_toml()
+        .raw_file(
+            "Acton.toml",
+            r#"[package]
+name = "wrapper-per-contract-settings"
+description = "Per-contract wrapper settings test"
+version = "0.1.0"
+
+[contracts.first]
+src = "contracts/First.tolk"
+
+[contracts.first.wrappers.tolk]
+output-dir = "generated/first"
+generate-test = true
+test-output-dir = "generated-tests/first"
+
+[contracts.first.wrappers.typescript]
+output-dir = "generated-ts/first"
+
+[contracts.inherited]
+src = "contracts/Inherited.tolk"
+
+[contracts.inherited.wrappers.tolk]
+output-dir = "generated/inherited"
+
+[contracts.second]
+src = "contracts/Second.tolk"
+
+[contracts.second.wrappers.tolk]
+output-dir = "generated/second"
+generate-test = false
+test-output-dir = "generated-tests/second"
+
+[contracts.second.wrappers.typescript]
+output-dir = "generated-ts/second"
+
+[wrappers.tolk]
+output-dir = "global-wrappers"
+generate-test = true
+test-output-dir = "global-tests"
+
+[wrappers.typescript]
+output-dir = "global-wrappers-ts"
+"#,
+        )
+        .raw_file("contracts/First.tolk", SIMPLE_CONTRACT)
+        .raw_file("contracts/Inherited.tolk", SIMPLE_CONTRACT)
+        .raw_file("contracts/Second.tolk", SIMPLE_CONTRACT)
+        .raw_file("bin/npx", FAKE_TYPESCRIPT_GENERATOR)
+        .raw_file("work/.keep", "")
+        .build();
+    let (capture_path, path_env) = setup_fake_typescript_generator(project.path());
+    let working_dir = project.path().join("work");
+
+    project
+        .acton()
+        .current_dir(&working_dir)
+        .arg("wrapper")
+        .arg("--all")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_uses_per_contract_settings/tolk-output.txt",
+        );
+
+    project
+        .acton()
+        .current_dir(&working_dir)
+        .arg("wrapper")
+        .arg("--all")
+        .arg("--ts")
+        .env("PATH", &path_env)
+        .env(
+            "ACTON_TS_WRAPPER_CAPTURE",
+            capture_path.to_str().expect("capture path"),
+        )
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_uses_per_contract_settings/typescript-output.txt",
+        );
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("wrapper")
+        .arg("second")
+        .arg("--output")
+        .arg("cli/SecondClient.tolk")
+        .arg("--test")
+        .arg("--test-output")
+        .arg("cli-tests/second.custom.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_uses_per_contract_settings/cli-output.txt",
+        );
+}
+
 #[test]
 fn test_wrapper_generation_test_output_dir_flag() {
     let project = ProjectBuilder::new("wrapper_test_output_dir_flag")

@@ -1,4 +1,4 @@
-import {FolderOpen, Plus} from "lucide-react"
+import {Archive, Boxes, FlaskConical, Plus} from "lucide-react"
 import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
@@ -144,7 +144,11 @@ function StudioWorkspace({
     },
     [setTestSearchParams],
   )
-  const testRuns = useStudioTestRuns(activePath === "/tests", selectedTestRunId, onSelectTestRun)
+  const testRuns = useStudioTestRuns(
+    activePath === "/" || activePath === "/tests",
+    selectedTestRunId,
+    onSelectTestRun,
+  )
   const [studioInfo, setStudioInfo] = useState<StudioInfo>()
   const [connectionState, setConnectionState] = useState<StudioConnectionState>("connecting")
   const [isEnvironmentCreateOpen, setIsEnvironmentCreateOpen] = useState(false)
@@ -282,7 +286,9 @@ function StudioWorkspace({
               leadingIcon={
                 activeEnvironmentShell.primaryAction.icon === "plus" ? (
                   <Plus size={16} aria-hidden="true" />
-                ) : undefined
+                ) : (
+                  <Archive size={16} aria-hidden="true" />
+                )
               }
               onClick={activeEnvironmentShell.primaryAction.onClick}
             >
@@ -300,16 +306,21 @@ function StudioWorkspace({
           ) : undefined
         ) : activePath === "/" ? (
           <>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/virtual-environments")}>
-              Explore workspace
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<FlaskConical size={16} aria-hidden="true" />}
+              onClick={() => navigate("/tests")}
+            >
+              Tests
             </Button>
             <Button
               variant="primary"
               size="sm"
-              leadingIcon={<FolderOpen size={16} aria-hidden="true" />}
-              onClick={() => showIntegrationToast("Project connection")}
+              leadingIcon={<Boxes size={16} aria-hidden="true" />}
+              onClick={() => navigate("/virtual-environments")}
             >
-              Open project
+              Virtual environments
             </Button>
           </>
         ) : activeFeaturePage && ActiveFeatureIcon ? (
@@ -409,15 +420,23 @@ function StudioWorkspace({
       ) : activePath === "/" ? (
         <OverviewPage
           connectionState={connectionState}
-          pages={studioPages}
+          environments={managedEnvironments}
+          environmentsError={environmentsState.error}
+          environmentsLoading={environmentsState.isLoading}
           projectName={projectName}
           projectPath={configuredProjectPath}
+          testRuns={testRuns.runs}
+          testRunsError={testRuns.error}
+          testRunsLoading={testRuns.isLoading}
           onNavigate={navigate}
+          onOpenEnvironment={openEnvironment}
+          onSelectTestRun={testRuns.selectRun}
         />
       ) : activePath === "/virtual-environments" ? (
         <VirtualEnvironmentsPage
           createOpen={isEnvironmentCreateOpen}
           environments={managedEnvironments}
+          importSourceEnvironments={environmentsState.environments}
           isLoading={environmentsState.isLoading}
           loadError={environmentsState.error}
           walletNames={studioInfo?.workspace?.walletNames ?? []}

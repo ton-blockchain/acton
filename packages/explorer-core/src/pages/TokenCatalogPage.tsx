@@ -8,7 +8,9 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  RelativeTime,
   Select,
+  TokenAmount,
 } from "@acton/ui"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -23,7 +25,7 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {formatAbsoluteTime, formatRelativeTime, parseAddress} from "../components/utils"
+import {parseAddress} from "../components/utils"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 
@@ -262,7 +264,12 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                         </div>
                       </DataTableCell>
                       <DataTableCell align="right" tone="strong">
-                        {formatTokenSupply(token)}
+                        <TokenAmount
+                          decimals={token.jetton_content.decimals}
+                          symbol={token.jetton_content.symbol}
+                          useGrouping
+                          value={token.total_supply}
+                        />
                       </DataTableCell>
                       <DataTableCell>
                         <span className={token.mintable ? styles.positive : styles.muted}>
@@ -272,12 +279,7 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                       {order === "recent" ? (
                         <DataTableCell>
                           {item.lastActivityAt ? (
-                            <time
-                              dateTime={new Date(item.lastActivityAt * 1000).toISOString()}
-                              title={formatAbsoluteTime(item.lastActivityAt)}
-                            >
-                              {formatRelativeTime(item.lastActivityAt)}
-                            </time>
+                            <RelativeTime unit="seconds" value={item.lastActivityAt} />
                           ) : (
                             <span className={styles.muted}>—</span>
                           )}
@@ -419,22 +421,4 @@ async function loadRecentlyActiveTokenBatch(
 
 function tokenAddressKey(address: string): string {
   return parseAddress(address)?.toRawString() ?? address
-}
-
-function formatTokenSupply(token: JettonMaster): string {
-  const parsedDecimals = Number(token.jetton_content.decimals ?? 9)
-  const decimals =
-    Number.isInteger(parsedDecimals) && parsedDecimals >= 0 && parsedDecimals <= 30
-      ? parsedDecimals
-      : 9
-
-  try {
-    const supply = BigInt(token.total_supply)
-    const scale = 10n ** BigInt(decimals)
-    const whole = supply / scale
-    const fraction = (supply % scale).toString().padStart(decimals, "0").replace(/0+$/, "")
-    return fraction ? `${whole.toLocaleString()}.${fraction}` : whole.toLocaleString()
-  } catch {
-    return token.total_supply
-  }
 }

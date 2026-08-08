@@ -7,7 +7,7 @@ import styles from "./OpcodeChip.module.css"
 
 export type OpcodeChipProps = Readonly<
   Omit<ComponentPropsWithRef<"span">, "children"> & {
-    readonly opcode?: number
+    readonly opcode?: number | string
     readonly abiName?: string
     readonly showOpcode?: boolean
   }
@@ -21,7 +21,7 @@ export function OpcodeChip({
   showOpcode = false,
   ...props
 }: OpcodeChipProps) {
-  const formattedOpcode = opcode === undefined ? undefined : `0x${opcode.toString(16)}`
+  const formattedOpcode = formatOpcode(opcode)
   const displayText = abiName ?? formattedOpcode ?? "Empty"
   const displaySubText = abiName && showOpcode ? formattedOpcode : undefined
 
@@ -52,4 +52,28 @@ export function OpcodeChip({
       </span>
     </InlineActions>
   )
+}
+
+/** Formats an opcode as an unsigned 32-bit hexadecimal value */
+export function formatOpcode(opcode: number | string | null | undefined): string | undefined {
+  if (opcode === null || opcode === undefined) return undefined
+  const normalized = typeof opcode === "string" ? opcode.trim() : opcode
+  if (normalized === "") return undefined
+
+  try {
+    const value =
+      typeof normalized === "number"
+        ? Number.isInteger(normalized)
+          ? BigInt(normalized)
+          : undefined
+        : /^[-+]?0x[\da-f]+$/i.test(normalized)
+          ? BigInt(normalized.replace(/^\+/, ""))
+          : /^[-+]?\d+$/.test(normalized)
+            ? BigInt(normalized)
+            : undefined
+    if (value === undefined || value < -0x8000_0000n || value > 0xffff_ffffn) return undefined
+    return `0x${BigInt.asUintN(32, value).toString(16).padStart(8, "0")}`
+  } catch {
+    return undefined
+  }
 }

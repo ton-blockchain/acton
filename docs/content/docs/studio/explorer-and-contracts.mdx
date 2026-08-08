@@ -1,0 +1,140 @@
+---
+title: "Explorer and Contracts"
+description: "Inspect blocks, accounts, transactions, tokens, and NFTs, then connect addresses to project source and ABI artifacts"
+---
+
+The Explorer shows the chain state of the selected environment. The Contracts area adds a
+project-owned registry on top of that state, linking important addresses to names, source artifacts,
+and ABI metadata.
+
+Use Explorer when the question starts with a block, address, message, or transaction. Use Contracts
+when the question starts with a project deployment or a known application component.
+
+## Find chain data
+
+Use the global **Find** field or the Explorer overview to open:
+
+- friendly and raw TON addresses
+- transaction hashes
+- masterchain and shardchain block identifiers
+- contracts known by their Studio name
+- ABI catalog entries
+
+The Explorer navigation provides **Overview**, **Blocks**, **Tokens**, and **NFTs**. Availability and
+freshness depend on the selected environment and its indexer.
+See [Explorer data is missing or stale](/docs/studio/troubleshooting#explorer-data-is-missing-or-stale)
+when indexed data does not appear.
+
+## Inspect an account
+
+An account page combines identity, balance, status, detected contract type, token metadata, and
+activity. Available tabs can include:
+
+- **History:** transactions or indexed actions involving the address
+- **Tokens:** Jetton balances associated with the account
+- **Holders:** owners when the account represents a token master or collection
+- **Contract:** code, data, storage, and detected metadata
+- **Methods:** get-method discovery and execution when ABI information is available
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/explorer-light.png"
+    alt="Environment Explorer account page in light theme showing a named contract, balance, detected type, and history tabs"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/explorer-dark.png"
+    alt="Environment Explorer account page in dark theme showing a named contract, balance, detected type, and history tabs"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+Select the pencil next to a known name to update the Studio contract name. Use the star action to add
+the address to **Favorites**, available from the bottom of the environment sidebar.
+
+## Inspect a transaction
+
+Open a transaction from account history, recent activity, a block, or search. The transaction page
+shows messages, phases, fees, exit codes, state changes, and decoded data when metadata is available.
+
+Use the debug or retrace action when you need to replay the transaction and inspect execution in
+more detail. Retrace uses the selected environment and source artifacts, so choose the environment
+that contains the relevant chain state before debugging.
+
+## Track contracts
+
+The **Contracts** table is a Studio registry, not a list of every active account on the network. It
+keeps addresses that matter to this project and shows:
+
+- contract name and address
+- active or inactive network status
+- how the contract entered the registry
+- whether source and ABI artifacts are available
+- actions to rename, open in Explorer, open in Simulator, or remove from Studio
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/contracts-light.png"
+    alt="Contracts registry in light theme showing a named active contract and source availability"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/contracts-dark.png"
+    alt="Contracts registry in dark theme showing a named active contract and source availability"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+Studio can add a contract in three ways:
+
+1. Detect a successful deployment submitted through a Studio RPC endpoint.
+2. Register an account [imported while creating a Full localnet](/docs/studio/environments#create-a-full-localnet).
+3. Add an address manually from the Contracts page.
+
+To register an existing address, select **Add contract**, enter its address and name, then confirm.
+Manual registration adds the address to Contracts but does not create source or ABI artifacts.
+
+A transaction sent directly to an internal runtime or public endpoint bypasses Studio observation.
+Add its contract manually if it should appear in the registry.
+
+Removing a contract from Studio removes only registry metadata. It does not change or delete the
+on-chain account.
+
+## Source artifacts
+
+Open **Contracts → Sources** to review immutable project artifacts available for matching. Studio
+uses code hashes to associate an active account with compiled source and source maps.
+
+Open a contract row to compare:
+
+- the active account code
+- the matched project artifact
+- source and compiler metadata
+- decoded storage and messages when ABI information is available
+
+**Source unavailable** means Studio could not match the active code to a known project artifact. It
+does not mean the account has no code. Start Studio from the Acton project that produced the
+matching artifact, build that project version, and add the contract to its registry.
+
+## ABI catalog
+
+Open **Contracts → ABI** to browse ABI from the project and the built-in catalog. An ABI details page
+shows the rendered contract interface and raw JSON.
+
+Studio uses ABI to:
+
+- name a detected contract type
+- decode storage, messages, and get-method values
+- offer typed message builders in Simulator
+- improve transaction and action presentation
+
+ABI matching and source matching are related but independent. A catalog ABI can decode a standard
+contract even when its project source is not available.
+
+## Recommended debugging path
+
+1. Open the contract from **Contracts** to confirm its active code and artifact match.
+2. Open it in **Explorer** and find the unexpected transaction or action.
+3. Inspect messages, exit codes, phases, and state changes.
+4. Retrace the transaction when the regular details are insufficient.
+5. Open the same address in **Simulator** to test a corrected message without changing network state.

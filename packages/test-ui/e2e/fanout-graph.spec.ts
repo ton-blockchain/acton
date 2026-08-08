@@ -165,3 +165,41 @@ test.describe("Fanout graph visual snapshots", () => {
     })
   }
 })
+
+test("external-out graph node selects its parent transaction", async ({fanoutGraphUi, page}) => {
+  await page.goto(fanoutGraphUi.baseUrl)
+
+  const scenario = fanoutGraphVisualScenarios.find(
+    item => item.testName === "graph has internal and external out children",
+  )
+  if (!scenario) {
+    throw new Error("External-out fanout scenario is not configured")
+  }
+
+  await openFanoutGraphScenario(page, scenario)
+
+  const selectedNode = page.locator(
+    'circle[aria-label^="Transaction "][class*="nodeCircleSelected"]',
+  )
+  const selectedParent = await selectedNode.getAttribute("aria-label")
+  const externalOutNode = page.getByRole("button", {
+    name: /^External-out message from transaction /,
+  })
+
+  await expect(externalOutNode).toBeVisible()
+  await externalOutNode.click()
+
+  await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
+  await expect(selectedNode).toHaveAttribute("aria-label", selectedParent ?? "")
+
+  await page
+    .getByRole("button", {name: /^Transaction /})
+    .nth(1)
+    .click()
+  const selectedOther = await selectedNode.getAttribute("aria-label")
+
+  await externalOutNode.click()
+
+  await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
+  await expect(selectedNode).not.toHaveAttribute("aria-label", selectedOther ?? "")
+})

@@ -2,6 +2,7 @@ import {AccountOgImage, type AccountOgPreview} from "./AccountOgImage"
 
 export type PageOgKey =
   | "home"
+  | "config"
   | "blocks"
   | "block"
   | "abi"
@@ -34,6 +35,16 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataTitle: "actonscan · TON explorer",
     metadataDescription:
       "Open-source TON explorer for accounts, transactions, blocks, tokens, and collectibles.",
+  },
+  config: {
+    key: "config",
+    title: "Config",
+    badge: "Network configuration",
+    description:
+      "Readable TON network parameters for validators, fees, bridges and system contracts",
+    metadataTitle: "TON network configuration · actonscan",
+    metadataDescription:
+      "Browse readable TON network configuration parameters, validators, fees, bridges, and system contracts on actonscan.",
   },
   blocks: {
     key: "blocks",
@@ -154,6 +165,7 @@ export function pageOgPreviewForKey(key: string): PageOgPreview {
 export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefined {
   const normalizedPath = normalizePath(pathname)
   if (normalizedPath === "/") return PAGE_OG_PREVIEWS.home
+  if (/^\/config(?:\/-?\d+)?$/.test(normalizedPath)) return PAGE_OG_PREVIEWS.config
   if (normalizedPath === "/blocks") return PAGE_OG_PREVIEWS.blocks
   if (normalizedPath === "/abi") return PAGE_OG_PREVIEWS.abi
   if (normalizedPath === "/sources") return PAGE_OG_PREVIEWS.sources

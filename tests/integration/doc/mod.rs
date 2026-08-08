@@ -1,5 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::verifier::{abi_response, spawn_verifier_mock};
+use serde_json::Value as JsonValue;
+use std::fs;
+use tycho_types::boc::Boc;
 
 const DOC_ABI_LOCAL_CONTRACT: &str = r"
 struct Storage {
@@ -234,7 +238,7 @@ fn test_doc_tvm_empty_sub_category_does_not_print_separator() {
 fn test_doc_without_subcommand() {
     let project = ProjectBuilder::new("doc-without-subcommand").build();
     let log_dir = project.path().join(".acton/logs");
-    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+    fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
 
     project
         .acton()
@@ -254,7 +258,7 @@ fn test_doc_without_subcommand() {
 fn test_doc_tvm_empty_query_is_rejected() {
     let project = ProjectBuilder::new("doc-tvm-empty-query").build();
     let log_dir = project.path().join(".acton/logs");
-    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+    fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
 
     project
         .acton()
@@ -308,11 +312,75 @@ fn test_doc_abi_local_contract_by_abi_name() {
         );
 }
 
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_doc_abi_verifier_contract_by_code_hash_and_cache() {
+    let source_project = ProjectBuilder::new("doc-abi-verifier-source")
+        .contract("my_contract", DOC_ABI_LOCAL_CONTRACT)
+        .build();
+    source_project
+        .acton()
+        .build()
+        .contract("my_contract")
+        .run()
+        .success();
+
+    let artifact = fs::read_to_string(source_project.path().join("build/my_contract.json"))
+        .expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+    let code = Boc::decode_base64(code_boc64).expect("code BoC must decode");
+    let code_hash = code.repr_hash().to_string();
+    let abi = fs::read_to_string(source_project.path().join("build/abi/my_contract.json"))
+        .expect("ABI artifact must exist");
+    let abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid json");
+
+    let project = ProjectBuilder::new("doc-abi-verifier").build();
+    let log_dir = project.path().join(".acton/logs");
+    fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+    let log_dir = log_dir.to_string_lossy().into_owned();
+    let code_hash_query = format!("0x{code_hash}");
+    let (verifier_url, verifier_handle, verifier_captured) =
+        spawn_verifier_mock(vec![abi_response(&code_hash, &abi)]);
+
+    for _ in 0..2 {
+        project
+            .acton()
+            .current_dir(project.path())
+            .arg("doc")
+            .arg("abi")
+            .arg(&code_hash_query)
+            .env("ACTON_NEW_VERIFY_BACKEND", &verifier_url)
+            .env("ACTON_LOG_DIR", &log_dir)
+            .run()
+            .success()
+            .assert_snapshot_matches(
+                "integration/snapshots/doc/test_doc_abi_local_contract_by_abi_name.stdout.json.txt",
+            );
+    }
+
+    verifier_handle
+        .join()
+        .expect("verifier mock server thread must finish");
+    let verifier_captured = verifier_captured
+        .lock()
+        .expect("captured verifier requests mutex should not be poisoned");
+    assert_eq!(verifier_captured.len(), 1, "verifier ABI should be cached");
+    assert_eq!(verifier_captured[0].method, "GET");
+    assert_eq!(
+        verifier_captured[0].path,
+        format!("/api/v1/abi?code_hash={code_hash}"),
+    );
+}
+
 #[test]
 fn test_doc_tvm_whitespace_query_is_normalized() {
     let project = ProjectBuilder::new("doc-tvm-whitespace-query").build();
     let log_dir = project.path().join(".acton/logs");
-    std::fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
+    fs::create_dir_all(&log_dir).expect("failed to create ACTON_LOG_DIR");
 
     project
         .acton()

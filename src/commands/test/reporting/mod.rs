@@ -20,6 +20,7 @@ use tycho_types::models::{ShardAccount, StdAddr};
 pub(super) mod console;
 pub(super) mod dot;
 pub(super) mod junit;
+pub(super) mod studio;
 pub(super) mod teamcity;
 pub(super) mod ui;
 
@@ -168,6 +169,10 @@ pub trait TestReporter: Send + Sync {
         Ok(())
     }
 
+    fn on_run_finished(&mut self, _success: bool) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     fn on_suite_started(
         &mut self,
         _file_path: &Path,
@@ -239,6 +244,13 @@ impl ReporterManager {
     pub fn on_testing_finished(&mut self, stats: &TestSuiteStats) -> anyhow::Result<()> {
         for reporter in &mut self.reporters {
             reporter.on_testing_finished(stats)?;
+        }
+        Ok(())
+    }
+
+    pub fn on_run_finished(&mut self, success: bool) -> anyhow::Result<()> {
+        for reporter in &mut self.reporters {
+            reporter.on_run_finished(success)?;
         }
         Ok(())
     }

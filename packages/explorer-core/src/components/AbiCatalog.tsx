@@ -1,7 +1,14 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
-import {InlineAction, InlineActions, Input, Pagination, useToast} from "@acton/ui"
+import {
+  InlineAction,
+  InlineActions,
+  Input,
+  Pagination,
+  humanizeIdentifier,
+  useToast,
+} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useNavigate} from "react-router"
@@ -596,5 +603,5 @@ function formatLinkKind(kind: string): string {
     website: "Website",
   }
   const normalized = kind.toLowerCase()
-  return labels[normalized] ?? kind.replaceAll("_", " ")
+  return labels[normalized] ?? humanizeIdentifier(kind)
 }

@@ -48,7 +48,7 @@
     "current": {
       "balance": null,
       "collection_address": "0:2b882f79e45a8d0b90c4903c2b1506d746474904a0ab41153ec115852343f325",
-      "content_type": "onchain",
+      "content_type": "offchain",
       "contract_type": "nft_item",
       "domain": null,
       "mintless_is_claimed": null,
@@ -63,7 +63,7 @@
     "historical": {
       "balance": null,
       "collection_address": "0:2b882f79e45a8d0b90c4903c2b1506d746474904a0ab41153ec115852343f325",
-      "content_type": "onchain",
+      "content_type": "offchain",
       "contract_type": "nft_item",
       "domain": null,
       "mintless_is_claimed": null,

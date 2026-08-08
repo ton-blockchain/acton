@@ -41,6 +41,7 @@ mod run_tests;
 mod scenarios;
 mod script_tests;
 mod stdlib_tests;
+mod studio;
 mod test_runner;
 mod test_tests;
 mod up_tests;

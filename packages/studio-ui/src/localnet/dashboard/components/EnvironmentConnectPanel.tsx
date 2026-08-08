@@ -120,8 +120,6 @@ console.log(masterchain)`
     tonClientRequest,
     urls,
   })
-  const primaryEndpoint = endpointEntries[0]
-
   return (
     <section
       className={styles.panel}
@@ -148,27 +146,6 @@ console.log(masterchain)`
           </CopyInlineButton>
         </div>
       </header>
-
-      {primaryEndpoint ? (
-        <dl className={styles.summary}>
-          <div className={styles.summaryItem}>
-            <dt>{primaryEndpoint.label}</dt>
-            <dd>
-              <Tooltip content={primaryEndpoint.value}>
-                <code>{primaryEndpoint.value}</code>
-              </Tooltip>
-              <CopyInlineButton
-                value={primaryEndpoint.value}
-                label={`Copy ${primaryEndpoint.label} endpoint`}
-                copiedLabel={`${primaryEndpoint.label} endpoint copied`}
-                copiedChildren={null}
-              >
-                {null}
-              </CopyInlineButton>
-            </dd>
-          </div>
-        </dl>
-      ) : undefined}
 
       <div className={styles.setup}>
         <div className={styles.step}>

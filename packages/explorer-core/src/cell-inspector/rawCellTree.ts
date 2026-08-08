@@ -1,4 +1,5 @@
 import {CellType, type Cell} from "@ton/core"
+import {formatNumberValue, truncateEnd} from "@acton/ui"
 
 import type {ParserWarning} from "./model"
 
@@ -167,7 +168,7 @@ function walkCell(
     state.truncatedNodes += 1
     pushWarning(state.warnings, {
       code: "tree-node-limit",
-      message: `Only the first ${limits.maxNodes.toLocaleString()} unique cells are shown`,
+      message: `Only the first ${formatNumberValue(limits.maxNodes)} unique cells are shown`,
       path,
     })
     return shallowNode(
@@ -237,7 +238,7 @@ function previewBits(cell: Cell, maxChars: number): RawCellBits {
   const truncated = value.length > maxChars
   return {
     length: cell.bits.length,
-    value: truncated ? `${value.slice(0, maxChars)}…` : value,
+    value: truncated ? truncateEnd(value, maxChars + 1) : value,
     truncated,
   }
 }
@@ -288,7 +289,7 @@ function serializeCell(
 
     pushWarning(state.warnings, {
       code: "tree-boc-limit",
-      message: `This cell is ${boc.length.toLocaleString()} bytes; inline BoC output is limited to ${limits.maxBocBytes.toLocaleString()} bytes`,
+      message: `This cell is ${formatNumberValue(boc.length)} bytes; inline BoC output is limited to ${formatNumberValue(limits.maxBocBytes)} bytes`,
       path,
     })
   } catch {

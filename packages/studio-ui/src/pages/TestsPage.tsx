@@ -1,5 +1,5 @@
 import type {TestReport} from "@acton/test-ui/embed"
-import {Button, Dialog} from "@acton/ui"
+import {Button, Dialog, Duration} from "@acton/ui"
 import {
   Ban,
   Check,
@@ -22,7 +22,7 @@ import {
   type TestRunStatus,
   studioTestRunArtifactsUrl,
 } from "../studioApi"
-import {formatTestRunDuration, testRunStatusLabel} from "../testRunPresentation"
+import {testRunStatusLabel} from "../testRunPresentation"
 import {RunTestsDialog} from "./RunTestsDialog"
 
 import styles from "./TestsPage.module.css"
@@ -272,7 +272,9 @@ function RunStats({run}: {readonly run: TestRunRecord}) {
         </span>
       ))}
       <span>
-        <strong>{formatTestRunDuration(run.stats.durationMs)}</strong>
+        <strong>
+          <Duration display="runtime" unit="milliseconds" value={run.stats.durationMs} />
+        </strong>
         Duration
       </span>
     </div>

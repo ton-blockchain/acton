@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
-import {InlineAction, Tooltip} from "@acton/ui"
+import {DateTime, formatCountLabel, InlineAction, Tooltip} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -733,7 +733,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       const applied = await applyPartialTraceState(result.state, requestedTraceHash)
       if (applied && result.failedRequests > 0) {
         setTraceGapError(
-          `${result.failedRequests} ${result.failedRequests === 1 ? "transaction" : "transactions"} could not be loaded. You can retry.`,
+          `${formatCountLabel(result.failedRequests, {singular: "transaction"})} could not be loaded. You can retry.`,
         )
       }
     } catch (loadError) {
@@ -776,7 +776,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             result => !result.stateUpdateHashOk,
           ).length
           throw new Error(
-            `State changes could not be verified for ${divergentTransactions} ${divergentTransactions === 1 ? "transaction" : "transactions"}`,
+            `State changes could not be verified for ${formatCountLabel(divergentTransactions, {singular: "transaction"})}`,
           )
         }
 
@@ -1144,9 +1144,12 @@ export function TransactionTraceView({
                     )}
                   </div>
                   <div className={styles.overviewMeta}>
-                    <div className={styles.value}>
-                      {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
-                    </div>
+                    <DateTime
+                      className={styles.value}
+                      display="date-time-seconds"
+                      unit="seconds"
+                      value={firstTrace.transaction.now}
+                    />
                     {onToggleFavorite && (
                       <InlineAction
                         className={`${styles.favoriteAction} ${isFavorite ? styles.favoriteActionActive : ""}`}

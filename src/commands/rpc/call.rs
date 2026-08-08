@@ -1,14 +1,12 @@
 use super::{
-    LocalContractMatch, find_local_contract_match, format_get_method_signature,
-    format_get_method_signature_colored, format_int_address, format_std_address, load_rpc_config,
+    find_contract_match_for_code, format_get_method_signature, format_get_method_signature_colored,
+    format_int_address, format_std_address, load_explicit_contract_match, load_rpc_config,
     pretty_address_format, resolve_rpc_network,
 };
 use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
-use crate::context::code_lookup_hash;
 use crate::formatter::FormatterContext;
 use acton_config::color::{OwoColorize, colors_enabled};
-use acton_config::config::ActonConfig;
 #[cfg(test)]
 use acton_debug::PrettyAddressFormat;
 use acton_debug::{PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type};
@@ -16,8 +14,9 @@ use anyhow::{Context, anyhow};
 use log::warn;
 use num_traits::ToPrimitive;
 use std::io::{Write, stderr, stdout};
+use std::path::PathBuf;
 use std::process;
-use tolk_compiler::abi::{ABIGetMethod, ContractABI};
+use tolk_compiler::abi::{ABIDeclaration, ABIGetMethod, ABIStructField, ContractABI};
 use tolk_compiler::types_kernel::{TyIdx, calc_width_on_stack};
 use ton_api::{Network, TonApiClient};
 use tvm_ffi::json_stack::legacy_stack_to_json;
@@ -26,32 +25,50 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::models::{AnyAddr, IntAddr, StdAddr, StdAddrFormat};
 
+pub(super) struct RpcCallOptions {
+    pub(super) abi: Option<PathBuf>,
+    pub(super) net: Option<String>,
+    pub(super) block_number: Option<u64>,
+    pub(super) json: bool,
+    pub(super) with_comments: bool,
+    pub(super) raw: bool,
+}
+
 pub(super) fn rpc_call_cmd(
     address: &str,
     method: &str,
     args: &[String],
-    net: Option<String>,
-    block_number: Option<u64>,
-    json: bool,
-    raw: bool,
+    options: RpcCallOptions,
 ) -> anyhow::Result<()> {
+    let RpcCallOptions {
+        abi: abi_path,
+        net,
+        block_number,
+        json,
+        with_comments,
+        raw,
+    } = options;
     let (address, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
         .map_err(|_| anyhow!("Invalid address"))
         .with_context(|| error_fmt::invalid_address(address))?;
 
     let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
+    let explicit_contract_match = load_explicit_contract_match(abi_path.as_deref(), &config)?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
     let remote = client
         .get_account_info(block_number, &address.to_string())
         .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
-    let contract_match = code
-        .as_ref()
-        .map(|code| find_contract_match_for_rpc_call(code, &config))
-        .transpose()?
-        .flatten();
+    let contract_match = match explicit_contract_match {
+        Some(contract_match) => Some(contract_match),
+        None => code
+            .as_ref()
+            .map(|code| find_contract_match_for_code(code, &config))
+            .transpose()?
+            .flatten(),
+    };
 
     let abi = contract_match
         .as_ref()
@@ -112,9 +129,15 @@ pub(super) fn rpc_call_cmd(
         None
     } else {
         abi.zip(get_method).and_then(|(abi, get_method)| {
-            decode_get_method_result(&result_tuple, abi, get_method.return_ty_idx, &network)
-                .map_err(|err| warn!("Skipping ABI result decode: {err:#}"))
-                .ok()
+            decode_get_method_result(
+                &result_tuple,
+                abi,
+                get_method.return_ty_idx,
+                &network,
+                with_comments,
+            )
+            .map_err(|err| warn!("Skipping ABI result decode: {err:#}"))
+            .ok()
         })
     };
 
@@ -150,30 +173,6 @@ pub(super) fn rpc_call_cmd(
     }
 
     Ok(())
-}
-
-fn find_contract_match_for_rpc_call(
-    code: &Cell,
-    config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
-    let local_match = find_local_contract_match(code.repr_hash(), config)?;
-    if local_match
-        .as_ref()
-        .is_some_and(|matched| matched.abi.is_some())
-    {
-        return Ok(local_match);
-    }
-
-    if let Some(catalog_contract) =
-        acton_abi_catalog::find_contract_by_code_hash(&code_lookup_hash(code).to_string())
-    {
-        return Ok(Some(LocalContractMatch {
-            contract_name: catalog_contract.display_name.clone(),
-            abi: Some(catalog_contract.abi()),
-        }));
-    }
-
-    Ok(local_match)
 }
 
 fn resolve_get_method<'a>(
@@ -243,6 +242,7 @@ fn decode_get_method_result(
     abi: &ContractABI,
     return_ty_idx: TyIdx,
     network: &Network,
+    with_comments: bool,
 ) -> anyhow::Result<DecodedResult> {
     let expected_width = calc_width_on_stack(abi, return_ty_idx);
     if expected_width != tuple.len() {
@@ -267,13 +267,26 @@ fn decode_get_method_result(
         address_labels: Default::default(),
         colorize: colors_enabled(),
     };
+    let pretty = if with_comments {
+        rendered.to_pretty_string_with_comments(options, &|type_name, field_name| {
+            abi_field_comment(abi, type_name, field_name)
+                .map(|comment| comment.replace(['\r', '\n'], " "))
+        })
+    } else {
+        rendered.to_pretty_string(options)
+    };
     Ok(DecodedResult {
-        json: rendered_value_to_json(&rendered, network),
-        pretty: rendered.to_pretty_string(options),
+        json: rendered_value_to_json(&rendered, network, abi, with_comments),
+        pretty,
     })
 }
 
-fn rendered_value_to_json(value: &RenderedValue, network: &Network) -> serde_json::Value {
+fn rendered_value_to_json(
+    value: &RenderedValue,
+    network: &Network,
+    abi: &ContractABI,
+    with_comments: bool,
+) -> serde_json::Value {
     match value {
         RenderedValue::Leaf { value, type_field } => {
             leaf_value_to_json(value, type_field.as_deref())
@@ -281,14 +294,17 @@ fn rendered_value_to_json(value: &RenderedValue, network: &Network) -> serde_jso
         RenderedValue::Address { value, fields, .. } => {
             serde_json::Value::String(rendered_address_value(value, fields, network))
         }
-        RenderedValue::Struct { fields, .. } | RenderedValue::MapKV { fields, .. } => {
-            fields_to_json(fields, network)
+        RenderedValue::Struct {
+            type_name, fields, ..
+        } => fields_to_json(fields, Some(type_name), network, abi, with_comments),
+        RenderedValue::MapKV { fields, .. } => {
+            fields_to_json(fields, None, network, abi, with_comments)
         }
         RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
             serde_json::Value::Array(
                 items
                     .iter()
-                    .map(|item| rendered_value_to_json(item, network))
+                    .map(|item| rendered_value_to_json(item, network, abi, with_comments))
                     .collect(),
             )
         }
@@ -297,7 +313,10 @@ fn rendered_value_to_json(value: &RenderedValue, network: &Network) -> serde_jso
             let mut object = serde_json::Map::new();
             object.insert("value".to_owned(), serde_json::Value::String(value.clone()));
             if !fields.is_empty() {
-                object.insert("fields".to_owned(), fields_to_json(fields, network));
+                object.insert(
+                    "fields".to_owned(),
+                    fields_to_json(fields, None, network, abi, with_comments),
+                );
             }
             serde_json::Value::Object(object)
         }
@@ -313,12 +332,19 @@ fn rendered_value_to_json(value: &RenderedValue, network: &Network) -> serde_jso
                 serde_json::Value::String(variant_name.clone()),
             );
             if !fields.is_empty() {
-                object.insert("fields".to_owned(), fields_to_json(fields, network));
+                object.insert(
+                    "fields".to_owned(),
+                    fields_to_json(fields, None, network, abi, with_comments),
+                );
             }
             serde_json::Value::Object(object)
         }
-        RenderedValue::LastSeen { inner } => rendered_value_to_json(inner, network),
-        RenderedValue::LazyNotYetLoaded { preview } => rendered_value_to_json(preview, network),
+        RenderedValue::LastSeen { inner } => {
+            rendered_value_to_json(inner, network, abi, with_comments)
+        }
+        RenderedValue::LazyNotYetLoaded { preview } => {
+            rendered_value_to_json(preview, network, abi, with_comments)
+        }
         RenderedValue::OptimizedOut => serde_json::Value::String("<optimized out>".to_owned()),
         RenderedValue::LazyCantParseSlice => serde_json::Value::String("<not loaded>".to_owned()),
         RenderedValue::LazyUnresolved { type_name } => {
@@ -327,12 +353,62 @@ fn rendered_value_to_json(value: &RenderedValue, network: &Network) -> serde_jso
     }
 }
 
-fn fields_to_json(fields: &[(String, RenderedValue)], network: &Network) -> serde_json::Value {
+fn fields_to_json(
+    fields: &[(String, RenderedValue)],
+    type_name: Option<&str>,
+    network: &Network,
+    abi: &ContractABI,
+    with_comments: bool,
+) -> serde_json::Value {
+    let abi_fields = with_comments
+        .then(|| type_name.and_then(|type_name| abi_struct_fields(abi, type_name)))
+        .flatten();
     let mut object = serde_json::Map::new();
     for (name, value) in fields {
-        object.insert(name.clone(), rendered_value_to_json(value, network));
+        let rendered = rendered_value_to_json(value, network, abi, with_comments);
+        let comment = abi_fields
+            .and_then(|fields| fields.iter().find(|field| field.name == *name))
+            .map(|field| field.description.as_str())
+            .filter(|comment| !comment.is_empty());
+        object.insert(name.clone(), field_value_with_comment(rendered, comment));
     }
     serde_json::Value::Object(object)
+}
+
+fn abi_struct_fields<'a>(abi: &'a ContractABI, type_name: &str) -> Option<&'a [ABIStructField]> {
+    let base_type_name = type_name
+        .split_once('<')
+        .map_or(type_name, |(base_type_name, _)| base_type_name)
+        .trim();
+
+    abi.declarations.iter().find_map(|declaration| {
+        let ABIDeclaration::Struct { name, fields, .. } = declaration else {
+            return None;
+        };
+        (name == base_type_name).then_some(fields.as_slice())
+    })
+}
+
+fn abi_field_comment<'a>(
+    abi: &'a ContractABI,
+    type_name: &str,
+    field_name: &str,
+) -> Option<&'a str> {
+    abi_struct_fields(abi, type_name)
+        .and_then(|fields| fields.iter().find(|field| field.name == field_name))
+        .map(|field| field.description.as_str())
+        .filter(|comment| !comment.is_empty())
+}
+
+fn field_value_with_comment(value: serde_json::Value, comment: Option<&str>) -> serde_json::Value {
+    let Some(comment) = comment else {
+        return value;
+    };
+
+    serde_json::json!({
+        "value": value,
+        "comment": comment,
+    })
 }
 
 fn leaf_value_to_json(value: &str, type_field: Option<&str>) -> serde_json::Value {
@@ -582,6 +658,72 @@ mod tests {
         assert_eq!(
             leaf_value_to_json("not a TVM int", Some("bool")),
             serde_json::Value::String("not a TVM int".to_owned())
+        );
+    }
+
+    #[test]
+    fn json_comments_wrap_described_struct_fields() {
+        let abi = ContractABI {
+            declarations: vec![ABIDeclaration::Struct {
+                name: "Reply".to_owned(),
+                ty_idx: 0,
+                type_params: None,
+                prefix: None,
+                fields: vec![
+                    ABIStructField {
+                        name: "count".to_owned(),
+                        ty_idx: 0,
+                        client_ty_idx: None,
+                        default_value: None,
+                        description: "Number of processed items".to_owned(),
+                    },
+                    ABIStructField {
+                        name: "owner".to_owned(),
+                        ty_idx: 0,
+                        client_ty_idx: None,
+                        default_value: None,
+                        description: String::new(),
+                    },
+                ],
+                custom_pack_unpack: None,
+                description: String::new(),
+            }],
+            ..ContractABI::default()
+        };
+        let value = RenderedValue::Struct {
+            type_name: "Reply".to_owned(),
+            fields: vec![
+                ("count".to_owned(), RenderedValue::leaf("42")),
+                ("owner".to_owned(), RenderedValue::leaf("EQ...")),
+            ],
+        };
+
+        assert_eq!(
+            rendered_value_to_json(&value, &Network::Testnet, &abi, true),
+            serde_json::json!({
+                "count": {
+                    "value": "42",
+                    "comment": "Number of processed items",
+                },
+                "owner": "EQ...",
+            })
+        );
+        assert_eq!(
+            rendered_value_to_json(&value, &Network::Testnet, &abi, false),
+            serde_json::json!({
+                "count": "42",
+                "owner": "EQ...",
+            })
+        );
+
+        assert_eq!(
+            value.to_pretty_string_with_comments(
+                PrettyRenderOptions::default(),
+                &|type_name, field_name| {
+                    abi_field_comment(&abi, type_name, field_name).map(str::to_owned)
+                },
+            ),
+            "Reply {\n    // Number of processed items\n    count: 42,\n    owner: EQ...,\n}"
         );
     }
 }

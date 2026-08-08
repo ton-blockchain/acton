@@ -10,7 +10,28 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.embedded {
+  overflow: visible;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+}
+
+.nested {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: var(--acton-radius-control-sm);
+}
+
 .inner {
+  min-width: var(--acton-data-table-min-width);
+}
+
+.embedded .inner {
+  min-width: 0;
+}
+
+.nested .inner {
   min-width: var(--acton-data-table-min-width);
 }
 
@@ -79,6 +100,17 @@
   line-height: 1.35;
 }
 
+.embedded .table,
+.embedded .row,
+.nested .table,
+.nested .row {
+  background: transparent;
+}
+
+.embedded .head {
+  background: transparent;
+}
+
 .layoutFixed {
   table-layout: fixed;
 }
@@ -136,6 +168,31 @@
   padding: 0 var(--acton-space-4);
   text-align: left;
   vertical-align: middle;
+}
+
+.embedded .cell,
+.nested .cell {
+  height: auto;
+  padding-block: 10px;
+  background: transparent;
+}
+
+.embedded .cell:first-child,
+.embedded .headerCell:first-child {
+  padding-inline: 0;
+  text-align: center;
+}
+
+.embedded .cell + .cell,
+.embedded .headerCell + .headerCell {
+  padding-inline-start: 0;
+}
+
+.embedded .cell:last-child,
+.embedded .headerCell:last-child {
+  min-width: 0;
+  padding-inline-end: 0;
+  overflow: hidden;
 }
 
 .headerCell:first-child,

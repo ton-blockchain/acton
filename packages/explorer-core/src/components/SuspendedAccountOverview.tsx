@@ -1,5 +1,6 @@
 import {useEffect, useId, useState, type FC} from "react"
 import {Link} from "react-router"
+import {DAY_SECONDS} from "@acton/ui"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import styles from "./SuspendedAccountOverview.module.css"
@@ -10,7 +11,6 @@ interface SuspendedAccountOverviewProps {
 
 const MINUTE_SECONDS = 60
 const HOUR_SECONDS = 60 * MINUTE_SECONDS
-const DAY_SECONDS = 24 * HOUR_SECONDS
 const MONTH_SECONDS = 30 * DAY_SECONDS
 const YEAR_SECONDS = 365 * DAY_SECONDS
 

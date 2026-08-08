@@ -4,7 +4,8 @@ import {
   type AbiMessageTransport,
   type ContractABI,
 } from "@acton/transaction-ui"
-import {beginCell, fromNano, storeMessage, type Message} from "@ton/core"
+import {formatGramAmount} from "@acton/ui"
+import {beginCell, storeMessage, type Message} from "@ton/core"
 import {
   readEmulateNavigationPayload,
   type EmulateAbiEndpoint,
@@ -45,7 +46,7 @@ export function createEmulateNavigationState(
     case "internal":
       targetAddress = message.info.dest.toString()
       sourceAddress = message.info.src.toString()
-      messageValue = fromNano(message.info.value.coins)
+      messageValue = formatGramAmount(message.info.value.coins, {showUnit: false})
       bounce = message.info.bounce
       break
     case "external-in":

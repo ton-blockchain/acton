@@ -1,4 +1,5 @@
 use crate::commands::common::format_nanograms;
+use crate::context::code_lookup_hash;
 use crate::contract_interface::{
     compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
 };
@@ -9,7 +10,8 @@ use acton_debug::{PrettyAddressFormat, PrettyRenderOptions, render_unpacked_valu
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
@@ -23,6 +25,7 @@ use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, Std
 mod call;
 mod info;
 mod trace;
+mod verifier;
 
 #[derive(Subcommand, Clone)]
 pub enum RpcCommand {
@@ -30,6 +33,12 @@ pub enum RpcCommand {
     Info {
         #[arg(help = "Contract address in friendly or raw format")]
         address: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
         #[arg(long, help = "Masterchain block seqno to query account state at")]
         block_number: Option<u64>,
         #[arg(
@@ -49,6 +58,12 @@ pub enum RpcCommand {
         #[arg(help = "Get-method name")]
         method: String,
         #[arg(
+            long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
+        #[arg(
             help = "Arguments to pass to the get-method",
             allow_hyphen_values = true
         )]
@@ -65,6 +80,12 @@ pub enum RpcCommand {
         block_number: Option<u64>,
         #[arg(long, help = "Print machine-readable JSON output")]
         json: bool,
+        #[arg(
+            long,
+            conflicts_with = "raw",
+            help = "Include ABI field comments in the result"
+        )]
+        with_comments: bool,
         #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
         raw: bool,
     },
@@ -120,20 +141,35 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info {
             address,
+            abi,
             block_number,
             net,
             json,
             raw,
-        } => info::rpc_info_cmd(&address, net, block_number, json, raw),
+        } => info::rpc_info_cmd(&address, abi.as_deref(), net, block_number, json, raw),
         RpcCommand::Call {
             address,
             method,
+            abi,
             args,
             net,
             block_number,
             json,
+            with_comments,
             raw,
-        } => call::rpc_call_cmd(&address, &method, &args, net, block_number, json, raw),
+        } => call::rpc_call_cmd(
+            &address,
+            &method,
+            &args,
+            call::RpcCallOptions {
+                abi,
+                net,
+                block_number,
+                json,
+                with_comments,
+                raw,
+            },
+        ),
         RpcCommand::Block { net } => rpc_block_cmd(net),
         RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
         RpcCommand::Trace {
@@ -194,20 +230,91 @@ pub(crate) fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     }
 }
 
-pub(crate) struct LocalContractMatch {
+pub(crate) struct ContractMatch {
     pub(crate) contract_name: String,
     pub(crate) abi: Option<Arc<ContractABI>>,
+    pub(crate) source: ContractMatchSource,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContractMatchSource {
+    Explicit,
+    Local,
+    Catalog,
+    Verifier,
+}
+
+impl ContractMatchSource {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Explicit => "explicit",
+            Self::Local => "local",
+            Self::Catalog => "catalog",
+            Self::Verifier => "verifier",
+        }
+    }
+}
+
+pub(crate) fn load_explicit_contract_match(
+    path: Option<&Path>,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let extension = path.extension().and_then(|extension| extension.to_str());
+    let abi = if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("json")) {
+        let bytes = fs::read(path)
+            .with_context(|| format!("Failed to read ABI file {}", path.display()))?;
+        serde_json::from_slice::<ContractABI>(&bytes)
+            .with_context(|| format!("Failed to parse compiler ABI JSON from {}", path.display()))?
+    } else if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("tolk")) {
+        if !path.is_file() {
+            anyhow::bail!("Tolk ABI source not found: {}", path.display());
+        }
+        let compiler = tolk_compiler::Compiler::new(2)
+            .with_allow_no_entrypoint(true)
+            .with_mappings(&config.mappings());
+        match compiler.compile(path, false) {
+            tolk_compiler::CompilerResult::Success(result) => result.abi.ok_or_else(|| {
+                anyhow!(
+                    "Tolk ABI source {} did not produce compiler ABI",
+                    path.display()
+                )
+            })?,
+            tolk_compiler::CompilerResult::Error(error) => {
+                anyhow::bail!(
+                    "Failed to compile Tolk ABI source {}: {}",
+                    path.display(),
+                    error.message.trim_end()
+                );
+            }
+        }
+    } else {
+        anyhow::bail!(
+            "Unsupported ABI file {}: expected a .json or .tolk file",
+            path.display()
+        );
+    };
+
+    Ok(Some(ContractMatch {
+        contract_name: abi.contract_name.clone(),
+        abi: Some(Arc::new(abi)),
+        source: ContractMatchSource::Explicit,
+    }))
 }
 
 pub(super) fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     for candidate in load_local_contract_candidates(config)? {
         if &candidate.code_hash == code_hash {
-            return Ok(Some(LocalContractMatch {
+            return Ok(Some(ContractMatch {
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
+                source: ContractMatchSource::Local,
             }));
         }
     }
@@ -215,10 +322,65 @@ pub(super) fn find_local_contract_match(
     Ok(None)
 }
 
+pub(crate) fn find_contract_match_for_code(
+    code: &Cell,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let code_hash = code_lookup_hash(code);
+    let local_match = find_local_contract_match(&code_hash, config)?;
+    if local_match
+        .as_ref()
+        .is_some_and(|matched| matched.abi.is_some())
+    {
+        return Ok(local_match);
+    }
+
+    let Some(fallback_match) = find_fallback_contract_match(&code_hash) else {
+        return Ok(local_match);
+    };
+    let Some(mut local_match) = local_match else {
+        return Ok(Some(fallback_match));
+    };
+
+    local_match.abi = fallback_match.abi;
+    local_match.source = fallback_match.source;
+    Ok(Some(local_match))
+}
+
+pub(crate) fn find_fallback_contract_match(code_hash: &HashBytes) -> Option<ContractMatch> {
+    let code_hash = code_hash.to_string();
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_code_hash(&code_hash) {
+        return Some(ContractMatch {
+            contract_name: catalog_contract.display_name.clone(),
+            abi: Some(catalog_contract.abi()),
+            source: ContractMatchSource::Catalog,
+        });
+    }
+
+    match find_verifier_abi_by_code_hash(&code_hash) {
+        Ok(Some(abi)) => Some(ContractMatch {
+            contract_name: abi.contract_name.clone(),
+            abi: Some(abi),
+            source: ContractMatchSource::Verifier,
+        }),
+        Ok(None) => None,
+        Err(err) => {
+            warn!("Skipping verifier ABI lookup for code hash {code_hash}: {err:#}");
+            None
+        }
+    }
+}
+
+pub(crate) fn find_verifier_abi_by_code_hash(
+    code_hash: &str,
+) -> anyhow::Result<Option<Arc<ContractABI>>> {
+    verifier::find_abi(code_hash)
+}
+
 pub(crate) fn find_local_contract_by_config_name(
     contract_name: &str,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     let Some(contracts) = config.contracts() else {
         return Ok(None);
     };
@@ -235,9 +397,10 @@ pub(crate) fn find_local_contract_by_config_name(
 
         let candidate =
             load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())?;
-        return Ok(Some(LocalContractMatch {
+        return Ok(Some(ContractMatch {
             contract_name: candidate.contract_name,
             abi: candidate.abi,
+            source: ContractMatchSource::Local,
         }));
     }
 
@@ -247,7 +410,7 @@ pub(crate) fn find_local_contract_by_config_name(
 pub(crate) fn find_local_contract_by_abi_name(
     contract_name: &str,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     let normalized = normalize_contract_lookup_name(contract_name);
     if normalized.is_empty() {
         return Ok(None);
@@ -259,9 +422,10 @@ pub(crate) fn find_local_contract_by_abi_name(
             .as_ref()
             .is_some_and(|abi| normalize_contract_lookup_name(&abi.contract_name) == normalized)
         {
-            return Ok(Some(LocalContractMatch {
+            return Ok(Some(ContractMatch {
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
+                source: ContractMatchSource::Local,
             }));
         }
     }

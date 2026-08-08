@@ -20,8 +20,9 @@ import type {ProjectWalletRecord} from "./types"
 
 const TON_CONNECT_BRIDGE_URL =
   import.meta.env.VITE_TON_CONNECT_BRIDGE_URL?.trim() || "https://bridge.tonapi.io/bridge"
-export const ACTON_WALLET_APP_NAME = "Acton Studio"
-export const ACTON_WALLET_JS_BRIDGE_KEY = "acton-studio"
+const TONKEEPER_WALLET_NAME = "Tonkeeper"
+const TONKEEPER_WALLET_APP_NAME = "tonkeeper"
+const TONKEEPER_WALLET_JS_BRIDGE_KEY = "tonkeeper"
 
 function getWalletOrigin(): string {
   if (globalThis.location === undefined) {
@@ -75,6 +76,17 @@ function createLocalnetApiClient(
   })
 }
 
+function resolveNetwork(chainId: number): Network {
+  if (chainId === Number(Network.mainnet().chainId)) {
+    return Network.mainnet()
+  }
+  if (chainId === Number(Network.testnet().chainId)) {
+    return Network.testnet()
+  }
+
+  return Network.custom(String(chainId))
+}
+
 export function createWalletKit(
   apiBaseUrl: string,
   environmentId: string,
@@ -85,11 +97,11 @@ export function createWalletKit(
   const walletUrl = origin
   const walletIconUrl = new URL("/favicon.svg", origin).toString()
   const apiEndpoint = getApiEndpoint(apiBaseUrl)
-  const network = Network.custom(String(chainId))
+  const network = resolveNetwork(chainId)
 
   return new TonWalletKit({
     deviceInfo: createDeviceInfo({
-      appName: ACTON_WALLET_APP_NAME,
+      appName: TONKEEPER_WALLET_APP_NAME,
       appVersion: "0.1.0",
       features: [
         "SendTransaction",
@@ -98,13 +110,13 @@ export function createWalletKit(
       ],
     }),
     walletManifest: createWalletManifest({
-      name: ACTON_WALLET_APP_NAME,
-      appName: ACTON_WALLET_APP_NAME,
+      name: TONKEEPER_WALLET_NAME,
+      appName: TONKEEPER_WALLET_APP_NAME,
       imageUrl: walletIconUrl,
       aboutUrl: origin,
       universalLink: walletUrl,
       bridgeUrl: TON_CONNECT_BRIDGE_URL,
-      jsBridgeKey: ACTON_WALLET_JS_BRIDGE_KEY,
+      jsBridgeKey: TONKEEPER_WALLET_JS_BRIDGE_KEY,
       injected: false,
       embedded: false,
       platforms: ["chrome", "firefox", "safari", "android", "ios", "windows", "macos", "linux"],
@@ -133,7 +145,7 @@ export async function addProjectWalletToKit(
   },
 ): Promise<Wallet | undefined> {
   const signer = createStudioWalletSigner(options.environmentId, walletRecord)
-  const network = Network.custom(String(options.chainId))
+  const network = resolveNetwork(options.chainId)
   const client = kit.getApiClient(network)
   const adapterOptions = {
     client,

@@ -14,9 +14,9 @@
     "typecheck": "tsc --noEmit"
   },
   "overrides": {
-    "brace-expansion": "5.0.8",
+    "brace-expansion": "5.0.9",
     "minimatch": "10.2.5",
-    "postcss": "8.5.18"
+    "postcss": "8.5.23"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16",

@@ -105,8 +105,3 @@ pub struct SetTimeRequest {
 pub struct SetNextBlockTimestampRequest {
     pub timestamp: u32,
 }
-
-#[derive(Deserialize)]
-pub struct GetApiCallsRequest {
-    pub limit: Option<usize>,
-}

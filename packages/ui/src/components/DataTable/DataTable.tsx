@@ -8,6 +8,7 @@ import styles from "./DataTable.module.css"
 export type DataTableAlign = "center" | "left" | "right"
 export type DataTableCellTone = "default" | "muted" | "strong" | "subtle"
 export type DataTableLayout = "auto" | "fixed"
+export type DataTableVariant = "default" | "embedded" | "nested"
 
 export type DataTableProps = Readonly<
   Omit<ComponentPropsWithRef<"section">, "title"> & {
@@ -16,6 +17,7 @@ export type DataTableProps = Readonly<
     readonly minWidth?: CSSProperties["minWidth"]
     readonly title?: ReactNode
     readonly titleId?: string
+    readonly variant?: DataTableVariant
   }
 >
 
@@ -96,6 +98,12 @@ const toneClassNames = {
   subtle: styles.toneSubtle,
 } satisfies Record<DataTableCellTone, string>
 
+const variantClassNames = {
+  default: undefined,
+  embedded: styles.embedded,
+  nested: styles.nested,
+} satisfies Record<DataTableVariant, string | undefined>
+
 export function DataTable({
   actions,
   children,
@@ -106,6 +114,7 @@ export function DataTable({
   style,
   title,
   titleId,
+  variant = "default",
   ...props
 }: DataTableProps) {
   const hasTitle = title !== undefined && title !== null
@@ -117,7 +126,7 @@ export function DataTable({
     <section
       {...props}
       ref={ref}
-      className={cx(styles.dataTable, className)}
+      className={cx(styles.dataTable, variantClassNames[variant], className)}
       style={getDataTableStyle(style, minWidth)}
     >
       <div className={styles.inner}>

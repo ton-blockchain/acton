@@ -13,7 +13,7 @@ const samples = [
   {
     id: "zero",
     title: "Zero Opcode",
-    description: "Zero is a valid opcode and remains copyable as 0x0.",
+    description: "Zero is a valid opcode and remains copyable as 0x00000000.",
     chip: <OpcodeChip opcode={0} />,
   },
   {
@@ -62,7 +62,7 @@ export const opcodeChipGallery = {
   agentSummary:
     "Use OpcodeChip for TON message opcodes. Pass a resolved ABI name from domain code and let the component own hexadecimal formatting and copy feedback.",
   usage: [
-    "Pass opcode as a number; zero is treated as the valid value 0x0.",
+    "Pass opcode as a number or string; zero is the valid value 0x00000000.",
     "Pass abiName when domain code has resolved a symbolic message name.",
     "Enable showOpcode to retain the hexadecimal value beside an ABI name.",
   ],

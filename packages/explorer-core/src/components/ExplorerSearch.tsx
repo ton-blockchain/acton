@@ -1,4 +1,4 @@
-import {SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
+import {formatOpcode, SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {abiSymbolAnchorId} from "@acton/transaction-ui/abi"
 import {FileCode2, History, Search} from "lucide-react"
@@ -53,7 +53,8 @@ const MASTERCHAIN_SHARD = "8000000000000000"
 const MAX_BLOCK_NUMBER = 2_147_483_647
 const MIN_WORKCHAIN = -2_147_483_648
 const MAX_WORKCHAIN = 2_147_483_647
-const TONCENTER_BLOCK_ID_PATTERN = /^\(\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*\)$/i
+const BLOCK_ID_PATTERN =
+  /^\s*(?<workchain>-?\d+)\s*(?<separator>[,:])\s*(?<shard>[\da-f]{16})\s*\k<separator>\s*(?<seqno>\d+)\s*$/i
 const INVALID_SEARCH_DESCRIPTION =
   "Paste a valid TON address, .ton or .t.me name, transaction hash, block ID, or ABI name."
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
@@ -343,23 +344,29 @@ function resolveSearchTarget(
   return undefined
 }
 
-function parseBlockSearchQuery(
+export function parseBlockSearchQuery(
   value: string,
 ): {workchain: number; shard: string; seqno: number} | undefined {
-  if (/^\d+$/.test(value)) {
-    const seqno = parseBlockNumber(value)
+  const trimmed = value.trim()
+  if (/^\d+$/.test(trimmed)) {
+    const seqno = parseBlockNumber(trimmed)
     return seqno === undefined
       ? undefined
       : {workchain: MASTERCHAIN_WORKCHAIN, shard: MASTERCHAIN_SHARD, seqno}
   }
 
-  const match = TONCENTER_BLOCK_ID_PATTERN.exec(value)
-  if (!match) {
+  if (trimmed.startsWith("(") !== trimmed.endsWith(")")) {
     return undefined
   }
 
-  const workchain = Number(match[1])
-  const seqno = parseBlockNumber(match[3])
+  const blockId = trimmed.startsWith("(") ? trimmed.slice(1, -1) : trimmed
+  const groups = BLOCK_ID_PATTERN.exec(blockId)?.groups
+  if (!groups) {
+    return undefined
+  }
+
+  const workchain = Number(groups.workchain)
+  const seqno = parseBlockNumber(groups.seqno)
   if (
     !Number.isSafeInteger(workchain) ||
     workchain < MIN_WORKCHAIN ||
@@ -369,7 +376,7 @@ function parseBlockSearchQuery(
     return undefined
   }
 
-  return {workchain, shard: match[2].toUpperCase(), seqno}
+  return {workchain, shard: groups.shard.toUpperCase(), seqno}
 }
 
 function parseBlockNumber(value: string): number | undefined {
@@ -486,8 +493,7 @@ function declarationOpcode(
     return undefined
   }
 
-  const opcode = declaration.prefix.prefix_num >>> 0
-  return `0x${opcode.toString(16).padStart(8, "0")}`
+  return formatOpcode(declaration.prefix.prefix_num >>> 0)
 }
 
 function searchAbiIndex(

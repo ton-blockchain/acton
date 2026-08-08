@@ -471,7 +471,6 @@ impl LocalnetHandle {
     fn wait_until_ready(&mut self, timeout: Duration) -> Result<String, String> {
         let deadline = Instant::now() + timeout;
         let probe_url = format!("http://127.0.0.1:{}/api/v2/getMasterchainInfo", self.port);
-
         loop {
             if let Some(status) = self
                 .child_mut()
@@ -481,17 +480,33 @@ impl LocalnetHandle {
                 return Err(format!("Localnet exited before ready with status {status}"));
             }
 
-            if let Ok(response) = self.with_auth(self.client.get(&probe_url)).send()
-                && response.status().is_success()
-                && let Ok(json) = response.json::<Value>()
-                && json.get("ok").and_then(Value::as_bool) == Some(true)
-            {
-                let base_url = probe_url.trim_end_matches("/api/v2/getMasterchainInfo");
-                return Ok(base_url.to_string());
-            }
+            let last_probe = match self.with_auth(self.client.get(&probe_url)).send() {
+                Ok(response) => {
+                    let status = response.status();
+                    match response.text() {
+                        Ok(body) => {
+                            if status.is_success()
+                                && serde_json::from_str::<Value>(&body)
+                                    .ok()
+                                    .and_then(|json| json.get("ok").and_then(Value::as_bool))
+                                    == Some(true)
+                            {
+                                let base_url =
+                                    probe_url.trim_end_matches("/api/v2/getMasterchainInfo");
+                                return Ok(base_url.to_string());
+                            }
+                            format!("status {status}: {body}")
+                        }
+                        Err(error) => format!("status {status}, unreadable body: {error}"),
+                    }
+                }
+                Err(error) => error.to_string(),
+            };
 
             if Instant::now() >= deadline {
-                return Err(format!("Timed out waiting for readiness probe {probe_url}"));
+                return Err(format!(
+                    "Timed out waiting for readiness probe {probe_url}; last probe: {last_probe}"
+                ));
             }
 
             thread::sleep(Duration::from_millis(100));

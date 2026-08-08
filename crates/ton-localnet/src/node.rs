@@ -191,7 +191,7 @@ impl Node {
 
     pub fn with_db_path<P: AsRef<std::path::Path>>(
         executor: Box<dyn TvmExecutor>,
-        config_boc: BocBytes,
+        mut config_boc: BocBytes,
         mut state_source: StateSource,
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
@@ -204,10 +204,6 @@ impl Node {
                 .context("Fork block seqno does not fit localnet block numbering")?,
         };
         let configured_origin_seqno = configured_fork_seqno.unwrap_or_default();
-        let initial_config_cell =
-            Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
-        let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
-
         let persistence = db_path.map(NodePersistence::open).transpose()?;
         let (
             mut latest,
@@ -236,6 +232,51 @@ impl Node {
                 Seqno::default(),
             )
         };
+        let history_origin_seqno = history
+            .blocks
+            .first()
+            .map(|block| {
+                block
+                    .seqno
+                    .checked_sub(1)
+                    .context("Persisted block history cannot start at seqno zero")
+            })
+            .transpose()?;
+        if let (Some(persisted), Some(history)) = (persisted_origin_seqno, history_origin_seqno) {
+            anyhow::ensure!(
+                persisted == history,
+                "Persisted origin seqno {persisted} does not match block history origin {history}"
+            );
+        }
+        let origin_seqno = persisted_origin_seqno
+            .or(history_origin_seqno)
+            .unwrap_or(configured_origin_seqno);
+        let fork_seqno = matches!(&state_source, StateSource::Remote(_)).then(|| {
+            persisted_fork_seqno
+                // Before fork metadata existed, a zero origin could describe local block
+                // numbering rather than the configured remote fork boundary.
+                .or_else(|| persisted_origin_seqno.filter(|origin| *origin > 0))
+                .or_else(|| history_origin_seqno.filter(|origin| *origin > 0))
+                .or(configured_fork_seqno)
+                .or(persisted_origin_seqno)
+                .or(history_origin_seqno)
+                .unwrap_or(origin_seqno)
+        });
+        let mut origin_gen_utime = 0;
+        if let (StateSource::Remote(provider), Some(fork_seqno)) = (&mut state_source, fork_seqno) {
+            provider.fork_block_number = Some(u64::from(fork_seqno));
+            if let Some(snapshot) = provider.snapshot_at(u64::from(fork_seqno))? {
+                config_boc = BocBytes::from(Boc::encode(snapshot.config));
+                origin_gen_utime = snapshot.gen_utime;
+            }
+        }
+        if let Some(persistence) = &persistence {
+            persistence.set_chain_origins(origin_seqno, fork_seqno)?;
+        }
+
+        let initial_config_cell =
+            Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
+        let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
         for block in &mut history.masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
                 block.config_boc_hash = initial_config_hash;
@@ -274,42 +315,6 @@ impl Node {
                 frozen_hash: None,
             });
 
-        let history_origin_seqno = history
-            .blocks
-            .first()
-            .map(|block| {
-                block
-                    .seqno
-                    .checked_sub(1)
-                    .context("Persisted block history cannot start at seqno zero")
-            })
-            .transpose()?;
-        if let (Some(persisted), Some(history)) = (persisted_origin_seqno, history_origin_seqno) {
-            anyhow::ensure!(
-                persisted == history,
-                "Persisted origin seqno {persisted} does not match block history origin {history}"
-            );
-        }
-        let origin_seqno = persisted_origin_seqno
-            .or(history_origin_seqno)
-            .unwrap_or(configured_origin_seqno);
-        let fork_seqno = matches!(&state_source, StateSource::Remote(_)).then(|| {
-            persisted_fork_seqno
-                // Before fork metadata existed, a zero origin could describe local block
-                // numbering rather than the configured remote fork boundary.
-                .or_else(|| persisted_origin_seqno.filter(|origin| *origin > 0))
-                .or_else(|| history_origin_seqno.filter(|origin| *origin > 0))
-                .or(configured_fork_seqno)
-                .or(persisted_origin_seqno)
-                .or(history_origin_seqno)
-                .unwrap_or(origin_seqno)
-        });
-        if let Some(persistence) = &persistence {
-            persistence.set_chain_origins(origin_seqno, fork_seqno)?;
-        }
-        if let (StateSource::Remote(provider), Some(fork_seqno)) = (&mut state_source, fork_seqno) {
-            provider.fork_block_number = Some(u64::from(fork_seqno));
-        }
         let effective_head_seqno = history
             .blocks
             .last()
@@ -323,10 +328,18 @@ impl Node {
 
         let mut globals = Globals::new(config_hash);
         globals.origin_seqno = origin_seqno;
+        globals.origin_gen_utime = origin_gen_utime;
         globals.head_seqno = effective_head_seqno;
         // Approximation of global LT
         globals.global_lt = history.blocks.last().map_or(0, |b| b.end_lt);
-        let clock = VirtualClock::from_blocks(&history.blocks)?;
+        let mut clock = VirtualClock::from_blocks(&history.blocks)?;
+        if origin_gen_utime != 0 {
+            let latest_timestamp = history
+                .blocks
+                .last()
+                .map_or(origin_gen_utime, |block| block.gen_utime);
+            clock.set_time(latest_timestamp, latest_timestamp)?;
+        }
 
         let mut node = Self {
             cas,
@@ -367,7 +380,7 @@ impl Node {
         (self.globals.origin_seqno > 0).then(|| BlockMeta {
             seqno: self.globals.origin_seqno,
             prev_seqno: None,
-            gen_utime: 0,
+            gen_utime: self.globals.origin_gen_utime,
             start_lt: 0,
             end_lt: 0,
             tx_hashes: Vec::new(),
@@ -380,7 +393,7 @@ impl Node {
         (self.globals.origin_seqno > 0).then(|| MasterchainBlockMeta {
             seqno: self.globals.origin_seqno,
             prev_seqno: None,
-            gen_utime: 0,
+            gen_utime: self.globals.origin_gen_utime,
             start_lt: 0,
             end_lt: 0,
             shard_block: LocalnetBlockId::basechain_anchor(self.globals.origin_seqno),
@@ -3297,6 +3310,7 @@ mod tests {
             StateSource::Remote(RemoteProvider {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(origin_seqno)),
+                fork_snapshot: None,
             }),
         )
         .expect("must create forked test node")
@@ -3361,6 +3375,7 @@ mod tests {
                 StateSource::Remote(RemoteProvider {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+                    fork_snapshot: None,
                 }),
                 Some(&db_path),
             )
@@ -3377,6 +3392,7 @@ mod tests {
                 StateSource::Remote(RemoteProvider {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(ORIGIN_SEQNO + 1_000)),
+                    fork_snapshot: None,
                 }),
                 Some(&db_path),
             )
@@ -3393,6 +3409,7 @@ mod tests {
             StateSource::Remote(RemoteProvider {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(ORIGIN_SEQNO + 2_000)),
+                fork_snapshot: None,
             }),
             Some(&db_path),
         )
@@ -3449,6 +3466,7 @@ mod tests {
                 StateSource::Remote(RemoteProvider {
                     network: Network::Mainnet,
                     fork_block_number: Some(u64::from(FORK_SEQNO)),
+                    fork_snapshot: None,
                 }),
                 Some(&db_path),
             )
@@ -3470,6 +3488,7 @@ mod tests {
             StateSource::Remote(RemoteProvider {
                 network: Network::Mainnet,
                 fork_block_number: Some(u64::from(FORK_SEQNO + 1_000)),
+                fork_snapshot: None,
             }),
             Some(&db_path),
         )

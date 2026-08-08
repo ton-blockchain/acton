@@ -29,7 +29,7 @@ Examples:
 
 - `[build].out-dir = "artifacts"` writes under `<project-root>/artifacts`.
 - `acton build --out-dir artifacts` writes under `<cwd>/artifacts`.
-- `[wrappers.tolk].output-dir = "wrappers"` resolves from project root, but `acton wrapper Counter --output-dir wrappers` resolves from the current working directory.
+- `[wrappers.tolk].output-dir = "wrappers"` and `[contracts.Counter.wrappers.tolk].output-dir = "counter-wrappers"` resolve from project root, but `acton wrapper Counter --output-dir wrappers` resolves from the current working directory.
 
 ## Root section
 
@@ -110,6 +110,7 @@ This section is a map where each key is a contract name and the value is a contr
 | `types`        | `string` | No       | Tolk interface file used to produce ABI for a precompiled `.boc`.       |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
 | `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+| `wrappers`     | `table`  | No       | Per-contract overrides for the project-level `[wrappers]` settings.     |
 
 For precompiled `.boc` contracts, `types` can point to a Tolk file that contains
 the contract header, message/storage types, and getters. Acton still loads code
@@ -120,7 +121,20 @@ from `src`, but uses the `types` file to produce ABI and generate wrappers.
 display-name = "Precompiled"
 src = "contracts/Precompiled.boc"
 types = "contracts/Precompiled.types.tolk"
+
+[contracts.Precompiled.wrappers.tolk]
+output-dir = "generated/precompiled"
+generate-test = true
+test-output-dir = "tests/generated/precompiled"
+
+[contracts.Precompiled.wrappers.typescript]
+output-dir = "app/src/wrappers/precompiled"
 ```
+
+The nested `wrappers.tolk` and `wrappers.typescript` tables accept the same
+fields as their project-level counterparts. A field set for a contract
+overrides only that field; omitted fields continue to use the project-level
+value.
 
 Do not put dependencies on the BoC contract itself: it is already compiled.
 Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
@@ -212,10 +226,10 @@ output-dir = "app/src/wrappers-ts"
 
 Override rules:
 
-- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
-- For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
-- For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
-- `[wrappers.tolk].generate-test` affects only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
+- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.tolk].output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
+- For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.typescript].output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
+- For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[contracts.<name>.wrappers.tolk].test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
+- Per-contract `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both affect only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
 
 Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
 
@@ -260,6 +274,10 @@ Configures defaults for `acton localnet`.
 | `block-interval-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                                 |
 | `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton localnet mine` or `/acton_mine`.                       |
 
+The localnet fork uses the network configuration from the resolved masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
+
 Example:
 
 ```acton-toml title="Acton.toml"
@@ -298,12 +316,17 @@ Configures the behavior of `acton test`.
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `studio-reporting`          | `boolean`  | `true`        | Send test run data to Acton Studio when it is available.               |
 | `gas-profile`               | `string`   | -             | Path to write a gas-weighted execution profile.                        |
 | `gas-profile-format`        | `string`   | `cpuprofile`  | Gas profile output format: `cpuprofile` or `collapsed`.                |
 | `gas-profile-include-tests` | `boolean`  | `false`       | Include `.test.tolk` unit-test get-method execution in the profile.    |
 | `ui`                        | `boolean`  | `false`       | Enable the browser test UI server.                                     |
 | `ui-port`                   | `integer`  | `12344`       | Port for the browser test UI server.                                   |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+The test fork uses state and network configuration from the same masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, it uses the current system Unix time.
 
 TON Center API keys are configured through the process environment, not `Acton.toml`: use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` when the built-in fork target needs authentication.
 

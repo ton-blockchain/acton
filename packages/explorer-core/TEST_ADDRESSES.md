@@ -24,6 +24,12 @@ These addresses are not fixtures and their balances or recent history can change
 | [`EQDgR7jZy9D88IBC3dK4qEJjb9D8WmfCbL9v-4Fjsjzm7cpq`](https://actonscan.com/address/EQDgR7jZy9D88IBC3dK4qEJjb9D8WmfCbL9v-4Fjsjzm7cpq?network=mainnet) | Account with more than 400 NFTs, useful for checking uninterrupted incremental loading in the NFTs tab | 2026-08-02 |
 | [`EQCA14o1-VWhS2efqoh_9M1b_A9DtKTuoqfmkn83AbJzwnPi`](https://actonscan.com/address/EQCA14o1-VWhS2efqoh_9M1b_A9DtKTuoqfmkn83AbJzwnPi?network=mainnet) | NFT collection with more than 800 items, useful for checking collection metadata and uninterrupted incremental item loading | 2026-08-02 |
 
+## Mainnet blocks
+
+| Block | What to verify | Last checked |
+| --- | --- | --- |
+| [`0:8000000000000000:86786720`](https://actonscan.com/block/0/8000000000000000/86786720?network=mainnet) | Block with 533 transactions, useful for checking the v2 fallback and uninterrupted incremental transaction loading | 2026-08-06 |
+
 ## Mainnet transactions
 
 | Transaction | What to verify | Last checked |

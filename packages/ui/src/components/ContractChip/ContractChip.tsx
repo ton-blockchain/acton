@@ -1,6 +1,7 @@
 import type {MouseEvent} from "react"
 
 import {cx} from "../../lib/cx"
+import {shortenMiddle} from "../../lib/formatting"
 import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
 import {Tooltip} from "../Tooltip"
 
@@ -37,11 +38,6 @@ function getDisplayAddress(
   }
 }
 
-function shortenAddress(address: string): string {
-  if (address.length <= 13) return address
-  return `${address.slice(0, 6)}…${address.slice(-6)}`
-}
-
 export function ContractChip({
   address,
   contracts,
@@ -55,7 +51,7 @@ export function ContractChip({
 
   const displayAddress = getDisplayAddress(address, formatAddress)
   const contractInfo = contracts?.get(address) ?? contracts?.get(displayAddress)
-  const shortAddress = shortenAddress(displayAddress)
+  const shortAddress = shortenMiddle(displayAddress, {start: 6, end: 6})
   const isClickable = onContractClick !== undefined
 
   const content = contractInfo ? (

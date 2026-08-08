@@ -7,17 +7,11 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import {Checkbox, InlineAction, Input, Select} from "@acton/ui"
+import {Checkbox, formatGramAmount, InlineAction, Input, parseGramAmount, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
-import {
-  abiValueToFormValue,
-  formatNanoAsGram,
-  parseGramAsNano,
-  SAMPLE_ADDRESS,
-  sampleAbiValueForTy,
-} from "../../lib/abiValue"
+import {abiValueToFormValue, SAMPLE_ADDRESS, sampleAbiValueForTy} from "../../lib/abiValue"
 import type {TonAddressKind} from "../../lib/tonAddress"
 import {TonAddressInput, type TonAddressSuggestion} from "../TonAddressInput/TonAddressInput"
 import styles from "./AbiValueEditor.module.css"
@@ -94,12 +88,16 @@ function TonCoinsInput({
   readonly disabled: boolean
 }) {
   const nanoValue = formatScalarValue(value)
-  const [draft, setDraft] = useState(() => formatNanoAsGram(nanoValue))
+  const [draft, setDraft] = useState(() =>
+    formatGramAmount(nanoValue, {fallback: "", showUnit: false}),
+  )
 
   useEffect(() => {
     setDraft(current => {
-      const currentNano = parseGramAsNano(current)
-      return currentNano === nanoValue ? current : formatNanoAsGram(nanoValue)
+      const currentNano = parseGramAmount(current)?.toString()
+      return currentNano === nanoValue
+        ? current
+        : formatGramAmount(nanoValue, {fallback: "", showUnit: false})
     })
   }, [nanoValue])
 
@@ -113,12 +111,14 @@ function TonCoinsInput({
         onChange={event => {
           const next = event.target.value
           setDraft(next)
-          const nextNano = parseGramAsNano(next)
+          const nextNano = parseGramAmount(next)?.toString()
           if (nextNano !== undefined) {
             onChange(nextNano)
           }
         }}
-        onBlur={() => setDraft(formatNanoAsGram(formatScalarValue(value)))}
+        onBlur={() =>
+          setDraft(formatGramAmount(formatScalarValue(value), {fallback: "", showUnit: false}))
+        }
         inputMode="decimal"
         placeholder="0.1"
         disabled={disabled}

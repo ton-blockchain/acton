@@ -81,6 +81,7 @@ pub(crate) struct TestConfig {
     pub fuzz_seed: Option<u64>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
+    pub studio_reporting: Option<bool>,
 }
 
 #[allow(dead_code)]
@@ -1059,6 +1060,10 @@ version = "0.1.0"
 
             if let Some(fail_on_diff) = config.fail_on_diff {
                 let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
+            }
+
+            if let Some(studio_reporting) = config.studio_reporting {
+                let _ = writeln!(toml_content, "studio-reporting = {studio_reporting}");
             }
 
             if let Some(gas_profile) = &config.gas_profile {
@@ -2105,6 +2110,15 @@ impl ActonCommand {
             output,
             project_path,
         }
+    }
+
+    /// Spawn a long-running command with captured output.
+    pub(crate) fn spawn(self) -> std::io::Result<std::process::Child> {
+        let mut command = self.into_prepared_command().into_std();
+        command
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
     }
 
     /// Spawn command in a pseudo-terminal for interactive tests.

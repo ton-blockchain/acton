@@ -313,6 +313,10 @@ ui-port = 23456
 | `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or `custom:<name>` for a custom network defined in `[networks]`). |
 | `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                                      |
 
+The fork uses state and network configuration from the same masterchain block.
+When `fork-block-number` is set, it also uses that block's Unix time; otherwise,
+it uses the current system Unix time.
+
 Examples:
 
 ```acton-toml title="Acton.toml"

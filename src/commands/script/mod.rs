@@ -8,6 +8,7 @@ use crate::context::{
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::paths::build_cache_dir;
 use crate::retrace;
 use crate::tonconnect::{TonConnectContext, TonConnectSession};
 use crate::wallets;
@@ -31,7 +32,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
-use ton_api::Network;
+use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteLibraryCache, RemoteSnapshotCache,
@@ -65,12 +66,6 @@ fn resolve_script_networks(
             "--fork-net".yellow()
         );
     }
-
-    let fork_net = if fork_net.is_none() {
-        net.clone()
-    } else {
-        fork_net
-    };
 
     Ok((net, fork_net))
 }
@@ -256,9 +251,30 @@ fn execute_script(
     let broadcast = net.is_some();
     let dest_address = contract_address(code_cell)?;
     let formatted_address = format_std_address(&dest_address, net);
-
-    let now = std::time::SystemTime::now();
-    let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let config = ActonConfig::load()?;
+    let effective_fork_net = fork_net.clone().or_else(|| net.cloned());
+    let snapshot_network = if fork_net.is_some() || fork_block_number.is_some() {
+        effective_fork_net.as_ref()
+    } else {
+        None
+    };
+    let fork_snapshot = snapshot_network
+        .map(|network| {
+            TonApiClient::new(network.clone(), config.custom_networks())?
+                .get_masterchain_snapshot_cached(
+                    fork_block_number,
+                    &build_cache_dir(project_root())
+                        .join(ton_api::MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR),
+                )
+        })
+        .transpose()?;
+    let execution_unixtime = if let Some(snapshot) = &fork_snapshot {
+        i64::from(snapshot.gen_utime)
+    } else {
+        let now = std::time::SystemTime::now();
+        let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        duration_since_epoch.as_secs().try_into()?
+    };
 
     let params = RunGetMethodArgs {
         code: Boc::encode_base64(code_cell),
@@ -266,7 +282,7 @@ fn execute_script(
         verbosity,
         libs: String::new(),
         address: formatted_address,
-        unixtime: duration_since_epoch.as_secs().try_into()?,
+        unixtime: execution_unixtime,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
@@ -276,14 +292,17 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let config_b64: Option<&str> = None;
+    let fork_config_b64 = fork_snapshot
+        .as_ref()
+        .map(|snapshot| Boc::encode_base64(&snapshot.config));
+    let config_b64 = fork_config_b64.as_deref().unwrap_or(DEFAULT_CONFIG);
 
-    let mut emulator = Emulator::new(verbosity, config_b64)?;
-    let resolver = match &fork_net {
+    let mut emulator = Emulator::new(verbosity, Some(config_b64))?;
+    let resolver = match &effective_fork_net {
         Some(net) => {
             let remote = RemoteAccountState::new(
                 net.clone(),
-                fork_block_number,
+                fork_snapshot.as_ref().map(|snapshot| snapshot.seqno),
                 RemoteSnapshotCache::new(),
                 RemoteLibraryCache::new(),
                 fork_cache_enabled,
@@ -292,7 +311,10 @@ fn execute_script(
         }
         None => AccountsState::Local(LocalAccountsState::new()),
     };
-    let mut world_state = WorldState::new(resolver, config_b64)?;
+    let mut world_state = WorldState::new(resolver, Some(config_b64))?;
+    if let Some(snapshot) = &fork_snapshot {
+        world_state.set_now(snapshot.gen_utime);
+    }
     let mut build_cache = BuildCache::new();
     build_cache.memoize(
         "script",
@@ -311,7 +333,6 @@ fn execute_script(
     let mut assert_failure = None;
     let mut expected_exit_code = None;
 
-    let config = ActonConfig::load()?;
     let current_project_root = project_root().to_path_buf();
     let tonconnect = if tonconnect {
         let network = net.expect("`--tonconnect` must be validated before script execution");
@@ -341,7 +362,7 @@ fn execute_script(
             tonconnect,
             build_override: BTreeMap::new(),
             explorer,
-            fork_net,
+            fork_net: effective_fork_net,
             running_id: "script".into(),
             // The script's own compiled code contains any user-defined predicate
             // lambdas (e.g. those built by `expect(...).toHaveTx({ ... })`), so
@@ -382,7 +403,7 @@ fn execute_script(
     let stack_b64 = Boc::encode_base64(serialize_tuple(&stack)?);
 
     if debug {
-        let mut executor = StepGetExecutor::new(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
+        let mut executor = StepGetExecutor::new(&stack_b64, &params, Some(config_b64))?;
         ffi::register(&mut executor, &mut ctx);
 
         let listener = debug_listener
@@ -412,7 +433,7 @@ fn execute_script(
 
     let mut executor = GetExecutor::new(&params)?;
     ffi::register(&mut executor, &mut ctx);
-    let result = executor.run_get_method(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
+    let result = executor.run_get_method(&stack_b64, &params, Some(config_b64))?;
 
     print_script_result(
         &ctx,

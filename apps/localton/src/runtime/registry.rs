@@ -14,9 +14,12 @@ use utoipa::ToSchema;
 
 use super::ManagedProcess;
 
+/// One process that the Localton launcher supervises
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ProcessInfo {
+    /// Stable process name
     pub name: String,
+    /// Current process ID
     pub pid: Option<u32>,
 }
 

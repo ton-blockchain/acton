@@ -76,6 +76,9 @@ Clear the compilation cache before running.
 
 {{#option "`--fork-net` _network_" }}
 Fork blockchain state from a remote network for local execution.
+Acton also uses the network configuration from the resolved masterchain block.
+With an explicit historical block, it uses that block's Unix time; otherwise,
+it uses the current system Unix time.
 When `--net` is set, omitted `--fork-net` defaults to the selected broadcast
 network.
 {{/option}}
@@ -86,14 +89,17 @@ Historical block sequence number to fork from.
 When a fork block number is set, Acton caches resolved remote accounts under
 `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
 runs with the same fork network, block number, and address read that file before
-calling the remote API.
+calling the remote API. Fork runs without an explicit block use the same account
+cache after they resolve the latest sequence number. Acton caches the matching
+network configuration and, for explicit historical forks, block time for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`.
 {{/option}}
 
 {{#option "`--no-fork-cache`" }}
-Disable persistent account cache for pinned fork block numbers. Use this when
-you want every script run to fetch forked accounts from the remote API. The
-regular `--clear-cache` flag removes this cache together with the rest of
-`build/cache`.
+Disable persistent account and library cache. Use this when you want every
+script run to fetch forked accounts and libraries from the remote API. This
+option does not disable the 24-hour masterchain snapshot cache. The regular
+`--clear-cache` flag removes this cache together with the rest of `build/cache`.
 {{/option}}
 
 {{/options}}
@@ -163,6 +169,7 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - state is not preserved between runs
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
+- fork state and configuration come from the same masterchain block; an explicit historical fork also uses that block's time
 - `--net` sends real transactions using configured wallets
 - `--net ... --tonconnect` sends real transactions through the connected TON Connect wallet
 

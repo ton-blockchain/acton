@@ -497,7 +497,9 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
                 api_v2_port: 8081,
                 api_v3_port: 8082,
                 admin_port: 8083,
+                config_port: 8084,
                 validators: 1,
+                imported_accounts: Vec::new(),
             },
             resume_on_startup: false,
         };

@@ -9,17 +9,13 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  Duration,
 } from "@acton/ui"
 import {FlaskConical} from "lucide-react"
 
 import type {TestRunStatus, TestRunSummary} from "../studioApi"
-import {
-  formatTestRunDuration,
-  testRunLabel,
-  testRunStatusLabel,
-  testRunSummary,
-  testRunTime,
-} from "../testRunPresentation"
+import {testRunLabel, testRunStatusLabel, testRunSummary} from "../testRunPresentation"
 
 import styles from "./TestRunsTable.module.css"
 
@@ -100,12 +96,10 @@ export function TestRunsTable({isLoading, runs, onOpenRun, onRunTests}: TestRuns
                 </DataTableCell>
                 <DataTableCell tone="muted">{testRunSummary(run)}</DataTableCell>
                 <DataTableCell tone="muted">
-                  {formatTestRunDuration(run.stats.durationMs)}
+                  <Duration display="runtime" unit="milliseconds" value={run.stats.durationMs} />
                 </DataTableCell>
                 <DataTableCell align="right" tone="muted">
-                  <time dateTime={run.startedAt} title={formatStartedAt(run.startedAt)}>
-                    {testRunTime(run.startedAt)}
-                  </time>
+                  <DateTime value={run.startedAt} display="smart" />
                 </DataTableCell>
               </DataTableRow>
             ))
@@ -123,11 +117,4 @@ function RunStatus({status}: {readonly status: TestRunStatus}) {
       {testRunStatusLabel(status)}
     </span>
   )
-}
-
-function formatStartedAt(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(value))
 }

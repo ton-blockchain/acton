@@ -37,6 +37,7 @@ struct WrapperModel {
     wrapper_import_paths: Vec<PathBuf>,
     wrapper_path: PathBuf,
     test_path: PathBuf,
+    generate_test_by_default: bool,
     mappings: Option<BTreeMap<String, String>>,
     format_options: tolk_fmt::FormatOptions,
 }
@@ -127,12 +128,32 @@ fn build_model(
         .unwrap_or(contract_id);
 
     let contract_name = to_pascal_case(file_stem);
-    let configured_tolk_output_dir = config.tolk_wrapper_output_dir().map(ToOwned::to_owned);
-    let configured_typescript_output_dir = config
-        .typescript_wrapper_output_dir()
+    let contract_tolk_settings = contract_config
+        .wrappers
+        .as_ref()
+        .and_then(|wrappers| wrappers.tolk.as_ref());
+    let contract_typescript_settings = contract_config
+        .wrappers
+        .as_ref()
+        .and_then(|wrappers| wrappers.typescript.as_ref());
+    let configured_tolk_output_dir = contract_tolk_settings
+        .and_then(|settings| settings.output_dir.as_deref())
+        .filter(|path| !path.trim().is_empty())
+        .or_else(|| config.tolk_wrapper_output_dir())
         .map(ToOwned::to_owned);
-    let configured_tolk_test_output_dir =
-        config.tolk_wrapper_test_output_dir().map(ToOwned::to_owned);
+    let configured_typescript_output_dir = contract_typescript_settings
+        .and_then(|settings| settings.output_dir.as_deref())
+        .filter(|path| !path.trim().is_empty())
+        .or_else(|| config.typescript_wrapper_output_dir())
+        .map(ToOwned::to_owned);
+    let configured_tolk_test_output_dir = contract_tolk_settings
+        .and_then(|settings| settings.test_output_dir.as_deref())
+        .filter(|path| !path.trim().is_empty())
+        .or_else(|| config.tolk_wrapper_test_output_dir())
+        .map(ToOwned::to_owned);
+    let generate_test_by_default = contract_tolk_settings
+        .and_then(|settings| settings.generate_test)
+        .unwrap_or_else(|| config.tolk_wrapper_generate_test());
     let mapped_wrapper_output_dir = mappings
         .as_ref()
         .and_then(|mappings| mappings.get("@wrappers").cloned());
@@ -191,6 +212,7 @@ fn build_model(
         wrapper_import_paths,
         wrapper_path,
         test_path,
+        generate_test_by_default,
         mappings,
         format_options,
     })
@@ -255,9 +277,6 @@ pub fn wrapper_cmd(
         );
     }
 
-    let generate_test_stub =
-        !generate_typescript && (explicit_test_request || config.tolk_wrapper_generate_test());
-
     if all {
         let contracts = config
             .contracts()
@@ -277,7 +296,7 @@ pub fn wrapper_cmd(
                 wrapper_output_dir.clone(),
                 None,
                 test_output_dir.clone(),
-                generate_test_stub,
+                explicit_test_request,
                 generate_typescript,
             )?;
         }
@@ -291,7 +310,7 @@ pub fn wrapper_cmd(
             wrapper_output_dir,
             test_output,
             test_output_dir,
-            generate_test_stub,
+            explicit_test_request,
             generate_typescript,
         )?;
     }
@@ -307,7 +326,7 @@ fn generate_for_contract(
     wrapper_output_dir: Option<String>,
     test_output: Option<String>,
     test_output_dir: Option<String>,
-    generate_test_stub: bool,
+    explicit_test_request: bool,
     generate_typescript: bool,
 ) -> anyhow::Result<()> {
     let model = build_model(
@@ -319,6 +338,8 @@ fn generate_for_contract(
         test_output_dir,
         generate_typescript,
     )?;
+    let generate_test_stub =
+        !generate_typescript && (explicit_test_request || model.generate_test_by_default);
 
     if let Some(parent) = model.wrapper_path.parent() {
         fs::create_dir_all(parent)

@@ -2,6 +2,7 @@ import {useId, useState, type ReactNode} from "react"
 import {Check, Copy, FileCode2} from "lucide-react"
 
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
+import {CountValue} from "../CountValue/CountValue"
 import {DisclosureToggle} from "../DisclosureToggle/DisclosureToggle"
 import {CopyInlineAction, InlineAction, InlineActions} from "../InlineActions/InlineActions"
 import {Popover} from "../Popover/Popover"
@@ -65,7 +66,7 @@ function ParsedCollection({
       <div className={styles.parsedCollectionHeader}>
         <span className={styles.parsedBadge}>{label}</span>
         <span className={styles.parsedCollectionCount}>
-          {itemCount} {itemCount === 1 ? "item" : "items"}
+          <CountValue singular="item" value={itemCount} />
         </span>
         <DisclosureToggle
           className={styles.parsedCollectionToggle}

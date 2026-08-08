@@ -45,12 +45,7 @@
   line-height: 22px;
 }
 
-.detailRowMonospace dd {
-  font-family: var(--acton-font-mono);
-  font-size: var(--acton-font-size-xs);
-}
-
-.detailRow dd span {
+.detailText {
   min-width: 0;
   display: block;
   overflow: hidden;

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3.5-slim AS frontend-builder
+FROM oven/bun:1.3.14-slim AS frontend-builder
 
 WORKDIR /workspace
 

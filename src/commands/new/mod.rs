@@ -263,6 +263,7 @@ pub fn new_cmd(
                         .collect(),
                 ),
                 output: None,
+                wrappers: None,
             },
         );
     }

@@ -33,6 +33,22 @@ export interface Shards {
   readonly shards: readonly BlockId[]
 }
 
+export interface V2BlockTransactionListItem {
+  readonly "@type": "blocks.shortTxId"
+  readonly mode: number
+  readonly account: string
+  readonly lt: string
+  readonly hash: string
+}
+
+export interface V2BlockTransactionsResponse {
+  readonly "@type": "blocks.transactions"
+  readonly id: BlockId
+  readonly req_count: number
+  readonly incomplete: boolean
+  readonly transactions: readonly V2BlockTransactionListItem[]
+}
+
 export interface AddressInformation {
   readonly balance: string
   readonly code: string | null
@@ -1092,6 +1108,15 @@ export interface StreamingTransactionsEvent {
   readonly transactions: readonly V3Transaction[]
 }
 
+export interface StreamingActionsEvent {
+  readonly type: "actions"
+  readonly finality: StreamingFinality
+  readonly trace_external_hash_norm?: string
+  readonly actions: readonly V3Action[]
+  readonly address_book?: Record<string, V3AddressBookRow>
+  readonly metadata?: V3Metadata
+}
+
 export interface V3TransactionStoragePhase {
   readonly storage_fees_collected?: string
   readonly storage_fees_due?: string
@@ -1221,37 +1246,6 @@ export interface LocalnetMineResult {
 export interface LocalnetCheckpoint {
   readonly name: string
   readonly block_seqno: number
-}
-
-export type ApiCallStatus = "success" | "failed"
-export type ApiCallType = "read" | "write"
-export type ApiCallSource = "external" | "studio_ui"
-export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
-
-export interface ApiCallRecord {
-  readonly sequence: number
-  readonly status: ApiCallStatus
-  readonly status_code: number
-  readonly source: ApiCallSource
-  readonly call_type: ApiCallType
-  readonly api_family: ApiCallFamily
-  readonly http_method: string
-  readonly path: string
-  readonly method: string
-  readonly request_id: unknown
-  readonly query_params: unknown | null
-  readonly request_body: unknown | null
-  readonly request_body_truncated: boolean
-  readonly response_body: unknown | null
-  readonly response_body_truncated: boolean
-  readonly timestamp_ms: number
-  readonly duration_ns: number
-}
-
-export interface ApiCallLogResponse {
-  readonly calls: readonly ApiCallRecord[]
-  readonly total_retained: number
-  readonly max_retained: number
 }
 
 export interface V3RunGetMethodStackEntry {

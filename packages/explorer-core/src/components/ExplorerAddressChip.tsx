@@ -47,6 +47,16 @@ export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
 }) => {
   const addressFormat = useAddressFormat()
   const resolvedName = useAddressName(resolveName ? address : "")
+  const addressVariants = [
+    {
+      label: "Bounceable",
+      value: formatAddress(address, false, {...addressFormat, bounceable: true}),
+    },
+    {
+      label: "Non-bounceable",
+      value: formatAddress(address, false, {...addressFormat, bounceable: false}),
+    },
+  ]
   return (
     <AddressChip
       address={address}
@@ -65,6 +75,7 @@ export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
       onCopyError={error => console.error("Failed to copy address", error)}
       onHoverAddressChange={onHoverAddressChange}
       shorten={shorten}
+      tooltipVariants={addressVariants}
       variant={variant}
     />
   )

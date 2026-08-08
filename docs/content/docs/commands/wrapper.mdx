@@ -325,7 +325,24 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
-CLI flags override config values for the current invocation.
+Each contract can override the same settings without changing the defaults for
+other contracts:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+test-output-dir = "tests/generated/counter"
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Settings are resolved field by field. CLI flags have the highest priority,
+then `[contracts.<name>.wrappers.*]`, then `[wrappers.*]`, and finally the
+wrapper command defaults. An omitted per-contract field inherits the
+project-wide value. An explicit per-contract `generate-test = false` overrides
+a project-wide `true`. With `--all`, Acton resolves these settings separately
+for every contract.
 
 For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
 generation can read ABI from the Tolk interface file:

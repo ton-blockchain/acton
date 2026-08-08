@@ -272,6 +272,14 @@ Both wait helpers automatically adapt to the execution mode:
 | Local (default)   | Returns the already processed local transaction or trace immediately |
 | `--net <network>` | Polls the network until the transaction or trace is found            |
 
+<Callout type="warn">
+  Do not use `ExternalSendResult.isAccepted()` after broadcasting an external-in
+  message. The send API confirms submission, but it does not report whether the
+  destination contract accepted the message. `isAccepted()` exits with an error
+  in this case. Use `waitForFirstTransaction()` or `waitForTrace()` to look for
+  the transaction on-chain.
+</Callout>
+
 Check the current mode using `net.isBroadcasting()`:
 
 ```tolk
@@ -317,13 +325,24 @@ to:
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
 
+Acton resolves one masterchain block for the script run. Account state and the
+network configuration come from that block. Use `--fork-block-number` to select
+an exact block and use its Unix time. If you omit it, Acton resolves the latest
+block once, pins it for the script run, and uses the current system Unix time.
+
 If the script also passes `--fork-block-number`, fetched account states are
 persisted under
 `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
 runs with the same fork network, block number, and address reuse that file
-before calling the remote API. Use `--no-fork-cache` to force fresh remote
-account reads for a run, or `--clear-cache` to remove the persisted entries with
-the rest of `build/cache`.
+before calling the remote API. Fork runs without an explicit block also persist
+accounts under the resolved sequence number.
+
+Acton stores the matching network configuration and, for explicit historical
+forks, block time for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`. Use
+`--no-fork-cache` to force fresh account and library reads for a run. This option
+does not disable the masterchain snapshot cache. Use `--clear-cache` to remove
+the persisted entries with the rest of `build/cache`.
 
 When the script runs with `--net`, the selected network already becomes the default remote read network. This means deploy scripts can send a transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper getters against the same chain without passing `--fork-net`.
 

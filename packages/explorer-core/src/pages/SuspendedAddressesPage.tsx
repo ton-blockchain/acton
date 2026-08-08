@@ -1,4 +1,6 @@
 import {
+  DateTime,
+  GramAmount,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -16,7 +18,7 @@ import type {TonClient} from "../api/client"
 import type {SuspendedAccountsConfig} from "../api/suspendedAccounts"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {formatNano, toRawAddress} from "../components/utils"
+import {toRawAddress} from "../components/utils"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -44,12 +46,6 @@ type SuspendedAccountsLoadState =
 const ACCOUNT_STATE_BATCH_SIZE = 50
 const SUSPENSION_STATUS_REFRESH_MS = 60_000
 const SUSPENDED_ACCOUNTS_VOTE_URL = "https://t.me/tonblockchain/182"
-const UNLOCK_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-})
 
 export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
@@ -157,7 +153,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                 ) : (
                   "validators' voting"
                 )}{" "}
-                until {formatUnlockDate(config.suspendedUntil)}
+                until{" "}
+                <DateTime
+                  display="date-long"
+                  timeZone="UTC"
+                  unit="seconds"
+                  value={config.suspendedUntil}
+                />
               </>
             ) : config ? (
               "No addresses are currently suspended by the network configuration"
@@ -217,11 +219,15 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                         />
                       </DataTableCell>
                       <DataTableCell align="right" tone="strong">
-                        {row.balance === undefined
-                          ? loadState.balancesStatus === "loading"
-                            ? "Loading…"
-                            : "—"
-                          : `${formatNano(row.balance)} GRAM`}
+                        {row.balance === undefined ? (
+                          loadState.balancesStatus === "loading" ? (
+                            "Loading…"
+                          ) : (
+                            "—"
+                          )
+                        ) : (
+                          <GramAmount value={row.balance} useGrouping />
+                        )}
                       </DataTableCell>
                     </DataTableRow>
                   )
@@ -240,11 +246,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                     Total balance
                   </DataTableCell>
                   <DataTableCell className={styles.totalCell} align="right" tone="strong">
-                    {loadState.balancesStatus === "loading"
-                      ? "Loading…"
-                      : loadState.balancesStatus === "error"
-                        ? "Unavailable"
-                        : `${formatNano(totalBalance.toString())} GRAM`}
+                    {loadState.balancesStatus === "loading" ? (
+                      "Loading…"
+                    ) : loadState.balancesStatus === "error" ? (
+                      "Unavailable"
+                    ) : (
+                      <GramAmount value={totalBalance} useGrouping />
+                    )}
                   </DataTableCell>
                 </DataTableRow>
               </DataTableFooter>
@@ -263,10 +271,6 @@ function compareSuspendedAccounts(left: SuspendedAccountRow, right: SuspendedAcc
     return left.rawAddress.localeCompare(right.rawAddress)
   }
   return leftBalance > rightBalance ? -1 : 1
-}
-
-function formatUnlockDate(timestamp: number): string {
-  return UNLOCK_DATE_FORMATTER.format(new Date(timestamp * 1000))
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {

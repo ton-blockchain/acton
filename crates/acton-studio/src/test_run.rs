@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use xxhash_rust::xxh3::xxh3_64;
 
@@ -17,14 +18,14 @@ const TEST_TRACES_RELATIVE_PATH: &str = ".studio/tests/traces";
 const TEST_OUTPUT_RELATIVE_PATH: &str = ".studio/tests/output";
 const STUDIO_DAEMON_RELATIVE_PATH: &str = ".studio/daemon.json";
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TestRunSource {
     Manual,
     Studio,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TestRunStatus {
     Queued,
@@ -41,7 +42,7 @@ impl TestRunStatus {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestRunStats {
     pub total: usize,
@@ -52,7 +53,7 @@ pub struct TestRunStats {
     pub duration_ms: u64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioTestExecutionLogs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -63,16 +64,17 @@ pub struct StudioTestExecutionLogs {
     pub vm_log: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct StudioTestDuration {
     pub secs: u64,
     pub nanos: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct StudioTestReport {
     pub name: String,
     pub suite_name: String,
+    #[schema(value_type = String)]
     pub file_path: PathBuf,
     pub row: usize,
     pub column: usize,
@@ -83,14 +85,18 @@ pub struct StudioTestReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detailed_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub failed_transactions: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub failed_transaction_context: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub location: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object)]
     pub execution: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trace_path: Option<String>,
@@ -98,17 +104,20 @@ pub struct StudioTestReport {
     pub execution_logs: StudioTestExecutionLogs,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestRunRecord {
     pub format_version: u32,
     pub id: String,
+    #[schema(value_type = String)]
     pub project_root: PathBuf,
     pub source: TestRunSource,
     pub status: TestRunStatus,
     pub command: Vec<String>,
+    #[schema(value_type = String, format = DateTime)]
     pub started_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String, format = DateTime)]
     pub finished_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
@@ -117,6 +126,7 @@ pub struct TestRunRecord {
     #[serde(default)]
     pub reports: Vec<StudioTestReport>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String)]
     pub trace_dir: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -165,7 +175,7 @@ impl TestRunRecord {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestRunSummary {
     pub format_version: u32,
@@ -173,8 +183,10 @@ pub struct TestRunSummary {
     pub source: TestRunSource,
     pub status: TestRunStatus,
     pub command: Vec<String>,
+    #[schema(value_type = String, format = DateTime)]
     pub started_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String, format = DateTime)]
     pub finished_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
@@ -183,7 +195,7 @@ pub struct TestRunSummary {
     pub error: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StartTestRunRequest {
     #[serde(default)]
@@ -200,7 +212,7 @@ pub struct StartTestRunRequest {
     pub save_traces: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestDescriptorSummary {
     pub name: String,
@@ -208,17 +220,18 @@ pub struct TestDescriptorSummary {
     pub column: usize,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestIdentity {
     pub name: String,
     pub suite_name: String,
+    #[schema(value_type = String)]
     pub file_path: PathBuf,
     pub row: usize,
     pub column: usize,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "type",
     content = "data",
@@ -230,10 +243,12 @@ pub enum TestRunEvent {
         run: TestRunRecord,
     },
     SuiteStarted {
+        #[schema(value_type = String)]
         file_path: PathBuf,
         tests: Vec<TestDescriptorSummary>,
     },
     SuiteFinished {
+        #[schema(value_type = String)]
         file_path: PathBuf,
         stats: TestRunStats,
     },
@@ -248,7 +263,7 @@ pub enum TestRunEvent {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestRunEventEnvelope {
     pub format_version: u32,
@@ -257,7 +272,7 @@ pub struct TestRunEventEnvelope {
     pub event: TestRunEvent,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "type",
     content = "data",
@@ -278,14 +293,14 @@ pub enum TestRunStreamEvent {
     },
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TestOutputStream {
     Stdout,
     Stderr,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TestRunOutput {
     pub stdout: String,

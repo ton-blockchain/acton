@@ -30,20 +30,10 @@
 }
 
 .amount {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--acton-space-1);
+  display: inline-block;
   max-width: 100%;
-}
-
-.balanceValue {
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
-}
-
-.jettonSymbol {
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-sm);
   white-space: nowrap;
 }

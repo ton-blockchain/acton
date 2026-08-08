@@ -7,7 +7,7 @@ import {useTheme} from "@acton/ui"
 
 import styles from "./ApiReferencePage.module.css"
 
-type ApiReferenceVersion = "control" | "v2" | "v3"
+type ApiReferenceVersion = "admin" | "config" | "control" | "v2" | "v3"
 
 interface ApiReferencePageProps {
   readonly apiBaseUrl: string
@@ -22,7 +22,7 @@ const apiReferences: Record<
   {
     readonly title: string
     readonly slug: string
-    readonly specUrl: string
+    readonly specUrl?: string
   }
 > = {
   v2: {
@@ -40,6 +40,14 @@ const apiReferences: Record<
     slug: "acton-localnet-control-api",
     specUrl: "/openapi/acton-localnet-control.openapi.json",
   },
+  admin: {
+    title: "Localton Admin API",
+    slug: "localton-admin-api",
+  },
+  config: {
+    title: "Localton Config API",
+    slug: "localton-config-api",
+  },
 }
 
 export const ApiReferencePage: FC<ApiReferencePageProps> = ({
@@ -51,7 +59,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
 }) => {
   const {theme} = useTheme()
   const reference = apiReferences[version]
-  const localnetOrigin = useMemo(() => apiOrigin(apiBaseUrl), [apiBaseUrl])
+  const serverUrl = useMemo(() => apiReferenceServerUrl(apiBaseUrl, version), [apiBaseUrl, version])
   const syncReferenceAnchor = useApiReferenceAnchorSync(reference.slug)
   const apiReferenceFetch = useMemo(
     () => createApiReferenceFetch(apiBaseUrl, localnetApiToken, toncenterApiKey, onUnauthorized),
@@ -61,7 +69,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
     () => ({
       title: reference.title,
       slug: reference.slug,
-      url: reference.specUrl,
+      url: reference.specUrl ?? `${serverUrl}/openapi.json`,
       authentication: toncenterApiKey
         ? {
             preferredSecurityScheme: "APIKeyHeader",
@@ -74,14 +82,14 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         : undefined,
       servers: [
         {
-          url: localnetOrigin,
+          url: serverUrl,
           description: "Acton localnet",
         },
       ],
       agent: {
         disabled: true,
       },
-      baseServerURL: localnetOrigin,
+      baseServerURL: serverUrl,
       defaultHttpClient: {
         targetKey: "shell",
         clientKey: "curl",
@@ -233,7 +241,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         }
       `,
     }),
-    [apiReferenceFetch, localnetOrigin, reference, syncReferenceAnchor, theme, toncenterApiKey],
+    [apiReferenceFetch, reference, serverUrl, syncReferenceAnchor, theme, toncenterApiKey],
   )
 
   return (
@@ -369,11 +377,18 @@ function isUrlWithinBase(url: URL, baseUrl: URL): boolean {
   )
 }
 
-function apiOrigin(apiBaseUrl: string): string {
+function apiReferenceServerUrl(apiBaseUrl: string, version: ApiReferenceVersion): string {
   const normalizedBaseUrl = apiBaseUrl.trim()
   if (normalizedBaseUrl.length === 0) {
     return globalThis.location.origin
   }
 
-  return new URL(normalizedBaseUrl, globalThis.location.origin).origin
+  const url = new URL(normalizedBaseUrl, globalThis.location.origin)
+  const apiSuffix = version === "v2" || version === "v3" ? `/api/${version}` : undefined
+  if (apiSuffix && url.pathname.endsWith(apiSuffix)) {
+    url.pathname = url.pathname.slice(0, -apiSuffix.length) || "/"
+  }
+  url.search = ""
+  url.hash = ""
+  return url.href.replace(/\/$/, "")
 }

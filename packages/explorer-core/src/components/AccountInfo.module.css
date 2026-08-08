@@ -279,16 +279,21 @@
 }
 
 .addressActions {
-  display: inline-flex;
-  align-items: center;
+  flex: 0 1 auto;
   gap: 8px;
-  flex: 0 0 auto;
-  margin-left: 2px;
-  line-height: 20px;
-  position: static;
-  top: auto;
-  vertical-align: baseline;
-  white-space: normal;
+}
+
+button.addressAction svg {
+  width: 14px;
+  height: 16px;
+}
+
+button.addressAction {
+  color: var(--acton-color-text-muted);
+}
+
+button.addressAction + button.addressAction {
+  margin-left: 8px;
 }
 
 .customName {
@@ -323,49 +328,10 @@
   font-size: var(--acton-font-size-sm);
 }
 
-.renameSaveButton,
-.renameCancelButton {
+.renameAction {
   height: 36px;
-  padding: 0 12px;
-  border-radius: 10px;
-  font: inherit;
-  font-size: var(--acton-font-size-sm);
-  font-weight: var(--acton-font-weight-utility);
-  cursor: pointer;
-  transition:
-    background-color var(--acton-duration-fast),
-    border-color var(--acton-duration-fast),
-    color var(--acton-duration-fast),
-    opacity var(--acton-duration-fast);
 }
 
-.renameSaveButton {
-  border: 1px solid var(--acton-color-primary);
-  background: var(--acton-color-primary);
-  color: var(--acton-color-primary-foreground);
-}
-
-.renameSaveButton:hover:not(:disabled) {
-  border-color: var(--acton-color-primary-hover);
-  background: var(--acton-color-primary-hover);
-}
-
-.renameSaveButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.renameCancelButton {
-  border: 1px solid var(--acton-color-border-control);
-  background: var(--acton-color-surface-raised);
-  color: var(--acton-color-text);
-}
-
-.renameCancelButton:hover {
-  background: var(--acton-color-surface-hover);
-}
-
-.iconButton,
 .qrToggle {
   display: inline-flex;
   align-items: center;
@@ -385,7 +351,6 @@
     color var(--acton-duration-fast);
 }
 
-.iconButton:hover,
 .qrToggle:hover {
   background: transparent;
   border-color: transparent;
@@ -400,7 +365,10 @@
   fill: currentColor;
 }
 
-.iconButton:focus-visible,
+.saveIcon {
+  color: var(--acton-color-status-passed);
+}
+
 .qrToggle:focus-visible,
 .moreLink:focus-visible,
 .externalLink:focus-visible {
@@ -418,15 +386,6 @@
 .tooltipTrigger {
   display: none;
   min-width: 0;
-}
-
-.addressActions .iconButton {
-  width: 16px;
-  height: 16px;
-}
-
-.saveIcon {
-  color: var(--acton-color-status-passed);
 }
 
 .assetRow {
@@ -872,16 +831,11 @@
     display: block;
   }
 
-  .addressActions {
-    margin-left: 0;
-  }
-
   .renamePanel {
     grid-template-columns: 1fr;
   }
 
-  .renameSaveButton,
-  .renameCancelButton {
+  .renameAction {
     width: 100%;
   }
 

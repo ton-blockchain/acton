@@ -108,6 +108,40 @@
   pointer-events: auto;
 }
 
+.tooltip {
+  min-width: min(27rem, 100%);
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--acton-space-2);
+  row-gap: var(--acton-space-1-5);
+}
+
+.tooltipRow {
+  min-width: 0;
+  display: contents;
+}
+
+.tooltipRow > :first-child {
+  grid-column: 1;
+  color: var(--acton-color-text-muted);
+  white-space: nowrap;
+}
+
+.tooltipCopyValue {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+}
+
+.tooltipCopyValue code {
+  min-width: 0;
+  font-family: var(--acton-font-mono);
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}
+
 @media (hover: none), (pointer: coarse) {
   .copyButton {
     opacity: 1;

@@ -73,10 +73,3 @@ export function getPathLookupValue(): string {
   const value = globalThis.location.pathname.replace(/^\/+/, "")
   return decodeURIComponent(value)
 }
-
-export function shortenMiddle(value: string, left = 10, right = 8): string {
-  if (value.length <= left + right + 1) {
-    return value
-  }
-  return `${value.slice(0, left)}…${value.slice(-right)}`
-}

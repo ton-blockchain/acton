@@ -9,10 +9,13 @@ import {codeViewerGallery} from "./codeViewerGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
+import {dateTimeGallery} from "./dateTimeGallery"
+import {durationGallery} from "./durationGallery"
 import {dialogGallery} from "./dialogGallery"
 import {disclosureGallery} from "./disclosureGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
+import {gramAmountGallery} from "./gramAmountGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
 import {ideSelectorGallery} from "./ideSelectorGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
@@ -37,9 +40,11 @@ import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {tlbCellViewerGallery} from "./tlbCellViewerGallery"
 import {toastGallery} from "./toastGallery"
+import {tokenAmountGallery} from "./tokenAmountGallery"
 import {tokensGallery} from "./tokensGallery"
 import {tooltipGallery} from "./tooltipGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
+import {valueFormattingGallery} from "./valueFormattingGallery"
 import type {ComponentGallery} from "./types"
 
 export const galleries = [
@@ -81,6 +86,11 @@ export const galleries = [
   toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
+  tokenAmountGallery,
+  gramAmountGallery,
+  dateTimeGallery,
+  durationGallery,
+  valueFormattingGallery,
   skeletonGallery,
   visuallyGroupedNumberGallery,
   checkboxGallery,

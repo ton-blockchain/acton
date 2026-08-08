@@ -1,124 +1,16 @@
-.tableWrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 12px;
-  background: var(--acton-color-surface-raised);
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-}
-
-.table {
-  width: 100%;
-  min-width: 720px;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.tableTitle {
-  height: 52px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--acton-color-border);
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface-raised);
-  display: flex;
-  align-items: center;
-  font-size: 0.86rem;
-  font-weight: 750;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.table th {
-  height: 36px;
-  padding: 0 14px;
-  color: var(--acton-color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1;
-  text-align: left;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--acton-color-border);
-  background: var(--acton-color-surface-row);
-  box-sizing: border-box;
-}
-
-.table td {
-  height: 46px;
-  padding: 0 14px;
-  color: var(--acton-color-text);
-  font-size: 0.82rem;
-  line-height: 1.35;
-  border-top: 1px solid var(--acton-color-border);
-  box-sizing: border-box;
-  vertical-align: middle;
-}
-
-.table tbody tr:first-child td {
-  border-top: 0;
-}
-
-.row {
-  background: var(--acton-color-surface-raised);
-  transition: background-color 120ms ease;
-}
-
-.rowInteractive {
-  cursor: pointer;
-}
-
-.rowInteractive:hover {
-  background: var(--acton-color-surface-row);
-}
-
-.timeHeader,
-.timeCell {
-  width: 92px;
-  padding-right: 10px !important;
-  padding-left: 18px !important;
-}
-
-.timeCell {
-  color: var(--acton-color-text-muted) !important;
-  white-space: nowrap;
-}
-
-.addressCell {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.fromHeader,
-.fromCell {
-  text-align: right !important;
-}
-
-.addressCell > * {
-  max-width: 100%;
-}
-
 .endpointText {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.endpointText {
   display: block;
   color: var(--acton-color-text);
   font-weight: 500;
 }
 
-.directionHeader,
-.directionCell {
-  width: 50px;
-  padding-right: 4px !important;
-  padding-left: 4px !important;
-  text-align: center !important;
+.timeCell {
+  white-space: nowrap;
 }
 
 .directionBadge {
@@ -135,6 +27,10 @@
   line-height: 1;
 }
 
+.directionCell {
+  padding-inline: 4px !important;
+}
+
 .directionIn {
   color: var(--acton-color-status-passed);
   background: var(--acton-color-status-passed-surface);
@@ -143,12 +39,6 @@
 .directionOut {
   color: var(--acton-color-status-failed);
   background: var(--acton-color-status-failed-surface);
-}
-
-.opcodeHeader,
-.opcodeCell {
-  width: 240px;
-  text-align: left !important;
 }
 
 .opcodeValue {
@@ -162,19 +52,6 @@
   font-weight: 600;
 }
 
-.valueHeader,
-.valueCell {
-  width: 12rem;
-  min-width: 12rem;
-  text-align: right !important;
-  white-space: nowrap;
-}
-
-.valueCell {
-  color: var(--acton-color-text) !important;
-  font-weight: 600;
-}
-
 .valueText {
   display: block;
   width: 100%;
@@ -183,97 +60,4 @@
 
 .valueEmpty {
   color: var(--acton-color-text-muted);
-}
-
-.skeletonLine {
-  position: relative;
-  display: block;
-  height: 11px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
-}
-
-.skeletonLine::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
-    transparent
-  );
-  transform: translateX(-100%);
-  animation: developerTransactionSkeletonShimmer 1300ms ease-in-out infinite;
-}
-
-.skeletonTime {
-  width: 58px;
-}
-
-.skeletonAddress {
-  width: min(180px, 74%);
-}
-
-.fromCell .skeletonAddress {
-  margin-left: auto;
-}
-
-.skeletonDirection {
-  width: 34px;
-  height: 22px;
-  margin-inline: auto;
-  border-radius: 6px;
-}
-
-.skeletonOpcode {
-  width: min(170px, 82%);
-}
-
-.skeletonValue {
-  width: 76px;
-  margin-left: auto;
-}
-
-.emptyState {
-  min-height: 62px;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 12px;
-  background: var(--acton-color-surface-raised);
-  color: var(--acton-color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  font-size: 0.9rem;
-}
-
-@keyframes developerTransactionSkeletonShimmer {
-  to {
-    transform: translateX(100%);
-  }
-}
-
-@media (max-width: 720px) {
-  .table {
-    min-width: 720px;
-  }
-
-  .table th,
-  .table td {
-    padding-right: 10px;
-    padding-left: 10px;
-  }
-
-  .timeHeader,
-  .timeCell {
-    width: 86px;
-    padding-left: 18px !important;
-  }
-
-  .opcodeHeader,
-  .opcodeCell {
-    width: 190px;
-  }
 }

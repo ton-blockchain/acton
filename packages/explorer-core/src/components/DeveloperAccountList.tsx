@@ -1,12 +1,10 @@
-import {DataTableEmpty} from "@acton/ui"
+import {DataTableEmpty, GramAmount} from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
 import type {V3AccountState} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
-import {formatNano} from "./utils"
-
 import styles from "./DeveloperAccountList.module.css"
 
 export interface DeveloperAccountListItem {
@@ -189,10 +187,10 @@ function getAccountType(state: V3AccountState | undefined): string {
   return "Unknown"
 }
 
-function formatAccountBalance(state: V3AccountState | undefined): string {
+function formatAccountBalance(state: V3AccountState | undefined): ReactNode {
   if (!state?.balance) {
     return "—"
   }
 
-  return `${formatNano(state.balance)} GRAM`
+  return <GramAmount value={state.balance} useGrouping />
 }

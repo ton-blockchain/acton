@@ -1,4 +1,4 @@
-import {formatCurrency} from "../../lib/formatCurrency"
+import {formatGramAmount} from "../GramAmount"
 
 const DECIMAL_SCALAR_PATTERN = /^-?\d+(?:\.\d+)?$/
 const INTEGER_SCALAR_PATTERN = /^-?\d+$/
@@ -117,11 +117,7 @@ export function formatScalarByFieldName({
   }
 
   if (shouldFormatCoins(typeName, fieldName)) {
-    try {
-      return formatCurrency(BigInt(value))
-    } catch {
-      return value
-    }
+    return formatGramAmount(value, {fallback: value})
   }
 
   return value

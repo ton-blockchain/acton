@@ -1,9 +1,9 @@
-import {SearchInput} from "@acton/ui"
+import {SearchInput, shortenMiddle} from "@acton/ui"
 import {History} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
 import type {FC} from "react"
 
-import {lookupPath, parseLookupTarget, shortenMiddle} from "../lib/target"
+import {lookupPath, parseLookupTarget} from "../lib/target"
 
 interface SearchBoxProps {
   readonly autoFocus?: boolean
@@ -130,7 +130,9 @@ function resolveSearchTarget(rawValue: string): SearchTarget | undefined {
 function formatHistoryItem(value: string): string {
   try {
     const target = parseLookupTarget(value)
-    return target.kind === "code_hash" ? shortenMiddle(target.value, 14, 10) : target.value
+    return target.kind === "code_hash"
+      ? shortenMiddle(target.value, {start: 14, end: 10})
+      : target.value
   } catch {
     return value
   }

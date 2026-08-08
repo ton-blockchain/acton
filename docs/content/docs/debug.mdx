@@ -353,14 +353,14 @@ Strengths:
 - pinned fork runs with `--fork-block-number` persist fetched accounts under
   `build/cache/<network>/<seqno>/`, so repeated CLI runs can skip remote account
   fetches for the same network, block, and address
+- fork state and network configuration come from the same masterchain block; an explicit historical fork also uses that block's Unix time
 - nested debug across `net.send*` and `net.runGetMethod()` still works for the local parts of execution
 
 Important limits:
 
 - fork mode is not historical replay
-- `--fork-block-number` pins remote account reads, not the full chain environment
-- `--no-fork-cache` disables the persistent cache when you need fresh remote reads
-- time, randomness, and configuration still come from the local run model
+- `--no-fork-cache` disables persistent account and library caching, but it does not disable the 24-hour masterchain snapshot cache
+- randomness still comes from the local run model
 - remote lookup failures can degrade into what looks like a non-existing account
 - remote contracts may execute under debug but still lack useful local source-level information
 

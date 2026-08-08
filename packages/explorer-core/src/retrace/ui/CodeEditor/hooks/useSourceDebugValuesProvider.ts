@@ -1,3 +1,4 @@
+import {truncateEnd} from "@acton/ui"
 import {useEffect, useMemo, type MutableRefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 import type {editor, IMarkdownString, Position} from "monaco-editor"
@@ -32,16 +33,8 @@ const MAX_HOVER_SCALAR_LENGTH = 240
 const IDENTIFIER_PATTERN = /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/g
 const EMPTY_SOURCE_DEBUG_VARIABLES: readonly SourceDebugVariableValue[] = []
 
-function truncateText(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value
-  }
-
-  return `${value.slice(0, Math.max(0, maxLength - 3))}...`
-}
-
 function scalarPreview(value: string, maxLength: number): string {
-  return truncateText(value.replace(/\s+/g, " ").trim(), maxLength)
+  return truncateEnd(value.replace(/\s+/g, " ").trim(), maxLength, "...")
 }
 
 function isPlaceholderValue(value: string): boolean {

@@ -1,4 +1,4 @@
-import {useEffect, useState, type FC} from "react"
+import {useEffect, useState, type FC, type ReactNode} from "react"
 
 import {
   Button,
@@ -9,8 +9,13 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  DateTime,
   Dialog,
+  formatSchedulePeriod,
+  formatTimeUntil,
+  GramAmount,
   InlineButton,
+  DAY_SECONDS,
   Skeleton,
 } from "@acton/ui"
 
@@ -22,14 +27,12 @@ import {
   type LockerPayment,
 } from "./lockerSchedule"
 import styles from "./LockerOverview.module.css"
-import {
-  capitalize,
-  formatGramAmount,
-  formatScheduleDate,
-  formatSchedulePeriod,
-  formatTimeUntil,
-  SECONDS_PER_DAY,
-} from "./scheduleFormatting"
+
+const LOCKER_STATUS_LABELS = {
+  locked: "Locked",
+  next: "Next",
+  unlocked: "Unlocked",
+} as const
 
 interface LockerOverviewProps {
   readonly address: string
@@ -112,8 +115,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   const schedule = buildLockerSchedule(data, nowSeconds)
   const firstPayment = schedule.payments[0]
   const finalPayment = schedule.payments.at(-1)
-  const paymentLabel =
-    data.unlockPeriod === 30 * SECONDS_PER_DAY ? "Monthly payment" : "Payment amount"
+  const paymentLabel = data.unlockPeriod === 30 * DAY_SECONDS ? "Monthly payment" : "Payment amount"
 
   return (
     <>
@@ -131,24 +133,53 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
           </InlineButton>
           <p className={styles.description}>
             {schedule.totalPeriods} payments every {formatSchedulePeriod(data.unlockPeriod)}, from{" "}
-            {firstPayment ? formatScheduleDate(firstPayment.unlockTime) : "—"} to{" "}
-            {finalPayment ? formatScheduleDate(finalPayment.unlockTime) : "—"}
+            {firstPayment ? (
+              <DateTime display="date-day-month" unit="seconds" value={firstPayment.unlockTime} />
+            ) : (
+              "—"
+            )}{" "}
+            to{" "}
+            {finalPayment ? (
+              <DateTime display="date-day-month" unit="seconds" value={finalPayment.unlockTime} />
+            ) : (
+              "—"
+            )}
           </p>
         </div>
 
         <div className={styles.metrics}>
-          <LockerMetric label="Deposit" value={formatGramAmount(data.totalCoinsLocked)} />
-          <LockerMetric label="Reward" value={formatGramAmount(data.totalReward)} />
+          <LockerMetric
+            label="Deposit"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={data.totalCoinsLocked} />
+            }
+          />
+          <LockerMetric
+            label="Reward"
+            value={<GramAmount maximumFractionDigits={2} useGrouping value={data.totalReward} />}
+          />
           <LockerMetric
             label={paymentLabel}
-            value={firstPayment ? formatGramAmount(firstPayment.amount) : "—"}
+            value={
+              firstPayment ? (
+                <GramAmount maximumFractionDigits={2} useGrouping value={firstPayment.amount} />
+              ) : (
+                "—"
+              )
+            }
           />
           <LockerMetric
             label="Next payment"
             value={
-              schedule.nextPayment
-                ? formatScheduleDate(schedule.nextPayment.unlockTime)
-                : "Completed"
+              schedule.nextPayment ? (
+                <DateTime
+                  display="date-day-month"
+                  unit="seconds"
+                  value={schedule.nextPayment.unlockTime}
+                />
+              ) : (
+                "Completed"
+              )
             }
           />
         </div>
@@ -174,14 +205,17 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
             {schedule.payments.map(payment => (
               <span
                 key={payment.number}
-                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(payment.status)}`]}`}
-                title={`Payment ${payment.number}: ${capitalize(payment.status)}`}
+                className={`${styles.progressSegment} ${styles[`progressSegment${LOCKER_STATUS_LABELS[payment.status]}`]}`}
+                title={`Payment ${payment.number}: ${LOCKER_STATUS_LABELS[payment.status]}`}
                 aria-hidden="true"
               />
             ))}
           </div>
           <div className={styles.progressMeta}>
-            <span>{formatGramAmount(schedule.unlockedAmount)} unlocked</span>
+            <span>
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />{" "}
+              unlocked
+            </span>
             <span>
               {schedule.nextPayment
                 ? `Next payment ${formatTimeUntil(schedule.nextPayment.unlockTime, nowSeconds)}`
@@ -223,7 +257,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   )
 }
 
-function LockerMetric({label, value}: {readonly label: string; readonly value: string}) {
+function LockerMetric({label, value}: {readonly label: string; readonly value: ReactNode}) {
   return (
     <div className={styles.metric}>
       <div className={styles.metricLabel}>{label}</div>
@@ -233,18 +267,22 @@ function LockerMetric({label, value}: {readonly label: string; readonly value: s
 }
 
 function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
+  const statusLabel = LOCKER_STATUS_LABELS[payment.status]
+
   return (
     <DataTableRow selected={payment.status === "next"}>
       <DataTableCell tone="muted">{payment.number}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(payment.unlockTime)}</DataTableCell>
-      <DataTableCell align="right" tone="strong">
-        {formatGramAmount(payment.amount)}
-      </DataTableCell>
-      <DataTableCell align="right">{formatGramAmount(payment.cumulativeAmount)}</DataTableCell>
       <DataTableCell>
-        <span className={`${styles.status} ${styles[`status${capitalize(payment.status)}`]}`}>
-          {capitalize(payment.status)}
-        </span>
+        <DateTime display="date-day-month" unit="seconds" value={payment.unlockTime} />
+      </DataTableCell>
+      <DataTableCell align="right" tone="strong">
+        <GramAmount maximumFractionDigits={2} useGrouping value={payment.amount} />
+      </DataTableCell>
+      <DataTableCell align="right">
+        <GramAmount maximumFractionDigits={2} useGrouping value={payment.cumulativeAmount} />
+      </DataTableCell>
+      <DataTableCell>
+        <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>{statusLabel}</span>
       </DataTableCell>
     </DataTableRow>
   )

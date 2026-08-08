@@ -764,6 +764,7 @@ fn append_mutation_test_command_args(
         .arg(if colors_enabled() { "always" } else { "never" })
         .arg("test")
         .arg("--fail-fast")
+        .arg("--no-studio-reporting")
         .arg("--reporter")
         .arg("console");
 
@@ -826,6 +827,10 @@ fn mutation_resume_command(paths: &[String], config: &TestConfig, session_id: &s
     }
 
     args.push("--mutate".to_owned());
+
+    if !config.studio_reporting {
+        args.push("--no-studio-reporting".to_owned());
+    }
 
     if let Some(contract) = &config.mutate_contract {
         args.push("--mutate-contract".to_owned());
@@ -1562,6 +1567,10 @@ mod tests {
                 .any(|pair| pair[0] == "--fork-block-number" && pair[1] == "123456"),
             "mutation child command must forward --fork-block-number, got {args:?}"
         );
+        assert!(
+            args.iter().any(|arg| arg == "--no-studio-reporting"),
+            "mutation child command must disable Studio reporting, got {args:?}"
+        );
     }
 
     #[test]
@@ -1569,6 +1578,7 @@ mod tests {
         let config = TestConfig {
             fork_net: Some(Network::Custom(Arc::from("remote-block"))),
             fork_block_number: Some(123_456),
+            studio_reporting: false,
             ..TestConfig::default()
         };
 
@@ -1582,6 +1592,10 @@ mod tests {
         assert!(
             command.contains("--fork-block-number 123456"),
             "resume command must include --fork-block-number, got {command}"
+        );
+        assert!(
+            command.contains("--no-studio-reporting"),
+            "resume command must preserve --no-studio-reporting, got {command}"
         );
     }
 }

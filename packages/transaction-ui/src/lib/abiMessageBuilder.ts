@@ -1,4 +1,5 @@
-import {Address, beginCell, external, storeMessage, toNano, type Message} from "@ton/core"
+import {Address, beginCell, external, storeMessage, type Message} from "@ton/core"
+import {parseGramAmount} from "@acton/ui"
 import {
   DynamicCtx,
   packToBuilderDynamic,
@@ -312,7 +313,13 @@ function parseBuilderArgsJson(value: string): unknown {
 
 function parseMessageValue(value: string | undefined): bigint {
   const trimmed = value?.trim()
-  return trimmed ? toNano(trimmed) : 0n
+  if (!trimmed) return 0n
+
+  const amount = parseGramAmount(trimmed)
+  if (amount === undefined) {
+    throw new Error("Message value must be a valid GRAM amount")
+  }
+  return amount
 }
 
 function requireField(value: string | undefined, label: string): string {

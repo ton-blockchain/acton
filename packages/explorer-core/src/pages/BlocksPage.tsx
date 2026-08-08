@@ -11,22 +11,41 @@ import {
 import {useNavigate, useParams} from "react-router"
 import {
   BlockChip,
+  BooleanValue,
   Button,
   CopyButton,
   CopyInlineAction,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableFooter,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  DateTime,
+  formatDateTimeLocalInput,
+  GramAmount,
   InlineAction,
   InlineActions,
   Input,
-  ModeViewer,
+  NumberValue,
   Popover,
+  RelativeTime,
+  shortenMiddle,
   formatToncenterBlockId,
-  type ModeInfo,
-  type ModeParser,
 } from "@acton/ui"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
 import type {RawBlockNetwork, TonClient} from "../api/client"
+import {
+  loadBlockTransactionsPage,
+  type BlockTransactionListItem,
+  type BlockTransactionsCursor,
+} from "../api/blockTransactions"
 import type {LoadNetworkTps} from "../api/networkStats"
 import type {V3Block, V3BlockId, V3TransactionListItem} from "../api/types"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -35,8 +54,9 @@ import {
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
+import {GlobalCapabilities} from "../components/GlobalCapabilities"
 import {NetworkTpsPanel} from "../components/NetworkTpsPanel"
-import {formatNano, formatRelativeTime, hashToHex} from "../components/utils"
+import {hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteBlocks} from "../hooks/useFavoriteBlocks"
@@ -54,83 +74,6 @@ const BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT = 100
 const BLOCKS_REFRESH_MS = 2000
 const MASTERCHAIN_SHARD = "8000000000000000"
 const MIN_BLOCK_UNIX_TIME = 0
-const GLOBAL_CAPABILITIES = [
-  {
-    value: 1,
-    name: "capIhrEnabled",
-    description: "Enables Instant Hypercube Routing.",
-  },
-  {
-    value: 2,
-    name: "capCreateStatsEnabled",
-    description: "Enables creation statistics in the masterchain state.",
-  },
-  {
-    value: 4,
-    name: "capBounceMsgBody",
-    description: "Allows bounced messages to retain part of the original message body.",
-  },
-  {
-    value: 8,
-    name: "capReportVersion",
-    description: "Makes collators report their supported version and capabilities in blocks.",
-  },
-  {
-    value: 16,
-    name: "capSplitMergeTransactions",
-    description: "Enables shard split and merge transactions.",
-  },
-  {
-    value: 32,
-    name: "capShortDequeue",
-    description: "Enables short dequeue records in block message queues.",
-  },
-  {
-    value: 64,
-    name: "capStoreOutMsgQueueSize",
-    description: "Stores the outgoing message queue size in the shard state.",
-  },
-  {
-    value: 128,
-    name: "capMsgMetadata",
-    description: "Enables transaction-chain metadata in message envelopes.",
-  },
-  {
-    value: 256,
-    name: "capDeferMessages",
-    description: "Enables deferred message processing through dispatch queues.",
-  },
-  {
-    value: 512,
-    name: "capFullCollatedData",
-    description: "Enables full collated data for block validation.",
-  },
-] as const
-
-const parseGlobalCapabilities: ModeParser = mode => {
-  const flags: ModeInfo[] = GLOBAL_CAPABILITIES.filter(
-    capability => Math.floor(mode / capability.value) % 2 === 1,
-  ).map(capability => ({...capability}))
-  const knownValue = flags.reduce((sum, flag) => sum + flag.value, 0)
-  const unknownValue = mode - knownValue
-
-  if (unknownValue > 0) {
-    flags.push({
-      value: unknownValue,
-      name: "Unknown capabilities",
-      description: "Capability bits that are not known to this explorer version.",
-    })
-  } else if (mode === 0) {
-    flags.push({
-      value: 0,
-      name: "No capabilities",
-      description: "This block does not report any enabled global capabilities.",
-    })
-  }
-
-  return flags
-}
-
 interface BlocksPageProps {
   readonly client: TonClient
   readonly loadNetworkTps?: LoadNetworkTps
@@ -153,8 +96,10 @@ interface BlockDetailsState {
   readonly block?: V3Block
   readonly latestBlock?: V3Block
   readonly shardchainBlocks: readonly V3Block[]
-  readonly transactions: readonly V3TransactionListItem[]
+  readonly transactions: readonly BlockTransactionListItem[]
+  readonly transactionsCursor?: BlockTransactionsCursor
   readonly isLoading: boolean
+  readonly areTransactionsUnavailable: boolean
   readonly isLoadingMoreTransactions: boolean
   readonly hasMoreTransactions: boolean
   readonly loadMoreTransactionsError?: string
@@ -341,6 +286,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     shardchainBlocks: [],
     transactions: [],
     isLoading: true,
+    areTransactionsUnavailable: false,
     isLoadingMoreTransactions: false,
     hasMoreTransactions: false,
   })
@@ -358,6 +304,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           shardchainBlocks: [],
           transactions: [],
           isLoading: false,
+          areTransactionsUnavailable: false,
           isLoadingMoreTransactions: false,
           hasMoreTransactions: false,
           error: "Invalid block route.",
@@ -368,6 +315,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
       setState(current => ({
         ...current,
         isLoading: true,
+        transactionsCursor: undefined,
+        areTransactionsUnavailable: false,
         isLoadingMoreTransactions: false,
         hasMoreTransactions: false,
         loadMoreTransactionsError: undefined,
@@ -405,6 +354,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
               shardchainBlocks: [],
               transactions: [],
               isLoading: false,
+              areTransactionsUnavailable: false,
               isLoadingMoreTransactions: false,
               hasMoreTransactions: false,
               error: "Block not found.",
@@ -427,23 +377,19 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                 .catch(() => undefined)
             : Promise.resolve(undefined)
         const [transactionsResponse, shardchainResponse, rawBlockMetadata] = await Promise.all([
-          client.getBlockTransactions({
-            workchain: block.workchain,
-            shard: block.shard,
-            seqno: block.seqno,
-            limit: BLOCK_TRANSACTIONS_INITIAL_LIMIT,
-          }),
+          loadBlockTransactionsPage(client, block, BLOCK_TRANSACTIONS_INITIAL_LIMIT),
           block.workchain === -1
             ? client.getMasterchainBlockShards(block.seqno)
             : Promise.resolve({blocks: []}),
           rawBlockMetadataPromise,
         ])
 
+        updateDomains(transactionsResponse.addressBook)
+
         if (!isActive) {
           return
         }
 
-        updateDomains(transactionsResponse.address_book)
         setState({
           block: rawBlockMetadata
             ? {
@@ -459,11 +405,11 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           latestBlock: latestResponse.blocks[0],
           shardchainBlocks: shardchainResponse.blocks,
           transactions: transactionsResponse.transactions,
+          transactionsCursor: transactionsResponse.nextCursor,
           isLoading: false,
+          areTransactionsUnavailable: transactionsResponse.unavailable,
           isLoadingMoreTransactions: false,
-          hasMoreTransactions:
-            transactionsResponse.transactions.length === BLOCK_TRANSACTIONS_INITIAL_LIMIT &&
-            transactionsResponse.transactions.length < block.tx_count,
+          hasMoreTransactions: transactionsResponse.nextCursor !== undefined,
         })
       } catch (error) {
         if (!isActive) {
@@ -472,6 +418,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
         setState(current => ({
           ...current,
           isLoading: false,
+          areTransactionsUnavailable: false,
           isLoadingMoreTransactions: false,
           hasMoreTransactions: false,
           error: error instanceof Error ? error.message : "Failed to load block",
@@ -489,10 +436,12 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
   const loadMoreTransactions = useCallback(() => {
     const block = state.block
     const offset = state.transactions.length
+    const cursor = state.transactionsCursor
     if (
       !block ||
       state.isLoading ||
       !state.hasMoreTransactions ||
+      !cursor ||
       isLoadingMoreTransactionsRef.current
     ) {
       return
@@ -505,21 +454,22 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
       loadMoreTransactionsError: undefined,
     }))
 
-    void client
-      .getBlockTransactions({
-        workchain: block.workchain,
-        shard: block.shard,
-        seqno: block.seqno,
-        limit: transactionsLoadMoreLimit,
-        offset,
-      })
-      .then(response => {
-        updateDomains(response.address_book)
+    void (async () => {
+      try {
+        const response = await loadBlockTransactionsPage(
+          client,
+          block,
+          transactionsLoadMoreLimit,
+          cursor,
+        )
+        updateDomains(response.addressBook)
+
         setState(current => {
           if (
             current.isLoading ||
             !current.block ||
             current.transactions.length !== offset ||
+            current.transactionsCursor !== cursor ||
             !isSameBlock(current.block, block.workchain, block.shard, block.seqno)
           ) {
             return current
@@ -529,19 +479,18 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           return {
             ...current,
             transactions,
+            transactionsCursor: response.nextCursor,
             isLoadingMoreTransactions: false,
-            hasMoreTransactions:
-              response.transactions.length === transactionsLoadMoreLimit &&
-              transactions.length < current.block.tx_count,
+            hasMoreTransactions: response.nextCursor !== undefined,
           }
         })
-      })
-      .catch(error => {
+      } catch (error) {
         setState(current => {
           if (
             current.isLoading ||
             !current.block ||
             current.transactions.length !== offset ||
+            current.transactionsCursor !== cursor ||
             !isSameBlock(current.block, block.workchain, block.shard, block.seqno)
           ) {
             return current
@@ -553,16 +502,17 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
               error instanceof Error ? error.message : "Failed to load more transactions",
           }
         })
-      })
-      .finally(() => {
+      } finally {
         isLoadingMoreTransactionsRef.current = false
-      })
+      }
+    })()
   }, [
     client,
     state.block,
     state.hasMoreTransactions,
     state.isLoading,
     state.transactions.length,
+    state.transactionsCursor,
     transactionsLoadMoreLimit,
     updateDomains,
   ])
@@ -706,10 +656,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                     variant="outline"
                     size="sm"
                     leadingIcon={<FileJson size={14} />}
-                    disabled={!blockActions.configUrl}
+                    disabled={blockActions.configSeqno === undefined}
                     onClick={() =>
-                      blockActions.configUrl &&
-                      globalThis.open(blockActions.configUrl, "_blank", "noopener,noreferrer")
+                      blockActions.configSeqno !== undefined &&
+                      void navigate(routes.configPath(blockActions.configSeqno))
                     }
                   >
                     Config
@@ -774,6 +724,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
               <BlockTableSection
                 title="Last shard blocks"
                 blocks={state.shardchainBlocks}
+                blockDisplay="full"
                 isLoading={false}
                 emptyLabel="No shardchain blocks for this masterchain block"
                 showShardFlags
@@ -785,6 +736,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
 
             <BlockTransactionsTable
               transactions={state.transactions}
+              areTransactionsUnavailable={state.areTransactionsUnavailable}
               hasMore={state.hasMoreTransactions}
               isLoadingMore={state.isLoadingMoreTransactions}
               loadMoreError={state.loadMoreTransactionsError}
@@ -933,46 +885,64 @@ const BlockDateNavigation: FC<{
 const BlockTableSection: FC<{
   readonly title: string
   readonly blocks: readonly V3Block[]
+  readonly blockDisplay?: "seqno" | "full"
   readonly isLoading: boolean
   readonly emptyLabel: string
   readonly showShardFlags?: boolean
   readonly onOpenBlock: (block: V3Block, event?: ExplorerNavigationClickEvent) => void
-}> = ({title, blocks, isLoading, emptyLabel, showShardFlags = false, onOpenBlock}) => {
+}> = ({
+  title,
+  blocks,
+  blockDisplay = "seqno",
+  isLoading,
+  emptyLabel,
+  showShardFlags = false,
+  onOpenBlock,
+}) => {
   const routes = useExplorerRoutePaths()
 
   if (isLoading) {
     return <BlockTableSkeleton title={title} rows={4} showShardFlags={showShardFlags} />
   }
 
-  if (blocks.length === 0) {
-    return <TableStateBlock title={title}>{emptyLabel}</TableStateBlock>
-  }
-
   return (
-    <section className={styles.blocksTableFrame} aria-label={title}>
-      <header className={styles.blocksTableTitle}>{title}</header>
-      <div className={styles.blocksTableScroller}>
-        <table className={`${styles.blocksTable} ${showShardFlags ? styles.shardBlocksTable : ""}`}>
-          <thead>
-            <tr>
-              <th>Block</th>
-              <th>Transactions</th>
-              <th>Generated at</th>
-              {showShardFlags ? (
-                <>
-                  <th>Before split</th>
-                  <th>After split</th>
-                  <th>Want split</th>
-                  <th>Want merge</th>
-                </>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {blocks.map(block => (
-              <tr
+    <DataTable
+      title={title}
+      minWidth={blockDisplay === "full" ? "54rem" : showShardFlags ? "42rem" : "32.5rem"}
+      aria-label={title}
+    >
+      <DataTableTable aria-label={title} layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell
+              columnWidth={blockDisplay === "full" ? "20rem" : showShardFlags ? "20%" : "14rem"}
+            >
+              Block
+            </DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "8rem"}>
+              Transactions
+            </DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "12rem"}>
+              Generated at
+            </DataTableHeaderCell>
+            {showShardFlags ? (
+              <>
+                <DataTableHeaderCell columnWidth="11%">Before split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">After split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">Want split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">Want merge</DataTableHeaderCell>
+              </>
+            ) : null}
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {blocks.length === 0 ? (
+            <DataTableEmpty colSpan={showShardFlags ? 7 : 3}>{emptyLabel}</DataTableEmpty>
+          ) : (
+            blocks.map(block => (
+              <DataTableRow
                 key={formatToncenterBlockId(block)}
-                className={styles.blocksTableRow}
+                interactive
                 tabIndex={0}
                 onClick={event => onOpenBlock(block, event)}
                 onKeyDown={event => {
@@ -982,53 +952,58 @@ const BlockTableSection: FC<{
                   }
                 }}
               >
-                <td className={styles.blocksPrimaryCell}>
+                <DataTableCell>
                   <BlockChip
                     workchain={block.workchain}
                     shard={block.shard}
                     seqno={block.seqno}
+                    display={blockDisplay}
                     href={routes.blockPath(block.workchain, block.shard, block.seqno)}
                     onClick={event => {
                       event.stopPropagation()
                       onOpenBlock(block, event)
                     }}
                   />
-                </td>
-                <td>{block.tx_count.toLocaleString()}</td>
-                <td
-                  title={formatAbsoluteBlockTime(block)}
-                  data-visual-dynamic="time"
-                  data-visual-placeholder="<time>"
-                >
-                  {formatAbsoluteBlockTime(block)}
-                </td>
+                </DataTableCell>
+                <DataTableCell>
+                  <NumberValue value={block.tx_count} />
+                </DataTableCell>
+                <DataTableCell truncate>
+                  <DateTime
+                    display="date-time-numeric-seconds"
+                    fallback="Unknown"
+                    unit="seconds"
+                    value={blockUnixTime(block)}
+                  />
+                </DataTableCell>
                 {showShardFlags ? (
                   <>
-                    <td>
-                      <BooleanValue value={block.before_split} />
-                    </td>
-                    <td>
-                      <BooleanValue value={block.after_split} />
-                    </td>
-                    <td>
-                      <BooleanValue value={block.want_split} />
-                    </td>
-                    <td>
-                      <BooleanValue value={block.want_merge} />
-                    </td>
+                    <DataTableCell>
+                      <BooleanValue display="true-false" value={block.before_split} />
+                    </DataTableCell>
+                    <DataTableCell>
+                      <BooleanValue display="true-false" value={block.after_split} />
+                    </DataTableCell>
+                    <DataTableCell>
+                      <BooleanValue display="true-false" value={block.want_split} />
+                    </DataTableCell>
+                    <DataTableCell>
+                      <BooleanValue display="true-false" value={block.want_merge} />
+                    </DataTableCell>
                   </>
                 ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
 const BlockTransactionsTable: FC<{
-  readonly transactions: readonly V3TransactionListItem[]
+  readonly transactions: readonly BlockTransactionListItem[]
+  readonly areTransactionsUnavailable: boolean
   readonly hasMore: boolean
   readonly isLoadingMore: boolean
   readonly loadMoreError?: string
@@ -1037,6 +1012,7 @@ const BlockTransactionsTable: FC<{
   readonly onOpenTransaction: (hash: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({
   transactions,
+  areTransactionsUnavailable,
   hasMore,
   isLoadingMore,
   loadMoreError,
@@ -1045,6 +1021,7 @@ const BlockTransactionsTable: FC<{
   onOpenTransaction,
 }) => {
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const columnCount = 5
 
   useEffect(() => {
     const target = loadMoreRef.current
@@ -1074,33 +1051,36 @@ const BlockTransactionsTable: FC<{
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, loadMoreError, onLoadMore])
 
-  if (transactions.length === 0) {
-    return <TableStateBlock title="Transactions">No transactions in this block</TableStateBlock>
-  }
-
   return (
-    <section className={styles.blocksTableFrame} aria-label="Transactions">
-      <header className={styles.blocksTableTitle}>Transactions</header>
-      <div className={styles.blocksTableScroller}>
-        <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Account</th>
-              <th>Logical time</th>
-              <th>Hash</th>
-              <th>Exit code</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((transaction, index) => {
+    <DataTable title="Transactions" minWidth="47.5rem" aria-label="Transactions">
+      <DataTableTable aria-label="Transactions" layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="3.375rem">#</DataTableHeaderCell>
+            <DataTableHeaderCell>Account</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="8.125rem">Logical time</DataTableHeaderCell>
+            <DataTableHeaderCell>Hash</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="8.125rem">
+              Exit code
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {transactions.length === 0 ? (
+            <DataTableEmpty colSpan={columnCount}>
+              {areTransactionsUnavailable
+                ? "Transactions are unavailable"
+                : "No transactions in this block"}
+            </DataTableEmpty>
+          ) : (
+            transactions.map((transaction, index) => {
               const hash = hashToHex(transaction.hash) ?? transaction.hash
               const exitCode = formatTransactionExitCode(transaction)
               const hasNonZeroExitCode = exitCode !== "0" && exitCode !== "Unknown"
               return (
-                <tr
+                <DataTableRow
                   key={`${transaction.hash}:${transaction.lt}`}
-                  className={styles.blocksTableRow}
+                  interactive
                   tabIndex={0}
                   onClick={event => onOpenTransaction(transaction.hash, event)}
                   onKeyDown={event => {
@@ -1110,19 +1090,19 @@ const BlockTransactionsTable: FC<{
                     }
                   }}
                 >
-                  <td>{index + 1}</td>
-                  <td>
+                  <DataTableCell tone="muted">{index + 1}</DataTableCell>
+                  <DataTableCell>
                     <ExplorerAddressChip
                       address={transaction.account}
                       fallback="Account"
                       onAddressClick={onOpenAccount}
                     />
-                  </td>
-                  <td>{transaction.lt}</td>
-                  <td>
+                  </DataTableCell>
+                  <DataTableCell mono>{transaction.lt}</DataTableCell>
+                  <DataTableCell>
                     <span className={styles.blocksHashCell}>
                       <span className={styles.blocksHashText} title={hash}>
-                        {compactMiddle(hash, 18)}
+                        {shortenMiddle(hash, {maxLength: 19})}
                       </span>
                       <CopyInlineAction
                         value={hash}
@@ -1131,39 +1111,45 @@ const BlockTransactionsTable: FC<{
                         copiedLabel="Transaction hash copied"
                       />
                     </span>
-                  </td>
-                  <td
-                    className={`${styles.blocksExitCodeCell} ${
-                      hasNonZeroExitCode ? styles.blocksExitCodeFailure : ""
-                    }`}
+                  </DataTableCell>
+                  <DataTableCell
+                    align="right"
+                    mono
+                    className={hasNonZeroExitCode ? styles.blocksExitCodeFailure : undefined}
                   >
                     {exitCode}
-                  </td>
-                </tr>
+                  </DataTableCell>
+                </DataTableRow>
               )
-            })}
-          </tbody>
-        </table>
-      </div>
-      {hasMore ? (
-        <div ref={loadMoreRef} className={styles.blockTransactionsLoadMore}>
-          {loadMoreError ? (
-            <span className={styles.blockTransactionsLoadMoreError} role="alert">
-              {loadMoreError}
-            </span>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onLoadMore}
-            disabled={isLoadingMore}
-          >
-            {isLoadingMore ? "Loading..." : loadMoreError ? "Retry" : "Load more"}
-          </Button>
-        </div>
-      ) : null}
-    </section>
+            })
+          )}
+        </DataTableBody>
+        {hasMore && transactions.length > 0 ? (
+          <DataTableFooter>
+            <DataTableRow>
+              <DataTableCell colSpan={columnCount} className={styles.blockTransactionsLoadMoreCell}>
+                <div ref={loadMoreRef} className={styles.blockTransactionsLoadMore}>
+                  {loadMoreError ? (
+                    <span className={styles.blockTransactionsLoadMoreError} role="alert">
+                      {loadMoreError}
+                    </span>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onLoadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? "Loading..." : loadMoreError ? "Retry" : "Load more"}
+                  </Button>
+                </div>
+              </DataTableCell>
+            </DataTableRow>
+          </DataTableFooter>
+        ) : null}
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -1172,93 +1158,75 @@ const BlockTableSkeleton: FC<{
   readonly rows: number
   readonly showShardFlags?: boolean
 }> = ({title, rows, showShardFlags = false}) => (
-  <section className={styles.blocksTableFrame} aria-label={`Loading ${title}`}>
-    <header className={styles.blocksTableTitle}>{title}</header>
-    <div className={styles.blocksTableScroller}>
-      <table className={`${styles.blocksTable} ${showShardFlags ? styles.shardBlocksTable : ""}`}>
-        <thead>
-          <tr>
-            <th>Block</th>
-            <th>Transactions</th>
-            <th>Generated at</th>
-            {showShardFlags ? (
-              <>
-                <th>Before split</th>
-                <th>After split</th>
-                <th>Want split</th>
-                <th>Want merge</th>
-              </>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: rows}, (_, index) => (
-            <tr key={`block-table-skeleton-${index}`}>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonBlock}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonCount}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonTime}`} />
-              </td>
-              {showShardFlags
-                ? Array.from({length: 4}, (_, flagIndex) => (
-                    <td key={`block-table-skeleton-${index}-flag-${flagIndex}`}>
-                      <span className={`${styles.skeletonLine} ${styles.blocksSkeletonFlag}`} />
-                    </td>
-                  ))
-                : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <DataTable
+    title={title}
+    minWidth={showShardFlags ? "42rem" : "32.5rem"}
+    aria-label={`Loading ${title}`}
+  >
+    <DataTableTable aria-busy="true" aria-label={title} layout="fixed">
+      <DataTableHead>
+        <DataTableRow>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "20%" : "14rem"}>
+            Block
+          </DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "8rem"}>
+            Transactions
+          </DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "12rem"}>
+            Generated at
+          </DataTableHeaderCell>
+          {showShardFlags ? (
+            <>
+              <DataTableHeaderCell columnWidth="11%">Before split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">After split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">Want split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">Want merge</DataTableHeaderCell>
+            </>
+          ) : null}
+        </DataTableRow>
+      </DataTableHead>
+      <DataTableBody>
+        <DataTableSkeletonRows
+          columns={showShardFlags ? 7 : 3}
+          rows={rows}
+          alignments={
+            showShardFlags ? ["left", "left", "left", "left", "left", "left", "left"] : undefined
+          }
+          widths={
+            showShardFlags
+              ? ["8rem", "5rem", "8rem", "2.5rem", "2.5rem", "2.5rem", "2.5rem"]
+              : ["8rem", "5rem", "10rem"]
+          }
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 const BlockTransactionsTableSkeleton: FC<{readonly rows: number}> = ({rows}) => (
-  <section className={styles.blocksTableFrame} aria-label="Loading transactions">
-    <header className={styles.blocksTableTitle}>Transactions</header>
-    <div className={styles.blocksTableScroller}>
-      <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Account</th>
-            <th>Logical time</th>
-            <th>Hash</th>
-            <th>Exit code</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: rows}, (_, index) => (
-            <tr key={`block-transaction-skeleton-${index}`}>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonIndex}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonAccount}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonLt}`} />
-              </td>
-              <td>
-                <span className={styles.blocksSkeletonHashCell}>
-                  <span className={`${styles.skeletonLine} ${styles.blocksSkeletonHash}`} />
-                  <span className={`${styles.skeletonLine} ${styles.blocksSkeletonCopy}`} />
-                </span>
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonExitCode}`} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <DataTable title="Transactions" minWidth="47.5rem" aria-label="Loading transactions">
+    <DataTableTable aria-busy="true" aria-label="Transactions" layout="fixed">
+      <DataTableHead>
+        <DataTableRow>
+          <DataTableHeaderCell columnWidth="3.375rem">#</DataTableHeaderCell>
+          <DataTableHeaderCell>Account</DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth="8.125rem">Logical time</DataTableHeaderCell>
+          <DataTableHeaderCell>Hash</DataTableHeaderCell>
+          <DataTableHeaderCell align="right" columnWidth="8.125rem">
+            Exit code
+          </DataTableHeaderCell>
+        </DataTableRow>
+      </DataTableHead>
+      <DataTableBody>
+        <DataTableSkeletonRows
+          columns={5}
+          rows={rows}
+          alignments={["left", "left", "left", "left", "right"]}
+          widths={["2rem", "12rem", "7rem", "15rem", "3rem"]}
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 const BlockSummaryTable: FC<{
@@ -1271,21 +1239,67 @@ const BlockSummaryTable: FC<{
   const fileHash = formatBlockHash(block.file_hash)
   const createdBy = formatBlockHash(block.created_by)
   const randSeed = formatBlockHash(block.rand_seed)
-  const masterchainShard = block.masterchain_block_ref?.shard ?? MASTERCHAIN_SHARD
+  const masterchainBlockRef = block.masterchain_block_ref
+  const masterchainShard = masterchainBlockRef?.shard ?? MASTERCHAIN_SHARD
   const prevKeyBlockSeqno = block.prev_key_block_seqno
   const minRefMcSeqno = block.min_ref_mc_seqno
   const genUtime = blockUnixTime(block)
-  const absoluteGenTime = formatAbsoluteBlockTime(block)
+  const workchainName =
+    block.workchain === -1 ? "Masterchain" : block.workchain === 0 ? "Basechain" : undefined
+  const shardName = block.shard === MASTERCHAIN_SHARD ? "root shard" : undefined
+  const globalIdName =
+    block.global_id === -239 ? "Mainnet" : block.global_id === -3 ? "Testnet" : undefined
   const hasGenSoftware =
     block.gen_software_version !== undefined || block.gen_software_capabilities !== undefined
 
   return (
     <section className={styles.blockDetailsPanel} aria-label="Block details">
       <BlockDetailSection label="Identity" contentClassName={styles.blockFourColumnGrid}>
-        <BlockDetailItem label="Workchain" value={block.workchain.toString()} />
-        <BlockDetailItem label="Shard" value={block.shard} mono />
+        <BlockDetailItem
+          label="Workchain"
+          value={
+            <>
+              {block.workchain}
+              {workchainName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({workchainName})</span>
+                </>
+              ) : null}
+            </>
+          }
+        />
+        <BlockDetailItem
+          label="Shard"
+          value={
+            <>
+              {block.shard}
+              {shardName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({shardName})</span>
+                </>
+              ) : null}
+            </>
+          }
+          mono
+        />
         <BlockDetailItem label="Seqno" value={block.seqno.toString()} mono />
-        <BlockDetailItem label="Global ID" value={formatOptionalNumber(block.global_id)} mono />
+        <BlockDetailItem
+          label="Global ID"
+          value={
+            <>
+              {formatOptionalNumber(block.global_id)}
+              {globalIdName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({globalIdName})</span>
+                </>
+              ) : null}
+            </>
+          }
+          mono
+        />
       </BlockDetailSection>
 
       <BlockDetailSection label="Hashes" contentClassName={styles.blockHashesGrid}>
@@ -1303,17 +1317,16 @@ const BlockSummaryTable: FC<{
           label="Gen utime"
           value={
             genUtime === undefined ? (
-              absoluteGenTime
+              "Unknown"
             ) : (
               <>
-                {absoluteGenTime}{" "}
-                <span className={styles.blockDetailRelativeTime}>
-                  ({formatRelativeTime(genUtime)})
+                <DateTime display="date-time-numeric-seconds" unit="seconds" value={genUtime} />{" "}
+                <span className={styles.blockDetailSecondaryValue}>
+                  (<RelativeTime mode="relative" tooltip={false} unit="seconds" value={genUtime} />)
                 </span>
               </>
             )
           }
-          title={absoluteGenTime}
           visualPlaceholder="<time>"
         />
         <BlockDetailItem label="Version" value={formatOptionalNumber(block.version)} mono />
@@ -1343,12 +1356,30 @@ const BlockSummaryTable: FC<{
         {block.gen_software_capabilities === undefined ? null : (
           <BlockDetailItem
             label="Capabilities"
-            value={<BlockCapabilities value={block.gen_software_capabilities} />}
+            value={<GlobalCapabilities value={block.gen_software_capabilities} />}
           />
         )}
       </BlockDetailSection>
 
       <BlockDetailSection label="References">
+        {block.workchain !== -1 && masterchainBlockRef ? (
+          <BlockDetailItem
+            label="Masterchain block"
+            value={
+              <BlockChip
+                workchain={masterchainBlockRef.workchain}
+                shard={masterchainBlockRef.shard}
+                seqno={masterchainBlockRef.seqno}
+                href={routes.blockPath(
+                  masterchainBlockRef.workchain,
+                  masterchainBlockRef.shard,
+                  masterchainBlockRef.seqno,
+                )}
+                onClick={event => onOpenBlock(masterchainBlockRef, event)}
+              />
+            }
+          />
+        ) : null}
         <BlockDetailItem
           label="Prev refs"
           value={
@@ -1424,36 +1455,54 @@ const BlockSummaryTable: FC<{
       </BlockDetailSection>
 
       <BlockDetailSection label="Activity">
-        <BlockDetailItem label="Tx quantity" value={block.tx_count.toLocaleString()} mono />
+        <BlockDetailItem label="Tx quantity" value={<NumberValue value={block.tx_count} />} mono />
         {block.fees_collected === undefined ? null : (
           <BlockDetailItem
             label="Fees collected"
-            value={`${formatNano(block.fees_collected)} GRAM`}
+            value={<GramAmount value={block.fees_collected} useGrouping />}
           />
         )}
         {block.in_msg_descr_length === undefined ? null : (
           <BlockDetailItem
             label="In msg descr length"
-            value={block.in_msg_descr_length.toLocaleString()}
+            value={<NumberValue value={block.in_msg_descr_length} />}
             mono
           />
         )}
         {block.out_msg_descr_length === undefined ? null : (
           <BlockDetailItem
             label="Out msg descr length"
-            value={block.out_msg_descr_length.toLocaleString()}
+            value={<NumberValue value={block.out_msg_descr_length} />}
             mono
           />
         )}
       </BlockDetailSection>
 
       <BlockDetailSection label="Flags" contentClassName={styles.blockSixColumnGrid}>
-        <BlockDetailItem label="Key block" value={<BooleanValue value={block.key_block} />} />
-        <BlockDetailItem label="After merge" value={<BooleanValue value={block.after_merge} />} />
-        <BlockDetailItem label="After split" value={<BooleanValue value={block.after_split} />} />
-        <BlockDetailItem label="Before split" value={<BooleanValue value={block.before_split} />} />
-        <BlockDetailItem label="Want merge" value={<BooleanValue value={block.want_merge} />} />
-        <BlockDetailItem label="Want split" value={<BooleanValue value={block.want_split} />} />
+        <BlockDetailItem
+          label="Key block"
+          value={<BooleanValue display="true-false" value={block.key_block} />}
+        />
+        <BlockDetailItem
+          label="After merge"
+          value={<BooleanValue display="true-false" value={block.after_merge} />}
+        />
+        <BlockDetailItem
+          label="After split"
+          value={<BooleanValue display="true-false" value={block.after_split} />}
+        />
+        <BlockDetailItem
+          label="Before split"
+          value={<BooleanValue display="true-false" value={block.before_split} />}
+        />
+        <BlockDetailItem
+          label="Want merge"
+          value={<BooleanValue display="true-false" value={block.want_merge} />}
+        />
+        <BlockDetailItem
+          label="Want split"
+          value={<BooleanValue display="true-false" value={block.want_split} />}
+        />
       </BlockDetailSection>
 
       <BlockDetailSection label="Logical time">
@@ -1520,43 +1569,6 @@ const BlockDetailItem: FC<BlockDetailItemProps> = ({
     </span>
   </div>
 )
-
-const BooleanValue: FC<{readonly value: boolean | undefined}> = ({value}) => {
-  if (value === undefined) {
-    return <>—</>
-  }
-  return (
-    <span className={value ? styles.blockBooleanTrue : styles.blockBooleanFalse}>
-      {value ? "true" : "false"}
-    </span>
-  )
-}
-
-const BlockCapabilities: FC<{readonly value: string | number}> = ({value}) => {
-  const mode = Number(value)
-  if (!Number.isSafeInteger(mode) || mode < 0) {
-    return <>{value}</>
-  }
-
-  return (
-    <Popover
-      ariaLabel={`Explain global capabilities ${value}`}
-      content={
-        <span className={styles.blockCapabilitiesPopover}>
-          <span className={styles.blockCapabilitiesPopoverTitle}>Enabled capabilities</span>
-          <ModeViewer mode={mode} parseMode={parseGlobalCapabilities} />
-        </span>
-      }
-      interaction="click"
-      placement="top"
-      maxWidth="min(42rem, calc(100vw - 2rem))"
-    >
-      <button type="button" className={styles.blockCapabilitiesTrigger}>
-        {value}
-      </button>
-    </Popover>
-  )
-}
 
 const BlockDetailSkeletonItem: FC<{
   readonly label: string
@@ -1697,7 +1709,7 @@ function getBlockActions(
   rawBlockNetwork: RawBlockNetwork | undefined,
 ): {
   readonly downloadUrl?: string
-  readonly configUrl?: string
+  readonly configSeqno?: number
   readonly tonscanUrl: string
   readonly toncoinUrl: string
   readonly extendedBlockId: string
@@ -1715,11 +1727,16 @@ function getBlockActions(
     downloadUrl: rawBlockNetwork
       ? `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
       : undefined,
-    configUrl: rawBlockNetwork ? `${tonscanOrigin}/config` : undefined,
+    configSeqno: getConfigSeqno(block),
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,
     extendedBlockId: getExtendedBlockId(block),
   }
+}
+
+function getConfigSeqno(block: V3Block): number | undefined {
+  if (block.workchain === -1) return block.seqno
+  return block.master_ref_seqno ?? block.masterchain_block_ref?.seqno
 }
 
 function blockUnixTime(block: V3Block): number | undefined {
@@ -1727,41 +1744,15 @@ function blockUnixTime(block: V3Block): number | undefined {
   return Number.isFinite(value) && value > 0 ? value : undefined
 }
 
-function formatDateTimeLocalInput(unixTime: number): string {
-  const date = new Date(unixTime * 1000)
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return localDate.toISOString().slice(0, 19)
-}
-
-function formatAbsoluteBlockTime(block: V3Block): string {
-  const unixTime = blockUnixTime(block)
-  if (unixTime === undefined) {
+function formatTransactionExitCode(transaction: BlockTransactionListItem): string {
+  if (!("description" in transaction)) {
     return "Unknown"
   }
 
-  const date = new Date(unixTime * 1000)
-  const day = date.getDate().toString().padStart(2, "0")
-  const month = (date.getMonth() + 1).toString().padStart(2, "0")
-  const hours = date.getHours().toString().padStart(2, "0")
-  const minutes = date.getMinutes().toString().padStart(2, "0")
-  const seconds = date.getSeconds().toString().padStart(2, "0")
-  return `${day}.${month}.${date.getFullYear()}, ${hours}:${minutes}:${seconds}`
-}
-
-function formatTransactionExitCode(transaction: V3TransactionListItem): string {
   const computeExitCode = transaction.description.compute_ph?.exit_code
   if (typeof computeExitCode === "number") {
     return computeExitCode.toString()
   }
   const resultCode = transaction.description.action?.result_code
   return typeof resultCode === "number" ? resultCode.toString() : "Unknown"
-}
-
-function compactMiddle(value: string, visibleChars: number): string {
-  if (value.length <= visibleChars + 3) {
-    return value
-  }
-
-  const side = Math.max(4, Math.floor(visibleChars / 2))
-  return `${value.slice(0, side)}…${value.slice(-side)}`
 }

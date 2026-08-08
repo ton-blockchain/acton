@@ -1,0 +1,11 @@
+.value {
+  font-weight: 600;
+}
+
+.trueValue {
+  color: var(--acton-color-success);
+}
+
+.falseValue {
+  color: var(--acton-color-text-muted);
+}

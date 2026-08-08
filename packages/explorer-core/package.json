@@ -7,6 +7,7 @@
   "type": "module",
   "exports": {
     "./api/client": "./src/api/client.ts",
+    "./api/config": "./src/api/config.ts",
     "./api/compilerAbi": "./src/api/compilerAbi.ts",
     "./api/compilerAbiCatalog": "./src/api/compilerAbiCatalog.ts",
     "./api/jettonWallets": "./src/api/jettonWallets.ts",
@@ -19,6 +20,7 @@
     "./components/ExplorerAddressChip": "./src/components/ExplorerAddressChip.tsx",
     "./components/ExplorerBreadcrumbs": "./src/components/ExplorerBreadcrumbs.tsx",
     "./components/ExplorerDocumentTitle": "./src/components/ExplorerDocumentTitle.tsx",
+    "./components/GlobalCapabilities": "./src/components/GlobalCapabilities.tsx",
     "./components/ExplorerSearch": "./src/components/ExplorerSearch.tsx",
     "./components/NftImage": "./src/components/NftImage.tsx",
     "./components/SourceCatalog": "./src/components/SourceCatalog.tsx",
@@ -45,6 +47,7 @@
     "./pages/AccountPage": "./src/pages/AccountPage.tsx",
     "./pages/TokenCatalogPage": "./src/pages/TokenCatalogPage.tsx",
     "./pages/BlocksPage": "./src/pages/BlocksPage.tsx",
+    "./pages/ConfigPage": "./src/pages/ConfigPage.tsx",
     "./pages/CellInspectorPage": "./src/pages/CellInspectorPage.tsx",
     "./pages/EmulatePage": "./src/pages/EmulatePage.tsx",
     "./pages/ExplorerIndexPage": "./src/pages/ExplorerIndexPage.tsx",
@@ -95,6 +98,6 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "typescript": "^7.0.2",
-    "vite": "^8.0.16"
+    "vite": "^8.2.0"
   }
 }

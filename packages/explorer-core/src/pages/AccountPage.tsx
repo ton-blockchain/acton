@@ -1,14 +1,15 @@
 import {useLocation, useNavigate, useParams} from "react-router"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {FC, ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react"
+import type {FC, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
-import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
 import {ListChecks, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import {sortJettonWalletsByAmount} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
   AddressInformation,
@@ -37,6 +38,7 @@ import {
   type AccountDetailsTab,
 } from "../components/AccountDetails"
 import {LockerOverview} from "../components/LockerOverview"
+import {JettonOverview} from "../components/JettonOverview"
 import {
   MultisigOrderActionsTab,
   MultisigOrdersTab,
@@ -45,6 +47,7 @@ import {
   type MultisigDetailsState,
 } from "../components/multisig-details"
 import {NftImage} from "../components/NftImage"
+import {NftOverview} from "../components/NftOverview"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {
@@ -56,9 +59,8 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {isLockerCodeHash} from "../components/lockerSchedule"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
-import {isVestingCodeHash, type VestingData} from "../components/vestingSchedule"
+import type {VestingData} from "../components/vestingSchedule"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -67,8 +69,14 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {
   countActionsForTrace,
   mergeAutomaticActionPage,
+  mergeStreamedActions,
   type AccountActionPageCursor,
 } from "./accountActionPagination"
+import {
+  getAccountContractTypeByCodeHash,
+  hasAccountContractHint,
+  hasAccountInterface,
+} from "./accountContractTypes"
 import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
@@ -76,6 +84,7 @@ interface AccountPageProps {
   readonly enableJettonMint?: boolean
   readonly enableTransactionStreaming?: boolean
   readonly jettonMintPath?: string
+  readonly showActonscanLink?: boolean
   readonly tokensLoadMoreLimit?: number
   readonly holdersLoadMoreLimit?: number
 }
@@ -137,11 +146,69 @@ interface AccountLoadIssue {
   readonly networkLabel: string
 }
 
+interface AccountActionHistoryState {
+  readonly actions: V3Action[]
+  readonly tracesLoadMore: Record<string, ActionTraceLoadMoreState>
+}
+
+type AccountActionHistoryStateAction =
+  | {readonly type: "set-actions"; readonly update: SetStateAction<V3Action[]>}
+  | {
+      readonly type: "set-traces-load-more"
+      readonly update: SetStateAction<Record<string, ActionTraceLoadMoreState>>
+    }
+  | {
+      readonly type: "merge-streamed-actions"
+      readonly actions: readonly V3Action[]
+      readonly sortOrder: AccountHistorySortOrder
+    }
+
+const INITIAL_ACCOUNT_ACTION_HISTORY_STATE: AccountActionHistoryState = {
+  actions: [],
+  tracesLoadMore: {},
+}
+
+function accountActionHistoryReducer(
+  state: AccountActionHistoryState,
+  action: AccountActionHistoryStateAction,
+): AccountActionHistoryState {
+  switch (action.type) {
+    case "set-actions":
+      return {
+        ...state,
+        actions: resolveStateUpdate(state.actions, action.update),
+      }
+    case "set-traces-load-more":
+      return {
+        ...state,
+        tracesLoadMore: resolveStateUpdate(state.tracesLoadMore, action.update),
+      }
+    case "merge-streamed-actions": {
+      const merged = mergeStreamedActions(state.actions, action.actions, action.sortOrder)
+      return {
+        actions: merged.actions,
+        tracesLoadMore: markCollapsedActionTraces(
+          state.tracesLoadMore,
+          merged.collapsedTraceIds,
+          merged.actions,
+        ),
+      }
+    }
+    default:
+      return state
+  }
+}
+
+function resolveStateUpdate<T>(current: T, update: SetStateAction<T>): T {
+  return typeof update === "function" ? (update as (current: T) => T)(current) : update
+}
+
 export const AccountPage: FC<AccountPageProps> = ({
   client,
   enableJettonMint = false,
   enableTransactionStreaming = true,
   jettonMintPath,
+  showActonscanLink = false,
   tokensLoadMoreLimit = ACCOUNT_TOKENS_LOAD_MORE_LIMIT,
   holdersLoadMoreLimit = JETTON_HOLDERS_LOAD_MORE_LIMIT,
 }) => {
@@ -168,7 +235,19 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [historySortOrder, setHistorySortOrder] = useState<AccountHistorySortOrder>(
     readAccountHistorySortOrder,
   )
-  const [actions, setActions] = useState<V3Action[]>([])
+  const [{actions, tracesLoadMore: actionTracesLoadMore}, dispatchActionHistory] = useReducer(
+    accountActionHistoryReducer,
+    INITIAL_ACCOUNT_ACTION_HISTORY_STATE,
+  )
+  const setActions = useCallback(
+    (update: SetStateAction<V3Action[]>) => dispatchActionHistory({type: "set-actions", update}),
+    [],
+  )
+  const setActionTracesLoadMore = useCallback(
+    (update: SetStateAction<Record<string, ActionTraceLoadMoreState>>) =>
+      dispatchActionHistory({type: "set-traces-load-more", update}),
+    [],
+  )
   const [actionMetadata, setActionMetadata] = useState<V3Metadata>({})
   const [highlightedTransactionHashes, setHighlightedTransactionHashes] = useState<string[]>([])
   const [transactionsHasMore, setTransactionsHasMore] = useState(false)
@@ -176,9 +255,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [actionsCursor, setActionsCursor] = useState<AccountActionPageCursor>({offset: 0})
   const [actionsHasMore, setActionsHasMore] = useState(false)
   const [actionsLoadingMore, setActionsLoadingMore] = useState(false)
-  const [actionTracesLoadMore, setActionTracesLoadMore] = useState<
-    Record<string, ActionTraceLoadMoreState>
-  >({})
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWalletAccount, setJettonWalletAccount] = useState<JettonWallet | undefined>()
   const [jettonWalletMaster, setJettonWalletMaster] = useState<JettonMasterMetadata | undefined>()
@@ -279,10 +355,22 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
   }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
-  const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
-  const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
-  const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
-  const isNftCollectionAccount = hasAccountInterface(accountInterfaces, "nft_collection")
+  const isJettonMasterAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "jetton_master",
+  )
+  const isJettonWalletAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "jetton_wallet",
+  )
+  const isNftItemAccount = hasAccountContractHint(accountInterfaces, accountTokenInfo, "nft_item")
+  const isNftCollectionAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "nft_collection",
+  )
   const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")
   const isMultisigOrderAccount = hasAccountInterface(accountInterfaces, "multisig_order_v2")
   const isMultisigAccount = isMultisigWalletAccount || isMultisigOrderAccount
@@ -696,6 +784,8 @@ export const AccountPage: FC<AccountPageProps> = ({
     historyRequestKey,
     historySortOrder,
     initialTransactionLimit,
+    setActions,
+    setActionTracesLoadMore,
     supportsAccountActions,
     updateDomains,
   ])
@@ -951,7 +1041,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
 
     let isActive = true
-    const unsubscribe = client.subscribeAccountTransactions(formattedAddress, {
+    const unsubscribe = client.subscribeAccountHistory(formattedAddress, {
       onTransactions: event => {
         if (event.finality === "pending") {
           return
@@ -976,6 +1066,27 @@ export const AccountPage: FC<AccountPageProps> = ({
         setTransactionsLoading(false)
         setTransactionsError(undefined)
       },
+      onActions: supportsAccountActions
+        ? event => {
+            if (event.finality === "pending") {
+              return
+            }
+
+            if (event.address_book) {
+              updateDomains(event.address_book)
+            }
+            if (event.metadata) {
+              setActionMetadata(current => ({...current, ...event.metadata}))
+            }
+            dispatchActionHistory({
+              type: "merge-streamed-actions",
+              actions: event.actions,
+              sortOrder: historySortOrder,
+            })
+            setActionsLoading(false)
+            setActionsError(undefined)
+          }
+        : undefined,
       onError: error => {
         if (isActive) {
           console.debug("Account transaction stream closed", error)
@@ -987,7 +1098,14 @@ export const AccountPage: FC<AccountPageProps> = ({
       isActive = false
       unsubscribe()
     }
-  }, [accountAddressKey, client, enableTransactionStreaming])
+  }, [
+    accountAddressKey,
+    client,
+    enableTransactionStreaming,
+    historySortOrder,
+    supportsAccountActions,
+    updateDomains,
+  ])
 
   useEffect(() => {
     setJettonMetadataOpen(false)
@@ -1628,7 +1746,8 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
 
     const hash = tab === "contract" ? "contract-storage" : tab
-    void navigate(`${location.pathname}#${hash}`, {replace: true})
+    if (location.hash === `#${hash}`) return
+    void navigate(`${location.pathname}#${hash}`)
   }
 
   useEffect(() => {
@@ -1644,19 +1763,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   const tokenImageSources = getImageSources(tokenInfo?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
   const tokenImage = tokenImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
   const jettonMasterAdminAddress = jettonMaster?.admin_address ?? undefined
-  const tokenTotalSupply = jettonMaster
-    ? formatJettonAmount(jettonMaster.total_supply, tokenDecimals)
-    : undefined
-  const tokenTotalSupplyLabel = tokenTotalSupply
-    ? `${tokenTotalSupply}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
-    : undefined
-  const jettonWalletAmount =
-    jettonWalletAccount && jettonWalletMaster
-      ? formatJettonAmount(jettonWalletAccount.balance, jettonWalletMaster.jetton_content.decimals)
-      : undefined
-  const jettonWalletAmountLabel = jettonWalletAmount
-    ? `${jettonWalletAmount}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
-    : undefined
   const jettonMetadataJson = jettonMaster
     ? JSON.stringify(
         {
@@ -1747,11 +1853,16 @@ export const AccountPage: FC<AccountPageProps> = ({
   )
   const accountUnavailable =
     accountLoadIssue !== undefined && !accountLoading && accountState === undefined
-  const showAccountHeader = accountLoading || Boolean(accountState) || accountUnavailable
-  const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
-  const isVestingAccount = Boolean(accountState && isVestingCodeHash(accountCodeLookupHash))
+
+  const showAccountHeader = accountLoading || accountState !== undefined || accountUnavailable
+
+  const codeHashContractType = getAccountContractTypeByCodeHash(accountCodeLookupHash)
+
+  const isLockerAccount = codeHashContractType === "locker"
+  const isVestingAccount = codeHashContractType === "vesting"
   const isScheduleAccount = isLockerAccount || isVestingAccount
   const accountSuspended = accountSuspendedUntil !== undefined
+
   const currentMultisigDetails: MultisigDetailsState =
     multisigDetails.status !== "idle" && multisigDetails.address !== formattedAddress
       ? {
@@ -1760,24 +1871,27 @@ export const AccountPage: FC<AccountPageProps> = ({
           kind: isMultisigOrderAccount ? "order" : "wallet",
         }
       : multisigDetails
+
   const multisigOrder =
     currentMultisigDetails.status === "success" && currentMultisigDetails.kind === "order"
       ? currentMultisigDetails.order
       : undefined
-  const hasHeaderContextCard = Boolean(
-    accountState &&
-      (tokenInfo ||
-        currentNftItem ||
-        (nftCollectionName && !currentNftItem) ||
-        isScheduleAccount ||
-        isMultisigAccount ||
-        accountSuspended),
-  )
+
+  const hasHeaderContextCard =
+    accountState !== undefined &&
+    (tokenInfo !== undefined ||
+      currentNftItem !== undefined ||
+      nftCollectionName !== undefined ||
+      isScheduleAccount ||
+      isMultisigAccount ||
+      accountSuspended)
+
   const topSectionClassName = hasHeaderContextCard
     ? isScheduleAccount || isMultisigAccount || accountSuspended
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
+
   const accountInfoDetails =
     isVestingAccount && vestingData
       ? [
@@ -1819,6 +1933,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             },
           ]
         : undefined
+
   const multisigTabs = useMemo<readonly AccountDetailsTab[]>(() => {
     if (isMultisigWalletAccount) {
       return [
@@ -1923,7 +2038,16 @@ export const AccountPage: FC<AccountPageProps> = ({
                   jettonWallets={jettonWallets}
                   accountLoading={accountLoading}
                   assetsLoading={accountLoading || jettonWalletsLoading}
-                  amount={jettonWalletAmountLabel}
+                  amount={
+                    jettonWalletAccount && jettonWalletMaster ? (
+                      <TokenAmount
+                        decimals={jettonWalletMaster.jetton_content.decimals}
+                        symbol={tokenSymbol}
+                        useGrouping
+                        value={jettonWalletAccount.balance}
+                      />
+                    ) : undefined
+                  }
                   amountLoading={isJettonWalletAccount && jettonWalletLoading}
                   details={accountInfoDetails}
                   client={client}
@@ -1933,6 +2057,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                   collectiblesLoading={accountLoading || nftItemsLoading}
                   onCollectiblesClick={() => handleTabChange("nfts")}
                   hasContextCard={hasHeaderContextCard}
+                  showActonscanLink={showActonscanLink}
                 />
               )}
               {hasHeaderContextCard && (
@@ -1957,171 +2082,73 @@ export const AccountPage: FC<AccountPageProps> = ({
                       onSignerHoverChange={setHoveredMultisigSignerAddress}
                     />
                   )}
-                  {accountState && tokenInfo && (
-                    <div
-                      className={`${styles.jettonInfo} ${jettonMaster ? styles.jettonMasterInfo : ""}`}
-                    >
-                      <div className={styles.jettonHeader}>
-                        <img
-                          src={tokenImage}
-                          alt={tokenName}
-                          className={styles.jettonImage}
-                          onError={event =>
-                            replaceBrokenImageWithFallback(event, tokenImageSources)
-                          }
-                        />
-                        <div className={styles.jettonHeaderContent}>
-                          <div className={styles.jettonTitle}>
-                            <div className={styles.jettonName}>{tokenName}</div>
-                            {tokenSymbol && (
-                              <div className={styles.jettonSymbol}>{tokenSymbol}</div>
-                            )}
-                          </div>
-                          {jettonMaster && tokenTotalSupplyLabel && (
-                            <div className={styles.jettonSupply}>
-                              Max.supply: {tokenTotalSupplyLabel}
-                            </div>
-                          )}
-                          {jettonMaster && (
-                            <button
-                              type="button"
-                              className={styles.jettonMetadataButton}
-                              onClick={() => setJettonMetadataOpen(true)}
-                            >
-                              Metadata
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {enableJettonMint && jettonMaster?.mintable && jettonMintPath && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className={styles.jettonMintButton}
-                          onClick={() =>
-                            void navigate(
-                              `${jettonMintPath}?jetton=${encodeURIComponent(
-                                toRawAddress(jettonMaster.address),
-                              )}`,
-                            )
-                          }
-                        >
-                          Mint token
-                        </Button>
-                      )}
-                      {!jettonMaster && jettonWalletAccount && jettonWalletMaster && (
-                        <>
-                          <div className={styles.jettonDivider} />
-                          <AccountDetailRows>
-                            <AccountAddressDetailRow
-                              label="Jetton master"
-                              address={jettonWalletAccount.jetton}
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountAddressDetailRow
-                              label="Holder address"
-                              address={jettonWalletAccount.owner}
-                              onAddressClick={handleSearch}
-                            />
-                          </AccountDetailRows>
-                        </>
-                      )}
-                    </div>
+                  {accountState !== undefined && tokenInfo !== undefined && (
+                    <JettonOverview
+                      name={tokenName}
+                      symbol={tokenSymbol}
+                      image={tokenImage}
+                      imageSources={tokenImageSources}
+                      decimals={tokenDecimals}
+                      totalSupply={jettonMaster?.total_supply}
+                      masterAddress={
+                        jettonMaster === undefined && jettonWalletMaster !== undefined
+                          ? jettonWalletAccount?.jetton
+                          : undefined
+                      }
+                      holderAddress={
+                        jettonMaster === undefined && jettonWalletMaster !== undefined
+                          ? jettonWalletAccount?.owner
+                          : undefined
+                      }
+                      onAddressClick={handleSearch}
+                      onMetadataClick={
+                        jettonMaster === undefined ? undefined : () => setJettonMetadataOpen(true)
+                      }
+                      onMint={
+                        enableJettonMint === true &&
+                        jettonMaster?.mintable === true &&
+                        jettonMintPath !== undefined &&
+                        jettonMintPath.length > 0
+                          ? () =>
+                              void navigate(
+                                `${jettonMintPath}?jetton=${encodeURIComponent(
+                                  toRawAddress(jettonMaster.address),
+                                )}`,
+                              )
+                          : undefined
+                      }
+                    />
                   )}
-                  {accountState && currentNftItem && (
-                    <div className={styles.nftPanel}>
-                      <div className={styles.nftPanelHeader}>
-                        <div className={styles.nftPanelHeading}>
-                          <div className={styles.nftPanelTitle}>{nftItemName}</div>
-                          <button
-                            type="button"
-                            className={styles.nftPanelMetadataButton}
-                            onClick={() => setJettonMetadataOpen(true)}
-                          >
-                            Metadata
-                          </button>
-                        </div>
-                      </div>
-                      <div className={styles.nftPanelDivider} />
-                      <div className={styles.nftPanelBody}>
-                        <div className={styles.nftPanelMain}>
-                          <AccountDetailRows>
-                            <AccountAddressDetailRow
-                              label="Owner"
-                              address={nftItemOwnerAddress}
-                              fallback="No owner"
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountAddressDetailRow
-                              label="Collection Address"
-                              address={nftItemCollectionAddress}
-                              fallback="Standalone"
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountTextDetailRow
-                              label="Index"
-                              value={`#${currentNftItem.index}`}
-                            />
-                          </AccountDetailRows>
-                          {nftItemDescription && (
-                            <div className={styles.nftPanelDescription}>{nftItemDescription}</div>
-                          )}
-                        </div>
-                        <div className={styles.nftPanelMedia}>
-                          <NftImage
-                            sources={nftItemImageSources}
-                            alt={nftItemName}
-                            className={styles.nftPanelImage}
-                            blurredClassName={styles.blurredImage}
-                            collectionName={nftItemCollectionName}
-                            blurred={nftItemIsScam}
-                            onNsfw={() => setCurrentNftItem(undefined)}
-                          />
-                          {nftItemIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
-                        </div>
-                      </div>
-                    </div>
+                  {accountState !== undefined && currentNftItem !== undefined && (
+                    <NftOverview
+                      kind="item"
+                      name={nftItemName ?? `NFT #${currentNftItem.index}`}
+                      description={nftItemDescription}
+                      imageSources={nftItemImageSources}
+                      isScam={nftItemIsScam}
+                      ownerAddress={nftItemOwnerAddress}
+                      collectionAddress={nftItemCollectionAddress}
+                      collectionName={nftItemCollectionName}
+                      index={currentNftItem.index}
+                      onAddressClick={handleSearch}
+                      onMetadataClick={() => setJettonMetadataOpen(true)}
+                      onNsfw={() => setCurrentNftItem(undefined)}
+                    />
                   )}
-                  {accountState && nftCollectionName && !currentNftItem && !nftCollectionIsNsfw && (
-                    <div className={styles.nftPanel}>
-                      <div className={styles.nftPanelHeader}>
-                        <div className={styles.nftPanelHeading}>
-                          <div className={styles.nftPanelTitle}>{nftCollectionName}</div>
-                        </div>
-                      </div>
-                      <div className={styles.nftPanelDivider} />
-                      <div className={styles.nftPanelBody}>
-                        <div className={styles.nftPanelMain}>
-                          {collectionSample && (
-                            <AccountDetailRows>
-                              <AccountAddressDetailRow
-                                label="Latest item"
-                                address={collectionSample.address}
-                                onAddressClick={handleSearch}
-                              />
-                            </AccountDetailRows>
-                          )}
-                          {nftCollectionDescription && (
-                            <div className={styles.nftPanelDescription}>
-                              {nftCollectionDescription}
-                            </div>
-                          )}
-                        </div>
-                        <div className={styles.nftPanelMedia}>
-                          <NftImage
-                            sources={nftCollectionImageSources}
-                            alt={nftCollectionName}
-                            className={styles.nftPanelImage}
-                            blurredClassName={styles.blurredImage}
-                            collectionName={nftCollectionName}
-                            blurred={nftCollectionIsScam}
-                          />
-                          {nftCollectionIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {accountState !== undefined &&
+                    nftCollectionName !== undefined &&
+                    currentNftItem === undefined &&
+                    !nftCollectionIsNsfw && (
+                      <NftOverview
+                        kind="collection"
+                        name={nftCollectionName}
+                        description={nftCollectionDescription}
+                        imageSources={nftCollectionImageSources}
+                        isScam={nftCollectionIsScam}
+                        latestItemAddress={collectionSample?.address}
+                        onAddressClick={handleSearch}
+                      />
+                    )}
                 </div>
               )}
             </div>
@@ -2252,10 +2279,17 @@ export const AccountPage: FC<AccountPageProps> = ({
                         )}
                       </dd>
                     </div>
-                    {tokenTotalSupplyLabel && (
+                    {jettonMaster && (
                       <div className={styles.metadataRow}>
                         <dt className={styles.metadataLabel}>Max supply</dt>
-                        <dd className={styles.metadataValue}>{tokenTotalSupplyLabel}</dd>
+                        <dd className={styles.metadataValue}>
+                          <TokenAmount
+                            decimals={tokenDecimals}
+                            symbol={tokenSymbol}
+                            useGrouping
+                            value={jettonMaster.total_supply}
+                          />
+                        </dd>
                       </div>
                     )}
                     <div className={styles.metadataRow}>
@@ -2322,49 +2356,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   )
 }
 
-function formatJettonAmount(value: string, decimals?: string): string {
-  const decimalsNumber = Number(decimals || 9)
-  return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
-    maximumFractionDigits: decimalsNumber,
-  })
-}
-
-function sortJettonWalletsByAmount(wallets: readonly JettonWallet[]): JettonWallet[] {
-  return [...wallets].sort(compareJettonWalletAmount)
-}
-
-function compareJettonWalletAmount(left: JettonWallet, right: JettonWallet): number {
-  const leftBalance = parseBigIntAmount(left.balance)
-  const rightBalance = parseBigIntAmount(right.balance)
-  const leftDecimals = parseJettonDecimals(left.master?.jetton_content.decimals)
-  const rightDecimals = parseJettonDecimals(right.master?.jetton_content.decimals)
-  const leftScaled = leftBalance * 10n ** BigInt(rightDecimals)
-  const rightScaled = rightBalance * 10n ** BigInt(leftDecimals)
-
-  if (leftScaled > rightScaled) return -1
-  if (leftScaled < rightScaled) return 1
-
-  const leftSymbol = left.master?.jetton_content.symbol ?? ""
-  const rightSymbol = right.master?.jetton_content.symbol ?? ""
-  return leftSymbol.localeCompare(rightSymbol)
-}
-
-function parseBigIntAmount(value: string): bigint {
-  try {
-    return BigInt(value)
-  } catch {
-    return 0n
-  }
-}
-
-function parseJettonDecimals(decimals: string | undefined): number {
-  const value = Number(decimals ?? 9)
-  if (!Number.isInteger(value) || value < 0) {
-    return 9
-  }
-  return Math.min(value, 36)
-}
-
 interface AccountIssueCardProps {
   readonly issue: AccountLoadIssue
 }
@@ -2381,51 +2372,6 @@ const AccountIssueCard: FC<AccountIssueCardProps> = ({issue}) => (
       </div>
     </div>
   </section>
-)
-
-interface AccountDetailRowsProps {
-  readonly children: ReactNode
-}
-
-const AccountDetailRows: FC<AccountDetailRowsProps> = ({children}) => (
-  <div className={styles.accountDetailRows}>{children}</div>
-)
-
-interface AccountTextDetailRowProps {
-  readonly label: string
-  readonly value: ReactNode
-}
-
-const AccountTextDetailRow: FC<AccountTextDetailRowProps> = ({label, value}) => (
-  <div className={styles.accountDetailRow}>
-    <span className={styles.accountDetailLabel}>{label}</span>
-    <span className={styles.accountDetailValue}>{value}</span>
-  </div>
-)
-
-interface AccountAddressDetailRowProps {
-  readonly label: string
-  readonly address?: string
-  readonly fallback?: string
-  readonly onAddressClick: (address: string) => void
-}
-
-const AccountAddressDetailRow: FC<AccountAddressDetailRowProps> = ({
-  label,
-  address,
-  fallback,
-  onAddressClick,
-}) => (
-  <div className={styles.accountDetailRow}>
-    <span className={styles.accountDetailLabel}>{label}</span>
-    {address ? (
-      <div className={styles.accountDetailAddressValue}>
-        <ExplorerAddressChip address={address} onAddressClick={onAddressClick} variant="plain" />
-      </div>
-    ) : (
-      <span className={styles.accountDetailValue}>{fallback ?? "Unknown"}</span>
-    )}
-  </div>
 )
 
 function getAccountTokenInfo(
@@ -2511,10 +2457,6 @@ function isAccountTab(value: string): value is AccountTab {
     value === "orders" ||
     value === "actions"
   )
-}
-
-function hasAccountInterface(interfaces: readonly string[], expected: string): boolean {
-  return interfaces.some(iface => iface.trim().toLowerCase() === expected)
 }
 
 function transactionHashSet(

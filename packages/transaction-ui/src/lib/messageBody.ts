@@ -1,4 +1,5 @@
 import type {Message, MessageRelaxed} from "@ton/core"
+import {formatOpcode} from "@acton/ui"
 import {Cell, loadShardAccount, type Slice} from "@ton/core"
 import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {
@@ -390,7 +391,7 @@ function nestedPayloadOpcodeValue(slice: Slice): ParsedValue | undefined {
 
   return {
     kind: "scalar",
-    value: `0x${slice.clone().preloadUint(32).toString(16).padStart(8, "0")}`,
+    value: formatOpcode(slice.clone().preloadUint(32)) ?? "unknown opcode",
   }
 }
 

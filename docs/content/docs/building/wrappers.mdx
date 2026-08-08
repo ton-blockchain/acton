@@ -58,6 +58,11 @@ The generated file provides:
 - `counter.sendAnyExternal(body)` — sends a custom external-in body when the contract declares external incoming messages.
 - `counter.{getMethodName}()` — one method per declared get method.
 
+In local emulation, `ExternalSendResult.isAccepted()` reports whether the
+contract accepted the external-in message. After a network broadcast, use
+`waitForFirstTransaction()` or `waitForTrace()` instead: successful submission
+does not prove contract acceptance, so `isAccepted()` exits with an error.
+
 Fine tune wrapper generation with the `contract { ... }` header in the contract entrypoint file:
 
 - `storage: ...` enables the typed `fromStorage()` initializer; without it, the initializer falls back to an untyped form.
@@ -157,6 +162,23 @@ test-output-dir = "tests"
 [wrappers.typescript]
 output-dir = "wrappers-ts"
 ```
+
+Override any of these fields for one contract by nesting the same tables under
+its contract entry:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Acton resolves each field independently, so omitted per-contract fields inherit
+the project defaults. CLI output and test options still have the highest
+priority. `acton wrapper --all` applies the resulting settings separately to
+each contract.
 
 See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
 

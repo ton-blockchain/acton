@@ -28,7 +28,11 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
     let address = SocketAddr::new(host, port);
     let listener = tokio::net::TcpListener::bind(address)
         .await
-        .with_context(|| format!("Failed to bind Studio server to {address}"))?;
+        .map_err(|source| {
+            anyhow::Error::new(source).context(format!(
+                "Failed to start Acton Studio on {address}\nSet another port with --port\nOr stop the process currently listening on that port"
+            ))
+        })?;
     let address = listener
         .local_addr()
         .context("Failed to inspect Studio server address")?;

@@ -1,0 +1,26 @@
+.trigger {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--acton-color-accent);
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.popover {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--acton-space-2);
+}
+
+.popoverTitle {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
+}

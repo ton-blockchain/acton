@@ -15,24 +15,33 @@ DESCRIPTION
 
 SUBCOMMANDS
    acton doc abi
-       Print compiler ABI JSON for a local or bundled contract.
+       Print compiler ABI JSON for a local or bundled contract name, or for a
+       code hash registered in the Acton verifier.
 
       Synopsis
-          acton doc abi contract
+          acton doc abi contract-or-code-hash
 
       Options
-          contract
-              Contract name, local contract id, or bundled catalog name.
+          contract-or-code-hash
+              Local or bundled contract name, local contract id, or verifier
+              code hash.
 
       Behavior
           acton doc abi first looks at local contracts from Acton.toml, then
-          falls back to the bundled ABI catalog.
+          falls back to the bundled ABI catalog. If the argument is a
+          64-character hexadecimal code hash, optionally prefixed with 0x,
+          Acton queries the verifier.
 
           o  local lookup accepts the contract id, display name, or ABI
              contract name
 
           o  bundled catalog lookup accepts the catalog display name or ABI
              contract name
+
+          o  verifier lookup uses the same 24-hour project cache as acton rpc
+
+          o  an expired verifier cache entry remains available during verifier
+             outages
 
           o  output is always formatted compiler ABI JSON
 

@@ -1,0 +1,2 @@
+GET /getMasterchainInfo
+GET /getConfigAll?seqno=123456

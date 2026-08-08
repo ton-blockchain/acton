@@ -10,7 +10,7 @@ import {
   stringifyAbiJson,
   type ContractABI,
 } from "@acton/transaction-ui/abi"
-import {Button, RawDataBlock} from "@acton/ui"
+import {Button, RawDataBlock, shortenMiddle} from "@acton/ui"
 import {useMemo, useState} from "react"
 
 import styles from "./abiValueEditorGallery.module.css"
@@ -192,7 +192,7 @@ const addressSuggestions = [
 ] as const
 
 function shortAddress(address: string): string {
-  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-6)}` : address
+  return shortenMiddle(address, {start: 6, end: 6})
 }
 
 const scalarValue = {

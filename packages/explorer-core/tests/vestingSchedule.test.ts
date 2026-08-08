@@ -1,11 +1,7 @@
 import {describe, expect, test} from "bun:test"
 
 import type {V3RunGetMethodResponse} from "../src/api/types"
-import {
-  buildVestingSchedule,
-  isVestingCodeHash,
-  parseVestingData,
-} from "../src/components/vestingSchedule"
+import {buildVestingSchedule, parseVestingData} from "../src/components/vestingSchedule"
 
 const vestingResponse = {
   gas_used: 2111,
@@ -33,16 +29,6 @@ const vestingResponse = {
 } satisfies V3RunGetMethodResponse
 
 describe("Vesting schedule", () => {
-  test("recognizes only the official vesting code hash", () => {
-    expect(
-      isVestingCodeHash("B48B531ABEC3B714638291F7D77ED6DC9F6A2729EFCA20477137374D4AE8B590"),
-    ).toBe(true)
-    expect(
-      isVestingCodeHash(`0x${"b48b531abec3b714638291f7d77ed6dc9f6a2729efca20477137374d4ae8b590"}`),
-    ).toBe(true)
-    expect(isVestingCodeHash("00".repeat(32))).toBe(false)
-  })
-
   test("parses get_vesting_data including controlling addresses", () => {
     expect(parseVestingData(vestingResponse)).toEqual({
       vestingStartTime: 1_691_405_880,

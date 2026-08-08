@@ -203,6 +203,7 @@ name = "acton-studio"
 version = "1.1.0"
 dependencies = [
  "axum",
+ "base64",
  "chrono",
  "dunce",
  "expect-test",
@@ -225,6 +226,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+ "utoipa",
  "uuid",
  "xxhash-rust",
 ]
@@ -5513,6 +5515,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "ton",
  "ton-networks",

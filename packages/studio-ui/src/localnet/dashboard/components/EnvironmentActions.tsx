@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArchiveRestore,
   Download,
   FastForward,
@@ -11,7 +12,15 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
-import {Button, Dialog, InlineButton, Input, useToast} from "@acton/ui"
+import {
+  Button,
+  Dialog,
+  formatByteSize,
+  formatNumberValue,
+  InlineButton,
+  Input,
+  useToast,
+} from "@acton/ui"
 import {useCallback, useRef, useState} from "react"
 import type {ChangeEvent, FC, FormEvent} from "react"
 
@@ -31,6 +40,7 @@ interface EnvironmentActionsProps {
   readonly onOpenMiningSettings: () => void
   readonly onFund: () => void
   readonly onSend: () => void
+  readonly onSnapshots: () => void
   readonly onStateChanged: () => void
 }
 
@@ -50,6 +60,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   onOpenMiningSettings,
   onFund,
   onSend,
+  onSnapshots,
   onStateChanged,
 }) => {
   const {showToast} = useToast()
@@ -66,7 +77,8 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   const hasFaucet = supportsAny(environment, "gramFaucet", "jettonFaucet")
   const hasAccountActions = hasFaucet || supports(environment, "simulator")
   const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
-  const hasStateActions = supports(environment, "checkpoints") || supports(environment, "snapshots")
+  const hasStateActions = supports(environment, "checkpoints")
+  const hasSnapshots = supports(environment, "snapshots")
 
   const loadCheckpoints = useCallback(async () => {
     setIsLoadingCheckpoints(true)
@@ -94,7 +106,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         showToast({
           variant: "success",
           title: "Block mined",
-          description: `Block ${result.last_block_seqno.toLocaleString()} is now the latest block`,
+          description: `Block ${formatNumberValue(result.last_block_seqno)} is now the latest block`,
         })
       } else {
         showToast({
@@ -148,7 +160,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
     if (!file) return
 
     setStateFile(file)
-    setStateFileDetails({size: formatFileSize(file.size), isInspecting: true})
+    setStateFileDetails({size: formatByteSize(file.size), isInspecting: true})
     void file
       .text()
       .then(text => {
@@ -157,7 +169,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         }
         if (stateFileInputRef.current?.files?.[0] !== file) return
         setStateFileDetails({
-          size: formatFileSize(file.size),
+          size: formatByteSize(file.size),
           blockSeqno:
             typeof document.globals?.head_seqno === "number"
               ? document.globals.head_seqno
@@ -167,7 +179,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
       .catch(() => {
         if (stateFileInputRef.current?.files?.[0] !== file) return
         setStateFileDetails({
-          size: formatFileSize(file.size),
+          size: formatByteSize(file.size),
           error: "This file is not valid JSON",
         })
       })
@@ -298,7 +310,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
 
   return (
     <>
-      {hasAccountActions || hasRuntimeActions || hasStateActions ? (
+      {hasAccountActions || hasRuntimeActions || hasStateActions || hasSnapshots ? (
         <div className={styles.environmentActions}>
           {hasAccountActions ? (
             <div className={styles.environmentActionGroup} aria-label="Account actions">
@@ -339,15 +351,21 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             </div>
           ) : undefined}
 
-          {hasStateActions ? (
+          {hasStateActions || hasSnapshots ? (
             <div className={styles.environmentActionGroup} aria-label="State actions">
-              {supports(environment, "checkpoints") ? (
-                <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
-                  Checkpoints
+              {hasSnapshots ? (
+                <InlineButton leadingIcon={<Archive size={15} />} onClick={onSnapshots}>
+                  Snapshots
                 </InlineButton>
               ) : undefined}
-              {supports(environment, "snapshots") ? (
+              {supports(environment, "checkpoints") ? (
                 <>
+                  <InlineButton
+                    leadingIcon={<ArchiveRestore size={15} />}
+                    onClick={openCheckpoints}
+                  >
+                    Checkpoints
+                  </InlineButton>
                   <InlineButton
                     leadingIcon={<Upload size={15} />}
                     onClick={() => stateFileInputRef.current?.click()}
@@ -581,10 +599,4 @@ function formatStateFileDetails(details: StateFileDetails | undefined): string {
   const metadata = [details.size]
   if (details.blockSeqno !== undefined) metadata.push(`Block ${details.blockSeqno}`)
   return metadata.join(" · ")
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

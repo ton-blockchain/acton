@@ -1,7 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
-use crate::support::toncenter::append_custom_network;
+use crate::support::toncenter::{
+    append_custom_network, spawn_toncenter_v2_mock, toncenter_v2_latest_fork_snapshot_responses,
+};
 use std::fs;
 
 const NETWORK_IMPORTS: &str = r#"
@@ -16,6 +18,8 @@ const UNKNOWN_LIBRARY_HASH: &str =
 
 #[test]
 fn load_library_unknown_hash_returns_null_in_project_builder() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let source = format!(
         r#"
 {NETWORK_IMPORTS}
@@ -39,7 +43,7 @@ get fun `test bm load library unknown hash project builder`() {{
     append_custom_network(
         project.path(),
         "bm-missing-net",
-        "http://127.0.0.1:1/api/v2",
+        &format!("{mock_url}/api/v2"),
     );
 
     project
@@ -53,10 +57,13 @@ get fun `test bm load library unknown hash project builder`() {{
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/load_library_unknown_hash_returns_null_in_project_builder/load_library_unknown_hash_returns_null_in_project_builder.stdout.txt",
         );
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
 fn load_library_unknown_hash_returns_null_in_fixture_project() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/bm_load_library_unknown_hash.test.tolk";
     let source = format!(
@@ -81,7 +88,7 @@ get fun `test bm load library unknown hash fixture`() {{
     append_custom_network(
         fixture.path(),
         "bm-missing-net",
-        "http://127.0.0.1:1/api/v2",
+        &format!("{mock_url}/api/v2"),
     );
 
     fixture
@@ -96,4 +103,5 @@ get fun `test bm load library unknown hash fixture`() {{
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/load_library_unknown_hash_returns_null_in_project_builder/load_library_unknown_hash_returns_null_in_fixture_project.stdout.txt",
         );
+    mock_handle.join().expect("mock toncenter must finish");
 }

@@ -1,4 +1,5 @@
 import {ImageResponse} from "@cloudflare/pages-plugin-vercel-og/api"
+import {shortenMiddle} from "@acton/ui"
 import abiCatalogData from "../../../crates/acton-abi-catalog/data/data-abis.json"
 import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
 import {PageOgImage, pageOgPreviewForKey, pageOgPreviewForPath} from "../src/og/PageOgImage"
@@ -543,10 +544,7 @@ function tokenInfoForAddress(metadata: Record<string, unknown> | undefined, addr
 }
 
 function formatAddress(address: string) {
-  if (address.length <= 18) {
-    return address
-  }
-  return `${address.slice(0, 8)}…${address.slice(-6)}`
+  return shortenMiddle(address, {start: 8, end: 6})
 }
 
 function formatStatus(status: string | undefined) {

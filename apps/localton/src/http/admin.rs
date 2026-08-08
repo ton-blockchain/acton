@@ -35,7 +35,7 @@ use super::{
 #[openapi(
     info(
         title = "localton Administrative API",
-        description = "Runtime state, settings, wallets, processes, node control, and account funding."
+        description = "Runtime state, settings, wallets, processes, node control, and account funding"
     ),
     paths(
         status_handler,
@@ -126,6 +126,9 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     ApiDoc::openapi()
 }
 
+/// Get the current launcher and network state
+///
+/// The response shows readiness, the latest masterchain block, node states, and service states
 #[utoipa::path(
     get,
     path = "/v1/status",
@@ -141,6 +144,9 @@ async fn status_handler(
     Ok(Json(RuntimeState::load(&state.control.layout().runtime)?))
 }
 
+/// Get the persistent Full localnet settings
+///
+/// The response includes network parameters, node settings, service settings, validation settings, and monitoring settings
 #[utoipa::path(
     get,
     path = "/v1/settings",
@@ -158,6 +164,9 @@ async fn settings_handler(
     )?))
 }
 
+/// List the wallets that Localton manages
+///
+/// The response does not include private keys
 #[utoipa::path(
     get,
     path = "/v1/wallets",
@@ -173,6 +182,9 @@ async fn wallets_handler(
     Ok(Json(wallets::load_public(state.control.layout())?))
 }
 
+/// List the child processes that the launcher supervises
+///
+/// Each item contains a stable process name and the current process ID
 #[utoipa::path(
     get,
     path = "/v1/processes",
@@ -183,6 +195,9 @@ async fn processes_handler(AxumState(state): AxumState<AdminState>) -> Json<Vec<
     Json(state.control.process_info().await)
 }
 
+/// Start a configured validator node
+///
+/// The node must exist in the persistent settings
 #[utoipa::path(
     post,
     path = "/v1/nodes/{name}/start",
@@ -200,6 +215,9 @@ async fn start_node_handler(
     Ok(Json(state.control.start_node(&name).await?))
 }
 
+/// Stop a configured validator node
+///
+/// The response contains the node state after the stop operation
 #[utoipa::path(
     post,
     path = "/v1/nodes/{name}/stop",

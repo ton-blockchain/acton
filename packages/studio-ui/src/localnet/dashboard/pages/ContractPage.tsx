@@ -1,4 +1,12 @@
-import {Button, CodeViewer, ContentTabs, CopyInlineAction, InlineAction, Skeleton} from "@acton/ui"
+import {
+  Button,
+  CodeViewer,
+  ContentTabs,
+  formatCompilerLabel,
+  InlineAction,
+  Skeleton,
+  TechnicalValue,
+} from "@acton/ui"
 import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CheckCircle2, CircleAlert, FileCode2, Pencil, Search, Waypoints} from "lucide-react"
@@ -17,12 +25,7 @@ import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 import type {RegisteredSource} from "@acton/explorer-core/metadata/types"
 import {localnetContractPath, useLocalnetRoutes} from "../../routes"
 import {EditContractNameDialog} from "../components/EditContractNameDialog"
-import {
-  contractOriginLabels,
-  formatContractCompiler,
-  getContractIdentity,
-  shortenTechnicalValue,
-} from "../contracts/contractPresentation"
+import {contractOriginLabels, getContractIdentity} from "../contracts/contractPresentation"
 import {ContractStatus} from "../contracts/ContractStatus"
 import {type ContractDetails, useContractDetails} from "../contracts/useContractDetails"
 
@@ -188,10 +191,20 @@ function ContractSummary({details}: {readonly details: ContractDetails}) {
     <dl className={`${styles.detailList} ${styles.summaryList}`}>
       <Detail label="Origin">{contractOriginLabels[contract.sourceKind].detail}</Detail>
       <Detail label="Code hash">
-        <TechnicalValue value={contract.codeHash} label="code hash" />
+        <TechnicalValue
+          className={styles.technicalValue}
+          copyLabel="code hash"
+          fallback={<span className={styles.unavailable}>Unavailable</span>}
+          value={contract.codeHash}
+        />
       </Detail>
       <Detail label="Artifact ID">
-        <TechnicalValue value={artifactId} label="artifact ID" />
+        <TechnicalValue
+          className={styles.technicalValue}
+          copyLabel="artifact ID"
+          fallback={<span className={styles.unavailable}>Unavailable</span>}
+          value={artifactId}
+        />
       </Detail>
     </dl>
   )
@@ -352,7 +365,7 @@ function ArtifactContext({
     <div className={styles.artifactContext}>
       <div>
         <strong>Deployed source</strong>
-        <span>{formatContractCompiler(compiler)}</span>
+        <span>{formatCompilerLabel(compiler, "Unavailable")}</span>
       </div>
       <span className={styles.artifactContextStatus} data-state={changed ? "changed" : "current"}>
         {changed ? <CircleAlert aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}
@@ -371,35 +384,15 @@ function Detail({children, label}: {readonly children: ReactNode; readonly label
   )
 }
 
-function TechnicalValue({
-  label,
-  shorten = true,
-  value,
-}: {
-  readonly label: string
-  readonly shorten?: boolean
-  readonly value: string | undefined
-}) {
-  if (!value) return <span className={styles.unavailable}>Unavailable</span>
-
-  return (
-    <span className={styles.technicalValue}>
-      <code title={value}>{shorten ? shortenTechnicalValue(value) : value}</code>
-      <CopyInlineAction
-        value={value}
-        label={`Copy ${label}`}
-        copiedLabel={`Copied ${label}`}
-        size="compact"
-      />
-    </span>
-  )
-}
-
 function ArtifactReference({label, value}: {readonly label: string; readonly value: string}) {
   return (
     <span className={styles.artifactReference}>
       <span>{label}</span>
-      <TechnicalValue label={`${label.toLowerCase()} artifact ID`} value={value} />
+      <TechnicalValue
+        className={styles.technicalValue}
+        copyLabel={`${label.toLowerCase()} artifact ID`}
+        value={value}
+      />
     </span>
   )
 }

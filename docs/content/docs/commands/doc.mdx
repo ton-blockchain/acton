@@ -21,11 +21,12 @@ instruction lookup through the `tvm` subcommand.
 
 ### acton doc abi
 
-Print compiler ABI JSON for a local or bundled contract.
+Print compiler ABI JSON for a local or bundled contract name, or for a code hash
+registered in the Acton verifier.
 
 #### Synopsis
 
-`acton doc abi` _contract_
+`acton doc abi` _contract-or-code-hash_
 
 #### Options
 
@@ -35,11 +36,11 @@ Print compiler ABI JSON for a local or bundled contract.
 <CommandOption>
 <CommandOptionTitle>
 
-_contract_
+_contract-or-code-hash_
 
 </CommandOptionTitle>
 
-Contract name, local contract id, or bundled catalog name.
+Local or bundled contract name, local contract id, or verifier code hash.
 
 </CommandOption>
 
@@ -49,10 +50,13 @@ Contract name, local contract id, or bundled catalog name.
 #### Behavior
 
 `acton doc abi` first looks at local contracts from `Acton.toml`, then falls
-back to the bundled ABI catalog.
+back to the bundled ABI catalog. If the argument is a 64-character hexadecimal
+code hash, optionally prefixed with `0x`, Acton queries the verifier.
 
 - local lookup accepts the contract id, display name, or ABI contract name
 - bundled catalog lookup accepts the catalog display name or ABI contract name
+- verifier lookup uses the same 24-hour project cache as `acton rpc`
+- an expired verifier cache entry remains available during verifier outages
 - output is always formatted compiler ABI JSON
 
 ### acton doc tvm

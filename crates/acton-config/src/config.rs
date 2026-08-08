@@ -331,6 +331,8 @@ pub struct TestSettings {
     pub fail_fast: Option<bool>,
     /// Exit with a non-zero code when profiling differs from baseline
     pub fail_on_diff: Option<bool>,
+    /// Send test run data to Acton Studio when it is available
+    pub studio_reporting: Option<bool>,
     /// Enable the test UI server
     pub ui: Option<bool>,
     /// Port for the test UI server
@@ -640,6 +642,8 @@ pub struct ContractConfig {
     pub depends: Option<Vec<ContractDependency>>,
     /// Path where the compiled `.boc` should be saved
     pub output: Option<String>,
+    /// Wrapper settings that override the project-level `[wrappers]` defaults for this contract
+    pub wrappers: Option<WrappersConfig>,
 }
 
 impl Default for ActonConfig {
@@ -1447,6 +1451,7 @@ impl TestSettings {
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
+            studio_reporting: self.studio_reporting.unwrap_or(true),
             ui: ui_override || self.ui.unwrap_or(false),
             ui_port: ui_port_override.unwrap_or_else(|| self.ui_port.unwrap_or(12344)),
         }
@@ -1520,6 +1525,7 @@ mod tests {
             junit_path: Some("configured-reports".to_owned()),
             fork_net: Some("custom:devnet".to_owned()),
             fail_fast: Some(true),
+            studio_reporting: Some(false),
             ui_port: Some(23_456),
             fork_block_number: Some(111_111),
             ..TestSettings::default()
@@ -1531,6 +1537,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
         assert_eq!(config.fork_block_number, Some(111_111));
         assert!(config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 23_456);
 
         let config = test_settings_to_config(
@@ -1547,6 +1554,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Testnet));
         assert_eq!(config.fork_block_number, Some(222_222));
         assert!(!config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 34_567);
     }
 
@@ -1560,6 +1568,7 @@ mod tests {
         assert_eq!(config.fork_net, None);
         assert_eq!(config.fork_block_number, None);
         assert!(!config.fail_fast);
+        assert!(config.studio_reporting);
         assert_eq!(config.ui_port, 12_344);
     }
 
@@ -1741,6 +1750,7 @@ rules-file = "mutation-rules.json"
                         types: None,
                         depends: Some(vec![]),
                         output: None,
+                        wrappers: None,
                     },
                 )]),
             }),
@@ -2030,6 +2040,7 @@ exclude = ["**/integration/**"]
 include = ["**/unit/**"]
 junit-path = "custom-reports"
 junit-merge = true
+studio-reporting = false
 
 [test.coverage]
 enabled = true
@@ -2080,6 +2091,7 @@ seed = 42
         assert_eq!(test_settings.include, Some(vec!["**/unit/**".to_string()]));
         assert_eq!(test_settings.junit_path, Some("custom-reports".to_string()));
         assert_eq!(test_settings.junit_merge, Some(true));
+        assert_eq!(test_settings.studio_reporting, Some(false));
     }
 
     #[test]
@@ -2247,6 +2259,58 @@ output-dir = "./wrappers-ts"
         assert_eq!(
             config.typescript_wrapper_output_dir(),
             Some("./wrappers-ts")
+        );
+    }
+
+    #[test]
+    fn test_per_contract_wrapper_settings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[contracts.counter]
+src = "contracts/Counter.tolk"
+
+[contracts.counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+test-output-dir = "generated-tests/counter"
+
+[contracts.counter.wrappers.typescript]
+output-dir = "generated-ts/counter"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let wrappers = config
+            .get_contract("counter")
+            .and_then(|contract| contract.wrappers.as_ref())
+            .expect("counter wrapper settings");
+        let tolk = wrappers.tolk.as_ref().expect("Tolk wrapper settings");
+        assert_eq!(tolk.output_dir.as_deref(), Some("generated/counter"));
+        assert_eq!(tolk.generate_test, Some(false));
+        assert_eq!(
+            tolk.test_output_dir.as_deref(),
+            Some("generated-tests/counter")
+        );
+        assert_eq!(
+            wrappers
+                .typescript
+                .as_ref()
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated-ts/counter")
+        );
+
+        let serialized = toml::to_string(&config).expect("serialize Acton config");
+        let reparsed: ActonConfig = toml::from_str(&serialized).expect("reparse Acton config");
+        assert_eq!(
+            reparsed
+                .get_contract("counter")
+                .and_then(|contract| contract.wrappers.as_ref())
+                .and_then(|wrappers| wrappers.tolk.as_ref())
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated/counter")
         );
     }
 

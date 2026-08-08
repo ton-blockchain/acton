@@ -1,8 +1,12 @@
 use crate::common::assertion;
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{ProjectBuilder, TestConfig};
+use acton_studio::{StudioServer, StudioServerConfig, StudioWorkspace};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 use tycho_types::boc::Boc;
 use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
@@ -175,6 +179,99 @@ fn trace_project(name: &str, test_cases: &str) -> crate::support::project::Proje
         .contract("simple", SIMPLE_CONTRACT)
         .test_file("trace", &source)
         .build()
+}
+
+struct RunningStudio {
+    url: String,
+    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl RunningStudio {
+    fn start(workspace_name: &str, workspace_path: &Path) -> Self {
+        let workspace_name = workspace_name.to_owned();
+        let workspace_path = workspace_path.to_path_buf();
+        let (url_sender, url_receiver) = mpsc::sync_channel(1);
+        let (shutdown, shutdown_receiver) = tokio::sync::oneshot::channel();
+        let thread = thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("Studio test runtime should build")
+                .block_on(async move {
+                    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                        .await
+                        .expect("Studio test listener should bind");
+                    let url = format!(
+                        "http://{}",
+                        listener
+                            .local_addr()
+                            .expect("Studio test listener address should be available")
+                    );
+                    url_sender
+                        .send(url)
+                        .expect("Studio test URL receiver should remain available");
+                    let server = StudioServer::new(
+                        StudioServerConfig::new("test")
+                            .with_workspace(StudioWorkspace::new(workspace_name, workspace_path)),
+                    );
+                    axum::serve(listener, server.router())
+                        .with_graceful_shutdown(async {
+                            let _ = shutdown_receiver.await;
+                        })
+                        .await
+                        .expect("Studio test server should run");
+                });
+        });
+
+        let url = url_receiver
+            .recv()
+            .expect("Studio test server should publish its URL");
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_millis(250))
+            .build()
+            .expect("Studio test client should build");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if client
+                .get(format!("{url}/api/v1/info"))
+                .send()
+                .is_ok_and(|response| response.status().is_success())
+            {
+                break;
+            }
+            assert!(
+                !thread.is_finished(),
+                "Studio test server stopped before startup"
+            );
+            assert!(
+                Instant::now() < deadline,
+                "Studio test server did not start"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        Self {
+            url,
+            shutdown: Some(shutdown),
+            thread: Some(thread),
+        }
+    }
+
+    fn url(&self) -> &str {
+        &self.url
+    }
+}
+
+impl Drop for RunningStudio {
+    fn drop(&mut self) {
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 fn read_json_from_project(
@@ -1190,6 +1287,200 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
         !trace_dir.exists(),
         "Trace dir should not exist without --save-test-trace: {}",
         trace_dir.display()
+    );
+}
+
+#[test]
+fn manual_run_with_studio_endpoint_saves_trace_for_history() {
+    let project = trace_project(
+        "h-manual-studio-trace",
+        r"
+        get fun `test studio history trace`() {
+            deployCounter();
+        }
+        ",
+    );
+    let studio = RunningStudio::start("h-manual-studio-trace", project.path());
+
+    project
+        .acton()
+        .env("ACTON_STUDIO_URL", studio.url())
+        .env("ACTON_STUDIO_RUN_ID", "manual-studio-trace")
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let run = read_json_from_project(&project, ".studio/tests/runs/manual-studio-trace.json");
+    let report = &run["reports"][0];
+    let trace_path = report["trace_path"]
+        .as_str()
+        .expect("Studio history report should reference its transaction trace");
+    let trace_relative_path =
+        PathBuf::from(".studio/tests/traces/manual-studio-trace").join(trace_path);
+    let trace = read_json_from_project(
+        &project,
+        trace_relative_path
+            .to_str()
+            .expect("Trace path should be valid UTF-8"),
+    );
+    let transaction_count = trace["traces"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|chain| chain["transactions"].as_array())
+        .map(Vec::len)
+        .sum::<usize>();
+    let project_root =
+        dunce::canonicalize(project.path()).unwrap_or_else(|_| project.path().to_path_buf());
+    let trace_dir = run["traceDir"]
+        .as_str()
+        .and_then(|path| Path::new(path).strip_prefix(&project_root).ok())
+        .map_or_else(
+            || "<outside-project>".to_owned(),
+            |path| path.display().to_string(),
+        );
+
+    assert_trace_summary_snapshot(
+        format!(
+            "run_source: {}\ntrace_dir: {trace_dir}\ntrace_path: {trace_path}\ntransactions: {transaction_count}\n",
+            run["source"].as_str().unwrap_or("<missing>"),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/manual_run_with_studio_endpoint_saves_trace_for_history.txt",
+    );
+    assert_trace_json_contract(
+        &project,
+        trace_relative_path
+            .to_str()
+            .expect("Trace path should be valid UTF-8"),
+        "test studio history trace",
+    );
+}
+
+#[test]
+fn studio_config_false_disables_test_history_and_automatic_traces() {
+    let source = format!(
+        "{TRACE_TEST_PREPARE}\n{}",
+        r"
+        get fun `test disabled studio reporting`() {
+            deployCounter();
+        }
+        "
+    );
+    let project = ProjectBuilder::new("h-disabled-studio-reporting")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("trace", &source)
+        .with_test_config(TestConfig {
+            studio_reporting: Some(false),
+            ..TestConfig::default()
+        })
+        .build();
+    let studio = RunningStudio::start("h-disabled-studio-reporting", project.path());
+
+    project
+        .acton()
+        .env("ACTON_STUDIO_URL", studio.url())
+        .env("ACTON_STUDIO_RUN_ID", "disabled-studio-reporting")
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let run_record = project
+        .path()
+        .join(".studio/tests/runs/disabled-studio-reporting.json");
+    let trace_dir = project
+        .path()
+        .join(".studio/tests/traces/disabled-studio-reporting");
+    assert_trace_summary_snapshot(
+        format!(
+            "run_record_exists: {}\ntrace_dir_exists: {}\n",
+            run_record.exists(),
+            trace_dir.exists(),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/studio_config_false_disables_test_history_and_automatic_traces.txt",
+    );
+}
+
+#[test]
+fn no_studio_reporting_flag_disables_test_history_and_automatic_traces() {
+    let source = format!(
+        "{TRACE_TEST_PREPARE}\n{}",
+        r"
+        get fun `test disabled studio reporting flag`() {
+            deployCounter();
+        }
+        "
+    );
+    let project = ProjectBuilder::new("h-no-studio-reporting-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("trace", &source)
+        .with_test_config(TestConfig {
+            studio_reporting: Some(true),
+            ..TestConfig::default()
+        })
+        .build();
+    let studio = RunningStudio::start("h-no-studio-reporting-flag", project.path());
+
+    project
+        .acton()
+        .env("ACTON_STUDIO_URL", studio.url())
+        .env("ACTON_STUDIO_RUN_ID", "no-studio-reporting-flag")
+        .test()
+        .arg("--no-studio-reporting")
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let run_record = project
+        .path()
+        .join(".studio/tests/runs/no-studio-reporting-flag.json");
+    let trace_dir = project
+        .path()
+        .join(".studio/tests/traces/no-studio-reporting-flag");
+    assert_trace_summary_snapshot(
+        format!(
+            "run_record_exists: {}\ntrace_dir_exists: {}\n",
+            run_record.exists(),
+            trace_dir.exists(),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/no_studio_reporting_flag_disables_test_history_and_automatic_traces.txt",
+    );
+}
+
+#[test]
+fn regular_run_without_studio_does_not_create_studio_history() {
+    let project = trace_project(
+        "h-no-running-studio",
+        r"
+        get fun `test without running studio`() {
+            deployCounter();
+        }
+        ",
+    );
+
+    project
+        .acton()
+        .env_remove("ACTON_STUDIO_URL")
+        .env("ACTON_STUDIO_RUN_ID", "no-running-studio")
+        .test()
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let run_record = project
+        .path()
+        .join(".studio/tests/runs/no-running-studio.json");
+    let trace_dir = project
+        .path()
+        .join(".studio/tests/traces/no-running-studio");
+    assert_trace_summary_snapshot(
+        format!(
+            "run_record_exists: {}\ntrace_dir_exists: {}\n",
+            run_record.exists(),
+            trace_dir.exists(),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/regular_run_without_studio_does_not_create_studio_history.txt",
     );
 }
 

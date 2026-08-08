@@ -1,5 +1,5 @@
 import type React from "react"
-import {Checkbox, Tooltip} from "@acton/ui"
+import {Checkbox, formatPercentageRatio, Percentage, SourceLocationValue, Tooltip} from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"
 import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
 import {select} from "d3-selection"
@@ -192,54 +192,6 @@ const INSTRUCTION_STATS_SCOPES: readonly InstructionStatsScopeOption[] = [
 const numberFormatter = new Intl.NumberFormat("en-US")
 
 const formatGas = (value: number) => numberFormatter.format(Math.round(value))
-
-const formatPercent = (value: number, total: number) => {
-  if (total <= 0) {
-    return "0.0%"
-  }
-
-  return `${((value / total) * 100).toFixed(1)}%`
-}
-
-const getRelativePath = (filePath: string, projectRoot?: string) => {
-  if (!filePath) {
-    return "unknown source"
-  }
-
-  let projectRootEnd = projectRoot?.length ?? 0
-  while (projectRoot && projectRootEnd > 0 && projectRoot.charCodeAt(projectRootEnd - 1) === 47) {
-    projectRootEnd -= 1
-  }
-  const normalizedProjectRoot = projectRoot?.slice(0, projectRootEnd)
-  if (
-    normalizedProjectRoot &&
-    (filePath === normalizedProjectRoot || filePath.startsWith(`${normalizedProjectRoot}/`))
-  ) {
-    return filePath.slice(normalizedProjectRoot.length + 1) || filePath
-  }
-
-  const pathSegments = filePath.split("/")
-  if (pathSegments.length > 4) {
-    return `.../${pathSegments.slice(-4).join("/")}`
-  }
-
-  return filePath
-}
-
-const formatLocation = (node: FlameNode, projectRoot?: string) => {
-  if (!node.url) {
-    return "unknown source"
-  }
-
-  const relativePath = getRelativePath(node.url, projectRoot)
-  if (node.lineNumber < 0) {
-    return relativePath
-  }
-
-  const line = node.lineNumber + 1
-  const column = node.columnNumber >= 0 ? `:${node.columnNumber + 1}` : ""
-  return `${relativePath}:${line}${column}`
-}
 
 const createMutableNode = (
   id: string,
@@ -618,9 +570,10 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
       .setColorMapper(node => colorForDepth(node.depth))
       .setLabelHandler(node => {
         const totalGas = node.value ?? flameDatumNumber(node.data, "totalGas")
-        return `${flameDatumString(node.data, "name")} (${formatPercent(
+        return `${flameDatumString(node.data, "name")} (${formatPercentageRatio(
           totalGas,
           selectedContract.total_gas,
+          {maximumFractionDigits: 1, minimumFractionDigits: 1},
         )}, ${formatGas(totalGas)} gas)`
       })
       .tooltip(
@@ -662,32 +615,26 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
       ? findFallbackSourceNode(selectedTree)
       : undefined
   const selectedNodeSourceUrl = selectedNodeUrl || selectedNodeSource?.url || ""
-  const selectedNodeLocation =
+  const selectedNodeLine =
     selectedNode === undefined
-      ? ""
-      : formatLocation(
-          {
-            id: flameDatumString(selectedNode, "id"),
-            name: selectedNodeName,
-            url: selectedNodeSourceUrl,
-            lineNumber:
-              selectedNodeUrl || selectedNodeSource === undefined
-                ? flameDatumNumber(selectedNode, "lineNumber")
-                : selectedNodeSource.lineNumber,
-            columnNumber:
-              selectedNodeUrl || selectedNodeSource === undefined
-                ? flameDatumNumber(selectedNode, "columnNumber")
-                : selectedNodeSource.columnNumber,
-            selfGas: selectedNodeSelfGas,
-            totalGas: selectedNodeValue,
-            children: [],
-          },
-          projectRoot,
-        )
+      ? -1
+      : selectedNodeUrl || selectedNodeSource === undefined
+        ? flameDatumNumber(selectedNode, "lineNumber")
+        : selectedNodeSource.lineNumber
+  const selectedNodeColumn =
+    selectedNode === undefined
+      ? -1
+      : selectedNodeUrl || selectedNodeSource === undefined
+        ? flameDatumNumber(selectedNode, "columnNumber")
+        : selectedNodeSource.columnNumber
+  const selectedNodeLocation = selectedNodeSourceUrl
+    ? {
+        file: selectedNodeSourceUrl,
+        line: selectedNodeLine >= 0 ? selectedNodeLine + 1 : undefined,
+        column: selectedNodeColumn >= 0 ? selectedNodeColumn + 1 : undefined,
+      }
+    : undefined
 
-  const selectedNodeShare = selectedContract
-    ? formatPercent(selectedNodeValue, selectedContract.total_gas)
-    : "0.0%"
   const allInstructionStats = useMemo(
     () =>
       selectedContract === undefined
@@ -857,8 +804,12 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                       <div className={styles.detailsTitle} title={selectedNodeName}>
                         {selectedNodeName}
                       </div>
-                      <div className={styles.detailsLocation} title={selectedNodeSourceUrl}>
-                        {selectedNodeLocation}
+                      <div className={styles.detailsLocation}>
+                        <SourceLocationValue
+                          fallback="unknown source"
+                          projectRoot={projectRoot}
+                          value={selectedNodeLocation}
+                        />
                       </div>
                     </div>
                     <div className={styles.metricGrid}>
@@ -872,7 +823,14 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                       </div>
                       <div className={styles.metric}>
                         <span>Contract Share</span>
-                        <strong>{selectedNodeShare}</strong>
+                        <strong>
+                          <Percentage
+                            maximumFractionDigits={1}
+                            minimumFractionDigits={1}
+                            total={selectedContract?.total_gas ?? 0}
+                            value={selectedNodeValue}
+                          />
+                        </strong>
                       </div>
                     </div>
                     {allInstructionStats.length > 0 && (
@@ -962,7 +920,12 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                                       <td>{formatGas(stat.totalGas)}</td>
                                       <td>{stat.samples}</td>
                                       <td>
-                                        {formatPercent(stat.totalGas, instructionStatsShareTotal)}
+                                        <Percentage
+                                          maximumFractionDigits={1}
+                                          minimumFractionDigits={1}
+                                          total={instructionStatsShareTotal}
+                                          value={stat.totalGas}
+                                        />
                                       </td>
                                     </tr>
                                   ))}
@@ -973,10 +936,12 @@ const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRo
                                     <td>{formatGas(selectedInstructionGas)}</td>
                                     <td>{selectedInstructionSamples}</td>
                                     <td>
-                                      {formatPercent(
-                                        selectedInstructionGas,
-                                        instructionStatsShareTotal,
-                                      )}
+                                      <Percentage
+                                        maximumFractionDigits={1}
+                                        minimumFractionDigits={1}
+                                        total={instructionStatsShareTotal}
+                                        value={selectedInstructionGas}
+                                      />
                                     </td>
                                   </tr>
                                 </tfoot>

@@ -243,16 +243,6 @@
   width: min(100%, 48rem);
 }
 
-.booleanTrue {
-  font-weight: var(--acton-font-weight-emphasis);
-  color: var(--acton-color-success);
-}
-
-.booleanFalse {
-  font-weight: var(--acton-font-weight-emphasis);
-  color: var(--acton-color-danger-text);
-}
-
 .numberValue {
   font-size: 0.8125rem;
 }

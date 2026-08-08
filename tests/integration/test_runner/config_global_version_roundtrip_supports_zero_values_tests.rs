@@ -1,6 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
-use crate::support::toncenter::{append_custom_network, spawn_toncenter_v2_mock_with_capture};
+use crate::support::toncenter::{
+    append_custom_network, format_captured_requests, spawn_toncenter_v2_mock_with_capture,
+    toncenter_v2_latest_fork_snapshot_responses,
+};
+use std::fs;
 
 const DO_CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
@@ -78,7 +82,8 @@ get fun `test do stdlib config global version non zero roundtrip`() {
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn get_config_stays_local_when_broadcast_flag_enabled_in_test_runner() {
-    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock_with_capture(vec![]);
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock_with_capture(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let source = format!(
         "{DO_CONFIG_IMPORTS}\n{}\n",
         r"
@@ -107,21 +112,28 @@ get fun `test do stdlib get config stays local with broadcast flag`() {
         .build();
     append_custom_network(project.path(), "mock-config-unused", &mock_url);
 
-    project
+    let output = project
         .acton()
         .test()
         .arg("--fork-net")
         .arg("custom:mock-config-unused")
         .run()
-        .success()
-        .assert_passed(1)
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/get_config_stays_local_when_broadcast_flag_enabled_in_test_runner.stdout.txt",
-        );
+        .success();
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/get_config_stays_local_when_broadcast_flag_enabled_in_test_runner.stdout.txt",
+    );
 
     mock_handle.join().expect("mock toncenter must finish");
     let captured = captured
         .lock()
         .expect("captured toncenter requests mutex poisoned");
-    assert_eq!(captured.len(), 0, "acton test must not fetch remote config");
+    fs::write(
+        project.path().join("get-config-fork-requests.txt"),
+        format_captured_requests(&captured),
+    )
+    .expect("failed to write captured fork requests");
+    output.assert_file_snapshot_matches(
+        "get-config-fork-requests.txt",
+        "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/get_config_stays_local_when_broadcast_flag_enabled_in_test_runner.requests.txt",
+    );
 }
