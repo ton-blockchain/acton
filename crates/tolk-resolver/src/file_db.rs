@@ -11,7 +11,6 @@ use smol_str::SmolStr;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::str::Utf8Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tolk_syntax::{AstNode, CONTRACT_ENTRYPOINTS, HasName, ast};
@@ -63,7 +62,7 @@ impl FileInfo {
         self.source
             .functions()
             .filter_map(|func| func.name())
-            .filter_map(|name| self.text(&name.0).ok())
+            .map(|name| self.text(&name))
             .any(|name| CONTRACT_ENTRYPOINTS.contains(&name))
     }
 
@@ -90,9 +89,43 @@ impl FileInfo {
         self.index.source_kind == FileSource::Workspace
     }
 
-    /// Returns the source text associated with a tree-sitter node.
-    pub fn text(&self, node: &Node) -> Result<&str, Utf8Error> {
-        node.utf8_text(self.source.source.as_ref().as_ref())
+    /// Returns the source text covered by a typed Tolk AST node.
+    ///
+    /// The method accepts any node that implements [`AstNode`], including a raw
+    /// [`tree_sitter::Node`], and returns a slice borrowed from this file's
+    /// source text. It does not allocate or normalize whitespace. Tolk source
+    /// files are UTF-8; if an invalid node boundary is encountered, the method
+    /// returns the `"<invalid utf8>"` placeholder used by [`AstNode::text`].
+    pub fn text<'tree, N: AstNode<'tree>>(&self, node: &N) -> &str {
+        node.text(self.source.source.as_ref())
+    }
+
+    /// Returns the exact source text covered by a resolver span.
+    ///
+    /// The span must use UTF-8 byte offsets from this file. The returned text
+    /// borrows the stored source and is not trimmed or otherwise normalized.
+    /// If the span is out of bounds or splits a UTF-8 code point, the method
+    /// returns the same `"<invalid utf8>"` placeholder as [`Self::text`].
+    #[must_use]
+    pub fn text_at(&self, span: Span) -> &str {
+        self.source
+            .source
+            .get(span.start()..span.end())
+            .unwrap_or("<invalid utf8>")
+    }
+
+    /// Finds the smallest syntax node that covers a resolver span in this file.
+    ///
+    /// The span uses UTF-8 byte offsets and must belong to this file's current
+    /// syntax tree. The returned node may be named or anonymous, matching
+    /// tree-sitter's `descendant_for_byte_range` semantics. Returns `None` when
+    /// the span is outside the tree or no descendant covers the complete range.
+    #[must_use]
+    pub fn find_node_at_span(&self, span: Span) -> Option<Node<'_>> {
+        self.source
+            .tree
+            .root_node()
+            .descendant_for_byte_range(span.start(), span.end())
     }
 
     /// Finds the `Symbol` declaration corresponding to an AST node that has a name.
@@ -148,6 +181,10 @@ impl FileDb {
     /// Creates a new, empty `FileDb`.
     #[must_use]
     pub fn new(stdlib_path: PathBuf, acton_stdlib_path: Option<PathBuf>) -> Self {
+        let stdlib_path = dunce::canonicalize(&stdlib_path).unwrap_or(stdlib_path);
+        let acton_stdlib_path =
+            acton_stdlib_path.map(|path| dunce::canonicalize(&path).unwrap_or(path));
+
         FileDb {
             files: DashMap::new(),
             files_by_id: DashMap::new(),
@@ -160,6 +197,36 @@ impl FileDb {
 
     pub fn stdlib_path(&self) -> &Path {
         self.stdlib_path.as_path()
+    }
+
+    /// Creates an independently mutable branch that shares immutable file data.
+    ///
+    /// File IDs are preserved, which lets speculative consumers update one file and
+    /// reuse project indexes built from this database without mutating the live state.
+    #[must_use]
+    pub fn fork(&self) -> Self {
+        let files = self
+            .files
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect::<DashMap<_, _>>();
+        let files_by_id = files
+            .iter()
+            .map(|entry| (entry.value().id(), entry.value().clone()))
+            .collect();
+
+        Self {
+            files,
+            files_by_id,
+            canonicalize_cache: self
+                .canonicalize_cache
+                .iter()
+                .map(|entry| (entry.key().clone(), entry.value().clone()))
+                .collect(),
+            stdlib_path: self.stdlib_path.clone(),
+            acton_stdlib_path: self.acton_stdlib_path.clone(),
+            next_id: AtomicU32::new(self.next_id.load(Ordering::Relaxed)),
+        }
     }
 
     /// Reads and processes a file from the disk.
@@ -186,7 +253,16 @@ impl FileDb {
         old_tree: Option<&Tree>,
     ) -> anyhow::Result<Arc<FileInfo>> {
         let file = tolk_syntax::parse_with_old_tree(content, old_tree)?;
+        Ok(self.process_source_file(path, file))
+    }
 
+    /// Processes an already parsed source file with the specified path.
+    ///
+    /// This is useful for language-server integrations where the document has
+    /// already been parsed by the editor document cache and should not be parsed
+    /// again just to update resolver indexes.
+    pub fn process_source_file(&self, path: PathBuf, file: ast::SourceFile) -> Arc<FileInfo> {
+        let content = file.source.clone();
         let mut line_offsets = vec![0];
         let mut last_offset = 0;
         for line in content.lines() {
@@ -205,7 +281,7 @@ impl FileDb {
         let info = Arc::new(FileInfo {
             id: file_id,
             index: Arc::new(FileIndex::build(
-                content,
+                content.as_ref(),
                 file_id,
                 path.clone(),
                 &file,
@@ -218,7 +294,7 @@ impl FileDb {
         // TODO: possible double work on concurrent run
         self.files.insert(path, info.clone());
         self.files_by_id.insert(file_id, info.clone());
-        Ok(info)
+        info
     }
 
     /// Checks if passed file resides in Tolk standard library.
@@ -249,6 +325,14 @@ impl FileDb {
         self.files.get(path).map(|entry| entry.clone())
     }
 
+    /// Removes a processed file from the cache.
+    pub fn remove_path(&self, path: &Path) {
+        let Some((_, info)) = self.files.remove(path) else {
+            return;
+        };
+        self.files_by_id.remove(&info.id);
+    }
+
     /// Resolves a `FileId` to its `FileInfo` if it has already been processed.
     pub fn get_by_id(&self, file_id: FileId) -> Option<Arc<FileInfo>> {
         self.files_by_id.get(&file_id).map(|entry| entry.clone())
@@ -266,10 +350,14 @@ impl FileDb {
         Ok(canonical)
     }
 
-    /// Retrieves the text content corresponding to a span in a file.
+    /// Returns the exact source text covered by a resolver span in a file.
+    ///
+    /// Returns `None` only when `file_id` is absent from the database. Invalid
+    /// span boundaries produce the `"<invalid utf8>"` placeholder documented by
+    /// [`FileInfo::text_at`] instead of making the file lookup appear to fail.
     pub fn text(&self, file_id: FileId, span: Span) -> Option<SmolStr> {
         let file = self.files_by_id.get(&file_id)?;
-        Some(file.source.source.get(span.start()..span.end())?.into())
+        Some(file.text_at(span).into())
     }
 
     /// Retrieves the text content of an AST node.
