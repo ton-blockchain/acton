@@ -11,7 +11,7 @@ use tolk_linter::{Checker, Rule};
 use tolk_resolver::ProjectIndexBuilder;
 use tolk_resolver::file_db::FileInfo;
 use tolk_resolver::symbol_resolver::resolve;
-use tolk_ty::{TypeDb, TypeInterner, infer};
+use tolk_ty::{FileBodyTypes, TypeDb, TypeInterner, WorkspaceBodyTypes, infer};
 use tower_lsp::lsp_types::Url;
 use tree_sitter::Tree;
 
@@ -98,7 +98,7 @@ impl Backend {
         let mut interner = TypeInterner::new();
         let mut type_db = TypeDb::new(&mut interner, &self.file_db, &index);
 
-        let mut all_body_types = HashMap::new();
+        let mut all_body_types = WorkspaceBodyTypes::default();
 
         let root_file_id = index
             .get_file_by_path(&root_path)
@@ -108,7 +108,7 @@ impl Backend {
         for file_id in &reachable {
             let file_info = self.file_db.get_by_id(*file_id).expect("file not found");
 
-            let mut body_types = HashMap::new();
+            let mut body_types = FileBodyTypes::default();
 
             for decl in file_info.source().top_levels() {
                 let Some(index_decl) = file_info.find_declaration(&decl) else {

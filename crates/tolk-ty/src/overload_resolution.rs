@@ -51,8 +51,7 @@ impl ShapeScore {
 /// calculate score for a receiver;
 /// note: it's an original receiver, with generics, not an instantiated one
 pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeScore {
-    let unwrapped = interner.unwrap_alias(id);
-    let data = interner.data(unwrapped);
+    let data = interner.data(id);
     match data {
         TyData::TypeParameter { .. } => ShapeScore {
             kind: ShapeKind::GenericT,
@@ -101,6 +100,24 @@ pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeS
                 depth: 1 + depth,
             }
         }
+        TyData::TypeAlias {
+            args: Some(args), ..
+        }
+        | TyData::Struct {
+            args: Some(args),
+            base: Some(_),
+            ..
+        } => {
+            let depth = args
+                .iter()
+                .map(|&arg| calculate_shape_score(arg, interner).depth)
+                .max()
+                .unwrap_or(0);
+            ShapeScore {
+                kind: ShapeKind::Instantiated,
+                depth: 1 + depth,
+            }
+        }
         TyData::TypeAlias { inner_ty, .. } => calculate_shape_score(*inner_ty, interner),
         _ => ShapeScore {
             kind: ShapeKind::Primitive,
@@ -114,7 +131,7 @@ pub struct MethodCallCandidate {
     pub original_receiver: TyId,
     pub instantiated_receiver: TyId,
     pub method_id: SymbolId,
-    pub substitutions: FxHashMap<String, TyId>,
+    pub substitutions: FxHashMap<TyId, TyId>,
 }
 
 impl MethodCallCandidate {
@@ -149,45 +166,63 @@ pub(crate) fn resolve_methods_for_call(
     called_name: &str,
     type_db: &mut TypeDb,
 ) -> Vec<MethodCallCandidate> {
+    resolve_methods(provided_receiver, called_name, None, type_db)
+}
+
+fn resolve_methods(
+    provided_receiver: TyId,
+    called_name: &str,
+    instance: Option<bool>,
+    type_db: &mut TypeDb,
+) -> Vec<MethodCallCandidate> {
     // find all methods theoretically applicable; we'll filter them by priority;
     // for instance, if there is `T.method`, it will be instantiated with T=provided_receiver
     let mut viable = Vec::with_capacity(4);
 
-    for file_index in type_db.project_index.files().values() {
-        for symbol in &file_index.decls {
-            let SymbolKind::Method { .. } = symbol.kind else {
-                continue;
-            };
+    let method_ids = type_db
+        .project_index
+        .methods_by_name()
+        .get(called_name)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    for method_id in method_ids {
+        let Some(symbol) = type_db.project_index.resolve_symbol(*method_id) else {
+            continue;
+        };
+        let SymbolKind::Method { is_instance, .. } = symbol.kind else {
+            continue;
+        };
 
-            if symbol.name.as_ref() != called_name {
-                continue;
-            }
+        if instance.is_some_and(|expected| expected != is_instance) {
+            continue;
+        }
 
-            let Some(&receiver) = type_db.receiver_types.get(&symbol.id) else {
-                continue;
-            };
+        let Some(&receiver) = type_db.receiver_types.get(&symbol.id) else {
+            continue;
+        };
 
-            let intn = &mut type_db.intrn;
-            if intn.has_generics(receiver) {
-                let mut deducer = GenericSubstitutionsDeducing::new();
-                let replaced = deducer.auto_deduce_from_argument(receiver, provided_receiver, intn);
+        let intn = &mut type_db.intrn;
+        if intn.has_generics(receiver) {
+            let mut deducer = GenericSubstitutionsDeducing::new();
+            let replaced = deducer.auto_deduce_from_argument(receiver, provided_receiver, intn);
 
-                if intn.can_rhs_be_assigned(replaced, provided_receiver) {
-                    viable.push(MethodCallCandidate {
-                        original_receiver: receiver,
-                        instantiated_receiver: replaced,
-                        method_id: symbol.id,
-                        substitutions: deducer.substitutions.mapping,
-                    });
-                }
-            } else if intn.can_rhs_be_assigned(receiver, provided_receiver) {
+            if intn.can_rhs_be_assigned(replaced, provided_receiver) {
                 viable.push(MethodCallCandidate {
                     original_receiver: receiver,
-                    instantiated_receiver: receiver,
+                    instantiated_receiver: replaced,
                     method_id: symbol.id,
-                    substitutions: FxHashMap::default(),
+                    substitutions: deducer.substitutions.mapping,
                 });
             }
+        } else if intn.can_rhs_be_assigned(receiver, provided_receiver)
+            && provided_receiver != intn.ty_never
+        {
+            viable.push(MethodCallCandidate {
+                original_receiver: receiver,
+                instantiated_receiver: receiver,
+                method_id: symbol.id,
+                substitutions: FxHashMap::default(),
+            });
         }
     }
 
@@ -200,7 +235,9 @@ pub(crate) fn resolve_methods_for_call(
     // 1) exact match candidates with equal_to()
     //    (for instance, an alias equals to its underlying type, as well as `T1|T2` equals to `T2|T1`)
     let mut exact = Vec::new();
+    let mut generic_count = 0;
     for candidate in &viable {
+        generic_count += usize::from(candidate.is_generic(type_db.intrn));
         if type_db
             .intrn
             .equals(candidate.instantiated_receiver, provided_receiver)
@@ -220,14 +257,13 @@ pub(crate) fn resolve_methods_for_call(
         viable = exact;
     }
 
-    // 2) if there are both generic and non-generic functions, filter out generic
-    let n_generics = viable
-        .iter()
-        .filter(|c| c.is_generic(type_db.intrn))
-        .count();
-    if n_generics < viable.len() {
-        viable.retain(|c| !c.is_generic(type_db.intrn));
+    if generic_count == 0 {
         return viable;
+    }
+
+    // 2) Prefer a receiver pattern that is strictly more specific than every other candidate.
+    if let Some(idx) = find_only_generic_dominator(&viable, type_db) {
+        return vec![viable.remove(idx)];
     }
 
     // 3) better shape in terms of structural depth
@@ -248,37 +284,89 @@ pub(crate) fn resolve_methods_for_call(
         return viable;
     }
 
-    // 4) find the overload that dominates all others
-    //    (prefer `Container<int>` over `Container<T>` and `map<K, slice>` over `map<K, V>`)
-    let mut dominator_idx = None;
-    for i in 0..viable.len() {
-        let mut dominates_all = true;
-        for j in 0..viable.len() {
-            if i != j
-                && !is_more_specific_generic(
-                    viable[i].original_receiver,
-                    viable[j].original_receiver,
-                    type_db,
-                )
-            {
-                dominates_all = false;
-                break;
-            }
-        }
-        if dominates_all {
-            if dominator_idx.is_some() {
-                // Ambiguous
-                return viable;
-            }
-            dominator_idx = Some(i);
-        }
+    // 4) Within the same shape, a concrete receiver beats a generic receiver.
+    let generic_count = viable
+        .iter()
+        .filter(|candidate| candidate.is_generic(type_db.intrn))
+        .count();
+    if generic_count < viable.len() {
+        viable.retain(|candidate| !candidate.is_generic(type_db.intrn));
+        return viable;
     }
 
-    if let Some(idx) = dominator_idx {
+    // 5) Shape filtering can reveal a dominator hidden by less-specific candidates.
+    if let Some(idx) = find_only_generic_dominator(&viable, type_db) {
         return vec![viable.remove(idx)];
     }
 
     viable
+}
+
+fn find_only_generic_dominator(
+    candidates: &[MethodCallCandidate],
+    type_db: &mut TypeDb<'_>,
+) -> Option<usize> {
+    let mut dominator = None;
+
+    for (candidate_idx, candidate) in candidates.iter().enumerate() {
+        let dominates_all = candidates.iter().enumerate().all(|(other_idx, other)| {
+            candidate_idx == other_idx
+                || is_more_specific_generic(
+                    candidate.original_receiver,
+                    other.original_receiver,
+                    type_db,
+                )
+        });
+
+        if dominates_all {
+            if dominator.is_some() {
+                return None;
+            }
+            dominator = Some(candidate_idx);
+        }
+    }
+
+    dominator
+}
+
+/// Returns the best applicable method declaration for every method name available on a receiver.
+#[must_use]
+pub fn method_ids_for_completion(
+    provided_receiver: TyId,
+    instance: bool,
+    type_db: &mut TypeDb<'_>,
+) -> Vec<SymbolId> {
+    type_db.ensure_method_receivers_loaded();
+    let mut result = Vec::new();
+    for (name, method_ids) in type_db.project_index.methods_by_name() {
+        let has_matching_receiver_kind = method_ids.iter().any(|method_id| {
+            type_db
+                .project_index
+                .resolve_symbol(*method_id)
+                .is_some_and(|symbol| {
+                    matches!(
+                        symbol.kind,
+                        SymbolKind::Method {
+                            is_instance,
+                            ..
+                        } if is_instance == instance
+                    )
+                })
+        });
+        if !has_matching_receiver_kind {
+            continue;
+        }
+
+        result.extend(
+            resolve_methods(provided_receiver, name, Some(instance), type_db)
+                .into_iter()
+                .map(|candidate| candidate.method_id),
+        );
+    }
+
+    result.sort_unstable();
+    result.dedup();
+    result
 }
 
 pub(crate) fn choose_only_method_to_call(

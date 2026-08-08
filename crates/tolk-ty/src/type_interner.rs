@@ -4,6 +4,7 @@ use crate::types::{AddressKind, IntTy, TyData};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use tolk_resolver::file_index::SymbolId;
+use tolk_resolver::resolve_index::LocalDefId;
 
 /// A lightweight identifier for an interned type.
 ///
@@ -299,7 +300,30 @@ impl TypeInterner {
 
     /// Creates a type parameter type.
     pub fn type_parameter(&mut self, name: String, default_type: Option<TyId>) -> TyId {
-        self.intern(TyData::TypeParameter { name, default_type })
+        self.intern(TyData::TypeParameter {
+            id: None,
+            name,
+            default_type,
+        })
+    }
+
+    pub fn scoped_type_parameter(
+        &mut self,
+        id: LocalDefId,
+        name: String,
+        default_type: Option<TyId>,
+    ) -> TyId {
+        if let Some((index, _)) = self.arena.iter().enumerate().find(|(_, data)| {
+            matches!(data, TyData::TypeParameter { id: Some(existing), .. } if *existing == id)
+        }) {
+            return TyId(index as u32);
+        }
+
+        self.intern(TyData::TypeParameter {
+            id: Some(id),
+            name,
+            default_type,
+        })
     }
 
     /// when `var v = rhs`, `v` is `undefined` before assignment (before rhs->inferred_type is assigned to it);
@@ -374,10 +398,11 @@ impl TypeInterner {
             if a_args.len() != b_args.len() {
                 return true;
             }
-            return !a_args
-                .iter()
-                .zip(b_args.iter())
-                .all(|(&at, &bt)| self.equals(at, bt));
+            return a_def != b_def
+                || !a_args
+                    .iter()
+                    .zip(b_args.iter())
+                    .all(|(&at, &bt)| self.equals(at, bt));
         }
 
         // handle `type MInt2 = MInt1`, as well as `type BalanceList = dict`, then they are equal
@@ -1203,8 +1228,8 @@ impl TypeInterner {
                 {
                     let mut mapping = FxHashMap::default();
                     for (&formal, &actual) in formal_args.iter().zip(types.iter()) {
-                        if let TyData::TypeParameter { name, .. } = self.data(formal) {
-                            mapping.insert(name.clone(), actual);
+                        if let TyData::TypeParameter { .. } = self.data(formal) {
+                            mapping.insert(formal, actual);
                         }
                     }
 
@@ -1362,7 +1387,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generic_alias_equality() {
+    fn generic_aliases_with_different_bases_are_nominal() {
         let mut interner = TypeInterner::new();
 
         let def_w1 = SymbolId {
@@ -1382,7 +1407,9 @@ mod tests {
         let t_w2_int =
             interner.type_alias_instantiation(def_w2, "Wrapper2".into(), t_int, vec![t_int]);
 
-        assert!(interner.equals(t_w1_int, t_w2_int));
+        assert!(!interner.equals(t_w1_int, t_w2_int));
+        assert!(!interner.can_rhs_be_assigned(t_w1_int, t_w2_int));
+        assert!(!interner.can_rhs_be_assigned(t_w2_int, t_w1_int));
     }
 
     #[test]

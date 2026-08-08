@@ -3,6 +3,7 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::type_substitutor::TypeSubstitutor;
 use crate::types::{AddressKind, TyData};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
 use std::sync::Arc;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_db::FileDb;
@@ -11,13 +12,51 @@ use tolk_resolver::file_index::{
     TypeParameter as DeclTypeParameter,
 };
 use tolk_resolver::project_index::ProjectIndex;
-use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
+use tolk_resolver::resolve_index::{LocalDefId, LocalDefKind, Resolved};
 use tolk_syntax::{
     AstChildren, AstNode, Expr, FunCallableType, FunctionLike, HasGenericParams, HasName,
     Instantiation, Method, NullableType, TensorType, TupleType, Type, TypeIdent,
     TypeInstantiatedTs, UnionType, match_parents,
 };
 use tolk_syntax::{HasTreeSitterKind, ast};
+
+/// Reusable type database state that can be carried across analysis snapshots.
+#[derive(Debug, Clone, Default)]
+pub struct TypeDbCache {
+    top_level_types: FxHashMap<SymbolId, TyId>,
+    receiver_types: FxHashMap<SymbolId, TyId>,
+    initialized_files: FxHashSet<FileId>,
+}
+
+impl TypeDbCache {
+    #[must_use]
+    pub fn top_level_type(&self, symbol_id: SymbolId) -> Option<TyId> {
+        self.top_level_types.get(&symbol_id).copied()
+    }
+
+    #[must_use]
+    pub fn method_receiver_type(&self, symbol_id: SymbolId) -> Option<TyId> {
+        self.receiver_types.get(&symbol_id).copied()
+    }
+
+    fn retain_current_except(
+        &mut self,
+        project_index: &ProjectIndex,
+        refresh_file_ids: &FxHashSet<FileId>,
+    ) {
+        self.top_level_types.retain(|symbol_id, _| {
+            project_index.get_file_index(symbol_id.file_id).is_some()
+                && !refresh_file_ids.contains(&symbol_id.file_id)
+        });
+        self.receiver_types.retain(|symbol_id, _| {
+            project_index.get_file_index(symbol_id.file_id).is_some()
+                && !refresh_file_ids.contains(&symbol_id.file_id)
+        });
+        self.initialized_files.retain(|file_id| {
+            project_index.get_file_index(*file_id).is_some() && !refresh_file_ids.contains(file_id)
+        });
+    }
+}
 
 /// Represents a field in a structure.
 #[derive(Debug, Clone)]
@@ -59,9 +98,9 @@ pub struct TypeDb<'a> {
     /// It is also used to get information about resolved symbols by their [`Span`].
     pub project_index: &'a ProjectIndex,
     /// Stores all inferred types for top-level definitions by their [`SymbolId`].
-    pub top_level_types: FxHashMap<SymbolId, TyId>,
+    pub top_level_types: Cow<'a, FxHashMap<SymbolId, TyId>>,
     /// Stores all receiver types for methods by their [`SymbolId`].
-    pub receiver_types: FxHashMap<SymbolId, TyId>,
+    pub receiver_types: Cow<'a, FxHashMap<SymbolId, TyId>>,
     /// Stores call graph
     pub call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
     pub inverted_call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
@@ -70,6 +109,8 @@ pub struct TypeDb<'a> {
     /// Keeps track of definitions that have already been processed or are currently
     /// being processed (to handle `A -> B -> A` dependencies).
     currently_lowering: FxHashSet<SymbolId>,
+    initialized_files: Cow<'a, FxHashSet<FileId>>,
+    refreshed_files: Vec<FileId>,
     method_receivers_loaded: bool,
     treat_unresolved_as_type_parameter: bool,
 }
@@ -83,6 +124,40 @@ impl<'a> TypeDb<'a> {
         file_db: &'a FileDb,
         project_index: &'a ProjectIndex,
     ) -> TypeDb<'a> {
+        let files_to_collect = project_index.files().keys().copied().collect::<Vec<_>>();
+        Self::new_with_cache(
+            type_interner,
+            file_db,
+            project_index,
+            TypeDbCache::default(),
+            files_to_collect,
+        )
+    }
+
+    /// Creates a `TypeDb` from reusable cache and refreshes selected files.
+    ///
+    /// The cache is valid only with the same [`TypeInterner`]. Callers should
+    /// refresh changed files and their semantic dependents so inferred auto
+    /// return types cannot leak from an older snapshot.
+    pub fn new_with_cache(
+        type_interner: &'a mut TypeInterner,
+        file_db: &'a FileDb,
+        project_index: &'a ProjectIndex,
+        mut cache: TypeDbCache,
+        refresh_file_ids: impl IntoIterator<Item = FileId>,
+    ) -> TypeDb<'a> {
+        let refresh_file_ids = refresh_file_ids.into_iter().collect::<FxHashSet<_>>();
+        cache.retain_current_except(project_index, &refresh_file_ids);
+        let mut files_to_collect = project_index
+            .files()
+            .keys()
+            .filter(|file_id| {
+                refresh_file_ids.contains(file_id) || !cache.initialized_files.contains(file_id)
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        files_to_collect.sort_unstable();
+
         let mut db = TypeDb {
             intrn: type_interner,
             file_db,
@@ -90,14 +165,59 @@ impl<'a> TypeDb<'a> {
             inverted_call_graph: FxHashMap::default(),
             call_graph: FxHashMap::default(),
             type_lower_cache: FxHashMap::default(),
-            top_level_types: FxHashMap::default(),
-            receiver_types: FxHashMap::default(),
+            top_level_types: Cow::Owned(cache.top_level_types),
+            receiver_types: Cow::Owned(cache.receiver_types),
             currently_lowering: FxHashSet::default(),
+            initialized_files: Cow::Owned(cache.initialized_files),
+            refreshed_files: files_to_collect.clone(),
             method_receivers_loaded: false,
             treat_unresolved_as_type_parameter: false,
         };
-        db.collect_top_level_types();
+        db.collect_top_level_types_for(files_to_collect);
+        db.method_receivers_loaded = true;
         db
+    }
+
+    /// Creates a query-only view over a fully initialized cache.
+    ///
+    /// Read-only operations borrow the cached maps without cloning them. Existing
+    /// mutation paths remain correct through [`Cow::to_mut`] and pay for a clone
+    /// only if a supposedly query-only operation needs to lower a missing type.
+    pub fn new_for_query(
+        type_interner: &'a mut TypeInterner,
+        file_db: &'a FileDb,
+        project_index: &'a ProjectIndex,
+        cache: &'a TypeDbCache,
+    ) -> TypeDb<'a> {
+        TypeDb {
+            intrn: type_interner,
+            file_db,
+            project_index,
+            inverted_call_graph: FxHashMap::default(),
+            call_graph: FxHashMap::default(),
+            type_lower_cache: FxHashMap::default(),
+            top_level_types: Cow::Borrowed(&cache.top_level_types),
+            receiver_types: Cow::Borrowed(&cache.receiver_types),
+            currently_lowering: FxHashSet::default(),
+            initialized_files: Cow::Borrowed(&cache.initialized_files),
+            refreshed_files: Vec::new(),
+            method_receivers_loaded: true,
+            treat_unresolved_as_type_parameter: false,
+        }
+    }
+
+    #[must_use]
+    pub fn refreshed_files(&self) -> &[FileId] {
+        &self.refreshed_files
+    }
+
+    #[must_use]
+    pub fn into_cache(self) -> TypeDbCache {
+        TypeDbCache {
+            top_level_types: self.top_level_types.into_owned(),
+            receiver_types: self.receiver_types.into_owned(),
+            initialized_files: self.initialized_files.into_owned(),
+        }
     }
 
     pub fn ensure_method_receivers_loaded(&mut self) {
@@ -105,16 +225,18 @@ impl<'a> TypeDb<'a> {
             return;
         }
 
-        let mut method_ids = Vec::new();
+        let mut missing_method_ids = Vec::new();
         for file_index in self.project_index.files().values() {
             for symbol in &file_index.decls {
-                if matches!(symbol.kind, SymbolKind::Method { .. }) {
-                    method_ids.push(symbol.id);
+                if matches!(symbol.kind, SymbolKind::Method { .. })
+                    && !self.receiver_types.contains_key(&symbol.id)
+                {
+                    missing_method_ids.push(symbol.id);
                 }
             }
         }
 
-        for method_id in method_ids {
+        for method_id in missing_method_ids {
             let _ = self.get_top_level_type(None, method_id);
         }
 
@@ -217,9 +339,15 @@ impl<'a> TypeDb<'a> {
         None
     }
 
-    fn collect_top_level_types(&mut self) {
+    fn collect_top_level_types_for(&mut self, file_ids: Vec<FileId>) {
         // Pass 1: Identity types (struct, enum) — globally available first
-        for file_index in self.project_index.files().values() {
+        let file_indexes = file_ids
+            .iter()
+            .filter_map(|file_id| self.project_index.get_file_index(*file_id))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for file_index in &file_indexes {
             for symbol in &file_index.decls {
                 let Symbol { kind, name, id, .. } = symbol;
                 let ty = match kind {
@@ -227,11 +355,16 @@ impl<'a> TypeDb<'a> {
                         type_parameters, ..
                     } => {
                         if name.as_ref() == "array" {
-                            let element_ty = type_parameters
-                                .first()
-                                .map_or(self.intrn.ty_undefined, |p| {
-                                    self.intrn.type_parameter(p.name.to_string(), None)
-                                });
+                            let element_ty =
+                                type_parameters
+                                    .first()
+                                    .map_or(self.intrn.ty_undefined, |p| {
+                                        self.intrn.scoped_type_parameter(
+                                            LocalDefId::new(id.file_id, p.span.start),
+                                            p.name.to_string(),
+                                            None,
+                                        )
+                                    });
                             Some(self.intrn.array(element_ty))
                         } else {
                             let base_ty = self.intrn.struct_ty(*id, name.clone());
@@ -249,16 +382,17 @@ impl<'a> TypeDb<'a> {
                     _ => continue,
                 };
                 if let Some(ty) = ty {
-                    self.top_level_types.insert(symbol.id, ty);
+                    self.top_level_types.to_mut().insert(symbol.id, ty);
                 }
             }
         }
 
         // Pass 2: Lower everything else (triggered by demand or by iterating)
-        for file_index in self.project_index.files().values() {
+        for file_index in &file_indexes {
             for symbol in &file_index.decls {
                 let _ = self.get_top_level_type(Some(&symbol.kind), symbol.id);
             }
+            self.initialized_files.to_mut().insert(file_index.id);
         }
     }
 
@@ -274,12 +408,18 @@ impl<'a> TypeDb<'a> {
                     params
                         .parameters()
                         .map(|param| {
-                            let name = param
-                                .name()
+                            let name_node = param.name();
+                            let name = name_node
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
                             let default_ty = self.lower_opt_type(file_id, param.default().as_ref());
-                            self.intrn.type_parameter(name.to_string(), default_ty)
+                            let local_id = LocalDefId::new(
+                                file_id,
+                                name_node
+                                    .map_or_else(|| param.span().start, |name| name.span().start),
+                            );
+                            self.intrn
+                                .scoped_type_parameter(local_id, name.to_string(), default_ty)
                         })
                         .collect::<Vec<_>>()
                 })
@@ -296,7 +436,13 @@ impl<'a> TypeDb<'a> {
 
         fallback
             .iter()
-            .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
+            .map(|p| {
+                self.intrn.scoped_type_parameter(
+                    LocalDefId::new(file_id, p.span.start),
+                    p.name.to_string(),
+                    None,
+                )
+            })
             .collect()
     }
 
@@ -344,7 +490,7 @@ impl<'a> TypeDb<'a> {
             }
         ) {
             let ty = self.as_primitive_type(&symbol.name)?;
-            self.top_level_types.insert(symbol_id, ty);
+            self.top_level_types.to_mut().insert(symbol_id, ty);
             return Some(ty);
         }
 
@@ -360,7 +506,7 @@ impl<'a> TypeDb<'a> {
             return self.top_level_types.get(&symbol_id).copied();
         }
         let ty = self.lower_top_level_decl(file_id, &ast_decl, symbol)?;
-        self.top_level_types.insert(symbol_id, ty);
+        self.top_level_types.to_mut().insert(symbol_id, ty);
         Some(ty)
     }
 
@@ -379,7 +525,9 @@ impl<'a> TypeDb<'a> {
         let ast_fields = body.fields();
         for (field_info, ast_field) in fields.iter().zip(ast_fields) {
             if let Some(field_ty) = self.lower_opt_type(file_id, ast_field.typ().as_ref()) {
-                self.top_level_types.insert(field_info.id, field_ty);
+                self.top_level_types
+                    .to_mut()
+                    .insert(field_info.id, field_ty);
             }
         }
 
@@ -436,7 +584,7 @@ impl<'a> TypeDb<'a> {
                     self.intrn.ty_undefined
                 };
 
-                self.receiver_types.insert(symbol.id, receiver_ty);
+                self.receiver_types.to_mut().insert(symbol.id, receiver_ty);
 
                 if is_instance_method {
                     params.insert(0, receiver_ty);
@@ -478,12 +626,20 @@ impl<'a> TypeDb<'a> {
                     let type_params = type_parameters
                         .parameters()
                         .map(|p| {
-                            let name = p
-                                .name()
+                            let name_node = p.name();
+                            let name = name_node
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
                             let default_ty = self.lower_opt_type(file_id, p.default().as_ref());
-                            self.intrn.type_parameter(name.to_string(), default_ty)
+                            self.intrn.scoped_type_parameter(
+                                LocalDefId::new(
+                                    file_id,
+                                    name_node
+                                        .map_or_else(|| p.span().start, |name| name.span().start),
+                                ),
+                                name.to_string(),
+                                default_ty,
+                            )
                         })
                         .collect::<Vec<_>>();
 
@@ -581,10 +737,11 @@ impl<'a> TypeDb<'a> {
                     return Some(primitive);
                 }
                 let default_ty = self.local_type_parameter_default(file_id, local.def_span);
-                return Some(
-                    self.intrn
-                        .type_parameter(local.name.to_string(), default_ty),
-                );
+                return Some(self.intrn.scoped_type_parameter(
+                    local.id,
+                    local.name.to_string(),
+                    default_ty,
+                ));
             }
             return None;
         };
@@ -596,10 +753,11 @@ impl<'a> TypeDb<'a> {
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
                     let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
-                    return Some(
-                        self.intrn
-                            .type_parameter(resolved.name.to_string(), default_ty),
-                    );
+                    return Some(self.intrn.scoped_type_parameter(
+                        local,
+                        resolved.name.to_string(),
+                        default_ty,
+                    ));
                 }
                 return None;
             }
@@ -736,46 +894,43 @@ impl<'a> TypeDb<'a> {
         }
 
         let inner_data = self.intrn.data(inner_ty);
-        if let TyData::GenericTypeWithTs { inner_ty, .. } = inner_data {
-            if non_generic {
-                if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
-                    return Some(
-                        self.intrn
-                            .struct_instantiation(*def, name.clone(), *def, tys),
-                    );
+        if let TyData::GenericTypeWithTs {
+            inner_ty,
+            types: formal_types,
+        } = inner_data
+        {
+            if non_generic && let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
+                return Some(
+                    self.intrn
+                        .struct_instantiation(*def, name.clone(), *def, tys),
+                );
+            }
+
+            if let TyData::TypeAlias {
+                def,
+                name,
+                inner_ty,
+                ..
+            } = self.intrn.data(*inner_ty).clone()
+            {
+                let mut inner_ty = inner_ty;
+
+                // type Alias<T> = Generic<T>
+                // Alias<int> -> Alias<int> with base=Generic<int>
+                let mut substitution = GenericsSubstitutions::new();
+                for (&formal, &ty) in formal_types.iter().zip(&tys) {
+                    substitution.set_type_t(formal, ty);
                 }
 
-                if let TyData::TypeAlias {
-                    def,
-                    name,
-                    inner_ty,
-                    ..
-                } = self.intrn.data(*inner_ty).clone()
-                {
-                    let mut inner_ty = inner_ty;
-
-                    // type Alias<T> = Generic<T>
-                    // Alias<int> -> Alias<int> with base=Generic<int>
-                    let resolved = self.project_index.resolve_symbol(def)?;
-                    if let SymbolKind::TypeAlias {
-                        type_parameters, ..
-                    } = &resolved.kind
-                    {
-                        let mut substitution = GenericsSubstitutions::new();
-
-                        for (param, &ty) in type_parameters.iter().zip(&tys) {
-                            substitution.set_type_t(param.name.to_string(), ty);
-                        }
-
-                        let mut substitutor = TypeSubstitutor::new(self.intrn);
-                        inner_ty = substitutor.substitute(inner_ty, &substitution.mapping);
-                    }
-
-                    return Some(
-                        self.intrn
-                            .type_alias_instantiation(def, name, inner_ty, tys),
-                    );
+                if !substitution.mapping.is_empty() {
+                    let mut substitutor = TypeSubstitutor::new(self.intrn);
+                    inner_ty = substitutor.substitute(inner_ty, &substitution.mapping);
                 }
+
+                return Some(
+                    self.intrn
+                        .type_alias_instantiation(def, name, inner_ty, tys),
+                );
             }
 
             return Some(self.intrn.generic_type_with_ts(*inner_ty, tys));
@@ -795,7 +950,12 @@ impl<'a> TypeDb<'a> {
             {
                 let mut substitution = GenericsSubstitutions::new();
                 for (param, &ty) in type_parameters.iter().zip(&tys) {
-                    substitution.set_type_t(param.name.to_string(), ty);
+                    let parameter_ty = self.intrn.scoped_type_parameter(
+                        LocalDefId::new(file_id, param.span.start),
+                        param.name.to_string(),
+                        None,
+                    );
+                    substitution.set_type_t(parameter_ty, ty);
                 }
                 let mut substitutor = TypeSubstitutor::new(self.intrn);
                 instantiated_inner =

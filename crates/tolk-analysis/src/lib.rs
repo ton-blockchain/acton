@@ -1,11 +1,10 @@
 use rustc_hash::FxHashMap;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_dataflow::{ControlFlowGraph, build_cfg_for_top_level_with_source};
 use tolk_resolver::resolve_index::LocalDefId;
 use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, Span, SymbolId, SymbolKind};
 use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
-use tolk_ty::{InferenceResult, TypeDb};
+use tolk_ty::{TypeDb, WorkspaceBodyTypes};
 
 bitflags::bitflags! {
     pub struct UseFlags: u8 {
@@ -72,7 +71,7 @@ impl AnalysisDb {
     pub fn use_facts(
         &mut self,
         type_db: &mut TypeDb,
-        body_types: &HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+        body_types: &WorkspaceBodyTypes,
         file_id: FileId,
     ) -> Option<Arc<FileUseFacts>> {
         if let Some(facts) = self.use_facts.get(&file_id) {

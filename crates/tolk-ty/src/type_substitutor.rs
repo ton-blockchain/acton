@@ -1,36 +1,42 @@
 use crate::type_interner::{TyId, TypeInterner};
 use crate::types::TyData;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub(crate) struct TypeSubstitutor<'a> {
     interner: &'a mut TypeInterner,
     apply_defaults: bool,
+    visiting: FxHashSet<TyId>,
 }
 
 impl<'a> TypeSubstitutor<'a> {
-    pub(crate) const fn new(interner: &'a mut TypeInterner) -> Self {
+    pub(crate) fn new(interner: &'a mut TypeInterner) -> Self {
         Self {
             interner,
             apply_defaults: false,
+            visiting: FxHashSet::default(),
         }
     }
 
-    pub(crate) const fn new_with_defaults(interner: &'a mut TypeInterner) -> Self {
+    pub(crate) fn new_with_defaults(interner: &'a mut TypeInterner) -> Self {
         Self {
             interner,
             apply_defaults: true,
+            visiting: FxHashSet::default(),
         }
     }
 
-    pub(crate) fn substitute(&mut self, id: TyId, mapping: &FxHashMap<String, TyId>) -> TyId {
+    pub(crate) fn substitute(&mut self, id: TyId, mapping: &FxHashMap<TyId, TyId>) -> TyId {
         let data = self.interner.data(id).clone();
         match data {
-            TyData::TypeParameter {
-                ref name,
-                default_type,
-            } => {
-                if let Some(&new_id) = mapping.get(name) {
-                    return new_id;
+            TyData::TypeParameter { default_type, .. } => {
+                if let Some(&new_id) = mapping.get(&id) {
+                    if !self.visiting.insert(id) {
+                        return id;
+                    }
+
+                    let substituted = self.substitute(new_id, mapping);
+                    self.visiting.remove(&id);
+                    return substituted;
                 }
                 if self.apply_defaults
                     && let Some(default_ty) = default_type
@@ -180,10 +186,8 @@ impl<'a> TypeSubstitutor<'a> {
                             // For generic aliases represented as `GenericTypeWithTs(alias, [T1, T2, ...])`,
                             // map those original generic placeholders to instantiated `types`.
                             for (&param_ty, &actual_ty) in old_types.iter().zip(&types) {
-                                if let TyData::TypeParameter { name, .. } =
-                                    self.interner.data(param_ty)
-                                {
-                                    alias_mapping.insert(name.clone(), actual_ty);
+                                if let TyData::TypeParameter { .. } = self.interner.data(param_ty) {
+                                    alias_mapping.insert(param_ty, actual_ty);
                                 }
                             }
 
@@ -191,10 +195,10 @@ impl<'a> TypeSubstitutor<'a> {
                             if let Some(alias_type_params) = args {
                                 for (&param_ty, &actual_ty) in alias_type_params.iter().zip(&types)
                                 {
-                                    if let TyData::TypeParameter { name, .. } =
+                                    if let TyData::TypeParameter { .. } =
                                         self.interner.data(param_ty)
                                     {
-                                        alias_mapping.insert(name.clone(), actual_ty);
+                                        alias_mapping.insert(param_ty, actual_ty);
                                     }
                                 }
                             }
@@ -269,13 +273,10 @@ mod tests {
     fn test_substitute_basic() {
         let mut interner = TypeInterner::new();
         let t_int = interner.ty_int;
-        let t_param = interner.intern(TyData::TypeParameter {
-            name: "T".to_string(),
-            default_type: None,
-        });
+        let t_param = interner.type_parameter("T".to_owned(), None);
 
         let mut mapping = FxHashMap::default();
-        mapping.insert("T".to_string(), t_int);
+        mapping.insert(t_param, t_int);
 
         let mut substitutor = TypeSubstitutor::new(&mut interner);
         let result = substitutor.substitute(t_param, &mapping);
@@ -289,21 +290,15 @@ mod tests {
         let t_int = interner.ty_int;
         let t_bool = interner.ty_bool;
 
-        let t_param_t = interner.intern(TyData::TypeParameter {
-            name: "T".to_string(),
-            default_type: None,
-        });
-        let t_param_u = interner.intern(TyData::TypeParameter {
-            name: "U".to_string(),
-            default_type: None,
-        });
+        let t_param_t = interner.type_parameter("T".to_owned(), None);
+        let t_param_u = interner.type_parameter("U".to_owned(), None);
 
         // fun (T) -> U
         let t_func = interner.func(vec![t_param_t], t_param_u);
 
         let mut mapping = FxHashMap::default();
-        mapping.insert("T".to_string(), t_int);
-        mapping.insert("U".to_string(), t_bool);
+        mapping.insert(t_param_t, t_int);
+        mapping.insert(t_param_u, t_bool);
 
         let mut substitutor = TypeSubstitutor::new(&mut interner);
         let result = substitutor.substitute(t_func, &mapping);
@@ -329,22 +324,44 @@ mod tests {
     fn test_substitute_nested() {
         let mut interner = TypeInterner::new();
         let t_int = interner.ty_int;
-        let t_param = interner.intern(TyData::TypeParameter {
-            name: "T".to_string(),
-            default_type: None,
-        });
+        let t_param = interner.type_parameter("T".to_owned(), None);
 
         // [[T]]
         let t_inner_tuple = interner.tuple(vec![t_param]);
         let t_outer_tuple = interner.tuple(vec![t_inner_tuple]);
 
         let mut mapping = FxHashMap::default();
-        mapping.insert("T".to_string(), t_int);
+        mapping.insert(t_param, t_int);
 
         let mut substitutor = TypeSubstitutor::new(&mut interner);
         let result = substitutor.substitute(t_outer_tuple, &mapping);
 
         let formatter = TypeFormatter::new(&interner);
         assert_eq!(formatter.format(result), "[[int]]");
+    }
+
+    #[test]
+    fn follows_chained_substitutions() {
+        let mut interner = TypeInterner::new();
+        let t_int = interner.ty_int;
+        let t_param = interner.type_parameter("T".to_owned(), None);
+        let u_param = interner.type_parameter("U".to_owned(), None);
+        let mapping = FxHashMap::from_iter([(t_param, u_param), (u_param, t_int)]);
+
+        let result = TypeSubstitutor::new(&mut interner).substitute(t_param, &mapping);
+
+        assert_eq!(result, t_int);
+    }
+
+    #[test]
+    fn stops_at_cyclic_substitutions() {
+        let mut interner = TypeInterner::new();
+        let t_param = interner.type_parameter("T".to_owned(), None);
+        let u_param = interner.type_parameter("U".to_owned(), None);
+        let mapping = FxHashMap::from_iter([(t_param, u_param), (u_param, t_param)]);
+
+        let result = TypeSubstitutor::new(&mut interner).substitute(t_param, &mapping);
+
+        assert_eq!(result, t_param);
     }
 }
