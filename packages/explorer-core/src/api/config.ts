@@ -118,6 +118,64 @@ interface ConfigParameterMetadata {
 }
 
 const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata>> = {
+  // The collection code identifies itself as "TON Config Parameter Ownership":
+  // https://actonscan.com/tx/59ac226ac63ba4ecfcf4b9da1a02510fc787cc1f52fdfddb3a2b8f1bf54bbd77?network=testnet
+  // Its NFT for parameter 10000 created this slot through the Config contract:
+  // https://actonscan.com/tx/54507a083797977b25d761d9a80b0892a3d12f1f958b225dcbd64fba96d6d6f0?network=testnet
+  [-10000]: {
+    title: "NFT-owned test slot",
+    description: "Test configuration slot controlled by a TON Config Parameter Ownership NFT",
+  },
+  // The current value was proposed as part of a live governance test on testnet:
+  // https://actonscan.com/tx/94541e28b2099038c06f23da9ab6fb8cefe6687d1e42bfdda083c1f726f99fda?network=testnet
+  [-1337]: {
+    title: "Governance test slot",
+    description: "Testnet scratch slot used to exercise configuration proposal and voting behavior",
+  },
+  // Created as one batch of independent testnet governance proposals:
+  // https://actonscan.com/tx/24b6a0d289f8acb6e86b69269916e164dd6d993c07917571cf7ee4cde193d3d7?network=testnet
+  // Their values copy the ConfigParam 16 layout while varying max_validators from 31 to 38:
+  // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/block/block.tlb#L700-L704
+  [-1306]: {
+    title: "Validator proposal test 31",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 31",
+  },
+  [-1305]: {
+    title: "Validator proposal test 32",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 32",
+  },
+  [-1304]: {
+    title: "Validator proposal test 33",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 33",
+  },
+  [-1303]: {
+    title: "Validator proposal test 34",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 34",
+  },
+  [-1302]: {
+    title: "Validator proposal test 35",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 35",
+  },
+  [-1301]: {
+    title: "Validator proposal test 36",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 36",
+  },
+  [-1300]: {
+    title: "Validator proposal test 37",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 37",
+  },
+  [-1299]: {
+    title: "Validator proposal test 38",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 38",
+  },
   // https://github.com/ton-blockchain/config-with-ownable-params/blob/4d942616389a7327f8ee40b3664b1b08a457a340/config-code.fc#L9-L10
   [-1025]: {
     title: "Custom config slot 2",
@@ -148,6 +206,29 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "Set config key",
     description: "Sets the master public key used to authorize configuration contract actions",
   },
+  // Installs currency ID 100 and the faucet contract address:
+  // https://actonscan.com/tx/4ca7d1700b1a36d5ffe94cfbe42fae219d8ed83475cca4c5c470879b46ac72c6?network=testnet
+  // Deploys the configured contract, which is subsequently funded with ECHIDNA and dispenses it:
+  // https://actonscan.com/tx/632ac6146ac1fa3a207d92d77075ca55b19775f3098676f5c3219460a1791b20?network=testnet
+  [-236]: {
+    title: "ECHIDNA faucet",
+    description: "Configures the testnet faucet contract for ECHIDNA extra currency",
+  },
+  // Set to 0xffffffff, then 1, and finally 0 through direct signed configuration updates:
+  // https://actonscan.com/tx/2f4ee3e8ccd5a8408b76c18e126c740adad4246a175885e6114d41811d4bbb69?network=testnet
+  // https://actonscan.com/tx/f9c1fac16a8fbece8e1aaac502cfa454d8ec6c055ceee3a5efce6b78db8185c9?network=testnet
+  // https://actonscan.com/tx/000be59ef8c5b2d1f6f76b977571626adabe44d64411c3294c851dc4fb367e3c?network=testnet
+  [-137]: {
+    title: "Direct config update test",
+    description: "Testnet scratch slot used to exercise signed configuration updates",
+  },
+  // Created through testnet governance voting:
+  // https://actonscan.com/tx/6c675b35b70653a497580add73f12dd67d72d88063982c62193d11d0fe8485e2?network=testnet
+  [-133]: {
+    title: "Governance test slot",
+    description:
+      "Testnet scratch slot containing a ConfigParam 16-shaped value with max validators set to zero",
+  },
   // https://t.me/tonstatus/175
   // https://actonscan.com/tx/2d5738520c63a6aeddc8d7ff7f52a19c70b11b9ecbca81acc1408488262358c2?network=mainnet
   // https://actonscan.com/tx/0ef291123b4ffc82db9b1eea82f675389151d676084a9885df42d2e7bd3ac2fe?network=testnet
@@ -166,6 +247,11 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "Legacy Ethereum jetton bridge",
     description: "Legacy configuration slot used as a fallback by Ethereum jetton bridge contracts",
   },
+  // https://github.com/ton-blockchain/ton/blob/6b49d6a382e30cf7f248a93d448726145c052300/crypto/func/auto-tests/legacy_tests/bsc-bridge-collector/bridge-config.fc#L1-L12
+  [-72]: {
+    title: "Legacy Binance Smart Chain bridge",
+    description: "Legacy configuration slot used as a fallback by BSC bridge contracts",
+  },
   // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/func/auto-tests/legacy_tests/eth-bridge-multisig/multisig-code.fc#L5-L10
   [-71]: {
     title: "Legacy Ethereum bridge",
@@ -175,6 +261,18 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
   [-41]: {
     title: "Legacy collator configuration",
     description: "Legacy full-collated-data flag and list of configured collator nodes",
+  },
+  // https://github.com/ton-blockchain/ton/blob/b978e27b2f2ca6e4403843b9d6bf3f407bf63499/crypto/smartcont/restricted-wallet-code.fc#L1-L10
+  [-13]: {
+    title: "Restricted wallet start time",
+    description: "Default activation timestamp used by legacy restricted wallet contracts",
+  },
+  // Installs the address of the collection deployed in the transaction linked above:
+  // https://actonscan.com/tx/52a0273685e28eba6511a9b5dcc1b62ae80f46ebaf7413ccb1b88043b7b892b9?network=testnet
+  [-1]: {
+    title: "Config ownership collection",
+    description:
+      "Address of the testnet NFT collection representing ownership of configuration slots",
   },
   0: {
     title: "Config address",
