@@ -5357,6 +5357,7 @@ name = "tolk-ty"
 version = "1.1.0"
 dependencies = [
  "dunce",
+ "expect-test",
  "log",
  "rustc-hash 2.1.1",
  "smol_str",

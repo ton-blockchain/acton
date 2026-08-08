@@ -275,7 +275,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
             let param_id = self.local_id_of(param_name_node.span());
             let param_ty = self
                 .intrn()
-                .scoped_type_parameter(param_id, param_name, default_ty);
+                .declare_scoped_type_parameter(param_id, param_name, default_ty);
 
             self.ctx.set_node_type(&param, param_ty);
             self.ctx.set_node_type(&param_name_node, param_ty);
