@@ -13,6 +13,49 @@ const ALT_PATH: &str = "/workspace/alt.tolk";
 const WORKSPACE_COMMON_PATH: &str = "/workspace/support/common.tolk";
 
 #[test]
+fn provider_refreshes_sources_already_cached_in_the_file_database() {
+    let mut fixture = Fixture::new();
+    let first = fixture.project();
+    let first_file_id = file_id(&first, LIB_PATH);
+
+    fixture.provider.files.insert(
+        PathBuf::from(LIB_PATH),
+        Arc::from("fun renamed(): int { return 2; }"),
+    );
+    let second = fixture.project();
+    let second_file_id = file_id(&second, LIB_PATH);
+    let first_declarations = first.files()[&first_file_id]
+        .decls
+        .iter()
+        .map(|symbol| symbol.name.as_ref())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let second_declarations = second.files()[&second_file_id]
+        .decls
+        .iter()
+        .map(|symbol| symbol.name.as_ref())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let cached_source = fixture
+        .file_db
+        .get_by_path(Path::new(LIB_PATH))
+        .expect("provider source must be cached")
+        .source()
+        .source
+        .clone();
+
+    expect![[r"
+        file id preserved: true
+        first declarations: helper
+        second declarations: renamed
+        cached source: fun renamed(): int { return 2; }"]]
+    .assert_eq(&format!(
+        "file id preserved: {}\nfirst declarations: {first_declarations}\nsecond declarations: {second_declarations}\ncached source: {cached_source}",
+        first_file_id == second_file_id,
+    ));
+}
+
+#[test]
 fn body_edit_reuses_every_other_file() {
     let mut fixture = Fixture::new();
     let first = fixture.resolved_project();
