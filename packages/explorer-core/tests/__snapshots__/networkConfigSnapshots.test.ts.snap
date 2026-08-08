@@ -6174,14 +6174,14 @@ exports[`real network configuration snapshots parses mainnet config at mastercha
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -1000,
-      "title": "Update config code",
+      "title": "Config code upgrade",
     },
     {
       "description": "Sets the master public key used to authorize configuration contract actions",
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -999,
-      "title": "Set config key",
+      "title": "Config key",
     },
     {
       "description": "Configures validator participation in governance for the BTC Teleport bridge",
@@ -7898,14 +7898,14 @@ exports[`real network configuration snapshots parses testnet config at mastercha
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -1000,
-      "title": "Update config code",
+      "title": "Config code upgrade",
     },
     {
       "description": "Sets the master public key used to authorize configuration contract actions",
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -999,
-      "title": "Set config key",
+      "title": "Config key",
     },
     {
       "description": "Configures the testnet faucet contract for ECHIDNA extra currency",

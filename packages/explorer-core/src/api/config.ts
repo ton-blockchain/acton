@@ -195,15 +195,15 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     description: "Disables signed external votes for configuration proposals when present",
   },
   [-1001]: {
-    title: "Update elector code",
+    title: "Elector code upgrade",
     description: "Contains code used to upgrade the Elector smart contract",
   },
   [-1000]: {
-    title: "Update config code",
+    title: "Config code upgrade",
     description: "Contains code used to upgrade the configuration smart contract",
   },
   [-999]: {
-    title: "Set config key",
+    title: "Config key",
     description: "Sets the master public key used to authorize configuration contract actions",
   },
   // Installs currency ID 100 and the faucet contract address:
