@@ -1,6 +1,6 @@
 [package]
 name = "zed-ton"
-version = "0.0.2"
+version = "0.1.0"
 edition = "2021"
 publish = false
 license = "MIT"
@@ -10,6 +10,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+semver = "1.0"
 zed_extension_api = "0.7.0"
 
 [workspace]

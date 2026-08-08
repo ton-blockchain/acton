@@ -1,0 +1,42 @@
+[
+  {
+    "token_type": "struct",
+    "style": ["type.struct", "type"]
+  },
+  {
+    "token_type": "enum",
+    "style": ["type.enum", "type"]
+  },
+  {
+    "token_type": "enumMember",
+    "style": ["type.enum.member", "constant"]
+  },
+  {
+    "token_type": "type",
+    "style": ["type"]
+  },
+  {
+    "token_type": "function",
+    "style": ["function"]
+  },
+  {
+    "token_type": "macro",
+    "style": ["function.macro", "function"]
+  },
+  {
+    "token_type": "parameter",
+    "style": ["variable.parameter"]
+  },
+  {
+    "token_type": "variable",
+    "style": ["variable"]
+  },
+  {
+    "token_type": "property",
+    "style": ["property"]
+  },
+  {
+    "token_type": "keyword",
+    "style": ["keyword"]
+  }
+]

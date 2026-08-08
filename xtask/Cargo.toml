@@ -33,4 +33,9 @@ indicatif = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
 tolk-linter = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-fift = { workspace = true }
+tree-sitter-tasm = { workspace = true }
+tree-sitter-tlb = { workspace = true }
+tree-sitter-tolk = { workspace = true }
 parse-changelog = { version = "0.6.15", default-features = false }

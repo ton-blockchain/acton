@@ -5,23 +5,33 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use clap::Args;
 
-const QUERY_DIRECTORIES: &[(&str, &str)] = &[
-    (
-        "crates/tree-sitter-tolk/queries",
-        "apps/zed-ton/languages/tolk",
-    ),
-    (
-        "crates/tree-sitter-tlb/queries",
-        "apps/zed-ton/languages/tlb",
-    ),
-    (
-        "crates/tree-sitter-tasm/queries",
-        "apps/zed-ton/languages/tasm",
-    ),
-    (
-        "crates/tree-sitter-fift/queries",
-        "apps/zed-ton/languages/fift",
-    ),
+struct QueryDirectory {
+    source: &'static str,
+    destination: &'static str,
+    language: fn() -> tree_sitter::Language,
+}
+
+const QUERY_DIRECTORIES: &[QueryDirectory] = &[
+    QueryDirectory {
+        source: "crates/tree-sitter-tolk/queries",
+        destination: "apps/zed-ton/languages/tolk",
+        language: || tree_sitter_tolk::LANGUAGE.into(),
+    },
+    QueryDirectory {
+        source: "crates/tree-sitter-tlb/queries",
+        destination: "apps/zed-ton/languages/tlb",
+        language: || tree_sitter_tlb::LANGUAGE.into(),
+    },
+    QueryDirectory {
+        source: "crates/tree-sitter-tasm/queries",
+        destination: "apps/zed-ton/languages/tasm",
+        language: || tree_sitter_tasm::LANGUAGE.into(),
+    },
+    QueryDirectory {
+        source: "crates/tree-sitter-fift/queries",
+        destination: "apps/zed-ton/languages/fift",
+        language: || tree_sitter_fift::LANGUAGE.into(),
+    },
 ];
 
 #[derive(Args)]
@@ -36,10 +46,11 @@ pub(crate) fn run(args: SyncZedQueriesArgs) -> Result<()> {
         .parent()
         .context("xtask manifest directory has no parent")?;
 
-    for &(source, destination) in QUERY_DIRECTORIES {
+    for directory in QUERY_DIRECTORIES {
         sync_directory(
-            &workspace_root.join(source),
-            &workspace_root.join(destination),
+            &workspace_root.join(directory.source),
+            &workspace_root.join(directory.destination),
+            (directory.language)(),
             args.check,
         )?;
     }
@@ -53,11 +64,17 @@ pub(crate) fn run(args: SyncZedQueriesArgs) -> Result<()> {
     Ok(())
 }
 
-fn sync_directory(source: &Path, destination: &Path, check: bool) -> Result<()> {
+fn sync_directory(
+    source: &Path,
+    destination: &Path,
+    language: tree_sitter::Language,
+    check: bool,
+) -> Result<()> {
     let source_queries = read_queries(source)?;
     if source_queries.is_empty() {
         bail!("no query files found in `{}`", source.display());
     }
+    validate_queries(source, &source_queries, &language)?;
 
     if check {
         let destination_queries = read_queries(destination)?;
@@ -92,7 +109,7 @@ fn sync_directory(source: &Path, destination: &Path, check: bool) -> Result<()> 
 
     for (name, content) in source_queries {
         let path = destination.join(name);
-        if fs::read(&path).ok().as_deref() == Some(content.as_slice()) {
+        if fs::read_to_string(&path).ok().as_deref() == Some(content.as_str()) {
             continue;
         }
         fs::write(&path, content)
@@ -102,7 +119,7 @@ fn sync_directory(source: &Path, destination: &Path, check: bool) -> Result<()> 
     Ok(())
 }
 
-fn read_queries(directory: &Path) -> Result<BTreeMap<String, Vec<u8>>> {
+fn read_queries(directory: &Path) -> Result<BTreeMap<String, String>> {
     let mut queries = BTreeMap::new();
     for entry in fs::read_dir(directory)
         .with_context(|| format!("failed to read `{}`", directory.display()))?
@@ -116,11 +133,27 @@ fn read_queries(directory: &Path) -> Result<BTreeMap<String, Vec<u8>>> {
             .context("query path has no file name")?
             .to_string_lossy()
             .into_owned();
-        let content =
-            fs::read(&path).with_context(|| format!("failed to read `{}`", path.display()))?;
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read `{}` as UTF-8", path.display()))?;
         queries.insert(name, content);
     }
     Ok(queries)
+}
+
+fn validate_queries(
+    directory: &Path,
+    queries: &BTreeMap<String, String>,
+    language: &tree_sitter::Language,
+) -> Result<()> {
+    for (name, source) in queries {
+        tree_sitter::Query::new(language, source).with_context(|| {
+            format!(
+                "invalid Tree-sitter query `{}`",
+                directory.join(name).display()
+            )
+        })?;
+    }
+    Ok(())
 }
 
 fn is_query_file(path: &Path) -> bool {

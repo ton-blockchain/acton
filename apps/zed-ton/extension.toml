@@ -1,8 +1,8 @@
 id = "ton"
 name = "TON"
-version = "0.0.2"
+version = "0.1.0"
 schema_version = 1
-description = "TON development support for Zed"
+description = "First-class TON development for Zed: Tolk, TL-B, TASM, Fift, Acton and ton-ls"
 repository = "https://github.com/ton-blockchain/acton"
 authors = ["TON Core"]
 themes = []

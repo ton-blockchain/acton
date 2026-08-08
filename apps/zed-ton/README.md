@@ -1,66 +1,95 @@
-# TON Zed Extension
+# TON for Zed
 
-Zed extension for TON development with syntax highlighting and `ton-ls`
-(via `acton ls --stdio`).
+This extension adds TON language support to Zed. It uses the Acton language server, `acton ls`.
 
-Supported languages:
+## Features
 
-- Tolk (`.tolk`)
-- TL-B (`.tlb`)
-- TASM (`.tasm`)
-- Fift (`.fif`, `.fift`)
-- Acton project configuration (`Acton.toml`, using Zed's built-in TOML grammar)
+- Tolk syntax highlighting and semantic tokens
+- Tolk completion, hover information, diagnostics, navigation, references, rename, formatting, and inlay hints
+- `Acton.toml` completion, hover information, validation, and path navigation
+- Syntax highlighting for TL-B, TASM, and Fift
+- Document outlines, bracket matching, indentation, and Vim text objects
+- Run buttons for Tolk scripts and tests
+- Acton tasks for scripts, tests, checks, and formatting
 
-## What is included
+The extension supports these files:
 
-- language definitions and Git-ignored generated query copies under `languages/`
-- Rust extension shim (`src/lib.rs`) that starts LSP server
+- Tolk: `.tolk`
+- TL-B: `.tlb`
+- TASM: `.tasm`
+- Fift: `.fif` and `.fift`
+- Acton project files: `Acton.toml`
 
-Grammar sources are located in the Acton repository:
+## Install the extension
 
-- `crates/tree-sitter-tolk`
-- `crates/tree-sitter-tlb`
-- `crates/tree-sitter-tasm`
-- `crates/tree-sitter-fift`
+Install `TON` from the Zed extension page.
 
-They are referenced as monorepo subdirectories through the `path` entries in
-`extension.toml`. Zed builds the grammar WASM files from these sources.
+For a development build, use these steps:
 
-The canonical Tree-sitter queries live beside each grammar under
-`crates/tree-sitter-*/queries/`. Zed requires query files inside the extension,
-so `apps/zed-ton/languages/*/*.scm` are generated copies. Do not edit those
-copies directly or add them to Git.
+1. Install the WASI target.
 
-Generate the extension copies after checkout and after every canonical query
-change:
+   ```bash
+   rustup target add wasm32-wasip2
+   ```
+
+2. Open the Zed extension page.
+3. Select **Install Dev Extension**.
+4. Select the `apps/zed-ton` directory.
+
+## Language server
+
+The extension selects `acton` in this order:
+
+1. The path in the Zed settings
+2. An `acton` executable in the worktree `PATH`
+3. A managed Acton release for macOS or Linux
+
+The managed installation supports Apple Silicon, macOS x86-64, Linux AArch64, and Linux x86-64.
+
+Acton does not publish a Windows binary or a 32-bit binary. On these platforms, install Acton and set its path.
+
+Use this Zed setting for a custom installation:
+
+```json
+{
+  "lsp": {
+    "ton-ls": {
+      "binary": {
+        "path": "/absolute/path/to/acton",
+        "arguments": ["ls", "--stdio"],
+        "env": {
+          "RUST_LOG": "info"
+        }
+      },
+      "initialization_options": {},
+      "settings": {}
+    }
+  }
+}
+```
+
+The `arguments` value replaces the default value. Keep `ls` and `--stdio` unless a compatible server command needs different arguments.
+
+The run buttons and tasks use `acton` from the terminal `PATH`. Add `acton` to that `PATH` before you use them.
+
+## Development
+
+The canonical Tree-sitter queries are in each `crates/tree-sitter-*/queries` directory.
+
+Zed requires query files in the extension directory. The repository stores synchronized copies in `apps/zed-ton/languages` for release packaging.
+
+Do not change a synchronized copy directly. Change the canonical query, and then run this command:
 
 ```bash
 cargo xtask sync-zed-queries
 ```
 
-To verify existing local copies without modifying files:
+Run the extension checks before a release:
 
 ```bash
-cargo xtask sync-zed-queries --check
+just check-zed-extension
 ```
 
-## Local usage in Zed
+This command checks query syntax and synchronization. It also runs Rust tests, Clippy, and the WASM release build.
 
-Install the WASI target used by Zed to build Rust extensions:
-
-```bash
-rustup target add wasm32-wasip2
-```
-
-1. Run `cargo xtask sync-zed-queries` from the repository root.
-2. Open Zed extensions panel.
-3. Install this folder as a dev extension (`apps/zed-ton`).
-4. Ensure LSP binary is available:
-   - preferred: `acton` in `PATH`
-   - fallback: workspace-local `cargo run --bin acton -- ls --stdio`
-
-If you update a grammar, review:
-
-- the pinned grammar commit in `extension.toml`
-- the corresponding canonical queries under `crates/tree-sitter-*/queries/`
-- the regenerated extension copies with `cargo xtask sync-zed-queries`
+If you change a grammar, update the pinned commit in `extension.toml`. Then synchronize the queries and run the extension checks.
