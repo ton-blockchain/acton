@@ -49,7 +49,8 @@
         "noContinue": "off",
         "noExcessiveLinesPerFile": "off",
         "noMagicNumbers": "off",
-        "noTernary": "off"
+        "noTernary": "off",
+        "useExportsLast": "off"
       }
     }
   }

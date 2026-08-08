@@ -22,18 +22,36 @@ impl DocumentUri {
     ///
     /// `file://` URIs use their file path, while other URI schemes use the
     /// portion after `://`. Values without a scheme are treated as paths. The
-    /// result is rooted at `/` and `.`/`..` components are resolved lexically;
-    /// this method does not access the filesystem or percent-decode the URI.
+    /// result is rooted at `/` and `.`/`..` components are resolved lexically.
+    /// File URI paths are percent-decoded without accessing the filesystem.
     #[must_use]
     pub fn logical_path(&self) -> PathBuf {
-        let path = if let Some(file_path) = self.0.strip_prefix("file://") {
-            PathBuf::from(format!("/{}", file_path.trim_start_matches('/')))
+        let path = if self.0.starts_with("file://") {
+            file_uri_path(&self.0).unwrap_or_else(|| {
+                let file_path = self.0.trim_start_matches("file://");
+                PathBuf::from(format!("/{}", file_path.trim_start_matches('/')))
+            })
         } else if let Some((_, rest)) = self.0.split_once("://") {
             PathBuf::from(format!("/{}", rest.trim_start_matches('/')))
         } else {
             PathBuf::from(self.0.as_ref())
         };
         normalize_logical_path(&path)
+    }
+}
+
+fn file_uri_path(uri: &str) -> Option<PathBuf> {
+    let mut uri = url::Url::parse(uri).ok()?;
+    let authority = uri.host_str().map(str::to_owned);
+    uri.set_host(None).ok()?;
+    let path = uri.to_file_path().ok()?;
+
+    if let Some(authority) = authority {
+        path.strip_prefix("/")
+            .ok()
+            .map(|path| Path::new("/").join(authority).join(path))
+    } else {
+        Some(path)
     }
 }
 

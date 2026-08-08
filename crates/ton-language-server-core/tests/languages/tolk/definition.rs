@@ -1,6 +1,6 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-#[path = "../../support/mod.rs"]
+#[path = "../../support.rs"]
 mod support;
 #[path = "definition/upstream.rs"]
 mod upstream;
@@ -196,6 +196,28 @@ fn accepts_file_uri_with_authority() {
         |_| {},
         expect![[r"
             1:25 -> file://fixture/main.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_imports_whose_file_uri_contains_encoded_path_bytes() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            import "my lib"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///fixture/my%20lib.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("encoded provider file should be added");
+        },
+        expect![[r"
+            1:25 -> file:///fixture/my%20lib.tolk 0:4 resolved"]],
     );
 }
 

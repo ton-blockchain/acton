@@ -1,4 +1,4 @@
-#[path = "../../support/mod.rs"]
+#[path = "../../support.rs"]
 mod support;
 
 use expect_test::{Expect, expect};

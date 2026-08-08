@@ -15,6 +15,7 @@ const DEBUG_READY_TIMEOUT_MS = 120_000
 const LEGACY_DAP_ENV = "ACTON_DEBUG_DAP_USE_LEGACY_VALUE"
 
 interface StartActonDebuggingOptions {
+  readonly cancellationToken?: vscode.CancellationToken
   readonly connectionMode?: "hostPort" | "debugServer"
   readonly createCommand: (port: number) => ActonCommand
   readonly debugType?: string
@@ -26,6 +27,10 @@ interface StartActonDebuggingOptions {
 }
 
 export async function startActonDebugging(options: StartActonDebuggingOptions): Promise<void> {
+  if (options.cancellationToken?.isCancellationRequested) {
+    return
+  }
+
   const port = await getFreeActonPort(DEBUG_HOST)
   const command = options.createCommand(port)
   const debugType = options.debugType ?? "acton"
@@ -87,6 +92,13 @@ export async function startActonDebugging(options: StartActonDebuggingOptions): 
     resolveTermination = resolve
   })
 
+  let cancellationSubscription: vscode.Disposable | undefined
+  const disposeSessionSubscriptions = (): void => {
+    startSubscription.dispose()
+    terminateSubscription.dispose()
+    cancellationSubscription?.dispose()
+  }
+
   const startSubscription = vscode.debug.onDidStartDebugSession(session => {
     if (isOwnedDebugSession(session, debugConfiguration, port)) {
       activeDebugSession = session
@@ -95,14 +107,29 @@ export async function startActonDebugging(options: StartActonDebuggingOptions): 
 
   const terminateSubscription = vscode.debug.onDidTerminateDebugSession(session => {
     if (isOwnedDebugSession(session, debugConfiguration, port)) {
-      startSubscription.dispose()
-      terminateSubscription.dispose()
+      disposeSessionSubscriptions()
       activeDebugSession = undefined
       hasDebugSessionTerminated = true
       stopProcess(actonProcess)
       resolveTermination?.()
     }
   })
+
+  const cancelDebugging = (): void => {
+    const session = activeDebugSession
+    disposeSessionSubscriptions()
+    activeDebugSession = undefined
+    stopProcess(actonProcess)
+    resolveTermination?.()
+    if (session && !hasDebugSessionTerminated) {
+      void vscode.debug.stopDebugging(session)
+    }
+  }
+  cancellationSubscription = options.cancellationToken?.onCancellationRequested(cancelDebugging)
+  if (options.cancellationToken?.isCancellationRequested) {
+    cancelDebugging()
+    return
+  }
 
   let success = false
   try {
@@ -113,16 +140,14 @@ export async function startActonDebugging(options: StartActonDebuggingOptions): 
     )
     success = await vscode.debug.startDebugging(options.workspaceFolder, debugConfiguration)
   } catch (error) {
-    startSubscription.dispose()
-    terminateSubscription.dispose()
+    disposeSessionSubscriptions()
     stopProcess(actonProcess)
     terminal.show(true)
     throw error
   }
 
   if (!success) {
-    startSubscription.dispose()
-    terminateSubscription.dispose()
+    disposeSessionSubscriptions()
     stopProcess(actonProcess)
     terminal.show(true)
     throw new Error("Failed to start the Acton debug session.")

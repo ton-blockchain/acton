@@ -3,7 +3,7 @@
 #[path = "../../support/snapshots.rs"]
 mod snapshots;
 
-#[path = "../../support/mod.rs"]
+#[path = "../../support.rs"]
 mod support;
 #[path = "inlay_hints/upstream.rs"]
 mod upstream;

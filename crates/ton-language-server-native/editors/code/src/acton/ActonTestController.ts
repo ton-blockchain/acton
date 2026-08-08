@@ -494,11 +494,12 @@ export class ActonTestController implements vscode.Disposable {
           this.createDirectoryDebugCommand(path.relative(workingDir, single.uri.fsPath)),
           `Debug ${path.basename(single.uri.fsPath)}`,
           vscode.workspace.getWorkspaceFolder(single.uri),
+          token,
         )
         return
       }
 
-      await this.debugTestItem(single, workingDir)
+      await this.debugTestItem(single, workingDir, token)
       return
     }
 
@@ -520,10 +521,15 @@ export class ActonTestController implements vscode.Disposable {
       this.createDirectoryDebugCommand(commandTarget, filterPattern),
       this.createDirectoryDebugSessionName(workingDir, commandTarget),
       workspaceFolder,
+      token,
     )
   }
 
-  private async debugTestItem(item: vscode.TestItem, workingDir: string): Promise<void> {
+  private async debugTestItem(
+    item: vscode.TestItem,
+    workingDir: string,
+    token?: vscode.CancellationToken,
+  ): Promise<void> {
     const uri = item.uri
     if (!uri) {
       return
@@ -549,6 +555,7 @@ export class ActonTestController implements vscode.Disposable {
       item.children.size > 0 ? command : this.withExactTestFilter(command, item.label),
       `Debug ${item.label}`,
       vscode.workspace.getWorkspaceFolder(uri),
+      token,
     )
   }
 
@@ -583,8 +590,10 @@ export class ActonTestController implements vscode.Disposable {
     command: TestCommand,
     sessionName: string,
     workspaceFolder: vscode.WorkspaceFolder | undefined,
+    cancellationToken?: vscode.CancellationToken,
   ): Promise<void> {
     await startActonDebugging({
+      cancellationToken,
       createCommand: port => {
         command.debug = true
         command.debugPort = String(port)

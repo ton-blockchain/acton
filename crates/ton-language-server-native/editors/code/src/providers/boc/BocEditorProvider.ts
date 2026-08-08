@@ -27,6 +27,15 @@ export class BocEditorProvider implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken,
   ): Promise<void> {
+    const openDecompiled = vscode.workspace
+      .getConfiguration("ton", document.uri)
+      .get<boolean>("boc.openDecompiledOnOpen", true)
+    if (!openDecompiled) {
+      webviewPanel.dispose()
+      await vscode.commands.executeCommand("vscode.openWith", document.uri, "default")
+      return
+    }
+
     const decompileUri = document.uri.with({
       scheme: BocDecompilerProvider.scheme,
       path: document.uri.path + ".decompiled.tasm",

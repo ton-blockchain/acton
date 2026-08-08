@@ -70,11 +70,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   configureDebugging(context)
 
+  context.subscriptions.push(BocEditorProvider.register())
+
   const config = vscode.workspace.getConfiguration("ton")
   const openDecompiled = config.get<boolean>("boc.openDecompiledOnOpen")
   if (openDecompiled) {
-    BocEditorProvider.register()
-
     const bocFsProvider = new BocFileSystemProvider()
     context.subscriptions.push(
       vscode.workspace.registerFileSystemProvider("boc", bocFsProvider, {

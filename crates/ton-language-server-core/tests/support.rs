@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt::Write as _;
 use ton_language_server_core::{
     CompletionItem, InlayHint, InlayHintKind, Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES,

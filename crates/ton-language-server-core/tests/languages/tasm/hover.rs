@@ -1,5 +1,4 @@
-#[path = "../../support/mod.rs"]
-#[allow(dead_code)]
+#[path = "../../support.rs"]
 mod support;
 
 use expect_test::{Expect, expect};

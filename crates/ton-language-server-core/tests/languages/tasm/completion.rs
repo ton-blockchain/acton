@@ -1,6 +1,6 @@
 #[path = "../../support/snapshots.rs"]
 mod snapshots;
-#[path = "../../support/mod.rs"]
+#[path = "../../support.rs"]
 mod support;
 
 use snapshots::assert_file_snapshot;

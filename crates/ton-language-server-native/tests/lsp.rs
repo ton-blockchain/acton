@@ -303,6 +303,187 @@ async fn rename_keeps_open_document_changes_addressable() -> anyhow::Result<()> 
 }
 
 #[tokio::test]
+async fn nested_manifest_does_not_replace_workspace_configuration() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    let root_manifest = concat!(
+        "[package]\n",
+        "name = \"fixture\"\n",
+        "version = \"0.1.0\"\n\n",
+        "[import-mappings]\n",
+        "lib = \"./root-lib\"\n",
+    );
+    let nested_manifest = concat!(
+        "[package]\n",
+        "name = \"nested\"\n",
+        "version = \"0.1.0\"\n\n",
+        "[import-mappings]\n",
+        "lib = \"./shadow-lib\"\n",
+    );
+    fs::create_dir_all(workspace.path().join("root-lib"))?;
+    fs::create_dir_all(workspace.path().join("shadow-lib"))?;
+    fs::create_dir_all(workspace.path().join("nested"))?;
+    fs::write(workspace.path().join("Acton.toml"), root_manifest)?;
+    fs::write(
+        workspace.path().join("root-lib/helper.tolk"),
+        "fun helper(): int { return 1; }\n",
+    )?;
+    fs::write(
+        workspace.path().join("shadow-lib/helper.tolk"),
+        "fun helper(): int { return 2; }\n",
+    )?;
+    let nested_manifest_path = workspace.path().join("nested/Acton.toml");
+    fs::write(&nested_manifest_path, nested_manifest)?;
+    let main_source = "import \"@lib/helper\"\nfun main(): int { return helper(); }\n";
+    let main_path = workspace.path().join("main.tolk");
+    fs::write(&main_path, main_source)?;
+
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let main_uri = Url::from_file_path(&main_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let nested_manifest_uri = Url::from_file_path(&nested_manifest_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert nested manifest path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": main_source,
+                }
+            }),
+        )
+        .await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": nested_manifest_uri,
+                    "languageId": "toml",
+                    "version": 1,
+                    "text": nested_manifest,
+                }
+            }),
+        )
+        .await?;
+    client
+        .notify(
+            "textDocument/didChange",
+            json!({
+                "textDocument": {"uri": nested_manifest_uri, "version": 2},
+                "contentChanges": [{"text": nested_manifest}],
+            }),
+        )
+        .await?;
+    client
+        .notify(
+            "textDocument/didSave",
+            json!({"textDocument": {"uri": nested_manifest_uri}, "text": nested_manifest}),
+        )
+        .await?;
+    client
+        .notify(
+            "workspace/didChangeWatchedFiles",
+            json!({"changes": [{"uri": nested_manifest_uri, "type": 2}]}),
+        )
+        .await?;
+
+    let definition = client
+        .request(
+            "textDocument/definition",
+            text_document_position(&main_uri, 1, 27),
+        )
+        .await?;
+    let actual = normalized_definition_uri(&definition, root_uri.as_str().trim_end_matches('/'));
+    expect!["$ROOT/root-lib/helper.tolk"].assert_eq(&actual);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
+async fn untitled_documents_use_their_declared_language_settings() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let untitled_uri = Url::parse("untitled:Untitled-1")?;
+    let source = "const COMPUTED = 1 + 2\n";
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": untitled_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": source,
+                }
+            }),
+        )
+        .await?;
+
+    let range = json!({
+        "textDocument": {"uri": untitled_uri},
+        "range": {
+            "start": {"line": 0, "character": 0},
+            "end": {"line": 1, "character": 0},
+        },
+    });
+    let before = client
+        .request("textDocument/inlayHint", range.clone())
+        .await?;
+    client
+        .notify(
+            "workspace/didChangeConfiguration",
+            json!({"settings": {"ton": {"tolk": {"hints": {"disable": true}}}}}),
+        )
+        .await?;
+    let after = client.request("textDocument/inlayHint", range).await?;
+
+    let actual = json!({
+        "before": before
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|hint| hint["label"].clone())
+            .collect::<Vec<_>>(),
+        "after": after,
+    });
+    expect![[r#"
+        {
+          "after": [],
+          "before": [
+            ": int",
+            " /* = 3 (0x3) */"
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn initialize_uses_cli_root_when_the_client_omits_its_root() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;

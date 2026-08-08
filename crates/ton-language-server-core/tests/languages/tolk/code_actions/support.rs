@@ -1,4 +1,4 @@
-#[path = "../../../support/mod.rs"]
+#[path = "../../../support.rs"]
 mod common;
 
 pub(super) use common::MarkedSource;

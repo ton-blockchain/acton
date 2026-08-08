@@ -1,6 +1,6 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-#[path = "../../support/mod.rs"]
+#[path = "../../support.rs"]
 mod support;
 #[path = "references/upstream.rs"]
 mod upstream;

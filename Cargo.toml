@@ -191,7 +191,6 @@ codespan-reporting = "0.11.1"
 
 # acton ls
 tower-lsp = "0.20"
-lsp-types = "0.94.1"
 tree-sitter-language = "0.1.7"
 
 # other

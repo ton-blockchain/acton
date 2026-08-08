@@ -476,6 +476,27 @@ impl NativeLanguageServer {
             .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))
     }
 
+    fn document_language_id(&self, uri: &lsp::Url) -> anyhow::Result<Option<LanguageId>> {
+        let documents = self
+            .documents
+            .lock()
+            .map_err(|_| anyhow::anyhow!("document map lock poisoned"))?;
+        if let Some(OpenDocument {
+            kind: OpenDocumentKind::Language { language_id, .. },
+            ..
+        }) = documents.get(uri.as_str())
+        {
+            return Ok(Some(language_id.clone()));
+        }
+        drop(documents);
+
+        Ok(language_id_for_document("", uri))
+    }
+
+    fn is_workspace_manifest_uri(&self, uri: &lsp::Url) -> anyhow::Result<bool> {
+        Ok(uri.to_core().logical_path() == self.workspace()?.manifest_uri.logical_path())
+    }
+
     fn update_settings(&self, value: Value) -> anyhow::Result<()> {
         let value = value.get("ton").cloned().unwrap_or(value);
         let settings = serde_json::from_value::<NativeSettings>(value)?;
@@ -742,7 +763,13 @@ impl LanguageServer for NativeLanguageServer {
     async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
         let item = params.text_document;
         let uri = item.uri;
-        let updates_workspace_config = is_acton_manifest_uri(&uri);
+        let updates_workspace_config = match self.is_workspace_manifest_uri(&uri) {
+            Ok(updates_workspace_config) => updates_workspace_config,
+            Err(error) => {
+                self.report_error("workspace.config.open", error).await;
+                false
+            }
+        };
         if updates_workspace_config
             && let Err(error) = self.apply_workspace_config_text(item.text.clone())
         {
@@ -821,7 +848,14 @@ impl LanguageServer for NativeLanguageServer {
 
     async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
         let uri = params.text_document.uri;
-        if is_acton_manifest_uri(&uri) {
+        let updates_workspace_config = match self.is_workspace_manifest_uri(&uri) {
+            Ok(updates_workspace_config) => updates_workspace_config,
+            Err(error) => {
+                self.report_error("workspace.config.save", error).await;
+                false
+            }
+        };
+        if updates_workspace_config {
             let text = params.text.unwrap_or_else(|| {
                 uri.to_file_path()
                     .ok()
@@ -889,7 +923,11 @@ impl LanguageServer for NativeLanguageServer {
                 service.references(&uri.to_core(), position, params.context.include_declaration)
             })
             .map_err(rpc_error)?;
-        if is_language_uri(&uri, "tolk")
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "tolk")
             && self.settings().map_err(rpc_error)?.tolk.find_usages.scope
                 == FindUsagesScope::Workspace
         {
@@ -964,7 +1002,12 @@ impl LanguageServer for NativeLanguageServer {
         let mut completion = self
             .with_service(|service| service.completion(&uri.to_core(), position, trigger))
             .map_err(rpc_error)?;
-        if is_language_uri(&uri, "tolk") {
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "tolk")
+        {
             let settings = self.settings().map_err(rpc_error)?.tolk.completion;
             if !settings.add_imports {
                 completion
@@ -987,7 +1030,11 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::SemanticTokensParams,
     ) -> jsonrpc::Result<Option<lsp::SemanticTokensResult>> {
         let uri = params.text_document.uri;
-        if is_language_uri(&uri, "fift")
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "fift")
             && !self
                 .settings()
                 .map_err(rpc_error)?
@@ -1017,7 +1064,8 @@ impl LanguageServer for NativeLanguageServer {
             .with_service(|service| service.inlay_hints(&uri.to_core(), range))
             .map_err(rpc_error)?;
         let settings = self.settings().map_err(rpc_error)?;
-        hints.retain(|hint| inlay_hint_enabled(&settings, &uri, hint.category));
+        let language_id = self.document_language_id(&uri).map_err(rpc_error)?;
+        hints.retain(|hint| inlay_hint_enabled(&settings, language_id.as_ref(), hint.category));
         Ok(Some(hints.into_iter().map(inlay_hint_to_lsp).collect()))
     }
 
@@ -1140,23 +1188,27 @@ impl LanguageServer for NativeLanguageServer {
 
     async fn did_change_watched_files(&self, params: lsp::DidChangeWatchedFilesParams) {
         for change in params.changes {
-            let result = if is_acton_manifest_uri(&change.uri) {
-                let text = if change.typ == lsp::FileChangeType::DELETED {
-                    String::new()
-                } else {
-                    change
-                        .uri
-                        .to_file_path()
-                        .ok()
-                        .and_then(|path| fs::read_to_string(path).ok())
-                        .unwrap_or_default()
-                };
-                self.apply_workspace_config_text(text)
-            } else if change.typ == lsp::FileChangeType::DELETED {
-                self.remove_tolk_file(&change.uri)
-            } else {
-                self.reload_tolk_file(&change.uri)
-            };
+            let result =
+                self.is_workspace_manifest_uri(&change.uri)
+                    .and_then(|updates_workspace_config| {
+                        if updates_workspace_config {
+                            let text = if change.typ == lsp::FileChangeType::DELETED {
+                                String::new()
+                            } else {
+                                change
+                                    .uri
+                                    .to_file_path()
+                                    .ok()
+                                    .and_then(|path| fs::read_to_string(path).ok())
+                                    .unwrap_or_default()
+                            };
+                            self.apply_workspace_config_text(text)
+                        } else if change.typ == lsp::FileChangeType::DELETED {
+                            self.remove_tolk_file(&change.uri)
+                        } else {
+                            self.reload_tolk_file(&change.uri)
+                        }
+                    });
 
             if let Err(error) = result {
                 self.report_error("workspace.files.change", error).await;
@@ -1934,19 +1986,6 @@ fn is_tolk_path(path: &Path) -> bool {
         .is_some_and(|extension| extension == "tolk")
 }
 
-fn is_language_uri(uri: &lsp::Url, language_id: &str) -> bool {
-    let extension = uri
-        .to_file_path()
-        .ok()
-        .and_then(|path| path.extension()?.to_str().map(str::to_owned));
-    match language_id {
-        "tolk" => extension.as_deref() == Some("tolk"),
-        "tlb" => extension.as_deref() == Some("tlb"),
-        "fift" => matches!(extension.as_deref(), Some("fif" | "fift")),
-        _ => false,
-    }
-}
-
 fn location_is_in_root(location: &Location, root: &Path) -> bool {
     lsp::Url::parse(location.uri.as_str())
         .ok()
@@ -1956,10 +1995,10 @@ fn location_is_in_root(location: &Location, root: &Path) -> bool {
 
 fn inlay_hint_enabled(
     settings: &NativeSettings,
-    uri: &lsp::Url,
+    language_id: Option<&LanguageId>,
     category: InlayHintCategory,
 ) -> bool {
-    if is_language_uri(uri, "tolk") {
+    if language_id.is_some_and(|language_id| language_id.as_str() == "tolk") {
         let hints = &settings.tolk.hints;
         return !hints.disable
             && match category {
@@ -1972,12 +2011,12 @@ fn inlay_hint_enabled(
                 | InlayHintCategory::Other => true,
             };
     }
-    if is_language_uri(uri, "tlb") {
+    if language_id.is_some_and(|language_id| language_id.as_str() == "tlb") {
         return !settings.tlb.hints.disable
             && (category != InlayHintCategory::ConstructorTag
                 || settings.tlb.hints.show_constructor_tag);
     }
-    if is_language_uri(uri, "fift") {
+    if language_id.is_some_and(|language_id| language_id.as_str() == "fift") {
         return category != InlayHintCategory::GasConsumption
             || settings.fift.hints.show_gas_consumption;
     }
@@ -2274,38 +2313,38 @@ mod tests {
                 "semanticHighlighting": {"enabled": false}
             }
         }))?;
-        let tolk = lsp::Url::parse("file:///workspace/main.tolk")?;
-        let tlb = lsp::Url::parse("file:///workspace/schema.tlb")?;
-        let fift = lsp::Url::parse("file:///workspace/main.fif")?;
+        let tolk = LanguageId::from("tolk");
+        let tlb = LanguageId::from("tlb");
+        let fift = LanguageId::from("fift");
 
         assert!(!inlay_hint_enabled(
             &settings,
-            &tolk,
+            Some(&tolk),
             InlayHintCategory::Type
         ));
         assert!(inlay_hint_enabled(
             &settings,
-            &tolk,
+            Some(&tolk),
             InlayHintCategory::Parameter
         ));
         assert!(!inlay_hint_enabled(
             &settings,
-            &tolk,
+            Some(&tolk),
             InlayHintCategory::MethodId
         ));
         assert!(!inlay_hint_enabled(
             &settings,
-            &tolk,
+            Some(&tolk),
             InlayHintCategory::ConstantValue
         ));
         assert!(!inlay_hint_enabled(
             &settings,
-            &tlb,
+            Some(&tlb),
             InlayHintCategory::ConstructorTag
         ));
         assert!(!inlay_hint_enabled(
             &settings,
-            &fift,
+            Some(&fift),
             InlayHintCategory::GasConsumption
         ));
         assert!(!settings.tolk.completion.type_aware);
