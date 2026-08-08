@@ -5,6 +5,15 @@
   "files": {
     "includes": ["**", "!dist", "!node_modules", "!*.vsix", "!bun.lock"]
   },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noUndeclaredDependencies": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      }
+    }
+  },
   "overrides": [
     {
       "includes": ["e2e/**"],

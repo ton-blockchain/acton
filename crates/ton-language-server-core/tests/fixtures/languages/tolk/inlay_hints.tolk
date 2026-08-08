@@ -6,13 +6,13 @@ const REFERENCED = COMPUTED * 4
 const BOOLEAN = REFERENCED == 12
 
 enum Status {
-    None,
-    Ready,
-    Explicit = 7,
-    Next,
-    Hex = 0x10,
-    Truthy = true,
-    AfterTruthy,
+    None
+    Ready
+    Explicit = 7
+    Next
+    Hex = 0x10
+    Truthy = true
+    AfterTruthy
 }
 
 struct Payload {

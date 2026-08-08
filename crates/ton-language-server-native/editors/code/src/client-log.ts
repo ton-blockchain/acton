@@ -4,11 +4,11 @@
 import * as vscode from "vscode"
 import process from "node:process"
 
-let consoleLogChannel: vscode.OutputChannel | undefined
+let consoleLogChannel: vscode.LogOutputChannel | undefined
 
-export function createClientLog(): vscode.OutputChannel {
+export function createClientLog(): vscode.LogOutputChannel {
   if (!consoleLogChannel) {
-    consoleLogChannel = vscode.window.createOutputChannel("TON")
+    consoleLogChannel = vscode.window.createOutputChannel("TON", {log: true})
 
     if (process.env["TON_LS_DEV"] === "true") {
       consoleLogChannel.show(true)

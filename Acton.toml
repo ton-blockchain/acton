@@ -11,7 +11,7 @@ fail-on-diff = false
 [test.mutation]
 
 [lint]
-exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
+exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/fixtures/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
 
 [fmt]
 ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**", "tests/integration/snapshots/check/**"]

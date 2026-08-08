@@ -2,6 +2,7 @@
 <!-- // SPDX-License-Identifier: MIT -->
 <!-- // Copyright © 2025 TON Studio -->
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="16px" height="16px" viewBox="0 0 16 16" version="1.1">
+<title>TON</title>
 <defs>
 <linearGradient id="linear0" gradientUnits="userSpaceOnUse" x1="72.93" y1="68.56" x2="243.68" y2="161.22" gradientTransform="matrix(0.0559964,0,0,0.0559208,1.59933,1.599846)">
 <stop offset="0" style="stop-color:rgb(14.901961%,50.980392%,88.627451%);stop-opacity:1;"/>
