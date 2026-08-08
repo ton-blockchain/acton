@@ -967,7 +967,7 @@ impl<'tree> ArgumentList<'tree> {
     /// Returns whether the byte offset is inside the call's parentheses.
     #[must_use]
     pub fn contains_offset(&self, offset: usize) -> bool {
-        self.0.start_byte() <= offset && offset <= self.0.end_byte()
+        self.0.start_byte() <= offset && offset < self.0.end_byte()
     }
 
     /// Returns the zero-based argument index at the byte offset.
@@ -1137,7 +1137,31 @@ impl<'tree> HasName<'tree> for InstanceArg<'tree> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_tolk_int_literal;
+    use super::{Call, parse_tolk_int_literal};
+    use crate::{TryFromNode, parse};
+
+    #[test]
+    fn argument_list_range_excludes_the_offset_after_the_closing_parenthesis() {
+        let source = "fun main() { target(1, 2); }";
+        let parsed = parse(source).expect("source must parse");
+        let target_offset = source.find("target").expect("call must exist");
+        let mut node = parsed
+            .tree
+            .root_node()
+            .descendant_for_byte_range(target_offset, target_offset + 1)
+            .expect("call identifier must exist");
+        let call = loop {
+            if let Ok(call) = Call::try_from_node(node) {
+                break call;
+            }
+            node = node.parent().expect("identifier must be inside a call");
+        };
+        let arguments = call.argument_list().expect("call must have arguments");
+
+        assert!(arguments.contains_offset(arguments.0.start_byte()));
+        assert!(arguments.contains_offset(arguments.0.end_byte() - 1));
+        assert!(!arguments.contains_offset(arguments.0.end_byte()));
+    }
 
     #[test]
     fn parse_decimal_literal_with_separators() {
