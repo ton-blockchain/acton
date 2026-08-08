@@ -1,13 +1,18 @@
 id = "ton"
 name = "TON"
-version = "0.0.1"
+version = "0.0.2"
 schema_version = 1
 description = "TON development support for Zed"
 repository = "https://github.com/ton-blockchain/acton"
 authors = ["TON Core"]
 themes = []
 icon_themes = []
-languages = ["languages/tolk"]
+languages = [
+    "languages/tolk",
+    "languages/tlb",
+    "languages/tasm",
+    "languages/fift",
+]
 capabilities = []
 
 [lib]
@@ -15,12 +20,28 @@ kind = "Rust"
 version = "0.7.0"
 
 [grammars.tolk]
-repository = "file:///Users/petrmakhnev/emulator-rs"
-rev = "7eb066226f14a945a95887400563ad92d0b30023"
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
 path = "crates/tree-sitter-tolk"
 
+[grammars.tlb]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-tlb"
+
+[grammars.tasm]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-tasm"
+
+[grammars.fift]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-fift"
+
 [language_servers.ton-ls]
-language = "Tolk"
+name = "TON Language Server"
+languages = ["Tolk", "TL-B", "TASM", "Fift", "TOML"]
 
 [context_servers]
 

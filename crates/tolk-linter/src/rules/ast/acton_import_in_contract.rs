@@ -43,17 +43,17 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let project_index = checker.type_db.project_index;
     let imports = project_index.imports().get(&file_id)?;
 
-    // for resolved_import in imports {
-    //     let Some(target_id) = resolved_import.target() else {
-    //         continue;
-    //     };
-    //     if !checker.file_db.is_acton_file(target_id) {
-    //         continue;
-    //     }
-    //
-    //     let import = resolved_import.import();
-    //     fire_diagnostic(checker, file_id, import.span);
-    // }
+    for resolved_import in imports {
+        let Some(target_id) = resolved_import.target() else {
+            continue;
+        };
+        if !checker.file_db.is_acton_file(target_id) {
+            continue;
+        }
+
+        let import = resolved_import.import();
+        fire_diagnostic(checker, file_id, import.span);
+    }
 
     Some(())
 }

@@ -1,0 +1,4 @@
+/Cargo.lock
+/extension.wasm
+/grammars/
+/languages/*/*.scm

@@ -26,6 +26,9 @@ build-faucet-pow-wasm:
 sync-artifacts:
     cargo xtask sync-artifacts
 
+sync-zed-queries:
+    cargo xtask sync-zed-queries
+
 install-tools:
     cargo install cargo-shear --version 1.13.1 --locked
     cargo install cargo-deny --version 0.19.8 --locked

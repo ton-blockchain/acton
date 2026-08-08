@@ -1,104 +1,159 @@
-"do" @keyword
-"if" @keyword
-"as" @keyword
-"is" @keyword
-"!is" @keyword
-"fun" @keyword
-"asm" @keyword
-"get" @keyword
-"try" @keyword
-"var" @keyword
-"val" @keyword
-"lazy" @keyword
-"else" @keyword
-"type" @keyword
-"enum" @keyword
-"struct" @keyword
-"contract" @keyword
-"readonly" @keyword
-"private" @keyword
-"true" @keyword
-"tolk" @keyword
-"const" @keyword
-"false" @keyword
-"throw" @keyword
-"redef" @keyword
-"while" @keyword
-"catch" @keyword
-"match" @keyword
-"return" @keyword
-"assert" @keyword
-"import" @keyword
-"global" @keyword
-"repeat" @keyword
-"mutate" @keyword
-(null_literal) @keyword
+; Editor highlighting for Tolk.
+
+[
+  "tolk"
+  "import"
+  "global"
+  "const"
+  "fun"
+  "get"
+  "asm"
+  "return"
+  "if"
+  "else"
+  "while"
+  "do"
+  "repeat"
+  "try"
+  "catch"
+  "throw"
+  "assert"
+  "match"
+  "var"
+  "val"
+  "mutate"
+  "redef"
+  "lazy"
+  "struct"
+  "enum"
+  "type"
+  "private"
+  "readonly"
+] @keyword
+
+[
+  "true"
+  "false"
+] @boolean
+
+(null_literal) @constant.builtin
 (builtin_specifier) @keyword
 
-"=" @operator
-"+=" @operator
-"-=" @operator
-"*=" @operator
-"/=" @operator
-"%=" @operator
-"<<=" @operator
-">>=" @operator
-"&=" @operator
-"|=" @operator
-"^=" @operator
+[
+  "="
+  "+="
+  "-="
+  "*="
+  "/="
+  "%="
+  "<<="
+  ">>="
+  "&="
+  "|="
+  "^="
+  "=="
+  "<"
+  ">"
+  "<="
+  ">="
+  "!="
+  "<=>"
+  "<<"
+  ">>"
+  "~>>"
+  "^>>"
+  "-"
+  "+"
+  "|"
+  "^"
+  "*"
+  "/"
+  "%"
+  "~/"
+  "^/"
+  "&"
+  "~"
+  "."
+  "!"
+  "&&"
+  "||"
+  "is"
+  "!is"
+] @operator
 
-"==" @operator
-"<" @operator
-">" @operator
-"<=" @operator
-">=" @operator
-"!=" @operator
-"<=>" @operator
-"<<" @operator
-">>" @operator
-"~>>" @operator
-"^>>" @operator
-"-" @operator
-"+" @operator
-"|" @operator
-"^" @operator
-"*" @operator
-"/" @operator
-"%" @operator
-"~/" @operator
-"^/" @operator
-"&" @operator
-"~" @operator
-"." @operator
-"!" @operator
-"&&" @operator
-"||" @operator
-"??" @operator
+[
+  "("
+  ")"
+  "["
+  "]"
+  "{"
+  "}"
+] @punctuation.bracket
 
-"->" @operator
-
+[
+  ","
+  ";"
+  ":"
+  "->"
+] @punctuation.delimiter
 
 (string_literal) @string
 (number_literal) @number
-(boolean_literal) @number
+(comment) @comment
 
-(annotation) @attribute
+;(identifier) @variable
+
+(annotation
+  name: (annotation_name) @attribute)
+
+(contract_declaration
+  "contract" @keyword
+  name: (identifier) @type)
+(struct_declaration
+  name: (identifier) @type)
+(enum_declaration
+  name: (identifier) @type)
+(type_alias_declaration
+  name: (identifier) @type)
+(type_identifier) @type
+
+(enum_member_declaration
+  name: (identifier) @constant)
 
 (function_declaration
   name: (identifier) @function)
 (method_declaration
-  name: (identifier) @function)
+  name: (identifier) @function.method)
 (get_method_declaration
-  name: (identifier) @function)
+  name: (identifier) @function.method)
+
+(parameter_declaration
+  name: (identifier) @variable.parameter)
+
+(instance_argument
+  name: (identifier) @property)
+
+(struct_field_declaration
+  name: (identifier) @property)
+
+(contract_field
+  name: (identifier) @property)
+
+(dot_access
+  field: (identifier) @property)
+
 (function_call
   callee: (identifier) @function)
 (function_call
-  callee: (dot_access (identifier) (identifier) @function))
-(dot_access
-  field: (identifier) @variable)
+  callee: (dot_access
+    field: (identifier) @function.method))
+(function_call
+  callee: (generic_instantiation
+    expr: (identifier) @function))
+(function_call
+  callee: (generic_instantiation
+    expr: (dot_access
+      field: (identifier) @function.method)))
 
-(type_identifier) @type
-
-(identifier) @variable
-
-(comment) @comment
+((identifier) @constant
+  (#match? @constant "^[A-Z][A-Z0-9_]*$"))
