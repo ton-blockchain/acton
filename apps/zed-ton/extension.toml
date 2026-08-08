@@ -1,9 +1,9 @@
-id = "tolk"
-name = "Tolk"
+id = "ton"
+name = "TON"
 version = "0.0.1"
 schema_version = 1
-description = "Tolk language support for Zed (syntax highlighting via tree-sitter-tolk)."
-repository = "https://github.com/i582/acton"
+description = "TON development support for Zed"
+repository = "https://github.com/ton-blockchain/acton"
 authors = ["TON Core"]
 themes = []
 icon_themes = []

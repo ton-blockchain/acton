@@ -1,8 +1,8 @@
 use zed_extension_api as zed;
 
-struct TolkExtension;
+struct TonExtension;
 
-impl TolkExtension {
+impl TonExtension {
     fn acton_command_for(worktree: &zed::Worktree) -> zed::Command {
         if let Some(acton) = worktree.which("acton") {
             return zed::Command {
@@ -31,7 +31,7 @@ impl TolkExtension {
     }
 }
 
-impl zed::Extension for TolkExtension {
+impl zed::Extension for TonExtension {
     fn new() -> Self {
         Self
     }
@@ -45,4 +45,4 @@ impl zed::Extension for TolkExtension {
     }
 }
 
-zed::register_extension!(TolkExtension);
+zed::register_extension!(TonExtension);

@@ -1,6 +1,7 @@
-# Tolk Zed Extension
+# TON Zed Extension
 
-Zed extension for Tolk with syntax highlighting and `ton-ls` (via `acton ls --stdio`).
+Zed extension for TON development with Tolk syntax highlighting and `ton-ls`
+(via `acton ls --stdio`).
 
 ## What is included
 
@@ -25,7 +26,7 @@ Bundled wasm is also copied from local grammar:
 ## Local usage in Zed
 
 1. Open Zed extensions panel.
-2. Install this folder as a dev extension (`crates/ton-ls/editors/zed`).
+2. Install this folder as a dev extension (`apps/zed-ton`).
 3. Ensure LSP binary is available:
    - preferred: `acton` in `PATH`
    - fallback: workspace-local `cargo run --bin acton -- ls --stdio`
@@ -33,7 +34,7 @@ Bundled wasm is also copied from local grammar:
 If you update grammar in `crates/tree-sitter-tolk`:
 
 ```bash
-cp crates/tree-sitter-tolk/tree-sitter-tolk.wasm crates/ton-ls/editors/zed/grammars/tolk.wasm
+cp crates/tree-sitter-tolk/tree-sitter-tolk.wasm apps/zed-ton/grammars/tolk.wasm
 ```
 
 Then review:

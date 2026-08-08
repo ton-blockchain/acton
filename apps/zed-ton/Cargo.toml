@@ -1,5 +1,5 @@
 [package]
-name = "zed-tolk"
+name = "zed-ton"
 version = "0.0.1"
 edition = "2021"
 publish = false
