@@ -42,14 +42,12 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     documentSelector: [
       {scheme: "file", language: "tolk"},
-      {scheme: "file", language: "func"},
       {scheme: "file", language: "tasm"},
       {scheme: "file", language: "fift"},
       {scheme: "file", language: "tlb"},
       {scheme: "file", language: "toml", pattern: "**/Acton.toml"},
       {scheme: "file", pattern: "**/Acton.toml"},
       {scheme: "untitled", language: "tolk"},
-      {scheme: "untitled", language: "func"},
       {scheme: "untitled", language: "tasm"},
       {scheme: "untitled", language: "fift"},
       {scheme: "untitled", language: "tlb"},
@@ -57,7 +55,7 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
     synchronize: {
       configurationSection: "ton",
       fileEvents: [
-        vscode.workspace.createFileSystemWatcher("**/*.{tolk,fc,func,tasm,fif,fift,tlb}"),
+        vscode.workspace.createFileSystemWatcher("**/*.{tolk,tasm,fif,fift,tlb}"),
         vscode.workspace.createFileSystemWatcher("**/Acton.toml"),
       ],
     },

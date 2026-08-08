@@ -51,7 +51,7 @@ async function saveBoc(fileUri: vscode.Uri | undefined): Promise<void> {
   const outputPath = actualFileUri.fsPath + ".decompiled.tasm"
 
   const bytes = new TextEncoder().encode(content)
-  vscode.workspace.fs.writeFile(vscode.Uri.file(outputPath), bytes)
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(outputPath), bytes)
 
   const relativePath = vscode.workspace.asRelativePath(outputPath)
   vscode.window.showInformationMessage(`Disassembled BOC saved to: ${relativePath}`)

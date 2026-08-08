@@ -893,8 +893,14 @@ impl LanguageServer for NativeLanguageServer {
             && self.settings().map_err(rpc_error)?.tolk.find_usages.scope
                 == FindUsagesScope::Workspace
         {
-            let project_root = self.workspace().map_err(rpc_error)?.project_root;
-            locations.retain(|location| location_is_in_root(location, &project_root));
+            let workspace = self.workspace().map_err(rpc_error)?;
+            locations.retain(|location| {
+                location_is_in_root(location, &workspace.project_root)
+                    && !workspace
+                        .tolk_stdlib_root
+                        .as_deref()
+                        .is_some_and(|root| location_is_in_root(location, root))
+            });
         }
         Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
     }
@@ -1174,6 +1180,22 @@ impl LanguageServer for NativeLanguageServer {
     async fn did_rename_files(&self, params: lsp::RenameFilesParams) {
         let files = file_renames_from_lsp(params.files);
         if let Err(error) = self.with_service(|service| service.did_rename_files(&files)) {
+            self.report_error("workspace.files.rename", error).await;
+            return;
+        }
+
+        let result = self
+            .documents
+            .lock()
+            .map_err(|_| anyhow::anyhow!("document map lock poisoned"))
+            .map(|mut documents| {
+                for file in &files {
+                    if let Some(document) = documents.remove(file.old_uri.as_str()) {
+                        documents.insert(file.new_uri.as_str().to_owned(), document);
+                    }
+                }
+            });
+        if let Err(error) = result {
             self.report_error("workspace.files.rename", error).await;
         }
     }

@@ -89,6 +89,16 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
             text_document_position(&main_uri, 2, 40),
         )
         .await?;
+    let stdlib_references = client
+        .request(
+            "textDocument/references",
+            json!({
+                "textDocument": {"uri": main_uri},
+                "position": {"line": 2, "character": 40},
+                "context": {"includeDeclaration": true},
+            }),
+        )
+        .await?;
 
     client
         .notify(
@@ -149,6 +159,13 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
         },
         "helper": normalized_definition_uri(&helper_definition, root),
         "stdlib": normalized_definition_uri(&stdlib_definition, root),
+        "stdlibReferences": stdlib_references
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|location| location["uri"].as_str())
+            .map(|uri| uri.replace(root, "$ROOT"))
+            .collect::<Vec<_>>(),
         "edited": normalized_definition_uri(&edited_definition, root),
         "reopened": normalized_definition_uri(&reopened_definition, root),
         "warnings": client.notifications().iter().filter_map(log_warning).collect::<Vec<_>>(),
@@ -175,10 +192,111 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
           "reopened": "$ROOT/lib.tolk",
           "server": "Acton Language Server",
           "stdlib": "$ROOT/.acton/tolk-stdlib/common.tolk",
+          "stdlibReferences": [
+            "$ROOT/main.tolk"
+          ],
           "warnings": [
             "workspace.scan: indexed 3 Tolk source files and skipped 1 files or directories"
           ]
         }"##]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
+async fn rename_keeps_open_document_changes_addressable() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let old_path = workspace.path().join("old.tolk");
+    let new_path = workspace.path().join("new.tolk");
+    let old_source = "fun beforeRename(): int { return 1; }\n";
+    let new_source = "fun afterRename(): int { return 2; }\n";
+    fs::write(&old_path, old_source)?;
+
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let old_uri = Url::from_file_path(&old_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert old file path to URI"))?;
+    let new_uri = Url::from_file_path(&new_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert new file path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {},
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": old_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": old_source,
+                }
+            }),
+        )
+        .await?;
+
+    fs::rename(&old_path, &new_path)?;
+    client
+        .notify(
+            "workspace/didRenameFiles",
+            json!({
+                "files": [{"oldUri": old_uri, "newUri": new_uri}],
+            }),
+        )
+        .await?;
+    client
+        .notify(
+            "textDocument/didChange",
+            json!({
+                "textDocument": {"uri": new_uri, "version": 2},
+                "contentChanges": [{"text": new_source}],
+            }),
+        )
+        .await?;
+
+    let symbols = client
+        .request(
+            "textDocument/documentSymbol",
+            json!({"textDocument": {"uri": new_uri}}),
+        )
+        .await?;
+    let actual = json!({
+        "symbols": symbols
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|symbol| symbol["name"].as_str())
+            .collect::<Vec<_>>(),
+        "errors": client
+            .notifications()
+            .iter()
+            .filter_map(|notification| {
+                (notification["method"] == "window/logMessage"
+                    && notification["params"]["type"] == 1)
+                    .then(|| notification["params"]["message"].as_str())
+                    .flatten()
+            })
+            .collect::<Vec<_>>(),
+    });
+    expect![[r#"
+        {
+          "errors": [],
+          "symbols": [
+            "afterRename"
+          ]
+        }"#]]
     .assert_eq(&serde_json::to_string_pretty(&actual)?);
 
     client.shutdown(server).await

@@ -339,7 +339,7 @@ fn evaluates_constants_like_tolk_compiler() {
             const PLUS_GRAMS = grams("+321.123456798")
             const PADDED_GRAMS = grams("0001.1000")
             const TRAILING_DOT_GRAMS = grams("1.")
-            const GRAMS_OVERFLOW = grams("1000000000")
+            const LARGE_GRAMS = grams("1000000000")
             const INVALID_GRAMS = grams("0.0.0")
             const TEXT = "hello"
             const TEXT_ALIAS = TEXT
@@ -375,7 +375,7 @@ fn evaluates_constants_like_tolk_compiler() {
             const PLUS_GRAMS/* : coins */ = grams(/* floatString: */"+321.123456798")/* = 0x4AC473171E */
             const PADDED_GRAMS/* : coins */ = grams(/* floatString: */"0001.1000")/* = 1100000000 (0x4190AB00) */
             const TRAILING_DOT_GRAMS/* : coins */ = grams(/* floatString: */"1.")/* = 1000000000 (0x3B9ACA00) */
-            const GRAMS_OVERFLOW/* : coins */ = grams(/* floatString: */"1000000000")/* = overflow */
+            const LARGE_GRAMS/* : coins */ = grams(/* floatString: */"1000000000")/* = 0xDE0B6B3A7640000 */
             const INVALID_GRAMS/* : coins */ = grams(/* floatString: */"0.0.0")
             const TEXT/* : string */ = "hello"
             const TEXT_ALIAS/* : string */ = TEXT/* = "hello" */
