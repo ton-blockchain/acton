@@ -1,0 +1,43 @@
+{
+  "grammars": [
+    {
+      "name": "toml",
+      "camelcase": "TOML",
+      "scope": "source.toml",
+      "file-types": [
+        "toml"
+      ],
+      "highlights": [
+        "queries/highlights.scm"
+      ],
+      "injection-regex": "^toml$"
+    }
+  ],
+  "metadata": {
+    "version": "0.7.0",
+    "license": "MIT",
+    "description": "TOML grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "Ika",
+        "email": "ikatyang@gmail.com",
+        "url": "https://github.com/ikatyang"
+      },
+      {
+        "name": "Amaan Qureshi",
+        "email": "amaanq12@gmail.com"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/tree-sitter-grammars/tree-sitter-toml"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": true
+  }
+}
