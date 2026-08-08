@@ -1,0 +1,2577 @@
+use std::collections::HashMap;
+use std::env;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write as _;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tasm_core::decompile::Disassembler;
+use tasm_core::printer::FormatOptions as TasmFormatOptions;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpListener;
+use ton_language_server_core::languages::fift::FiftLanguage;
+use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
+use ton_language_server_core::languages::tlb::TlbLanguage;
+use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::languages::toml::TomlLanguage;
+use ton_language_server_core::{
+    CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
+    CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
+    DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
+    InlayHintCategory, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
+    LanguageServiceConfig, Location, Position, PrepareRename, ProfileReport, Range,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    SignatureHelp, SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig,
+    WorkspaceEdit, WorkspaceSymbol,
+};
+use tower_lsp::jsonrpc;
+use tower_lsp::lsp_types as lsp;
+use tower_lsp::{Client, LanguageServer, LspService, Server};
+use tracing::field::{Field, Visit};
+use tracing::span::{Attributes, Id, Record};
+use tracing::{Event, Level, Metadata, Subscriber};
+use tycho_types::boc::Boc;
+
+pub use ton_language_server_core::LogLevel;
+
+const TASM_SPEC_JSON: &str = include_str!("../../tasm-core/spec/tvm-specification.json");
+pub const TOLK_TYPE_AT_POSITION_REQUEST: &str = "tolk.getTypeAtPosition";
+pub const PROFILE_REQUEST: &str = "ton/profile";
+pub const DISASSEMBLE_REQUEST: &str = "ton/disassemble";
+
+trait ToCore {
+    type Core;
+
+    fn to_core(&self) -> Self::Core;
+}
+
+impl ToCore for lsp::Url {
+    type Core = DocumentUri;
+
+    fn to_core(&self) -> Self::Core {
+        DocumentUri::from(self.as_str())
+    }
+}
+
+impl ToCore for lsp::Position {
+    type Core = Position;
+
+    fn to_core(&self) -> Self::Core {
+        Position::new(self.line, self.character)
+    }
+}
+
+impl ToCore for lsp::Range {
+    type Core = Range;
+
+    fn to_core(&self) -> Self::Core {
+        Range::new(self.start.to_core(), self.end.to_core())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TypeAtPositionParams {
+    text_document: lsp::TextDocumentIdentifier,
+    position: lsp::Position,
+}
+
+#[derive(Debug, Serialize)]
+struct TypeAtPositionResponse {
+    #[serde(rename = "type")]
+    type_name: Option<String>,
+    range: Option<lsp::Range>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProfileParams {}
+
+impl From<Option<TypeAtPosition>> for TypeAtPositionResponse {
+    fn from(result: Option<TypeAtPosition>) -> Self {
+        let Some(result) = result else {
+            return Self {
+                type_name: None,
+                range: None,
+            };
+        };
+
+        Self {
+            type_name: Some(result.type_name),
+            range: Some(range_to_lsp(result.range)),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DisassembleParams {
+    uri: Option<lsp::Url>,
+    data: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DisassembleResponse {
+    assembly: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ServerConfig {
+    pub project_root: PathBuf,
+    pub tolk_stdlib_path: Option<PathBuf>,
+    pub logging: Option<NativeLoggingConfig>,
+    pub enable_profiling: bool,
+}
+
+impl ServerConfig {
+    #[must_use]
+    pub fn new(project_root: impl Into<PathBuf>) -> Self {
+        Self {
+            project_root: project_root.into(),
+            tolk_stdlib_path: None,
+            logging: None,
+            enable_profiling: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeLoggingConfig {
+    pub path: PathBuf,
+    pub level: LogLevel,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct NativeSettings {
+    tolk: TolkSettings,
+    tlb: TlbSettings,
+    fift: FiftSettings,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct TolkSettings {
+    hints: TolkHintSettings,
+    completion: TolkCompletionSettings,
+    find_usages: FindUsagesSettings,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct TolkHintSettings {
+    disable: bool,
+    types: bool,
+    parameters: bool,
+    show_method_id: bool,
+    constant_values: bool,
+}
+
+impl Default for TolkHintSettings {
+    fn default() -> Self {
+        Self {
+            disable: false,
+            types: true,
+            parameters: true,
+            show_method_id: true,
+            constant_values: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct TolkCompletionSettings {
+    type_aware: bool,
+    add_imports: bool,
+}
+
+impl Default for TolkCompletionSettings {
+    fn default() -> Self {
+        Self {
+            type_aware: true,
+            add_imports: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+struct FindUsagesSettings {
+    scope: FindUsagesScope,
+}
+
+impl Default for FindUsagesSettings {
+    fn default() -> Self {
+        Self {
+            scope: FindUsagesScope::Workspace,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum FindUsagesScope {
+    #[default]
+    Workspace,
+    Everywhere,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+struct TlbSettings {
+    hints: TlbHintSettings,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct TlbHintSettings {
+    disable: bool,
+    show_constructor_tag: bool,
+}
+
+impl Default for TlbHintSettings {
+    fn default() -> Self {
+        Self {
+            disable: false,
+            show_constructor_tag: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct FiftSettings {
+    hints: FiftHintSettings,
+    semantic_highlighting: SemanticHighlightingSettings,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct FiftHintSettings {
+    show_gas_consumption: bool,
+}
+
+impl Default for FiftHintSettings {
+    fn default() -> Self {
+        Self {
+            show_gas_consumption: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+struct SemanticHighlightingSettings {
+    enabled: bool,
+}
+
+impl Default for SemanticHighlightingSettings {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+impl NativeLoggingConfig {
+    #[must_use]
+    pub fn new(path: impl Into<PathBuf>, level: LogLevel) -> Self {
+        Self {
+            path: path.into(),
+            level,
+        }
+    }
+}
+
+pub async fn serve_stdio(config: ServerConfig) -> anyhow::Result<()> {
+    install_logging(config.logging.as_ref())?;
+    serve_stream(config, tokio::io::stdin(), tokio::io::stdout()).await
+}
+
+pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
+    install_logging(config.logging.as_ref())?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).await?;
+    tracing::info!(
+        target: "ton_language_server_native",
+        operation = "server.listen",
+        port,
+        "language server is listening"
+    );
+    let (stream, _) = listener.accept().await?;
+    let (reader, writer) = tokio::io::split(stream);
+    serve_stream(config, reader, writer).await
+}
+
+pub async fn serve_stream<R, W>(config: ServerConfig, reader: R, writer: W) -> anyhow::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite,
+{
+    let (service, socket) =
+        LspService::build(|client| NativeLanguageServer::new(client, config.clone()))
+            .custom_method(
+                TOLK_TYPE_AT_POSITION_REQUEST,
+                NativeLanguageServer::type_at_position,
+            )
+            .custom_method(PROFILE_REQUEST, NativeLanguageServer::profile)
+            .custom_method(DISASSEMBLE_REQUEST, NativeLanguageServer::disassemble)
+            .finish();
+    Server::new(reader, writer, socket).serve(service).await;
+    Ok(())
+}
+
+pub struct NativeLanguageServer {
+    client: Client,
+    service: Mutex<LanguageService>,
+    fallback_project_root: PathBuf,
+    tolk_stdlib_path: Option<PathBuf>,
+    workspace: Mutex<Option<NativeWorkspace>>,
+    startup_warnings: Mutex<Vec<String>>,
+    documents: Mutex<HashMap<String, OpenDocument>>,
+    settings: Mutex<NativeSettings>,
+}
+
+#[derive(Clone, Debug)]
+struct NativeWorkspace {
+    project_root: PathBuf,
+    root_uri: DocumentUri,
+    manifest_uri: DocumentUri,
+    tolk_stdlib_root: Option<PathBuf>,
+    tolk_stdlib_root_uri: Option<DocumentUri>,
+}
+
+impl NativeWorkspace {
+    fn new(project_root: PathBuf, tolk_stdlib_path: Option<PathBuf>) -> anyhow::Result<Self> {
+        let project_root = absolute_project_root(project_root);
+        let root_uri = DocumentUri::from(file_uri_string(&project_root));
+        let manifest_uri = DocumentUri::from(file_uri_string(&project_root.join("Acton.toml")));
+        let tolk_stdlib_root = resolve_tolk_stdlib_root(&project_root, tolk_stdlib_path)?;
+        let tolk_stdlib_root_uri = tolk_stdlib_root
+            .as_ref()
+            .map(|path| DocumentUri::from(file_uri_string(path)));
+
+        Ok(Self {
+            project_root,
+            root_uri,
+            manifest_uri,
+            tolk_stdlib_root,
+            tolk_stdlib_root_uri,
+        })
+    }
+}
+
+impl NativeLanguageServer {
+    #[must_use]
+    pub fn new(client: Client, config: ServerConfig) -> Self {
+        Self {
+            client,
+            service: Mutex::new(native_language_service(config.enable_profiling)),
+            fallback_project_root: absolute_project_root(config.project_root),
+            tolk_stdlib_path: config.tolk_stdlib_path,
+            workspace: Mutex::new(None),
+            startup_warnings: Mutex::new(Vec::new()),
+            documents: Mutex::new(HashMap::new()),
+            settings: Mutex::new(NativeSettings::default()),
+        }
+    }
+
+    async fn report_error(&self, operation: &'static str, error: impl ToString) {
+        let message = format!("{operation}: {}", error.to_string());
+        tracing::warn!(
+            target: "ton_language_server_native",
+            operation,
+            error = %message,
+            "language server operation failed"
+        );
+        self.client
+            .log_message(lsp::MessageType::ERROR, message)
+            .await;
+    }
+
+    fn with_service<T>(
+        &self,
+        f: impl FnOnce(&mut LanguageService) -> anyhow::Result<T>,
+    ) -> anyhow::Result<T> {
+        let mut service = self
+            .service
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language service lock poisoned"))?;
+        f(&mut service)
+    }
+
+    fn workspace(&self) -> anyhow::Result<NativeWorkspace> {
+        self.workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))?
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("language server workspace is not initialized"))
+    }
+
+    fn initialize_workspace(&self, params: &lsp::InitializeParams) -> anyhow::Result<()> {
+        if self
+            .workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))?
+            .is_some()
+        {
+            anyhow::bail!("language server workspace is already initialized");
+        }
+
+        let project_root = project_root_from_initialize(params, &self.fallback_project_root)?;
+        let workspace = NativeWorkspace::new(project_root, self.tolk_stdlib_path.clone())?;
+
+        self.with_service(|service| {
+            if let Err(error) = apply_initial_workspace_config(
+                service,
+                &workspace.root_uri,
+                Some(&workspace.manifest_uri),
+                workspace.tolk_stdlib_root_uri.as_ref(),
+            ) {
+                self.record_startup_warning("workspace.config.init", error);
+            }
+
+            let scan = prime_workspace_sources(
+                service,
+                &workspace.project_root,
+                workspace.tolk_stdlib_root.as_deref(),
+            );
+            if scan.failed > 0 {
+                self.record_startup_warning(
+                    "workspace.scan",
+                    format!(
+                        "indexed {} Tolk source files and skipped {} files or directories",
+                        scan.indexed, scan.failed
+                    ),
+                );
+            }
+            Ok(())
+        })?;
+
+        *self
+            .workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))? =
+            Some(workspace);
+        Ok(())
+    }
+
+    fn record_startup_warning(&self, operation: &'static str, error: impl ToString) {
+        let message = format!("{operation}: {}", error.to_string());
+        tracing::warn!(
+            target: "ton_language_server_native",
+            operation,
+            error = %message,
+            "language server startup operation failed"
+        );
+        if let Ok(mut warnings) = self.startup_warnings.lock() {
+            warnings.push(message);
+        }
+    }
+
+    fn settings(&self) -> anyhow::Result<NativeSettings> {
+        self.settings
+            .lock()
+            .map(|settings| settings.clone())
+            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))
+    }
+
+    fn document_language_id(&self, uri: &lsp::Url) -> anyhow::Result<Option<LanguageId>> {
+        let documents = self
+            .documents
+            .lock()
+            .map_err(|_| anyhow::anyhow!("document map lock poisoned"))?;
+        if let Some(OpenDocument {
+            kind: OpenDocumentKind::Language { language_id, .. },
+            ..
+        }) = documents.get(uri.as_str())
+        {
+            return Ok(Some(language_id.clone()));
+        }
+        drop(documents);
+
+        Ok(language_id_for_document("", uri))
+    }
+
+    fn is_workspace_manifest_uri(&self, uri: &lsp::Url) -> anyhow::Result<bool> {
+        Ok(uri.to_core().logical_path() == self.workspace()?.manifest_uri.logical_path())
+    }
+
+    fn update_settings(&self, value: Value) -> anyhow::Result<()> {
+        let value = value.get("ton").cloned().unwrap_or(value);
+        let settings = serde_json::from_value::<NativeSettings>(value)?;
+        *self
+            .settings
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))? = settings;
+        Ok(())
+    }
+
+    async fn type_at_position(
+        &self,
+        params: TypeAtPositionParams,
+    ) -> jsonrpc::Result<TypeAtPositionResponse> {
+        let uri = params.text_document.uri.to_core();
+        let position = params.position.to_core();
+        let result = self
+            .with_service(|service| service.type_at_position(&uri, position))
+            .map_err(rpc_error)?;
+
+        Ok(TypeAtPositionResponse::from(result))
+    }
+
+    async fn profile(&self, _params: ProfileParams) -> jsonrpc::Result<ProfileReport> {
+        self.with_service(|service| Ok(service.profiler().report()))
+            .map_err(rpc_error)
+    }
+
+    async fn disassemble(&self, params: DisassembleParams) -> jsonrpc::Result<DisassembleResponse> {
+        let bytes = match (params.uri, params.data) {
+            (Some(uri), None) => {
+                let path = uri
+                    .to_file_path()
+                    .map_err(|()| rpc_error(format!("cannot convert URI to file path: {uri}")))?;
+                fs::read(path).map_err(rpc_error)?
+            }
+            (None, Some(data)) => data.into_bytes(),
+            (Some(_), Some(_)) => {
+                return Err(rpc_error("provide either 'uri' or 'data', not both"));
+            }
+            (None, None) => return Err(rpc_error("missing 'uri' or 'data'")),
+        };
+        let cell = decode_boc(&bytes).map_err(rpc_error)?;
+        let assembly = Disassembler::new()
+            .decompile_cell(&cell)
+            .map_err(rpc_error)?
+            .print(&TasmFormatOptions::default());
+        Ok(DisassembleResponse { assembly })
+    }
+
+    fn apply_workspace_config_text(&self, text: String) -> anyhow::Result<()> {
+        let workspace = self.workspace()?;
+        self.with_service(|service| {
+            service.set_workspace_config(
+                LanguageId::from(TOLK_LANGUAGE_ID),
+                workspace_config(
+                    workspace.root_uri,
+                    Some(workspace.manifest_uri),
+                    workspace.tolk_stdlib_root_uri,
+                    text,
+                ),
+            )
+        })
+    }
+
+    fn reload_tolk_file(&self, uri: &lsp::Url) -> anyhow::Result<()> {
+        let path = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("cannot convert uri to file path: {uri}"))?;
+        if !is_tolk_path(&path) {
+            return Ok(());
+        }
+        let text = fs::read_to_string(&path)?;
+        let uri = uri.to_core();
+        self.with_service(|service| {
+            service.add_source_file(LanguageId::from(TOLK_LANGUAGE_ID), uri, text)
+        })
+    }
+
+    fn remove_tolk_file(&self, uri: &lsp::Url) -> anyhow::Result<()> {
+        let path = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("cannot convert uri to file path: {uri}"))?;
+        if !is_tolk_path(&path) {
+            return Ok(());
+        }
+        let uri = uri.to_core();
+        self.with_service(|service| {
+            service.remove_source_file(LanguageId::from(TOLK_LANGUAGE_ID), &uri)
+        })
+    }
+
+    fn prepare_document_change(
+        &self,
+        uri: &lsp::Url,
+        changes: &[lsp::TextDocumentContentChangeEvent],
+    ) -> anyhow::Result<(OpenDocumentKind, String, AppliedChanges)> {
+        let uri_string = uri.to_string();
+        let mut documents = self
+            .documents
+            .lock()
+            .map_err(|_| anyhow::anyhow!("document map lock poisoned"))?;
+        let Some(document) = documents.get_mut(&uri_string) else {
+            anyhow::bail!("document is not open: {uri}");
+        };
+        let applied = apply_lsp_changes_to_text(&mut document.text, changes)?;
+        let kind = document.kind.clone();
+        let text = document.text.clone();
+        drop(documents);
+        Ok((kind, text, applied))
+    }
+}
+
+#[tower_lsp::async_trait]
+impl LanguageServer for NativeLanguageServer {
+    async fn initialize(
+        &self,
+        params: lsp::InitializeParams,
+    ) -> jsonrpc::Result<lsp::InitializeResult> {
+        self.initialize_workspace(&params).map_err(rpc_error)?;
+
+        Ok(lsp::InitializeResult {
+            capabilities: lsp::ServerCapabilities {
+                position_encoding: Some(lsp::PositionEncodingKind::UTF16),
+                text_document_sync: Some(lsp::TextDocumentSyncCapability::Options(
+                    lsp::TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(lsp::TextDocumentSyncKind::INCREMENTAL),
+                        will_save: None,
+                        will_save_wait_until: None,
+                        save: Some(lsp::TextDocumentSyncSaveOptions::SaveOptions(
+                            lsp::SaveOptions {
+                                include_text: Some(true),
+                            },
+                        )),
+                    },
+                )),
+                hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
+                document_formatting_provider: Some(lsp::OneOf::Left(true)),
+                document_range_formatting_provider: Some(lsp::OneOf::Left(true)),
+                definition_provider: Some(lsp::OneOf::Left(true)),
+                type_definition_provider: Some(lsp::TypeDefinitionProviderCapability::Simple(true)),
+                references_provider: Some(lsp::OneOf::Left(true)),
+                document_highlight_provider: Some(lsp::OneOf::Left(true)),
+                completion_provider: Some(lsp::CompletionOptions {
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(
+                        [".", "@", "#"].into_iter().map(str::to_owned).collect(),
+                    ),
+                    ..lsp::CompletionOptions::default()
+                }),
+                inlay_hint_provider: Some(lsp::OneOf::Left(true)),
+                semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::from(
+                    lsp::SemanticTokensOptions {
+                        work_done_progress_options: lsp::WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                        legend: semantic_tokens_legend_to_lsp(),
+                        range: Some(false),
+                        full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+                    },
+                )),
+                code_lens_provider: Some(lsp::CodeLensOptions {
+                    resolve_provider: Some(false),
+                }),
+                folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
+                document_symbol_provider: Some(lsp::OneOf::Left(true)),
+                workspace_symbol_provider: Some(lsp::OneOf::Left(true)),
+                code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
+                    lsp::CodeActionOptions {
+                        code_action_kinds: Some(vec![lsp::CodeActionKind::QUICKFIX]),
+                        resolve_provider: Some(false),
+                        work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+                    },
+                )),
+                signature_help_provider: Some(lsp::SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_owned(), ",".to_owned()]),
+                    retrigger_characters: Some(vec![",".to_owned()]),
+                    ..lsp::SignatureHelpOptions::default()
+                }),
+                rename_provider: Some(lsp::OneOf::Right(lsp::RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+                })),
+                execute_command_provider: Some(lsp::ExecuteCommandOptions {
+                    commands: execute_commands(),
+                    work_done_progress_options: lsp::WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                }),
+                workspace: Some(lsp::WorkspaceServerCapabilities {
+                    workspace_folders: None,
+                    file_operations: Some(lsp::WorkspaceFileOperationsServerCapabilities {
+                        will_rename: Some(tolk_file_operation_options()),
+                        did_rename: Some(tolk_file_operation_options()),
+                        ..lsp::WorkspaceFileOperationsServerCapabilities::default()
+                    }),
+                }),
+                ..lsp::ServerCapabilities::default()
+            },
+            server_info: Some(lsp::ServerInfo {
+                name: "Acton Language Server".to_owned(),
+                version: None,
+            }),
+        })
+    }
+
+    async fn initialized(&self, _: lsp::InitializedParams) {
+        let project_root = self.workspace().map_or_else(
+            |_| self.fallback_project_root.clone(),
+            |workspace| workspace.project_root,
+        );
+        self.client
+            .log_message(
+                lsp::MessageType::INFO,
+                format!(
+                    "Acton language server started for {}",
+                    project_root.display()
+                ),
+            )
+            .await;
+
+        let warnings = self
+            .startup_warnings
+            .lock()
+            .map(|mut warnings| std::mem::take(&mut *warnings))
+            .unwrap_or_default();
+        for warning in warnings {
+            self.client
+                .log_message(lsp::MessageType::WARNING, warning)
+                .await;
+        }
+    }
+
+    async fn did_change_configuration(&self, params: lsp::DidChangeConfigurationParams) {
+        if let Err(error) = self.update_settings(params.settings) {
+            self.report_error("workspace.configuration.change", error)
+                .await;
+            return;
+        }
+
+        if let Err(error) = self.client.inlay_hint_refresh().await {
+            tracing::debug!(
+                target: "ton_language_server_native",
+                operation = "workspace.inlay_hint.refresh",
+                error = %error,
+                "client did not accept an inlay hint refresh"
+            );
+        }
+        if let Err(error) = self.client.semantic_tokens_refresh().await {
+            tracing::debug!(
+                target: "ton_language_server_native",
+                operation = "workspace.semantic_tokens.refresh",
+                error = %error,
+                "client did not accept a semantic token refresh"
+            );
+        }
+    }
+
+    async fn shutdown(&self) -> jsonrpc::Result<()> {
+        Ok(())
+    }
+
+    async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
+        let item = params.text_document;
+        let uri = item.uri;
+        let updates_workspace_config = match self.is_workspace_manifest_uri(&uri) {
+            Ok(updates_workspace_config) => updates_workspace_config,
+            Err(error) => {
+                self.report_error("workspace.config.open", error).await;
+                false
+            }
+        };
+        if updates_workspace_config
+            && let Err(error) = self.apply_workspace_config_text(item.text.clone())
+        {
+            self.report_error("workspace.config.open", error).await;
+        }
+
+        let kind = language_id_for_document(&item.language_id, &uri).map_or(
+            OpenDocumentKind::Unsupported,
+            |language_id| OpenDocumentKind::Language {
+                language_id,
+                updates_workspace_config,
+            },
+        );
+
+        if let OpenDocumentKind::Language { language_id, .. } = &kind {
+            let result = self.with_service(|service| {
+                service.open_document(
+                    uri.to_core(),
+                    language_id.clone(),
+                    item.version,
+                    item.text.clone(),
+                )
+            });
+            if let Err(error) = result {
+                self.report_error("document.open", error).await;
+            }
+        }
+
+        if let Ok(mut documents) = self.documents.lock() {
+            documents.insert(
+                uri.to_string(),
+                OpenDocument {
+                    kind,
+                    text: item.text,
+                },
+            );
+        }
+    }
+
+    async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
+        let uri = params.text_document.uri;
+        let version = params.text_document.version;
+        let change = match self.prepare_document_change(&uri, &params.content_changes) {
+            Ok(change) => change,
+            Err(error) => {
+                self.report_error("document.change", error).await;
+                return;
+            }
+        };
+
+        if change.0.updates_workspace_config()
+            && let Err(error) = self.apply_workspace_config_text(change.1.clone())
+        {
+            self.report_error("workspace.config.change", error).await;
+        }
+
+        match change {
+            (OpenDocumentKind::Language { .. }, full_text, AppliedChanges::FullText) => {
+                let result = self.with_service(|service| {
+                    service.change_document(&uri.to_core(), version, full_text)
+                });
+                if let Err(error) = result {
+                    self.report_error("document.change", error).await;
+                }
+            }
+            (OpenDocumentKind::Language { .. }, _, AppliedChanges::Incremental(edits)) => {
+                let result = self
+                    .with_service(|service| service.edit_document(&uri.to_core(), version, edits));
+                if let Err(error) = result {
+                    self.report_error("document.edit", error).await;
+                }
+            }
+            (OpenDocumentKind::Unsupported, _, _) => {}
+        }
+    }
+
+    async fn did_save(&self, params: lsp::DidSaveTextDocumentParams) {
+        let uri = params.text_document.uri;
+        let updates_workspace_config = match self.is_workspace_manifest_uri(&uri) {
+            Ok(updates_workspace_config) => updates_workspace_config,
+            Err(error) => {
+                self.report_error("workspace.config.save", error).await;
+                false
+            }
+        };
+        if updates_workspace_config {
+            let text = params.text.unwrap_or_else(|| {
+                uri.to_file_path()
+                    .ok()
+                    .and_then(|path| fs::read_to_string(path).ok())
+                    .unwrap_or_default()
+            });
+            if let Err(error) = self.apply_workspace_config_text(text) {
+                self.report_error("workspace.config.save", error).await;
+            }
+        } else if let Err(error) = self.reload_tolk_file(&uri) {
+            self.report_error("source_file.reload", error).await;
+        }
+    }
+
+    async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
+        let uri = params.text_document.uri;
+        let document = self
+            .documents
+            .lock()
+            .ok()
+            .and_then(|mut documents| documents.remove(&uri.to_string()));
+
+        if matches!(
+            document,
+            Some(OpenDocument {
+                kind: OpenDocumentKind::Language { .. },
+                ..
+            })
+        ) {
+            self.with_service(|service| {
+                service.close_document(&uri.to_core());
+                Ok(())
+            })
+            .unwrap_or_else(|error| {
+                tracing::warn!(
+                    target: "ton_language_server_native",
+                    operation = "document.close",
+                    error = %error,
+                    "failed to close document"
+                );
+            });
+        }
+    }
+
+    async fn goto_definition(
+        &self,
+        params: lsp::GotoDefinitionParams,
+    ) -> jsonrpc::Result<Option<lsp::GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let locations = self
+            .with_service(|service| service.definition(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(locations_to_definition_response(locations))
+    }
+
+    async fn references(
+        &self,
+        params: lsp::ReferenceParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position.to_core();
+        let mut locations = self
+            .with_service(|service| {
+                service.references(&uri.to_core(), position, params.context.include_declaration)
+            })
+            .map_err(rpc_error)?;
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "tolk")
+            && self.settings().map_err(rpc_error)?.tolk.find_usages.scope
+                == FindUsagesScope::Workspace
+        {
+            let workspace = self.workspace().map_err(rpc_error)?;
+            locations.retain(|location| {
+                location_is_in_root(location, &workspace.project_root)
+                    && !workspace
+                        .tolk_stdlib_root
+                        .as_deref()
+                        .is_some_and(|root| location_is_in_root(location, root))
+            });
+        }
+        Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
+    }
+
+    async fn formatting(
+        &self,
+        params: lsp::DocumentFormattingParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::TextEdit>>> {
+        let uri = params.text_document.uri;
+        let edits = self
+            .with_service(|service| service.formatting(&uri.to_core(), None))
+            .map_err(rpc_error)?;
+        Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
+    }
+
+    async fn range_formatting(
+        &self,
+        params: lsp::DocumentRangeFormattingParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::TextEdit>>> {
+        let uri = params.text_document.uri;
+        let range = params.range.to_core();
+        let edits = self
+            .with_service(|service| service.formatting(&uri.to_core(), Some(range)))
+            .map_err(rpc_error)?;
+        Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
+    }
+
+    async fn document_highlight(
+        &self,
+        params: lsp::DocumentHighlightParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::DocumentHighlight>>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let highlights = self
+            .with_service(|service| service.document_highlights(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            highlights
+                .into_iter()
+                .map(document_highlight_to_lsp)
+                .collect(),
+        ))
+    }
+
+    async fn hover(&self, params: lsp::HoverParams) -> jsonrpc::Result<Option<lsp::Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let hover = self
+            .with_service(|service| service.hover(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(hover.map(hover_to_lsp))
+    }
+
+    async fn completion(
+        &self,
+        params: lsp::CompletionParams,
+    ) -> jsonrpc::Result<Option<lsp::CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position.to_core();
+        let trigger = completion_trigger_from_lsp(params.context);
+        let mut completion = self
+            .with_service(|service| service.completion(&uri.to_core(), position, trigger))
+            .map_err(rpc_error)?;
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "tolk")
+        {
+            let settings = self.settings().map_err(rpc_error)?.tolk.completion;
+            if !settings.add_imports {
+                completion
+                    .items
+                    .retain(|item| item.additional_text_edits.is_empty());
+            }
+            if !settings.type_aware {
+                for item in &mut completion.items {
+                    item.sort_text = None;
+                }
+            }
+        }
+        Ok(Some(lsp::CompletionResponse::List(completion_list_to_lsp(
+            completion,
+        ))))
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: lsp::SemanticTokensParams,
+    ) -> jsonrpc::Result<Option<lsp::SemanticTokensResult>> {
+        let uri = params.text_document.uri;
+        if self
+            .document_language_id(&uri)
+            .map_err(rpc_error)?
+            .as_ref()
+            .is_some_and(|language_id| language_id.as_str() == "fift")
+            && !self
+                .settings()
+                .map_err(rpc_error)?
+                .fift
+                .semantic_highlighting
+                .enabled
+        {
+            return Ok(Some(lsp::SemanticTokensResult::Tokens(
+                semantic_tokens_to_lsp(SemanticTokens::new(Vec::new())),
+            )));
+        }
+        let tokens = self
+            .with_service(|service| service.semantic_tokens(&uri.to_core()))
+            .map_err(rpc_error)?;
+        Ok(Some(lsp::SemanticTokensResult::Tokens(
+            semantic_tokens_to_lsp(tokens),
+        )))
+    }
+
+    async fn inlay_hint(
+        &self,
+        params: lsp::InlayHintParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::InlayHint>>> {
+        let uri = params.text_document.uri;
+        let range = params.range.to_core();
+        let mut hints = self
+            .with_service(|service| service.inlay_hints(&uri.to_core(), range))
+            .map_err(rpc_error)?;
+        let settings = self.settings().map_err(rpc_error)?;
+        let language_id = self.document_language_id(&uri).map_err(rpc_error)?;
+        hints.retain(|hint| inlay_hint_enabled(&settings, language_id.as_ref(), hint.category));
+        Ok(Some(hints.into_iter().map(inlay_hint_to_lsp).collect()))
+    }
+
+    async fn code_lens(
+        &self,
+        params: lsp::CodeLensParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CodeLens>>> {
+        let uri = params.text_document.uri;
+        let lenses = self
+            .with_service(|service| service.code_lens(&uri.to_core()))
+            .map_err(rpc_error)?;
+        Ok(Some(lenses.into_iter().map(code_lens_to_lsp).collect()))
+    }
+
+    async fn folding_range(
+        &self,
+        params: lsp::FoldingRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::FoldingRange>>> {
+        let uri = params.text_document.uri;
+        let ranges = self
+            .with_service(|service| service.folding_ranges(&uri.to_core()))
+            .map_err(rpc_error)?;
+        Ok(Some(ranges.into_iter().map(folding_range_to_lsp).collect()))
+    }
+
+    async fn document_symbol(
+        &self,
+        params: lsp::DocumentSymbolParams,
+    ) -> jsonrpc::Result<Option<lsp::DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+        let symbols = self
+            .with_service(|service| service.document_symbols(&uri.to_core()))
+            .map_err(rpc_error)?;
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(
+            symbols.into_iter().map(document_symbol_to_lsp).collect(),
+        )))
+    }
+
+    async fn code_action(
+        &self,
+        params: lsp::CodeActionParams,
+    ) -> jsonrpc::Result<Option<lsp::CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let range = params.range.to_core();
+        let actions = self
+            .with_service(|service| service.code_actions(&uri.to_core(), range))
+            .map_err(rpc_error)?;
+        let actions = actions
+            .into_iter()
+            .map(code_action_to_lsp)
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(rpc_error)?;
+        Ok(Some(actions))
+    }
+
+    async fn symbol(
+        &self,
+        params: lsp::WorkspaceSymbolParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::SymbolInformation>>> {
+        let symbols = self
+            .with_service(|service| service.workspace_symbols(&params.query))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            symbols
+                .into_iter()
+                .filter_map(workspace_symbol_to_lsp)
+                .collect(),
+        ))
+    }
+
+    async fn goto_type_definition(
+        &self,
+        params: lsp::request::GotoTypeDefinitionParams,
+    ) -> jsonrpc::Result<Option<lsp::request::GotoTypeDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let locations = self
+            .with_service(|service| service.type_definition(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(locations_to_definition_response(locations))
+    }
+
+    async fn signature_help(
+        &self,
+        params: lsp::SignatureHelpParams,
+    ) -> jsonrpc::Result<Option<lsp::SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let signature_help = self
+            .with_service(|service| service.signature_help(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(signature_help.map(signature_help_to_lsp))
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: lsp::TextDocumentPositionParams,
+    ) -> jsonrpc::Result<Option<lsp::PrepareRenameResponse>> {
+        let uri = params.text_document.uri;
+        let position = params.position.to_core();
+        let prepare = self
+            .with_service(|service| service.prepare_rename(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(prepare.map(prepare_rename_to_lsp))
+    }
+
+    async fn rename(
+        &self,
+        params: lsp::RenameParams,
+    ) -> jsonrpc::Result<Option<lsp::WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position.to_core();
+        let edit = self
+            .with_service(|service| service.rename(&uri.to_core(), position, &params.new_name))
+            .map_err(rpc_error)?;
+        edit.map(workspace_edit_to_lsp)
+            .transpose()
+            .map_err(rpc_error)
+    }
+
+    async fn did_change_watched_files(&self, params: lsp::DidChangeWatchedFilesParams) {
+        for change in params.changes {
+            let result =
+                self.is_workspace_manifest_uri(&change.uri)
+                    .and_then(|updates_workspace_config| {
+                        if updates_workspace_config {
+                            let text = if change.typ == lsp::FileChangeType::DELETED {
+                                String::new()
+                            } else {
+                                change
+                                    .uri
+                                    .to_file_path()
+                                    .ok()
+                                    .and_then(|path| fs::read_to_string(path).ok())
+                                    .unwrap_or_default()
+                            };
+                            self.apply_workspace_config_text(text)
+                        } else if change.typ == lsp::FileChangeType::DELETED {
+                            self.remove_tolk_file(&change.uri)
+                        } else {
+                            self.reload_tolk_file(&change.uri)
+                        }
+                    });
+
+            if let Err(error) = result {
+                self.report_error("workspace.files.change", error).await;
+            }
+        }
+    }
+
+    async fn will_rename_files(
+        &self,
+        params: lsp::RenameFilesParams,
+    ) -> jsonrpc::Result<Option<lsp::WorkspaceEdit>> {
+        let files = file_renames_from_lsp(params.files);
+        let edit = self
+            .with_service(|service| service.will_rename_files(&files))
+            .map_err(rpc_error)?;
+        edit.map(workspace_edit_to_lsp)
+            .transpose()
+            .map_err(rpc_error)
+    }
+
+    async fn did_rename_files(&self, params: lsp::RenameFilesParams) {
+        let files = file_renames_from_lsp(params.files);
+        if let Err(error) = self.with_service(|service| service.did_rename_files(&files)) {
+            self.report_error("workspace.files.rename", error).await;
+            return;
+        }
+
+        let result = self
+            .documents
+            .lock()
+            .map_err(|_| anyhow::anyhow!("document map lock poisoned"))
+            .map(|mut documents| {
+                for file in &files {
+                    if let Some(document) = documents.remove(file.old_uri.as_str()) {
+                        documents.insert(file.new_uri.as_str().to_owned(), document);
+                    }
+                }
+            });
+        if let Err(error) = result {
+            self.report_error("workspace.files.rename", error).await;
+        }
+    }
+
+    async fn execute_command(
+        &self,
+        _params: lsp::ExecuteCommandParams,
+    ) -> jsonrpc::Result<Option<Value>> {
+        Ok(None)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct OpenDocument {
+    kind: OpenDocumentKind,
+    text: String,
+}
+
+#[derive(Clone, Debug)]
+enum OpenDocumentKind {
+    Language {
+        language_id: LanguageId,
+        updates_workspace_config: bool,
+    },
+    Unsupported,
+}
+
+impl OpenDocumentKind {
+    const fn updates_workspace_config(&self) -> bool {
+        matches!(
+            self,
+            Self::Language {
+                updates_workspace_config: true,
+                ..
+            }
+        )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum AppliedChanges {
+    Incremental(Vec<TextEdit>),
+    FullText,
+}
+
+fn native_language_service(enable_profiling: bool) -> LanguageService {
+    let mut service = LanguageService::new(LanguageServiceConfig { enable_profiling });
+
+    service.register_language(TlbLanguage::new());
+
+    match TasmLanguage::with_spec_json(TASM_SPEC_JSON) {
+        Ok(language) => service.register_language(language),
+        Err(error) => {
+            tracing::warn!(
+                target: "ton_language_server_native",
+                operation = "language.register",
+                language_id = "tasm",
+                error = %error,
+                "failed to load bundled TASM specification"
+            );
+            service.register_language(TasmLanguage::new());
+        }
+    }
+
+    match FiftLanguage::with_spec_json(TASM_SPEC_JSON) {
+        Ok(language) => service.register_language(language),
+        Err(error) => {
+            tracing::warn!(
+                target: "ton_language_server_native",
+                operation = "language.register",
+                language_id = "fift",
+                error = %error,
+                "failed to load bundled TVM instruction specification"
+            );
+            service.register_language(FiftLanguage::new());
+        }
+    }
+
+    service.register_language(TomlLanguage::new());
+    service.register_language(TolkLanguage::new());
+
+    service
+}
+
+fn execute_commands() -> Vec<String> {
+    vec![STACK_EFFECT_CODE_LENS_COMMAND.to_owned()]
+}
+
+fn tolk_file_operation_options() -> lsp::FileOperationRegistrationOptions {
+    lsp::FileOperationRegistrationOptions {
+        filters: vec![lsp::FileOperationFilter {
+            scheme: Some("file".to_owned()),
+            pattern: lsp::FileOperationPattern {
+                glob: "**/*.tolk".to_owned(),
+                matches: Some(lsp::FileOperationPatternKind::File),
+                options: None,
+            },
+        }],
+    }
+}
+
+fn file_renames_from_lsp(files: Vec<lsp::FileRename>) -> Vec<FileRename> {
+    files
+        .into_iter()
+        .map(|file| {
+            FileRename::new(
+                DocumentUri::from(file.old_uri),
+                DocumentUri::from(file.new_uri),
+            )
+        })
+        .collect()
+}
+
+fn apply_initial_workspace_config(
+    service: &mut LanguageService,
+    root_uri: &DocumentUri,
+    manifest_uri: Option<&DocumentUri>,
+    tolk_stdlib_root_uri: Option<&DocumentUri>,
+) -> anyhow::Result<()> {
+    let manifest_text = manifest_uri
+        .and_then(|uri| lsp::Url::parse(uri.as_str()).ok())
+        .and_then(|uri| uri.to_file_path().ok())
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_default();
+    service.set_workspace_config(
+        LanguageId::from(TOLK_LANGUAGE_ID),
+        workspace_config(
+            root_uri.clone(),
+            manifest_uri.cloned(),
+            tolk_stdlib_root_uri.cloned(),
+            manifest_text,
+        ),
+    )?;
+
+    Ok(())
+}
+
+fn prime_workspace_sources(
+    service: &mut LanguageService,
+    project_root: &Path,
+    tolk_stdlib_root: Option<&Path>,
+) -> SourceScanReport {
+    let mut report = SourceScanReport::default();
+    if let Some(tolk_stdlib_root) = tolk_stdlib_root {
+        prime_tolk_sources(service, tolk_stdlib_root, &[], &mut report);
+    }
+
+    let excluded_roots = tolk_stdlib_root
+        .into_iter()
+        .map(Path::to_path_buf)
+        .collect::<Vec<_>>();
+    prime_tolk_sources(service, project_root, &excluded_roots, &mut report);
+    report
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SourceScanReport {
+    indexed: usize,
+    failed: usize,
+}
+
+fn prime_tolk_sources(
+    service: &mut LanguageService,
+    root: &Path,
+    excluded_roots: &[PathBuf],
+    report: &mut SourceScanReport,
+) {
+    visit_tolk_sources(root, root, excluded_roots, report, &mut |path| {
+        let text = fs::read_to_string(path)?;
+        service.add_source_file(
+            LanguageId::from(TOLK_LANGUAGE_ID),
+            DocumentUri::from(file_uri_string(path)),
+            text,
+        )
+    });
+}
+
+fn visit_tolk_sources(
+    root: &Path,
+    dir: &Path,
+    excluded_roots: &[PathBuf],
+    report: &mut SourceScanReport,
+    visit: &mut impl FnMut(&Path) -> anyhow::Result<()>,
+) {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+        Err(error) => {
+            report.failed += 1;
+            log_source_scan_error(dir, &error);
+            return;
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                report.failed += 1;
+                log_source_scan_error(dir, &error);
+                continue;
+            }
+        };
+        let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                report.failed += 1;
+                log_source_scan_error(&path, &error);
+                continue;
+            }
+        };
+        if file_type.is_dir() {
+            if !is_excluded_workspace_dir(root, &path)
+                && !is_excluded_source_root(&path, excluded_roots)
+            {
+                visit_tolk_sources(root, &path, excluded_roots, report, visit);
+            }
+        } else if file_type.is_file() && is_tolk_path(&path) {
+            match visit(&path) {
+                Ok(()) => report.indexed += 1,
+                Err(error) => {
+                    report.failed += 1;
+                    log_source_scan_error(&path, &error);
+                }
+            }
+        }
+    }
+}
+
+fn log_source_scan_error(path: &Path, error: &impl std::fmt::Display) {
+    tracing::warn!(
+        target: "ton_language_server_native",
+        operation = "workspace.source.index",
+        path = path.to_string_lossy().as_ref(),
+        error = %error,
+        "failed to index Tolk source; continuing workspace scan"
+    );
+}
+
+fn workspace_config(
+    root_uri: DocumentUri,
+    manifest_uri: Option<DocumentUri>,
+    tolk_stdlib_root_uri: Option<DocumentUri>,
+    manifest_text: impl Into<std::sync::Arc<str>>,
+) -> WorkspaceConfig {
+    let config = WorkspaceConfig::new(root_uri, manifest_uri, manifest_text);
+    match tolk_stdlib_root_uri {
+        Some(uri) => config.with_tolk_stdlib_root_uri(uri),
+        None => config,
+    }
+}
+
+fn language_id_for_document(language_id: &str, uri: &lsp::Url) -> Option<LanguageId> {
+    if is_acton_manifest_uri(uri) {
+        return Some(LanguageId::from("toml"));
+    }
+
+    match language_id {
+        "tolk" | "tasm" | "fift" | "tlb" => Some(LanguageId::from(language_id.to_owned())),
+        _ => language_id_for_path(&uri.to_file_path().ok()?),
+    }
+}
+
+fn language_id_for_path(path: &Path) -> Option<LanguageId> {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some("tolk") => Some(LanguageId::from("tolk")),
+        Some("tasm") => Some(LanguageId::from("tasm")),
+        Some("fif" | "fift") => Some(LanguageId::from("fift")),
+        Some("tlb") => Some(LanguageId::from("tlb")),
+        _ => None,
+    }
+}
+
+fn apply_lsp_changes_to_text(
+    text: &mut String,
+    changes: &[lsp::TextDocumentContentChangeEvent],
+) -> anyhow::Result<AppliedChanges> {
+    let mut edits = Vec::new();
+    let mut has_full_text_change = false;
+
+    for change in changes {
+        let Some(range) = change.range else {
+            text.clone_from(&change.text);
+            edits.clear();
+            has_full_text_change = true;
+            continue;
+        };
+
+        let range = range.to_core();
+        let index = TextIndex::new(text);
+        let start = index.position_to_offset(text, range.start);
+        let end = index.position_to_offset(text, range.end);
+        if start > end {
+            anyhow::bail!(
+                "change range start {}:{} is after end {}:{}",
+                range.start.line,
+                range.start.character,
+                range.end.line,
+                range.end.character
+            );
+        }
+
+        text.replace_range(start..end, &change.text);
+        if !has_full_text_change {
+            edits.push(TextEdit::new(range, change.text.clone()));
+        }
+    }
+
+    if has_full_text_change {
+        Ok(AppliedChanges::FullText)
+    } else {
+        Ok(AppliedChanges::Incremental(edits))
+    }
+}
+
+fn decode_boc(bytes: &[u8]) -> anyhow::Result<tycho_types::cell::Cell> {
+    let trimmed = bytes.trim_ascii();
+    if let Ok(cell) = Boc::decode_hex(trimmed) {
+        return Ok(cell);
+    }
+    if let Ok(cell) = Boc::decode_base64(trimmed) {
+        return Ok(cell);
+    }
+    if let Ok(cell) = Boc::decode(bytes) {
+        return Ok(cell);
+    }
+
+    anyhow::bail!("failed to decode BoC as hex, base64, or binary data")
+}
+
+fn locations_to_definition_response(
+    locations: Vec<Location>,
+) -> Option<lsp::GotoDefinitionResponse> {
+    match locations.as_slice() {
+        [] => None,
+        [location] => location_to_lsp(location).map(lsp::GotoDefinitionResponse::Scalar),
+        _ => Some(lsp::GotoDefinitionResponse::Array(
+            locations.iter().filter_map(location_to_lsp).collect(),
+        )),
+    }
+}
+
+fn location_to_lsp(location: &Location) -> Option<lsp::Location> {
+    Some(lsp::Location {
+        uri: lsp::Url::parse(location.uri.as_str()).ok()?,
+        range: range_to_lsp(location.range),
+    })
+}
+
+fn hover_to_lsp(hover: Hover) -> lsp::Hover {
+    lsp::Hover {
+        contents: lsp::HoverContents::Markup(lsp::MarkupContent {
+            kind: lsp::MarkupKind::Markdown,
+            value: hover.contents,
+        }),
+        range: hover.range.map(range_to_lsp),
+    }
+}
+
+fn document_highlight_to_lsp(highlight: DocumentHighlight) -> lsp::DocumentHighlight {
+    lsp::DocumentHighlight {
+        range: range_to_lsp(highlight.range),
+        kind: highlight.kind.map(|kind| match kind {
+            DocumentHighlightKind::Text => lsp::DocumentHighlightKind::TEXT,
+            DocumentHighlightKind::Read => lsp::DocumentHighlightKind::READ,
+            DocumentHighlightKind::Write => lsp::DocumentHighlightKind::WRITE,
+        }),
+    }
+}
+
+fn completion_trigger_from_lsp(context: Option<lsp::CompletionContext>) -> CompletionTrigger {
+    let Some(context) = context else {
+        return CompletionTrigger::invoked();
+    };
+    let kind = match context.trigger_kind {
+        lsp::CompletionTriggerKind::TRIGGER_CHARACTER => CompletionTriggerKind::TriggerCharacter,
+        lsp::CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS => {
+            CompletionTriggerKind::TriggerForIncompleteCompletions
+        }
+        _ => CompletionTriggerKind::Invoked,
+    };
+    CompletionTrigger {
+        kind,
+        character: context.trigger_character,
+    }
+}
+
+fn completion_list_to_lsp(completion: CompletionList) -> lsp::CompletionList {
+    lsp::CompletionList {
+        is_incomplete: completion.is_incomplete,
+        items: completion
+            .items
+            .into_iter()
+            .map(completion_item_to_lsp)
+            .collect(),
+    }
+}
+
+fn completion_item_to_lsp(item: CompletionItem) -> lsp::CompletionItem {
+    lsp::CompletionItem {
+        label: item.label,
+        label_details: item
+            .label_details
+            .map(|details| lsp::CompletionItemLabelDetails {
+                detail: details.detail,
+                description: details.description,
+            }),
+        kind: item.kind.map(completion_item_kind_to_lsp),
+        detail: item.detail,
+        documentation: item.documentation.map(|value| {
+            lsp::Documentation::MarkupContent(lsp::MarkupContent {
+                kind: lsp::MarkupKind::Markdown,
+                value,
+            })
+        }),
+        deprecated: item.deprecated.then_some(true),
+        sort_text: item.sort_text,
+        filter_text: item.filter_text,
+        insert_text: item.insert_text,
+        insert_text_format: Some(match item.insert_text_format {
+            InsertTextFormat::PlainText => lsp::InsertTextFormat::PLAIN_TEXT,
+            InsertTextFormat::Snippet => lsp::InsertTextFormat::SNIPPET,
+        }),
+        text_edit: item.text_edit.map(|edit| {
+            lsp::CompletionTextEdit::Edit(lsp::TextEdit {
+                range: range_to_lsp(edit.range),
+                new_text: edit.new_text,
+            })
+        }),
+        additional_text_edits: (!item.additional_text_edits.is_empty()).then(|| {
+            item.additional_text_edits
+                .into_iter()
+                .map(|edit| lsp::TextEdit {
+                    range: range_to_lsp(edit.range),
+                    new_text: edit.new_text,
+                })
+                .collect()
+        }),
+        ..lsp::CompletionItem::default()
+    }
+}
+
+const fn completion_item_kind_to_lsp(kind: CompletionItemKind) -> lsp::CompletionItemKind {
+    match kind {
+        CompletionItemKind::Text => lsp::CompletionItemKind::TEXT,
+        CompletionItemKind::Method => lsp::CompletionItemKind::METHOD,
+        CompletionItemKind::Function => lsp::CompletionItemKind::FUNCTION,
+        CompletionItemKind::Constructor => lsp::CompletionItemKind::CONSTRUCTOR,
+        CompletionItemKind::Field => lsp::CompletionItemKind::FIELD,
+        CompletionItemKind::Variable => lsp::CompletionItemKind::VARIABLE,
+        CompletionItemKind::Class => lsp::CompletionItemKind::CLASS,
+        CompletionItemKind::Interface => lsp::CompletionItemKind::INTERFACE,
+        CompletionItemKind::Module => lsp::CompletionItemKind::MODULE,
+        CompletionItemKind::Property => lsp::CompletionItemKind::PROPERTY,
+        CompletionItemKind::Unit => lsp::CompletionItemKind::UNIT,
+        CompletionItemKind::Value => lsp::CompletionItemKind::VALUE,
+        CompletionItemKind::Enum => lsp::CompletionItemKind::ENUM,
+        CompletionItemKind::Keyword => lsp::CompletionItemKind::KEYWORD,
+        CompletionItemKind::Snippet => lsp::CompletionItemKind::SNIPPET,
+        CompletionItemKind::Color => lsp::CompletionItemKind::COLOR,
+        CompletionItemKind::File => lsp::CompletionItemKind::FILE,
+        CompletionItemKind::Reference => lsp::CompletionItemKind::REFERENCE,
+        CompletionItemKind::Folder => lsp::CompletionItemKind::FOLDER,
+        CompletionItemKind::EnumMember => lsp::CompletionItemKind::ENUM_MEMBER,
+        CompletionItemKind::Constant => lsp::CompletionItemKind::CONSTANT,
+        CompletionItemKind::Struct => lsp::CompletionItemKind::STRUCT,
+        CompletionItemKind::Event => lsp::CompletionItemKind::EVENT,
+        CompletionItemKind::Operator => lsp::CompletionItemKind::OPERATOR,
+        CompletionItemKind::TypeParameter => lsp::CompletionItemKind::TYPE_PARAMETER,
+    }
+}
+
+fn semantic_tokens_legend_to_lsp() -> lsp::SemanticTokensLegend {
+    lsp::SemanticTokensLegend {
+        token_types: SEMANTIC_TOKEN_TYPE_NAMES
+            .iter()
+            .copied()
+            .map(lsp::SemanticTokenType::from)
+            .collect(),
+        token_modifiers: SEMANTIC_TOKEN_MODIFIER_NAMES
+            .iter()
+            .copied()
+            .map(lsp::SemanticTokenModifier::from)
+            .collect(),
+    }
+}
+
+fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> lsp::SemanticTokens {
+    lsp::SemanticTokens {
+        result_id: tokens.result_id,
+        data: tokens.data.into_iter().map(semantic_token_to_lsp).collect(),
+    }
+}
+
+fn inlay_hint_to_lsp(hint: InlayHint) -> lsp::InlayHint {
+    lsp::InlayHint {
+        position: position_to_lsp(hint.position),
+        label: lsp::InlayHintLabel::String(hint.label),
+        kind: hint.kind.map(|kind| match kind {
+            InlayHintKind::Type => lsp::InlayHintKind::TYPE,
+            InlayHintKind::Parameter => lsp::InlayHintKind::PARAMETER,
+        }),
+        text_edits: (!hint.text_edits.is_empty()).then(|| {
+            hint.text_edits
+                .into_iter()
+                .map(|edit| lsp::TextEdit {
+                    range: range_to_lsp(edit.range),
+                    new_text: edit.new_text,
+                })
+                .collect()
+        }),
+        tooltip: hint.tooltip.map(lsp::InlayHintTooltip::String),
+        padding_left: Some(hint.padding_left),
+        padding_right: Some(hint.padding_right),
+        data: None,
+    }
+}
+
+const fn semantic_token_to_lsp(token: SemanticToken) -> lsp::SemanticToken {
+    lsp::SemanticToken {
+        delta_line: token.delta_line,
+        delta_start: token.delta_start,
+        length: token.length,
+        token_type: token.token_type,
+        token_modifiers_bitset: token.token_modifiers_bitset,
+    }
+}
+
+fn code_lens_to_lsp(lens: CodeLens) -> lsp::CodeLens {
+    lsp::CodeLens {
+        range: range_to_lsp(lens.range),
+        command: lens.command.map(|command| lsp::Command {
+            title: command.title,
+            command: command.command,
+            arguments: (!command.arguments.is_empty()).then(|| {
+                command
+                    .arguments
+                    .into_iter()
+                    .map(Value::String)
+                    .collect::<Vec<_>>()
+            }),
+        }),
+        data: None,
+    }
+}
+
+fn code_action_to_lsp(action: CodeAction) -> anyhow::Result<lsp::CodeActionOrCommand> {
+    Ok(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+        title: action.title,
+        kind: Some(match action.kind {
+            CodeActionKind::QuickFix => lsp::CodeActionKind::QUICKFIX,
+            CodeActionKind::Refactor => lsp::CodeActionKind::REFACTOR,
+        }),
+        diagnostics: None,
+        edit: Some(workspace_edit_to_lsp(action.edit)?),
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    }))
+}
+
+const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
+    lsp::FoldingRange {
+        start_line: range.start_line,
+        start_character: range.start_character,
+        end_line: range.end_line,
+        end_character: range.end_character,
+        kind: None,
+        collapsed_text: None,
+    }
+}
+
+fn document_symbol_to_lsp(symbol: DocumentSymbol) -> lsp::DocumentSymbol {
+    lsp::DocumentSymbol {
+        name: symbol.name,
+        detail: symbol.detail,
+        kind: document_symbol_kind_to_lsp(symbol.kind),
+        tags: None,
+        #[allow(deprecated)]
+        deprecated: None,
+        range: range_to_lsp(symbol.range),
+        selection_range: range_to_lsp(symbol.selection_range),
+        children: (!symbol.children.is_empty()).then(|| {
+            symbol
+                .children
+                .into_iter()
+                .map(document_symbol_to_lsp)
+                .collect()
+        }),
+    }
+}
+
+fn workspace_symbol_to_lsp(symbol: WorkspaceSymbol) -> Option<lsp::SymbolInformation> {
+    Some(lsp::SymbolInformation {
+        name: symbol.name,
+        kind: document_symbol_kind_to_lsp(symbol.kind),
+        tags: None,
+        #[allow(deprecated)]
+        deprecated: None,
+        location: lsp::Location {
+            uri: lsp::Url::parse(symbol.location.uri.as_str()).ok()?,
+            range: range_to_lsp(symbol.location.range),
+        },
+        container_name: symbol.container_name,
+    })
+}
+
+fn signature_help_to_lsp(help: SignatureHelp) -> lsp::SignatureHelp {
+    lsp::SignatureHelp {
+        signatures: help
+            .signatures
+            .into_iter()
+            .map(signature_information_to_lsp)
+            .collect(),
+        active_signature: help.active_signature,
+        active_parameter: help.active_parameter,
+    }
+}
+
+fn signature_information_to_lsp(signature: SignatureInformation) -> lsp::SignatureInformation {
+    lsp::SignatureInformation {
+        label: signature.label,
+        documentation: signature.documentation.map(lsp::Documentation::String),
+        parameters: Some(
+            signature
+                .parameters
+                .into_iter()
+                .map(|label| lsp::ParameterInformation {
+                    label: lsp::ParameterLabel::Simple(label),
+                    documentation: None,
+                })
+                .collect(),
+        ),
+        active_parameter: signature.active_parameter,
+    }
+}
+
+fn prepare_rename_to_lsp(prepare: PrepareRename) -> lsp::PrepareRenameResponse {
+    lsp::PrepareRenameResponse::RangeWithPlaceholder {
+        range: range_to_lsp(prepare.range),
+        placeholder: prepare.placeholder,
+    }
+}
+
+fn workspace_edit_to_lsp(edit: WorkspaceEdit) -> anyhow::Result<lsp::WorkspaceEdit> {
+    let changes = edit
+        .documents
+        .into_iter()
+        .map(|document| {
+            let uri = lsp::Url::parse(document.uri.as_str())?;
+            let edits = document.edits.into_iter().map(text_edit_to_lsp).collect();
+            Ok((uri, edits))
+        })
+        .collect::<anyhow::Result<_>>()?;
+
+    Ok(lsp::WorkspaceEdit {
+        changes: Some(changes),
+        document_changes: None,
+        change_annotations: None,
+    })
+}
+
+fn text_edit_to_lsp(edit: TextEdit) -> lsp::TextEdit {
+    lsp::TextEdit {
+        range: range_to_lsp(edit.range),
+        new_text: edit.new_text,
+    }
+}
+
+const fn document_symbol_kind_to_lsp(kind: DocumentSymbolKind) -> lsp::SymbolKind {
+    match kind {
+        DocumentSymbolKind::File => lsp::SymbolKind::FILE,
+        DocumentSymbolKind::Module => lsp::SymbolKind::MODULE,
+        DocumentSymbolKind::Namespace => lsp::SymbolKind::NAMESPACE,
+        DocumentSymbolKind::Class => lsp::SymbolKind::CLASS,
+        DocumentSymbolKind::Method => lsp::SymbolKind::METHOD,
+        DocumentSymbolKind::Property => lsp::SymbolKind::PROPERTY,
+        DocumentSymbolKind::Field => lsp::SymbolKind::FIELD,
+        DocumentSymbolKind::Constructor => lsp::SymbolKind::CONSTRUCTOR,
+        DocumentSymbolKind::Enum => lsp::SymbolKind::ENUM,
+        DocumentSymbolKind::Interface => lsp::SymbolKind::INTERFACE,
+        DocumentSymbolKind::Function => lsp::SymbolKind::FUNCTION,
+        DocumentSymbolKind::Variable => lsp::SymbolKind::VARIABLE,
+        DocumentSymbolKind::Constant => lsp::SymbolKind::CONSTANT,
+        DocumentSymbolKind::String => lsp::SymbolKind::STRING,
+        DocumentSymbolKind::Number => lsp::SymbolKind::NUMBER,
+        DocumentSymbolKind::Boolean => lsp::SymbolKind::BOOLEAN,
+        DocumentSymbolKind::Array => lsp::SymbolKind::ARRAY,
+        DocumentSymbolKind::Object => lsp::SymbolKind::OBJECT,
+        DocumentSymbolKind::Key => lsp::SymbolKind::KEY,
+        DocumentSymbolKind::Null => lsp::SymbolKind::NULL,
+        DocumentSymbolKind::EnumMember => lsp::SymbolKind::ENUM_MEMBER,
+        DocumentSymbolKind::Struct => lsp::SymbolKind::STRUCT,
+        DocumentSymbolKind::Event => lsp::SymbolKind::EVENT,
+        DocumentSymbolKind::Operator => lsp::SymbolKind::OPERATOR,
+        DocumentSymbolKind::TypeParameter => lsp::SymbolKind::TYPE_PARAMETER,
+    }
+}
+
+const fn position_to_lsp(position: Position) -> lsp::Position {
+    lsp::Position {
+        line: position.line,
+        character: position.character,
+    }
+}
+
+const fn range_to_lsp(range: Range) -> lsp::Range {
+    lsp::Range {
+        start: position_to_lsp(range.start),
+        end: position_to_lsp(range.end),
+    }
+}
+
+fn rpc_error(error: impl ToString) -> jsonrpc::Error {
+    let mut rpc_error = jsonrpc::Error::internal_error();
+    rpc_error.message = error.to_string().into();
+    rpc_error
+}
+
+fn is_acton_manifest_uri(uri: &lsp::Url) -> bool {
+    uri.to_file_path()
+        .ok()
+        .and_then(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_owned)
+        })
+        .is_some_and(|name| name.eq_ignore_ascii_case("Acton.toml"))
+}
+
+fn is_tolk_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension == "tolk")
+}
+
+fn location_is_in_root(location: &Location, root: &Path) -> bool {
+    lsp::Url::parse(location.uri.as_str())
+        .ok()
+        .and_then(|uri| uri.to_file_path().ok())
+        .is_some_and(|path| path.starts_with(root))
+}
+
+fn inlay_hint_enabled(
+    settings: &NativeSettings,
+    language_id: Option<&LanguageId>,
+    category: InlayHintCategory,
+) -> bool {
+    if language_id.is_some_and(|language_id| language_id.as_str() == "tolk") {
+        let hints = &settings.tolk.hints;
+        return !hints.disable
+            && match category {
+                InlayHintCategory::Type => hints.types,
+                InlayHintCategory::Parameter => hints.parameters,
+                InlayHintCategory::ConstantValue => hints.constant_values,
+                InlayHintCategory::MethodId => hints.show_method_id,
+                InlayHintCategory::ConstructorTag
+                | InlayHintCategory::GasConsumption
+                | InlayHintCategory::Other => true,
+            };
+    }
+    if language_id.is_some_and(|language_id| language_id.as_str() == "tlb") {
+        return !settings.tlb.hints.disable
+            && (category != InlayHintCategory::ConstructorTag
+                || settings.tlb.hints.show_constructor_tag);
+    }
+    if language_id.is_some_and(|language_id| language_id.as_str() == "fift") {
+        return category != InlayHintCategory::GasConsumption
+            || settings.fift.hints.show_gas_consumption;
+    }
+    true
+}
+
+fn is_excluded_workspace_dir(root: &Path, path: &Path) -> bool {
+    let name = path.file_name().and_then(|name| name.to_str());
+
+    // A nested Acton project owns a separate dependency environment and must be indexed
+    // by a language-server workspace rooted at that project instead.
+    if name == Some(".acton") && path.parent() != Some(root) {
+        return true;
+    }
+
+    // The selected stdlib is primed separately and must not re-enter as workspace sources.
+    if path.ends_with(Path::new(".acton/tolk-stdlib")) {
+        return true;
+    }
+
+    name.is_some_and(|name| matches!(name, ".git" | "target" | "node_modules" | ".direnv"))
+}
+
+fn is_excluded_source_root(path: &Path, excluded_roots: &[PathBuf]) -> bool {
+    excluded_roots
+        .iter()
+        .any(|root| path == root || path.starts_with(root))
+}
+
+fn project_root_from_initialize(
+    params: &lsp::InitializeParams,
+    fallback: &Path,
+) -> anyhow::Result<PathBuf> {
+    let root_uri = params.root_uri.as_ref().or_else(|| {
+        params
+            .workspace_folders
+            .as_ref()
+            .and_then(|folders| folders.first())
+            .map(|folder| &folder.uri)
+    });
+    if let Some(root_uri) = root_uri {
+        return root_uri
+            .to_file_path()
+            .map(absolute_project_root)
+            .map_err(|()| anyhow::anyhow!("workspace root is not a file URI: {root_uri}"));
+    }
+    #[allow(deprecated)]
+    if let Some(root_path) = params.root_path.as_ref() {
+        return Ok(absolute_project_root(PathBuf::from(root_path)));
+    }
+
+    Ok(absolute_project_root(fallback.to_path_buf()))
+}
+
+pub fn resolve_tolk_stdlib_root(
+    project_root: &Path,
+    stdlib_path: Option<PathBuf>,
+) -> anyhow::Result<Option<PathBuf>> {
+    if let Some(path) = stdlib_path {
+        if !path.is_dir() {
+            anyhow::bail!("Tolk stdlib path is not a directory: {}", path.display());
+        }
+        return Ok(Some(absolute_project_root(path)));
+    }
+
+    let candidates = default_tolk_stdlib_candidates(project_root);
+    if let Some(path) = candidates.iter().find(|path| path.is_dir()) {
+        return Ok(Some(absolute_project_root(path.clone())));
+    }
+
+    Ok(None)
+}
+
+fn default_tolk_stdlib_candidates(project_root: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = path_from_env("TEST_TOLK_STDLIB_PATH") {
+        candidates.push(path);
+    }
+    candidates.extend([
+        project_root.join(".acton").join("tolk-stdlib"),
+        project_root
+            .join("node_modules")
+            .join("@ton")
+            .join("tolk-js")
+            .join("dist")
+            .join("tolk-stdlib"),
+        project_root.join("stdlib"),
+        project_root.join("tolk-stdlib"),
+    ]);
+    if let Some(path) = path_from_env("TOLK_STDLIB") {
+        candidates.push(path);
+    }
+    candidates.extend(platform_tolk_stdlib_candidates());
+    candidates
+}
+
+fn path_from_env(name: &str) -> Option<PathBuf> {
+    let value = env::var_os(name)?;
+    (!value.is_empty()).then_some(PathBuf::from(value))
+}
+
+fn platform_tolk_stdlib_candidates() -> Vec<PathBuf> {
+    if cfg!(target_os = "linux") {
+        vec![PathBuf::from("/usr/share/ton/smartcont/tolk-stdlib")]
+    } else if cfg!(target_os = "macos") {
+        vec![
+            PathBuf::from("/opt/homebrew/share/ton/ton/smartcont/tolk-stdlib"),
+            PathBuf::from("/usr/local/share/ton/ton/smartcont/tolk-stdlib"),
+        ]
+    } else if cfg!(target_os = "windows") {
+        vec![PathBuf::from(
+            "C:\\ProgramData\\chocolatey\\lib\\ton\\smartcont\\tolk-stdlib",
+        )]
+    } else {
+        Vec::new()
+    }
+}
+
+fn absolute_project_root(project_root: PathBuf) -> PathBuf {
+    if project_root.is_absolute() {
+        project_root
+    } else {
+        env::current_dir()
+            .map(|current_dir| current_dir.join(&project_root))
+            .unwrap_or(project_root)
+    }
+}
+
+fn file_uri_string(path: &Path) -> String {
+    lsp::Url::from_file_path(path).map_or_else(
+        |()| format!("file://{}", path.display()),
+        |uri| uri.to_string(),
+    )
+}
+
+fn install_logging(config: Option<&NativeLoggingConfig>) -> anyhow::Result<()> {
+    let Some(config) = config else {
+        return Ok(());
+    };
+    if let Some(parent) = config.path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&config.path)?;
+    let _ = tracing::subscriber::set_global_default(FileSubscriber::new(file, config.level));
+    Ok(())
+}
+
+struct FileSubscriber {
+    writer: Mutex<File>,
+    level: LogLevel,
+    next_span_id: AtomicU64,
+}
+
+impl FileSubscriber {
+    const fn new(file: File, level: LogLevel) -> Self {
+        Self {
+            writer: Mutex::new(file),
+            level,
+            next_span_id: AtomicU64::new(1),
+        }
+    }
+}
+
+impl Subscriber for FileSubscriber {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        level_enabled(self.level, *metadata.level())
+    }
+
+    fn new_span(&self, _span: &Attributes<'_>) -> Id {
+        Id::from_u64(self.next_span_id.fetch_add(1, Ordering::Relaxed))
+    }
+
+    fn record(&self, _span: &Id, _values: &Record<'_>) {}
+
+    fn record_follows_from(&self, _span: &Id, _follows: &Id) {}
+
+    fn event(&self, event: &Event<'_>) {
+        if !self.enabled(event.metadata()) {
+            return;
+        }
+        let mut visitor = EventVisitor::default();
+        event.record(&mut visitor);
+        let Ok(mut writer) = self.writer.lock() else {
+            return;
+        };
+        let _ = writeln!(
+            writer,
+            "[{}][{}] {}{}",
+            event.metadata().level(),
+            event.metadata().target(),
+            visitor.message(),
+            visitor.render_fields()
+        );
+    }
+
+    fn enter(&self, _span: &Id) {}
+
+    fn exit(&self, _span: &Id) {}
+}
+
+#[derive(Default)]
+struct EventVisitor {
+    message: Option<String>,
+    fields: Vec<(String, String)>,
+}
+
+impl EventVisitor {
+    fn message(&self) -> &str {
+        self.message.as_deref().unwrap_or("")
+    }
+
+    fn render_fields(&self) -> String {
+        if self.fields.is_empty() {
+            return String::new();
+        }
+        let fields = self
+            .fields
+            .iter()
+            .map(|(name, value)| format!("{name}={value}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(" {fields}")
+    }
+}
+
+impl Visit for EventVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        let value = format!("{value:?}");
+        if field.name() == "message" {
+            self.message = Some(trim_debug_string(&value).to_owned());
+        } else {
+            self.fields.push((field.name().to_owned(), value));
+        }
+    }
+}
+
+fn trim_debug_string(value: &str) -> &str {
+    value
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(value)
+}
+
+const fn level_enabled(configured: LogLevel, level: Level) -> bool {
+    match configured {
+        LogLevel::Off => false,
+        LogLevel::Error => level_rank(level) <= 1,
+        LogLevel::Warn => level_rank(level) <= 2,
+        LogLevel::Info => level_rank(level) <= 3,
+        LogLevel::Debug => level_rank(level) <= 4,
+        LogLevel::Trace => level_rank(level) <= 5,
+    }
+}
+
+const fn level_rank(level: Level) -> u8 {
+    if matches!(level, Level::ERROR) {
+        1
+    } else if matches!(level, Level::WARN) {
+        2
+    } else if matches!(level, Level::INFO) {
+        3
+    } else if matches!(level, Level::DEBUG) {
+        4
+    } else {
+        5
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_and_applies_language_feature_settings() -> anyhow::Result<()> {
+        let settings = serde_json::from_value::<NativeSettings>(serde_json::json!({
+            "tolk": {
+                "hints": {
+                    "types": false,
+                    "parameters": true,
+                    "showMethodId": false,
+                    "constantValues": false
+                },
+                "completion": {"typeAware": false, "addImports": false},
+                "findUsages": {"scope": "everywhere"}
+            },
+            "tlb": {"hints": {"showConstructorTag": false}},
+            "fift": {
+                "hints": {"showGasConsumption": false},
+                "semanticHighlighting": {"enabled": false}
+            }
+        }))?;
+        let tolk = LanguageId::from("tolk");
+        let tlb = LanguageId::from("tlb");
+        let fift = LanguageId::from("fift");
+
+        assert!(!inlay_hint_enabled(
+            &settings,
+            Some(&tolk),
+            InlayHintCategory::Type
+        ));
+        assert!(inlay_hint_enabled(
+            &settings,
+            Some(&tolk),
+            InlayHintCategory::Parameter
+        ));
+        assert!(!inlay_hint_enabled(
+            &settings,
+            Some(&tolk),
+            InlayHintCategory::MethodId
+        ));
+        assert!(!inlay_hint_enabled(
+            &settings,
+            Some(&tolk),
+            InlayHintCategory::ConstantValue
+        ));
+        assert!(!inlay_hint_enabled(
+            &settings,
+            Some(&tlb),
+            InlayHintCategory::ConstructorTag
+        ));
+        assert!(!inlay_hint_enabled(
+            &settings,
+            Some(&fift),
+            InlayHintCategory::GasConsumption
+        ));
+        assert!(!settings.tolk.completion.type_aware);
+        assert!(!settings.tolk.completion.add_imports);
+        assert_eq!(settings.tolk.find_usages.scope, FindUsagesScope::Everywhere);
+        assert!(!settings.fift.semantic_highlighting.enabled);
+
+        Ok(())
+    }
+
+    #[test]
+    fn decodes_text_and_binary_boc_payloads() -> anyhow::Result<()> {
+        let base64 = b"te6ccgEBAQEAAgAAAA==";
+        let cell = decode_boc(base64)?;
+        let binary = Boc::encode(&cell);
+
+        assert_eq!(decode_boc(&binary)?.repr_hash(), cell.repr_hash());
+        assert!(decode_boc(b"not a boc").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn detects_language_from_path() -> anyhow::Result<()> {
+        let fift = lsp::Url::parse("file:///workspace/main.fif")?;
+        let tlb = lsp::Url::parse("file:///workspace/schema.tlb")?;
+        let acton_toml = lsp::Url::parse("file:///workspace/Acton.toml")?;
+        let other_toml = lsp::Url::parse("file:///workspace/config.toml")?;
+
+        assert_eq!(
+            language_id_for_document("plaintext", &fift).map(|id| id.to_string()),
+            Some("fift".to_owned())
+        );
+        assert_eq!(
+            language_id_for_document("plaintext", &tlb).map(|id| id.to_string()),
+            Some("tlb".to_owned())
+        );
+        assert!(is_acton_manifest_uri(&acton_toml));
+        assert_eq!(
+            language_id_for_document("plaintext", &acton_toml).map(|id| id.to_string()),
+            Some("toml".to_owned())
+        );
+        assert_eq!(language_id_for_document("toml", &other_toml), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn registers_acton_toml_support_in_the_native_service() -> anyhow::Result<()> {
+        let mut service = native_language_service(false);
+        let uri = DocumentUri::from("file:///workspace/Acton.toml");
+        service.open_document(uri.clone(), LanguageId::from("toml"), 1, "")?;
+
+        let completion =
+            service.completion(&uri, Position::new(0, 0), CompletionTrigger::invoked())?;
+        let labels = completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(labels.contains(&"package"));
+        assert!(labels.contains(&"test"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn applies_incremental_changes_with_utf16_positions() -> anyhow::Result<()> {
+        let mut text = "a💎c".to_owned();
+        let change = lsp::TextDocumentContentChangeEvent {
+            range: Some(lsp::Range {
+                start: lsp::Position {
+                    line: 0,
+                    character: 3,
+                },
+                end: lsp::Position {
+                    line: 0,
+                    character: 4,
+                },
+            }),
+            range_length: None,
+            text: "d".to_owned(),
+        };
+
+        let applied = apply_lsp_changes_to_text(&mut text, &[change])?;
+
+        assert_eq!(text, "a💎d");
+        assert_eq!(
+            applied,
+            AppliedChanges::Incremental(vec![TextEdit::new(
+                Range::new(Position::new(0, 3), Position::new(0, 4)),
+                "d"
+            )])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn primes_tolk_workspace_sources_for_imports() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let lib_path = dir.path().join("lib.tolk");
+        let main_path = dir.path().join("main.tolk");
+        fs::write(&lib_path, "fun helper(): int { return 1; }\n")?;
+        let main_source = "import \"lib\"\nfun main(): int { return helper(); }\n";
+        fs::write(&main_path, main_source)?;
+
+        let mut service = native_language_service(false);
+        let report = prime_workspace_sources(&mut service, dir.path(), None);
+        assert_eq!(report.failed, 0);
+        let main_uri = DocumentUri::from(file_uri_string(&main_path));
+        service.open_document(
+            main_uri.clone(),
+            LanguageId::from(TOLK_LANGUAGE_ID),
+            1,
+            main_source,
+        )?;
+
+        let locations = service.definition(&main_uri, Position::new(1, 25))?;
+
+        assert_eq!(locations.len(), 1);
+        assert_eq!(
+            locations[0].uri,
+            DocumentUri::from(file_uri_string(&lib_path))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn primes_external_tolk_stdlib_root_for_imports() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let stdlib_dir = dir.path().join(".acton").join("tolk-stdlib");
+        fs::create_dir_all(&stdlib_dir)?;
+        let stdlib_common_path = stdlib_dir.join("common.tolk");
+        let main_path = dir.path().join("main.tolk");
+        fs::write(
+            &stdlib_common_path,
+            "fun stdlibHelper(): int { return 1; }\n",
+        )?;
+        let main_source = "import \"@stdlib/common\"\nfun main(): int { return stdlibHelper(); }\n";
+        fs::write(&main_path, main_source)?;
+
+        let root_uri = DocumentUri::from(file_uri_string(dir.path()));
+        let stdlib_uri = DocumentUri::from(file_uri_string(&stdlib_dir));
+        let mut service = native_language_service(false);
+        service.set_workspace_config(
+            LanguageId::from(TOLK_LANGUAGE_ID),
+            workspace_config(root_uri, None, Some(stdlib_uri), ""),
+        )?;
+        let report = prime_workspace_sources(&mut service, dir.path(), Some(&stdlib_dir));
+        assert_eq!(report.failed, 0);
+        let main_uri = DocumentUri::from(file_uri_string(&main_path));
+        service.open_document(
+            main_uri.clone(),
+            LanguageId::from(TOLK_LANGUAGE_ID),
+            1,
+            main_source,
+        )?;
+
+        let locations = service.definition(&main_uri, Position::new(1, 25))?;
+
+        assert_eq!(locations.len(), 1);
+        assert_eq!(
+            locations[0].uri,
+            DocumentUri::from(file_uri_string(&stdlib_common_path))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_scan_uses_only_root_acton_environment() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let main_path = dir.path().join("main.tolk");
+        let package_path = dir.path().join(".acton/packages/helper.tolk");
+        let nested_package_path = dir
+            .path()
+            .join("nested-project/.acton/packages/helper.tolk");
+        let nested_stdlib_path = dir
+            .path()
+            .join("nested-project/.acton/tolk-stdlib/common.tolk");
+        let nested_stdlib_module_path = dir
+            .path()
+            .join("nested-project/.acton/tolk-stdlib/arrays.tolk");
+
+        fs::create_dir_all(package_path.parent().expect("package path has a parent"))?;
+        fs::create_dir_all(
+            nested_package_path
+                .parent()
+                .expect("nested package path has a parent"),
+        )?;
+        fs::create_dir_all(
+            nested_stdlib_path
+                .parent()
+                .expect("stdlib path has a parent"),
+        )?;
+        fs::write(&main_path, "fun main() {}\n")?;
+        fs::write(&package_path, "fun helper() {}\n")?;
+        fs::write(&nested_package_path, "fun nestedHelper() {}\n")?;
+        fs::write(&nested_stdlib_path, "fun duplicatedStdlibSymbol() {}\n")?;
+        fs::write(
+            &nested_stdlib_module_path,
+            "fun duplicatedStdlibMethod() {}\n",
+        )?;
+
+        let mut visited = Vec::new();
+        let mut report = SourceScanReport::default();
+        visit_tolk_sources(dir.path(), dir.path(), &[], &mut report, &mut |path| {
+            visited.push(
+                path.strip_prefix(dir.path())
+                    .expect("visited path is inside workspace")
+                    .to_path_buf(),
+            );
+            Ok(())
+        });
+        assert_eq!(report.failed, 0);
+        visited.sort();
+
+        assert_eq!(
+            visited,
+            vec![
+                PathBuf::from(".acton/packages/helper.tolk"),
+                PathBuf::from("main.tolk"),
+            ]
+        );
+
+        Ok(())
+    }
+}

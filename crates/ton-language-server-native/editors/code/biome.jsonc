@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": false,
+  "extends": ["../../../../biome.jsonc"],
+  "files": {
+    "includes": ["**", "!dist", "!node_modules", "!*.vsix", "!bun.lock"]
+  },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noUndeclaredDependencies": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["e2e/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noMisplacedAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
+}

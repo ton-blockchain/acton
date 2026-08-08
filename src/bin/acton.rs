@@ -1009,8 +1009,22 @@ enum Commands {
         stdio: bool,
         #[arg(long, help = "Path to log file")]
         log_file: Option<String>,
+        #[arg(
+            long,
+            default_value = "info",
+            help = "Language server log level: off, error, warn, info, debug, or trace"
+        )]
+        log_level: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Path to physical Tolk standard library root"
+        )]
+        stdlib_path: Option<PathBuf>,
         #[arg(long, help = "Disable logging")]
         no_log: bool,
+        #[arg(long, help = "Collect language server performance profiles")]
+        profile: bool,
     },
     #[command(
         about = "Install or update Acton CLI releases",
@@ -2701,13 +2715,24 @@ fn main() {
             port,
             stdio,
             log_file,
+            log_level,
+            stdlib_path,
             no_log,
+            profile,
         } => {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("Failed to initialize tokio runtime for language server");
-            rt.block_on(ls_cmd(port, stdio, log_file, no_log))
+            rt.block_on(ls_cmd(
+                port,
+                stdio,
+                log_file,
+                no_log,
+                log_level,
+                stdlib_path,
+                profile,
+            ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
         Commands::Studio { command } => match command {

@@ -39,6 +39,10 @@ Write language-server logs to a custom file.
 Disable language-server logging setup.
 {{/option}}
 
+{{#option "`--profile`" }}
+Collect performance counters and timings for the `ton/profile` LSP request.
+{{/option}}
+
 {{/options}}
 
 ### Display Options
@@ -69,6 +73,13 @@ build/logs/tolk-language-server.log
 ```
 
 Parent directories for a custom `--log-file` are created automatically.
+
+## Profiling
+
+Pass `--profile` to collect operation counters and timings. Clients can retrieve
+the current session data with the `ton/profile` custom request. See
+[Language server protocol extensions](https://ton-blockchain.github.io/acton/docs/ide-support/language-server-protocol)
+for the request and response schema.
 
 ## Project Context
 

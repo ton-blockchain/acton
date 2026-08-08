@@ -36,7 +36,6 @@ dependencies = [
  "ctrlc",
  "dap",
  "dap-client",
- "dashmap 7.0.0-rc2",
  "dotenvy",
  "dunce",
  "ed25519-dalek",
@@ -97,13 +96,12 @@ dependencies = [
  "ton-emulator",
  "ton-executor",
  "ton-indexer-contracts",
+ "ton-language-server-native",
  "ton-localnet",
- "ton-ls",
  "ton-networks",
  "ton-retrace",
  "toncenter-keys",
  "tower-http",
- "tower-lsp",
  "tree-sitter",
  "tvm-ffi",
  "tvm-logs",
@@ -5621,6 +5619,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-language-server-core"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "expect-test",
+ "fift-syntax",
+ "include_dir",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
+ "tasm-syntax",
+ "tlb-syntax",
+ "tolk-analysis",
+ "tolk-fmt",
+ "tolk-resolver",
+ "tolk-syntax",
+ "tolk-ty",
+ "toml",
+ "toml-syntax",
+ "ton-json-schema",
+ "ton-syntax",
+ "tracing",
+ "tree-sitter",
+ "url",
+ "web-time",
+]
+
+[[package]]
+name = "ton-language-server-native"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "expect-test",
+ "serde",
+ "serde_json",
+ "tasm-core",
+ "tempfile",
+ "tokio",
+ "ton-language-server-core",
+ "tower-lsp",
+ "tracing",
+ "tycho-types",
+]
+
+[[package]]
+name = "ton-language-server-wasm"
+version = "1.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "ton-language-server-core",
+ "tracing",
+ "tree-sitter",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "ton-liteapi"
 version = "1.1.0"
 dependencies = [
@@ -5685,35 +5742,6 @@ dependencies = [
  "tvm-ffi",
  "tycho-types",
  "url",
-]
-
-[[package]]
-name = "ton-ls"
-version = "1.1.0"
-dependencies = [
- "acton-config",
- "anyhow",
- "dashmap 7.0.0-rc2",
- "expect-test",
- "fift-syntax",
- "function_name",
- "log",
- "lsp-types",
- "rustc-hash 2.1.1",
- "serde_json",
- "tasm-core",
- "tasm-syntax",
- "tlb-syntax",
- "tokio",
- "tolk-linter",
- "tolk-resolver",
- "tolk-syntax",
- "tolk-ty",
- "toml-syntax",
- "ton-json-schema",
- "ton-syntax",
- "tower-lsp",
- "tree-sitter",
 ]
 
 [[package]]

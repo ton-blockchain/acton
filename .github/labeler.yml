@@ -24,7 +24,9 @@
   - changed-files:
       - any-glob-to-any-file:
           - "crates/dap-client/**"
-          - "crates/ton-ls/**"
+          - "crates/ton-language-server-core/**"
+          - "crates/ton-language-server-native/**"
+          - "crates/ton-language-server-wasm/**"
           - "crates/tree-sitter-tolk/**"
           - "crates/tree-sitter-fift/**"
           - "crates/tree-sitter-tlb/**"

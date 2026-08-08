@@ -1,0 +1,50 @@
+{
+  "name": "ton-language-server-web-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build:wasm && tsc --noEmit && vite build",
+    "build:fift": "bun run build:wasm:fift && tsc --noEmit && vite build",
+    "build:tasm": "bun run build:wasm:tasm && tsc --noEmit && vite build",
+    "build:tlb": "bun run build:wasm:tlb && tsc --noEmit && vite build",
+    "build:tolk": "bun run build:wasm:tolk && tsc --noEmit && vite build",
+    "build:toml": "bun run build:wasm:toml && tsc --noEmit && vite build",
+    "build:wasm": "wasm-pack build .. --target web --out-dir web/src/wasm --release",
+    "build:wasm:dev": "wasm-pack build .. --target web --out-dir web/src/wasm --dev",
+    "build:wasm:fift": "wasm-pack build .. --target web --out-dir web/src/wasm --release --no-default-features --features fift",
+    "build:wasm:profiling": "wasm-pack build .. --target web --out-dir web/src/wasm --profiling",
+    "build:wasm:tasm": "wasm-pack build .. --target web --out-dir web/src/wasm --release --no-default-features --features tasm",
+    "build:wasm:tlb": "wasm-pack build .. --target web --out-dir web/src/wasm --release --no-default-features --features tlb",
+    "build:wasm:tolk": "wasm-pack build .. --target web --out-dir web/src/wasm --release --no-default-features --features tolk",
+    "build:wasm:toml": "wasm-pack build .. --target web --out-dir web/src/wasm --release --no-default-features --features toml",
+    "dev": "vite --host 127.0.0.1 --port 3021",
+    "e2e": "playwright test --config playwright.config.ts",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "preview": "vite preview --host 127.0.0.1 --port 3022"
+  },
+  "dependencies": {
+    "@codingame/monaco-vscode-editor-api": "^25.1.2",
+    "@codingame/monaco-vscode-monarch-service-override": "^25.1.2",
+    "monaco-languageclient": "10.7.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@^25.1.2",
+    "vscode-languageserver": "9.0.1",
+    "vscode-languageserver-textdocument": "1.0.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0",
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16",
+    "wasm-pack": "0.15.0"
+  }
+}

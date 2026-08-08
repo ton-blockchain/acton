@@ -41,4 +41,5 @@ extend-ignore-re = [
   "authentification",
   "ba",
   "lazer",
+  "\\b(?:vart|fo|FO|Fo|tou|overfl|bui|tru|TNam)\\b", # completion prefixes
 ]

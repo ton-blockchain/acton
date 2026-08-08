@@ -1,0 +1,276 @@
+[package]
+name = "ton-language-server-core"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[features]
+default = ["all-languages"]
+all-languages = ["tlb", "tasm", "fift", "tolk", "toml"]
+tlb = ["dep:tlb-syntax"]
+tasm = ["dep:tasm-syntax"]
+fift = ["dep:fift-syntax"]
+toml = ["dep:toml", "dep:toml-syntax", "dep:ton-json-schema"]
+tolk = [
+    "dep:include_dir",
+    "dep:rustc-hash",
+    "dep:tolk-analysis",
+    "dep:tolk-fmt",
+    "dep:tolk-resolver",
+    "dep:tolk-syntax",
+    "dep:tolk-ty",
+    "dep:toml",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+include_dir = { workspace = true, optional = true }
+rustc-hash = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+fift-syntax = { workspace = true, optional = true }
+tasm-syntax = { workspace = true, optional = true }
+tlb-syntax = { workspace = true, optional = true }
+tolk-resolver = { workspace = true, optional = true }
+tolk-analysis = { workspace = true, optional = true }
+tolk-fmt = { workspace = true, optional = true }
+tolk-syntax = { workspace = true, optional = true }
+tolk-ty = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+toml-syntax = { workspace = true, optional = true }
+ton-json-schema = { workspace = true, optional = true }
+ton-syntax = { workspace = true }
+tracing = { workspace = true }
+tree-sitter = { workspace = true }
+url = { workspace = true }
+web-time = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
+
+[[test]]
+name = "logging"
+path = "tests/logging.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "profiling"
+path = "tests/profiling.rs"
+required-features = ["tlb", "tolk"]
+
+[[test]]
+name = "tlb_definition"
+path = "tests/languages/tlb/definition.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_completion"
+path = "tests/languages/tlb/completion.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_incremental_edit"
+path = "tests/languages/tlb/incremental_edit.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_semantic_tokens"
+path = "tests/languages/tlb/semantic_tokens.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_references"
+path = "tests/languages/tlb/references.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_hover"
+path = "tests/languages/tlb/hover.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_document_symbols"
+path = "tests/languages/tlb/document_symbols.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tlb_inlay_hints"
+path = "tests/languages/tlb/inlay_hints.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "tasm_hover"
+path = "tests/languages/tasm/hover.rs"
+required-features = ["tasm"]
+
+[[test]]
+name = "tasm_completion"
+path = "tests/languages/tasm/completion.rs"
+required-features = ["tasm"]
+
+[[test]]
+name = "tasm_code_lens"
+path = "tests/languages/tasm/code_lens.rs"
+required-features = ["tasm"]
+
+[[test]]
+name = "tasm_folding"
+path = "tests/languages/tasm/folding.rs"
+required-features = ["tasm"]
+
+[[test]]
+name = "fift_folding"
+path = "tests/languages/fift/folding.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_completion"
+path = "tests/languages/fift/completion.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_semantic_tokens"
+path = "tests/languages/fift/semantic_tokens.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_definition"
+path = "tests/languages/fift/definition.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_references"
+path = "tests/languages/fift/references.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_hover"
+path = "tests/languages/fift/hover.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_code_lens"
+path = "tests/languages/fift/code_lens.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "fift_inlay_hints"
+path = "tests/languages/fift/inlay_hints.rs"
+required-features = ["fift"]
+
+[[test]]
+name = "tolk_definition"
+path = "tests/languages/tolk/definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_incremental_analysis"
+path = "tests/languages/tolk/incremental_analysis.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_folding"
+path = "tests/languages/tolk/folding.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_hover"
+path = "tests/languages/tolk/hover.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_document_symbols"
+path = "tests/languages/tolk/document_symbols.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_signature_help"
+path = "tests/languages/tolk/signature_help.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_rename"
+path = "tests/languages/tolk/rename.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_type_definition"
+path = "tests/languages/tolk/type_definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_type_at_position"
+path = "tests/languages/tolk/type_at_position.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_compiler_corpus"
+path = "tests/languages/tolk/compiler/mod.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_document_highlights"
+path = "tests/languages/tolk/document_highlights.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_workspace_symbols"
+path = "tests/languages/tolk/workspace_symbols.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_code_actions"
+path = "tests/languages/tolk/code_actions/mod.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_file_rename"
+path = "tests/languages/tolk/file_rename.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_completion_providers"
+path = "tests/languages/tolk/completion/providers.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_references"
+path = "tests/languages/tolk/references.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_semantic_tokens"
+path = "tests/languages/tolk/semantic_tokens.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_inlay_hints"
+path = "tests/languages/tolk/inlay_hints.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_formatting"
+path = "tests/languages/tolk/formatting.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "toml_completion"
+path = "tests/languages/toml/completion.rs"
+required-features = ["toml"]
+
+[[test]]
+name = "toml_hover"
+path = "tests/languages/toml/hover.rs"
+required-features = ["toml"]
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

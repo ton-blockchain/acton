@@ -1,0 +1,83 @@
+:root {
+  --color-primary: #0a84ff;
+  --color-primary-rgb: 10, 132, 255;
+
+  --color-success: var(--vscode-charts-green);
+  --color-success-bg: color-mix(in srgb, var(--color-success) 10%, transparent);
+  --color-success-text: var(--vscode-charts-green);
+  --color-share-copied-bg: color-mix(in srgb, var(--color-success) 10%, transparent);
+  --color-share-copied-border: var(--vscode-charts-green);
+  --color-share-copied-text: var(--vscode-charts-green);
+
+  --color-error-text: var(--vscode-errorForeground);
+  --color-error-bg: color-mix(in srgb, var(--color-error-text) 10%, transparent);
+
+  --color-text-primary: var(--vscode-foreground);
+  --color-text-secondary: var(--vscode-descriptionForeground);
+  --color-text-tertiary: var(--vscode-disabledForeground);
+  --color-text-secondary-hex: var(--vscode-descriptionForeground);
+  --color-text-placeholder: var(--vscode-input-placeholderForeground);
+  --color-text-disabled: var(--vscode-disabledForeground);
+  --color-text-on-primary: #fff;
+  --color-text-inverted: var(--vscode-editor-background);
+  --color-text-inverted-only-on-light: #fff;
+  --editor-faded-text-color: var(--vscode-disabledForeground);
+
+  --color-background-primary: var(--vscode-editor-background);
+  --color-background-secondary: var(--vscode-sideBar-background);
+  --color-background-tertiary: var(--vscode-panel-background);
+
+  --color-border: var(--vscode-panel-border);
+  --color-divider: var(--vscode-panel-border);
+
+  --table-border-color: var(--color-divider);
+  --table-th-text-color: var(--color-text-secondary);
+  --table-th-border-color: var(--color-background-primary);
+  --table-td-text-color: var(--color-text-primary);
+  --table-boolean-true-color: var(--color-success-text);
+  --table-boolean-false-color: var(--color-error-text);
+
+  --font-size-xsss: 0.55rem;
+  --font-size-xss: 0.65rem;
+  --font-size-xs: 0.75rem;
+  --font-size-xsm: 0.82rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-xss: 0.1rem;
+  --spacing-xs: 0.25rem;
+  --spacing-sms: 0.35rem;
+  --spacing-sm: 0.5rem;
+  --spacing-mds: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lmd: 1.25rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-full: 9999px;
+
+  --transition-duration-fast: 0.15s;
+  --transition-duration-normal: 0.3s;
+
+  font-family: var(--vscode-font-family), sans-serif;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background-color: var(--color-background-primary);
+  font-synthesis: none;
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
