@@ -1,0 +1,20 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ unit double [TIME]
+
+ ✓ 1 passed in 1 file
+
+ COVERAGE  
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                Covered   Total Lines   % Lines   Covered   Total Branches   % Branches   Score 
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                 1             2     50.0%         0                0          n/a   50.0% 
+ code/helpers.tolk         1             2     50.0%         0                0          n/a   50.0% 
+
+Text coverage file saved in coverage.txt

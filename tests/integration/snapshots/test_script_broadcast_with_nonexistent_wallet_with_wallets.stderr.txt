@@ -1,3 +1,0 @@
-Error: Wallet nonexistent not found in Acton.toml
-Available wallets:
-  deployer

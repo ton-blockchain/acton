@@ -1,9 +1,12 @@
+use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, global_libraries_path, global_wallets_path,
     project_root as configured_project_root,
 };
 use anyhow::{Context, anyhow};
 use inquire::Select;
+use num_bigint::{BigInt, Sign};
+use std::io::{IsTerminal, stdin, stdout};
 use std::path::Path;
 use ton_executor::ExecutorVerbosity;
 
@@ -96,15 +99,16 @@ pub mod error_fmt {
         if contracts.is_none() || contracts.as_ref().is_some_and(|c| c.is_empty()) {
             return "no contracts defined yet".to_string();
         }
-        contracts
-            .map(|contracts| {
+        contracts.map_or_else(
+            || "none".to_string(),
+            |contracts| {
                 contracts
                     .keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string())
+            },
+        )
     }
 
     #[must_use]
@@ -113,15 +117,16 @@ pub mod error_fmt {
         if wallets.is_none() || wallets.as_ref().is_some_and(|c| c.is_empty()) {
             return format!("Wallet {} not found. {}", name.yellow(), no_wallets_found());
         }
-        let available = wallets
-            .map(|contracts| {
+        let available = wallets.map_or_else(
+            || "none".to_string(),
+            |contracts| {
                 contracts
                     .keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string());
+            },
+        );
         format!(
             "Wallet {} not found in wallets.toml and global.wallets.toml\nAvailable wallets:\n{}",
             name.yellow(),
@@ -139,14 +144,15 @@ pub mod error_fmt {
                 no_libraries_found()
             );
         }
-        let available = libraries
-            .map(|libs| {
+        let available = libraries.map_or_else(
+            || "none".to_string(),
+            |libs| {
                 libs.keys()
                     .map(|s| format!(" {}", s.yellow()))
                     .collect::<Vec<_>>()
                     .join("\n")
-            })
-            .unwrap_or_else(|| "none".to_string());
+            },
+        );
         format!(
             "Library {} not found in libraries.toml and global.libraries.toml\nAvailable libraries:\n{}",
             name.yellow(),
@@ -256,7 +262,7 @@ script-name = \"command invocation\""
     #[must_use]
     pub fn no_wallets_found() -> String {
         format!(
-            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more information",
+            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/wallets for more information",
             "wallets.toml".yellow(),
             "acton wallet new".yellow(),
             "wallets.toml".green(),
@@ -277,6 +283,35 @@ script-name = \"command invocation\""
             "libraries.toml".green()
         )
     }
+}
+
+#[must_use]
+pub fn format_nanograms(value: &BigInt) -> String {
+    let sign = if value.sign() == Sign::Minus { "-" } else { "" };
+    let digits = value.to_str_radix(10);
+    let digits = digits.trim_start_matches('-');
+
+    let formatted = if digits.len() <= 9 {
+        let fractional = format!("{digits:0>9}");
+        trim_nanogram_fraction(format!("0.{fractional}"))
+    } else {
+        let (whole, fractional) = digits.split_at(digits.len() - 9);
+        trim_nanogram_fraction(format!("{whole}.{fractional}"))
+    };
+
+    format!("{sign}{formatted} GRAM")
+}
+
+fn trim_nanogram_fraction(mut value: String) -> String {
+    if let Some(dot_index) = value.find('.') {
+        while value.ends_with('0') {
+            value.pop();
+        }
+        if value.len() == dot_index + 1 {
+            value.pop();
+        }
+    }
+    value
 }
 
 pub fn select_contract(
@@ -340,6 +375,19 @@ pub fn validate_cli_verbosity(level: u8) -> anyhow::Result<u8> {
     }
 }
 
+pub(crate) fn shell_quote(value: &str) -> String {
+    if value.is_empty() {
+        "''".to_owned()
+    } else if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | ','))
+    {
+        value.to_owned()
+    } else {
+        format!("'{}'", value.replace('\'', r"'\''"))
+    }
+}
+
 pub fn select_wallet(wallet_name: Option<String>, config: &ActonConfig) -> anyhow::Result<String> {
     let wallet_name = if let Some(name) = wallet_name {
         name
@@ -352,6 +400,17 @@ pub fn select_wallet(wallet_name: Option<String>, config: &ActonConfig) -> anyho
         match wallet_names.len() {
             0 => anyhow::bail!(error_fmt::no_wallets_found()),
             1 => wallet_names[0].clone(),
+            _ if !stdin().is_terminal() || !stdout().is_terminal() => {
+                let available_wallets = wallet_names
+                    .iter()
+                    .map(|name| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                anyhow::bail!(
+                    "Cannot prompt for wallet selection in a non-interactive environment.\n\nPass the wallet name explicitly. Available wallets: {}",
+                    available_wallets.cyan()
+                );
+            }
             _ => {
                 let wallet_name = Select::new(
                     "Multiple wallets configured. Please select which wallet to use:",
@@ -396,4 +455,32 @@ pub fn symlink_global_libraries() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_nanograms;
+    use num_bigint::BigInt;
+
+    #[test]
+    fn format_nanograms_preserves_large_integer_precision() {
+        let value = BigInt::parse_bytes(b"123456789012345678901234567890123456789", 10)
+            .expect("valid decimal integer");
+
+        assert_eq!(
+            format_nanograms(&value),
+            "123456789012345678901234567890.123456789 GRAM"
+        );
+    }
+
+    #[test]
+    fn format_nanograms_trims_fractional_zeroes_and_preserves_sign() {
+        assert_eq!(format_nanograms(&BigInt::from(0)), "0 GRAM");
+        assert_eq!(format_nanograms(&BigInt::from(1)), "0.000000001 GRAM");
+        assert_eq!(
+            format_nanograms(&BigInt::from(1_234_500_000)),
+            "1.2345 GRAM"
+        );
+        assert_eq!(format_nanograms(&BigInt::from(-1)), "-0.000000001 GRAM");
+    }
 }

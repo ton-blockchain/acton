@@ -2,6 +2,7 @@ use crate::commands::test::TestDescriptor;
 use crate::commands::test::trace::TransactionInfo;
 use crate::context::{AssertFailure, BuildCache, EmulationsState, KnownAddresses};
 use crate::formatter::FormatterContext;
+use acton_config::config::Network;
 use acton_config::test::BacktraceMode;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
@@ -9,17 +10,17 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use ton_abi::ContractAbi;
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceLocation;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::{ShardAccount, StdAddr};
 
 pub(super) mod console;
 pub(super) mod dot;
 pub(super) mod junit;
+pub(super) mod studio;
 pub(super) mod teamcity;
 pub(super) mod ui;
 
@@ -28,6 +29,7 @@ pub struct TestExecutionContext {
     pub gas_used: u64,
     pub stdout: String,
     pub stderr: String,
+    pub debug_output: String,
     pub vm_log: Option<Arc<str>>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
@@ -79,6 +81,10 @@ pub struct TestFailureExecutionContext {
     pub emulations: EmulationsState,
     pub known_addresses: KnownAddresses,
     pub known_code_cells: FxHashMap<HashBytes, String>,
+    pub has_wallets_config: bool,
+    pub available_wallets: Vec<String>,
+    pub fork_net: Option<Network>,
+    pub network: Option<Network>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -106,11 +112,9 @@ pub struct TestReport {
     pub details: Option<String>,
     pub location: Option<SourceLocation>,
     #[serde(skip)]
-    pub abi: Arc<ContractAbi>,
+    pub abi: Option<Arc<ContractABI>>,
     #[serde(skip)]
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
-    #[serde(skip)]
-    pub source_map: Arc<TolkSourceMap>,
+    pub source_map: Arc<SourceMap>,
     #[serde(skip)]
     pub show_bodies: bool,
     #[serde(skip)]
@@ -162,6 +166,10 @@ pub trait TestReporter: Send + Sync {
     }
 
     fn on_testing_finished(&mut self, _stats: &TestSuiteStats) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn on_run_finished(&mut self, _success: bool) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -240,6 +248,13 @@ impl ReporterManager {
         Ok(())
     }
 
+    pub fn on_run_finished(&mut self, success: bool) -> anyhow::Result<()> {
+        for reporter in &mut self.reporters {
+            reporter.on_run_finished(success)?;
+        }
+        Ok(())
+    }
+
     pub fn on_suite_started(
         &mut self,
         file_path: &Path,
@@ -292,30 +307,20 @@ pub(super) fn extract_suite_name(file_path: &Path) -> Arc<str> {
         .into()
 }
 
-pub(super) fn formatter_for_failed_test<'a>(test: &'a TestReport) -> Option<FormatterContext<'a>> {
+pub(super) fn formatter_for_failed_test(test: &TestReport) -> Option<FormatterContext<'_>> {
     let failure = test.execution.as_ref()?.failure.as_ref()?;
 
     Some(FormatterContext {
-        contract_abi: test.abi.clone(),
         accounts: Cow::Borrowed(&failure.accounts),
         build_cache: Cow::Borrowed(&failure.build_cache),
         emulations: Cow::Borrowed(&failure.emulations),
         known_addresses: Cow::Borrowed(&failure.known_addresses),
         known_code_cells: Cow::Borrowed(&failure.known_code_cells),
         show_bodies: test.show_bodies,
-        has_wallets_config: false,
-        available_wallets: vec![],
+        has_wallets_config: failure.has_wallets_config,
+        available_wallets: failure.available_wallets.clone(),
         backtrace: test.backtrace,
-        fork_net: None,
-        network: None,
+        fork_net: failure.fork_net.clone(),
+        network: failure.network.clone(),
     })
-}
-
-pub(super) fn escape_xml(input: &str) -> String {
-    input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }

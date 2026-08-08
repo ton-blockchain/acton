@@ -1,6 +1,11 @@
+use crate::commands::rpc::{
+    find_local_contract_by_abi_name, find_local_contract_by_config_name,
+    find_verifier_abi_by_code_hash, load_rpc_config,
+};
 use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, anyhow};
 use tasm_core::spec::{SpecInstruction, load_tvm_specification};
+use tolk_compiler::abi::ContractABI;
 
 const FIELD_LABEL_WIDTH: usize = 14;
 
@@ -40,9 +45,12 @@ pub fn doc_tvm_cmd(
                 search_in_description,
             );
             if matches.is_empty() {
-                anyhow::bail!(
-                    "No TVM instructions found for query '{query}' in the built-in specification"
-                );
+                return Err(find_query_not_found_error(
+                    query,
+                    &spec.instructions,
+                    &normalized_search_query,
+                    search_in_description,
+                ));
             }
 
             results.push(FindQueryResult {
@@ -104,6 +112,52 @@ pub fn doc_tvm_cmd(
     Ok(())
 }
 
+pub fn doc_abi_cmd(contract_query: &str) -> Result<()> {
+    let contract_query = contract_query.trim();
+    if contract_query.is_empty() {
+        anyhow::bail!("Contract name or code hash cannot be empty");
+    }
+
+    let config = load_rpc_config()?;
+    let local_contract = find_local_contract_by_config_name(contract_query, &config)?;
+    if let Some(abi) = local_contract
+        .as_ref()
+        .and_then(|contract| contract.abi.as_deref())
+    {
+        return print_abi_json(abi);
+    }
+
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_query) {
+        return print_abi_json(catalog_contract.abi().as_ref());
+    }
+
+    if let Some(local_contract) = find_local_contract_by_abi_name(contract_query, &config)?
+        && let Some(abi) = local_contract.abi.as_deref()
+    {
+        return print_abi_json(abi);
+    }
+
+    if let Some(abi) = find_verifier_abi_by_code_hash(contract_query)? {
+        return print_abi_json(abi.as_ref());
+    }
+
+    if let Some(local_contract) = local_contract {
+        anyhow::bail!(
+            "Local contract '{}' was found, but it does not declare ABI",
+            local_contract.contract_name
+        );
+    }
+
+    anyhow::bail!(
+        "Contract ABI '{contract_query}' not found in local Acton.toml contracts, bundled ABI catalog, or verifier"
+    );
+}
+
+fn print_abi_json(abi: &ContractABI) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(abi)?);
+    Ok(())
+}
+
 fn find_instruction<'a>(
     instructions: &'a [SpecInstruction],
     normalized_name_query: &str,
@@ -139,6 +193,31 @@ fn suggest_instruction_names(
         .into_iter()
         .take(limit)
         .collect()
+}
+
+fn find_query_not_found_error(
+    raw_query: &str,
+    instructions: &[SpecInstruction],
+    normalized_query: &str,
+    search_in_description: bool,
+) -> anyhow::Error {
+    let base_message =
+        format!("No TVM instructions found for query '{raw_query}' in the built-in specification");
+
+    if search_in_description {
+        return anyhow!(base_message);
+    }
+
+    let description_matches = find_instruction_names(instructions, normalized_query, true);
+    if description_matches.is_empty() {
+        anyhow!(base_message)
+    } else {
+        anyhow!(
+            "{}. Pass {} to search instruction descriptions as well.",
+            base_message,
+            "--description".yellow()
+        )
+    }
 }
 
 fn find_instruction_names(

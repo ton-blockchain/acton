@@ -13,19 +13,21 @@ import "@contracts/storage"
 struct JettonMinter {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
 fun JettonMinter.fromStorage(
     storage: MinterStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): JettonMinter {
     val stateInit = ContractState {
         code: build("JettonMinter"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return JettonMinter { address, stateInit };
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+    return JettonMinter { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -41,7 +43,11 @@ fun JettonMinter.deploy(self, from: address, config: SendParams = {}): SendResul
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }
@@ -183,12 +189,12 @@ fun JettonMinter.sendUpgradeMinterCode(
     return net.send(from, genericMsg);
 }
 
-fun JettonMinter.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+fun JettonMinter.sendTopUpGrams(self, from: address, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: TopUpTons {},
+        body: TopUpGrams {},
     });
     return net.send(from, genericMsg);
 }

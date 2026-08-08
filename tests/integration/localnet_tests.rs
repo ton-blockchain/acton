@@ -1,12 +1,29 @@
 use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
+use crate::support::localnet::{
+    assert_v3_bad_request, block_header_gen_utime, is_success_response, latest_masterchain_seqno,
+    parse_address_balance, pretty_json_for_snapshot, response_payload, summarize_admin_response,
+    wait_for_address_balance_at_least, wait_for_ok_response,
+};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
+use crate::support::toncenter::{
+    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG, append_custom_network,
+    append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
+    extract_canonical_addr_marker, format_captured_requests, jetton_v1_action_project,
+    mocked_config_boc64, mocked_global_version_cell, nft_v1_action_project,
+    run_localnet_action_project, spawn_toncenter_v2_mock_with_capture, test_std_addr,
+    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
+    with_nft_v1_action_fixtures,
+};
 use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::fs;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -15,11 +32,15 @@ use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
-use ton_localnet::types::Hash256;
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
+use ton_api::toncenter::emulate::v1::EmulateTraceResponse;
+use ton_api::toncenter::v2::StringOrNumber;
+use ton_api::toncenter::v2::{requests as v2_requests, responses as v2_responses};
+use ton_api::toncenter::v3 as toncenter_v3;
+use ton_localnet::types::{Addr, Hash256};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::{
-    CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo, OwnedMessage, StdAddr,
+    AccountState, ExtInMsgInfo, IntAddr, Message, MsgInfo, ShardAccount, StateInit, StdAddr,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -107,12 +128,63 @@ fun main() {
 }
 "#;
 
-const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
-kind = "v4r2"
-workchain = 0
-keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+const EXTERNAL_IS_ACCEPTED_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val result = net.sendExternal(
+        net.createExternalMessage(wallet.address, createEmptyCell()),
+    );
+
+    net.disableBroadcast();
+    println(result.isAccepted());
+}
 "#;
+
+const DEPLOY_TRACKED_CONTRACT_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val trackedInit = ContractState {
+        code: build("tracked"),
+        data: createEmptyCell(),
+    };
+    val trackedAddress = AutoDeployAddress {
+        stateInit: trackedInit,
+    }.calculateAddress();
+
+    val deployTracked = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: trackedInit,
+        },
+    });
+    net.send(wallet.address, deployTracked);
+
+    println("TRACKED_CONTRACT={}", trackedAddress);
+}
+"#;
+
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+fn reserve_localnet_port() -> Option<(TcpListener, String)> {
+    let listener = TcpListener::bind("127.0.0.1:0").ok()?;
+    let port = listener
+        .local_addr()
+        .expect("Reserved localnet TCP port has no address")
+        .port()
+        .to_string();
+    Some((listener, port))
+}
 
 const V3_GETTER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -122,6 +194,43 @@ get fun addTen(value: int): int {
     return value + 10;
 }
 ";
+
+const PREVBLOCKS_GETTER_CONTRACT: &str = r#"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+@pure
+fun prevMcBlocks(): tuple
+    asm "PREVMCBLOCKS"
+
+@pure
+fun prevKeyBlock(): tuple
+    asm "PREVKEYBLOCK"
+
+@pure
+fun prevMcBlocks100(): tuple
+    asm "PREVMCBLOCKS_100"
+
+fun blockSeqno(block: tuple): int {
+    return block.get(2) as int;
+}
+
+get fun prevMcBlocksCount(): int {
+    return prevMcBlocks().size();
+}
+
+get fun latestPrevMcSeqno(): int {
+    return blockSeqno(prevMcBlocks().first() as tuple);
+}
+
+get fun prevKeySeqno(): int {
+    return blockSeqno(prevKeyBlock());
+}
+
+get fun prevMcBlocks100FirstSeqno(): int {
+    return blockSeqno(prevMcBlocks100().first() as tuple);
+}
+"#;
 
 const V3_DEPLOY_GETTER_SCRIPT: &str = r#"
 import "../../lib/build"
@@ -150,6 +259,104 @@ fun main() {
     net.send(wallet.address, deployGetter);
 
     println("GETTER_CONTRACT={}", getterAddress);
+}
+"#;
+
+const LOCALNET_CACHE_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    counter: uint32
+}
+
+fun Storage.load(): Storage {
+    return Storage.fromCell(contract.getData());
+}
+
+fun Storage.save(self) {
+    contract.setData(self.toCell());
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+";
+
+const LOCALNET_CACHE_COUNTER_CONTRACT: &str = r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy IncreaseCounter.fromSlice(in.body);
+    var storage = lazy Storage.load();
+    storage.counter += msg.increaseBy;
+    storage.save();
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounter(): int {
+    val storage = lazy Storage.load();
+    return storage.counter;
+}
+"#;
+
+const LOCALNET_CACHE_REFRESH_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/types"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val counterInit = ContractState {
+        code: build("counter"),
+        data: Storage {
+            id: 0,
+            counter: 7,
+        }.toCell(),
+    };
+    val counterAddress = AutoDeployAddress {
+        stateInit: counterInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: counterInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val before: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("BEFORE={}", before);
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.05"),
+        dest: counterAddress,
+        body: IncreaseCounter {
+            increaseBy: 5,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("INCREASE_NULL");
+        return;
+    }
+
+    val after: int = net.runGetMethod(counterAddress, "currentCounter");
+    println("AFTER={}", after);
 }
 "#;
 
@@ -305,6 +512,99 @@ fun main() {
 "#;
 
 #[test]
+fn localnet_start_port_conflict_is_reported_with_hint() {
+    let project = ProjectBuilder::new("localnet-port-conflict").build();
+    let Some((_listener, port)) = reserve_localnet_port() else {
+        return;
+    };
+
+    let output = project
+        .acton()
+        .arg("localnet")
+        .arg("start")
+        .arg("--port")
+        .arg(&port)
+        .arg("--block-interval-ms")
+        .arg("50")
+        .run()
+        .failure();
+
+    output
+        .assert_not_contains("Starting Localnet server")
+        .assert_stderr_contains("Failed to start localnet on 127.0.0.1:")
+        .assert_stderr_contains("Set another port with [localnet].port in Acton.toml")
+        .assert_stderr_contains("Or stop the process currently listening on that port")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/localnet/test_localnet_start_port_conflict.stderr.txt",
+        );
+}
+
+#[test]
+fn localnet_liteapi_is_opt_in() {
+    let default_project = ProjectBuilder::new("localnet-liteapi-default-off").build();
+    let default_node = default_project.localnet().start();
+    let default_liteapi_port = default_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let default_liteapi = match TcpListener::bind(("127.0.0.1", default_liteapi_port)) {
+        Ok(_listener) => "available",
+        Err(_) => "occupied",
+    };
+    default_node.stop();
+
+    let enabled_project = ProjectBuilder::new("localnet-liteapi-enabled").build();
+    let enabled_node = enabled_project.localnet().arg("--liteapi").start();
+    let enabled_liteapi_port = enabled_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let enabled_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", enabled_liteapi_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    enabled_node.stop();
+
+    let explicit_project = ProjectBuilder::new("localnet-liteapi-explicit-port").build();
+    let explicit_builder = explicit_project.localnet();
+    let explicit_port_probe =
+        TcpListener::bind(("127.0.0.1", 0)).expect("failed to reserve explicit LiteAPI test port");
+    let explicit_port = explicit_port_probe
+        .local_addr()
+        .expect("failed to read explicit LiteAPI test port")
+        .port();
+    drop(explicit_port_probe);
+    let explicit_port_arg = explicit_port.to_string();
+    let explicit_node = explicit_builder
+        .args(["--liteapi", "--liteapi-port", explicit_port_arg.as_str()])
+        .start();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let explicit_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", explicit_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    explicit_node.stop();
+
+    assertion().eq(
+        format!(
+            "without --liteapi: {default_liteapi}\nwith --liteapi: {enabled_liteapi}\nwith --liteapi-port: {explicit_liteapi}\n"
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_liteapi_opt_in.txt"),
+    );
+}
+
+#[test]
 fn localnet_starts_and_serves_masterchain_info() {
     let project = ProjectBuilder::new("localnet-smoke-masterchain-info").build();
     let node = project.localnet().start();
@@ -326,41 +626,1220 @@ fn localnet_starts_and_serves_masterchain_info() {
 }
 
 #[test]
-fn localnet_serves_embedded_ui_and_spa_routes() {
-    let project = ProjectBuilder::new("localnet-ui-smoke").build();
+fn localnet_v2_json_rpc_entrypoints_share_canonical_envelope() {
+    let project = ProjectBuilder::new("localnet-v2-json-rpc-entrypoints").build();
     let node = project.localnet().start();
+
+    let responses = ["/api/v2", "/api/v2/jsonRPC", "/api/v2/v2/jsonRPC"].map(|path| {
+        let response: v2_responses::JsonRpcResponse<v2_responses::MasterchainInfo> = node
+            .post_v2_json_rpc(
+                path,
+                StringOrNumber::String("masterchain".to_owned()),
+                "getMasterchainInfo",
+                v2_requests::EmptyRequest {},
+            );
+        (
+            path,
+            serde_json::to_value(response)
+                .expect("Typed getMasterchainInfo response must serialize"),
+        )
+    });
+    let expected_seqno = responses[0].1["result"]["last"]["seqno"].clone();
+    let summary = Value::Array(
+        responses
+            .into_iter()
+            .map(|(path, response)| {
+                json!({
+                    "path": path,
+                    "ok": response["ok"],
+                    "result_type": response["result"]["@type"],
+                    "same_seqno": response["result"]["last"]["seqno"] == expected_seqno,
+                    "has_extra": response["@extra"].as_str().is_some_and(|value| !value.is_empty()),
+                    "has_jsonrpc": response.get("jsonrpc").is_some(),
+                    "has_id": response.get("id").is_some(),
+                })
+            })
+            .collect(),
+    );
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_json_rpc_entrypoints.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_mines_empty_blocks_on_interval_without_transactions() {
+    let project = ProjectBuilder::new("localnet-empty-interval-blocks").build();
+    let node = project.localnet().args(["--mine-empty-blocks"]).start();
+
+    let initial_seqno = latest_masterchain_seqno(&node);
+    let empty_block_seqno = initial_seqno + 1;
+    let target_seqno = initial_seqno + 2;
+    let reached_seqno =
+        wait_for_masterchain_seqno_at_least(&node, target_seqno, Duration::from_secs(5));
+
+    let block = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={empty_block_seqno}"
+        ),
+        Duration::from_secs(5),
+    );
+    let block_payload = response_payload(&block);
+    let transactions = block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactionsExt must return transactions array");
+
+    let snapshot = json!({
+        "target_seqno_reached": reached_seqno >= target_seqno,
+        "empty_block": {
+            "type": block_payload["@type"].as_str(),
+            "req_count": block_payload["req_count"].as_u64(),
+            "transaction_count": transactions.len(),
+            "incomplete": block_payload["incomplete"].as_bool(),
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_empty_interval_blocks.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_uses_configured_db_path_relative_to_project_root() {
+    let project = ProjectBuilder::new("localnet-configured-db-path").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\ndb-path = \"state/localnet.sqlite\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to configure db-path in Acton.toml");
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir(&nested_dir).expect("failed to create nested working directory");
+    let db_path = project.path().join("state/localnet.sqlite");
+
+    let node = project.localnet().current_dir(nested_dir).start();
+    assert!(db_path.is_file(), "configured database must be created");
+    node.stop();
+}
+
+#[test]
+fn localnet_cli_db_path_overrides_configured_path() {
+    let project = ProjectBuilder::new("localnet-cli-db-path-override").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\ndb-path = \"state/config.sqlite\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to configure db-path in Acton.toml");
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir(&nested_dir).expect("failed to create nested working directory");
+    let configured_db_path = project.path().join("state/config.sqlite");
+    let cli_db_path = nested_dir.join("cli.sqlite");
+
+    let node = project
+        .localnet()
+        .current_dir(&nested_dir)
+        .args(["--db-path", "cli.sqlite"])
+        .start();
+    assert!(cli_db_path.is_file(), "CLI database must be created");
+    assert!(
+        !configured_db_path.exists(),
+        "configured database must not be used when --db-path is passed"
+    );
+    node.stop();
+}
+
+#[test]
+fn localnet_no_mining_mines_only_on_request() {
+    let project = ProjectBuilder::new("localnet-no-mining-manual-blocks").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
+
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let initial_seqno = latest_masterchain_seqno(&node);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&node);
+
+    let mine_default = node.post_json("/acton_mine", &json!({}));
+    let default_payload = response_payload(&mine_default);
+    let after_default_seqno = latest_masterchain_seqno(&node);
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("mine")
+        .arg("2")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let after_cli_seqno = latest_masterchain_seqno(&node);
+
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let before_faucet = node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000_u64
+        }),
+    );
+    let after_faucet_before_mine =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let mine_faucet = node.post_json("/acton_mine", &json!({}));
+    let after_faucet_mine =
+        wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
+
+    let mut invalid_zero = node.post_json_error("/acton_mine", &json!({ "blocks": 0 }));
+    normalize_extra_for_snapshot(&mut invalid_zero);
+
+    let snapshot = json!({
+        "config_no_mining_kept_seqno": after_sleep_seqno == initial_seqno,
+        "default_mine": {
+            "ok": mine_default["ok"].as_bool(),
+            "blocks_mined": default_payload["blocks_mined"].as_u64(),
+            "skipped_empty_blocks": default_payload["skipped_empty_blocks"].as_u64(),
+            "block_count": default_payload["blocks"].as_array().map(Vec::len),
+            "seqno_delta": after_default_seqno - initial_seqno,
+        },
+        "cli_mine": {
+            "seqno_delta": after_cli_seqno - after_default_seqno,
+        },
+        "queued_faucet": {
+            "fund_ok": fund["ok"].as_bool(),
+            "balance_before": parse_address_balance(&before_faucet).to_string(),
+            "balance_after_queue": parse_address_balance(&after_faucet_before_mine).to_string(),
+            "mine_ok": mine_faucet["ok"].as_bool(),
+            "balance_after_mine": parse_address_balance(&after_faucet_mine).to_string(),
+        },
+        "invalid_zero": {
+            "ok": invalid_zero["ok"].as_bool(),
+            "code": invalid_zero["code"].as_i64(),
+            "error": invalid_zero["error"].as_str(),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_no_mining_manual_blocks.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
+    let project = ProjectBuilder::new("localnet-time-controls").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\nmine-empty-blocks = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
+
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+
+    let first_mine = node.post_json("/acton_mine", &json!({}));
+    let first_seqno = response_payload(&first_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let first_gen_utime = block_header_gen_utime(&node, first_seqno);
+
+    let increase = node.post_json("/acton_increaseTime", &json!({ "seconds": 3600 }));
+    let increase_payload = response_payload(&increase);
+    let second_mine = node.post_json("/acton_mine", &json!({}));
+    let second_seqno = response_payload(&second_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let second_gen_utime = block_header_gen_utime(&node, second_seqno);
+
+    let target = "0:3333333333333333333333333333333333333333333333333333333333333333";
+    let next_block_timestamp = second_gen_utime + 7200;
+    let next_block_timestamp_arg = next_block_timestamp.to_string();
+    project
+        .acton()
+        .arg("localnet")
+        .arg("set-next-block-timestamp")
+        .arg(&next_block_timestamp_arg)
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let pending_status = node.get_json("/acton_nodeInfo");
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000_u64
+        }),
+    );
+    let next_timestamp_mine = node.post_json("/acton_mine", &json!({}));
+    let tx_block_seqno = response_payload(&next_timestamp_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let tx_block_gen_utime = block_header_gen_utime(&node, tx_block_seqno);
+    let tx_response = node.wait_for_non_empty_v3_transactions(
+        &format!("/api/v3/transactions?account={target}&limit=10"),
+        Duration::from_secs(3),
+    );
+    let txs = v3_transactions_from_response(&tx_response);
+    let faucet_tx_now = txs
+        .first()
+        .and_then(|tx| tx["now"].as_u64())
+        .expect("faucet transaction must expose now") as u32;
+    let cleared_status = node.get_json("/acton_nodeInfo");
+
+    let set_time_target = tx_block_gen_utime + 1800;
+    let set_time = node.post_json("/acton_setTime", &json!({ "timestamp": set_time_target }));
+    let set_time_mine = node.post_json("/acton_mine", &json!({}));
+    let set_time_seqno = response_payload(&set_time_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let set_time_block_gen_utime = block_header_gen_utime(&node, set_time_seqno);
+
+    let mut invalid_backwards = node.post_json_error(
+        "/acton_setNextBlockTimestamp",
+        &json!({ "timestamp": set_time_block_gen_utime - 1 }),
+    );
+    normalize_extra_for_snapshot(&mut invalid_backwards);
+    let mut invalid_zero_increase =
+        node.post_json_error("/acton_increaseTime", &json!({ "seconds": 0 }));
+    normalize_extra_for_snapshot(&mut invalid_zero_increase);
+
+    let snapshot = json!({
+        "increase_time": {
+            "ok": increase["ok"].as_bool(),
+            "offset_at_least_requested": increase_payload["time_offset_seconds"]
+                .as_i64()
+                .is_some_and(|offset| offset >= 3600),
+            "block_advanced_by_requested_delta": second_gen_utime >= first_gen_utime + 3600,
+        },
+        "next_block_timestamp": {
+            "pending_matches_requested_timestamp": pending_status["result"]["next_block_timestamp"]
+                .as_u64()
+                == Some(u64::from(next_block_timestamp)),
+            "fund_ok": fund["ok"].as_bool(),
+            "block_matches_requested_timestamp": tx_block_gen_utime == next_block_timestamp,
+            "tx_now_matches_block": faucet_tx_now == tx_block_gen_utime,
+            "pending_cleared_after_mine": cleared_status["result"]["next_block_timestamp"].is_null(),
+        },
+        "set_time": {
+            "ok": set_time["ok"].as_bool(),
+            "block_at_or_after_requested_time": set_time_block_gen_utime >= set_time_target,
+        },
+        "invalid_backwards": {
+            "ok": invalid_backwards["ok"].as_bool(),
+            "code": invalid_backwards["code"].as_i64(),
+            "error_contains_latest_block": invalid_backwards["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("before latest block timestamp")),
+        },
+        "invalid_zero_increase": {
+            "ok": invalid_zero_increase["ok"].as_bool(),
+            "code": invalid_zero_increase["code"].as_i64(),
+            "error": invalid_zero_increase["error"].as_str(),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_time_controls.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    const GLOBAL_VERSION: u32 = 777;
+    const GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+    let config_boc64 = mocked_config_boc64(GLOBAL_VERSION, GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+    ]);
+    let project = ProjectBuilder::new("localnet-historical-fork-snapshot").build();
+    append_custom_network(
+        project.path(),
+        "historical-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let start_fork = |db_path: &str| {
+        project
+            .localnet()
+            .args([
+                "--fork-net",
+                "custom:historical-snapshot",
+                "--fork-block-number",
+            ])
+            .arg(FORK_SEQNO.to_string())
+            .args(["--no-mining", "--mine-empty-blocks", "--db-path"])
+            .arg(db_path)
+            .ready_timeout(Duration::from_secs(5))
+            .start()
+    };
+    let node = start_fork("state/first.sqlite");
+    let config_param = node.get_json("/api/v2/getConfigParam?param=8");
+    let config_param_cell = Boc::decode_base64(
+        config_param["result"]["config"]["bytes"]
+            .as_str()
+            .expect("getConfigParam must return config bytes"),
+    )
+    .expect("config param must be a valid cell");
+    let mine = node.post_json("/acton_mine", &json!({}));
+    let mined_seqno = response_payload(&mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let mined_header = node.get_json(&format!(
+        "/api/v2/getBlockHeader?workchain=-1&shard=-9223372036854775808&seqno={mined_seqno}"
+    ));
+    let mined_gen_utime = response_payload(&mined_header)["gen_utime"]
+        .as_u64()
+        .expect("masterchain block header must expose gen_utime") as u32;
+
+    let snapshot = json!({
+        "config": {
+            "request_ok": config_param["ok"].as_bool(),
+            "matches_fork_block": config_param_cell.repr_hash()
+                == mocked_global_version_cell(GLOBAL_VERSION, GLOBAL_CAPABILITIES).repr_hash(),
+        },
+        "time": {
+            "mined_block_uses_fork_clock": (FORK_GEN_UTIME..=FORK_GEN_UTIME + 10).contains(&mined_gen_utime),
+        }
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.summary.json"
+        ),
+    );
+
+    node.stop();
+    let restarted_node = start_fork("state/second.sqlite");
+    restarted_node.stop();
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("localnet-fork-snapshot-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write localnet fork snapshot request log");
+    assertion().eq(
+        fs::read_to_string(project.path().join("localnet-fork-snapshot-requests.txt"))
+            .expect("failed to read localnet fork snapshot request log"),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.requests.txt"
+        ),
+    );
+}
+
+#[test]
+fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
+    let project = ProjectBuilder::new("localnet-no-mining-startup-accounts-fork").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    let source_fork_block = u64::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
+    let forked_db_path = project.path().join("state/forked.sqlite");
+    fs::create_dir_all(
+        forked_db_path
+            .parent()
+            .expect("forked database must have a parent"),
+    )
+    .expect("failed to create forked database directory");
+
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+
+    let historical_seqno = source_fork_block.saturating_sub(1);
+    let historical_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={historical_seqno}&limit=1"
+    );
+    let source_recent_transactions = source_node.get_json("/api/v3/transactions?limit=1&sort=desc");
+    let source_transaction = source_recent_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("fork source must expose a startup transaction");
+    let transaction_block = &source_transaction["block_ref"];
+    let transaction_workchain = transaction_block["workchain"]
+        .as_i64()
+        .expect("transaction block must expose workchain");
+    let transaction_shard = transaction_block["shard"]
+        .as_str()
+        .expect("transaction block must expose shard");
+    let transaction_seqno = transaction_block["seqno"]
+        .as_u64()
+        .expect("transaction block must expose seqno");
+    let transaction_account = source_transaction["account"]
+        .as_str()
+        .expect("source transaction must expose account");
+    let transaction_hash = source_transaction["hash"]
+        .as_str()
+        .expect("source transaction must expose hash");
+    let transaction_hash_hex = transaction_hash
+        .parse::<Hash256>()
+        .expect("source transaction hash must parse")
+        .to_hex();
+    let historical_transactions_path = format!(
+        "/api/v3/transactions?workchain={transaction_workchain}&shard={transaction_shard}&seqno={transaction_seqno}&limit=100"
+    );
+    let historical_shards_path = format!("/api/v2/getShards?seqno={historical_seqno}");
+    let fork_block_path = format!(
+        "/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={source_fork_block}&limit=1"
+    );
+    let source_historical_block = source_node.get_json(&historical_block_path);
+    let forked_historical_block = forked_node.get_json(&historical_block_path);
+    let source_fork_block_response = source_node.get_json(&fork_block_path);
+    let forked_fork_block_response = forked_node.get_json(&fork_block_path);
+    let source_historical_transactions = source_node.get_json(&historical_transactions_path);
+    let forked_historical_transactions = forked_node.get_json(&historical_transactions_path);
+    let source_historical_shards = source_node.get_json(&historical_shards_path);
+    let forked_historical_shards = forked_node.get_json(&historical_shards_path);
+    let source_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        source_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("source-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        forked_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("forked-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_unpinned_account = forked_node.get_json(&format!(
+        "/api/v3/transactions?account={transaction_account}&limit=100&sort=desc"
+    ));
+    let forked_unpinned_hash = forked_node.get_json(&format!(
+        "/api/v3/transactions?hash={transaction_hash_hex}&limit=100"
+    ));
+
+    let startup_accounts = forked_node.get_json("/acton_getStartupAccounts");
+    let startup_accounts_payload = response_payload(&startup_accounts);
+    let wallets = startup_accounts_payload
+        .as_array()
+        .expect("startup wallets response must contain an array");
+    let wallet = wallets
+        .first()
+        .expect("forked no-mining localnet must bootstrap deployer wallet");
+    let address = wallet["address"]
+        .as_str()
+        .expect("startup wallet must expose address");
+
+    wait_until_address_state_active(&forked_node, address, Duration::from_secs(5));
+    let node_info = forked_node.get_json("/acton_nodeInfo");
+    let initial_seqno = latest_masterchain_seqno(&forked_node);
+    let local_block_path =
+        format!("/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno={initial_seqno}&limit=1");
+    let source_at_local_seqno = source_node.get_json(&local_block_path);
+    let forked_local_block = forked_node.get_json(&local_block_path);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&forked_node);
+    let mine_response = forked_node.post_json("/acton_mine", &json!({}));
+    let after_mine_seqno = latest_masterchain_seqno(&forked_node);
+
+    let snapshot = json!({
+        "startup_wallet": {
+            "count": wallets.len(),
+            "name": wallet["name"].as_str(),
+            "version": wallet["version"].as_str(),
+            "network": wallet["network"].as_str(),
+            "address_present": !address.is_empty(),
+        },
+        "state_source": {
+            "state_source": node_info["result"]["state_source"].as_str(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+            "fork_block_number": {
+                "present": node_info["result"]["fork_block_number"].as_u64().is_some(),
+                "matches_source_at_fork": node_info["result"]["fork_block_number"].as_u64()
+                    == Some(source_fork_block),
+                "nonzero": node_info["result"]["fork_block_number"]
+                    .as_u64()
+                    .is_some_and(|seqno| seqno > 0),
+            },
+        },
+        "runtime": {
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "block_interval_ms": node_info["result"]["block_interval_ms"].as_u64(),
+            "rate_limit_rps": node_info["result"]["rate_limit_rps"].as_u64(),
+        },
+        "historical_reads": {
+            "requested_before_fork": historical_seqno < source_fork_block,
+            "blocks_match_source":
+                forked_historical_block["blocks"] == source_historical_block["blocks"],
+            "fork_block_matches_source":
+                forked_fork_block_response["blocks"] == source_fork_block_response["blocks"],
+            "transactions_match_source":
+                forked_historical_transactions["transactions"]
+                    == source_historical_transactions["transactions"]
+                    && source_historical_transactions["transactions"]
+                        .as_array()
+                        .is_some_and(|transactions| !transactions.is_empty()),
+            "shards_match_source":
+                forked_historical_shards["result"] == source_historical_shards["result"],
+            "json_rpc_shards_match_source":
+                serde_json::to_value(&forked_historical_shards_rpc.response.result)
+                    .expect("forked shards must serialize")
+                    == serde_json::to_value(&source_historical_shards_rpc.response.result)
+                        .expect("source shards must serialize"),
+            "unpinned_account_includes_remote_transaction":
+                forked_unpinned_account["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
+            "unpinned_hash_includes_remote_transaction":
+                forked_unpinned_hash["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
+            "first_local_block_is_local": forked_local_block["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty())
+                && source_at_local_seqno["blocks"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty),
+        },
+        "manual_mining": {
+            "startup_blocks_follow_fork": u64::try_from(initial_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
+            "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
+            "mine_ok": mine_response["ok"].as_bool(),
+            "seqno_delta": after_mine_seqno - after_sleep_seqno,
+            "manual_block_follows_head": after_mine_seqno == after_sleep_seqno + 1,
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_no_mining_startup_accounts_fork.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    let source_advance = source_node.post_json("/acton_mine", &json!({}));
+    let advanced_source_seqno = latest_masterchain_seqno(&source_node);
+    let advanced_source_at_local_seqno = source_node.get_json(&local_block_path);
+    let restarted_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:fork-source")
+        .arg("--accounts")
+        .arg("deployer")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .arg("--db-path")
+        .arg(forked_db_path.display().to_string())
+        .start();
+    let restarted_info = restarted_node.get_json("/acton_nodeInfo");
+    let restarted_local_block = restarted_node.get_json(&local_block_path);
+    let restart_snapshot = json!({
+        "source_advanced": source_advance["ok"].as_bool() == Some(true)
+            && u64::try_from(advanced_source_seqno)
+                .ok()
+                .is_some_and(|seqno| seqno > source_fork_block),
+        "fork_boundary_preserved":
+            restarted_info["result"]["fork_block_number"].as_u64() == Some(source_fork_block),
+        "head_preserved":
+            restarted_info["result"]["last_block_seqno"].as_u64()
+                == u64::try_from(after_mine_seqno).ok(),
+        "source_now_has_same_seqno":
+            advanced_source_at_local_seqno["blocks"]
+                .as_array()
+                .is_some_and(|blocks| !blocks.is_empty()),
+        "local_block_preserved":
+            restarted_local_block["blocks"] == forked_local_block["blocks"],
+        "local_block_not_replaced_by_source":
+            restarted_local_block["blocks"] != advanced_source_at_local_seqno["blocks"],
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&restart_snapshot, project.path())
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_persisted_fork_boundary.summary.json"),
+    );
+
+    restarted_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_v2_block_history_stays_on_the_correct_side_of_the_fork() {
+    let project = ProjectBuilder::new("localnet-v2-fork-history-routing").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    source_node.post_json("/acton_increaseTime", &json!({ "seconds": 10 }));
+    source_node.post_json("/acton_mine", &json!({}));
+    let fork_seqno = u32::try_from(latest_masterchain_seqno(&source_node))
+        .expect("source masterchain seqno must be non-negative");
+    assert!(fork_seqno > 0, "fork must have a historical predecessor");
+    let historical_seqno = fork_seqno - 1;
+
+    append_custom_localnet_network(project.path(), "v2-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .arg("--fork-net")
+        .arg("custom:v2-fork-source")
+        .arg("--no-mining")
+        .arg("--mine-empty-blocks")
+        .start();
+    let source_initial_masterchain_info = source_node.get_json("/api/v2/getMasterchainInfo");
+    let forked_initial_masterchain_info = forked_node.get_json("/api/v2/getMasterchainInfo");
+    forked_node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
+    forked_node.post_json("/acton_mine", &json!({}));
+    source_node.post_json("/acton_mine", &json!({}));
+    let local_seqno = fork_seqno + 1;
+    assert_eq!(latest_masterchain_seqno(&forked_node), local_seqno as i64);
+    assert_eq!(latest_masterchain_seqno(&source_node), local_seqno as i64);
+
+    let header_path = |seqno| {
+        format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}")
+    };
+    let transactions_path = |seqno, extended| {
+        format!(
+            "/api/v2/getBlockTransactions{}?workchain=0&shard=-9223372036854775808&seqno={seqno}&count=100",
+            if extended { "Ext" } else { "" }
+        )
+    };
+    let lookup_seqno_path =
+        |seqno| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&seqno={seqno}");
+
+    let source_historical_header = source_node.get_json(&header_path(historical_seqno));
+    let forked_historical_header = forked_node.get_json(&header_path(historical_seqno));
+    let source_boundary_header = source_node.get_json(&header_path(fork_seqno));
+    let forked_boundary_header = forked_node.get_json(&header_path(fork_seqno));
+    let source_local_seqno_header = source_node.get_json(&header_path(local_seqno));
+    let forked_local_header = forked_node.get_json(&header_path(local_seqno));
+
+    let source_historical_transactions =
+        source_node.get_json(&transactions_path(historical_seqno, false));
+    let forked_historical_transactions =
+        forked_node.get_json(&transactions_path(historical_seqno, false));
+    let source_boundary_transactions = source_node.get_json(&transactions_path(fork_seqno, false));
+    let forked_boundary_transactions = forked_node.get_json(&transactions_path(fork_seqno, false));
+    let source_local_seqno_transactions =
+        source_node.get_json(&transactions_path(local_seqno, false));
+    let forked_local_transactions = forked_node.get_json(&transactions_path(local_seqno, false));
+    let source_historical_transactions_ext =
+        source_node.get_json(&transactions_path(historical_seqno, true));
+    let forked_historical_transactions_ext =
+        forked_node.get_json(&transactions_path(historical_seqno, true));
+    let source_boundary_transactions_ext =
+        source_node.get_json(&transactions_path(fork_seqno, true));
+    let forked_boundary_transactions_ext =
+        forked_node.get_json(&transactions_path(fork_seqno, true));
+    let source_local_seqno_transactions_ext =
+        source_node.get_json(&transactions_path(local_seqno, true));
+    let forked_local_transactions_ext = forked_node.get_json(&transactions_path(local_seqno, true));
+
+    let source_historical_lookup = source_node.get_json(&lookup_seqno_path(historical_seqno));
+    let forked_historical_lookup = forked_node.get_json(&lookup_seqno_path(historical_seqno));
+    let source_boundary_lookup = source_node.get_json(&lookup_seqno_path(fork_seqno));
+    let forked_boundary_lookup = forked_node.get_json(&lookup_seqno_path(fork_seqno));
+    let source_local_seqno_lookup = source_node.get_json(&lookup_seqno_path(local_seqno));
+    let forked_local_lookup = forked_node.get_json(&lookup_seqno_path(local_seqno));
+
+    let historical_lt = source_historical_header["result"]["start_lt"]
+        .as_str()
+        .expect("historical header must expose start_lt");
+    let historical_time = source_historical_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("historical header must expose gen_utime");
+    let local_lt = forked_local_header["result"]["start_lt"]
+        .as_str()
+        .expect("local header must expose start_lt");
+    let local_time = forked_local_header["result"]["gen_utime"]
+        .as_u64()
+        .expect("local header must expose gen_utime");
+    let lookup_lt_path =
+        |lt: &str| format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&lt={lt}");
+    let lookup_time_path = |time| {
+        format!("/api/v2/lookupBlock?workchain=0&shard=-9223372036854775808&unixtime={time}")
+    };
+    let source_historical_lt_lookup = source_node.get_json(&lookup_lt_path(historical_lt));
+    let forked_historical_lt_lookup = forked_node.get_json(&lookup_lt_path(historical_lt));
+    let source_historical_time_lookup = source_node.get_json(&lookup_time_path(historical_time));
+    let forked_historical_time_lookup = forked_node.get_json(&lookup_time_path(historical_time));
+    let forked_local_lt_lookup = forked_node.get_json(&lookup_lt_path(local_lt));
+    let forked_local_time_lookup = forked_node.get_json(&lookup_time_path(local_time));
+
+    let snapshot = json!({
+        "initial_masterchain_info": {
+            "fork_boundary_matches_remote":
+                forked_initial_masterchain_info["result"]["last"]
+                    == source_initial_masterchain_info["result"]["last"],
+            "root_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["root_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+            "file_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["file_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+        },
+        "get_block_header": {
+            "pre_fork_matches_remote":
+                forked_historical_header["result"] == source_historical_header["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_header["result"] == source_boundary_header["result"],
+            "post_fork_stays_local":
+                forked_local_header["result"]["id"] != source_local_seqno_header["result"]["id"],
+        },
+        "get_block_transactions": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions["result"]
+                    == source_historical_transactions["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions["result"] == source_boundary_transactions["result"],
+            "post_fork_stays_local":
+                forked_local_transactions["result"]["id"]
+                    != source_local_seqno_transactions["result"]["id"],
+        },
+        "get_block_transactions_ext": {
+            "pre_fork_matches_remote":
+                forked_historical_transactions_ext["result"]
+                    == source_historical_transactions_ext["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_transactions_ext["result"]
+                    == source_boundary_transactions_ext["result"],
+            "post_fork_stays_local":
+                forked_local_transactions_ext["result"]["id"]
+                    != source_local_seqno_transactions_ext["result"]["id"],
+        },
+        "lookup_block": {
+            "pre_fork_seqno_matches_remote":
+                forked_historical_lookup["result"] == source_historical_lookup["result"],
+            "fork_boundary_matches_remote":
+                forked_boundary_lookup["result"] == source_boundary_lookup["result"],
+            "post_fork_stays_local":
+                forked_local_lookup["result"] == forked_local_header["result"]["id"]
+                    && forked_local_lookup["result"] != source_local_seqno_lookup["result"],
+            "pre_fork_lt_matches_remote":
+                forked_historical_lt_lookup["result"] == source_historical_lt_lookup["result"],
+            "pre_fork_time_matches_remote":
+                forked_historical_time_lookup["result"] == source_historical_time_lookup["result"],
+            "post_fork_lt_stays_local":
+                forked_local_lt_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+            "post_fork_time_stays_local":
+                forked_local_time_lookup["result"]["seqno"].as_u64()
+                    == Some(u64::from(local_seqno)),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_fork_history_routing.summary.json"),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
+    let project = ProjectBuilder::new("localnet-auto-mining-fork-remote-account").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--no-mining",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    let source_accounts = source_node.get_json("/acton_getStartupAccounts");
+    let source_address = response_payload(&source_accounts)
+        .as_array()
+        .and_then(|wallets| wallets.first())
+        .and_then(|wallet| wallet["address"].as_str())
+        .expect("source startup wallet must expose an address");
+
+    append_custom_localnet_network(project.path(), "auto-fork-source", &source_node.base_url());
+    let forked_node = project
+        .localnet()
+        .args(["--fork-net", "custom:auto-fork-source"])
+        .start();
+
+    let (account_status, account_state) = forked_node.get_json_with_status(&format!(
+        "/api/v3/accountStates?address={source_address}&include_boc=false"
+    ));
+    let (node_info_status, node_info) = forked_node.get_json_with_status("/acton_nodeInfo");
+    let snapshot = json!({
+        "remote_account": {
+            "request_finished": account_status > 0,
+            "response_is_json": account_state.is_object(),
+        },
+        "node_after_fetch": {
+            "status": node_info_status,
+            "responded": node_info["ok"].as_bool(),
+            "auto_mining": node_info["result"]["auto_mining"].as_bool(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_auto_mining_fork_remote_account.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_empty_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
+    let node = project.localnet().start();
+    let address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let mut response = node.get_json(&format!("/api/v2/getShardAccountCell?address={address}"));
+    normalize_extra_for_snapshot(&mut response);
+
+    let _parsed = decode_shard_account_cell_response(&response);
+
+    let mut rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getShardAccountCell",
+            "params": {
+                "address": address
+            }
+        }),
+    );
+    normalize_extra_for_snapshot(&mut rpc_response);
+    let _rpc_parsed = decode_shard_account_cell_response(&rpc_response);
+
+    let (invalid_status, mut invalid_response) =
+        node.get_json_with_status("/api/v2/getShardAccountCell?address=not-a-ton-address");
+    normalize_extra_for_snapshot(&mut invalid_response);
+
+    let snapshot = json!({
+        "empty_http": response,
+        "empty_json_rpc": rpc_response,
+        "invalid_status": invalid_status,
+        "invalid_address": invalid_response,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("Failed to serialize JSON response")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_get_shard_account_cell_empty.response.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_serves_get_shard_account_cell_for_active_account() {
+    let project = ProjectBuilder::new("localnet-shard-account-cell-active")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let stdout = output.get_stdout();
+    let tracked_address = extract_marker_value(&stdout, "TRACKED_CONTRACT=");
+
+    wait_until_address_state_active(&node, &tracked_address, Duration::from_secs(12));
+    let raw_address = unpack_address(&node, &tracked_address);
+
+    let http_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={tracked_address}"),
+        Duration::from_secs(12),
+    );
+    let rpc_response = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "tracked",
+            "method": "getShardAccountCell",
+            "params": {
+                "address": tracked_address
+            }
+        }),
+    );
+
+    let http_boc = shard_account_cell_boc64(&http_response);
+    let rpc_boc = shard_account_cell_boc64(&rpc_response);
+    let snapshot = json!({
+        "http": summarize_shard_account_cell_response(&http_response, Some(&raw_address)),
+        "json_rpc": summarize_shard_account_cell_response(&rpc_response, Some(&raw_address)),
+        "same_cell_bytes": http_boc == rpc_boc,
+    });
+
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot)
+            .expect("Failed to serialize active shard account summary")
+    );
+    assertion().eq(
+        normalize_output_preserve_escapes(&response_json, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_get_shard_account_cell_active.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_require_auth_protects_http_api() {
+    let project = ProjectBuilder::new("localnet-require-auth").build();
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
-        .expect("Failed to create HTTP client for Localnet UI smoke test");
+        .expect("Failed to create HTTP client");
 
-    for path in ["", "/explorer"] {
-        let url = format!("{}{}", node.base_url(), path);
-        let response = client
-            .get(&url)
-            .send()
-            .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
-        let status = response.status();
-        let body = response
-            .text()
-            .unwrap_or_else(|error| panic!("Failed to read GET {url} response body: {error}"));
+    let unauthorized_v2 = get_json_with_status(
+        &client,
+        &format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+    );
+    let unauthorized_control =
+        get_json_with_status(&client, &format!("{}/acton_nodeInfo", node.base_url()));
+    let unauthorized_emulate = post_json_with_status(
+        &client,
+        &format!("{}/api/emulate/v1/emulateTrace", node.base_url()),
+        &json!({}),
+    );
+    let unauthorized_sse = post_json_with_status(
+        &client,
+        &format!("{}/api/streaming/v2/sse", node.base_url()),
+        &json!({
+            "addresses": [V3_TRANSACTIONS_TEST_ACCOUNT_A],
+            "types": ["transactions"]
+        }),
+    );
+    let ui_response = client
+        .get(node.base_url())
+        .send()
+        .expect("UI request must be sent");
+    let ui_status = ui_response.status().as_u16();
+    let ui_body = ui_response
+        .text()
+        .expect("UI response body must be readable");
 
-        assert!(
-            status.is_success(),
-            "GET {url} failed with status {status}: {body}"
-        );
-        assert!(
-            body.contains("<title>TON Localnet UI</title>"),
-            "Expected Localnet UI HTML from {url}, got:\n{body}"
-        );
-        assert!(
-            body.contains("<div id=\"root\"></div>"),
-            "Expected Localnet UI root container from {url}, got:\n{body}"
-        );
-    }
+    let authorized_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .bearer_auth(token)
+        .send()
+        .expect("authorized v2 request must be sent");
+    let authorized_v2_status = authorized_v2.status().as_u16();
+    let authorized_v2_json: Value = authorized_v2
+        .json()
+        .expect("authorized v2 response must be JSON");
 
-    let response = node.get_json("/api/v2/getMasterchainInfo");
-    assert_eq!(response["ok"].as_bool(), Some(true));
+    let api_key_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .header("X-API-Key", token)
+        .send()
+        .expect("x-api-key v2 request must be sent");
+    let api_key_v2_status = api_key_v2.status().as_u16();
+    let api_key_v2_json: Value = api_key_v2
+        .json()
+        .expect("x-api-key v2 response must be JSON");
+
+    let options_response = client
+        .request(
+            reqwest::Method::OPTIONS,
+            format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+        )
+        .header("Origin", "https://actonscan.com")
+        .header("Access-Control-Request-Method", "GET")
+        .header("Access-Control-Request-Headers", "x-api-key")
+        .send()
+        .expect("OPTIONS request must be sent");
+    let options_status = options_response.status().as_u16();
+    let options_allow_origin = options_response
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+
+    let cors_v3 = client
+        .get(format!("{}/api/v3/nft/items", node.base_url()))
+        .header("Origin", "https://actonscan.com")
+        .send()
+        .expect("CORS v3 request must be sent");
+    let cors_v3_status = cors_v3.status().as_u16();
+    let cors_v3_allow_origin = cors_v3
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let control_cors = client
+        .get(format!("{}/acton_nodeInfo", node.base_url()))
+        .header("Origin", "https://actonscan.com")
+        .send()
+        .expect("control CORS request must be sent");
+    let control_cors_status = control_cors.status().as_u16();
+    let control_cors_allow_origin = control_cors
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+
+    let status_output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let mut status_payload: Value = serde_json::from_str(&status_output.get_stdout())
+        .expect("protected status output must be JSON");
+    normalize_localnet_status_json(&mut status_payload, node.port());
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("airdrop")
+        .arg(V3_TRANSACTIONS_TEST_ACCOUNT_A)
+        .arg("--amount")
+        .arg("0.25")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+
+    let summary = json!({
+        "unauthorized": {
+            "v2": summarize_auth_error(unauthorized_v2),
+            "control": summarize_auth_error(unauthorized_control),
+            "emulate": summarize_auth_error(unauthorized_emulate),
+            "sse": summarize_auth_error(unauthorized_sse),
+        },
+        "authorized": {
+            "bearer_status": authorized_v2_status,
+            "bearer_ok": authorized_v2_json["ok"].as_bool(),
+            "x_api_key_status": api_key_v2_status,
+            "x_api_key_ok": api_key_v2_json["ok"].as_bool(),
+            "options_status": options_status,
+            "options_allow_origin": options_allow_origin,
+            "cors_v3_status": cors_v3_status,
+            "cors_v3_allow_origin": cors_v3_allow_origin,
+            "control_cors_status": control_cors_status,
+            "control_cors_allow_origin": control_cors_allow_origin,
+            "status_command_running": status_payload["running"].as_bool(),
+        },
+        "ui": {
+            "status": ui_status,
+            "html_shell": ui_body.contains("<div id=\"root\"></div>"),
+            "leaks_token": ui_body.contains(token),
+            "has_bootstrap_token": ui_body.contains("__ACTON_LOCALNET__"),
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_require_auth.summary.json"),
+    );
 
     node.stop();
 }
@@ -394,7 +1873,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     assertion().eq(
         normalize_output_preserve_escapes(&response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_out_msg_queue_size.response.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_get_out_msg_queue_size.response.json"),
     );
 
     let script_result = project
@@ -451,6 +1930,79 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
         serde_json::to_string_pretty(&tx_std_response).unwrap_or_default()
     );
 
+    let parent_transaction = transactions
+        .iter()
+        .find(|tx| {
+            tx.get("out_msgs")
+                .and_then(Value::as_array)
+                .is_some_and(|out| !out.is_empty())
+        })
+        .expect("deployer trace must include a parent transaction with out messages");
+    let parent_tx_hash = parent_transaction
+        .pointer("/transaction_id/hash")
+        .and_then(Value::as_str)
+        .expect("parent transaction hash must be present");
+    let traces = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/traces?tx_hash={}",
+            encode_query_component(parent_tx_hash)
+        ),
+        Duration::from_secs(12),
+    );
+    let trace_payload = response_payload(&traces);
+    let trace = trace_payload["traces"]
+        .as_array()
+        .and_then(|items| items.first())
+        .expect("v3 traces must contain a first trace");
+    let transactions_map = trace["transactions"]
+        .as_object()
+        .expect("v3 trace must include transactions map");
+    let parent_v3_tx = transactions_map
+        .get(parent_tx_hash)
+        .unwrap_or_else(|| panic!("v3 trace must include parent transaction {parent_tx_hash}"));
+    let legacy_child_lts = parent_v3_tx["child_transactions"]
+        .as_array()
+        .expect("v3 transaction entry must include legacy child_transactions");
+    let trace_root_children = trace["trace"]["children"].as_array();
+    let parent_trace_node = find_trace_node(&trace["trace"], parent_tx_hash);
+    let parent_trace_children = parent_trace_node
+        .and_then(|node| node.get("children"))
+        .and_then(Value::as_array);
+    let first_tree_child_lt = parent_trace_children
+        .and_then(|children| children.first())
+        .and_then(|child| child.get("tx_hash"))
+        .and_then(Value::as_str)
+        .and_then(|child_hash| transactions_map.get(child_hash))
+        .and_then(|tx| tx.get("lt"))
+        .and_then(Value::as_str);
+    let first_legacy_child_lt = legacy_child_lts.first().and_then(Value::as_str);
+    let parent_account_state_after = &parent_v3_tx["account_state_after"];
+
+    let trace_legacy_summary = json!({
+        "trace_root_children_count": trace_root_children.map_or(0, Vec::len),
+        "parent_trace_node_present": parent_trace_node.is_some(),
+        "parent_trace_node_children_count": parent_trace_children.map_or(0, Vec::len),
+        "parent_legacy_child_transactions_count": legacy_child_lts.len(),
+        "first_child_lt_matches_legacy_child_transaction": first_tree_child_lt.is_some()
+            && first_tree_child_lt == first_legacy_child_lt,
+        "parent_account_state_after_has_code_boc": parent_account_state_after["code_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+        "parent_account_state_after_has_data_boc": parent_account_state_after["data_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+    });
+    let trace_legacy_summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&trace_legacy_summary)
+            .expect("Failed to serialize v3 trace compatibility summary")
+    );
+    assertion().eq(
+        trace_legacy_summary_json,
+        snapbox::file!("snapshots/localnet/test_localnet_v3_trace_children.summary.json"),
+    );
+
     let mut tx_std_response = tx_std_response;
     normalize_transactions_std_for_snapshot(&mut tx_std_response);
 
@@ -462,7 +2014,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     assertion().eq(
         normalize_output_preserve_escapes(&tx_std_response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_transactions_std.response.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_get_transactions_std.response.json"),
     );
 
     node.stop();
@@ -495,7 +2047,7 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         serde_json::to_string_pretty(&rate_limited).unwrap_or_default()
     );
 
-    let (admin_status, admin_response) = node.get_json_with_status("/admin/state-source");
+    let (admin_status, admin_response) = node.get_json_with_status("/acton_nodeInfo");
     assert_eq!(
         admin_status, 200,
         "Admin endpoints must stay available when API rate-limit is enabled"
@@ -511,6 +2063,693 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         "Expected API requests to recover after rate-limit window"
     );
     assert_eq!(api_after_window["ok"].as_bool(), Some(true));
+
+    node.stop();
+}
+
+#[test]
+fn localnet_can_update_response_delay_while_running() {
+    let project = ProjectBuilder::new("localnet-response-delay-runtime").build();
+    let node = project.localnet().start();
+
+    let initial_info_response = node.get_json("/acton_nodeInfo");
+    let initial_info = response_payload(&initial_info_response);
+    let initial_response_delay_ms = initial_info["network_conditions"]["response_delay_ms"].clone();
+
+    let set_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 250 }),
+    );
+    let set_conditions = response_payload(&set_conditions_response);
+    let set_response_delay_ms = set_conditions["response_delay_ms"].clone();
+
+    let info_after_set_response = node.get_json("/acton_nodeInfo");
+    let info_after_set = response_payload(&info_after_set_response);
+    let node_info_response_delay_ms =
+        info_after_set["network_conditions"]["response_delay_ms"].clone();
+
+    let started_at = Instant::now();
+    let delayed_api_response = node.get_json("/api/v2/getMasterchainInfo");
+    let delayed_api_elapsed = started_at.elapsed();
+
+    let reset_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 0 }),
+    );
+    let reset_conditions = response_payload(&reset_conditions_response);
+    let reset_response_delay_ms = reset_conditions["response_delay_ms"].clone();
+
+    let info_after_reset_response = node.get_json("/acton_nodeInfo");
+    let info_after_reset = response_payload(&info_after_reset_response);
+    let node_info_after_reset_response_delay_ms =
+        info_after_reset["network_conditions"]["response_delay_ms"].clone();
+
+    let summary = json!({
+        "initial_response_delay_ms": initial_response_delay_ms,
+        "set_response_delay_ms": set_response_delay_ms,
+        "node_info_response_delay_ms": node_info_response_delay_ms,
+        "api_delay_observed": delayed_api_elapsed >= Duration::from_millis(220),
+        "api_request_ok": delayed_api_response["ok"].as_bool(),
+        "reset_response_delay_ms": reset_response_delay_ms,
+        "node_info_after_reset_response_delay_ms": node_info_after_reset_response_delay_ms,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_response_delay_runtime.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_status_json_reports_running_node_details() {
+    let project = ProjectBuilder::new("localnet-status-running").build();
+    let node = project.localnet().start();
+    let output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .run()
+        .success();
+
+    let mut payload: Value =
+        serde_json::from_str(&output.get_stdout()).expect("status --json must return valid JSON");
+    normalize_localnet_status_json(&mut payload, node.port());
+    assertion().eq(
+        pretty_json_for_snapshot(&payload, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_status_json_running.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_status_human_reports_running_node_details() {
+    let project = ProjectBuilder::new("localnet-status-human-running").build();
+    let node = project.localnet().start();
+    let output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .run()
+        .success();
+
+    assertion().eq(
+        normalize_localnet_status_stdout(&strip_ansi(&output.get_stdout()), node.port()),
+        snapbox::file!("snapshots/localnet/test_localnet_status_human_running.stdout.txt"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_status_json_reports_stopped_node() {
+    let project = ProjectBuilder::new("localnet-status-stopped").build();
+    let node = project.localnet().start();
+    let port = node.port();
+    node.stop();
+
+    let output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&port.to_string())
+        .run()
+        .success();
+
+    let mut payload: Value =
+        serde_json::from_str(&output.get_stdout()).expect("status --json must return valid JSON");
+    normalize_localnet_status_json(&mut payload, port);
+    assertion().eq(
+        pretty_json_for_snapshot(&payload, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_status_json_stopped.response.json"),
+    );
+}
+
+#[test]
+fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
+    let project = ProjectBuilder::new("localnet-status-non-localnet-http").build();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind fake status server");
+    listener
+        .set_nonblocking(true)
+        .expect("failed to make fake status server non-blocking");
+    let port = listener
+        .local_addr()
+        .expect("failed to resolve fake status server address")
+        .port();
+    let server = thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let mut request = [0u8; 1024];
+                    let _ = stream.read(&mut request);
+                    let body = "<html>not an acton localnet</html>";
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    stream
+                        .write_all(response.as_bytes())
+                        .expect("failed to write fake status response");
+                    return;
+                }
+                Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(err) => panic!("failed to accept fake status request: {err}"),
+            }
+        }
+    });
+
+    let output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&port.to_string())
+        .run()
+        .success();
+    server
+        .join()
+        .expect("fake status server thread must finish");
+
+    let mut payload: Value =
+        serde_json::from_str(&output.get_stdout()).expect("status --json must return valid JSON");
+    normalize_localnet_status_json(&mut payload, port);
+    assertion().eq(
+        pretty_json_for_snapshot(&payload, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_status_json_non_localnet_http.response.json"
+        ),
+    );
+}
+
+#[test]
+fn localnet_admin_set_shard_account_updates_selected_account() {
+    let project = ProjectBuilder::new("localnet-admin-set-shard-account").build();
+    let node = project.localnet().start();
+    let source = "0:1111111111111111111111111111111111111111111111111111111111111111";
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": source,
+            "amount": 1_000_000_000u128,
+        }),
+    );
+    let source_info =
+        wait_for_address_balance_at_least(&node, source, 1_000_000_000, Duration::from_secs(5));
+    let source_balance = parse_address_balance(&source_info);
+    let source_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={source}"),
+        Duration::from_secs(5),
+    );
+    let source_shard_boc = shard_account_cell_boc64(&source_shard_response).to_owned();
+
+    let set = node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": source_shard_boc,
+        }),
+    );
+    let target_info_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_balance_after_set = parse_address_balance(&target_info_after_set);
+    let target_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_shard_boc = shard_account_cell_boc64(&target_shard_response).to_owned();
+
+    let invalid = node.post_json_error(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": "not-a-boc",
+        }),
+    );
+
+    let snapshot = json!({
+        "fund": summarize_admin_response(&fund),
+        "set": summarize_admin_response(&set),
+        "source_balance": source_balance.to_string(),
+        "target_balance_after_set": target_balance_after_set.to_string(),
+        "target_cell_matches_source": target_shard_boc == source_shard_boc,
+        "target_after_set": summarize_shard_account_cell_response(&target_shard_response, None),
+        "invalid": summarize_admin_response(&invalid),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_set_shard_account_updates_selected_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_change_account_state_updates_selected_account() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let active = extract_marker_value(&deploy_output.get_stdout(), "TRACKED_CONTRACT=");
+    wait_until_address_state_active(&node, &active, Duration::from_secs(12));
+    let active_raw = unpack_address(&node, &active);
+
+    let uninit = "0:4444444444444444444444444444444444444444444444444444444444444444";
+    let explicit_frozen = "0:5555555555555555555555555555555555555555555555555555555555555555";
+    let nonexist = "0:6666666666666666666666666666666666666666666666666666666666666666";
+
+    let freeze_current = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let active_after_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+    let freeze_current_tx_response = node.wait_for_non_empty_v3_transactions(
+        &format!("/api/v3/transactions?account={active}&limit=1&sort=desc"),
+        Duration::from_secs(5),
+    );
+    let freeze_current_tx = &v3_transactions_from_response(&freeze_current_tx_response)[0];
+
+    let set_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "uninit",
+                "balance": "1000000000",
+            },
+        }),
+    );
+    let uninit_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={uninit}"),
+        Duration::from_secs(5),
+    );
+
+    let frozen_hash = hex::encode([0x77; 32]);
+    let set_explicit_frozen = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "frozen_hash": frozen_hash,
+                "balance": "2000000000",
+            },
+        }),
+    );
+    let explicit_frozen_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={explicit_frozen}"),
+        Duration::from_secs(5),
+    );
+
+    let set_nonexist = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": nonexist,
+            "state": {
+                "type": "nonexist",
+            },
+        }),
+    );
+    let nonexist_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={nonexist}"),
+        Duration::from_secs(5),
+    );
+
+    let invalid_current_balance = node.post_json_error(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+                "balance": "1",
+            },
+        }),
+    );
+
+    let snapshot = json!({
+        "deploy_active": {
+            "ok": true,
+        },
+        "freeze_current": summarize_admin_response(&freeze_current),
+        "active_after_freeze": summarize_shard_account_cell_response(&active_after_freeze, Some(&active_raw)),
+        "freeze_current_tx": summarize_admin_freeze_transaction(freeze_current_tx, &active_raw),
+        "set_uninit": summarize_admin_response(&set_uninit),
+        "uninit_after_set": summarize_shard_account_cell_response(&uninit_after_set, Some(uninit)),
+        "set_explicit_frozen": summarize_admin_response(&set_explicit_frozen),
+        "explicit_frozen_after_set": summarize_shard_account_cell_response(&explicit_frozen_after_set, Some(explicit_frozen)),
+        "set_nonexist": summarize_admin_response(&set_nonexist),
+        "nonexist_after_set": summarize_shard_account_cell_response(&nonexist_after_set, None),
+        "invalid_current_balance": summarize_admin_response(&invalid_current_balance),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_updates_selected_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_change_account_state_current_freeze_rejects_non_active_accounts() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state-non-active").build();
+    let node = project.localnet().start();
+
+    let nonexist = "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let uninit = "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    let explicit_frozen = "0:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
+    let freeze_nonexist = node.post_json_error(
+        "/acton_changeAccountState",
+        &json!({
+            "address": nonexist,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+
+    let set_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "uninit",
+                "balance": "1000000000",
+            },
+        }),
+    );
+    let freeze_uninit = node.post_json_error(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let uninit_after_failed_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={uninit}"),
+        Duration::from_secs(5),
+    );
+
+    let set_explicit_frozen = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "frozen_hash": hex::encode([0xcc; 32]),
+                "balance": "2000000000",
+            },
+        }),
+    );
+    let freeze_already_frozen = node.post_json_error(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let explicit_frozen_after_failed_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={explicit_frozen}"),
+        Duration::from_secs(5),
+    );
+
+    let snapshot = json!({
+        "nonexist": {
+            "freeze_current": summarize_admin_response(&freeze_nonexist),
+        },
+        "uninit": {
+            "set": summarize_admin_response(&set_uninit),
+            "freeze_current": summarize_admin_response(&freeze_uninit),
+            "after_failed_freeze": summarize_shard_account_cell_response(&uninit_after_failed_freeze, Some(uninit)),
+        },
+        "already_frozen": {
+            "set": summarize_admin_response(&set_explicit_frozen),
+            "freeze_current": summarize_admin_response(&freeze_already_frozen),
+            "after_failed_freeze": summarize_shard_account_cell_response(&explicit_frozen_after_failed_freeze, Some(explicit_frozen)),
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_current_freeze_rejects_non_active_accounts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_change_account_state_can_defer_current_freeze_until_manual_mine() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state-deferred")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer", "--no-mining"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let active = extract_marker_value(&deploy_output.get_stdout(), "TRACKED_CONTRACT=");
+    let active_raw = unpack_address(&node, &active);
+
+    let deploy_mine = node.post_json("/acton_mine", &json!({}));
+    wait_until_address_state_active(&node, &active, Duration::from_secs(12));
+
+    let active_std = std_addr_from_raw(&active_raw);
+    let internal_boc = base64::engine::general_purpose::STANDARD.encode(
+        build_internal_message_boc(test_std_addr(0x77), active_std, 50_000_000),
+    );
+    let send_internal = node.post_json(
+        "/acton_sendInternalMessage",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let defer_freeze = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "mine": false,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let before_mine = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+
+    let mine_deferred = node.post_json("/acton_mine", &json!({}));
+    let after_mine = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+    let tx_response = node.wait_for_non_empty_v3_transactions(
+        &format!("/api/v3/transactions?account={active}&limit=2&sort=desc"),
+        Duration::from_secs(5),
+    );
+    let txs = v3_transactions_from_response(&tx_response);
+    let freeze_tx = &txs[0];
+    let previous_tx = &txs[1];
+
+    let invalid_deferred_uninit = node.post_json_error(
+        "/acton_changeAccountState",
+        &json!({
+            "address": "0:7777777777777777777777777777777777777777777777777777777777777777",
+            "mine": false,
+            "state": {
+                "type": "uninit",
+            },
+        }),
+    );
+
+    let snapshot = json!({
+        "deploy_mine": summarize_mine_response(&deploy_mine),
+        "send_internal": summarize_admin_response(&send_internal),
+        "defer_freeze": summarize_admin_response(&defer_freeze),
+        "before_mine": summarize_shard_account_cell_response(&before_mine, Some(&active_raw)),
+        "mine_deferred": summarize_mine_response(&mine_deferred),
+        "after_mine": summarize_shard_account_cell_response(&after_mine, Some(&active_raw)),
+        "transactions": {
+            "count": txs.len(),
+            "freeze": summarize_admin_freeze_transaction(freeze_tx, &active_raw),
+            "same_mc_block_seqno": freeze_tx["mc_block_seqno"] == previous_tx["mc_block_seqno"],
+            "freeze_prev_matches_previous": freeze_tx["prev_trans_lt"] == previous_tx["lt"],
+            "previous_end_status": previous_tx["end_status"],
+            "previous_compute_exit_code": previous_tx.pointer("/description/compute_ph/exit_code").cloned().unwrap_or(Value::Null),
+        },
+        "invalid_deferred_uninit": summarize_admin_response(&invalid_deferred_uninit),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_can_defer_current_freeze_until_manual_mine.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_raw_internal_messages_use_acton_endpoint() {
+    let project = ProjectBuilder::new("localnet-raw-internal-message").build();
+    let node = project.localnet().start();
+    let internal_boc = build_localnet_internal_boc();
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let (send_boc_status, send_boc) = node.post_json_with_status(
+        "/api/v2/sendBoc",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let (send_boc_return_hash_status, send_boc_return_hash) = node.post_json_with_status(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let (json_rpc_send_boc_status, json_rpc_send_boc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "send",
+            "method": "sendBoc",
+            "params": {
+                "boc": internal_boc,
+            },
+        }),
+    );
+    let (json_rpc_send_boc_return_hash_status, json_rpc_send_boc_return_hash) = node
+        .post_json_with_status(
+            "/api/v2/jsonRPC",
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "send-return-hash",
+                "method": "sendBocReturnHash",
+                "params": {
+                    "boc": internal_boc,
+                },
+            }),
+        );
+    let (message_status, message) = node.post_json_with_status(
+        "/api/v3/message",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let acton_send = node.post_json(
+        "/acton_sendInternalMessage",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let target_info =
+        wait_for_address_balance_at_least(&node, target, 50_000_000, Duration::from_secs(5));
+
+    let snapshot = json!({
+        "send_boc": summarize_admin_response(&send_boc),
+        "send_boc_status": send_boc_status,
+        "send_boc_return_hash": summarize_admin_response(&send_boc_return_hash),
+        "send_boc_return_hash_status": send_boc_return_hash_status,
+        "json_rpc_send_boc_status": json_rpc_send_boc_status,
+        "json_rpc_send_boc": summarize_admin_response(&json_rpc_send_boc),
+        "json_rpc_send_boc_return_hash_status": json_rpc_send_boc_return_hash_status,
+        "json_rpc_send_boc_return_hash": summarize_admin_response(&json_rpc_send_boc_return_hash),
+        "message_status": message_status,
+        "message": message,
+        "acton_send": summarize_admin_response(&acton_send),
+        "target_balance": parse_address_balance(&target_info).to_string(),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_raw_internal_messages_use_acton_endpoint.summary.json"
+        ),
+    );
 
     node.stop();
 }
@@ -543,7 +2782,68 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_contains("Broadcast send (synthetic result)")
         .assert_not_contains("compute phase skipped")
         .assert_snapshot_matches(
-            "integration/snapshots/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+            "integration/snapshots/localnet/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+        );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_is_accepted_rejects_unknown_broadcast_status() {
+    let project = ProjectBuilder::new("localnet-external-is-accepted")
+        .script_file("external_is_accepted", EXTERNAL_IS_ACCEPTED_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/external_is_accepted.tolk")
+        .verify_network("localnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/localnet/test_localnet_script_is_accepted_rejects_unknown_broadcast_status.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_invalidates_remote_cache_after_broadcast_before_get_method() {
+    let project = ProjectBuilder::new("localnet-script-cache-refresh")
+        .file("contracts/types", LOCALNET_CACHE_COUNTER_TYPES)
+        .contract("counter", LOCALNET_CACHE_COUNTER_CONTRACT)
+        .script_file("cache_refresh", LOCALNET_CACHE_REFRESH_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/cache_refresh.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output
+        .assert_contains("BEFORE=7")
+        .assert_contains("AFTER=12")
+        .assert_snapshot_matches(
+            "integration/snapshots/localnet/test_localnet_script_invalidates_remote_cache_after_broadcast_before_get_method.stdout.txt",
         );
 
     node.stop();
@@ -586,12 +2886,12 @@ fn localnet_supports_try_locate_transaction_endpoints() {
     let deployer_address = extract_marker_value(&script_stdout, "DEPLOYER_CONTRACT=");
 
     let deadline = Instant::now() + Duration::from_secs(12);
-    let (source_tx_hash, source, destination, created_lt) = loop {
+    let (get_transactions_response, (source_tx_hash, source, destination, created_lt)) = loop {
         let response = node.get_json(&format!(
             "/api/v2/getTransactions?address={deployer_address}&limit=10"
         ));
         if let Some(locator) = extract_first_outgoing_message_locator(&response) {
-            break locator;
+            break (response, locator);
         }
         assert!(
             Instant::now() < deadline,
@@ -600,6 +2900,14 @@ fn localnet_supports_try_locate_transaction_endpoints() {
         );
         thread::sleep(Duration::from_millis(200));
     };
+    let source_transaction = get_transactions_response["result"]
+        .as_array()
+        .and_then(|transactions| {
+            transactions
+                .iter()
+                .find(|tx| v2_transaction_id_hash(tx) == Some(source_tx_hash.as_str()))
+        })
+        .expect("getTransactions response must include the source transaction");
 
     let try_locate_tx_query = format!(
         "/api/v2/tryLocateTx?source={source}&destination={destination}&created_lt={created_lt}"
@@ -619,9 +2927,11 @@ fn localnet_supports_try_locate_transaction_endpoints() {
     );
     let try_locate_result_tx =
         wait_for_ok_response(&node, &try_locate_result_tx_query, Duration::from_secs(12));
+    let try_locate_tx_hash = v2_transaction_id_hash(&try_locate_tx["result"])
+        .expect("tryLocateTx result must include transaction_id.hash");
     assert_eq!(
-        try_locate_result_tx["result"]["hash"].as_str(),
-        try_locate_tx["result"]["hash"].as_str()
+        v2_transaction_id_hash(&try_locate_result_tx["result"]),
+        Some(try_locate_tx_hash)
     );
 
     let try_locate_source_tx = node.get_json(&format!(
@@ -634,7 +2944,7 @@ fn localnet_supports_try_locate_transaction_endpoints() {
         serde_json::to_string_pretty(&try_locate_source_tx).unwrap_or_default()
     );
     assert_eq!(
-        try_locate_source_tx["result"]["hash"].as_str(),
+        v2_transaction_id_hash(&try_locate_source_tx["result"]),
         Some(source_tx_hash.as_str())
     );
     assert_eq!(
@@ -657,8 +2967,70 @@ fn localnet_supports_try_locate_transaction_endpoints() {
     );
     assert_eq!(try_locate_tx_rpc["ok"].as_bool(), Some(true));
     assert_eq!(
-        try_locate_tx_rpc["result"]["hash"].as_str(),
-        try_locate_tx["result"]["hash"].as_str()
+        v2_transaction_id_hash(&try_locate_tx_rpc["result"]),
+        Some(try_locate_tx_hash)
+    );
+
+    let source_tx_hash_hex = Hash256::from_base64(&source_tx_hash)
+        .expect("source transaction hash must be valid base64")
+        .to_hex();
+    let result_tx_hash_hex = Hash256::from_base64(try_locate_tx_hash)
+        .expect("result transaction hash must be valid base64")
+        .to_hex();
+    let adjacent_out_response = node.get_json(&format!(
+        "/api/v3/adjacentTransactions?hash={source_tx_hash_hex}&direction=out"
+    ));
+    let adjacent_out: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&adjacent_out_response).clone())
+            .expect("outgoing adjacentTransactions must match its typed response");
+    let adjacent_in_response = node.get_json(&format!(
+        "/api/v3/adjacentTransactions?hash={result_tx_hash_hex}&direction=in"
+    ));
+    let adjacent_in: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&adjacent_in_response).clone())
+            .expect("incoming adjacentTransactions must match its typed response");
+
+    let message_hash = source_transaction["out_msgs"]
+        .as_array()
+        .and_then(|messages| messages.first())
+        .and_then(|message| message["hash"].as_str())
+        .expect("source transaction must contain an outgoing message");
+    let message_hash_hex = Hash256::from_base64(message_hash)
+        .expect("outgoing message hash must be valid base64")
+        .to_hex();
+    let messages_response = node.get_json(&format!(
+        "/api/v3/messages?msg_hash={message_hash_hex}&limit=10"
+    ));
+    let messages: toncenter_v3::MessagesResponse =
+        serde_json::from_value(response_payload(&messages_response).clone())
+            .expect("messages must match its typed response");
+
+    let shape_summary = json!({
+        "get_transactions": summarize_v2_ext_transaction_shape(source_transaction),
+        "try_locate_tx": summarize_v2_ext_transaction_shape(&try_locate_tx["result"]),
+        "try_locate_result_tx_hash_matches": v2_transaction_id_hash(&try_locate_result_tx["result"])
+            == Some(try_locate_tx_hash),
+        "try_locate_source_tx_hash_matches": v2_transaction_id_hash(&try_locate_source_tx["result"])
+            == Some(source_tx_hash.as_str()),
+        "try_locate_tx_rpc_hash_matches": v2_transaction_id_hash(&try_locate_tx_rpc["result"])
+            == Some(try_locate_tx_hash),
+        "v3_adjacent_out_finds_result": adjacent_out
+            .transactions
+            .iter()
+            .any(|transaction| transaction.hash == try_locate_tx_hash),
+        "v3_adjacent_in_finds_source": adjacent_in
+            .transactions
+            .iter()
+            .any(|transaction| transaction.hash == source_tx_hash),
+        "v3_message_links_both_transactions": messages.messages.iter().any(|message| {
+            message.hash == message_hash
+                && message.in_msg_tx_hash.as_deref() == Some(try_locate_tx_hash)
+                && message.out_msg_tx_hash.as_deref() == Some(source_tx_hash.as_str())
+        }),
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&shape_summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_ext_transaction_shape.summary.json"),
     );
 
     node.stop();
@@ -764,7 +3136,8 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         format!("0{}", &library_hash[1..])
     };
 
-    let mixed_query = format!("/api/v2/getLibraries?libraries={missing_hash},,{library_hash}");
+    let mixed_query =
+        format!("/api/v2/getLibraries?libraries={missing_hash}&libraries={library_hash}");
     let mixed_response = node.get_json(&mixed_query);
     assert_eq!(mixed_response["ok"].as_bool(), Some(true));
     let mixed_items = mixed_response
@@ -790,18 +3163,19 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         Some(library_code_b64.as_str())
     );
 
-    let empty_libraries_response = node.get_json("/api/v2/getLibraries?libraries=,,");
-    assert_eq!(empty_libraries_response["ok"].as_bool(), Some(false));
+    let empty_libraries_response = node.get_json("/api/v2/getLibraries");
+    assert_eq!(empty_libraries_response["ok"].as_bool(), Some(true));
     assert!(
-        empty_libraries_response["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("`libraries` query parameter is required"),
-        "Unexpected error for empty libraries query: {}",
+        empty_libraries_response
+            .pointer("/result/result")
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty),
+        "Expected empty libraries result: {}",
         serde_json::to_string_pretty(&empty_libraries_response).unwrap_or_default()
     );
 
-    let invalid_libraries_response = node.get_json("/api/v2/getLibraries?libraries=not-a-hash");
+    let invalid_libraries_response =
+        node.get_json_error("/api/v2/getLibraries?libraries=not-a-hash");
     assert_eq!(invalid_libraries_response["ok"].as_bool(), Some(false));
     assert!(
         invalid_libraries_response["error"]
@@ -819,7 +3193,7 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
             "id": 1,
             "method": "getLibraries",
             "params": {
-                "libraries": format!("{missing_hash},{library_hash}")
+                "libraries": [missing_hash, library_hash]
             }
         }),
     );
@@ -1265,7 +3639,7 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
 
     let normalized_hash_query = encode_query_component(message_hash_norm);
 
-    let traces = wait_for_ok_response(
+    let traces = wait_for_non_empty_v3_traces_response(
         &node,
         &format!("/api/v3/traces?msg_hash={normalized_hash_query}"),
         Duration::from_secs(12),
@@ -1283,8 +3657,7 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
         Some(message_hash)
     );
 
-    let by_msg_hash = wait_for_ok_response(
-        &node,
+    let by_msg_hash = node.wait_for_non_empty_v3_transactions(
         &format!(
             "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
         ),
@@ -1303,6 +3676,141 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
         serde_json::to_string_pretty(&by_msg_hash).unwrap_or_default()
     );
 
+    let trace_account = traces_payload[0]["trace"]["transaction"]["account"]
+        .as_str()
+        .expect("trace root transaction must include account");
+    let transaction_account = matched[0]["account"]
+        .as_str()
+        .expect("matched transaction must include account");
+    let trace_address_book = response_payload(&traces)["address_book"]
+        .as_object()
+        .expect("traces response must include address_book");
+    let transaction_address_book = response_payload(&by_msg_hash)["address_book"]
+        .as_object()
+        .expect("transactionsByMessage response must include address_book");
+    let address_book_summary = json!({
+        "trace": {
+            "contains_account": trace_address_book.contains_key(trace_account),
+            "user_friendly": trace_address_book[trace_account]["user_friendly"].is_string(),
+        },
+        "transactions_by_message": {
+            "contains_account": transaction_address_book.contains_key(transaction_account),
+            "user_friendly": transaction_address_book[transaction_account]["user_friendly"].is_string(),
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&address_book_summary, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_v3_trace_and_transaction_address_books.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_traces_unknown_hashes_return_empty_traces() {
+    let project = ProjectBuilder::new("localnet-v3-traces-unknown-hashes").build();
+    let node = project.localnet().start();
+
+    let unknown_msg_hash = encode_query_component(&Hash256([0x42; 32]).to_base64());
+    let unknown_tx_hash = encode_query_component(&Hash256([0x43; 32]).to_base64());
+
+    let (msg_status, msg_response) =
+        node.get_json_with_status(&format!("/api/v3/traces?msg_hash={unknown_msg_hash}"));
+    let (tx_status, tx_response) =
+        node.get_json_with_status(&format!("/api/v3/traces?tx_hash={unknown_tx_hash}"));
+
+    let summary = json!({
+        "msg_hash": {
+            "status": msg_status,
+            "response": msg_response,
+        },
+        "tx_hash": {
+            "status": tx_status,
+            "response": tx_response,
+        },
+    });
+    snapbox::assert_data_eq!(
+        format!("{}\n", pretty_json_for_snapshot(&summary, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_v3_traces_unknown_hashes.response.json")
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_send_boc_return_hash_waits_for_scheduled_block_before_transaction_appears() {
+    let project = ProjectBuilder::new("localnet-send-boc-scheduled-mining").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .args([
+            "--accounts",
+            "deployer",
+            "--block-interval-ms",
+            "3000",
+            "--mine-empty-blocks",
+        ])
+        .start();
+    let initial_seqno = latest_masterchain_seqno(&node);
+    wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
+
+    let message_boc = build_localnet_ext_in_boc();
+    let (expected_hash, expected_hash_norm) = compute_message_hashes_base64(&message_boc);
+
+    let response = node.post_json(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": message_boc
+        }),
+    );
+    let payload = response_payload(&response);
+    let message_hash = payload["hash"]
+        .as_str()
+        .expect("sendBocReturnHash hash must be a string");
+    let message_hash_norm = payload["hash_norm"]
+        .as_str()
+        .expect("sendBocReturnHash hash_norm must be a string");
+    let normalized_hash_query = encode_query_component(message_hash_norm);
+    let by_message_query = format!(
+        "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
+    );
+
+    let before_tick = wait_for_ok_response(&node, &by_message_query, Duration::from_secs(2));
+    let before_tick_transactions = v3_transactions_from_response(&before_tick);
+
+    let after_tick =
+        node.wait_for_non_empty_v3_transactions(&by_message_query, Duration::from_secs(8));
+    let after_tick_transactions = v3_transactions_from_response(&after_tick);
+    let matched_normalized_hash = after_tick_transactions
+        .iter()
+        .any(|tx| tx["in_msg"]["hash_norm"].as_str() == Some(message_hash_norm));
+
+    let snapshot = json!({
+        "accepted": {
+            "hash_matches": message_hash == expected_hash,
+            "hash_norm_matches": message_hash_norm == expected_hash_norm,
+        },
+        "before_next_tick": {
+            "transaction_count": before_tick_transactions.len(),
+        },
+        "after_next_tick": {
+            "has_transaction": !after_tick_transactions.is_empty(),
+            "matched_normalized_hash": matched_normalized_hash,
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_send_boc_waits_for_scheduled_block.summary.json"
+        ),
+    );
+
     node.stop();
 }
 
@@ -1315,6 +3823,12 @@ fn localnet_supports_emulate_v1_emulate_trace() {
     let seqno_before = before["result"]["last"]["seqno"]
         .as_i64()
         .expect("masterchain seqno must be integer before emulate");
+    let transactions_before = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100",
+        Duration::from_secs(5),
+    );
+    let tx_count_before = v3_transactions_from_response(&transactions_before).len();
 
     let response = node.post_json(
         "/api/emulate/v1/emulateTrace",
@@ -1362,19 +3876,22 @@ fn localnet_supports_emulate_v1_emulate_trace() {
         "address_book/metadata must be absent by default:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
-    assert_eq!(
-        response["mc_block_seqno"].as_i64(),
-        Some(seqno_before),
-        "Unexpected mc_block_seqno in emulateTrace response:\n{}",
+    let response_seqno = response["mc_block_seqno"]
+        .as_i64()
+        .expect("emulateTrace response must include mc_block_seqno");
+    assert!(
+        response_seqno >= seqno_before,
+        "Unexpected mc_block_seqno in emulateTrace response; expected at least {seqno_before}:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
 
+    let explicit_seqno = response_seqno.max(0) as u32;
     let response_with_seqno = node.post_json(
         "/api/emulate/v1/emulateTrace",
         &json!({
             "boc": V3_MESSAGE_TEST_BOC,
             "ignore_chksig": false,
-            "mc_block_seqno": seqno_before
+            "mc_block_seqno": explicit_seqno
         }),
     );
     assert!(
@@ -1390,18 +3907,22 @@ fn localnet_supports_emulate_v1_emulate_trace() {
     );
     assert_eq!(
         response_with_seqno["mc_block_seqno"].as_i64(),
-        Some(seqno_before),
+        Some(i64::from(explicit_seqno)),
         "Unexpected mc_block_seqno for explicit emulate request:\n{}",
         serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
     );
 
-    let after = wait_for_ok_response(&node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
-    let seqno_after = after["result"]["last"]["seqno"]
-        .as_i64()
-        .expect("masterchain seqno must be integer after emulate");
+    let transactions_after = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100",
+        Duration::from_secs(5),
+    );
     assert_eq!(
-        seqno_after, seqno_before,
-        "emulateTrace must not commit state. before={seqno_before}, after={seqno_after}"
+        v3_transactions_from_response(&transactions_after).len(),
+        tx_count_before,
+        "emulateTrace must not commit transactions. before:\n{}\nafter:\n{}",
+        serde_json::to_string_pretty(&transactions_before).unwrap_or_default(),
+        serde_json::to_string_pretty(&transactions_after).unwrap_or_default()
     );
 
     let (invalid_status, invalid) = node.post_json_with_status(
@@ -1475,6 +3996,1541 @@ fn localnet_supports_emulate_v1_emulate_trace() {
 }
 
 #[test]
+fn localnet_supports_emulate_v1_emulate_ton_connect() {
+    let project = ProjectBuilder::new("localnet-emulate-v1-emulate-ton-connect").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v3,wallet_v4,wallet_v5", "--no-mining"])
+        .start();
+
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallets = response_payload(&startup_accounts)
+        .as_array()
+        .expect("startup wallets response must contain an array");
+    let transactions_before = node.get_json("/api/v3/transactions?limit=100");
+    let tx_count_before = v3_transactions_from_response(&transactions_before).len();
+    let mut wallet_results = Vec::new();
+
+    for wallet in wallets {
+        let address = wallet["address"]
+            .as_str()
+            .expect("startup wallet must expose address");
+        let mut messages = vec![json!({
+            "address": address,
+            "amount": "1000000"
+        })];
+        if wallet["version"] == "v4r2" {
+            let state_init =
+                CellBuilder::build_from(StateInit::default()).expect("empty state init must build");
+            messages[0]["payload"] = json!(Boc::encode_base64(Cell::default()));
+            messages[0]["stateInit"] = json!(Boc::encode_base64(&state_init));
+        } else if wallet["version"] == "v5r1" {
+            messages.push(json!({
+                "address": address,
+                "amount": "2000000"
+            }));
+        }
+        let (status, response) = node.post_json_with_status(
+            "/api/emulate/v1/emulateTonConnect",
+            &json!({
+                "from": address,
+                "messages": messages,
+                "with_actions": true,
+                "include_code_data": true,
+                "include_address_book": true,
+                "include_metadata": true
+            }),
+        );
+        let typed: EmulateTraceResponse =
+            serde_json::from_value(response.clone()).unwrap_or_else(|error| {
+                panic!("Invalid emulateTonConnect response: {error}\n{response:#}")
+            });
+        let root_transaction = typed
+            .trace
+            .transaction
+            .as_ref()
+            .expect("emulateTonConnect trace must contain root transaction");
+        let raw_address = Addr::parse(address)
+            .expect("startup wallet address must parse")
+            .to_string();
+        let address_book_contains_wallet = typed
+            .address_book
+            .as_ref()
+            .is_some_and(|book| book.contains_key(&raw_address));
+        wallet_results.push(json!({
+            "version": wallet["version"],
+            "status": status,
+            "trace_present": typed.trace.tx_hash.is_some(),
+            "transaction_count": typed.transactions.len(),
+            "compute_success": root_transaction
+                .description
+                .compute_ph
+                .as_ref()
+                .and_then(|phase| phase.success),
+            "compute_exit_code": root_transaction
+                .description
+                .compute_ph
+                .as_ref()
+                .and_then(|phase| phase.exit_code),
+            "action_success": root_transaction
+                .description
+                .action
+                .as_ref()
+                .and_then(|phase| phase.success),
+            "aborted": root_transaction.description.aborted,
+            "out_message_count": root_transaction.out_msgs.len(),
+            "actions_included": typed.actions.is_some(),
+            "code_or_data_cells_non_empty": typed
+                .code_cells
+                .as_ref()
+                .is_some_and(|cells| !cells.is_empty())
+                || typed
+                    .data_cells
+                    .as_ref()
+                    .is_some_and(|cells| !cells.is_empty()),
+            "address_book_contains_wallet": address_book_contains_wallet,
+            "metadata_included": typed.metadata.is_some(),
+            "complete": !typed.is_incomplete,
+        }));
+    }
+
+    let (empty_status, empty_response) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": wallets[0]["address"],
+            "messages": []
+        }),
+    );
+    let (amount_status, amount_response) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": wallets[0]["address"],
+            "messages": [{
+                "address": wallets[0]["address"],
+                "amount": "not-a-number"
+            }]
+        }),
+    );
+    let transactions_after = node.get_json("/api/v3/transactions?limit=100");
+    let snapshot = json!({
+        "wallets": wallet_results,
+        "validation": {
+            "empty_messages": {
+                "status": empty_status,
+                "error": empty_response["error"],
+            },
+            "invalid_amount": {
+                "status": amount_status,
+                "error": amount_response["error"],
+            },
+        },
+        "state": {
+            "transaction_count_unchanged": v3_transactions_from_response(&transactions_after).len()
+                == tx_count_before,
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_emulate_v1_emulate_ton_connect.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_supports_v3_estimate_fee_and_top_accounts() {
+    let project = ProjectBuilder::new("localnet-v3-estimate-fee-and-top-accounts").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v4", "--no-mining"])
+        .start();
+
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet = response_payload(&startup_accounts)
+        .as_array()
+        .and_then(|wallets| wallets.first())
+        .expect("startup wallet must be present");
+    let address = wallet["address"]
+        .as_str()
+        .expect("startup wallet must expose address");
+    let ton_connect = node.post_json(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": address,
+            "messages": [{"address": address, "amount": "1"}]
+        }),
+    );
+    let emulated: EmulateTraceResponse = serde_json::from_value(ton_connect)
+        .expect("emulateTonConnect response must match typed contract");
+    let body = emulated
+        .trace
+        .transaction
+        .as_ref()
+        .and_then(|transaction| transaction.in_msg.as_ref())
+        .and_then(|message| message.message_content.as_ref())
+        .and_then(|content| content.body.as_ref())
+        .expect("emulated wallet message must contain body BOC");
+    let body_hex = hex::encode(
+        base64::engine::general_purpose::STANDARD
+            .decode(body)
+            .expect("body must be base64"),
+    );
+
+    let estimate_request = |body: &str| {
+        json!({
+            "address": address,
+            "body": body,
+            "ignore_chksig": true
+        })
+    };
+    let (base64_status, base64_response) =
+        node.post_json_with_status("/api/v3/estimateFee", &estimate_request(body));
+    let (hex_status, hex_response) =
+        node.post_json_with_status("/api/v3/estimateFee", &estimate_request(&body_hex));
+    let estimate: toncenter_v3::EstimateFeeResult = serde_json::from_value(base64_response.clone())
+        .expect("estimateFee response must match typed contract");
+
+    let top_accounts: Vec<toncenter_v3::AccountBalance> =
+        serde_json::from_value(node.get_json("/api/v3/topAccountsByBalance?limit=3&offset=0"))
+            .expect("topAccountsByBalance response must match typed contract");
+    let balances = top_accounts
+        .iter()
+        .map(|account| account.balance.parse::<u128>().expect("valid balance"))
+        .collect::<Vec<_>>();
+    let pending_actions: toncenter_v3::ActionsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/pendingActions?account={address}&include_transactions=true"),
+    ))
+    .expect("pendingActions response must match typed contract");
+    let pending_traces: toncenter_v3::TracesResponse =
+        serde_json::from_value(node.get_json(&format!("/api/v3/pendingTraces?account={address}")))
+            .expect("pendingTraces response must match typed contract");
+
+    let snapshot = json!({
+        "estimate_fee": {
+            "base64_status": base64_status,
+            "hex_status": hex_status,
+            "encodings_match": base64_response == hex_response,
+            "in_fwd_fee_positive": estimate.source_fees.in_fwd_fee > 0,
+            "gas_fee_positive": estimate.source_fees.gas_fee > 0,
+            "destination_fees_empty": estimate.destination_fees.is_empty(),
+        },
+        "top_accounts": {
+            "count": top_accounts.len(),
+            "sorted_descending": balances.windows(2).all(|pair| pair[0] >= pair[1]),
+        },
+        "pending": {
+            "actions": pending_actions.actions.len(),
+            "action_address_book": pending_actions.address_book.len(),
+            "action_metadata": pending_actions.metadata.len(),
+            "traces": pending_traces.traces.len(),
+            "trace_address_book": pending_traces.address_book.len(),
+            "trace_metadata": pending_traces.metadata.len(),
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_estimate_fee_and_top_accounts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexed_contract_endpoints_match_typed_contracts() {
+    let project = ProjectBuilder::new("localnet-v3-indexed-contract-endpoints").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v4", "--no-mining"])
+        .start();
+    let no_state = "0:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+
+    let dns: toncenter_v3::DnsRecordsResponse =
+        serde_json::from_value(node.get_json("/api/v3/dns/records?domain=missing.ton"))
+            .expect("dns records response must match typed contract");
+    let jetton_transfers: toncenter_v3::JettonTransfersResponse = serde_json::from_value(
+        node.get_json("/api/v3/jetton/transfers?limit=10&offset=0&sort=desc"),
+    )
+    .expect("jetton transfers response must match typed contract");
+    let jetton_burns: toncenter_v3::JettonBurnsResponse =
+        serde_json::from_value(node.get_json("/api/v3/jetton/burns?limit=10&offset=0&sort=desc"))
+            .expect("jetton burns response must match typed contract");
+    let collections: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/collections?limit=10&offset=0"))
+            .expect("NFT collections response must match typed contract");
+    let sales: toncenter_v3::NftSalesResponse =
+        serde_json::from_value(node.get_json(&format!("/api/v3/nft/sales?address={no_state}")))
+            .expect("NFT sales response must match typed contract");
+    let nft_transfers: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/transfers?limit=10&offset=0&sort=desc"))
+            .expect("NFT transfers response must match typed contract");
+    let orders: toncenter_v3::MultisigOrdersResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/multisig/orders?address={no_state}&parse_actions=true"),
+    ))
+    .expect("multisig orders response must match typed contract");
+    let multisigs: toncenter_v3::MultisigsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/multisig/wallets?address={no_state}&include_orders=true"),
+    ))
+    .expect("multisig wallets response must match typed contract");
+    let vesting: toncenter_v3::VestingContractsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/vesting?contract_address={no_state}&check_whitelist=true"),
+    ))
+    .expect("vesting response must match typed contract");
+
+    let snapshot = json!({
+        "dns": { "records": dns.records.len(), "address_book": dns.address_book.len() },
+        "jetton_burns": { "items": jetton_burns.jetton_burns.len(), "address_book": jetton_burns.address_book.len(), "metadata": jetton_burns.metadata.len() },
+        "jetton_transfers": { "items": jetton_transfers.jetton_transfers.len(), "address_book": jetton_transfers.address_book.len(), "metadata": jetton_transfers.metadata.len() },
+        "multisig_orders": { "items": orders.orders.len(), "address_book": orders.address_book.len() },
+        "multisig_wallets": { "items": multisigs.multisigs.len(), "address_book": multisigs.address_book.len() },
+        "nft_collections": { "items": collections.nft_collections.len(), "address_book": collections.address_book.len(), "metadata": collections.metadata.len() },
+        "nft_sales": { "items": sales.nft_sales.len(), "address_book": sales.address_book.len(), "metadata": sales.metadata.len() },
+        "nft_transfers": { "items": nft_transfers.nft_transfers.len(), "address_book": nft_transfers.address_book.len(), "metadata": nft_transfers.metadata.len() },
+        "vesting": { "items": vesting.vesting_contracts.len(), "address_book": vesting.address_book.len() },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_v3_indexed_contract_endpoints_match_typed_contracts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_jetton_actions() {
+    let project = jetton_v1_action_project("localnet-v3-real-jetton-actions");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/jetton.tolk");
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
+    let source_wallet = extract_canonical_addr_marker(&script_output, "JETTON_SOURCE_WALLET=");
+    let recipient_wallet =
+        extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let jetton_burns = loop {
+        let response: toncenter_v3::JettonBurnsResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/jetton/burns?jetton_wallet={}",
+                encode_query_component(&source_wallet)
+            )))
+            .expect("jetton burns response must match typed contract");
+        if ["102", "104"].iter().all(|query_id| {
+            response
+                .jetton_burns
+                .iter()
+                .any(|burn| burn.query_id == *query_id)
+        }) || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let jetton_transfers: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("jetton transfers response must match typed contract");
+    let incoming: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&jetton_master={}&direction=in&sort=asc",
+            encode_query_component(&recipient),
+            encode_query_component(&jetton_master)
+        )))
+        .expect("incoming jetton transfers must match typed contract");
+    let outgoing: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&direction=out&sort=asc",
+            encode_query_component(&owner)
+        )))
+        .expect("outgoing jetton transfers must match typed contract");
+    let wrong_direction: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&direction=out",
+            encode_query_component(&recipient)
+        )))
+        .expect("mismatched jetton direction must match typed contract");
+    let first_ascending: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}&sort=asc&limit=1",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("ascending jetton page must match typed contract");
+    let first_descending: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}&sort=desc&limit=1",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("descending jetton page must match typed contract");
+    let burns_by_owner_and_master: toncenter_v3::JettonBurnsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/burns?address={}&jetton_master={}&sort=asc",
+            encode_query_component(&owner),
+            encode_query_component(&jetton_master)
+        )))
+        .expect("filtered jetton burns must match typed contract");
+    let masters: toncenter_v3::JettonMastersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/masters?address={}",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("jetton masters response must match typed contract");
+    let wallets: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?address={}&address={}",
+            encode_query_component(&source_wallet),
+            encode_query_component(&recipient_wallet)
+        )))
+        .expect("jetton wallets response must match typed contract");
+    let wallets_ascending: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?jetton_address={}&sort=asc",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("ascending jetton wallets must match typed contract");
+    let wallets_descending: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?jetton_address={}&sort=desc",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("descending jetton wallets must match typed contract");
+    let transfer = jetton_transfers
+        .jetton_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "101")
+        .expect("successful jetton transfer must be indexed");
+    let burn = jetton_burns
+        .jetton_burns
+        .iter()
+        .find(|burn| burn.query_id == "102")
+        .expect("successful jetton burn must be indexed");
+    let aborted_transfer_present = jetton_transfers
+        .jetton_transfers
+        .iter()
+        .any(|transfer| transfer.query_id == "103");
+    let aborted_burn = jetton_burns
+        .jetton_burns
+        .iter()
+        .find(|burn| burn.query_id == "104")
+        .expect("aborted jetton burn must be indexed");
+    let master = masters
+        .jetton_masters
+        .first()
+        .expect("deployed jetton master must be indexed");
+    let source_wallet_state = wallets
+        .jetton_wallets
+        .iter()
+        .find(|wallet| wallet.address == source_wallet)
+        .expect("source jetton wallet must be indexed");
+    let recipient_wallet_state = wallets
+        .jetton_wallets
+        .iter()
+        .find(|wallet| wallet.address == recipient_wallet)
+        .expect("recipient jetton wallet must be indexed");
+    let snapshot = json!({
+        "jetton": {
+            "master": {
+                "address": master.address,
+                "admin_address": master.admin_address,
+                "mintable": master.mintable,
+                "total_supply": master.total_supply,
+                "address_book_has_master": masters.address_book.contains_key(&jetton_master),
+                "metadata_has_master": masters.metadata.contains_key(&jetton_master),
+            },
+            "source_wallet": {
+                "address": source_wallet_state.address,
+                "balance": source_wallet_state.balance,
+                "owner": source_wallet_state.owner,
+                "jetton": source_wallet_state.jetton,
+            },
+            "recipient_wallet": {
+                "address": recipient_wallet_state.address,
+                "balance": recipient_wallet_state.balance,
+                "owner": recipient_wallet_state.owner,
+                "jetton": recipient_wallet_state.jetton,
+            },
+            "transfer": {
+                "query_id": transfer.query_id,
+                "source": transfer.source,
+                "destination": transfer.destination,
+                "amount": transfer.amount,
+                "source_wallet": transfer.source_wallet,
+                "jetton_master": transfer.jetton_master,
+                "transaction_aborted": transfer.transaction_aborted,
+                "response_destination": transfer.response_destination,
+                "custom_payload": transfer.custom_payload,
+                "forward_ton_amount": transfer.forward_ton_amount,
+                "address_book_has_recipient": jetton_transfers.address_book.contains_key(&recipient),
+                "metadata_has_source_wallet": jetton_transfers.metadata.contains_key(&source_wallet),
+            },
+            "burn": {
+                "query_id": burn.query_id,
+                "owner": burn.owner,
+                "amount": burn.amount,
+                "jetton_wallet": burn.jetton_wallet,
+                "jetton_master": burn.jetton_master,
+                "transaction_aborted": burn.transaction_aborted,
+                "response_destination": burn.response_destination,
+                "custom_payload": burn.custom_payload,
+            },
+            "aborted_transfer_present": aborted_transfer_present,
+            "aborted_burn": {
+                "query_id": aborted_burn.query_id,
+                "amount": aborted_burn.amount,
+                "owner": aborted_burn.owner,
+                "transaction_aborted": aborted_burn.transaction_aborted,
+            },
+        },
+        "filters": {
+            "incoming_query_ids": incoming.jetton_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "outgoing_query_ids": outgoing.jetton_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wrong_direction_count": wrong_direction.jetton_transfers.len(),
+            "ascending_first_query_id": first_ascending.jetton_transfers.first().map(|event| &event.query_id),
+            "descending_first_query_id": first_descending.jetton_transfers.first().map(|event| &event.query_id),
+            "burn_query_ids": burns_by_owner_and_master.jetton_burns.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wallet_balances_ascending": wallets_ascending.jetton_wallets.iter().map(|wallet| &wallet.balance).collect::<Vec<_>>(),
+            "wallet_balances_descending": wallets_descending.jetton_wallets.iter().map(|wallet| &wallet.balance).collect::<Vec<_>>(),
+        },
+        "actors": {
+            "owner": owner,
+            "recipient": recipient,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_jetton_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_jetton_faucet_detects_legacy_v1_mint_layout() {
+    let project = jetton_v1_action_project("localnet-legacy-jetton-faucet");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/jetton.tolk");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
+    let recipient_wallet =
+        extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
+
+    let faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": recipient,
+            "jetton_master": jetton_master,
+            "amount": "7",
+        }),
+    );
+    let message_hash = faucet["result"]["hash"]
+        .as_str()
+        .expect("legacy jetton faucet must return a message hash");
+    let transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("legacy mint transaction must be indexed");
+    let master_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={jetton_master}"),
+        Duration::from_secs(12),
+    );
+    let wallet_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={recipient_wallet}"),
+        Duration::from_secs(12),
+    );
+    let master = response_payload(&master_response);
+    let wallet = response_payload(&wallet_response);
+
+    let snapshot = json!({
+        "faucet": {
+            "ok": faucet["ok"],
+            "message_hash_present": !message_hash.is_empty(),
+        },
+        "mint_transaction": {
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+        },
+        "master_total_supply": master["total_supply"],
+        "recipient_wallet_balance": wallet["balance"],
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_jetton_faucet_detects_legacy_v1_mint_layout.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_nft_actions() {
+    let project = nft_v1_action_project("localnet-v3-real-nft-actions");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/nft.tolk");
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
+    let nft_item = extract_canonical_addr_marker(&script_output, "NFT_ITEM=");
+    let nft_item_second = extract_canonical_addr_marker(&script_output, "NFT_ITEM_SECOND=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let nft_transfers = loop {
+        let response: toncenter_v3::NftTransfersResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/nft/transfers?item_address={}",
+                encode_query_component(&nft_item)
+            )))
+            .expect("NFT transfers response must match typed contract");
+        if ["201", "203"].iter().all(|query_id| {
+            response
+                .nft_transfers
+                .iter()
+                .any(|transfer| transfer.query_id == *query_id)
+        }) || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let collections: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?collection_address={}",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT collections response must match typed contract");
+    let items: toncenter_v3::NftItemsResponse = serde_json::from_value(node.get_json(&format!(
+        "/api/v3/nft/items?address={}",
+        encode_query_component(&nft_item)
+    )))
+    .expect("NFT items response must match typed contract");
+    let collections_by_owner: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?owner_address={}",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT collections owner filter must match typed contract");
+    let collections_by_wrong_owner: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?collection_address={}&owner_address={}",
+            encode_query_component(&nft_collection),
+            encode_query_component(&recipient)
+        )))
+        .expect("NFT collections mismatched owner must match typed contract");
+    let items_by_owner: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}",
+            encode_query_component(&recipient)
+        )))
+        .expect("NFT items owner filter must match typed contract");
+    let items_by_collection_index: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&index=0",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT items collection index filter must match typed contract");
+    let all_items: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/items"))
+            .expect("unfiltered NFT items must match typed contract");
+    let items_by_collection: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT collection items must match typed contract");
+    let items_by_repeated_collection: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&collection_address={}",
+            encode_query_component(&nft_collection),
+            encode_query_component(&nft_collection)
+        )))
+        .expect("repeated NFT collection filter must match typed contract");
+    let items_by_empty_index: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&index=",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("empty NFT index filter must match typed contract");
+    let items_by_owners: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&owner_address={}",
+            encode_query_component(&owner),
+            encode_query_component(&recipient)
+        )))
+        .expect("multi-owner NFT items must match typed contract");
+    let items_by_lt: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&sort_by_last_transaction_lt=true",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("LT-sorted NFT items must match typed contract");
+    let first_item_page: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&limit=1",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("first NFT item page must match typed contract");
+    let second_item_page: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&limit=1&offset=1",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("second NFT item page must match typed contract");
+    let (index_without_collection_status, index_without_collection) =
+        node.get_json_with_status("/api/v3/nft/items?index=0");
+    let incoming: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&direction=in&sort=asc",
+            encode_query_component(&recipient)
+        )))
+        .expect("incoming NFT transfers must match typed contract");
+    let outgoing: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&collection_address={}&direction=out&sort=asc",
+            encode_query_component(&owner),
+            encode_query_component(&nft_collection)
+        )))
+        .expect("outgoing NFT transfers must match typed contract");
+    let wrong_direction: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&direction=out",
+            encode_query_component(&recipient)
+        )))
+        .expect("mismatched NFT direction must match typed contract");
+    let first_ascending: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}&sort=asc&limit=1",
+            encode_query_component(&nft_item)
+        )))
+        .expect("ascending NFT page must match typed contract");
+    let first_descending: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}&sort=desc&limit=1",
+            encode_query_component(&nft_item)
+        )))
+        .expect("descending NFT page must match typed contract");
+
+    let collection = collections
+        .nft_collections
+        .first()
+        .expect("deployed NFT collection must be indexed");
+    let item = items
+        .nft_items
+        .first()
+        .expect("deployed NFT item must be indexed");
+    let transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "201")
+        .expect("successful NFT transfer must be indexed");
+    let aborted_transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "203")
+        .expect("aborted NFT transfer must be indexed");
+
+    let snapshot = json!({
+        "collection": {
+            "address": collection.address,
+            "owner_address": collection.owner_address,
+            "next_item_index": collection.next_item_index,
+            "address_book_has_collection": collections.address_book.contains_key(&nft_collection),
+            "metadata_has_collection": collections.metadata.contains_key(&nft_collection),
+        },
+        "item": {
+            "address": item.address,
+            "collection_address": item.collection_address,
+            "owner_address": item.owner_address,
+            "index": item.index,
+            "init": item.init,
+            "address_book_has_item": items.address_book.contains_key(&nft_item),
+            "metadata_has_item": items.metadata.contains_key(&nft_item),
+        },
+        "transfer": {
+            "query_id": transfer.query_id,
+            "nft_address": transfer.nft_address,
+            "nft_collection": transfer.nft_collection,
+            "old_owner": transfer.old_owner,
+            "new_owner": transfer.new_owner,
+            "transaction_aborted": transfer.transaction_aborted,
+            "response_destination": transfer.response_destination,
+            "custom_payload": transfer.custom_payload,
+            "forward_amount": transfer.forward_amount,
+            "address_book_has_recipient": nft_transfers.address_book.contains_key(&recipient),
+            "metadata_has_item": nft_transfers.metadata.contains_key(&nft_item),
+        },
+        "aborted_transfer": {
+            "query_id": aborted_transfer.query_id,
+            "old_owner": aborted_transfer.old_owner,
+            "new_owner": aborted_transfer.new_owner,
+            "transaction_aborted": aborted_transfer.transaction_aborted,
+        },
+        "filters": {
+            "collection_by_owner_count": collections_by_owner.nft_collections.len(),
+            "collection_by_wrong_owner_count": collections_by_wrong_owner.nft_collections.len(),
+            "items_by_owner_count": items_by_owner.nft_items.len(),
+            "items_by_collection_index_count": items_by_collection_index.nft_items.len(),
+            "index_without_collection_status": index_without_collection_status,
+            "index_without_collection_error": index_without_collection,
+            "incoming_query_ids": incoming.nft_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "outgoing_query_ids": outgoing.nft_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wrong_direction_count": wrong_direction.nft_transfers.len(),
+            "ascending_first_query_id": first_ascending.nft_transfers.first().map(|event| &event.query_id),
+            "descending_first_query_id": first_descending.nft_transfers.first().map(|event| &event.query_id),
+        },
+        "item_ordering": {
+            "expected_insertion_addresses": [&nft_item_second, &nft_item],
+            "unfiltered_addresses": all_items.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "single_collection_indexes": items_by_collection.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "repeated_collection_indexes": items_by_repeated_collection.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "empty_index_indexes": items_by_empty_index.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "multi_owner_addresses": items_by_owners.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "last_transaction_lt_addresses": items_by_lt.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "first_page_index": first_item_page.nft_items.first().map(|item| &item.index),
+            "second_page_index": second_item_page.nft_items.first().map(|item| &item.index),
+        },
+        "actors": {
+            "owner": owner,
+            "recipient": recipient,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_nft_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_getgems_sale() {
+    let project = with_nft_v1_action_fixtures(ProjectBuilder::new("localnet-v3-real-getgems-sale"))
+        .contract_from_boc_with_types(
+            "GetgemsNftFixpriceSaleV3",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/GetgemsNftFixpriceSaleV3.boc")
+                .to_vec(),
+            "types/getgems_nft_fixprice_sale_v3.types.tolk",
+        )
+        .file(
+            "types/getgems_nft_fixprice_sale_v3.types",
+            include_str!(
+                "testdata/toncenter_v3_actions/types/getgems_nft_fixprice_sale_v3.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/GetgemsNftFixpriceSaleV3.gen",
+            include_str!(
+                "testdata/toncenter_v3_actions/wrappers/GetgemsNftFixpriceSaleV3.gen.tolk"
+            ),
+        )
+        .script_file(
+            "getgems_sale",
+            include_str!("testdata/toncenter_v3_actions/getgems_sale.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/getgems_sale.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
+    let nft_item = extract_canonical_addr_marker(&script_output, "NFT_ITEM=");
+    let nft_sale = extract_canonical_addr_marker(&script_output, "NFT_SALE=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let sales = loop {
+        let response: toncenter_v3::NftSalesResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/nft/sales?address={}",
+                encode_query_component(&nft_sale)
+            )))
+            .expect("NFT sales response must match typed contract");
+        if !response.nft_sales.is_empty() || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let nft_transfers: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}",
+            encode_query_component(&nft_item)
+        )))
+        .expect("NFT transfers response must match typed contract");
+    let items: toncenter_v3::NftItemsResponse = serde_json::from_value(node.get_json(&format!(
+        "/api/v3/nft/items?address={}&include_on_sale=true",
+        encode_query_component(&nft_item)
+    )))
+    .expect("NFT items response must match typed contract");
+    let items_by_real_owner_without_sale: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&include_on_sale=false",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT real owner filter without sale lookup must match typed contract");
+    let items_by_real_owner_with_sale: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&include_on_sale=true",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT real owner filter with sale lookup must match typed contract");
+    let items_by_contract_owner: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}",
+            encode_query_component(&nft_sale)
+        )))
+        .expect("NFT sale contract owner filter must match typed contract");
+    let mixed_sales: toncenter_v3::NftSalesResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/sales?address={}&address={}",
+            encode_query_component(&nft_sale),
+            encode_query_component(&owner)
+        )))
+        .expect("repeated NFT sale addresses must match typed contract");
+    let (missing_address_status, missing_address_error) =
+        node.get_json_with_status("/api/v3/nft/sales");
+
+    let sale = sales
+        .nft_sales
+        .first()
+        .expect("initialized Getgems sale must be indexed");
+    let item = items
+        .nft_items
+        .first()
+        .expect("listed NFT item must be indexed");
+    let transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "202")
+        .expect("NFT transfer into the sale must be indexed");
+
+    let snapshot = json!({
+        "sale": {
+            "type": sale.kind,
+            "address": sale.address,
+            "nft_address": sale.nft_address,
+            "nft_owner_address": sale.nft_owner_address,
+            "marketplace_address": sale.marketplace_address,
+            "created_at": sale.created_at,
+            "details": sale.details,
+            "has_embedded_nft_item": sale.nft_item.is_some(),
+            "embedded_nft_on_sale": sale.nft_item.as_ref().map(|item| item.on_sale),
+            "embedded_nft_real_owner": sale.nft_item.as_ref().and_then(|item| item.real_owner.as_ref()),
+            "embedded_nft_sale_contract": sale.nft_item.as_ref().and_then(|item| item.sale_contract_address.as_ref()),
+            "address_book_has_sale": sales.address_book.contains_key(&nft_sale),
+            "metadata_has_item": sales.metadata.contains_key(&nft_item),
+        },
+        "item": {
+            "address": item.address,
+            "collection_address": item.collection_address,
+            "owner_address": item.owner_address,
+            "owner_is_sale": item.owner_address.as_deref() == Some(nft_sale.as_str()),
+            "on_sale": item.on_sale,
+            "real_owner": item.real_owner,
+            "sale_contract_address": item.sale_contract_address,
+        },
+        "filters": {
+            "real_owner_without_sale_count": items_by_real_owner_without_sale.nft_items.len(),
+            "real_owner_with_sale_count": items_by_real_owner_with_sale.nft_items.len(),
+            "contract_owner_count": items_by_contract_owner.nft_items.len(),
+            "mixed_sale_count": mixed_sales.nft_sales.len(),
+            "missing_address_status": missing_address_status,
+            "missing_address_error": missing_address_error,
+        },
+        "listing_transfer": {
+            "query_id": transfer.query_id,
+            "nft_address": transfer.nft_address,
+            "nft_collection": transfer.nft_collection,
+            "old_owner": transfer.old_owner,
+            "new_owner": transfer.new_owner,
+            "transaction_aborted": transfer.transaction_aborted,
+            "forward_amount": transfer.forward_amount,
+            "new_owner_is_sale": transfer.new_owner == nft_sale,
+        },
+        "actors": {
+            "owner": owner,
+            "collection": nft_collection,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_getgems_sale.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_multisig_actions() {
+    let project = ProjectBuilder::new("localnet-v3-real-multisig-actions")
+        .contract(
+            "librarypublisher",
+            include_str!("testdata/toncenter_v3_actions/library_publisher.tolk"),
+        )
+        .contract_from_boc_with_types(
+            "MultisigV2",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/MultisigV2.boc").to_vec(),
+            "types/multisig_v2.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "MultisigOrderV2",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/MultisigOrderV2.boc").to_vec(),
+            "types/multisig_order_v2.types.tolk",
+        )
+        .contract_from_boc(
+            "MultisigOrderV2Library",
+            base64::engine::general_purpose::STANDARD
+                .decode(
+                    include_str!(
+                        "testdata/toncenter_v3_actions/contracts/MultisigOrderV2.library.boc.base64"
+                    )
+                    .trim(),
+                )
+                .expect("MultisigOrderV2 library fixture must be base64"),
+        )
+        .file(
+            "types/multisig_v2.types",
+            include_str!("testdata/toncenter_v3_actions/types/multisig_v2.types.tolk"),
+        )
+        .file(
+            "types/multisig_order_v2.types",
+            include_str!("testdata/toncenter_v3_actions/types/multisig_order_v2.types.tolk"),
+        )
+        .file(
+            "wrappers/MultisigV2.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/MultisigV2.gen.tolk"),
+        )
+        .file(
+            "wrappers/MultisigOrderV2.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/MultisigOrderV2.gen.tolk"),
+        )
+        .script_file(
+            "multisig",
+            include_str!("testdata/toncenter_v3_actions/multisig.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/multisig.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let cosigner = extract_canonical_addr_marker(&script_output, "COSIGNER=");
+    let multisig_address = extract_canonical_addr_marker(&script_output, "MULTISIG=");
+    let order_address = extract_canonical_addr_marker(&script_output, "MULTISIG_ORDER=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let orders = loop {
+        let response: toncenter_v3::MultisigOrdersResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/multisig/orders?address={}&parse_actions=true",
+                encode_query_component(&order_address)
+            )))
+            .expect("multisig orders response must match typed contract");
+        if !response.orders.is_empty() || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let multisigs: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?address={}&include_orders=true",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig wallets response must match typed contract");
+    let orders_without_actions: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?address={}&parse_actions=false",
+            encode_query_component(&order_address)
+        )))
+        .expect("unparsed multisig orders must match typed contract");
+    let orders_by_multisig: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?multisig_address={}&parse_actions=true",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig-address order filter must match typed contract");
+    let orders_after_offset: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?multisig_address={}&offset=1",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig order pagination must match typed contract");
+    let multisigs_without_orders: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?address={}&include_orders=false",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig response without orders must match typed contract");
+    let multisigs_by_owner: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&owner)
+        )))
+        .expect("multisig owner filter must match typed contract");
+    let multisigs_by_cosigner: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&cosigner)
+        )))
+        .expect("multisig cosigner filter must match typed contract");
+    let multisigs_by_unrelated_wallet: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&order_address)
+        )))
+        .expect("unrelated multisig wallet filter must match typed contract");
+
+    let multisig = multisigs
+        .multisigs
+        .first()
+        .expect("deployed MultisigV2 must be indexed");
+    let order = orders
+        .orders
+        .first()
+        .unwrap_or_else(|| {
+            let account = node.get_json(&format!(
+                "/api/v3/accountStates?address={}",
+                encode_query_component(&order_address)
+            ));
+            panic!(
+                "created MultisigOrderV2 must be indexed\naccount: {account:#}\nmultisigs: {multisigs:#?}"
+            )
+        });
+    let update_action = order
+        .actions
+        .iter()
+        .find(|action| action.parsed_body_type == "multisig_update_params")
+        .expect("multisig update action must be parsed");
+    let send_action = order
+        .actions
+        .iter()
+        .find(|action| action.destination.as_deref() == Some(cosigner.as_str()))
+        .unwrap_or_else(|| {
+            panic!(
+                "multisig send-message action must be parsed: {:#?}",
+                order.actions
+            )
+        });
+    let external_action = order
+        .actions
+        .iter()
+        .find(|action| action.parsed && action.send_mode == 64)
+        .expect("multisig external-out action must be parsed");
+    let unknown_action = order
+        .actions
+        .iter()
+        .find(|action| !action.parsed)
+        .expect("unknown multisig action must be preserved as a parse error");
+    let snapshot = json!({
+        "multisig": {
+            "address": multisig.address,
+            "next_order_seqno": multisig.next_order_seqno,
+            "threshold": multisig.threshold,
+            "signers": multisig.signers,
+            "proposers": multisig.proposers,
+            "embedded_order_count": multisig.orders.len(),
+            "address_book_has_multisig": multisigs.address_book.contains_key(&multisig_address),
+            "address_book_has_owner": multisigs.address_book.contains_key(&owner),
+            "address_book_has_cosigner": multisigs.address_book.contains_key(&cosigner),
+        },
+        "order": {
+            "address": order.address,
+            "multisig_address": order.multisig_address,
+            "order_seqno": order.order_seqno,
+            "threshold": order.threshold,
+            "sent_for_execution": order.sent_for_execution,
+            "approvals_mask": order.approvals_mask,
+            "approvals_num": order.approvals_num,
+            "has_expiration_date": order.expiration_date.is_some(),
+            "signers": order.signers,
+            "address_book_has_order": orders.address_book.contains_key(&order_address),
+        },
+        "actions": {
+            "count": order.actions.len(),
+            "update": {
+                "destination": update_action.destination,
+                "value": update_action.value,
+                "parsed": update_action.parsed,
+                "error": update_action.error,
+                "parsed_body": update_action.parsed_body,
+                "parsed_body_type": update_action.parsed_body_type,
+                "send_mode": update_action.send_mode,
+            },
+            "send": {
+                "destination": send_action.destination,
+                "value": send_action.value,
+                "parsed": send_action.parsed,
+                "error": send_action.error,
+                "parsed_body_type": send_action.parsed_body_type,
+                "send_mode": send_action.send_mode,
+            },
+            "external": {
+                "destination": external_action.destination,
+                "value": external_action.value,
+                "parsed": external_action.parsed,
+                "error": external_action.error,
+                "parsed_body_type": external_action.parsed_body_type,
+                "send_mode": external_action.send_mode,
+            },
+            "unknown": {
+                "destination": unknown_action.destination,
+                "value": unknown_action.value,
+                "parsed": unknown_action.parsed,
+                "error": unknown_action.error,
+                "parsed_body_type": unknown_action.parsed_body_type,
+                "send_mode": unknown_action.send_mode,
+            },
+        },
+        "filters": {
+            "orders_without_actions_count": orders_without_actions.orders.len(),
+            "unparsed_action_count": orders_without_actions.orders.first().map(|order| order.actions.len()),
+            "orders_by_multisig_count": orders_by_multisig.orders.len(),
+            "orders_after_offset_count": orders_after_offset.orders.len(),
+            "embedded_orders_disabled_count": multisigs_without_orders.multisigs.first().map(|multisig| multisig.orders.len()),
+            "wallet_by_owner_count": multisigs_by_owner.multisigs.len(),
+            "wallet_by_cosigner_count": multisigs_by_cosigner.multisigs.len(),
+            "wallet_by_unrelated_count": multisigs_by_unrelated_wallet.multisigs.len(),
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_multisig_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_vesting_actions() {
+    let project = ProjectBuilder::new("localnet-v3-real-vesting-actions")
+        .contract_from_boc_with_types(
+            "WalletVesting",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/WalletVesting.boc").to_vec(),
+            "types/wallet_vesting.types.tolk",
+        )
+        .file(
+            "types/wallet_vesting.types",
+            include_str!("testdata/toncenter_v3_actions/types/wallet_vesting.types.tolk"),
+        )
+        .file(
+            "wrappers/WalletVesting.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/WalletVesting.gen.tolk"),
+        )
+        .script_file(
+            "vesting",
+            include_str!("testdata/toncenter_v3_actions/vesting.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/vesting.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let sender = extract_canonical_addr_marker(&script_output, "SENDER=");
+    let whitelisted = extract_canonical_addr_marker(&script_output, "WHITELISTED=");
+    let vesting_address = extract_canonical_addr_marker(&script_output, "VESTING=");
+    let second_vesting_address = extract_canonical_addr_marker(&script_output, "VESTING_SECOND=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let discovered_contracts = loop {
+        let response: toncenter_v3::VestingContractsResponse =
+            serde_json::from_value(node.get_json("/api/v3/vesting?check_whitelist=true"))
+                .expect("unfiltered vesting response must match typed contract");
+        let first_is_updated = response.vesting_contracts.iter().any(|contract| {
+            contract.address.as_deref() == Some(vesting_address.as_str())
+                && contract.whitelist.contains(&whitelisted)
+        });
+        let second_is_deployed = response
+            .vesting_contracts
+            .iter()
+            .any(|contract| contract.address.as_deref() == Some(second_vesting_address.as_str()));
+        if (first_is_updated && second_is_deployed) || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let discovered_addresses = discovered_contracts
+        .vesting_contracts
+        .iter()
+        .map(|contract| contract.address.as_deref())
+        .collect::<Vec<_>>();
+    let expected_addresses = [
+        Some(vesting_address.as_str()),
+        Some(second_vesting_address.as_str()),
+    ];
+    if discovered_addresses != expected_addresses {
+        let second_account = node.get_json(&format!(
+            "/api/v3/accountStates?address={}",
+            encode_query_component(&second_vesting_address)
+        ));
+        let second_vesting = node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}",
+            encode_query_component(&second_vesting_address)
+        ));
+        let top_accounts = node.get_json("/api/v3/topAccountsByBalance?limit=100");
+        let second_vesting_data = node.post_json(
+            "/api/v3/runGetMethod",
+            &json!({
+                "address": second_vesting_address,
+                "method": "get_vesting_data",
+                "stack": [],
+            }),
+        );
+        panic!(
+            "both vesting contracts must be indexed in deployment order\n\
+             discovered: {discovered_addresses:#?}\n\
+             expected: {expected_addresses:#?}\n\
+             second account: {second_account:#}\n\
+             second vesting: {second_vesting:#}\n\
+             top accounts: {top_accounts:#}\n\
+             get_vesting_data: {second_vesting_data:#}"
+        );
+    }
+    let contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&check_whitelist=true",
+            encode_query_component(&vesting_address)
+        )))
+        .expect("vesting response must match typed contract");
+    let by_owner: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&owner)
+        )))
+        .expect("vesting owner lookup must match typed contract");
+    let all_contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting"))
+            .expect("unfiltered vesting response must match typed contract");
+    let all_contracts_repeated: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting"))
+            .expect("repeated unfiltered vesting response must match typed contract");
+    let by_whitelist_without_check: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&whitelisted)
+        )))
+        .expect("vesting whitelist lookup must match typed contract");
+    let by_whitelist_with_check: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}&check_whitelist=true",
+            encode_query_component(&whitelisted)
+        )))
+        .expect("vesting checked whitelist lookup must match typed contract");
+    let by_sender: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&sender)
+        )))
+        .expect("vesting sender lookup must match typed contract");
+    let repeated_contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&contract_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("repeated vesting contracts must match typed contract");
+    let after_offset: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}&offset=1",
+            encode_query_component(&owner)
+        )))
+        .expect("vesting pagination must match typed contract");
+    let combined_match: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&owner)
+        )))
+        .expect("combined vesting filters must match typed contract");
+    let combined_mismatch: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("mismatched combined vesting filters must match typed contract");
+    let combined_whitelist_match: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}&check_whitelist=true",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("combined vesting whitelist filters must match typed contract");
+    let first_page: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting?limit=1"))
+            .expect("first vesting page must match typed contract");
+    let second_page: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting?limit=1&offset=1"))
+            .expect("second vesting page must match typed contract");
+
+    let vesting = contracts
+        .vesting_contracts
+        .first()
+        .expect("deployed WalletVesting must be indexed");
+    let snapshot = json!({
+        "vesting": {
+            "address": vesting.address,
+            "start_time": vesting.start_time,
+            "total_duration": vesting.total_duration,
+            "unlock_period": vesting.unlock_period,
+            "cliff_duration": vesting.cliff_duration,
+            "sender_address": vesting.sender_address,
+            "owner_address": vesting.owner_address,
+            "total_amount": vesting.total_amount,
+            "whitelist": vesting.whitelist,
+            "address_book_has_vesting": contracts.address_book.contains_key(&vesting_address),
+            "address_book_has_owner": contracts.address_book.contains_key(&owner),
+            "address_book_has_sender": contracts.address_book.contains_key(&sender),
+            "address_book_has_whitelisted": contracts.address_book.contains_key(&whitelisted),
+        },
+        "filters": {
+            "all_contract_addresses": all_contracts.vesting_contracts.iter().map(|contract| &contract.address).collect::<Vec<_>>(),
+            "unfiltered_order_is_stable": all_contracts.vesting_contracts.iter().map(|contract| &contract.address).eq(all_contracts_repeated.vesting_contracts.iter().map(|contract| &contract.address)),
+            "owner_match_count": by_owner.vesting_contracts.len(),
+            "sender_match_count": by_sender.vesting_contracts.len(),
+            "whitelist_without_check_count": by_whitelist_without_check.vesting_contracts.len(),
+            "whitelist_with_check_count": by_whitelist_with_check.vesting_contracts.len(),
+            "repeated_contract_count": repeated_contracts.vesting_contracts.len(),
+            "after_offset_count": after_offset.vesting_contracts.len(),
+            "combined_match_count": combined_match.vesting_contracts.len(),
+            "combined_mismatch_count": combined_mismatch.vesting_contracts.len(),
+            "combined_whitelist_match_count": combined_whitelist_match.vesting_contracts.len(),
+            "first_page_address": first_page.vesting_contracts.first().map(|contract| &contract.address),
+            "second_page_address": second_page.vesting_contracts.first().map(|contract| &contract.address),
+            "expected_deployment_order": [&vesting_address, &second_vesting_address],
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_vesting_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+#[ignore = "optional live TonCenter fork contract test"]
+fn localnet_fork_supports_emulate_v1_emulate_ton_connect() {
+    let raw_request = std::env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON")
+        .expect("ACTON_TONCENTER_LIVE_TONCONNECT_JSON is required");
+    let request: Value = serde_json::from_str(&raw_request)
+        .expect("ACTON_TONCENTER_LIVE_TONCONNECT_JSON must be valid JSON");
+    let project = ProjectBuilder::new("localnet-fork-emulate-v1-emulate-ton-connect").build();
+    let node = project
+        .localnet()
+        .args(["--fork-net", "mainnet", "--no-mining"])
+        .ready_timeout(Duration::from_secs(30))
+        .start();
+
+    let (status, response) =
+        node.post_json_with_status("/api/emulate/v1/emulateTonConnect", &request);
+    let typed: EmulateTraceResponse =
+        serde_json::from_value(response.clone()).unwrap_or_else(|error| {
+            panic!("Invalid fork emulateTonConnect response: {error}\n{response:#}")
+        });
+    let root = typed
+        .trace
+        .transaction
+        .as_ref()
+        .expect("fork emulateTonConnect trace must contain root transaction");
+    let snapshot = json!({
+        "status": status,
+        "trace_present": typed.trace.tx_hash.is_some(),
+        "transaction_count_nonzero": !typed.transactions.is_empty(),
+        "compute_exit_code": root
+            .description
+            .compute_ph
+            .as_ref()
+            .and_then(|phase| phase.exit_code),
+        "emulated": root.emulated,
+        "complete": !typed.is_incomplete,
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_fork_emulate_v1_emulate_ton_connect.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_supports_v3_address_information_endpoint() {
     let project = ProjectBuilder::new("localnet-v3-address-information")
         .contract("getter", V3_GETTER_CONTRACT)
@@ -1529,10 +5585,8 @@ fn localnet_supports_v3_address_information_endpoint() {
         v3_payload["data"].as_str(),
         v2_response["result"]["data"].as_str()
     );
-    assert_eq!(
-        v3_payload["frozen_hash"].as_str(),
-        v2_response["result"]["frozen_hash"].as_str()
-    );
+    assert!(v3_payload["frozen_hash"].is_null());
+    assert_eq!(v2_response["result"]["frozen_hash"].as_str(), Some(""));
     assert_eq!(
         v3_payload["last_transaction_hash"].as_str(),
         v2_response["result"]["last_transaction_id"]["hash"].as_str()
@@ -1573,15 +5627,235 @@ fn localnet_supports_v3_address_information_endpoint() {
     );
     assert_eq!(
         v3_missing_default_payload["status"].as_str(),
-        Some("uninitialized")
+        Some("uninit")
     );
     assert_eq!(
         v3_missing_use_v2_false_payload["status"].as_str(),
-        Some("uninitialized")
+        Some("uninit")
     );
     assert_eq!(
         v3_missing_default_payload["status"].as_str(),
         v3_missing_use_v2_false_payload["status"].as_str()
+    );
+    for field in ["code", "data", "frozen_hash"] {
+        assert!(
+            v3_missing_default_payload[field].is_null(),
+            "missing account {field} must be null"
+        );
+    }
+
+    node.stop();
+}
+
+#[test]
+fn localnet_supports_v3_core_lookup_endpoints() {
+    let project = ProjectBuilder::new("localnet-v3-core-lookups").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+
+    let startup_accounts = node.get_json("/acton_getStartupAccounts");
+    let wallet_address = response_payload(&startup_accounts)[0]["address"]
+        .as_str()
+        .expect("startup wallet must expose address")
+        .to_owned();
+    let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_A,
+            "amount": 250_000_000u128
+        }),
+    );
+    assert_eq!(faucet["ok"].as_bool(), Some(true));
+    let transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=100&sort=desc"
+        ),
+        Duration::from_secs(12),
+    );
+    let expected_tx = v3_transactions_from_response(&transactions)
+        .iter()
+        .find(|tx| tx["account"].as_str() == Some(V3_TRANSACTIONS_TEST_ACCOUNT_A))
+        .expect("funded account transaction must be indexed");
+    let expected_hash = expected_tx["hash"]
+        .as_str()
+        .expect("transaction hash must be a string");
+    let mc_seqno = expected_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("transaction mc seqno must be an integer");
+
+    let wallet_response = node.get_json(&format!(
+        "/api/v3/walletInformation?address={wallet_address}&use_v2=true"
+    ));
+    let wallet: toncenter_v3::V2WalletInformation =
+        serde_json::from_value(response_payload(&wallet_response).clone())
+            .expect("walletInformation must match its typed response");
+    let missing_wallet_response = node.get_json(&format!(
+        "/api/v3/walletInformation?address={missing_address}"
+    ));
+    let missing_wallet: toncenter_v3::V2WalletInformation =
+        serde_json::from_value(response_payload(&missing_wallet_response).clone())
+            .expect("missing walletInformation must match its typed response");
+
+    let masterchain_response = node.get_json("/api/v3/masterchainInfo");
+    let masterchain: toncenter_v3::MasterchainInfo =
+        serde_json::from_value(response_payload(&masterchain_response).clone())
+            .expect("masterchainInfo must match its typed response");
+
+    let address_book_response = node.get_json(&format!(
+        "/api/v3/addressBook?address={wallet_address}&address={missing_address}"
+    ));
+    let address_book: toncenter_v3::AddressBook =
+        serde_json::from_value(response_payload(&address_book_response).clone())
+            .expect("addressBook must match its typed response");
+
+    let metadata_response = node.get_json(&format!(
+        "/api/v3/metadata?address={wallet_address}&address={missing_address}"
+    ));
+    let metadata: toncenter_v3::Metadata =
+        serde_json::from_value(response_payload(&metadata_response).clone())
+            .expect("metadata must match its typed response");
+
+    let by_masterchain_response = node.get_json(&format!(
+        "/api/v3/transactionsByMasterchainBlock?seqno={mc_seqno}&limit=100&offset=0&sort=desc"
+    ));
+    let by_masterchain: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&by_masterchain_response).clone())
+            .expect("transactionsByMasterchainBlock must match its typed response");
+
+    let message_hash = expected_tx["in_msg"]["hash"]
+        .as_str()
+        .expect("funded account transaction must have an inbound message");
+    let message_hash_hex = Hash256::from_base64(message_hash)
+        .expect("message hash must be valid base64")
+        .to_hex();
+    let messages_response = node.get_json(&format!(
+        "/api/v3/messages?msg_hash={message_hash_hex}&limit=10&sort=asc"
+    ));
+    let messages: toncenter_v3::MessagesResponse =
+        serde_json::from_value(response_payload(&messages_response).clone())
+            .expect("messages must match its typed response");
+
+    let wallet_states_response = node.get_json(&format!(
+        "/api/v3/walletStates?address={wallet_address}&address={V3_TRANSACTIONS_TEST_ACCOUNT_A}&address={missing_address}"
+    ));
+    let wallet_states: toncenter_v3::WalletStatesResponse =
+        serde_json::from_value(response_payload(&wallet_states_response).clone())
+            .expect("walletStates must match its typed response");
+
+    let (address_book_empty_status, address_book_empty) =
+        node.get_json_with_status("/api/v3/addressBook");
+    let (metadata_empty_status, metadata_empty) = node.get_json_with_status("/api/v3/metadata");
+    let (negative_seqno_status, negative_seqno) =
+        node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=-1");
+    let (invalid_sort_status, invalid_sort) =
+        node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=1&sort=invalid");
+    let (messages_invalid_direction_status, messages_invalid_direction) =
+        node.get_json_with_status("/api/v3/messages?direction=sideways");
+    let (wallet_states_empty_status, wallet_states_empty) =
+        node.get_json_with_status("/api/v3/walletStates");
+
+    let summary = json!({
+        "wallet_information": {
+            "status": wallet.status,
+            "wallet_type": wallet.wallet_type,
+            "has_seqno": wallet.seqno.is_some(),
+            "has_wallet_id": wallet.wallet_id.is_some(),
+            "missing_status": missing_wallet.status,
+            "missing_wallet_fields_omitted": missing_wallet.wallet_type.is_none()
+                && missing_wallet.seqno.is_none()
+                && missing_wallet.wallet_id.is_none(),
+        },
+        "masterchain_info": {
+            "first_workchain": masterchain.first.workchain,
+            "last_workchain": masterchain.last.workchain,
+            "seqno_ordered": masterchain.first.seqno <= masterchain.last.seqno,
+        },
+        "address_book": {
+            "preserves_wallet_key": address_book.contains_key(&wallet_address),
+            "preserves_missing_key": address_book.contains_key(missing_address),
+            "wallet_interfaces": address_book
+                .get(&wallet_address)
+                .and_then(|row| row.interfaces.clone()),
+            "missing_interfaces_are_empty": address_book
+                .get(missing_address)
+                .and_then(|row| row.interfaces.as_ref())
+                .is_some_and(Vec::is_empty),
+        },
+        "metadata": {
+            "is_empty_for_plain_wallets": metadata.is_empty(),
+        },
+        "transactions_by_masterchain_block": {
+            "contains_expected": by_masterchain
+                .transactions
+                .iter()
+                .any(|tx| tx.hash == expected_hash),
+            "all_match_mc_seqno": by_masterchain
+                .transactions
+                .iter()
+                .all(|tx| u64::from(tx.mc_block_seqno) == mc_seqno),
+            "address_book_present": !by_masterchain.address_book.is_empty(),
+        },
+        "messages": {
+            "count": messages.messages.len(),
+            "contains_expected": messages.messages.iter().any(|message| message.hash == message_hash),
+            "links_both_transactions": messages.messages.iter().any(|message| {
+                message.hash == message_hash
+                    && message.in_msg_tx_hash.is_some()
+                    && message.out_msg_tx_hash.is_some()
+            }),
+            "address_book_present": !messages.address_book.is_empty(),
+        },
+        "wallet_states": {
+            "contains_wallet": wallet_states
+                .wallets
+                .iter()
+                .any(|wallet| wallet.is_wallet && wallet.seqno.is_some()),
+            "contains_funded_non_wallet": wallet_states.wallets.iter().any(|wallet| {
+                wallet.address == V3_TRANSACTIONS_TEST_ACCOUNT_A && !wallet.is_wallet
+            }),
+            "omits_missing_account": wallet_states
+                .wallets
+                .iter()
+                .all(|wallet| wallet.address != missing_address),
+            "address_book_matches_returned_states": wallet_states.address_book.len()
+                == wallet_states.wallets.len(),
+        },
+        "bad_requests": {
+            "address_book_empty": {
+                "status": address_book_empty_status,
+                "error": address_book_empty["error"],
+            },
+            "metadata_empty": {
+                "status": metadata_empty_status,
+                "error": metadata_empty["error"],
+            },
+            "negative_seqno": {
+                "status": negative_seqno_status,
+                "error": negative_seqno["error"],
+            },
+            "invalid_sort": {
+                "status": invalid_sort_status,
+                "error": invalid_sort["error"],
+            },
+            "messages_invalid_direction": {
+                "status": messages_invalid_direction_status,
+                "error": messages_invalid_direction["error"],
+            },
+            "wallet_states_empty": {
+                "status": wallet_states_empty_status,
+                "error": wallet_states_empty["error"],
+            },
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&summary, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_core_lookup_endpoints.summary.json"
+        ),
     );
 
     node.stop();
@@ -1597,7 +5871,7 @@ fn localnet_supports_v3_transactions_endpoints() {
         V3_TRANSACTIONS_TEST_ACCOUNT_B,
     ] {
         let faucet = node.post_json(
-            "/admin/faucet",
+            "/acton_fundAccount",
             &json!({
                 "address": address,
                 "amount": 250_000_000u128
@@ -1611,8 +5885,7 @@ fn localnet_supports_v3_transactions_endpoints() {
         );
     }
 
-    let all_txs_response = wait_for_ok_response(
-        &node,
+    let all_txs_response = node.wait_for_non_empty_v3_transactions(
         "/api/v3/transactions?limit=100&sort=desc",
         Duration::from_secs(12),
     );
@@ -1670,6 +5943,21 @@ fn localnet_supports_v3_transactions_endpoints() {
     let by_hash_txs = v3_transactions_from_response(&by_hash);
     assert_eq!(by_hash_txs.len(), 1);
     assert_eq!(by_hash_txs[0]["hash"].as_str(), Some(tx_hash.as_str()));
+
+    let by_repeated_hash = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?hash={}&hash={tx_hash_query}&limit=10",
+            "00".repeat(32)
+        ),
+        Duration::from_secs(12),
+    );
+    let repeated_hash_matches =
+        contains_tx_hash(v3_transactions_from_response(&by_repeated_hash), &tx_hash);
+    assert!(
+        repeated_hash_matches,
+        "repeated hash filters must use OR semantics"
+    );
 
     let by_lt = wait_for_ok_response(
         &node,
@@ -1757,26 +6045,34 @@ fn localnet_supports_v3_transactions_endpoints() {
         serde_json::to_string_pretty(&by_wrong_workchain).unwrap_or_default()
     );
 
-    let start_utime_strict = wait_for_ok_response(
+    let start_utime_inclusive = wait_for_ok_response(
         &node,
         &format!("/api/v3/transactions?hash={tx_hash_query}&start_utime={tx_now}&limit=10"),
         Duration::from_secs(12),
     );
+    let start_utime_includes_boundary = contains_tx_hash(
+        v3_transactions_from_response(&start_utime_inclusive),
+        &tx_hash,
+    );
     assert!(
-        v3_transactions_from_response(&start_utime_strict).is_empty(),
-        "start_utime must be strict (after):\n{}",
-        serde_json::to_string_pretty(&start_utime_strict).unwrap_or_default()
+        start_utime_includes_boundary,
+        "start_utime must be inclusive:\n{}",
+        serde_json::to_string_pretty(&start_utime_inclusive).unwrap_or_default()
     );
 
-    let end_utime_strict = wait_for_ok_response(
+    let end_utime_inclusive = wait_for_ok_response(
         &node,
         &format!("/api/v3/transactions?hash={tx_hash_query}&end_utime={tx_now}&limit=10"),
         Duration::from_secs(12),
     );
+    let end_utime_includes_boundary = contains_tx_hash(
+        v3_transactions_from_response(&end_utime_inclusive),
+        &tx_hash,
+    );
     assert!(
-        v3_transactions_from_response(&end_utime_strict).is_empty(),
-        "end_utime must be strict (before):\n{}",
-        serde_json::to_string_pretty(&end_utime_strict).unwrap_or_default()
+        end_utime_includes_boundary,
+        "end_utime must be inclusive:\n{}",
+        serde_json::to_string_pretty(&end_utime_inclusive).unwrap_or_default()
     );
 
     let start_lt_inclusive = wait_for_ok_response(
@@ -1935,7 +6231,7 @@ fn localnet_supports_v3_transactions_endpoints() {
 
     let by_message_offset = wait_for_ok_response(
         &node,
-        "/api/v3/transactionsByMessage?limit=1&offset=1",
+        &format!("/api/v3/transactionsByMessage?msg_hash={in_msg_hash_query}&limit=1&offset=1"),
         Duration::from_secs(12),
     );
     assert!(
@@ -1946,7 +6242,7 @@ fn localnet_supports_v3_transactions_endpoints() {
 
     let pending = wait_for_ok_response(
         &node,
-        "/api/v3/pendingTransactions",
+        &format!("/api/v3/pendingTransactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}"),
         Duration::from_secs(12),
     );
     let pending_payload = response_payload(&pending);
@@ -1990,7 +6286,7 @@ fn localnet_supports_v3_transactions_endpoints() {
     assert_v3_bad_request(status, &response, "`limit` must be between 1 and 1000");
     let (status, response) =
         node.get_json_with_status("/api/v3/transactions?account=not-an-address");
-    assert_v3_bad_request(status, &response, "Invalid address format");
+    assert_v3_bad_request(status, &response, "Invalid address");
     let (status, response) =
         node.get_json_with_status("/api/v3/transactionsByMessage?direction=sideways");
     assert_v3_bad_request(status, &response, "Invalid `direction`");
@@ -2001,10 +6297,450 @@ fn localnet_supports_v3_transactions_endpoints() {
     assert_v3_bad_request(status, &response, "Invalid hash format");
     let (status, response) =
         node.get_json_with_status("/api/v3/pendingTransactions?account=bad-account");
-    assert_v3_bad_request(status, &response, "Invalid address format");
+    assert_v3_bad_request(status, &response, "Invalid address");
     let (status, response) =
         node.get_json_with_status("/api/v3/pendingTransactions?trace_id=bad-hash");
     assert_v3_bad_request(status, &response, "Invalid hash format");
+
+    let fixed_semantics = json!({
+        "end_utime_includes_boundary": end_utime_includes_boundary,
+        "repeated_hash_uses_or": repeated_hash_matches,
+        "start_utime_includes_boundary": start_utime_includes_boundary,
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&fixed_semantics, project.path())
+        ),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_transactions_endpoints.fixed-semantics.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_supports_v3_blocks_endpoint() {
+    let project = ProjectBuilder::new("localnet-v3-blocks-endpoint").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\nmine-empty-blocks = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable manual empty block mining");
+
+    let node = project.localnet().start();
+    let mine = node.post_json("/acton_mine", &json!({ "blocks": 4 }));
+    let mine_payload = response_payload(&mine);
+
+    let all_desc = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?limit=100&sort=desc",
+        Duration::from_secs(12),
+    );
+    let all_blocks = v3_blocks_from_response(&all_desc);
+    let workchain_block = all_blocks
+        .iter()
+        .find(|block| block["workchain"].as_i64() == Some(0))
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected workchain block in /api/v3/blocks:\n{}",
+                serde_json::to_string_pretty(&all_desc).unwrap_or_default()
+            )
+        });
+    let masterchain_block = all_blocks
+        .iter()
+        .find(|block| block["workchain"].as_i64() == Some(-1))
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected masterchain block in /api/v3/blocks:\n{}",
+                serde_json::to_string_pretty(&all_desc).unwrap_or_default()
+            )
+        });
+    let workchain_shard = workchain_block["shard"]
+        .as_str()
+        .expect("workchain block shard must be string");
+    let workchain_seqno = workchain_block["seqno"]
+        .as_u64()
+        .expect("workchain block seqno must be integer");
+    let workchain_root_hash = workchain_block["root_hash"]
+        .as_str()
+        .expect("workchain block root_hash must be string");
+    let workchain_file_hash = workchain_block["file_hash"]
+        .as_str()
+        .expect("workchain block file_hash must be string");
+    let workchain_gen_utime = block_gen_utime(workchain_block);
+    let workchain_start_lt = block_start_lt(workchain_block);
+    let workchain_mc_seqno = workchain_block["masterchain_block_ref"]["seqno"]
+        .as_u64()
+        .or_else(|| workchain_block["master_ref_seqno"].as_u64())
+        .expect("workchain block must reference a masterchain block");
+    let masterchain_shard = masterchain_block["shard"]
+        .as_str()
+        .expect("masterchain block shard must be string");
+    let masterchain_seqno = masterchain_block["seqno"]
+        .as_u64()
+        .expect("masterchain block seqno must be integer");
+
+    let workchain_shard_query = encode_query_component(workchain_shard);
+    let workchain_root_hash_query = encode_query_component(workchain_root_hash);
+    let workchain_file_hash_query = encode_query_component(workchain_file_hash);
+    let masterchain_shard_query = encode_query_component(masterchain_shard);
+
+    let only_workchain = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?workchain=0&limit=100&sort=desc",
+        Duration::from_secs(12),
+    );
+    let only_masterchain = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?workchain=-1&limit=100&sort=desc",
+        Duration::from_secs(12),
+    );
+    let exact_workchain = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?workchain=0&shard={workchain_shard_query}&seqno={workchain_seqno}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let exact_masterchain = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?workchain=-1&shard={masterchain_shard_query}&seqno={masterchain_seqno}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let by_root_hash = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/blocks?root_hash={workchain_root_hash_query}&limit=10"),
+        Duration::from_secs(12),
+    );
+    let by_file_hash = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/blocks?file_hash={workchain_file_hash_query}&limit=10"),
+        Duration::from_secs(12),
+    );
+    let by_mc_seqno = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/blocks?mc_seqno={workchain_mc_seqno}&limit=100&sort=desc"),
+        Duration::from_secs(12),
+    );
+    let start_utime_inclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?root_hash={workchain_root_hash_query}&start_utime={workchain_gen_utime}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let end_utime_inclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?root_hash={workchain_root_hash_query}&end_utime={workchain_gen_utime}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let start_lt_inclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?root_hash={workchain_root_hash_query}&start_lt={workchain_start_lt}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let end_lt_inclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/blocks?root_hash={workchain_root_hash_query}&end_lt={workchain_start_lt}&limit=10"
+        ),
+        Duration::from_secs(12),
+    );
+    let paged_first = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?limit=1&offset=0&sort=desc",
+        Duration::from_secs(12),
+    );
+    let paged_second = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?limit=1&offset=1&sort=desc",
+        Duration::from_secs(12),
+    );
+    let empty_workchain = wait_for_ok_response(
+        &node,
+        "/api/v3/blocks?workchain=42&limit=10",
+        Duration::from_secs(12),
+    );
+    let shard_state_json = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/masterchainBlockShardState?seqno={workchain_mc_seqno}"),
+        Duration::from_secs(12),
+    );
+    let shard_state: toncenter_v3::BlocksResponse =
+        serde_json::from_value(shard_state_json).expect("shard state must match typed response");
+    let shard_diff_json = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=10&offset=0"),
+        Duration::from_secs(12),
+    );
+    let shard_diff: toncenter_v3::BlocksResponse =
+        serde_json::from_value(shard_diff_json).expect("shard diff must match typed response");
+
+    let (shard_without_workchain_status, shard_without_workchain) =
+        node.get_json_with_status("/api/v3/blocks?shard=8000000000000000");
+    let (seqno_without_shard_status, seqno_without_shard) =
+        node.get_json_with_status("/api/v3/blocks?workchain=0&seqno=1");
+    let (invalid_sort_status, invalid_sort) =
+        node.get_json_with_status("/api/v3/blocks?sort=invalid");
+    let (invalid_limit_status, invalid_limit) = node.get_json_with_status("/api/v3/blocks?limit=0");
+    let (invalid_hash_status, invalid_hash) =
+        node.get_json_with_status("/api/v3/blocks?root_hash=not-a-hash");
+    let (missing_shard_state_seqno_status, missing_shard_state_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState");
+    let (negative_shard_state_seqno_status, negative_shard_state_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState?seqno=-1");
+    let (unknown_shard_state_status, unknown_shard_state) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState?seqno=2147483647");
+    let (missing_shard_diff_seqno_status, missing_shard_diff_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShards");
+    let (invalid_shard_diff_limit_status, invalid_shard_diff_limit) = node.get_json_with_status(
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=0"),
+    );
+    let (empty_shard_diff_page_status, empty_shard_diff_page) = node.get_json_with_status(
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=1&offset=1"),
+    );
+    let (unknown_shard_diff_status, unknown_shard_diff) =
+        node.get_json_with_status("/api/v3/masterchainBlockShards?seqno=2147483647");
+
+    let paged_first_blocks = v3_blocks_from_response(&paged_first);
+    let paged_second_blocks = v3_blocks_from_response(&paged_second);
+
+    let summary = json!({
+        "mine": {
+            "ok": mine["ok"].as_bool(),
+            "mined_at_least_requested": mine_payload["last_block_seqno"]
+                .as_u64()
+                .is_some_and(|seqno| seqno >= 4),
+        },
+        "all": {
+            "non_empty": !all_blocks.is_empty(),
+            "has_masterchain": all_blocks.iter().any(|block| block["workchain"].as_i64() == Some(-1)),
+            "has_workchain": all_blocks.iter().any(|block| block["workchain"].as_i64() == Some(0)),
+            "sorted_desc": blocks_sorted_by_gen_utime(all_blocks, false),
+            "shape": block_shape_summary(all_blocks.first()),
+        },
+        "filters": {
+            "workchain_only": block_filter_summary(&only_workchain, 0),
+            "masterchain_only": block_filter_summary(&only_masterchain, -1),
+            "exact_workchain": exact_block_summary(&exact_workchain, workchain_block),
+            "exact_masterchain": exact_block_summary(&exact_masterchain, masterchain_block),
+            "root_hash": exact_block_summary(&by_root_hash, workchain_block),
+            "file_hash": exact_block_summary(&by_file_hash, workchain_block),
+            "mc_seqno": {
+                "contains_workchain_block": contains_block_id(v3_blocks_from_response(&by_mc_seqno), workchain_block),
+                "all_match_mc_seqno": v3_blocks_from_response(&by_mc_seqno)
+                    .iter()
+                    .all(|block| block_matches_mc_seqno(block, workchain_mc_seqno)),
+            },
+            "start_utime_inclusive": exact_block_summary(&start_utime_inclusive, workchain_block),
+            "end_utime_inclusive": exact_block_summary(&end_utime_inclusive, workchain_block),
+            "start_lt_inclusive": exact_block_summary(&start_lt_inclusive, workchain_block),
+            "end_lt_inclusive": exact_block_summary(&end_lt_inclusive, workchain_block),
+            "empty_workchain": {
+                "count": v3_blocks_from_response(&empty_workchain).len(),
+            },
+        },
+        "pagination": {
+            "first_count": paged_first_blocks.len(),
+            "second_count": paged_second_blocks.len(),
+            "offset_moves_window": paged_first_blocks.first().zip(paged_second_blocks.first())
+                .is_some_and(|(first, second)| !same_block_id(first, second)),
+        },
+        "masterchain_shards": {
+            "state_count": shard_state.blocks.len(),
+            "state_all_workchain": shard_state.blocks.iter().all(|block| block.workchain != -1),
+            "state_contains_selected_block": shard_state.blocks.iter().any(|block| {
+                block.workchain == 0 && u64::from(block.seqno) == workchain_seqno
+            }),
+            "diff_count": shard_diff.blocks.len(),
+            "diff_all_workchain": shard_diff.blocks.iter().all(|block| block.workchain != -1),
+            "diff_all_reference_requested_masterchain": shard_diff.blocks.iter().all(|block| {
+                u64::try_from(block.master_ref_seqno).ok() == Some(workchain_mc_seqno)
+            }),
+            "state_and_diff_same_ids": shard_state.blocks.iter().all(|state_block| {
+                shard_diff.blocks.iter().any(|diff_block| {
+                    state_block.workchain == diff_block.workchain
+                        && state_block.shard == diff_block.shard
+                        && state_block.seqno == diff_block.seqno
+                })
+            }),
+        },
+        "bad_requests": {
+            "shard_without_workchain": v3_bad_request_summary(shard_without_workchain_status, &shard_without_workchain),
+            "seqno_without_shard": v3_bad_request_summary(seqno_without_shard_status, &seqno_without_shard),
+            "invalid_sort": v3_bad_request_summary(invalid_sort_status, &invalid_sort),
+            "invalid_limit": v3_bad_request_summary(invalid_limit_status, &invalid_limit),
+            "invalid_hash": v3_bad_request_summary(invalid_hash_status, &invalid_hash),
+            "missing_shard_state_seqno": v3_bad_request_summary(missing_shard_state_seqno_status, &missing_shard_state_seqno),
+            "negative_shard_state_seqno": v3_bad_request_summary(negative_shard_state_seqno_status, &negative_shard_state_seqno),
+            "unknown_shard_state": v3_bad_request_summary(unknown_shard_state_status, &unknown_shard_state),
+            "missing_shard_diff_seqno": v3_bad_request_summary(missing_shard_diff_seqno_status, &missing_shard_diff_seqno),
+            "invalid_shard_diff_limit": v3_bad_request_summary(invalid_shard_diff_limit_status, &invalid_shard_diff_limit),
+            "empty_shard_diff_page": v3_bad_request_summary(empty_shard_diff_page_status, &empty_shard_diff_page),
+            "unknown_shard_diff": v3_bad_request_summary(unknown_shard_diff_status, &unknown_shard_diff),
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&summary, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_supports_v3_blocks_endpoint.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
+    let project = ProjectBuilder::new("localnet-batch-faucet-scheduled-block").build();
+    let node = project
+        .localnet()
+        .args(["--block-interval-ms", "3000", "--mine-empty-blocks"])
+        .start();
+    let initial_seqno = latest_masterchain_seqno(&node);
+    wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
+
+    let first_faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_A,
+            "amount": 250_000_000u128
+        }),
+    );
+    let second_faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_B,
+            "amount": 250_000_000u128
+        }),
+    );
+
+    let first_account_response = node.wait_for_non_empty_v3_transactions(
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=10"),
+        Duration::from_secs(8),
+    );
+    let second_account_response = node.wait_for_non_empty_v3_transactions(
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_B}&limit=10"),
+        Duration::from_secs(8),
+    );
+
+    let first_tx = &v3_transactions_from_response(&first_account_response)[0];
+    let second_tx = &v3_transactions_from_response(&second_account_response)[0];
+    let first_seqno = first_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("first transaction mc_block_seqno must be integer");
+    let second_seqno = second_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("second transaction mc_block_seqno must be integer");
+    let block = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}"
+        ),
+        Duration::from_secs(5),
+    );
+    let block_payload = response_payload(&block);
+    let block_transactions = block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactionsExt must return transactions array");
+    let short_block = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactions?workchain=0&shard=-9223372036854775808&seqno={first_seqno}"
+        ),
+        Duration::from_secs(5),
+    );
+    let short_block_payload = response_payload(&short_block);
+    let short_block_transactions = short_block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactions must return short transaction ids");
+    let first_page = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}&count=1"
+        ),
+        Duration::from_secs(5),
+    );
+    let first_page_payload = response_payload(&first_page);
+    let first_page_transactions = first_page_payload["transactions"]
+        .as_array()
+        .expect("first block transaction page must be an array");
+    let cursor_transaction = first_page_transactions
+        .first()
+        .expect("first block transaction page must not be empty");
+    let cursor_lt = cursor_transaction
+        .pointer("/transaction_id/lt")
+        .and_then(Value::as_str)
+        .expect("cursor transaction lt must be present");
+    let cursor_account_hash = cursor_transaction["account"]
+        .as_str()
+        .and_then(|account| account.split_once(':'))
+        .map(|(_, hash)| hash)
+        .expect("cursor transaction account must be raw address");
+    let second_page = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}&count=1&after_lt={cursor_lt}&after_hash={cursor_account_hash}"
+        ),
+        Duration::from_secs(5),
+    );
+    let second_page_payload = response_payload(&second_page);
+    let second_page_transactions = second_page_payload["transactions"]
+        .as_array()
+        .expect("second block transaction page must be an array");
+
+    let snapshot = json!({
+        "faucet": {
+            "first_ok": is_success_response(&first_faucet),
+            "second_ok": is_success_response(&second_faucet),
+        },
+        "transactions": {
+            "first_account": first_tx["account"].as_str(),
+            "second_account": second_tx["account"].as_str(),
+            "same_mc_block_seqno": first_seqno == second_seqno,
+        },
+        "block": {
+            "req_count": block_payload["req_count"].as_u64(),
+            "transaction_count": block_transactions.len(),
+            "has_at_least_two_transactions": block_transactions.len() >= 2,
+            "short_transactions": {
+                "type": short_block_payload["@type"].as_str(),
+                "count": short_block_transactions.len(),
+                "all_modes_are_135": short_block_transactions
+                    .iter()
+                    .all(|transaction| transaction["mode"] == 135),
+                "match_extended": short_block_transactions.iter().zip(block_transactions).all(
+                    |(short, full)| {
+                        short["account"] == full["account"]
+                            && short["lt"] == full["transaction_id"]["lt"]
+                            && short["hash"] == full["transaction_id"]["hash"]
+                    },
+                ),
+            },
+            "pagination": {
+                "first_req_count": first_page_payload["req_count"].as_u64(),
+                "first_incomplete": first_page_payload["incomplete"].as_bool(),
+                "first_count": first_page_transactions.len(),
+                "second_count": second_page_transactions.len(),
+                "cursor_moves_window": first_page_transactions.first().zip(second_page_transactions.first())
+                    .is_some_and(|(first, second)| first["transaction_id"] != second["transaction_id"]),
+            },
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_batches_faucet_messages_into_one_block.summary.json"
+        ),
+    );
 
     node.stop();
 }
@@ -2086,7 +6822,7 @@ fn localnet_supports_v3_account_states_endpoint() {
     let node = project
         .localnet()
         .before_start(super::super::support::project::ActonCommand::build)
-        .args(["--accounts", "deployer"])
+        .args(["--accounts", "deployer", "--mine-empty-blocks"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
 
@@ -2114,15 +6850,36 @@ fn localnet_supports_v3_account_states_endpoint() {
     let owner_address = extract_prefixed_line_value(&script_stdout, "JETTON_ADMIN OWNER_ADDRESS=");
     wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
 
-    let mint_result = project
-        .acton()
-        .script("scripts/mint.tolk")
-        .verify_network("localnet")
-        .env("JETTON_ADMIN", "deployer")
-        .env("JETTON_MINTER_ADDRESS", &minter_address)
-        .run();
-    let mint_status = mint_result.output.get_output().status.code().unwrap_or(1);
-    assert_eq!(mint_status, 0, "Mint script failed");
+    let jetton_faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "100",
+        }),
+    );
+    let (invalid_amount_status, invalid_amount_response) = node.post_json_with_status(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "0",
+        }),
+    );
+    let mint_message_hash = jetton_faucet["result"]["hash"]
+        .as_str()
+        .expect("jetton faucet must return the queued message hash");
+    let mint_transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(mint_message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = mint_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("jetton faucet transaction must be indexed");
 
     let wallets_response = wait_for_ok_response(
         &node,
@@ -2137,6 +6894,19 @@ fn localnet_supports_v3_account_states_endpoint() {
         .and_then(|wallet| wallet["address"].as_str())
         .expect("deployer must have a jetton wallet after mint")
         .to_owned();
+
+    let master_token_data = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={minter_address}"),
+        Duration::from_secs(12),
+    );
+    let wallet_token_data = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={jetton_wallet_address}"),
+        Duration::from_secs(12),
+    );
+    let (non_token_status, non_token_data) =
+        node.get_json_with_status(&format!("/api/v2/getTokenData?address={owner_address}"));
 
     let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
     let response = wait_for_ok_response(
@@ -2333,6 +7103,61 @@ fn localnet_supports_v3_account_states_endpoint() {
         serde_json::to_string_pretty(metadata).unwrap_or_default()
     );
 
+    let master_token = response_payload(&master_token_data);
+    let wallet_token = response_payload(&wallet_token_data);
+    let token_data_summary = json!({
+        "faucet": {
+            "ok": jetton_faucet["ok"],
+            "result_type": jetton_faucet["result"]["@type"],
+            "message_hash_present": jetton_faucet["result"]["hash"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+            "invalid_amount": {
+                "status": invalid_amount_status,
+                "ok": invalid_amount_response["ok"],
+                "code": invalid_amount_response["code"],
+                "error": invalid_amount_response["error"],
+            },
+        },
+        "master": {
+            "type": master_token["@type"],
+            "contract_type": master_token["contract_type"],
+            "address_present": master_token["address"].as_str().is_some_and(|value| !value.is_empty()),
+            "total_supply": master_token["total_supply"],
+            "wallet_code_present": master_token["jetton_wallet_code"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "content_type": master_token["jetton_content"]["type"],
+        },
+        "wallet": {
+            "type": wallet_token["@type"],
+            "contract_type": wallet_token["contract_type"],
+            "address_present": wallet_token["address"].as_str().is_some_and(|value| !value.is_empty()),
+            "owner_present": wallet_token["owner"].as_str().is_some_and(|value| !value.is_empty()),
+            "master_present": wallet_token["jetton"].as_str().is_some_and(|value| !value.is_empty()),
+            "balance": wallet_token["balance"],
+            "wallet_code_present": wallet_token["jetton_wallet_code"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+        },
+        "non_token": {
+            "status": non_token_status,
+            "ok": non_token_data["ok"],
+            "code": non_token_data["code"],
+        }
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&token_data_summary, project.path())
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_token_data.summary.json"),
+    );
+
     node.stop();
 }
 
@@ -2394,15 +7219,85 @@ fn localnet_supports_v3_run_get_method() {
     let payload = response_payload(&response);
     assert_eq!(payload["exit_code"].as_i64(), Some(0));
     assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
-    assert_eq!(payload["stack"][0]["value"].as_str(), Some("17"));
+    assert_eq!(payload["stack"][0]["value"].as_str(), Some("0x11"));
 
     node.stop();
 }
 
 #[test]
-fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
-    let project = ProjectBuilder::new("localnet-compiler-abi-registry")
-        .contract("getter", V3_GETTER_CONTRACT)
+fn localnet_run_get_method_on_missing_account_returns_vm_exit_code() {
+    let project = ProjectBuilder::new("localnet-run-get-method-missing-account").build();
+    let node = project.localnet().start();
+
+    let (v3_status, v3_response) = node.post_json_with_status(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": "EQDzA78rXj_YgEpIn43GrHcPgffSdYWiBFVZfAAD9SKdc7Vn",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+    let (v2_status, v2_response) = node.post_json_with_status(
+        "/api/v2/runGetMethod",
+        &json!({
+            "address": "EQDzA78rXj_YgEpIn43GrHcPgffSdYWiBFVZfAAD9SKdc7Vn",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+    let v2_payload = response_payload(&v2_response);
+    let (no_code_status, no_code_response) = node.post_json_with_status(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": "0:5555555555555555555555555555555555555555555555555555555555555555",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+
+    let snapshot = json!({
+        "v3": {
+            "status": v3_status,
+            "has_error": v3_response.get("error").is_some(),
+            "gas_used": v3_response["gas_used"],
+            "exit_code": v3_response["exit_code"],
+            "stack": v3_response["stack"],
+        },
+        "v2": {
+            "status": v2_status,
+            "ok": v2_response["ok"],
+            "gas_used": v2_payload["gas_used"],
+            "exit_code": v2_payload["exit_code"],
+            "stack": v2_payload["stack"],
+            "last_transaction_id": v2_payload["last_transaction_id"],
+        },
+        "existing_no_code": {
+            "status": no_code_status,
+            "has_error": no_code_response.get("error").is_some(),
+            "gas_used": no_code_response["gas_used"],
+            "exit_code": no_code_response["exit_code"],
+            "stack": no_code_response["stack"],
+        },
+    });
+
+    let snapshot_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("snapshot JSON must serialize")
+    );
+    assertion().eq(
+        snapshot_json,
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_run_get_method_missing_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_contracts_can_read_prevblocks_instructions() {
+    let project = ProjectBuilder::new("localnet-prevblocks-get-method")
+        .contract("getter", PREVBLOCKS_GETTER_CONTRACT)
         .script_file("deploy_getter", V3_DEPLOY_GETTER_SCRIPT)
         .build();
 
@@ -2434,50 +7329,36 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
 
     let getter_address = extract_marker_value(&script_stdout, "GETTER_CONTRACT=");
     wait_until_address_state_active(&node, &getter_address, Duration::from_secs(12));
+    let query_seqno = latest_masterchain_seqno(&node) as u32;
 
-    let account_states = wait_for_ok_response(
+    let prev_count =
+        run_v3_get_num_at_seqno(&node, &getter_address, "prevMcBlocksCount", query_seqno);
+    let latest_prev_seqno =
+        run_v3_get_num_at_seqno(&node, &getter_address, "latestPrevMcSeqno", query_seqno);
+    let prev_key_seqno =
+        run_v3_get_num_at_seqno(&node, &getter_address, "prevKeySeqno", query_seqno);
+    let sparse_first_seqno = run_v3_get_num_at_seqno(
         &node,
-        &format!("/api/v3/accountStates?address={getter_address}&include_boc=false"),
-        Duration::from_secs(12),
+        &getter_address,
+        "prevMcBlocks100FirstSeqno",
+        query_seqno,
     );
-    let code_hash_b64 = response_payload(&account_states)["accounts"]
-        .as_array()
-        .and_then(|accounts| accounts.first())
-        .and_then(|account| account["code_hash"].as_str())
-        .expect("accountStates must include code_hash for deployed getter");
-    let code_hash_hex = Hash256::from_base64(code_hash_b64)
-        .expect("accountStates code_hash must be valid base64")
-        .to_hex();
+    let expected_sparse_first_seqno = i64::from(query_seqno - (query_seqno % 100));
 
-    let compiler_abi_response = wait_for_ok_response(
-        &node,
-        &format!("/admin/compiler-abi?code_hash={code_hash_hex}"),
-        Duration::from_secs(12),
-    );
-    let compiler_abi = response_payload(&compiler_abi_response);
+    let snapshot = json!({
+        "prev_mc_blocks_count_positive": prev_count > 0,
+        "latest_prev_mc_seqno_matches_query_seqno": latest_prev_seqno == i64::from(query_seqno),
+        "prev_key_seqno_matches_latest_prev_mc_seqno": prev_key_seqno == latest_prev_seqno,
+        "prev_mc_blocks_100_first_seqno_matches_expected": sparse_first_seqno == expected_sparse_first_seqno,
+    });
 
-    assert_eq!(compiler_abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(compiler_abi["contract_name"].as_str(), Some("getter"));
-    assert!(
-        compiler_abi["get_methods"]
-            .as_array()
-            .is_some_and(|methods| {
-                methods
-                    .iter()
-                    .any(|method| method["name"].as_str() == Some("addTen"))
-            }),
-        "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(compiler_abi).unwrap_or_default()
+    let snapshot_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("snapshot JSON must serialize")
     );
-
-    let missing_response = node.get_json(
-        "/admin/compiler-abi?code_hash=1111111111111111111111111111111111111111111111111111111111111111",
-    );
-    assert_eq!(missing_response["ok"].as_bool(), Some(true));
-    assert!(
-        response_payload(&missing_response).is_null(),
-        "Unknown code hash must return null result:\n{}",
-        serde_json::to_string_pretty(&missing_response).unwrap_or_default()
+    assertion().eq(
+        snapshot_json,
+        snapbox::file!("snapshots/localnet/test_localnet_prevblocks_get_methods.summary.json"),
     );
 
     node.stop();
@@ -2558,17 +7439,20 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
     node.stop();
 }
 
-fn append_localnet_network(project_path: &Path, base_url: &str) {
+fn append_custom_localnet_network(project_path: &Path, network_name: &str, base_url: &str) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
-[networks.localnet]
+[networks.{network_name}]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet");
 }
 
@@ -2590,48 +7474,262 @@ fn extract_prefixed_line_value(output: &str, prefix: &str) -> String {
         .unwrap_or_else(|| panic!("Line starting with `{prefix}` not found in output:\n{cleaned}"))
 }
 
-fn is_success_response(response: &Value) -> bool {
-    match response.get("ok").and_then(Value::as_bool) {
-        Some(ok) => ok,
-        None => response.get("error").is_none(),
+fn run_v3_get_num_at_seqno(
+    node: &crate::support::localnet::LocalnetHandle,
+    address: &str,
+    method: &str,
+    seqno: u32,
+) -> i64 {
+    let response = node.post_json(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": address,
+            "method": method,
+            "seqno": seqno,
+            "stack": [],
+        }),
+    );
+
+    assert!(
+        is_success_response(&response),
+        "v3 runGetMethod {method} failed: {}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let payload = response_payload(&response);
+    assert_eq!(payload["exit_code"].as_i64(), Some(0));
+    assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
+    let value = payload["stack"][0]["value"]
+        .as_str()
+        .expect("numeric get-method result must be a string");
+    let digits = value
+        .strip_prefix("0x")
+        .expect("v3 numeric get-method result must use hexadecimal format");
+    i64::from_str_radix(digits, 16).expect("numeric get-method result must parse")
+}
+
+fn get_json_with_status(client: &Client, url: &str) -> (u16, Value) {
+    let response = client
+        .get(url)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
+    parse_json_response(response, "GET", url)
+}
+
+fn post_json_with_status(client: &Client, url: &str, payload: &Value) -> (u16, Value) {
+    let response = client
+        .post(url)
+        .json(payload)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed POST {url}: {error}"));
+    parse_json_response(response, "POST", url)
+}
+
+fn parse_json_response(
+    response: reqwest::blocking::Response,
+    method: &str,
+    url: &str,
+) -> (u16, Value) {
+    let status = response.status().as_u16();
+    let body = response
+        .text()
+        .unwrap_or_else(|error| panic!("Failed to read {method} {url} response body: {error}"));
+    let json = serde_json::from_str(&body)
+        .unwrap_or_else(|error| panic!("{method} {url} returned invalid JSON: {error}\n{body}"));
+    (status, json)
+}
+
+fn summarize_auth_error((status, mut response): (u16, Value)) -> Value {
+    normalize_extra_for_snapshot(&mut response);
+    json!({
+        "status": status,
+        "ok": response["ok"],
+        "code": response["code"],
+        "error": response["error"],
+    })
+}
+
+fn normalize_localnet_status_json(payload: &mut Value, expected_port: u16) {
+    match payload.get_mut("port").and_then(|value| value.as_u64()) {
+        Some(port) if port == u64::from(expected_port) => {
+            payload["port"] = json!("[PORT]");
+        }
+        _ => panic!(
+            "Expected localnet status port {expected_port}, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("uptime_seconds") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[UPTIME_SECONDS]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status uptime_seconds to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("last_block_seqno") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[LAST_BLOCK_SEQNO]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status last_block_seqno to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("current_unix_time") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[CURRENT_UNIX_TIME]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status current_unix_time to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("time_offset_seconds") {
+        Some(value) if value.as_i64().is_some() => {
+            *value = json!("[TIME_OFFSET_SECONDS]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status time_offset_seconds to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("next_block_timestamp") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[NEXT_BLOCK_TIMESTAMP]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status next_block_timestamp to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
     }
 }
 
-fn response_payload(response: &Value) -> &Value {
-    if response.get("ok").and_then(Value::as_bool) == Some(true) {
-        response.get("result").unwrap_or_else(|| {
-            panic!(
-                "Expected `result` for wrapped successful response:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
+fn normalize_localnet_status_stdout(stdout: &str, port: u16) -> String {
+    let port_fragment = format!("127.0.0.1:{port}");
+    let normalized = stdout.replace(&port_fragment, "127.0.0.1:[PORT]");
+    let mut lines = normalized
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("Uptime: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Uptime: [UPTIME_SECONDS]s")
+            } else if trimmed.starts_with("Last block seqno: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Last block seqno: [LAST_BLOCK_SEQNO]")
+            } else if trimmed.starts_with("Virtual time: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Virtual time: [CURRENT_UNIX_TIME]")
+            } else if trimmed.starts_with("Time offset: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Time offset: [TIME_OFFSET_SECONDS]s")
+            } else if trimmed.starts_with("Next block timestamp: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Next block timestamp: [NEXT_BLOCK_TIMESTAMP]")
+            } else {
+                line.to_owned()
+            }
         })
-    } else if response.get("ok").is_none() && response.get("error").is_none() {
-        response
-    } else {
-        panic!(
-            "Expected successful response, got:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        )
+        .collect::<Vec<_>>()
+        .join("\n");
+    if normalized.ends_with('\n') {
+        lines.push('\n');
     }
+    lines
 }
 
-fn wait_for_ok_response(
+fn summarize_admin_freeze_transaction(tx: &Value, expected_destination: &str) -> Value {
+    let source = tx.pointer("/in_msg/source").and_then(Value::as_str);
+    let destination = tx.pointer("/in_msg/destination").and_then(Value::as_str);
+    let lt = tx.get("lt").and_then(Value::as_str).unwrap_or_default();
+    let prev_trans_lt = tx
+        .get("prev_trans_lt")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let mc_block_seqno = tx
+        .get("mc_block_seqno")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+
+    json!({
+        "orig_status": tx["orig_status"],
+        "end_status": tx["end_status"],
+        "source_zero": source == Some("0:0000000000000000000000000000000000000000000000000000000000000000"),
+        "destination_matches": destination == Some(expected_destination),
+        "lt_nonzero": lt != "0" && !lt.is_empty(),
+        "prev_trans_lt_nonzero": prev_trans_lt != "0" && !prev_trans_lt.is_empty(),
+        "mc_block_seqno_positive": mc_block_seqno > 0,
+        "storage_status_change": tx.pointer("/description/storage_ph/status_change").cloned().unwrap_or(Value::Null),
+    })
+}
+
+fn summarize_mine_response(response: &Value) -> Value {
+    let payload = response_payload(response);
+    json!({
+        "ok": response["ok"],
+        "blocks_mined": payload["blocks_mined"],
+        "skipped_empty_blocks": payload["skipped_empty_blocks"],
+        "block_count": payload["blocks"].as_array().map(Vec::len),
+        "last_block_seqno_positive": payload["last_block_seqno"].as_u64().unwrap_or_default() > 0,
+    })
+}
+
+fn wait_for_non_empty_v3_traces_response(
     node: &crate::support::localnet::LocalnetHandle,
     query: &str,
     timeout: Duration,
 ) -> Value {
     let deadline = Instant::now() + timeout;
     loop {
-        let response = node.get_json(query);
-        if is_success_response(&response) {
+        let (status, response) = node.get_json_with_status(query);
+        if (200..300).contains(&status)
+            && is_success_response(&response)
+            && response_payload(&response)["traces"]
+                .as_array()
+                .is_some_and(|traces| !traces.is_empty())
+        {
             return response;
         }
         assert!(
             Instant::now() < deadline,
-            "Timed out waiting for successful response from `{query}`:\n{}",
+            "Timed out waiting for non-empty traces response from `{query}`; last status={status}:\n{}",
             serde_json::to_string_pretty(&response).unwrap_or_default()
         );
         thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn wait_for_masterchain_seqno_at_least(
+    node: &crate::support::localnet::LocalnetHandle,
+    min_seqno: i64,
+    timeout: Duration,
+) -> i64 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json("/api/v2/getMasterchainInfo");
+        if let Some(seqno) = response["result"]["last"]["seqno"].as_i64()
+            && seqno >= min_seqno
+        {
+            return seqno;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for masterchain seqno >= {min_seqno}; last response:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(50));
     }
 }
 
@@ -2656,52 +7754,125 @@ fn wait_until_address_state_active(
     }
 }
 
-fn parse_address_balance(address_information: &Value) -> u128 {
-    address_information["result"]["balance"]
-        .as_str()
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected string balance field in getAddressInformation response:\n{}",
-                serde_json::to_string_pretty(address_information).unwrap_or_default()
-            )
-        })
-        .parse::<u128>()
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to parse balance from getAddressInformation response: {e}\n{}",
-                serde_json::to_string_pretty(address_information).unwrap_or_default()
-            )
-        })
-}
-
 fn unpack_address(node: &crate::support::localnet::LocalnetHandle, address: &str) -> String {
     let response = wait_for_ok_response(
         node,
         &format!("/api/v2/unpackAddress?address={address}"),
         Duration::from_secs(12),
     );
-    response["result"]
-        .as_str()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    response["result"].as_str().map_or_else(
+        || {
             panic!(
                 "Expected string result from unpackAddress for `{address}`:\n{}",
                 serde_json::to_string_pretty(&response).unwrap_or_default()
             )
-        })
+        },
+        ToOwned::to_owned,
+    )
+}
+
+fn shard_account_cell_boc64(response: &Value) -> &str {
+    response["result"]["bytes"].as_str().unwrap_or_else(|| {
+        panic!(
+            "getShardAccountCell result must contain cell bytes:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        )
+    })
+}
+
+fn decode_shard_account_cell_response(response: &Value) -> ShardAccount {
+    Boc::decode_base64(shard_account_cell_boc64(response))
+        .expect("getShardAccountCell bytes must be a valid BoC")
+        .parse::<ShardAccount>()
+        .expect("getShardAccountCell bytes must decode as ShardAccount")
+}
+
+fn summarize_shard_account_cell_response(
+    response: &Value,
+    expected_raw_address: Option<&str>,
+) -> Value {
+    let shard_account = decode_shard_account_cell_response(response);
+    let last_trans_lt = if shard_account.last_trans_lt == 0 {
+        "zero"
+    } else {
+        "nonzero"
+    };
+    let last_trans_hash_nonzero = shard_account.last_trans_hash != HashBytes::ZERO;
+
+    let optional_account = shard_account
+        .account
+        .load()
+        .expect("ShardAccount account reference must load");
+    let Some(account) = optional_account.0 else {
+        return json!({
+            "ok": response["ok"],
+            "cell_type": response["result"]["@type"],
+            "state": "nonexist",
+            "last_trans_lt": last_trans_lt,
+            "last_trans_hash_nonzero": last_trans_hash_nonzero,
+        });
+    };
+
+    let address_matches = expected_raw_address.map(|expected| match &account.address {
+        IntAddr::Std(std) => {
+            format!("{}:{}", std.workchain, hex::encode(std.address.0)) == expected
+        }
+        IntAddr::Var(_) => false,
+    });
+    let balance: u128 = account.balance.tokens.into();
+    let (state, code_present, data_present, frozen_hash_present) = match account.state {
+        AccountState::Active(state_init) => (
+            "active",
+            state_init.code.is_some(),
+            state_init.data.is_some(),
+            false,
+        ),
+        AccountState::Uninit => ("uninitialized", false, false, false),
+        AccountState::Frozen(hash) => ("frozen", false, false, hash != HashBytes::ZERO),
+    };
+
+    json!({
+        "ok": response["ok"],
+        "cell_type": response["result"]["@type"],
+        "state": state,
+        "balance_positive": balance > 0,
+        "address_matches": address_matches,
+        "code_present": code_present,
+        "data_present": data_present,
+        "frozen_hash_present": frozen_hash_present,
+        "last_trans_lt": last_trans_lt,
+        "last_trans_hash_nonzero": last_trans_hash_nonzero,
+    })
 }
 
 fn v3_transactions_from_response(response: &Value) -> &[Value] {
     response_payload(response)
         .get("transactions")
         .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_else(|| {
-            panic!(
-                "Expected `transactions` array in response payload:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
-        })
+        .map_or_else(
+            || {
+                panic!(
+                    "Expected `transactions` array in response payload:\n{}",
+                    serde_json::to_string_pretty(response).unwrap_or_default()
+                )
+            },
+            Vec::as_slice,
+        )
+}
+
+fn v3_blocks_from_response(response: &Value) -> &[Value] {
+    response_payload(response)
+        .get("blocks")
+        .and_then(Value::as_array)
+        .map_or_else(
+            || {
+                panic!(
+                    "Expected `blocks` array in response payload:\n{}",
+                    serde_json::to_string_pretty(response).unwrap_or_default()
+                )
+            },
+            Vec::as_slice,
+        )
 }
 
 fn hashes_equivalent(left: &str, right: &str) -> bool {
@@ -2719,25 +7890,7 @@ fn build_localnet_ext_in_boc() -> String {
         TonWallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
 
     let wallet_addr = ton_address_to_std_addr(&wallet.address);
-    let message = OwnedMessage {
-        info: MsgInfo::Int(IntMsgInfo {
-            ihr_disabled: true,
-            bounce: false,
-            bounced: false,
-            src: IntAddr::Std(wallet_addr.clone()),
-            dst: IntAddr::Std(wallet_addr),
-            value: CurrencyCollection::new(50_000_000),
-            ihr_fee: Default::default(),
-            fwd_fee: Default::default(),
-            created_at: 0,
-            created_lt: 0,
-        }),
-        init: None,
-        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
-        layout: None,
-    };
-
-    let internal_boc = BocRepr::encode(message).expect("must encode internal message boc");
+    let internal_boc = build_internal_message_boc(wallet_addr.clone(), wallet_addr, 50_000_000);
     let internal_cell = TonCell::from_boc(internal_boc).expect("must decode internal TonCell");
     let expire_at = (SystemTime::now() + Duration::from_secs(600))
         .duration_since(UNIX_EPOCH)
@@ -2748,6 +7901,31 @@ fn build_localnet_ext_in_boc() -> String {
         .expect("must build external-in message")
         .to_boc_base64()
         .expect("must encode external-in message boc")
+}
+
+fn build_localnet_internal_boc() -> String {
+    let source = test_std_addr(0x11);
+    let target = test_std_addr(0x22);
+    base64::engine::general_purpose::STANDARD
+        .encode(build_internal_message_boc(source, target, 50_000_000))
+}
+
+fn std_addr_from_raw(raw: &str) -> StdAddr {
+    let (workchain, hash_hex) = raw
+        .split_once(':')
+        .unwrap_or_else(|| panic!("raw address must contain workchain:hash: {raw}"));
+    let workchain = workchain
+        .parse::<i8>()
+        .unwrap_or_else(|e| panic!("raw address workchain must be i8: {e}"));
+    let bytes =
+        hex::decode(hash_hex).unwrap_or_else(|e| panic!("raw address hash must be hex: {e}"));
+    let address = <[u8; 32]>::try_from(bytes.as_slice())
+        .unwrap_or_else(|_| panic!("raw address hash must be exactly 32 bytes: {raw}"));
+    StdAddr {
+        anycast: None,
+        address: HashBytes(address),
+        workchain,
+    }
 }
 
 fn compute_message_hashes_base64(boc_b64: &str) -> (String, String) {
@@ -2849,7 +8027,9 @@ fn encode_query_component(value: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(char::from(byte));
             }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
         }
     }
     encoded
@@ -2859,6 +8039,125 @@ fn contains_tx_hash(transactions: &[Value], hash: &str) -> bool {
     transactions
         .iter()
         .any(|tx| tx["hash"].as_str() == Some(hash))
+}
+
+fn block_filter_summary(response: &Value, expected_workchain: i64) -> Value {
+    let blocks = v3_blocks_from_response(response);
+    json!({
+        "non_empty": !blocks.is_empty(),
+        "all_match_workchain": blocks
+            .iter()
+            .all(|block| block["workchain"].as_i64() == Some(expected_workchain)),
+        "sorted_desc": blocks_sorted_by_gen_utime(blocks, false),
+    })
+}
+
+fn exact_block_summary(response: &Value, expected: &Value) -> Value {
+    let blocks = v3_blocks_from_response(response);
+    json!({
+        "count": blocks.len(),
+        "contains_expected": contains_block_id(blocks, expected),
+        "first_matches_expected": blocks.first().is_some_and(|block| same_block_id(block, expected)),
+        "shape": block_shape_summary(blocks.first()),
+    })
+}
+
+fn block_shape_summary(block: Option<&Value>) -> Value {
+    let Some(block) = block else {
+        return Value::Null;
+    };
+
+    json!({
+        "has_block_id": block["workchain"].is_i64()
+            && block["shard"].is_string()
+            && block["seqno"].is_u64(),
+        "has_hashes": block["root_hash"].as_str().is_some_and(|hash| normalize_hash_to_bytes(hash).is_some())
+            && block["file_hash"].as_str().is_some_and(|hash| normalize_hash_to_bytes(hash).is_some()),
+        "has_string_time_and_lt": block["gen_utime"].is_string()
+            && block["start_lt"].is_string()
+            && block["end_lt"].is_string(),
+        "has_tx_count": block["tx_count"].is_u64(),
+        "has_prev_blocks": block["prev_blocks"].is_array(),
+        "has_masterchain_ref": block.get("masterchain_block_ref").is_some(),
+        "has_toncenter_fields": block["after_merge"].is_boolean()
+            && block["after_split"].is_boolean()
+            && block["before_split"].is_boolean()
+            && block["created_by"].as_str().is_some_and(|hash| normalize_hash_to_bytes(hash).is_some())
+            && block["flags"].is_u64()
+            && block["gen_catchain_seqno"].is_u64()
+            && block["global_id"].is_u64()
+            && block["key_block"].is_boolean()
+            && block["min_ref_mc_seqno"].is_u64()
+            && block["prev_key_block_seqno"].is_u64()
+            && block["rand_seed"].as_str().is_some_and(|hash| normalize_hash_to_bytes(hash).is_some())
+            && block["validator_list_hash_short"].is_u64()
+            && block["version"].is_u64()
+            && block["vert_seqno"].is_u64()
+            && block["vert_seqno_incr"].is_boolean()
+            && block["want_merge"].is_boolean()
+            && block["want_split"].is_boolean(),
+    })
+}
+
+fn contains_block_id(blocks: &[Value], expected: &Value) -> bool {
+    blocks.iter().any(|block| same_block_id(block, expected))
+}
+
+fn same_block_id(left: &Value, right: &Value) -> bool {
+    left["workchain"].as_i64() == right["workchain"].as_i64()
+        && left["shard"].as_str() == right["shard"].as_str()
+        && left["seqno"].as_u64() == right["seqno"].as_u64()
+}
+
+fn block_matches_mc_seqno(block: &Value, expected_mc_seqno: u64) -> bool {
+    if block["workchain"].as_i64() == Some(-1) {
+        return block["seqno"].as_u64() == Some(expected_mc_seqno);
+    }
+
+    block["masterchain_block_ref"]["seqno"].as_u64() == Some(expected_mc_seqno)
+        || block["master_ref_seqno"].as_u64() == Some(expected_mc_seqno)
+}
+
+fn block_gen_utime(block: &Value) -> u64 {
+    block["gen_utime"]
+        .as_str()
+        .and_then(|value| value.parse::<u64>().ok())
+        .or_else(|| block["gen_utime"].as_u64())
+        .expect("block gen_utime must parse as u64")
+}
+
+fn block_start_lt(block: &Value) -> u64 {
+    block["start_lt"]
+        .as_str()
+        .and_then(|value| value.parse::<u64>().ok())
+        .expect("block start_lt must parse as u64")
+}
+
+fn blocks_sorted_by_gen_utime(blocks: &[Value], asc: bool) -> bool {
+    blocks.windows(2).all(|window| {
+        let left = block_gen_utime(&window[0]);
+        let right = block_gen_utime(&window[1]);
+        if asc { left <= right } else { left >= right }
+    })
+}
+
+fn v3_bad_request_summary(status: u16, response: &Value) -> Value {
+    json!({
+        "status": status,
+        "code": response["code"].as_u64(),
+        "has_error": response["error"].as_str().is_some_and(|error| !error.is_empty()),
+    })
+}
+
+fn find_trace_node<'a>(node: &'a Value, tx_hash: &str) -> Option<&'a Value> {
+    if node.get("tx_hash").and_then(Value::as_str) == Some(tx_hash) {
+        return Some(node);
+    }
+
+    node.get("children")
+        .and_then(Value::as_array)?
+        .iter()
+        .find_map(|child| find_trace_node(child, tx_hash))
 }
 
 fn assert_transactions_sorted_by_lt_asc(transactions: &[Value]) {
@@ -2901,42 +8200,6 @@ fn assert_transactions_sorted_by_lt_desc(transactions: &[Value]) {
     }
 }
 
-fn assert_v3_bad_request(status: u16, response: &Value, expected_error_fragment: &str) {
-    assert_eq!(
-        status,
-        400,
-        "Expected HTTP 400 for v3 bad request response:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
-    if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
-        assert!(
-            !ok,
-            "Expected v3 bad request response:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        );
-    } else {
-        assert!(
-            response.get("error").is_some(),
-            "Expected v3 bad request response with `error` field:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        );
-    }
-    assert_eq!(
-        response["code"].as_i64(),
-        Some(400),
-        "Expected code=400 in v3 bad request response:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
-    assert!(
-        response["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains(expected_error_fragment),
-        "Expected error to contain `{expected_error_fragment}`:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
-}
-
 fn has_incoming_transaction_from_source(response: &Value, source: &str) -> bool {
     response["result"].as_array().is_some_and(|txs| {
         txs.iter().any(|tx| {
@@ -2952,7 +8215,7 @@ fn extract_first_outgoing_message_locator(
 ) -> Option<(String, String, String, u64)> {
     let txs = response.get("result")?.as_array()?;
     for tx in txs {
-        let tx_hash = tx.get("hash")?.as_str()?;
+        let tx_hash = v2_transaction_id_hash(tx)?;
         let out_msgs = tx.get("out_msgs")?.as_array()?;
         for out_msg in out_msgs {
             let source = out_msg.get("source")?.as_str()?;
@@ -2971,17 +8234,38 @@ fn extract_first_outgoing_message_locator(
     None
 }
 
+fn v2_transaction_id_hash(transaction: &Value) -> Option<&str> {
+    transaction
+        .pointer("/transaction_id/hash")
+        .and_then(Value::as_str)
+}
+
+fn summarize_v2_ext_transaction_shape(transaction: &Value) -> Value {
+    let first_out_msg_type = transaction
+        .get("out_msgs")
+        .and_then(Value::as_array)
+        .and_then(|messages| messages.first())
+        .and_then(|message| message.get("@type"))
+        .and_then(Value::as_str);
+
+    json!({
+        "type": transaction.get("@type").and_then(Value::as_str),
+        "has_top_level_hash": transaction.get("hash").is_some(),
+        "has_top_level_success": transaction.get("success").is_some(),
+        "has_top_level_exit_code": transaction.get("exit_code").is_some(),
+        "transaction_id_hash_present": v2_transaction_id_hash(transaction).is_some(),
+        "in_msg_type": transaction.pointer("/in_msg/@type").and_then(Value::as_str),
+        "first_out_msg_type": first_out_msg_type,
+    })
+}
+
 fn normalize_transactions_std_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
     redact_dynamic_transaction_fields(response);
 }
 
 fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
-    if let Some(extra) = response.get_mut("@extra") {
-        *extra = json!("[EXTRA]");
-    }
+    normalize_extra_for_snapshot(response);
 
     if let Some(shards) = response
         .pointer_mut("/result/shards")
@@ -3000,6 +8284,12 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 }
             }
         }
+    }
+}
+
+fn normalize_extra_for_snapshot(response: &mut Value) {
+    if let Some(extra) = response.get_mut("@extra") {
+        *extra = json!("[EXTRA]");
     }
 }
 

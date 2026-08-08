@@ -14,7 +14,7 @@ fn run_random_requires_initialization_test(content: &str, name: &str) {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E024")
+        .arg("E018")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -43,7 +43,7 @@ fn run_random_requires_initialization_test_with_files(
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E024")
+        .arg("E018")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

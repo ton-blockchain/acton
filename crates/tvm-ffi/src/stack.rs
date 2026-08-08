@@ -13,15 +13,6 @@ impl Tuple {
         Tuple(vec![])
     }
 
-    /// Creates wrapper over values with specified type.
-    #[must_use]
-    pub fn to_typed(&self, type_name: &str) -> TupleItem {
-        TupleItem::TypedTuple {
-            type_name: type_name.to_owned(),
-            inner: self.clone(),
-        }
-    }
-
     /// Unwrap an empty tuple.
     ///
     /// ```text
@@ -148,10 +139,6 @@ pub enum TupleItem {
     Slice(Cell),
     Builder(Cell),
     Tuple(Tuple),
-    TypedTuple {
-        type_name: String,
-        inner: Tuple,
-    },
 }
 
 impl TupleItem {
@@ -207,22 +194,6 @@ impl TupleItem {
 }
 
 impl TupleItem {
-    /// Creates wrapper over values with specified type.
-    #[must_use]
-    pub fn to_typed(&self, type_name: &str) -> TupleItem {
-        if let TupleItem::Tuple(item) = self {
-            return TupleItem::TypedTuple {
-                type_name: type_name.to_owned(),
-                inner: item.clone(),
-            };
-        }
-
-        TupleItem::TypedTuple {
-            type_name: type_name.to_owned(),
-            inner: Tuple(vec![self.clone()]),
-        }
-    }
-
     /// Unwrap a single item tuple.
     ///
     /// ```text

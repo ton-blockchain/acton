@@ -1,5 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{ProjectBuilder, TestConfig};
+use acton::build_info;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
 
@@ -86,6 +88,49 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const GAS_PROFILED_UNIT_TEST: &str = r"
+struct X {
+    seed: int
+}
+
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    if (result == 0) {
+        throw 901;
+    }
+}
+";
+
+fn toolchain_mismatch_snapshot_path(
+    stable_path: &'static str,
+    trunk_path: &'static str,
+) -> &'static str {
+    if build_info::is_trunk_build() {
+        trunk_path
+    } else {
+        stable_path
+    }
+}
+
 #[test]
 fn test_filter_via_config() {
     ProjectBuilder::new("filter-config")
@@ -132,6 +177,149 @@ fn test_filter_via_config() {
         .assert_contains("unit 1")
         .assert_contains("unit 2")
         .assert_not_contains("other");
+}
+
+#[test]
+fn test_toolchain_acton_version_mismatch_fails_before_project_command() {
+    let project = ProjectBuilder::new("toolchain-version-mismatch")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "0.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
+            "integration/snapshots/config/test_toolchain_acton_version_mismatch.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_version_mismatch.trunk.stderr.txt",
+        ));
+}
+
+#[test]
+fn test_toolchain_acton_trunk_build_mismatch_suggests_trunk_config_value() {
+    if !build_info::is_trunk_build() {
+        return;
+    }
+
+    let project = ProjectBuilder::new("toolchain-trunk-version-mismatch")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "1.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/config/test_toolchain_acton_trunk_build_mismatch.stderr.txt",
+        );
+}
+
+#[test]
+fn test_toolchain_acton_empty_version_fails_with_setup_hint() {
+    let project = ProjectBuilder::new("toolchain-empty-version")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = ""
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/config/test_toolchain_acton_empty_version.stderr.txt",
+        );
+}
+
+#[test]
+#[cfg_attr(not(unix), ignore)]
+fn test_toolchain_acton_package_version_allows_project_command() {
+    let project = ProjectBuilder::new("toolchain-current-version")
+        .script_config("hello", "echo toolchain-ok")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    write!(
+        toml_content,
+        r#"
+[toolchain]
+acton = "{}"
+"#,
+        build_info::PACKAGE_VERSION
+    )
+    .expect("Append toolchain config");
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/config/test_toolchain_acton_current_version.stdout.txt",
+        );
+}
+
+#[test]
+fn test_toolchain_acton_v_prefixed_current_version_is_rejected() {
+    let project = ProjectBuilder::new("toolchain-v-prefixed-current-version")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    write!(
+        toml_content,
+        r#"
+[toolchain]
+acton = "v{}"
+"#,
+        build_info::SHORT_VERSION
+    )
+    .expect("Append toolchain config");
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
+            "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.trunk.stderr.txt",
+        ));
 }
 
 #[test]
@@ -219,7 +407,9 @@ fn test_backtrace_via_config() {
         .failure()
         .assert_failed(1)
         .assert_contains("exit_code=42")
-        .assert_snapshot_matches("integration/snapshots/test_backtrace_via_config.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/config/test_backtrace_via_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -282,7 +472,7 @@ fn test_filter_and_coverage_via_config() {
         .assert_contains("unit div")
         .assert_not_contains("integration triple")
         .assert_snapshot_matches(
-            "integration/snapshots/test_filter_and_coverage_via_config.stdout.txt",
+            "integration/snapshots/config/test_filter_and_coverage_via_config.stdout.txt",
         );
 }
 
@@ -547,7 +737,7 @@ fn test_include_patterns_via_config_with_explicit_directory_path() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_include_patterns_via_config_with_explicit_directory_path.stdout.txt",
+            "integration/snapshots/config/test_include_patterns_via_config_with_explicit_directory_path.stdout.txt",
         );
 }
 
@@ -687,7 +877,9 @@ fn test_fail_fast_via_config() {
         .assert_contains("second fail")
         .assert_not_contains("third pass")
         .assert_not_contains("fourth pass")
-        .assert_snapshot_matches("integration/snapshots/test_with_fail_fast_via_config.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/config/test_with_fail_fast_via_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -732,7 +924,7 @@ fn test_fail_on_diff_via_config_exits_non_zero_for_profile_drift() {
     failed
         .assert_contains("CHAIN GAS & FEES SUMMARY COMPARISON")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_fail_on_diff_via_config_exits_non_zero_for_profile_drift.stderr.txt",
+            "integration/snapshots/config/test_fail_on_diff_via_config_exits_non_zero_for_profile_drift.stderr.txt",
         );
 }
 
@@ -762,4 +954,49 @@ fn test_fail_on_diff_via_config_without_baseline_snapshot_mode_succeeds() {
         !stderr.contains("`--fail-on-diff` requires `--baseline-snapshot`"),
         "snapshot mode with fail-on-diff from config must not require baseline, stderr:\n{stderr}"
     );
+}
+
+#[test]
+fn test_gas_profile_via_config_exports_devtools_profile() {
+    let project = ProjectBuilder::new("gas-profile-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .with_test_config(TestConfig {
+            gas_profile: Some("gas.cpuprofile".to_string()),
+            gas_profile_include_tests: Some(true),
+            ..Default::default()
+        })
+        .build();
+
+    let output = project.acton().test().run().success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/config/test_gas_profile_via_config_exports_devtools_profile.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_format_collapsed_via_config_exports_collapsed_stacks() {
+    let project = ProjectBuilder::new("gas-profile-collapsed-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .with_test_config(TestConfig {
+            gas_profile: Some("gas.collapsed".to_string()),
+            gas_profile_format: Some("collapsed".to_string()),
+            gas_profile_include_tests: Some(true),
+            ..Default::default()
+        })
+        .build();
+
+    let output = project.acton().test().run().success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/config/test_gas_profile_format_collapsed_via_config_exports_collapsed_stacks.collapsed",
+        );
 }

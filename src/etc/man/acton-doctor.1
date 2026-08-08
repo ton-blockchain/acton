@@ -12,7 +12,8 @@ Print a diagnostic report for the current Acton environment.
 .sp
 The report is intended to help debug project resolution, manifest parsing,
 wallet and library overlays, bundled standard\-library state, native emulator
-and Tolk library metadata, logging paths, and relevant environment variables.
+and Tolk library metadata, logging paths, relevant environment variables, and
+API reachability from the current machine.
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -72,7 +73,19 @@ embedded in the linked libraries
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'selected environment variables such as \fBHOME\fR, \fBSHELL\fR, and \fBNO_COLOR\fR
+\h'-04'\(bu\h'+03'selected environment variables such as \fBHOME\fR, \fBSHELL\fR, \fBNO_COLOR\fR, and
+\fBACTON_DISABLE_AUTO_STDLIB\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_USE_PROXY\fR, which opts Acton CLI HTTP clients into \fBHTTP_PROXY\fR,
+\fBHTTPS_PROXY\fR, \fBALL_PROXY\fR, and system proxy settings. Acton ignores those
+proxy settings by default to avoid macOS sandbox proxy autodetection crashes.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'API reachability checks for the default TON API backends and verifier backend
+config endpoint.
 .RE
 .SH "PATH AND OVERLAY CHECKS"
 For each reported path, Acton shows whether it exists, whether it appears
@@ -113,6 +126,33 @@ The stdlib section reports whether \fB\&.acton/tolk\-stdlib\fR is:
 .RS 4
 \h'-04'\(bu\h'+03'\fBunknown\-version\fR
 .RE
+.SH "API REACHABILITY"
+After the local environment report, \fBacton doctor\fR probes the default remote
+services Acton commonly uses:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'TonCenter v2 and v3 for mainnet and testnet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'TonHub v4 for mainnet and testnet
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'DTON GraphQL
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the verifier backend configuration file
+.RE
+.sp
+The command prints a healthy/total count and per\-endpoint status. These checks
+use short timeouts and are diagnostic only: failed API probes are reported in
+the output but do not by themselves make \fBacton doctor\fR exit with status \fB1\fR\&.
+.sp
+Set \fBDTON_API_KEY\fR to use your own DTON key. For controlled environments,
+\fBACTON_DOCTOR_API_TARGETS_JSON\fR can replace the default probe list with a JSON
+array of targets.
 .SH "EXIT STATUS"
 .sp
 .RS 4

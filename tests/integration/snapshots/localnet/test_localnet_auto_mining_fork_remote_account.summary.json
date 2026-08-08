@@ -1,0 +1,12 @@
+{
+  "node_after_fetch": {
+    "auto_mining": true,
+    "fork_network": "auto-fork-source",
+    "responded": true,
+    "status": 200
+  },
+  "remote_account": {
+    "request_finished": true,
+    "response_is_json": true
+  }
+}

@@ -3,9 +3,9 @@ use crate::support::project::ProjectBuilder;
 use function_name::named;
 
 const MULTIPLE_RULES_SAMPLE: &str = r"
-            global result: int; // E028
-            fun onInternalMessage(in: InMessage) { // E002
-                var x = 1; // E003
+            global result: int; // E022
+            fun onInternalMessage(in: InMessage) { // E001
+                var x = 1; // E002
                 _ = x;
             }
         ";
@@ -23,7 +23,7 @@ fn check_enable_only_e002_rules() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E002")
+        .arg("E001")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -45,7 +45,7 @@ fn check_enable_only_e028_rules() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E028")
+        .arg("E022")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -67,7 +67,7 @@ fn check_enable_only_multiple_rules() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E028,E003")
+        .arg("E022,E002")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -112,7 +112,7 @@ fn check_enable_only_preserves_deny_for_selected_rule() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E003")
+        .arg("E002")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
@@ -135,7 +135,7 @@ fn check_enable_only_unmutes_allow_for_selected_rule() {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E028")
+        .arg("E022")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

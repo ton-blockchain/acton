@@ -1,0 +1,5 @@
+trace_path: test-ui-contract-path_trace.json
+contract_name: simple/contract
+contract_status: 200 OK
+contract_json_name: simple/contract
+contract_json_display_name: Pool/Wallet

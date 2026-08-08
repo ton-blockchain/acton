@@ -1,27 +1,30 @@
-use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
+use crate::build_info;
+use crate::commands::common::{shell_quote, symlink_global_libraries, symlink_global_wallets};
 use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, default_project_mappings,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, ToolchainConfig,
+    default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{IsTerminal, Write, stdin, stdout};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 mod licenses;
 mod template;
 use template::ProjectLayout;
-pub use template::ProjectTemplate;
+pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";
 const BASE_GITIGNORE: &str = "
 # Acton main directory
 .acton/
+.studio/
 
 # Build directory
 build/
@@ -67,6 +70,9 @@ const BASE_ENV_EXAMPLE: &str = "
 # Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
 # exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
 # You can obtain a key in the bot at https://t.me/toncenter.
+# Acton ignores HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and system proxy settings by default
+# to avoid macOS sandbox proxy autodetection crashes. Set ACTON_USE_PROXY=1 or
+# ACTON_USE_PROXY=true if you need Acton CLI HTTP requests to use those proxies.
 # Uncomment the network keys you need:
 # TONCENTER_MAINNET_API_KEY=\"your-mainnet-key-here\"
 # TONCENTER_TESTNET_API_KEY=\"your-testnet-key-here\"
@@ -93,6 +99,9 @@ const ACTON_TOML_REFERENCE_FOOTER: &str = "
 # https://ton-blockchain.github.io/acton/docs/acton-toml
 ";
 
+const GENERATED_PROJECT_FILES: &[&str] =
+    &["Acton.toml", ".gitignore", ".env.example", ".editorconfig"];
+
 #[derive(Clone, Copy)]
 struct TemplateSelectItem(ProjectTemplate);
 
@@ -112,6 +121,7 @@ pub fn new_cmd(
     app: bool,
     hooks: bool,
     agents: bool,
+    overwrite: bool,
     templates: bool,
 ) -> anyhow::Result<()> {
     if templates {
@@ -131,16 +141,12 @@ pub fn new_cmd(
             anyhow::bail!(
                 "Directory {} already exists, if you want to create a new project inside this directory run following commands:\n  {}\n  {}",
                 path.display().to_string().yellow(),
-                format!("cd {}", path.display()).bold(),
+                format!("cd {}", shell_quote(&path.display().to_string())).bold(),
                 "acton new .".bold()
             )
         }
         path
     };
-
-    if !project_path.exists() {
-        fs::create_dir_all(&project_path)?;
-    }
 
     let default_name = project_path
         .file_name()
@@ -150,16 +156,18 @@ pub fn new_cmd(
 
     let project_name = if let Some(name) = name {
         name
-    } else {
+    } else if interactive {
         Text::new("Project name:")
             .with_placeholder(default_name)
             .with_default(default_name)
             .prompt()?
+    } else {
+        default_name.to_owned()
     };
 
     let template = if let Some(template) = template {
         template
-    } else {
+    } else if interactive {
         let template_options = template::get_available_templates()
             .into_iter()
             .map(TemplateSelectItem)
@@ -169,6 +177,20 @@ pub fn new_cmd(
             .with_starting_cursor(0)
             .prompt()?
             .0
+    } else {
+        let available_templates = template::get_available_templates()
+            .into_iter()
+            .map(ProjectTemplate::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let template_flag = "--template <TEMPLATE>".yellow().bold().to_string();
+        let example = format!("acton new {path} --template empty")
+            .cyan()
+            .to_string();
+        let available_templates = available_templates.cyan().to_string();
+        anyhow::bail!(
+            "Project template is required when running acton new non-interactively.\n\nPass {template_flag}, for example:\n  {example}\n\nAvailable templates: {available_templates}"
+        );
     };
 
     let git_available = is_git_available();
@@ -192,10 +214,23 @@ pub fn new_cmd(
         )
     })?;
 
+    if !project_path.exists() {
+        fs::create_dir_all(&project_path)?;
+    }
+
+    let colliding_files =
+        find_colliding_project_files(&project_path, scaffold, include_agents, &license);
+    confirm_or_reject_colliding_files(&colliding_files, interactive, overwrite)?;
+
+    let author = get_git_user_name().unwrap_or_else(|| "Acton User".to_string());
+
     let mut config = ActonConfig::default();
-    config.package.name = project_name.clone();
-    config.package.description = description.clone();
+    config.package.name.clone_from(&project_name);
+    config.package.description.clone_from(&description);
     config.package.license = Some(license.clone());
+    config.toolchain = Some(ToolchainConfig {
+        acton: Some(build_info::PACKAGE_VERSION.to_owned()),
+    });
 
     std::env::set_current_dir(&project_path)?;
 
@@ -209,6 +244,7 @@ pub fn new_cmd(
         Path::new("."),
         include_agents,
         normalized_npm_package_name.as_deref(),
+        &author,
     )?;
 
     let mut contracts = BTreeMap::new();
@@ -218,6 +254,7 @@ pub fn new_cmd(
             ContractConfig {
                 name: Some(contract.name.to_owned()),
                 src: scaffold.contract_src(contract),
+                types: None,
                 depends: Some(
                     contract
                         .depends
@@ -226,6 +263,7 @@ pub fn new_cmd(
                         .collect(),
                 ),
                 output: None,
+                wrappers: None,
             },
         );
     }
@@ -246,6 +284,9 @@ pub fn new_cmd(
             scaffold.deploy_script_path()
         ),
     );
+    for (alias, command) in scaffold.extra_scripts() {
+        scripts.insert(alias, command);
+    }
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
 
@@ -255,7 +296,6 @@ pub fn new_cmd(
 
     stdlib::ensure_latest(Path::new("."))?;
 
-    let author = get_git_user_name().unwrap_or_else(|| "Acton User".to_string());
     let year = chrono::Local::now().format("%Y").to_string();
     if let Some(license_text) = licenses::get_license_text(&license, &year, &author) {
         fs::write("LICENSE", license_text)?;
@@ -326,7 +366,11 @@ pub fn new_cmd(
     println!("Next steps:");
     println!();
     println!("  {}", "# Navigate to project".dimmed());
-    println!("  {} {}", "cd".bold(), project_path.display());
+    println!(
+        "  {} {}",
+        "cd".bold(),
+        shell_quote(&project_path.display().to_string())
+    );
     println!("  {}", "# Build your contract".dimmed());
     println!("  {} build", "acton".bold());
     println!("  {}", "# Run tests".dimmed());
@@ -503,6 +547,71 @@ fn project_mappings(layout: ProjectLayout) -> BTreeMap<String, String> {
     mappings
 }
 
+fn find_colliding_project_files(
+    project_path: &Path,
+    scaffold: template::ProjectScaffold,
+    include_agents: bool,
+    license: &str,
+) -> Vec<PathBuf> {
+    let mut paths = template::scaffold_file_paths(scaffold, include_agents);
+    paths.extend(GENERATED_PROJECT_FILES.iter().map(PathBuf::from));
+
+    if licenses::get_license_text(license, "", "").is_some() {
+        paths.push(PathBuf::from("LICENSE"));
+    }
+
+    paths.sort();
+    paths.dedup();
+    paths
+        .into_iter()
+        .filter(|relative| project_path.join(relative).exists())
+        .collect()
+}
+
+fn confirm_or_reject_colliding_files(
+    colliding_files: &[PathBuf],
+    interactive: bool,
+    overwrite: bool,
+) -> anyhow::Result<()> {
+    if colliding_files.is_empty() || overwrite {
+        return Ok(());
+    }
+
+    let file_list = format_colliding_files(colliding_files);
+
+    if !interactive {
+        let overwrite_flag = "--overwrite".yellow().bold();
+        anyhow::bail!(
+            "Refusing to overwrite existing files in non-interactive mode:\n{file_list}\n\nMove or remove these files, or pass {overwrite_flag} to replace them."
+        );
+    }
+
+    println!(
+        "\n{} acton new will overwrite existing files:",
+        "Warning:".yellow().bold()
+    );
+    print!("{file_list}");
+    println!();
+
+    let overwrite = Confirm::new("Overwrite existing files?")
+        .with_default(false)
+        .prompt()?;
+
+    if !overwrite {
+        anyhow::bail!("Aborted to avoid overwriting existing files.");
+    }
+
+    Ok(())
+}
+
+fn format_colliding_files(colliding_files: &[PathBuf]) -> String {
+    colliding_files
+        .iter()
+        .map(|path| format!("  {}", path.display()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn normalize_npm_package_name(project_name: &str) -> String {
     let mut normalized = String::new();
     let mut last_was_separator = false;
@@ -548,8 +657,7 @@ fn is_git_available() -> bool {
     std::process::Command::new("git")
         .arg("--version")
         .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|output| output.status.success())
 }
 
 fn initialize_git_repository() -> anyhow::Result<()> {

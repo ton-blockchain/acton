@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/assert_not_equal_nullable_struct.test.tolk (1 test)
+  ✗ ej stdlib assert not equal nullable struct diagnostic [TIME]
+    └─ Error: ej Assert.notEqual nullable struct compares by rendered Tolk value
+       Values are equal but expected to be different:
+         NullablePoint {
+            x: 10,
+            y: 20,
+        }
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

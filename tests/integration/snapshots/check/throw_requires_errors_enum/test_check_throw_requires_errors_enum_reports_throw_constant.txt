@@ -1,4 +1,4 @@
-warning[E034]: throw code should use `Errors.<Name>`
+warning[E028]: throw code should use `Errors.<Name>`
   --> [ROOT]/contracts/main[LINE]
   |
 5 |                 throw ERR_NOT_OWNER;
@@ -8,4 +8,4 @@ warning[E034]: throw code should use `Errors.<Name>`
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E034
+For example: acton check --explain E028

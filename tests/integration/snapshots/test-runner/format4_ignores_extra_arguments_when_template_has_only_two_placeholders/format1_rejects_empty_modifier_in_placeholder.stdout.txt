@@ -1,21 +1,12 @@
   Installing standard library [ACTON_VERSION]
    Compiling contracts
-No contracts section found in Acton.toml. Add at least one contract.
-To add a contract add the following section to Acton.toml:
-
-[contracts.MyContract]
-display-name = "MyContract"
-src = "contracts/MyContract.tolk"
-depends = []
-
-See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
      Running tests
 
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
   ✗ eb stdlib format1 empty modifier [TIME]
-    └─ Error: Invalid format string at byte 6: unknown format modifier '' in {:} (supported: :x, :ton)
+    └─ Error: Invalid format string at byte 6: unknown format modifier '' in {:} (supported: :x, :X, :b, :B, :gram, :grams, :ton, :cell-tree)
 
  ✗ 1 failed in 1 file
 

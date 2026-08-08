@@ -1,4 +1,4 @@
-warning[E009]: method can be static
+warning[S004]: method can be static
   --> [ROOT]/contracts/main[LINE]
   |
 4 |             fun Foo.bar(self, a: int): int {
@@ -8,4 +8,4 @@ warning[E009]: method can be static
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E009
+For example: acton check --explain S004

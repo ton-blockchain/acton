@@ -16,7 +16,7 @@ use tolk_syntax::{Expr, Paren};
 /// ```tolk twoslash
 /// fun main(a: int, b: int) {
 ///     a != b;
-/// //  ^^^^^^^ E032: unused expression has no effect
+/// //  ^^^^^^^ E026: unused expression has no effect
 /// }
 /// ```
 ///

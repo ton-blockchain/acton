@@ -60,7 +60,7 @@ fn outlist_to_be_send_message_at_fails_for_non_send_action() {
         "cb-stdlib-outlist-non-send-action",
         r#"
 get fun `test cb outlist non send action`() {
-    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val out_actions = testing.outActions();
     expect(out_actions.size()).toEqual(1);

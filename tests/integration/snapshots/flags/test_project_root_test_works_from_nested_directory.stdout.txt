@@ -4,9 +4,9 @@
     Finished in [TIME]
      Running tests
 
- TEST  [ROOT]/nested
+ TEST  [ROOT]
 
- > ../tests/manifest_path.test.tolk (1 test)
+ > tests/manifest_path.test.tolk (1 test)
   ✓ manifest path works [TIME]
 
  ✓ 1 passed in 1 file

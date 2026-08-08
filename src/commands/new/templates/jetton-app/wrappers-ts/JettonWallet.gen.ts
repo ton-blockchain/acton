@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a JettonWallet contract in Tolk
+// It's a TypeScript wrapper for a JettonWallet contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -28,6 +28,17 @@ function loadAndCheckPrefix32(s: c.Slice, expected: number, structName: string):
     let prefix = s.loadUint(32);
     if (prefix !== expected) {
         throw new Error(`Incorrect prefix for '${structName}': expected 0x${expected.toString(16).padStart(8, '0')}, got 0x${prefix.toString(16).padStart(8, '0')}`);
+    }
+}
+
+function formatPrefix(prefixNum: number, prefixLen: number): string {
+    return prefixLen % 4 ? `0b${prefixNum.toString(2).padStart(prefixLen, '0')}` : `0x${prefixNum.toString(16).padStart(prefixLen / 4, '0')}`;
+}
+
+function loadAndCheckPrefix(s: c.Slice, expected: number, prefixLen: number, structName: string): void {
+    let prefix = s.loadUint(prefixLen);
+    if (prefix !== expected) {
+        throw new Error(`Incorrect prefix for '${structName}': expected ${formatPrefix(expected, prefixLen)}, got ${formatPrefix(prefix, prefixLen)}`);
     }
 }
 
@@ -93,10 +104,18 @@ class StackReader {
 
     private popExpecting<ItemT>(itemType: string): ItemT {
         const item = this.tuple.shift();
-        if (item?.type !== itemType) {
-            throw new Error(`not '${itemType}' on a stack`);
+        if (item?.type === itemType) {
+            return item as ItemT;
         }
-        return item as ItemT;
+        throw new Error(`not '${itemType}' on a stack`);
+    }
+
+    private popCellLike(): c.Cell {
+        const item = this.tuple.shift();
+        if (item && (item.type === 'cell' || item.type === 'slice' || item.type === 'builder')) {
+            return item.cell;
+        }
+        throw new Error(`not cell/slice on a stack`);
     }
 
     readBigInt(): bigint {
@@ -108,11 +127,11 @@ class StackReader {
     }
 
     readCell(): c.Cell {
-        return this.popExpecting<c.TupleItemCell>('cell').cell;
+        return this.popCellLike();
     }
 
     readSlice(): c.Slice {
-        return this.popExpecting<c.TupleItemSlice>('slice').cell.beginParse();
+        return this.popCellLike().beginParse();
     }
 }
 
@@ -122,16 +141,7 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
-type uint32 = bigint
 type uint64 = bigint
-type uint256 = bigint
 
 /**
  > type ForwardPayloadRemainder = RemainingBitsAndRefs
@@ -147,6 +157,80 @@ export const ForwardPayloadRemainder = {
     },
     toCell(self: ForwardPayloadRemainder): c.Cell {
         return makeCellFrom<ForwardPayloadRemainder>(self, ForwardPayloadRemainder.store);
+    }
+}
+
+/**
+ > struct (0b0) PayloadInline {
+ >     value: RemainingBitsAndRefs
+ > }
+ */
+export interface PayloadInline {
+    readonly $: 'PayloadInline'
+    value: RemainingBitsAndRefs
+}
+
+export const PayloadInline = {
+    PREFIX: 0b0,
+
+    create(args: {
+        value: RemainingBitsAndRefs
+    }): PayloadInline {
+        return {
+            $: 'PayloadInline',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInline {
+        loadAndCheckPrefix(s, 0b0, 1, 'PayloadInline');
+        return {
+            $: 'PayloadInline',
+            value: loadTolkRemaining(s),
+        }
+    },
+    store(self: PayloadInline, b: c.Builder): void {
+        b.storeUint(0b0, 1);
+        storeTolkRemaining(self.value, b);
+    },
+    toCell(self: PayloadInline): c.Cell {
+        return makeCellFrom<PayloadInline>(self, PayloadInline.store);
+    }
+}
+
+/**
+ > struct (0b1) PayloadInRef {
+ >     value: Cell<RemainingBitsAndRefs>
+ > }
+ */
+export interface PayloadInRef {
+    readonly $: 'PayloadInRef'
+    value: CellRef<RemainingBitsAndRefs>
+}
+
+export const PayloadInRef = {
+    PREFIX: 0b1,
+
+    create(args: {
+        value: CellRef<RemainingBitsAndRefs>
+    }): PayloadInRef {
+        return {
+            $: 'PayloadInRef',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): PayloadInRef {
+        loadAndCheckPrefix(s, 0b1, 1, 'PayloadInRef');
+        return {
+            $: 'PayloadInRef',
+            value: loadCellRef<RemainingBitsAndRefs>(s, loadTolkRemaining),
+        }
+    },
+    store(self: PayloadInRef, b: c.Builder): void {
+        b.storeUint(0b1, 1);
+        storeCellRef<RemainingBitsAndRefs>(self.value, b, storeTolkRemaining);
+    },
+    toCell(self: PayloadInRef): c.Cell {
+        return makeCellFrom<PayloadInRef>(self, PayloadInRef.store);
     }
 }
 
@@ -169,7 +253,7 @@ export interface AskToTransfer {
     sendExcessesTo: c.Address | null
     customPayload: c.Cell | null
     forwardTonAmount: coins
-    forwardPayload: ForwardPayloadRemainder
+    forwardPayload: PayloadInline | PayloadInRef
 }
 
 export const AskToTransfer = {
@@ -182,7 +266,7 @@ export const AskToTransfer = {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }): AskToTransfer {
         return {
             $: 'AskToTransfer',
@@ -199,7 +283,9 @@ export const AskToTransfer = {
             sendExcessesTo: s.loadMaybeAddress(),
             customPayload: s.loadBoolean() ? s.loadRef() : null,
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('AskToTransfer.forwardPayload'),
         }
     },
     store(self: AskToTransfer, b: c.Builder): void {
@@ -212,10 +298,186 @@ export const AskToTransfer = {
             (v,b) => b.storeRef(v)
         );
         b.storeCoins(self.forwardTonAmount);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
     },
     toCell(self: AskToTransfer): c.Cell {
         return makeCellFrom<AskToTransfer>(self, AskToTransfer.store);
+    }
+}
+
+/**
+ > struct (0x7362d09c) TransferNotificationForRecipient {
+ >     queryId: uint64
+ >     jettonAmount: coins
+ >     transferInitiator: address?
+ >     forwardPayload: ForwardPayloadRemainder
+ > }
+ */
+export interface TransferNotificationForRecipient {
+    readonly $: 'TransferNotificationForRecipient'
+    queryId: uint64
+    jettonAmount: coins
+    transferInitiator: c.Address | null
+    forwardPayload: PayloadInline | PayloadInRef
+}
+
+export const TransferNotificationForRecipient = {
+    PREFIX: 0x7362d09c,
+
+    create(args: {
+        queryId: uint64
+        jettonAmount: coins
+        transferInitiator: c.Address | null
+        forwardPayload: PayloadInline | PayloadInRef
+    }): TransferNotificationForRecipient {
+        return {
+            $: 'TransferNotificationForRecipient',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): TransferNotificationForRecipient {
+        loadAndCheckPrefix32(s, 0x7362d09c, 'TransferNotificationForRecipient');
+        return {
+            $: 'TransferNotificationForRecipient',
+            queryId: s.loadUintBig(64),
+            jettonAmount: s.loadCoins(),
+            transferInitiator: s.loadMaybeAddress(),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('TransferNotificationForRecipient.forwardPayload'),
+        }
+    },
+    store(self: TransferNotificationForRecipient, b: c.Builder): void {
+        b.storeUint(0x7362d09c, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeCoins(self.jettonAmount);
+        b.storeAddress(self.transferInitiator);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
+    },
+    toCell(self: TransferNotificationForRecipient): c.Cell {
+        return makeCellFrom<TransferNotificationForRecipient>(self, TransferNotificationForRecipient.store);
+    }
+}
+
+/**
+ > struct (0x178d4519) InternalTransferStep {
+ >     queryId: uint64
+ >     jettonAmount: coins
+ >     transferInitiator: address?
+ >     sendExcessesTo: address?
+ >     forwardTonAmount: coins
+ >     forwardPayload: ForwardPayloadRemainder
+ > }
+ */
+export interface InternalTransferStep {
+    readonly $: 'InternalTransferStep'
+    queryId: uint64
+    jettonAmount: coins
+    transferInitiator: c.Address | null
+    sendExcessesTo: c.Address | null
+    forwardTonAmount: coins
+    forwardPayload: PayloadInline | PayloadInRef
+}
+
+export const InternalTransferStep = {
+    PREFIX: 0x178d4519,
+
+    create(args: {
+        queryId: uint64
+        jettonAmount: coins
+        transferInitiator: c.Address | null
+        sendExcessesTo: c.Address | null
+        forwardTonAmount: coins
+        forwardPayload: PayloadInline | PayloadInRef
+    }): InternalTransferStep {
+        return {
+            $: 'InternalTransferStep',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): InternalTransferStep {
+        loadAndCheckPrefix32(s, 0x178d4519, 'InternalTransferStep');
+        return {
+            $: 'InternalTransferStep',
+            queryId: s.loadUintBig(64),
+            jettonAmount: s.loadCoins(),
+            transferInitiator: s.loadMaybeAddress(),
+            sendExcessesTo: s.loadMaybeAddress(),
+            forwardTonAmount: s.loadCoins(),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('InternalTransferStep.forwardPayload'),
+        }
+    },
+    store(self: InternalTransferStep, b: c.Builder): void {
+        b.storeUint(0x178d4519, 32);
+        b.storeUint(self.queryId, 64);
+        b.storeCoins(self.jettonAmount);
+        b.storeAddress(self.transferInitiator);
+        b.storeAddress(self.sendExcessesTo);
+        b.storeCoins(self.forwardTonAmount);
+        switch (self.forwardPayload.$) {
+            case 'PayloadInline':
+                PayloadInline.store(self.forwardPayload, b);
+                break;
+            case 'PayloadInRef':
+                PayloadInRef.store(self.forwardPayload, b);
+                break;
+        }
+    },
+    toCell(self: InternalTransferStep): c.Cell {
+        return makeCellFrom<InternalTransferStep>(self, InternalTransferStep.store);
+    }
+}
+
+/**
+ > struct (0xd53276db) ReturnExcessesBack {
+ >     queryId: uint64
+ > }
+ */
+export interface ReturnExcessesBack {
+    readonly $: 'ReturnExcessesBack'
+    queryId: uint64
+}
+
+export const ReturnExcessesBack = {
+    PREFIX: 0xd53276db,
+
+    create(args: {
+        queryId: uint64
+    }): ReturnExcessesBack {
+        return {
+            $: 'ReturnExcessesBack',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ReturnExcessesBack {
+        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
+        return {
+            $: 'ReturnExcessesBack',
+            queryId: s.loadUintBig(64),
+        }
+    },
+    store(self: ReturnExcessesBack, b: c.Builder): void {
+        b.storeUint(0xd53276db, 32);
+        b.storeUint(self.queryId, 64);
+    },
+    toCell(self: ReturnExcessesBack): c.Cell {
+        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
     }
 }
 
@@ -274,230 +536,6 @@ export const AskToBurn = {
 }
 
 /**
- > struct (0x178d4519) InternalTransferStep {
- >     queryId: uint64
- >     jettonAmount: coins
- >     transferInitiator: address?
- >     sendExcessesTo: address?
- >     forwardTonAmount: coins
- >     forwardPayload: ForwardPayloadRemainder
- > }
- */
-export interface InternalTransferStep {
-    readonly $: 'InternalTransferStep'
-    queryId: uint64
-    jettonAmount: coins
-    transferInitiator: c.Address | null
-    sendExcessesTo: c.Address | null
-    forwardTonAmount: coins
-    forwardPayload: ForwardPayloadRemainder
-}
-
-export const InternalTransferStep = {
-    PREFIX: 0x178d4519,
-
-    create(args: {
-        queryId: uint64
-        jettonAmount: coins
-        transferInitiator: c.Address | null
-        sendExcessesTo: c.Address | null
-        forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
-    }): InternalTransferStep {
-        return {
-            $: 'InternalTransferStep',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): InternalTransferStep {
-        loadAndCheckPrefix32(s, 0x178d4519, 'InternalTransferStep');
-        return {
-            $: 'InternalTransferStep',
-            queryId: s.loadUintBig(64),
-            jettonAmount: s.loadCoins(),
-            transferInitiator: s.loadMaybeAddress(),
-            sendExcessesTo: s.loadMaybeAddress(),
-            forwardTonAmount: s.loadCoins(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
-        }
-    },
-    store(self: InternalTransferStep, b: c.Builder): void {
-        b.storeUint(0x178d4519, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeCoins(self.jettonAmount);
-        b.storeAddress(self.transferInitiator);
-        b.storeAddress(self.sendExcessesTo);
-        b.storeCoins(self.forwardTonAmount);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
-    },
-    toCell(self: InternalTransferStep): c.Cell {
-        return makeCellFrom<InternalTransferStep>(self, InternalTransferStep.store);
-    }
-}
-
-/**
- > struct (0xd372158c) TopUpTons {
- > }
- */
-export interface TopUpTons {
-    readonly $: 'TopUpTons'
-}
-
-export const TopUpTons = {
-    PREFIX: 0xd372158c,
-
-    create(): TopUpTons {
-        return {
-            $: 'TopUpTons',
-        }
-    },
-    fromSlice(s: c.Slice): TopUpTons {
-        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpTons');
-        return {
-            $: 'TopUpTons',
-        }
-    },
-    store(self: TopUpTons, b: c.Builder): void {
-        b.storeUint(0xd372158c, 32);
-    },
-    toCell(self: TopUpTons): c.Cell {
-        return makeCellFrom<TopUpTons>(self, TopUpTons.store);
-    }
-}
-
-/**
- > struct WalletStorage {
- >     jettonBalance: coins
- >     ownerAddress: address
- >     minterAddress: address
- > }
- */
-export interface WalletStorage {
-    readonly $: 'WalletStorage'
-    jettonBalance: coins
-    ownerAddress: c.Address
-    minterAddress: c.Address
-}
-
-export const WalletStorage = {
-    create(args: {
-        jettonBalance: coins
-        ownerAddress: c.Address
-        minterAddress: c.Address
-    }): WalletStorage {
-        return {
-            $: 'WalletStorage',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): WalletStorage {
-        return {
-            $: 'WalletStorage',
-            jettonBalance: s.loadCoins(),
-            ownerAddress: s.loadAddress(),
-            minterAddress: s.loadAddress(),
-        }
-    },
-    store(self: WalletStorage, b: c.Builder): void {
-        b.storeCoins(self.jettonBalance);
-        b.storeAddress(self.ownerAddress);
-        b.storeAddress(self.minterAddress);
-    },
-    toCell(self: WalletStorage): c.Cell {
-        return makeCellFrom<WalletStorage>(self, WalletStorage.store);
-    }
-}
-
-/**
- > struct (0x7362d09c) TransferNotificationForRecipient {
- >     queryId: uint64
- >     jettonAmount: coins
- >     transferInitiator: address?
- >     forwardPayload: ForwardPayloadRemainder
- > }
- */
-export interface TransferNotificationForRecipient {
-    readonly $: 'TransferNotificationForRecipient'
-    queryId: uint64
-    jettonAmount: coins
-    transferInitiator: c.Address | null
-    forwardPayload: ForwardPayloadRemainder
-}
-
-export const TransferNotificationForRecipient = {
-    PREFIX: 0x7362d09c,
-
-    create(args: {
-        queryId: uint64
-        jettonAmount: coins
-        transferInitiator: c.Address | null
-        forwardPayload: ForwardPayloadRemainder
-    }): TransferNotificationForRecipient {
-        return {
-            $: 'TransferNotificationForRecipient',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): TransferNotificationForRecipient {
-        loadAndCheckPrefix32(s, 0x7362d09c, 'TransferNotificationForRecipient');
-        return {
-            $: 'TransferNotificationForRecipient',
-            queryId: s.loadUintBig(64),
-            jettonAmount: s.loadCoins(),
-            transferInitiator: s.loadMaybeAddress(),
-            forwardPayload: ForwardPayloadRemainder.fromSlice(s),
-        }
-    },
-    store(self: TransferNotificationForRecipient, b: c.Builder): void {
-        b.storeUint(0x7362d09c, 32);
-        b.storeUint(self.queryId, 64);
-        b.storeCoins(self.jettonAmount);
-        b.storeAddress(self.transferInitiator);
-        ForwardPayloadRemainder.store(self.forwardPayload, b);
-    },
-    toCell(self: TransferNotificationForRecipient): c.Cell {
-        return makeCellFrom<TransferNotificationForRecipient>(self, TransferNotificationForRecipient.store);
-    }
-}
-
-/**
- > struct (0xd53276db) ReturnExcessesBack {
- >     queryId: uint64
- > }
- */
-export interface ReturnExcessesBack {
-    readonly $: 'ReturnExcessesBack'
-    queryId: uint64
-}
-
-export const ReturnExcessesBack = {
-    PREFIX: 0xd53276db,
-
-    create(args: {
-        queryId: uint64
-    }): ReturnExcessesBack {
-        return {
-            $: 'ReturnExcessesBack',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ReturnExcessesBack {
-        loadAndCheckPrefix32(s, 0xd53276db, 'ReturnExcessesBack');
-        return {
-            $: 'ReturnExcessesBack',
-            queryId: s.loadUintBig(64),
-        }
-    },
-    store(self: ReturnExcessesBack, b: c.Builder): void {
-        b.storeUint(0xd53276db, 32);
-        b.storeUint(self.queryId, 64);
-    },
-    toCell(self: ReturnExcessesBack): c.Cell {
-        return makeCellFrom<ReturnExcessesBack>(self, ReturnExcessesBack.store);
-    }
-}
-
-/**
  > struct (0x7bdd97de) BurnNotificationForMinter {
  >     queryId: uint64
  >     jettonAmount: coins
@@ -546,6 +584,79 @@ export const BurnNotificationForMinter = {
     },
     toCell(self: BurnNotificationForMinter): c.Cell {
         return makeCellFrom<BurnNotificationForMinter>(self, BurnNotificationForMinter.store);
+    }
+}
+
+/**
+ > struct (0xd372158c) TopUpGrams {
+ > }
+ */
+export interface TopUpGrams {
+    readonly $: 'TopUpGrams'
+}
+
+export const TopUpGrams = {
+    PREFIX: 0xd372158c,
+
+    create(): TopUpGrams {
+        return {
+            $: 'TopUpGrams',
+        }
+    },
+    fromSlice(s: c.Slice): TopUpGrams {
+        loadAndCheckPrefix32(s, 0xd372158c, 'TopUpGrams');
+        return {
+            $: 'TopUpGrams',
+        }
+    },
+    store(self: TopUpGrams, b: c.Builder): void {
+        b.storeUint(0xd372158c, 32);
+    },
+    toCell(self: TopUpGrams): c.Cell {
+        return makeCellFrom<TopUpGrams>(self, TopUpGrams.store);
+    }
+}
+
+/**
+ > struct WalletStorage {
+ >     jettonBalance: coins
+ >     ownerAddress: address
+ >     minterAddress: address
+ > }
+ */
+export interface WalletStorage {
+    readonly $: 'WalletStorage'
+    jettonBalance: coins
+    ownerAddress: c.Address
+    minterAddress: c.Address
+}
+
+export const WalletStorage = {
+    create(args: {
+        jettonBalance: coins
+        ownerAddress: c.Address
+        minterAddress: c.Address
+    }): WalletStorage {
+        return {
+            $: 'WalletStorage',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): WalletStorage {
+        return {
+            $: 'WalletStorage',
+            jettonBalance: s.loadCoins(),
+            ownerAddress: s.loadAddress(),
+            minterAddress: s.loadAddress(),
+        }
+    },
+    store(self: WalletStorage, b: c.Builder): void {
+        b.storeCoins(self.jettonBalance);
+        b.storeAddress(self.ownerAddress);
+        b.storeAddress(self.minterAddress);
+    },
+    toCell(self: WalletStorage): c.Cell {
+        return makeCellFrom<WalletStorage>(self, WalletStorage.store);
     }
 }
 
@@ -618,14 +729,14 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
         code,
         data,
         splitDepth: options.toShard?.fixedPrefixLength,
-        special: null,          // todo will somebody need special?
-        libraries: null,        // todo will somebody need libraries?
+        special: null,
+        libraries: null,
     })).endCell();
 
     let addrHash = stateInitCell.hash();
     if (options.toShard) {
         const shardDepth = options.toShard.fixedPrefixLength;
-        addrHash = beginCell()  // todo any way to do it better? N bits from closeTo + 256-N from stateInitCell
+        addrHash = beginCell()
             .storeBits(new c.BitString(options.toShard.closeTo.hash, 0, shardDepth))
             .storeBits(new c.BitString(stateInitCell.hash(), shardDepth, 256 - shardDepth))
             .endCell()
@@ -647,9 +758,9 @@ export class JettonWallet implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }
@@ -678,7 +789,7 @@ export class JettonWallet implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }) {
         return AskToTransfer.toCell(AskToTransfer.create(body));
     }
@@ -698,14 +809,14 @@ export class JettonWallet implements c.Contract {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }) {
         return InternalTransferStep.toCell(InternalTransferStep.create(body));
     }
 
-    static createCellOfTopUpTons(body: {
+    static createCellOfTopUpGrams(body: {
     }) {
-        return TopUpTons.toCell(TopUpTons.create());
+        return TopUpGrams.toCell(TopUpGrams.create());
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, msgValue: coins, extraOptions?: ExtraSendOptions) {
@@ -723,7 +834,7 @@ export class JettonWallet implements c.Contract {
         sendExcessesTo: c.Address | null
         customPayload: c.Cell | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
@@ -751,7 +862,7 @@ export class JettonWallet implements c.Contract {
         transferInitiator: c.Address | null
         sendExcessesTo: c.Address | null
         forwardTonAmount: coins
-        forwardPayload: ForwardPayloadRemainder
+        forwardPayload: PayloadInline | PayloadInRef
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
@@ -760,11 +871,11 @@ export class JettonWallet implements c.Contract {
         });
     }
 
-    async sendTopUpTons(provider: ContractProvider, via: Sender, msgValue: coins, body: {
+    async sendTopUpGrams(provider: ContractProvider, via: Sender, msgValue: coins, body: {
     }, extraOptions?: ExtraSendOptions) {
         return provider.internal(via, {
             value: msgValue,
-            body: TopUpTons.toCell(TopUpTons.create()),
+            body: TopUpGrams.toCell(TopUpGrams.create()),
             ...extraOptions
         });
     }

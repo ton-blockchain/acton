@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (2 tests)
+  ✓ unit double [TIME]
+  ✓ integration triple [TIME]
+
+ ✓ 2 passed in 1 file
+
+ COVERAGE  
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                Covered   Total Lines   % Lines   Covered   Total Branches   % Branches   Score  
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                 2             2    100.0%         0                0          n/a   100.0% 
+ code/helpers.tolk         2             2    100.0%         0                0          n/a   100.0% 
+
+Text coverage file saved in coverage.txt

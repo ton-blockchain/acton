@@ -1,0 +1,2 @@
+Available wallets:
+  global-only [WALLET_ADDRESS_BASE] (v5r1) [global] 

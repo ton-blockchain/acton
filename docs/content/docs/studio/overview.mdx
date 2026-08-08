@@ -1,0 +1,100 @@
+---
+title: "Overview"
+description: "Understand what Acton Studio is, when to use it, and how its workspace, tests, and environments fit together"
+---
+
+Acton Studio is a local browser workspace for developing and debugging TON applications with Acton.
+It brings test history, isolated networks, an explorer, contract metadata, wallets, simulation, and
+API diagnostics into one interface. Acton CLI remains the execution layer.
+
+Start Studio when you want to see the state of a project as a whole instead of switching between
+terminal output, a standalone explorer, and several localnet tools.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/overview-light.png"
+    alt="Acton Studio overview in light theme showing workspace status, recent tests, and running environments"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/overview-dark.png"
+    alt="Acton Studio overview in dark theme showing workspace status, recent tests, and running environments"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+## Why use Studio
+
+- **Keep a project workspace visible.** See the current project, Studio connection, recent test
+  results, and environment health on one page.
+- **Run and investigate tests.** Start the same `acton test` workflow from the browser or inspect
+  runs reported by the CLI, including failures, traces, logs, source locations, and runner output.
+- **Create isolated TON networks.** Use a fast simulated localnet for daily work or a Docker-based
+  Full localnet when validator and indexer fidelity matters.
+- **Debug the application, not only the contract.** Follow blocks and transactions, inspect known
+  contracts, simulate messages, review API calls, and connect a frontend to a stable Studio RPC URL.
+
+## The Studio model
+
+Studio opens one Acton project as a **workspace**. The workspace contains project-wide test history
+and a catalog of **environments**.
+
+Tests belong to the project workspace. Explorer, wallets, simulation, contracts, and API tools
+belong to the selected environment.
+
+An environment is a specific TON network context. It provides the state and endpoints used by the
+explorer, wallets, simulator, contracts, and API tools. Studio exposes three environment models:
+
+| Environment | Purpose |
+| --- | --- |
+| Simulated localnet | Fast contract and dApp iteration with Acton emulation, forks, mining controls, and project wallets added as startup accounts |
+| Full localnet | Local validators and indexers in Docker for behavior closer to a full TON network |
+| Testnet and Mainnet | Persistent external network entries for inspecting and interacting with public TON networks |
+
+Features appear only when the selected environment supports them. For example, a Full localnet has
+cold snapshots, while Testnet and Mainnet do not expose lifecycle or mining controls.
+
+## Studio and the CLI
+
+Studio is not a second implementation of Acton commands. A test started from Studio uses the same
+test runner as `acton test`, and network endpoints are regular TON-compatible endpoints that can be
+used by scripts, dApps, and external tools.
+
+This means you can keep your existing terminal workflow:
+
+```bash
+acton test
+acton script --net localnet scripts/deploy.tolk
+```
+
+When Studio is running for the same project, supported CLI activity is added to the workspace. When
+Studio is not running, the normal CLI behavior and exit codes stay unchanged.
+
+## Main areas
+
+<Cards>
+  <Card href="/docs/studio/getting-started" title="Getting Started">
+    Start Studio, open the workspace, and complete the first local development loop.
+  </Card>
+  <Card href="/docs/studio/tests" title="Tests">
+    Run tests from Studio or the CLI and investigate failures with saved artifacts.
+  </Card>
+  <Card href="/docs/studio/environments" title="Environments">
+    Choose between Simulated localnet, Full localnet, Testnet, and Mainnet.
+  </Card>
+  <Card href="/docs/studio/workspace" title="Environment Workspace">
+    Connect projects and applications, use wallets and faucets, and review API traffic.
+  </Card>
+  <Card href="/docs/studio/explorer-and-contracts" title="Explorer and Contracts">
+    Follow network activity and connect deployed addresses to source and ABI artifacts.
+  </Card>
+  <Card href="/docs/studio/simulator-and-data-tools" title="Simulator and Data Tools">
+    Emulate messages against an environment and decode TON cells.
+  </Card>
+  <Card href="/docs/studio/snapshots-and-settings" title="Snapshots and Settings">
+    Save Full localnet state, inspect configuration, and manage an environment.
+  </Card>
+  <Card href="/docs/studio/troubleshooting" title="Troubleshooting">
+    Diagnose Studio, test reporting, environment, Explorer, and API problems.
+  </Card>
+</Cards>

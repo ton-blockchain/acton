@@ -1,0 +1,48 @@
+{
+  "highload_v1_revision_minus_one": {
+    "get_wallet_information_is_wallet": false,
+    "revision": -1,
+    "state": {
+      "seqno": -2147483647,
+      "type": "wallet.highload.v1.accountState",
+      "wallet_id": 4275878552
+    }
+  },
+  "highload_v2_revision_two": {
+    "get_wallet_information_is_wallet": false,
+    "revision": 2,
+    "state": {
+      "type": "wallet.highload.v2.accountState",
+      "wallet_id": 4275878552
+    }
+  },
+  "highload_v2_without_data": {
+    "get_wallet_information_is_wallet": false,
+    "revision": 2,
+    "state": {
+      "type": "wallet.highload.v2.accountState",
+      "wallet_id": 0
+    }
+  },
+  "known_code_with_truncated_data": {
+    "error": "Failed to parse highload wallet v1 data",
+    "ok": false,
+    "status": 500
+  },
+  "manual_dns_revision_one": {
+    "get_wallet_information_is_wallet": false,
+    "revision": 1,
+    "state": {
+      "type": "dns.accountState",
+      "wallet_id": 2147483648
+    }
+  },
+  "manual_dns_without_data": {
+    "get_wallet_information_is_wallet": false,
+    "revision": 1,
+    "state": {
+      "type": "dns.accountState",
+      "wallet_id": 0
+    }
+  }
+}

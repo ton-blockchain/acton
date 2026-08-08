@@ -17,7 +17,7 @@ This removes the manual "airdrop + first deploy transaction" bootstrap step from
 
 ## Configure in `Acton.toml`
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [localnet]
 accounts = ["deployer", "user"]
 ```
@@ -33,7 +33,7 @@ CLI values override `Acton.toml` for the current run.
 ## Wallet Configuration
 
 Wallets are resolved by name from your wallet config.
-See [Setup wallets](/docs/tutorial/setup-wallets) for full wallet setup.
+See [Setup wallets](/docs/wallets) for full wallet setup.
 
 ```toml title="wallets.toml"
 [wallets.deployer]

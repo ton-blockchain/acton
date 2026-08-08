@@ -16,6 +16,9 @@ The command can rewrite files in place or run in `--check` mode for CI and
 pre-commit validation. If no `_paths_` are provided, Acton scans the resolved
 project root recursively.
 
+For editor integrations, `acton fmt --stdin` reads one Tolk source buffer from
+standard input and writes only the formatted source to standard output.
+
 ## Options
 
 ### Format Options
@@ -32,6 +35,32 @@ If omitted, Acton scans the project root.
 Check formatting without rewriting files.
 
 In this mode Acton prints diffs for mismatches and exits non-zero.
+{{/option}}
+
+{{#option "`--stdin`" }}
+Read Tolk source from standard input and write formatted source to standard
+output.
+
+This mode is intended for editor and IDE integrations. It does not rewrite files
+and, unless combined with `--check`, does not print status messages to standard
+output.
+{{/option}}
+
+{{#option "`--stdin-filepath` _PATH_" }}
+Virtual file path to use for diagnostics when formatting source from standard
+input.
+
+This option is accepted only with `--stdin`. Acton does not read or write this
+path.
+{{/option}}
+
+{{#option "`--range` _startLine:startChar-endLine:endChar_" }}
+Format only the specified zero-based source range.
+
+This is intended for editor integrations that format a selected region. Lines
+are zero-based, and `startChar` / `endChar` are zero-based UTF-8 byte columns.
+Editor integrations that expose Unicode scalar or UTF-16 positions need to
+convert them before invoking Acton.
 {{/option}}
 
 {{/options}}
@@ -56,12 +85,20 @@ In this mode Acton prints diffs for mismatches and exits non-zero.
 - Syntax errors are reported as diagnostics and cause a non-zero exit
 - `--check` prints a unified diff with three lines of context for each changed
   file
+- `--stdin` writes only formatted source to stdout; diagnostics and errors go to
+  stderr
+- `--stdin --check` compares stdin with formatted output and prints a unified
+  diff if formatting would change
+- `--range` keeps nodes outside the specified range unchanged and disables
+  import reordering for that invocation
+- `--range` can only be used with one explicit `.tolk` file path, unless
+  `--stdin` is used
 
 ## Configuration
 
 `acton fmt` reads defaults from `[fmt]` in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [fmt]
 width = 100
 ignore = ["contracts/generated/*.tolk"]
@@ -124,6 +161,18 @@ Within each group, imports are sorted lexicographically.
 
    ```bash
    acton fmt contracts/main.tolk --check
+   ```
+
+6. Format only a selected source range:
+
+   ```bash
+   acton fmt contracts/main.tolk --range 2:4-5:1
+   ```
+
+7. Format an editor buffer through stdin/stdout:
+
+   ```bash
+   acton fmt --stdin --stdin-filepath contracts/main.tolk < contracts/main.tolk
    ```
 
 ## See Also

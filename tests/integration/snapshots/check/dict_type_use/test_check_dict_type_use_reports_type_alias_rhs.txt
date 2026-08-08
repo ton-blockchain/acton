@@ -1,4 +1,4 @@
-warning[E033]: low-level `dict` type should be replaced with typed `map<K, V>`
+warning[E027]: low-level `dict` type should be replaced with typed `map<K, V>`
   --> [ROOT]/contracts/main[LINE]
   |
 2 |             type StorageDict = dict
@@ -8,4 +8,4 @@ warning[E033]: low-level `dict` type should be replaced with typed `map<K, V>`
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E033
+For example: acton check --explain E027

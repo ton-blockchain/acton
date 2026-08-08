@@ -28,6 +28,7 @@ npm ci
 ```bash
 acton build
 acton test
+npm run test
 npm run build
 npm run typecheck
 npm run fmt:check
@@ -36,11 +37,14 @@ npm run dev
 
 ## Scripts
 
-- `acton script contracts/scripts/deployCollection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
-- `acton script contracts/scripts/deployItem.tolk` — mints a single NFT item into an existing collection.
-- `acton script contracts/scripts/deployBatch.tolk` — batch-mints multiple items in a single transaction.
-- `acton script contracts/scripts/transferItem.tolk` — transfers an NFT item to a new owner.
-- `acton script contracts/scripts/changeAdmin.tolk` — changes the admin address of an existing collection.
+- `acton script contracts/scripts/deploy-collection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
+- `acton script contracts/scripts/deploy-item.tolk` — mints a single NFT item into an existing collection.
+- `acton script contracts/scripts/deploy-batch.tolk` — batch-mints multiple items in a single transaction.
+- `acton script contracts/scripts/transfer-item.tolk` — transfers an NFT item to a new owner.
+- `acton script contracts/scripts/change-admin.tolk` — changes the admin address of an existing collection.
+
+The same scripts are available through generated aliases such as
+`acton run nft-deploy-item` and `acton run nft-transfer-item`.
 
 ## Notes
 
@@ -50,7 +54,12 @@ npm run dev
 - `acton wrapper NftCollection --ts` and `acton wrapper NftItem --ts`
   regenerate the TypeScript wrappers under `wrappers-ts/`.
 - `npm run build` runs the contract build and the frontend build.
-- `npm run test` delegates to `acton test`.
+- `npm run test` is a placeholder dApp test script; use `acton test` for Tolk
+  integration tests.
+- `.github/workflows/contracts.yml` runs `acton build`, `acton fmt --check`,
+  `acton check --output-format github`, and `acton test`.
+- `.github/workflows/dapp.yml` runs `npm ci`, `npm run fmt:check`,
+  `npm run typecheck`, `npm run build`, and `npm run test`.
 - The app reads blockchain data through Toncenter. Set
   `TONCENTER_TESTNET_API_KEY` and/or `TONCENTER_MAINNET_API_KEY` in a local
   `.env` copied from `.env.example` if you need higher rate limits. Acton CLI

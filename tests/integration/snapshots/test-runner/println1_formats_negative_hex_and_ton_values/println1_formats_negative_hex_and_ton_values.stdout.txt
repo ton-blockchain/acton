@@ -1,14 +1,5 @@
   Installing standard library [ACTON_VERSION]
    Compiling contracts
-No contracts section found in Acton.toml. Add at least one contract.
-To add a contract add the following section to Acton.toml:
-
-[contracts.MyContract]
-display-name = "MyContract"
-src = "contracts/MyContract.tolk"
-depends = []
-
-See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
      Running tests
 
  TEST  [ROOT]
@@ -18,7 +9,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
     └─ Test output:
        hex_neg_one=-1
        hex_neg_255=-ff
-       ton_neg_nano=-0.000000001 TON
-       ton_neg_one_and_half=-1.5 TON
+       ton_neg_nano=-0.000000001 GRAM
+       ton_neg_one_and_half=-1.5 GRAM
 
  ✓ 1 passed in 1 file

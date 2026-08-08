@@ -3,55 +3,109 @@ title: "VS Code-based editors"
 description: "Learn about Acton support in VS Code, Cursor, and Windsurf"
 ---
 
+import {LandingVideo} from "@/components/LandingVideo"
+
 The [TON extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ton-core.vscode-ton) supports Acton development, providing intelligent features and toolchain integration.
 
-For installation instructions, see the [official TON documentation](https://docs.ton.org/contract-dev/ide/vscode).
+For installation instructions, see the [official TON documentation](https://docs.ton.org/contracts/ide/vscode).
 
-## Supported Editors
+## Supported editors
 
 The extension is compatible with:
-- Visual Studio Code
-- Cursor
-- Windsurf
-- VSCodium
-- And other VS Code-based editors
 
-## Acton.toml Support
+- Visual Studio Code;
+- Cursor;
+- Windsurf;
+- VSCodium;
+- And other VS Code-based editors.
 
-### Quick Actions
+<LandingVideo
+  className="docs-video rounded-lg border bg-fd-muted"
+  controls
+  controlsList="nodownload noplaybackrate"
+  height={720}
+  playsInline
+  playLabel="Play VS Code support video"
+  preload="metadata"
+  src="https://strapi-images-data.s3.eu-central-1.amazonaws.com/tolk/vscode.mp4"
+  style={{aspectRatio: "1280 / 720"}}
+  width={1280}
+>
+  Your browser does not support the video tag.
+</LandingVideo>
+
+## Recommended TOML extension
+
+We recommend installing [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
+as well. It ensures `Acton.toml` is treated as TOML, while the TON language server provides
+Acton schema completion and hover documentation for the file.
+
+## `Acton.toml` support
+
+### Quick actions
+
 Code lenses allow running builds and tests directly from the `Acton.toml` file.
 
 #### Building a specific contract
+
 ![](imgs/vscode/acton-toml-build.png)
 
 #### Running project tests
+
 ![](imgs/vscode/acton-toml-run-tests.png)
 
 #### Running a script
+
 ![](imgs/vscode/acton-toml-run-script.png)
+
+## Contract actions
+
+For contracts declared in Tolk files, the extension adds code lenses to build the contract and
+generate Tolk or TypeScript wrappers.
+
+![](imgs/vscode/contract-actions.png)
+
+## Disassembly
+
+The extension can open an assembly preview for a Tolk contract, making it easier to inspect the
+compiled code without leaving the editor.
+
+![](imgs/vscode/disassembly.png)
 
 ## Testing
 
-### Native Test Runner
+### Native test runner
+
 Acton tests integrate with the IDE's native test runner, providing a hierarchical view and progress indicators.
 
 ![](imgs/vscode/test-runner.png)
+![](imgs/vscode/test-runner-tree.png)
 
-For convenient execution, the plugin provides a test run icon in the editor.
+For convenient execution, the extension provides a test run icon in the editor.
 
 ![](imgs/vscode/test-run.png)
 
-### Failure Analysis
-When a test fails, the plugin highlights the specific `expect` call that failed and changes the test icon.
+### Failure analysis
+
+When a test fails, the extension highlights the specific `expect` call that failed and changes the test icon.
 
 ![](imgs/vscode/fail-tests.png)
 
-### Code Coverage
+### Debugging
+
+Set breakpoints in Tolk tests and contracts, start
+debugging from the editor, and inspect stack frames, local values, and TVM registers.
+
+![](imgs/vscode/debug.png)
+
+### Code coverage
+
 Coverage results are displayed in the editor gutter and file tree, showing which contract lines were executed during tests.
 
 ![](imgs/vscode/test-coverage.png)
 
-### Test Snippets
+### Test snippets
+
 The `test` live template allows generating test structures by typing `test` and pressing Tab.
 
 ![](imgs/vscode/test-completion.png)
@@ -59,12 +113,28 @@ The `test` live template allows generating test structures by typing `test` and 
 
 ## Toolchain Integration
 
-### Wallet Management
-The Wallets View allows managing project wallets, including generation, import via mnemonic, balance tracking, and testnet TON requests.
+### Wallet management
+
+The Wallets View allows managing project wallets, including generation, import via mnemonic, balance tracking, and testnet GRAM requests.
 
 ![](imgs/vscode/wallets-view.png)
 
-### Script Execution
+### Script execution
+
 Scripts can be executed via code lenses:
 
 ![](imgs/vscode/scripts-run.png)
+
+### Terminal links
+
+TON addresses in Acton terminal output are converted into clickable links that open the configured
+block explorer.
+
+![](imgs/vscode/terminal-links.png)
+
+### Linting
+
+The extension runs `acton check` for Tolk files and reports diagnostics directly in the editor.
+Available fixes can be applied from the Problems panel or the inline quick-fix menu.
+
+![](imgs/vscode/check.png)

@@ -1,0 +1,67 @@
+.scalarPanel {
+  display: grid;
+  min-width: 0;
+  max-width: 32rem;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.scalarRow {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+  gap: var(--acton-space-4);
+  align-items: baseline;
+}
+
+.scalarLabel,
+.sampleLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.scalarValue,
+.sampleValue {
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.formsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.formSample {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.hexValue,
+.hashValue {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .scalarRow {
+    grid-template-columns: 1fr;
+    gap: var(--acton-space-1);
+  }
+}

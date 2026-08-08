@@ -1,0 +1,135 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  background: var(--acton-color-surface-raised);
+  border: 0;
+  border-radius: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 1rem;
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 24px;
+}
+
+.description {
+  margin: 4px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.listLink {
+  flex: 0 0 auto;
+  color: var(--acton-color-accent);
+  border-radius: 4px;
+  font-size: var(--acton-font-size-sm);
+  line-height: 24px;
+  text-decoration: none;
+}
+
+.listLink:hover {
+  text-decoration: underline;
+}
+
+.listLink:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 16px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--acton-color-border);
+}
+
+.countdown {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+  margin: 0;
+}
+
+.countdownValue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 6px;
+  text-align: center;
+  background: var(--acton-color-surface-group);
+  border-radius: 10px;
+}
+
+.countdownValue dd {
+  order: 1;
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 1.25rem;
+  font-weight: var(--acton-font-weight-emphasis);
+  font-variant-numeric: tabular-nums;
+  line-height: 28px;
+}
+
+.countdownValue dt {
+  order: 2;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 16px;
+}
+
+@media (max-width: 680px) {
+  .card {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .header {
+    gap: 16px;
+  }
+
+  .countdown {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .countdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

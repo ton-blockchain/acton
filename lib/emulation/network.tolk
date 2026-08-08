@@ -43,7 +43,7 @@ const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 /// Represents a set of parameters for creating a message.
 struct SendParams {
     /// Value to send with the message.
-    value: coins = ton("0.1")
+    value: coins = grams("0.1")
     /// Whether to bounce the message if the contract does not exist or fails (default: false)
     bounce: bool = false
 }
@@ -164,14 +164,185 @@ fun SendResult.allOutActions(self): OutActionList {
 
 /// Represents a list of send results obtained from [net.send] method.
 ///
-/// This list represent all transactions produced by a [net.send] call.
+/// This list represents all transactions produced by a [net.send] call.
+///
+/// You can print the whole list with [println] to inspect the transaction tree produced by
+/// the send call.
+///
+/// Example output:
+/// ```acton-trace
+/// N/A -> sender A
+/// └── AskToTransfer 0.3 GRAM -> JettonWallet B                                 gas=5158
+///     └── InternalTransferStep 0.19 GRAM -> JettonWallet C                     gas=6974
+///         ├── TransferNotificationForRecipient 0.05 GRAM -> receiver D         gas=1234
+///         └── ReturnExcessesBack 0.13 GRAM -> sender A                         gas=4321
+/// ```
 ///
 /// To get a single send result, use [SendResultList.at] method.
 type SendResultList = BigArray<SendResult>
 
+/// Metadata returned when an external-in message fails before producing an
+/// accepted transaction trace.
+///
+/// Available since Acton 1.1.
+struct ExternalSendError {
+    /// Error message returned by the emulator.
+    message: string
+    /// Whether the external-in message was not accepted by the smart contract.
+    externalNotAccepted: bool
+    /// VM exit code reported by the emulator, if available.
+    vmExitCode: int?
+    /// Opaque diagnostic id used by Acton to retrieve full emulator metadata.
+    diagnosticId: int?
+}
+
+/// Result returned by [net.sendExternal].
+///
+/// If the external-in message is accepted, `transactions` contains the produced
+/// trace. If it is rejected before acceptance or cannot be emulated,
+/// `transactions` is `null` and `error` contains emulator metadata such as VM
+/// exit code and an opaque diagnostic id.
+///
+/// After a network broadcast, submission success does not tell Acton whether
+/// the destination contract accepted the message. In that case,
+/// `acceptanceKnown` is `false`; use [ExternalSendResult.waitForFirstTransaction]
+/// or [ExternalSendResult.waitForTrace] to look for the transaction on-chain.
+///
+/// In tests, prefer `expect(result).toBeAccepted()`,
+/// `expect(result).toBeNotAccepted()`, and
+/// `expect(result).toHaveExternalVmExitCode(...)` for diagnostics.
+/// Use [ExternalSendResult.unwrap] when a trace is required, or
+/// [ExternalSendResult.isAccepted] when the test needs to branch on the result.
+///
+/// Available since Acton 1.1.
+struct ExternalSendResult {
+    /// Produced transaction trace, or `null` if the external-in message was not accepted.
+    transactions: SendResultList?
+    /// Failure metadata, or `null` when the external-in message was accepted.
+    error: ExternalSendError?
+    /// Destination account extracted from the original external-in message.
+    destination: address
+    /// Whether Acton knows if the destination contract accepted the message.
+    acceptanceKnown: bool = true
+}
+
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
+}
+
+/// Returns whether a locally emulated external-in message was accepted.
+///
+/// After a network broadcast, Acton only knows that the message was submitted.
+/// Calling this method then fails with an actionable error because returning
+/// either `true` or `false` would be misleading. Use
+/// [ExternalSendResult.waitForFirstTransaction] or
+/// [ExternalSendResult.waitForTrace] to look for the transaction on-chain.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.isAccepted(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): bool {
+    if (!self.acceptanceKnown) {
+        Assert.fail(
+            "ExternalSendResult.isAccepted() is unavailable after broadcasting because submission does not report contract acceptance; use waitForFirstTransaction() to check whether the message appears on-chain",
+            location,
+        );
+    }
+    return self.transactions != null;
+}
+
+/// Returns produced transactions, or fails with external-error metadata if the
+/// message was not accepted.
+///
+/// Failed unwraps are reported like `expect(result).toBeAccepted()`:
+/// diagnostics include the external status, emulator reason, VM exit code when
+/// available, known exit-code description or ABI error name, source location,
+/// and the full backtrace when the test is run with `--backtrace full`.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.unwrap(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): SendResultList {
+    if (self.transactions != null) {
+        return self.transactions!;
+    }
+    self.__failExternalSend("ExternalSendResult.unwrap()", location);
+}
+
+fun ExternalSendError.__toFFITuple(self, destination: address?): tuple {
+    return [
+        self.message,
+        self.externalNotAccepted,
+        self.vmExitCode,
+        self.diagnosticId,
+        destination,
+    ];
+}
+
+fun ExternalSendResult.__failExternalSend(self, context: string, location: string = ""): never {
+    if (self.error != null) {
+        ffi.failExternalSendNotAccepted(
+            location,
+            context,
+            self.error!.__toFFITuple(self.destination),
+        );
+        throw ASSERTION_FAILED;
+    }
+
+    Assert.fail(format("{}: external message was not accepted", context), location);
+}
+
+/// Returns the send result at the given index, or fails with external-error
+/// metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.at(
+    self,
+    index: int,
+    location: string = reflect.sourceLocationAsString(),
+): SendResult {
+    return self.unwrap(location).at(index);
+}
+
+/// Give a custom name for a trace chain produced by [net.sendExternal].
+///
+/// Fails with external-error metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.giveName(
+    self,
+    nameForUI: string,
+    location: string = reflect.sourceLocationAsString(),
+): void {
+    self.unwrap(location).giveName(nameForUI);
+}
+
+/// Hide a trace chain produced by [net.sendExternal] from saved traces and the Test UI.
+///
+/// Fails with external-error metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.hideTraceFromUi(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): void {
+    self.unwrap(location).hideTraceFromUi();
 }
 
 /// Give a custom name for a trace chain produced by [net.send].
@@ -188,13 +359,20 @@ fun SendResultList.giveName(self, nameForUI: string): void {
     ffi.saveTraceName(self, nameForUI);
 }
 
+/// Hide this trace chain from saved traces and the Test UI.
+///
+/// The transactions are still available to test code and console assertions.
+fun SendResultList.hideTraceFromUi(self): void {
+    ffi.hideTraceFromUi(self);
+}
+
 /// Wait for the first (root) message of the send result to be applied on the blockchain.
 ///
 /// This method is useful when broadcasting transactions to the real network.
 /// It polls the network until the transaction is applied or the maximum number of attempts is reached.
 ///
 /// The lookup follows the TON docs message-lookup reference
-/// (https://docs.ton.org/ecosystem/ton-connect/message-lookup): the external-in message
+/// (https://docs.ton.org/applications/ton-connect/how-to/message-lookup): the external-in message
 /// actually delivered to the network is identified by its TEP-467 normalized hash
 /// (returned by `sendBocReturnHash` at send time), and the destination account's recent
 /// transactions are scanned until one with a matching `inMessage` shows up.
@@ -204,8 +382,12 @@ fun SendResultList.giveName(self, nameForUI: string): void {
 /// (`childTxs`, `parentLt`, `outActions`) are left empty/null; `outMessages`, `externals`,
 /// and `gasUsed` are derived from the transaction itself.
 ///
+/// If the matched root transaction is already known to have failed, the method returns
+/// `null` immediately and prints a warning instead of waiting for the remaining attempts.
+///
 /// In emulation mode (without `--net`), this method returns the first [SendResult] immediately
 /// (or `null` if the list is empty), because the trace is already fully processed locally.
+/// Use [SendResultList.waitForTrace] when you need the complete descendant transaction chain.
 ///
 /// Example:
 /// ```tolk
@@ -262,6 +444,8 @@ fun SendResultList.waitForFirstTransaction(
 /// the method returns `self` as-is (or `null` if the list is empty).
 ///
 /// Returns `null` if the chain cannot be fetched within the given attempt budget.
+/// If the matched root transaction is already known to have failed, the method returns
+/// `null` immediately and prints a warning.
 fun SendResultList.waitForTrace(
     self,
     quiet: bool = false,
@@ -285,13 +469,43 @@ fun SendResultList.waitForTrace(
     );
 }
 
+/// Wait for the first transaction produced by [net.sendExternal].
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.waitForFirstTransaction(
+    self,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 1000,
+): SendResult? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.waitForFirstTransaction(quiet, attempts, sleepDuration);
+}
+
+/// Wait for the full trace produced by [net.sendExternal].
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.waitForTrace(
+    self,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 1000,
+): SendResultList? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.waitForTrace(quiet, attempts, sleepDuration);
+}
+
 /// Represents a set of parameters to search for a transaction in the transaction list.
 struct SearchParams {
     /// Destination address of the transaction.
     to: (address -> bool) | address | null = null
     /// Source address of the transaction.
     from: (address -> bool) | address | null = null
-    /// Value of the message in nanotons.
+    /// Value of the message in nanograms.
     value: (coins -> bool) | coins | null = null
     /// Exit code of the transaction.
     exitCode: (int32 -> bool) | int32 | null = null
@@ -330,6 +544,10 @@ struct SearchParams {
     /// });
     /// ```
     state_init: (Cell<StateInit?> -> bool) | Cell<StateInit?> | null = null
+    /// Send mode of the parent action that produced this transaction.
+    ///
+    /// Available since Acton 1.1.
+    sendMode: (uint32 -> bool) | uint32 | null = null
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
@@ -367,7 +585,7 @@ fun impl.toPredicate<T>(field: (T -> bool) | T | null): tuple {
 
 /// Check if user-provided SearchParams has any lambdas.
 /// If not (most common), fast FFI path will be used.
-fun SearchParams.hasPredicates(self): bool {
+fun SearchParams.__hasPredicates(self): bool {
     return impl.isPredicate(self.to) | impl.isPredicate(self.from) | impl.isPredicate(self.value) |
     impl.isPredicate(self.exitCode) |
     impl.isPredicate(self.success) |
@@ -379,11 +597,12 @@ fun SearchParams.hasPredicates(self): bool {
     impl.isPredicate(self.actionExitCode) |
     impl.isPredicate(self.computePhaseSkipped) |
     impl.isPredicate(self.body) |
-    impl.isPredicate(self.state_init);
+    impl.isPredicate(self.state_init) |
+    impl.isPredicate(self.sendMode);
 }
 
 /// Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
-fun SearchParams.toScalarFFITuple(self): tuple {
+fun SearchParams.__toScalarFFITuple(self): tuple {
     return [
         impl.unwrapScalar(self.to),
         impl.unwrapScalar(self.from),
@@ -399,11 +618,12 @@ fun SearchParams.toScalarFFITuple(self): tuple {
         impl.unwrapScalar(self.computePhaseSkipped),
         impl.unwrapScalar(self.body),
         impl.unwrapScalar(self.state_init),
+        impl.unwrapScalar(self.sendMode),
     ];
 }
 
 /// Convert SearchParams to a tuple of [tag, predicate] pairs for FFI.
-fun SearchParams.toPredicateFFITuple(self): tuple {
+fun SearchParams.__toPredicateFFITuple(self): tuple {
     return [
         impl.toPredicate(self.to),
         impl.toPredicate(self.from),
@@ -419,6 +639,7 @@ fun SearchParams.toPredicateFFITuple(self): tuple {
         impl.toPredicate(self.computePhaseSkipped),
         impl.toPredicate(self.body),
         impl.toPredicate(self.state_init),
+        impl.toPredicate(self.sendMode),
     ];
 }
 
@@ -459,7 +680,7 @@ fun TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches<TBody>(
     return true;
 }
 
-/// Find a external-out message in the send result list by specified parameters.
+/// Find an external-out message in the send result list by specified parameters.
 ///
 /// Example:
 /// ```tolk
@@ -470,13 +691,13 @@ fun TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches<TBody>(
 /// ```
 ///
 /// You can specify an optional type argument, specifying the message type to search for;
-/// the function will also check that the opcode of the tx message matches the opcode of the
-/// given message.
+/// the function will also check that the opcode of the external-out message body
+/// matches the opcode of the given message.
 ///
 /// Example:
 /// ```tolk
-/// tx.findExternalOutMessage<IncrementEvent>({ from: counter.address });
-/// //                        ^^^^^^^^^^^^^^ search for message with IncrementEvent opcode
+/// txs.findExternalOutMessage<IncrementEvent>({ from: counter.address });
+/// //                         ^^^^^^^^^^^^^^ search for message with IncrementEvent opcode
 /// ```
 ///
 /// If the message is not found, returns `null`.
@@ -514,6 +735,19 @@ fun SendResultList.findExternalOutMessage<TBody = unknown>(
     return null;
 }
 
+/// Find an external-out message in the trace produced by [net.sendExternal].
+///
+/// Available since Acton 1.1.
+fun ExternalSendResult.findExternalOutMessage<TBody = unknown>(
+    self,
+    params: ExternalOutSearchParams = {},
+): TlbMessage<TBody, TlbExternalOutMessageInfo>? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.findExternalOutMessage<TBody>(params);
+}
+
 /// Find a transaction in the send result list by specified parameters.
 ///
 /// Example:
@@ -543,6 +777,8 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///
 /// In broadcast mode (with `--net`), sending to the real network is attempted only when `from`
 /// matches one of the wallets opened at script startup.
+/// With `--tonconnect`, `scripts.wallet("name")` resolves to the connected TON Connect wallet
+/// and matching sends are approved in that wallet instead of signed by local keys.
 /// If `from` is not an opened wallet address, this method falls back to normal
 /// emulator execution, even when [net.isBroadcasting] is `true`.
 ///
@@ -553,7 +789,7 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///     val message = createMessage({
 ///         bounce: false,
 ///         dest: counter.address,
-///         value: ton("1"),
+///         value: grams("1"),
 ///     });
 ///     net.send(deployer.address, message);
 /// }
@@ -582,17 +818,21 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     return rawRes;
 }
 
-/// The response from `net.createExternalMessage`.
-/// It's an already composed message cell, ready to be sent by `net.sendExternal`.
+/// The response from [net.createExternalMessage].
+/// It stores an already composed message cell and the destination address used
+/// by [net.sendExternal] diagnostics.
 struct ExternalInMessage {
+    /// Encoded external-in message cell.
     messageCell: cell
+    /// Destination account address.
+    dest: address
 }
 
 /// Creates an external-in message.
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
 /// Full TL-B scheme of the message is.
-/// ```
+/// ```tlb
 /// ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
 ///   import_fee:Grams = CommonMsgInfo;
 /// message$_ {X:Type} info:CommonMsgInfo
@@ -624,29 +864,57 @@ fun net.createExternalMessage<TBody>(
                 src,
                 dest,
                 // It is better to fairly calculate the import fee right here or in acton
-                importFee: ton("0.1"),
+                importFee: grams("0.1"),
             },
             init,
             body: TlbEither<TBody, Cell<TBody>>.right(body.__asPayload()),
         }.toCell(),
+        dest,
     };
 }
 
 /// Sends an external-in message to the specified destination address.
 /// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 ///
-/// This helper recursively processes the resulting trace in local emulation
-/// just like [net.send], but it starts from an already composed external-in
+/// In local emulation, this helper recursively processes the resulting trace just
+/// like [net.send], but it starts from an already composed external-in
 /// message instead of an internal message sent from a wallet-like address.
 ///
-/// Returns `null` if the external message was not accepted or the destination
-/// account does not exist.
-fun net.sendExternal(msg: ExternalInMessage): SendResultList? {
-    // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(
-        msg.messageCell,
-        address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell(),
-    );
+/// In broadcast mode without `--tonconnect`, Acton sends the external-in message to
+/// the network and returns a single pseudo transaction placeholder. This only
+/// confirms submission, not whether the destination contract accepted the message.
+/// Call [ExternalSendResult.waitForFirstTransaction] or
+/// [ExternalSendResult.waitForTrace] to look for the transaction on-chain. With
+/// `--tonconnect`, `net.sendExternal` is rejected; use [net.send] with an
+/// internal wallet message so the connected wallet can approve it.
+///
+/// If the external message is accepted, the returned [ExternalSendResult]
+/// contains the full transaction trace in `transactions`.
+///
+/// If the external message is not accepted, the destination account does not
+/// exist, or emulation fails before a trace is produced, the returned result has
+/// `transactions = null` and `error` contains all available emulator metadata.
+/// In tests, prefer `expect(result).toBeAccepted()` or
+/// [ExternalSendResult.unwrap] so Acton can render the external status, VM exit
+/// code, ABI error name, source location, and backtrace.
+///
+/// Example:
+/// ```tolk
+/// val result = net.sendExternal(msg);
+/// expect(result).toBeAccepted();
+///
+/// val txs = result.unwrap();
+/// expect(txs).toHaveAllSuccessfulTxs();
+/// ```
+fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
+    val result = ffi.sendExternalMessage(msg.messageCell);
+    val error = result.get(1);
+    return ExternalSendResult {
+        transactions: result.get(0) as SendResultList?,
+        error: error == null ? null : error as ExternalSendError,
+        destination: msg.dest,
+        acceptanceKnown: result.get(2) as bool,
+    };
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -655,7 +923,7 @@ fun net.sendExternal(msg: ExternalInMessage): SendResultList? {
 /// ```tolk
 /// val msg = createMessage({
 ///     bounce: false,
-///     value: ton("1"),
+///     value: grams("1"),
 ///     dest: counter.address,
 /// });
 /// val bouncedMsg = msg.bounced();
@@ -667,7 +935,7 @@ fun net.sendExternal(msg: ExternalInMessage): SendResultList? {
 /// ```tolk
 /// val bouncedMsg = createMessage({
 ///     bounce: false,
-///     value: ton("0.95"),
+///     value: grams("0.95"),
 ///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
@@ -680,7 +948,10 @@ fun OutMessage.bounced(self): OutMessage {
     return { messageCell: msg.toCell() };
 }
 
-/// Returns `true` if the script is running in broadcasting mode (with `--net`), `false` otherwise.
+/// Returns the current runtime broadcast flag.
+///
+/// The flag is normally enabled by running a script with `--net`, and can also be
+/// changed at runtime with [net.enableBroadcast] and [net.disableBroadcast].
 ///
 /// This is useful for writing scripts that behave differently in emulation and broadcasting modes.
 ///
@@ -790,7 +1061,6 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
         code,
         methodId,
         methodName,
-        reflect.typeNameOf<Ret>(),
         args,
     );
     if (res == null) {
@@ -914,6 +1184,68 @@ fun Cell<T>.__asPayload(self): Cell<T> {
 
 fun cell.__asPayload(self): Cell<cell> {
     return self as Cell<cell>;
+}
+
+/// Expect the external-in message to be accepted and produce a transaction trace.
+///
+/// On failure, Acton reports the external status, emulator reason, VM exit code
+/// when available, a known exit-code description or ABI error name, source
+/// location, and the full backtrace when the test is run with `--backtrace full`.
+///
+/// Available since Acton 1.1.
+fun Expectation<ExternalSendResult>.toBeAccepted(self): void {
+    if (self.value.transactions != null) {
+        return;
+    }
+    self.value.__failExternalSend("expect(<actual>).toBeAccepted()", self.location);
+}
+
+/// Expect the external-in message to be rejected before acceptance.
+///
+/// Available since Acton 1.1.
+fun Expectation<ExternalSendResult>.toBeNotAccepted(self): void {
+    if (self.value.error != null && self.value.error.externalNotAccepted) {
+        return;
+    }
+    if (self.value.error != null) {
+        self.fail(
+            format(
+                "expect(<actual>).toBeNotAccepted(): external send failed, but not as an external-not-accepted error: {}",
+                self.value.error.message,
+            ),
+        );
+    }
+    self.fail("expect(<actual>).toBeNotAccepted(): external message was accepted");
+}
+
+/// Expect the external send error to have a specific VM exit code.
+///
+/// This matcher is intended for rejected external-in messages. For accepted
+/// external messages, use transaction matchers on the produced [SendResultList].
+///
+/// Available since Acton 1.1.
+fun Expectation<ExternalSendResult>.toHaveExternalVmExitCode(self, exitCode: int): void {
+    if (
+        self.value.error != null && self.value.error.vmExitCode != null &&
+        self.value.error.vmExitCode == exitCode
+    ) {
+        return;
+    }
+    if (self.value.error != null) {
+        self.fail(
+            format(
+                "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, got {}",
+                exitCode,
+                self.value.error.vmExitCode,
+            ),
+        );
+    }
+    self.fail(
+        format(
+            "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, but external message was accepted",
+            exitCode,
+        ),
+    );
 }
 
 /// Expect the transaction list to have a successful deploy transaction.
@@ -1126,31 +1458,21 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
 /// ```
 fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
-    var i = 0;
-    repeat (self.value.size()) {
-        val result = self.value.at(i);
-
-        var j = 0;
-        repeat (result.externals.size()) {
-            val external = result.externals.atOrNull<Msg>(j);
-            if (external != null) {
-                // message found
-                return;
-            }
-            j += 1;
-        }
-
-        i += 1;
+    if (self.value.findExternalOutMessage<Msg>() != null) {
+        return;
     }
 
-    self.fail(
+    ffi.failToFindExternalMessage(
+        self.location,
         format(
-            "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
+            "expect(<actual>).toEmitExternalMessage<{}>()",
             reflect.typeNameOf<Msg>(),
-            reflect.typeNameOf<Msg>(),
-            reflect.serializationPrefixOf<Msg>().0,
         ),
+        self.value,
+        reflect.typeNameOf<Msg>(),
+        reflect.serializationPrefixOf<Msg>().0,
     );
+    throw ASSERTION_FAILED;
 }
 
 /// Expect the transaction to consume less than the expected amount of gas.
@@ -1191,16 +1513,16 @@ fun impl.findTransaction(txs: SendResultList, params: SearchParams): cell? {
         return null;
     }
 
-    return params.hasPredicates()
+    return params.__hasPredicates()
         ? ffi.findTransactionByPredicateParams(
             txs.first().lt,
             txs.last().lt,
-            params.toPredicateFFITuple(),
+            params.__toPredicateFFITuple(),
         )
         : ffi.findTransactionByScalarParams(
             txs.first().lt,
             txs.last().lt,
-            params.toScalarFFITuple(),
+            params.__toScalarFFITuple(),
         );
 }
 
@@ -1212,7 +1534,7 @@ fun impl.findTransactionOrFail(
 ): void {
     val tx = impl.findTransaction(txs, params);
     if (tx == null) {
-        ffi.failToFindTransactionByParams(location, message, txs, params.toPredicateFFITuple());
+        ffi.failToFindTransactionByParams(location, message, txs, params.__toPredicateFFITuple());
         throw ASSERTION_FAILED;
     }
 }
@@ -1225,7 +1547,12 @@ fun impl.findNoTransactionOrFail(
 ): void {
     val tx = impl.findTransaction(txs, params);
     if (tx != null) {
-        ffi.failToNotFindTransactionByParams(location, message, txs, params.toPredicateFFITuple());
+        ffi.failToNotFindTransactionByParams(
+            location,
+            message,
+            txs,
+            params.__toPredicateFFITuple(),
+        );
         throw ASSERTION_FAILED;
     }
 }
@@ -1233,12 +1560,14 @@ fun impl.findNoTransactionOrFail(
 fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList?
     asm "9 EXTCALL"
 
+fun ffi.sendExternalMessage(msg: cell): tuple
+    asm "56 EXTCALL"
+
 fun ffi.runGetMethod(
     addr: cell,
     code: cell,
     methodId: int,
     methodName: string,
-    returnType: string,
     args: tuple,
 ): tuple?
     asm "8 EXTCALL"
@@ -1277,6 +1606,22 @@ fun ffi.failToNotFindTransactionByParams(
 ): tuple?
     asm "104 EXTCALL"
 
+fun ffi.failToFindExternalMessage(
+    location: string,
+    message: string,
+    txs: SendResultList,
+    messageName: string,
+    opcode: int,
+): tuple?
+    asm "108 EXTCALL"
+
+fun ffi.failExternalSendNotAccepted(
+    location: string,
+    message: string,
+    error: tuple,
+): tuple?
+    asm "109 EXTCALL"
+
 fun ffi.loadLibrary(hash: string): cell?
     asm "21 EXTCALL"
 
@@ -1310,6 +1655,9 @@ fun ffi.getConfig(): dict
 
 fun ffi.saveTraceName(txs: SendResultList, name: string): void
     asm "35 EXTCALL"
+
+fun ffi.hideTraceFromUi(txs: SendResultList): void
+    asm "58 EXTCALL"
 
 fun ffi.crc16(data: string): int
     asm "13 EXTCALL"

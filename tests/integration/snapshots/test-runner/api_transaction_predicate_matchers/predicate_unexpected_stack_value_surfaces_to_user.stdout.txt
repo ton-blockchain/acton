@@ -11,7 +11,7 @@
   ✗ predicate unexpected stack value [TIME]
     └─ Error: expect(actual).toHaveTx(expected)
         N/A -> sender A
-        └── Ping 0.5 TON -> harness B                                                   gas=690
+        └── Ping 0.5 GRAM -> harness B                                                  gas=690
         
         Cannot find transaction from <any> to <any>
         with:

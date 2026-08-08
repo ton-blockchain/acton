@@ -13,19 +13,21 @@ import "@contracts/types"
 struct NftItem {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
 fun NftItem.fromStorage(
     storage: NftItemStorageNotInitialized,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): NftItem {
     val stateInit = ContractState {
         code: build("NftItem"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return NftItem { address, stateInit };
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+    return NftItem { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -41,7 +43,11 @@ fun NftItem.deploy(self, from: address, config: SendParams = {}): SendResultList
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }
@@ -54,21 +60,23 @@ fun NftItem.sendAskToChangeOwnership(
     sendExcessesTo: address?,
     customPayload: cell?,
     forwardTonAmount: coins,
-    forwardPayload: Payload,
+    forwardPayload: PayloadInline | PayloadInRef,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x5fcc3d14, 32)
+        .storeAny(queryId)
+        .storeAny(newOwnerAddress)
+        .storeAny(sendExcessesTo)
+        .storeAny(customPayload)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: AskToChangeOwnership {
-            queryId,
-            newOwnerAddress,
-            sendExcessesTo,
-            customPayload,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: AskToChangeOwnership.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }

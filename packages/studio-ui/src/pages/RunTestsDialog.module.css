@@ -1,0 +1,42 @@
+.dialogContent {
+  padding: 0;
+}
+
+.form {
+  display: grid;
+  gap: var(--acton-space-5);
+  padding: var(--acton-space-5);
+}
+
+.formGrid,
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.error {
+  padding: var(--acton-space-3);
+  color: var(--acton-color-danger-text);
+  background: color-mix(in srgb, var(--acton-color-danger) 7%, var(--acton-color-surface));
+  border: 1px solid color-mix(in srgb, var(--acton-color-danger) 38%, var(--acton-color-border));
+  border-radius: var(--acton-radius-control);
+  font-size: var(--acton-font-size-xs);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
+@media (max-width: 680px) {
+  .formGrid,
+  .options {
+    grid-template-columns: 1fr;
+  }
+
+  .form {
+    padding: var(--acton-space-4);
+  }
+}

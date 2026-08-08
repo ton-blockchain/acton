@@ -74,7 +74,7 @@ cargo xtask retag --version 0.22.0
 - verifies the worktree is clean
 - fetches `origin/master` and checks local `master` is up to date
 - verifies GitHub Actions builds succeeded for the current `HEAD`
-- updates versions in `Acton.toml`, `Cargo.toml`, and `package.json`
+- updates versions in `Acton.toml`, `Cargo.toml`, `package.json`, and `docs/.versions`
 - runs `cargo update --workspace`
 - creates commit `chore(acton): bump to version \`X.Y.Z\``
 - creates tag `vX.Y.Z`
@@ -85,8 +85,7 @@ cargo xtask retag --version 0.22.0
 ## After the push
 
 After the tag is pushed, the GitHub `Release` workflow builds release
-artifacts, creates the GitHub release, and only then publishes the Docker image
-and mirrored release to `i582/acton-public`.
+artifacts, creates the GitHub release, and only then publishes the Docker image.
 
 The retag workflow creates an empty commit on top of `master`, deletes the
 existing tag in `origin`, recreates the tag on that retry commit, and pushes

@@ -1,0 +1,40 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/bench_measure.test.tolk (1 test)
+  ✓ bench measure returns result gas and instruction map [TIME]
+    └─ Test output:
+       BENCH_RESULT=12
+       BENCH_GAS_POSITIVE=true
+       BENCH_INSTRUCTIONS_POSITIVE=true
+       BENCH_NAMES_NON_EMPTY=true
+       BENCH_COUNTS_POSITIVE=true
+       BENCH_GAS_STATS_POSITIVE=true
+       BENCH_CALL_OVERHEAD_REMOVED=true
+       BENCH_BOUNDS_VALID=true
+       BENCH_GAS_MATCHES_INSTRUCTION_TOTAL=true
+       BENCH_ASM_CODE_NON_EMPTY=true
+       BENCH_ASM_CODE_NOT_RAW_CALLDICT=true
+       BENCH_ASM_CODE_START
+       PUSHINT_4 0
+       DUP
+       PUSHCONT_SHORT {
+           DUP
+           LESSINT 4
+       }
+       PUSHCONT_SHORT {
+           DUP
+           LSHIFT 1
+           XCHG_1I s1 s2
+           ADD
+           SWAP
+           INC
+       }
+       WHILE
+       DROP
+       BENCH_ASM_CODE_END
+
+ ✓ 1 passed in 1 file

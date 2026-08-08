@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ with error [TIME]
+    └─ exit_code=42
+      ├─ at tests/test.test[LINE]
+      │     test with error   at tests/test.test[LINE]
+      └─ custom THROW
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

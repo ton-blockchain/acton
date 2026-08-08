@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/assert_not_equal_rendered_unequal.test.tolk (4 tests)
+  ✓ ej stdlib assert not equal pass nullable struct value differs [TIME]
+  ✓ ej stdlib assert not equal pass nullable struct differs from null [TIME]
+  ✓ ej stdlib assert not equal pass same union variant payload differs [TIME]
+  ✓ ej stdlib assert not equal pass different union variants [TIME]
+
+ ✓ 4 passed in 1 file

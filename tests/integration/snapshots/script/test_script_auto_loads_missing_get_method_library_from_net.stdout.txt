@@ -1,0 +1,2 @@
+  Installing standard library [ACTON_VERSION]
+AUTO_LOADED_COUNTER=123

@@ -39,6 +39,14 @@ pub enum ExecutorLine<'a> {
     ProcessSendMessage {
         message_hash: &'a str,
     },
+    ProcessSetCode {
+        new_code_hash: &'a str,
+    },
+    ProcessChangeLibrary {
+        mode: &'a str,
+        lib_hash: &'a str,
+        lib_ref: &'a str,
+    },
     ProcessRawReserve {
         mode: &'a str,
     },
@@ -167,6 +175,28 @@ fn executor_process_send_message<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>>
     Ok(ExecutorLine::ProcessSendMessage { message_hash })
 }
 
+// process set code 96444DE3098C2942729F6B0AD6D215138CF00724C38F3E560ED0C79D2ABF8EE7
+fn executor_process_set_code<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
+    let _ = "process set code ".parse_next(i)?;
+    let new_code_hash = take_while(1.., |c: char| c.is_ascii_hexdigit()).parse_next(i)?;
+    Ok(ExecutorLine::ProcessSetCode { new_code_hash })
+}
+
+// process change library with mode 2, lib_hash=96444DE3098C2942729F6B0AD6D215138CF00724C38F3E560ED0C79D2ABF8EE7, lib_ref=cell
+fn executor_process_change_library<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
+    let _ = "process change library with mode ".parse_next(i)?;
+    let mode = number.parse_next(i)?;
+    let _ = ", lib_hash=".parse_next(i)?;
+    let lib_hash = take_while(1.., |c: char| c.is_ascii_hexdigit()).parse_next(i)?;
+    let _ = ", lib_ref=".parse_next(i)?;
+    let lib_ref = alt(("cell", "hash")).parse_next(i)?;
+    Ok(ExecutorLine::ProcessChangeLibrary {
+        mode,
+        lib_hash,
+        lib_ref,
+    })
+}
+
 // process raw reserve with mode 16
 fn executor_process_raw_reserve<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
     let _ = "process raw reserve with mode ".parse_next(i)?;
@@ -267,6 +297,8 @@ fn executor_unknown<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
         "out_of_gas=",
         "gas fees: ",
         "process send message ",
+        "process set code ",
+        "process change library with mode ",
         "process raw reserve with mode ",
         "remaining balance ",
         "action_reserve_currency: mode=",
@@ -286,6 +318,8 @@ pub fn executor_line<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
         executor_out_of_gas,
         executor_gas_fees,
         executor_process_send_message,
+        executor_process_set_code,
+        executor_process_change_library,
         executor_process_raw_reserve,
         executor_remaining_balance,
         executor_action_reserve_currency,
@@ -332,6 +366,8 @@ mod tests {
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	out_of_gas=false, accepted=true, success=true, time=0.000000s, cpu_time=0.000000
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	gas fees: 568400 = 26214400 * 1421 /2^16 ; price=26214400; flat rate=[40000 for 100]; remaining balance=998442400ng
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	process send message 96444DE3098C2942729F6B0AD6D215138CF00724C38F3E560ED0C79D2ABF8EE7
+[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	process set code 2FC67A3BD6D8B11D1B7A51F87CF8A8B26D423EFA76D0484E0F36BB8537A005CE
+[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	process change library with mode 18, lib_hash=35657E63B984F620E511037E4DB920F9C805A6F72C67C0771EED1E2C388635C5, lib_ref=cell
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	process raw reserve with mode 16
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	remaining balance 96968400ng
 [ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]	action_reserve_currency: mode=0, reserve=10000ng, balance=96334000ng, original balance=999753200ng
@@ -356,10 +392,10 @@ mod tests {
             }
         }
 
-        assert_eq!(results.len(), 12, "Expected 12 log lines");
+        assert_eq!(results.len(), 14, "Expected 14 log lines");
 
         let success_count = results.iter().filter(|r| r.is_ok()).count();
-        assert_eq!(success_count, 12, "All lines should parse successfully");
+        assert_eq!(success_count, 14, "All lines should parse successfully");
     }
 
     #[test]
@@ -460,6 +496,45 @@ mod tests {
             assert_eq!(mode, "16");
         } else {
             panic!("Expected ProcessRawReserve variant");
+        }
+    }
+
+    #[test]
+    fn test_parse_process_set_code_line() {
+        let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tprocess set code 2FC67A3BD6D8B11D1B7A51F87CF8A8B26D423EFA76D0484E0F36BB8537A005CE";
+        let result = parse_executor_line(line);
+        assert!(result.is_ok());
+
+        if let Ok(ExecutorLine::ProcessSetCode { new_code_hash }) = result {
+            assert_eq!(
+                new_code_hash,
+                "2FC67A3BD6D8B11D1B7A51F87CF8A8B26D423EFA76D0484E0F36BB8537A005CE"
+            );
+        } else {
+            panic!("Expected ProcessSetCode variant");
+        }
+    }
+
+    #[test]
+    fn test_parse_process_change_library_line() {
+        let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tprocess change library with mode 18, lib_hash=35657E63B984F620E511037E4DB920F9C805A6F72C67C0771EED1E2C388635C5, lib_ref=cell";
+        let result = parse_executor_line(line);
+        assert!(result.is_ok());
+
+        if let Ok(ExecutorLine::ProcessChangeLibrary {
+            mode,
+            lib_hash,
+            lib_ref,
+        }) = result
+        {
+            assert_eq!(mode, "18");
+            assert_eq!(
+                lib_hash,
+                "35657E63B984F620E511037E4DB920F9C805A6F72C67C0771EED1E2C388635C5"
+            );
+            assert_eq!(lib_ref, "cell");
+        } else {
+            panic!("Expected ProcessChangeLibrary variant");
         }
     }
 

@@ -1,0 +1,12 @@
+Start Acton Studio
+
+Usage: acton[EXE] studio start [OPTIONS]
+
+Options:
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --host <IP>             Address for the Studio server to listen on [default: 127.0.0.1]
+      --manifest-path <PATH>  Path to Acton.toml
+      --port <PORT>           Studio server port [default: 3015]
+      --no-open               Do not open Studio in the default browser
+      --project-root <PATH>   Path to project root
+  -h, --help                  Print help

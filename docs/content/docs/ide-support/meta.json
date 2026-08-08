@@ -1,9 +1,9 @@
 {
   "title": "IDE support",
-  "icon": "ToolCase",
+  "icon": "FileCode",
   "pages": [
-    "overview",
+    "vscode",
     "jetbrains",
-    "vscode"
+    "language-server-protocol"
   ]
 }

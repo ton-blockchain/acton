@@ -1,0 +1,79 @@
+{
+  "@extra": "[EXTRA]",
+  "ok": true,
+  "result": {
+    "@type": "raw.transactions",
+    "previous_transaction_id": {
+      "@type": "internal.transactionId",
+      "hash": "[HASH]",
+      "lt": "[LT]"
+    },
+    "transactions": [
+      {
+        "@type": "raw.transaction",
+        "address": {
+          "@type": "accountAddress",
+          "account_address": "[WALLET_ADDRESS_BASE]"
+        },
+        "data": "[DATA]",
+        "fee": "147956",
+        "in_msg": {
+          "@type": "raw.message",
+          "body_hash": "[HASH]",
+          "created_lt": "[LT]",
+          "destination": {
+            "@type": "accountAddress",
+            "account_address": "[WALLET_ADDRESS_BASE]"
+          },
+          "extra_currencies": [],
+          "fwd_fee": "92269",
+          "hash": "[HASH]",
+          "ihr_fee": "0",
+          "msg_data": {
+            "@type": "msg.dataRaw",
+            "body": "[BOC]",
+            "init_state": "[BOC]"
+          },
+          "source": {
+            "@type": "accountAddress",
+            "account_address": "[WALLET_ADDRESS_BASE]"
+          },
+          "value": "1000000000"
+        },
+        "other_fee": "147956",
+        "out_msgs": [
+          {
+            "@type": "raw.message",
+            "body_hash": "[HASH]",
+            "created_lt": "[LT]",
+            "destination": {
+              "@type": "accountAddress",
+              "account_address": "[WALLET_ADDRESS_BASE]"
+            },
+            "extra_currencies": [],
+            "fwd_fee": "63113",
+            "hash": "[HASH]",
+            "ihr_fee": "0",
+            "msg_data": {
+              "@type": "msg.dataRaw",
+              "body": "[BOC]",
+              "init_state": "[BOC]"
+            },
+            "source": {
+              "@type": "accountAddress",
+              "account_address": "[WALLET_ADDRESS_BASE]"
+            },
+            "value": "199905332"
+          }
+        ],
+        "storage_fee": "0",
+        "transaction_id": {
+          "@type": "internal.transactionId",
+          "hash": "[HASH]",
+          "lt": "[LT]"
+        },
+        "utime": "[TIME]"
+      }
+    ]
+  }
+}

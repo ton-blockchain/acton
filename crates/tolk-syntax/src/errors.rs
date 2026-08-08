@@ -40,7 +40,10 @@ fn walk_tree(node: Node<'_>, mut f: impl FnMut(Node<'_>)) {
         f(n);
         let child_count = n.child_count();
         for i in (0..child_count).rev() {
-            if let Some(ch) = n.child(i) {
+            let Ok(child_index) = u32::try_from(i) else {
+                continue;
+            };
+            if let Some(ch) = n.child(child_index) {
                 stack.push(ch);
             }
         }
@@ -380,7 +383,7 @@ fn coalesce_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
         map.entry(key)
             .and_modify(|acc| {
                 if d.message.len() > acc.message.len() {
-                    acc.message = d.message.clone();
+                    acc.message.clone_from(&d.message);
                 }
                 let mut exp = acc.expected.clone();
                 exp.extend(d.expected.clone());

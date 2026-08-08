@@ -3,224 +3,516 @@ title: "Cookbook"
 description: "Practical examples and code snippets for common testing scenarios in Tolk smart contracts"
 ---
 
-## Basic assertions
+This page is a collection of practical testing patterns. For the full API
+surface, use the [built-in matchers and helpers](/docs/testing/built-in-matchers-and-helpers)
+reference.
+
+For complete real-world suites, use
+[acton-contracts](https://github.com/ton-blockchain/acton-contracts) as a reference:
+it contains larger Jetton, NFT, wallet, multisig, DNS, elector, and config
+contract tests built with these patterns.
+
+## Start from a shared setup
+
+Keep deployment and common actors in one helper. Larger projects usually put
+this in `tests/test-utils.tolk` and import it from scenario files.
 
 ```tolk
-get fun `test some`() {
-    expect(1 + 2).toEqual(3);
-}
-```
+fun setupCounter(): (Counter, Treasury, Treasury) {
+    val deployer = testing.treasury("deployer");
+    val outsider = testing.treasury("outsider");
 
-## Sending internal message from one contract to another
-
-```tolk
-get fun `test mint`() {
-    // ...
-    val msg = createMessage({ // same createMessage as in contracts
-        bounce: false,
-        value: ton("0.05"),
-        dest: address,
-        body: ChangeMinterAdmin {
-            queryId: 0,
-            newAdminAddress: newOwner,
-        },
+    val counter = Counter.fromStorage({
+        id: 0,
+        owner: deployer.address,
+        counter: 0,
     });
-    val result = net.send(from, msg);
-    println(result); // show transaction tree
+
+    val deploy = counter.deploy(deployer.address, { value: grams("1") });
+    expect(deploy).toHaveSuccessfulDeploy({ to: counter.address });
+
+    return (counter, deployer, outsider);
 }
 ```
 
-See [Reading Transaction Chains](/docs/testing/reading-transaction-chains)
-for the exact text format and a guide to interpreting it.
+Use the generated stub when starting a new test file:
 
-## Calling get method
+```bash
+acton wrapper Counter --test
+```
+
+## Assert the initial state
+
+After deployment, assert the storage and get methods that define the contract's
+invariants. This catches bad initial state before message-flow tests get noisy.
 
 ```tolk
-fun JettonMinter.getJettonData(self): JettonDataReply {
-    return net.runGetMethod(self.address, "get_jetton_data");
+get fun `test deploy exposes initial owner`() {
+    val (counter, deployer, _) = setupCounter();
+
+    expect(counter.owner()).toEqual(deployer.address);
+    expect(counter.currentCounter()).toEqual(0);
 }
 ```
 
-## Calling get method with an argument
+## Test an internal happy path
+
+Prefer generated wrapper methods for normal messages. Name important traces so
+gas reports, saved traces, and the Test UI stay readable.
 
 ```tolk
-fun JettonMinter.getWalletAddress(self, owner: address): address {
-    return net.runGetMethod(self.address, "get_wallet_address", [owner]);
-}
-```
+get fun `test owner can increase counter`() {
+    val (counter, deployer, _) = setupCounter();
 
-## Creating a treasury
+    val res = counter.sendIncreaseCounter(deployer.address, 123);
+    res.giveName("increase-counter");
 
-```tolk
-import "@acton/emulation/testing"
-
-get fun `test some`() {
-    val treasury = testing.treasury("treasury");
-    // ..
-    net.send(treasury.address, msg);
-}
-```
-
-## Asserting successful deploy
-
-```tolk
-get fun `test mint`() {
-    // ...
-    expect(transactions).toHaveSuccessfulDeploy({ to: minter.address });
-}
-```
-
-## Asserting successful transaction in the result
-
-```tolk
-get fun `test mint`() {
-    // ...
-    expect(mintResult).toHaveSuccessfulTx({
-        from: minter.address,
-        to: wallet.address,
-    });
-}
-```
-
-## Asserting successful transaction with specific message in the result
-
-```tolk
-get fun `test mint`() {
-    // ...
-    expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
-        from: minter.address,
-        to: wallet.address,
-    });
-}
-```
-
-<Callout type="info">
-You can also specify the message type in some of the methods described below.
-</Callout>
-
-## Asserting transaction in the result
-
-```tolk
-get fun `test mint`() {
-    // ...
-    expect(transactions).toHaveTx({
+    expect(res).toHaveSuccessfulTx<IncreaseCounter>({
         from: deployer.address,
         to: counter.address,
     });
+    expect(res).toHaveAllSuccessfulTxs();
+    expect(counter.currentCounter()).toEqual(123);
 }
 ```
 
-## Asserting bounced transaction in the result
+## Search for a transaction and inspect its body
+
+Use `findTransaction<T>()` when the test needs values from the transaction
+instead of only asserting that it exists.
 
 ```tolk
-get fun `test mint`() {
-    // ...
-    expect(sendResult).toHaveBouncedTx({
-        from: deployerJettonWallet.address,
-        to: deployer.address,
+val response = res.findTransaction<ResponseWalletAddress>({
+    from: minter.address,
+    to: owner.address,
+});
+
+expect(response).toBeNotNull();
+
+val body = response!.loadBody<ResponseWalletAddress>();
+expect(body.jettonWalletAddress).toEqual(wallet.address);
+```
+
+Use `toHaveTx<T>()` when the message type matters but you do not need the body:
+
+```tolk
+expect(res).toHaveTx<TransferNotificationForRecipient>({
+    from: recipientWallet.address,
+    to: recipient.address,
+    value: forwardAmount,
+});
+```
+
+## Test a rejected internal message
+
+For negative paths, assert both the failure and the unchanged state. If the
+contract must not emit a follow-up message, assert that too.
+
+```tolk
+get fun `test non-owner cannot change counter`() {
+    val (counter, _, outsider) = setupCounter();
+    val before = counter.currentCounter();
+
+    val res = counter.sendIncreaseCounter(outsider.address, 10);
+
+    expect(res).toHaveFailedTx<IncreaseCounter>({
+        from: outsider.address,
+        to: counter.address,
+        exitCode: Errors.NotOwner,
+    });
+    expect(res).toNotHaveTx({
+        from: counter.address,
+        to: outsider.address,
+    });
+    expect(counter.currentCounter()).toEqual(before);
+}
+```
+
+## Send a malformed or unknown body
+
+Wrappers also generate `sendAny(...)`, which is useful for payload validation
+and unknown-opcode tests.
+
+```tolk
+get fun `test unknown message is rejected`() {
+    val (counter, deployer, _) = setupCounter();
+    val body = beginCell().storeUint(0x999, 32).endCell();
+
+    val res = counter.sendAny(deployer.address, body);
+
+    expect(res).toHaveFailedTx({
+        from: deployer.address,
+        to: counter.address,
+        exitCode: Errors.InvalidMessage,
     });
 }
 ```
 
-## Asserting fail transaction in the result
+Use `net.send(...)` directly when the wrapper would hide the malformed shape:
 
 ```tolk
-get fun `test mint`() {
-    // ...
-    expect(mintResult).toHaveFailedTx({
-        from: notDeployer.address,
-        to: minter.address,
-        exitCode: ERR_NOT_FROM_ADMIN,
+val msg = createMessage({
+    bounce: true,
+    value: grams("0.1"),
+    dest: wallet.address,
+    body: malformedBody,
+});
+
+val res = net.send(owner.address, msg);
+expect(res).toHaveTx<AskToTransfer>({
+    from: owner.address,
+    to: wallet.address,
+    success: false,
+    aborted: true,
+});
+```
+
+## Test bounced messages
+
+When the contract has special bounce logic, build the bounced message explicitly
+and assert it with `toHaveBouncedTx()`.
+
+```tolk
+val bounced = createMessage({
+    bounce: false,
+    value: grams("0.1"),
+    dest: counter.address,
+    body: IncreaseCounter { increaseBy: 10 },
+}).bounced();
+
+val res = net.send(deployer.address, bounced);
+expect(res).toHaveBouncedTx({ to: counter.address });
+```
+
+## Assert external-out messages
+
+Use `toEmitExternalMessage<T>()` for a simple existence check, and
+`findExternalOutMessage<T>()` when you need to inspect the body.
+
+```tolk
+expect(res).toEmitExternalMessage<TransferEvent>();
+
+val event = res.findExternalOutMessage<TransferEvent>({
+    from: counter.address,
+});
+
+expect(event).toBeNotNull();
+expect(event!.loadBody()).toEqual(TransferEvent { value: 123 });
+```
+
+## Test accepted external-in messages
+
+`net.sendExternal(...)` and generated `sendExternal*` wrapper methods return
+`ExternalSendResult`. Assert acceptance before unwrapping the trace.
+
+```tolk
+get fun `test signed external transfer`() {
+    val (wallet, keyPair) = setupWallet();
+    val body = createExternalSignedBody(keyPair, 0);
+
+    val result = wallet.sendExternalSigned(body);
+
+    expect(result).toBeAccepted();
+    result.giveName("wallet-external-transfer");
+
+    val txs = result.unwrap();
+    expect(txs).toHaveSuccessfulTx<InternalTransfer>({
+        from: wallet.address,
+        to: wallet.address,
     });
 }
 ```
 
-## Asserting transaction absence in the result
+The same helpers work on the accepted trace:
 
 ```tolk
-get fun `test mint`() {
-    // ...
-    expect(sendResult).toNotHaveTx({
-        from: notDeployerJettonWallet.address,
-        to: notDeployer.address
-    });
+val first = result.at(0);
+expect(first.getUsedGas()).toBeGreater(0);
+
+val trace = result.waitForTrace(true, 1, 1);
+expect(trace).toBeNotNull();
+```
+
+## Test rejected external-in messages
+
+For an external-in rejection, assert the external status directly. Do not
+unwrap it just to check for `null`.
+
+```tolk
+get fun `test bad signature is rejected`() {
+    val (wallet, badKeyPair) = setupWalletWithWrongKey();
+    val body = createExternalSignedBody(badKeyPair, 0);
+
+    val result = wallet.sendExternalSigned(body);
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(Errors.BadSignature);
+    expect(result.isAccepted()).toBeFalse();
+    expect(result.waitForFirstTransaction(true, 1, 1)).toBeNull();
 }
 ```
 
-## Asserting external message transaction in the result
+Rejected external-in matcher failures include source location and emulator
+diagnostics. Run with `--backtrace full` to also see the contract-side
+`onExternalMessage` backtrace when source maps are available.
+
+## Check balances and fees
+
+Balance tests are usually strongest when they include the transaction fee that
+was charged to the receiving account.
 
 ```tolk
-get fun `test something`() {
-    // ...
-    expect(result).toEmitExternalMessage<SellEvent>();
-}
+val before = testing.getAccountBalance(receiver.address);
+
+val res = wallet.sendTransfer(owner.address, receiver.address, value);
+expect(res).toHaveTx({ from: wallet.address, to: receiver.address });
+
+val fee = res.at(1).tx.load().totalFees.grams;
+val after = testing.getAccountBalance(receiver.address);
+
+expect(after).toEqual(before + value - fee);
 ```
 
-## Asserting gas consumption
+## Add a local gas assertion
+
+Use `toConsumeLessThan(...)` for a tight local guard on one transaction.
 
 ```tolk
-get fun `test something`() {
-    // ...
-    expect(sendResult.at(0)).toConsumeLessThan(1500);
-}
+val res = counter.sendIncreaseCounter(deployer.address, 100);
+
+expect(res).toHaveSuccessfulTx<IncreaseCounter>({
+    from: deployer.address,
+    to: counter.address,
+});
+expect(res.at(0)).toConsumeLessThan(1500);
 ```
 
-## Getting out actions of the result
+For project-level gas drift, create and compare gas snapshots:
 
-```tolk
-get fun `test something`() {
-    // ...
-    val outActions = sendResult.at(0).allOutActions();
-    val first = outActions.at(0);
-    println(first.kind());
-}
+```bash
+acton test --snapshot gas-baseline.json
+acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 ```
 
-## Creating a random address
+See [gas profiling and snapshots](/docs/testing/gas-profiling-with-snapshots)
+for baseline reports and CI setup.
+
+## Inspect out actions
+
+Use out-action helpers when the interesting behavior is in C5 actions rather
+than the delivered child transactions.
 
 ```tolk
-import "@acton/emulation/network"
+val tx = res.at(0);
+val actions = tx.allOutActions();
 
-get fun `test something`() {
-    val addr = randomAddress("name-to-display");
-}
+expect(actions).toBeSendMessageAt<TransferNotification>(0);
+
+val body = actions.getSendMessageBodyAt<TransferNotification>(0);
+expect(body).toBeNotNull();
 ```
 
-## Check if contract is deployed
+Remember that action indexing is reversed: index `0` is the last produced
+action. See [out-action helpers](/docs/testing/built-in-matchers-and-helpers#out-action-helpers)
+for details.
+
+## Control time
+
+Use `testing.setNow(...)` for expiration windows, replay protection, and
+time-dependent get methods.
 
 ```tolk
-import "@acton/emulation/testing"
+testing.setNow(1700000000);
 
+val expiresAt = testing.getNow() + 3600;
+val res = contract.sendNewOrder(owner.address, order, expiresAt);
+
+expect(res).toHaveSuccessfulTx<NewOrderRequest>({
+    from: owner.address,
+    to: contract.address,
+});
+```
+
+## Control config
+
+Use config overrides for tests that depend on fees, prices, or global chain
+parameters.
+
+```tolk
+import "@acton/emulation/config"
+
+var config = testing.getConfig();
+var prices = config.getMsgForwardPrices(BASECHAIN);
+
+prices.bitPrice *= 10;
+prices.cellPrice *= 10;
+config.setMsgForwardPrices(prices, BASECHAIN);
+
+expect(testing.setConfig(config)).toEqual(true);
+```
+
+## Work with deterministic addresses
+
+Use treasuries for accounts that send messages, and named random addresses for
+passive accounts. Names show up in transaction trees and matcher failures.
+
+```tolk
+val owner = testing.treasury("owner");
+val receiver = testing.treasury("receiver");
+val passiveAddress = randomAddress("not-deployed-recipient");
+
+testing.topUp(passiveAddress, grams("0.5"));
+```
+
+## Read account state
+
+Use `testing.isDeployed(...)` before get methods that should tolerate lazy
+deployment, and `testing.getAccountState(...)` when you need balance or storage
+metadata.
+
+```tolk
 fun JettonWallet.getJettonBalance(self): coins {
     if (!testing.isDeployed(self.address)) {
         return 0;
     }
 
-    val result = net.runGetMethod<JettonWalletDataReply>(self.address, "get_wallet_data");
-    return result.jettonBalance;
+    val data = net.runGetMethod<JettonWalletDataReply>(
+        self.address,
+        "get_wallet_data",
+    );
+    return data.jettonBalance;
 }
 ```
-
-## Inspect deployed account state
 
 ```tolk
-import "@acton/emulation/testing"
+val state = testing.getAccountState(contract.address);
+expect(state).toBeNotNull();
 
-get fun `test something`() {
-    val state = testing.getAccountState(addr);
-    if (state != null) {
-        println("Balance: {:ton}", state.storage.balance.grams);
-    }
-}
+val balance = state!.storage.balance.grams;
+expect(balance).toBeGreater(0);
 ```
 
-## Register a library
+## Save and restore world state
+
+World-state snapshots are useful when setup is expensive and several tests need
+the same deployed base state.
 
 ```tolk
-import "@acton/emulation/testing"
+val saved = testing.saveSnapshot("build/test-state/after-deploy.json");
+expect(saved).toBeTrue();
 
-get fun `test something`() {
-    testing.registerLibrary(lib_cell);
-    // ...
+// Later in another test:
+val loaded = testing.loadSnapshot("build/test-state/after-deploy.json");
+expect(loaded).toBeTrue();
+```
+
+See [world state snapshots](/docs/testing/world-state-snapshots) for file
+layout and caveats.
+
+## Split a long chain into steps
+
+Use a cursor when a large transaction cascade should be inspected in phases.
+
+```tolk
+val cursor = testing.createTraceIterationCursor(sender.address, msg);
+
+val firstHop = cursor.executeN(1);
+expect(firstHop).toHaveSuccessfulTx({ to: root.address });
+
+val rest = cursor.executeAllRemaining();
+expect(rest).toHaveAllSuccessfulTxs();
+```
+
+See [step-by-step execution](/docs/testing/step-by-step-execution) for
+`executeTill(...)`, batching, and trace export behavior.
+
+## Write staged end-to-end tests
+
+For large flows, split the scenario into named stage helpers. This keeps each
+assertion close to the state transition it validates and lets you reuse early
+stages as smaller benchmark tests.
+
+```tolk
+fun deployStage(): FlowContext {
+    val ctx = deployFixture();
+    expect(ctx.minter.getTotalSupply()).toEqual(0);
+    return ctx;
+}
+
+fun mintStage(ctx: FlowContext) {
+    val res = ctx.minter.sendMint(ctx.admin.address, ctx.user.address, amount);
+    expect(res).toHaveSuccessfulDeploy({ to: ctx.userWallet.address });
+    expect(ctx.userWallet.getJettonBalance()).toEqual(amount);
+}
+
+get fun `test full flow`() {
+    val ctx = deployStage();
+    mintStage(ctx);
+    transferStage(ctx);
+    burnStage(ctx);
 }
 ```
+
+## Use attributes for test intent
+
+Use dotted `@test.*` attributes for expected failures, gas limits, skipped work,
+and fuzzing.
+
+```tolk
+@test.fail_with(Errors.NotOwner)
+get fun `test direct helper throws not owner`() {
+    throw Errors.NotOwner;
+}
+
+@test.gas_limit(5000)
+get fun `test transfer stays within gas budget`() {
+    runTransferScenario();
+}
+```
+
+```tolk
+import "@acton/testing/fuzz"
+
+@test.fuzz({ runs: 64, seed: 42 })
+get fun `test amount is bounded`(rawAmount: int) {
+    val amount = fuzz.bound(rawAmount, 1, 1000);
+    expect(amount).toBeGreater(0);
+}
+```
+
+See [test attributes](/docs/testing/test-attributes) and
+[fuzz testing](/docs/testing/fuzz-testing) for the complete syntax.
+
+## Register libraries in setup
+
+If a transaction tree reports a missing library, register the code before the
+message that needs it.
+
+```tolk
+fun setupWithLibrary(): ContractWithLib {
+    testing.registerLibrary(libraryCode);
+    return deployContractThatDependsOnLibrary();
+}
+```
+
+## Debug failing tests
+
+Start with the failing test only, then add body decoding and full backtraces:
+
+```bash
+acton test --filter "non-owner cannot change counter"
+acton test --filter "non-owner cannot change counter" --show-bodies
+acton test --filter "non-owner cannot change counter" --backtrace full
+```
+
+Print a trace when developing a test:
+
+```tolk
+val res = counter.sendIncreaseCounter(deployer.address, 123);
+println(res);
+```
+
+The printed tree is the same format used by matcher failures. See
+[reading transaction chains](/docs/testing/reading-transaction-chains) for the
+format and [Test UI](/docs/testing/test-ui/overview) for interactive trace
+inspection.

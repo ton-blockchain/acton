@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/fs_new_api.test.tolk (1 test)
+  ✓ fs rejects symlink escapes [TIME]
+
+ ✓ 1 passed in 1 file

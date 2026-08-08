@@ -37,6 +37,7 @@ pub(crate) struct ProjectBuilder {
 struct ContractDef {
     name: String,
     code: ContractSource,
+    types: Option<String>,
     depends: Vec<DependencyDef>,
     output: Option<String>,
     dir: Option<String>,
@@ -70,6 +71,9 @@ pub(crate) struct TestConfig {
     pub coverage_minimum_percent: Option<f64>,
     pub coverage_include_wrappers: Option<bool>,
     pub coverage_include_tests: Option<bool>,
+    pub gas_profile: Option<String>,
+    pub gas_profile_format: Option<String>,
+    pub gas_profile_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
     pub fuzz_runs: Option<usize>,
@@ -77,6 +81,7 @@ pub(crate) struct TestConfig {
     pub fuzz_seed: Option<u64>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
+    pub studio_reporting: Option<bool>,
 }
 
 #[allow(dead_code)]
@@ -84,7 +89,7 @@ pub(crate) struct TestConfig {
 fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+        .is_some_and(|ext| matches!(ext, "json" | "sarif" | "cpuprofile"))
 }
 
 #[allow(dead_code)]
@@ -159,7 +164,7 @@ impl ProcessCommandBuilder {
 #[cfg(unix)]
 #[allow(dead_code)]
 pub(crate) struct PtySession {
-    inner: expectrl::Session,
+    inner: expectrl::session::OsSession,
     project_path: PathBuf,
 }
 
@@ -214,7 +219,7 @@ impl NeedleLabel for &[u8] {
 #[cfg(unix)]
 #[allow(dead_code)]
 impl PtySession {
-    fn new(inner: expectrl::Session, project_path: PathBuf) -> Self {
+    fn new(inner: expectrl::session::OsSession, project_path: PathBuf) -> Self {
         Self {
             inner,
             project_path,
@@ -236,7 +241,7 @@ impl PtySession {
         N: expectrl::Needle + NeedleLabel,
     {
         let message = format!("Expected PTY output to match {}", needle.needle_label());
-        self.inner.expect(needle).expect(&message);
+        expectrl::Expect::expect(&mut self.inner, needle).expect(&message);
         self
     }
 
@@ -246,7 +251,7 @@ impl PtySession {
         N: expectrl::Needle + NeedleLabel,
     {
         let label = needle.needle_label();
-        match self.inner.expect(needle) {
+        match expectrl::Expect::expect(&mut self.inner, needle) {
             Err(expectrl::Error::ExpectTimeout | expectrl::Error::Eof) => self,
             Ok(_) => panic!("Expected PTY output to not match {label}"),
             Err(err) => panic!("Expected PTY output to not match {label}, got error: {err}"),
@@ -260,13 +265,20 @@ impl PtySession {
     where
         N: expectrl::Needle,
     {
-        self.inner.expect(needle).expect(message);
+        expectrl::Expect::expect(&mut self.inner, needle).expect(message);
         self
+    }
+
+    pub(crate) fn send<B>(&mut self, buf: B) -> Result<(), expectrl::Error>
+    where
+        B: AsRef<[u8]>,
+    {
+        expectrl::Expect::send(&mut self.inner, buf)
     }
 
     /// Send a line and panic with a custom message on failure.
     pub(crate) fn send_line(&mut self, line: impl AsRef<str>, message: &str) -> &mut Self {
-        self.inner.send_line(line).expect(message);
+        expectrl::Expect::send_line(&mut self.inner, line.as_ref()).expect(message);
         self
     }
 
@@ -317,7 +329,7 @@ impl PtySession {
 
 #[cfg(unix)]
 impl std::ops::Deref for PtySession {
-    type Target = expectrl::Session;
+    type Target = expectrl::session::OsSession;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -426,6 +438,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -447,6 +460,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: Some(directory.to_string()),
@@ -464,6 +478,30 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Boc(boc_data),
+            types: None,
+            depends: Vec::new(),
+            output: None,
+            dir: None,
+        });
+        self
+    }
+
+    /// Add a contract from a `BoC` file with a Tolk interface file for ABI and wrappers.
+    ///
+    /// # Examples
+    /// ```
+    /// .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+    /// ```
+    pub(crate) fn contract_from_boc_with_types(
+        mut self,
+        name: &str,
+        boc_data: Vec<u8>,
+        types: &str,
+    ) -> Self {
+        self.contracts.push(ContractDef {
+            name: name.to_string(),
+            code: ContractSource::Boc(boc_data),
+            types: Some(types.to_string()),
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -482,6 +520,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: depends
                 .iter()
                 .map(|s| DependencyDef {
@@ -516,6 +555,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: depends
                 .iter()
                 .map(|(dep_name, kind, function, path)| DependencyDef {
@@ -541,6 +581,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: Some(output.to_string()),
             dir: None,
@@ -557,7 +598,7 @@ impl ProjectBuilder {
     ///
     /// # Examples
     /// ```
-    /// .test_file_from_path("test", "tests/ffi/get_config.tolk")
+    /// .test_file_from_path("test", "tests/integration/ffi/get_config.tolk")
     /// ```
     pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
@@ -578,6 +619,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -732,17 +774,21 @@ impl ProjectBuilder {
                 &self.lint_excludes,
                 self.lint_max_warnings,
                 self.lint_output_format,
-                &self.test_config,
+                self.test_config.as_ref(),
                 self.wrappers_tolk_output_dir.as_deref(),
                 self.wrappers_tolk_generate_test,
                 self.wrappers_tolk_test_output_dir.as_deref(),
                 self.wrappers_typescript_output_dir.as_deref(),
-                &self.license,
+                self.license.as_deref(),
             );
         }
 
+        let isolated_home = self.temp_dir.path().join(".acton-test-home");
+        fs::create_dir_all(&isolated_home).expect("Failed to create isolated home dir");
+
         Project {
             path: project_path,
+            isolated_home,
             _temp_dir: self.temp_dir,
         }
     }
@@ -773,12 +819,12 @@ impl ProjectBuilder {
         lint_excludes: &[String],
         lint_max_warnings: Option<usize>,
         lint_output_format: Option<String>,
-        test_config: &Option<TestConfig>,
+        test_config: Option<&TestConfig>,
         wrappers_tolk_output_dir: Option<&str>,
         wrappers_tolk_generate_test: Option<bool>,
         wrappers_tolk_test_output_dir: Option<&str>,
         wrappers_typescript_output_dir: Option<&str>,
-        license: &Option<String>,
+        license: Option<&str>,
     ) {
         use std::fmt::Write as _;
 
@@ -818,6 +864,10 @@ version = "0.1.0"
             )
             .ok();
 
+            if let Some(types) = &contract.types {
+                let _ = writeln!(toml_content, "types = \"{types}\"");
+            }
+
             // Generate dependencies
             if contract.depends.is_empty() {
                 toml_content.push_str("depends = []\n");
@@ -831,37 +881,38 @@ version = "0.1.0"
                     toml_content.push_str("depends = [\n");
                     for dep in &contract.depends {
                         if dep.kind.is_none() && dep.function.is_none() && dep.path.is_none() {
-                            toml_content.push_str(&format!("  \"{}\",\n", dep.name));
+                            let _ = writeln!(toml_content, "  \"{}\",", dep.name);
                         } else {
-                            toml_content.push_str(&format!("  {{ name = \"{}\"", dep.name));
+                            let _ = write!(toml_content, "  {{ name = \"{}\"", dep.name);
                             if let Some(kind) = &dep.kind {
-                                toml_content.push_str(&format!(", kind = \"{kind}\""));
+                                let _ = write!(toml_content, ", kind = \"{kind}\"");
                             }
                             if let Some(function) = &dep.function {
-                                toml_content.push_str(&format!(", function = \"{function}\""));
+                                let _ = write!(toml_content, ", function = \"{function}\"");
                             }
                             if let Some(path) = &dep.path {
-                                toml_content.push_str(&format!(", path = \"{path}\""));
+                                let _ = write!(toml_content, ", path = \"{path}\"");
                             }
                             toml_content.push_str(" },\n");
                         }
                     }
                     toml_content.push_str("]\n");
                 } else {
-                    toml_content.push_str(&format!(
-                        "depends = [{}]\n",
+                    let _ = writeln!(
+                        toml_content,
+                        "depends = [{}]",
                         contract
                             .depends
                             .iter()
                             .map(|d| format!("\"{}\"", d.name))
                             .collect::<Vec<_>>()
                             .join(", ")
-                    ));
+                    );
                 }
             }
 
             if let Some(output) = &contract.output {
-                toml_content.push_str(&format!("output = \"{output}\"\n"));
+                let _ = writeln!(toml_content, "output = \"{output}\"");
             }
 
             toml_content.push('\n');
@@ -870,7 +921,7 @@ version = "0.1.0"
         if !mappings.is_empty() {
             toml_content.push_str("[import-mappings]\n");
             for (prefix, target) in mappings {
-                toml_content.push_str(&format!("\"{prefix}\" = \"{target}\"\n"));
+                let _ = writeln!(toml_content, "\"{prefix}\" = \"{target}\"");
             }
             toml_content.push('\n');
         }
@@ -881,27 +932,27 @@ version = "0.1.0"
         {
             toml_content.push_str("[wrappers.tolk]\n");
             if let Some(path) = wrappers_tolk_output_dir {
-                toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+                let _ = writeln!(toml_content, "output-dir = \"{path}\"");
             }
             if let Some(enabled) = wrappers_tolk_generate_test {
-                toml_content.push_str(&format!("generate-test = {enabled}\n"));
+                let _ = writeln!(toml_content, "generate-test = {enabled}");
             }
             if let Some(path) = wrappers_tolk_test_output_dir {
-                toml_content.push_str(&format!("test-output-dir = \"{path}\"\n"));
+                let _ = writeln!(toml_content, "test-output-dir = \"{path}\"");
             }
             toml_content.push('\n');
         }
 
         if let Some(path) = wrappers_typescript_output_dir {
             toml_content.push_str("[wrappers.typescript]\n");
-            toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            let _ = writeln!(toml_content, "output-dir = \"{path}\"");
             toml_content.push('\n');
         }
 
         if !scripts.is_empty() {
             toml_content.push_str("[scripts]\n");
             for (name, cmd) in scripts {
-                toml_content.push_str(&format!("{name} = \"{cmd}\"\n"));
+                let _ = writeln!(toml_content, "{name} = \"{cmd}\"");
             }
             toml_content.push('\n');
         }
@@ -921,11 +972,11 @@ version = "0.1.0"
                 toml_content.push_str("]\n");
             }
             if let Some(max_warnings) = lint_max_warnings {
-                toml_content.push_str(&format!("max-warnings = {max_warnings}\n"));
+                let _ = writeln!(toml_content, "max-warnings = {max_warnings}");
             }
 
             if let Some(output_format) = lint_output_format {
-                toml_content.push_str(&format!("output-format = \"{output_format}\"\n"));
+                let _ = writeln!(toml_content, "output-format = \"{output_format}\"");
             }
 
             toml_content.push('\n');
@@ -934,7 +985,7 @@ version = "0.1.0"
         if !lint_levels.is_empty() {
             toml_content.push_str("[lint.rules]\n");
             for (rule, level) in lint_levels {
-                toml_content.push_str(&format!("{rule} = \"{level}\"\n"));
+                let _ = writeln!(toml_content, "{rule} = \"{level}\"");
             }
             toml_content.push('\n');
         }
@@ -944,68 +995,93 @@ version = "0.1.0"
             toml_content.push_str("[test]\n");
 
             if let Some(filter) = &config.filter {
-                toml_content.push_str(&format!("filter = \"{filter}\"\n"));
+                let _ = writeln!(toml_content, "filter = \"{filter}\"");
             }
 
             if let Some(exclude_patterns) = &config.exclude_patterns {
-                toml_content.push_str(&format!(
-                    "exclude = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "exclude = [{}]",
                     exclude_patterns
                         .iter()
                         .map(|p| format!("\"{p}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(include_patterns) = &config.include_patterns {
-                toml_content.push_str(&format!(
-                    "include = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "include = [{}]",
                     include_patterns
                         .iter()
                         .map(|p| format!("\"{p}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(reporters) = &config.reporters {
-                toml_content.push_str(&format!(
-                    "reporter = [{}]\n",
+                let _ = writeln!(
+                    toml_content,
+                    "reporter = [{}]",
                     reporters
                         .iter()
                         .map(|r| format!("\"{r}\""))
                         .collect::<Vec<_>>()
                         .join(", ")
-                ));
+                );
             }
 
             if let Some(debug) = config.debug {
-                toml_content.push_str(&format!("debug = {debug}\n"));
+                let _ = writeln!(toml_content, "debug = {debug}");
             }
 
             if let Some(debug_port) = config.debug_port {
-                toml_content.push_str(&format!("debug-port = {debug_port}\n"));
+                let _ = writeln!(toml_content, "debug-port = {debug_port}");
             }
 
             if let Some(backtrace) = &config.backtrace {
-                toml_content.push_str(&format!("backtrace = \"{backtrace}\"\n"));
+                let _ = writeln!(toml_content, "backtrace = \"{backtrace}\"");
             }
 
             if let Some(junit_path) = &config.junit_path {
-                toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
+                let _ = writeln!(toml_content, "junit-path = \"{junit_path}\"");
             }
 
             if let Some(junit_merge) = config.junit_merge {
-                toml_content.push_str(&format!("junit-merge = {junit_merge}\n"));
+                let _ = writeln!(toml_content, "junit-merge = {junit_merge}");
             }
 
             if let Some(fail_fast) = config.fail_fast {
-                toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+                let _ = writeln!(toml_content, "fail-fast = {fail_fast}");
             }
 
             if let Some(fail_on_diff) = config.fail_on_diff {
-                toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+                let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
+            }
+
+            if let Some(studio_reporting) = config.studio_reporting {
+                let _ = writeln!(toml_content, "studio-reporting = {studio_reporting}");
+            }
+
+            if let Some(gas_profile) = &config.gas_profile {
+                let _ = writeln!(toml_content, "gas-profile = \"{gas_profile}\"");
+            }
+
+            if let Some(gas_profile_format) = &config.gas_profile_format {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-format = \"{gas_profile_format}\""
+                );
+            }
+
+            if let Some(gas_profile_include_tests) = config.gas_profile_include_tests {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-include-tests = {gas_profile_include_tests}"
+                );
             }
 
             if config.fuzz_runs.is_some()
@@ -1015,15 +1091,15 @@ version = "0.1.0"
                 toml_content.push_str("\n[test.fuzz]\n");
 
                 if let Some(fuzz_runs) = config.fuzz_runs {
-                    toml_content.push_str(&format!("runs = {fuzz_runs}\n"));
+                    let _ = writeln!(toml_content, "runs = {fuzz_runs}");
                 }
 
                 if let Some(fuzz_max_test_rejects) = config.fuzz_max_test_rejects {
-                    toml_content.push_str(&format!("max-test-rejects = {fuzz_max_test_rejects}\n"));
+                    let _ = writeln!(toml_content, "max-test-rejects = {fuzz_max_test_rejects}");
                 }
 
                 if let Some(fuzz_seed) = config.fuzz_seed {
-                    toml_content.push_str(&format!("seed = {fuzz_seed}\n"));
+                    let _ = writeln!(toml_content, "seed = {fuzz_seed}");
                 }
             }
 
@@ -1037,29 +1113,30 @@ version = "0.1.0"
                 toml_content.push_str("\n[test.coverage]\n");
 
                 if let Some(coverage) = config.coverage {
-                    toml_content.push_str(&format!("enabled = {coverage}\n"));
+                    let _ = writeln!(toml_content, "enabled = {coverage}");
                 }
 
                 if let Some(coverage_format) = &config.coverage_format {
-                    toml_content.push_str(&format!("format = \"{coverage_format}\"\n"));
+                    let _ = writeln!(toml_content, "format = \"{coverage_format}\"");
                 }
 
                 if let Some(coverage_file) = &config.coverage_file {
-                    toml_content.push_str(&format!("output-file = \"{coverage_file}\"\n"));
+                    let _ = writeln!(toml_content, "output-file = \"{coverage_file}\"");
                 }
 
                 if let Some(coverage_minimum_percent) = config.coverage_minimum_percent {
-                    toml_content
-                        .push_str(&format!("minimum-percent = {coverage_minimum_percent}\n"));
+                    let _ = writeln!(toml_content, "minimum-percent = {coverage_minimum_percent}");
                 }
 
                 if let Some(coverage_include_wrappers) = config.coverage_include_wrappers {
-                    toml_content
-                        .push_str(&format!("include-wrappers = {coverage_include_wrappers}\n"));
+                    let _ = writeln!(
+                        toml_content,
+                        "include-wrappers = {coverage_include_wrappers}"
+                    );
                 }
 
                 if let Some(coverage_include_tests) = config.coverage_include_tests {
-                    toml_content.push_str(&format!("include-tests = {coverage_include_tests}\n"));
+                    let _ = writeln!(toml_content, "include-tests = {coverage_include_tests}");
                 }
             }
 
@@ -1073,6 +1150,7 @@ version = "0.1.0"
 
 pub(crate) struct Project {
     path: PathBuf,
+    isolated_home: PathBuf,
     _temp_dir: TempDir,
 }
 
@@ -1081,19 +1159,22 @@ impl Project {
     pub(crate) fn acton(&self) -> ActonCommand {
         let cmd = ProcessCommandBuilder::new(acton_exe())
             .env("PATH", acton_path_env())
+            .env("HOME", &self.isolated_home)
+            .env("USERPROFILE", &self.isolated_home)
             .env("ACTON_LOG_DIR", self.path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
             project: Arc::new(ProjectRef {
                 path: self.path.clone(),
             }),
-            test_path: None,
+            test_paths: Vec::new(),
             filter: None,
             build_contract: None,
             build_clear_cache: false,
             build_graph: None,
             build_out_dir: None,
             build_gen_dir: None,
+            build_output_abi: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
@@ -1117,7 +1198,9 @@ impl Project {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
+            verify_new: false,
             test_fail_fast: false,
+            test_no_capture: false,
             script_fork_net: None,
             build_info: false,
             force_no_color_env: true,
@@ -1129,6 +1212,11 @@ impl Project {
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn isolated_home(&self) -> &Path {
+        &self.isolated_home
+    }
 }
 
 pub(crate) struct ProjectRef {
@@ -1138,13 +1226,14 @@ pub(crate) struct ProjectRef {
 pub(crate) struct ActonCommand {
     pub(crate) cmd: ProcessCommandBuilder,
     pub(crate) project: Arc<ProjectRef>,
-    pub(crate) test_path: Option<String>,
+    pub(crate) test_paths: Vec<String>,
     pub(crate) filter: Option<String>,
     pub(crate) build_contract: Option<String>,
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
     pub(crate) build_out_dir: Option<String>,
     pub(crate) build_gen_dir: Option<String>,
+    pub(crate) build_output_abi: Option<String>,
     pub(crate) build_output_fift: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
@@ -1168,7 +1257,9 @@ pub(crate) struct ActonCommand {
     pub(crate) verify_address: Option<String>,
     pub(crate) verify_wallet: Option<String>,
     pub(crate) verify_network: Option<String>,
+    pub(crate) verify_new: bool,
     pub(crate) test_fail_fast: bool,
+    pub(crate) test_no_capture: bool,
     pub(crate) script_fork_net: Option<String>,
     pub(crate) build_info: bool,
     pub(crate) force_no_color_env: bool,
@@ -1266,6 +1357,17 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        for arg in args {
+            self.cmd = self.cmd.arg(arg);
+        }
+        self
+    }
+
     pub(crate) fn env(mut self, key: &str, value: &str) -> Self {
         self.cmd = self.cmd.env(key, value);
         self
@@ -1273,6 +1375,11 @@ impl ActonCommand {
 
     pub(crate) fn env_remove(mut self, key: &str) -> Self {
         self.cmd = self.cmd.env_remove(key);
+        self
+    }
+
+    pub(crate) fn stdin(mut self, stream: impl snapbox::IntoData) -> Self {
+        self.cmd = self.cmd.stdin(stream);
         self
     }
 
@@ -1366,7 +1473,7 @@ impl ActonCommand {
         self
     }
 
-    /// Specify TonCenter API key env value for test requests
+    /// Specify `TonCenter` API key env value for test requests
     ///
     /// # Examples
     /// ```
@@ -1457,7 +1564,13 @@ impl ActonCommand {
     /// .test().path("tests/")              // Specific directory
     /// ```
     pub(crate) fn path(mut self, path: &str) -> Self {
-        self.test_path = Some(path.to_string());
+        self.test_paths = vec![path.to_string()];
+        self
+    }
+
+    /// Specify several paths to test files or directories.
+    pub(crate) fn paths(mut self, paths: &[&str]) -> Self {
+        self.test_paths = paths.iter().map(ToString::to_string).collect();
         self
     }
 
@@ -1532,9 +1645,27 @@ impl ActonCommand {
         self
     }
 
-    /// Include `.test.tolk` files in coverage reports.
+    /// Include files under `tests/` and `.test.tolk` files in coverage reports.
     pub(crate) fn with_coverage_include_tests(mut self) -> Self {
         self.cmd = self.cmd.arg("--coverage-include-tests");
+        self
+    }
+
+    /// Write a gas-weighted execution profile.
+    pub(crate) fn with_gas_profile(mut self, file: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile").arg(file);
+        self
+    }
+
+    /// Select the gas profile export format (e.g. "cpuprofile", "collapsed").
+    pub(crate) fn with_gas_profile_format(mut self, format: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-format").arg(format);
+        self
+    }
+
+    /// Include `.test.tolk` unit-test execution in the generated gas profile.
+    pub(crate) fn with_gas_profile_include_tests(mut self) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-include-tests");
         self
     }
 
@@ -1554,6 +1685,11 @@ impl ActonCommand {
     /// Enable fail-fast mode
     pub(crate) fn fail_fast(mut self) -> Self {
         self.test_fail_fast = true;
+        self
+    }
+
+    pub(crate) fn no_capture(mut self) -> Self {
+        self.test_no_capture = true;
         self
     }
 
@@ -1601,6 +1737,11 @@ impl ActonCommand {
 
     pub(crate) fn verify_network(mut self, network: &str) -> Self {
         self.verify_network = Some(network.to_string());
+        self
+    }
+
+    pub(crate) fn new_verifier(mut self) -> Self {
+        self.verify_new = true;
         self
     }
 
@@ -1746,6 +1887,12 @@ impl ActonCommand {
         self
     }
 
+    /// Set output directory for contract ABI JSON files (only for build command)
+    pub(crate) fn with_output_abi(mut self, path: &str) -> Self {
+        self.build_output_abi = Some(path.to_string());
+        self
+    }
+
     /// Set output directory for compiled Fift files (only for build command)
     pub(crate) fn with_output_fift(mut self, path: &str) -> Self {
         self.build_output_fift = Some(path.to_string());
@@ -1765,7 +1912,7 @@ impl ActonCommand {
     }
 
     fn into_prepared_command(mut self) -> ProcessCommandBuilder {
-        if let Some(path) = self.test_path {
+        for path in self.test_paths {
             self.cmd = self.cmd.arg(path);
         }
 
@@ -1795,6 +1942,10 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--fail-fast");
         }
 
+        if self.test_no_capture {
+            self.cmd = self.cmd.arg("--no-capture");
+        }
+
         if let Some(contract) = self.build_contract {
             self.cmd = self.cmd.arg(contract);
         }
@@ -1813,6 +1964,10 @@ impl ActonCommand {
 
         if let Some(network) = self.verify_network {
             self.cmd = self.cmd.arg("--net").arg(network);
+        }
+
+        if self.verify_new {
+            self.cmd = self.cmd.arg("--new");
         }
 
         if let Some(network) = self.script_fork_net {
@@ -1838,6 +1993,10 @@ impl ActonCommand {
 
         if let Some(gen_dir) = self.build_gen_dir {
             self.cmd = self.cmd.arg("--gen-dir").arg(gen_dir);
+        }
+
+        if let Some(output_abi_dir) = self.build_output_abi {
+            self.cmd = self.cmd.arg("--output-abi").arg(output_abi_dir);
         }
 
         if let Some(output_fift_dir) = self.build_output_fift {
@@ -1932,6 +2091,11 @@ impl ActonCommand {
             self.cmd = self.cmd.env("NO_COLOR", "1");
         }
 
+        self.cmd = self
+            .cmd
+            .env("ACTON_TEST_TONCENTER_RETRY_BACKOFF_MS", "0")
+            .env("ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS", "0");
+
         self.cmd
     }
 
@@ -1946,6 +2110,15 @@ impl ActonCommand {
             output,
             project_path,
         }
+    }
+
+    /// Spawn a long-running command with captured output.
+    pub(crate) fn spawn(self) -> std::io::Result<std::process::Child> {
+        let mut command = self.into_prepared_command().into_std();
+        command
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
     }
 
     /// Spawn command in a pseudo-terminal for interactive tests.

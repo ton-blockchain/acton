@@ -1,5 +1,4 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
-use crate::commands::create_app::create_app_cmd;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
@@ -9,11 +8,16 @@ use std::path::Path;
 use tree_sitter::Node;
 use walkdir::WalkDir;
 
+mod create_app;
+
+pub use create_app::DEFAULT_APP_DIR;
+
 const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
     (
         "# Acton related files",
         &[
             ".acton/",
+            ".studio/",
             "gen/",
             "build/",
             "lcov.info",
@@ -27,24 +31,32 @@ const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
     ),
 ];
 
-pub fn init_cmd(create_app_path: Option<&Path>) -> anyhow::Result<()> {
+pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Result<()> {
     if create_app_path.is_some() {
-        return create_app_cmd(create_app_path);
+        return create_app::create_app_cmd(create_app_path);
+    }
+
+    if stdlib_only {
+        stdlib::update_latest(Path::new("."))?;
+        println!("\n{}", "✓ Updated Acton standard library".green().bold());
+        return Ok(());
     }
 
     let acton_toml_exists = Path::new("Acton.toml").exists();
+
+    if !acton_toml_exists && current_directory_is_empty()? {
+        println!(
+            "  {} This directory is empty. For new projects, prefer creating from a template with {}",
+            "Warning:".yellow().bold(),
+            "acton new .".cyan().bold()
+        );
+    }
 
     if acton_toml_exists {
         println!(
             "    {} Acton.toml project configuration",
             "Skipping".green().bold()
         );
-        if patch_default_mappings()? {
-            println!(
-                "     {} Acton.toml with default mappings",
-                "Patched".green().bold()
-            );
-        }
     } else {
         let mut config = ActonConfig::default();
         config.ensure_default_mappings();
@@ -112,16 +124,8 @@ pub fn init_cmd(create_app_path: Option<&Path>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn patch_default_mappings() -> anyhow::Result<bool> {
-    let content = fs::read_to_string("Acton.toml")?;
-    let mut config: ActonConfig = toml::from_str(&content)?;
-
-    if !config.ensure_default_mappings() {
-        return Ok(false);
-    }
-
-    config.save()?;
-    Ok(true)
+fn current_directory_is_empty() -> anyhow::Result<bool> {
+    Ok(fs::read_dir(".")?.next().is_none())
 }
 
 fn patch_or_create_gitignore() -> anyhow::Result<()> {
@@ -241,8 +245,10 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
         let contract_config = ContractConfig {
             name: Some(contract_name),
             src: relative_path,
+            types: None,
             depends: Some(vec![]),
             output: None,
+            wrappers: None,
         };
 
         contracts.insert(contract_key, contract_config);

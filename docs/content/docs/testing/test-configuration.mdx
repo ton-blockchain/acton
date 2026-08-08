@@ -1,32 +1,32 @@
 ---
-title: "Test Configuration"
+title: "Test configuration"
 description: "Learn how to configure test runner behavior through project settings and command line options"
 ---
 
-Test runner provides flexible configuration options that allow you to set default test behavior in your project configuration file and override it as needed via command line flags. This approach helps maintain consistent testing practices across your project while still allowing per-run customization.
+Default test behavior is set in `Acton.toml`. Command-line flags override those defaults for a single run.
 
-## Configuration Methods
+## Configuration methods
 
 Acton supports two methods for configuring test behavior:
 
-1. **Project Configuration** — Set defaults in `Acton.toml` for consistent behavior
-2. **Command Line Flags** — Override configuration for specific test runs
+- Project configuration: set defaults in `Acton.toml`.
+- Command-line flags: override defaults for a specific run.
 
-### Configuration Precedence
+### Configuration precedence
 
 When both methods are used, the precedence order is:
 
-1. **Command line flags** (highest priority) — override everything
-2. **Acton.toml settings** (medium priority) — project defaults
-3. **Built-in defaults** (lowest priority) — fallback values
+1. Command line flags (highest priority) — override matching project settings.
+2. `Acton.toml` settings (medium priority) — project defaults.
+3. Built-in defaults (lowest priority) — fallback values.
 
-## Project Configuration in Acton.toml
+## Project configuration in `Acton.toml`
 
-### Basic Configuration
+### Basic configuration
 
-Add a `[test]` section to your `Acton.toml` file to configure default test behavior:
+Add a `[test]` section to `Acton.toml` to set default test behavior:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [package]
 name = "my-ton-project"
 version = "0.1.0"
@@ -45,11 +45,12 @@ seed = 42
 # Enable code coverage by default
 enabled = true
 format = "lcov"
+minimum-percent = 80
 ```
 
-## Command Line Override
+## Command-line overrides
 
-Any configuration option can be overridden via command line flags:
+Many configuration options can be overridden with command-line flags:
 
 ```bash
 # Use specific reporter
@@ -77,9 +78,9 @@ acton test --reporter teamcity
 acton test --coverage --filter "test deploy" --debug --reporter junit
 ```
 
-## Configuration Options Reference
+## Configuration options reference
 
-### Filter Options
+### Filter options
 
 | Configuration | CLI Flag    | Type   | Description                              |
 |---------------|-------------|--------|------------------------------------------|
@@ -87,47 +88,52 @@ acton test --coverage --filter "test deploy" --debug --reporter junit
 | `exclude`     | `--exclude` | Array  | Glob patterns to exclude test files      |
 | `include`     | `--include` | Array  | Glob patterns to include only test files |
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test]
-filter = ".*wallet.*"              # Only get fun `...wallet...`
+filter = ".*wallet.*"              # Only tests whose names have "wallet" within
 exclude = ["**/integration/**"]    # Skip integration directory
 include = ["**/unit/**"]           # Only include unit test files
 ```
 
-### Execution Options
+### Execution options
 
 | Configuration | CLI Flag      | Type    | Description                                  |
 |---------------|---------------|---------|----------------------------------------------|
 | `fail-fast`   | `--fail-fast` | Boolean | Stop executing tests after the first failure |
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test]
 fail-fast = true
 ```
 
-### Reporter Options
+### Reporter options
 
 | Configuration | CLI Flag      | Type  | Description                          |
 |---------------|---------------|-------|--------------------------------------|
 | `reporter`    | `--reporter`  | Array | Test output format(s)                |
 
-**Supported reporters:**
+Supported reporters:
+
 - `console` — Detailed console output with code context (default)
 - `teamcity` — TeamCity CI integration (minimal output, best combined with console)
 - `junit` — JUnit XML reports for external tools
 - `dot` — Compact dot-style progress with detailed failure diagnostics at the end
 
-<Callout type="info" title="TeamCity Integration">
-When using TeamCity CI, combine `teamcity` with `console` reporter to see detailed test output alongside CI integration data.
-```bash
-acton test --reporter console,teamcity
-```
+<Callout type="info" title="TeamCity integration">
+    For TeamCity CI, combine the `teamcity` and `console` reporters so detailed test output appears alongside CI integration data.
+
+    ```bash
+    acton test --reporter console,teamcity
+    ```
 </Callout>
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test]
 # Use multiple reporters
 reporter = ["console", "junit"]
@@ -142,7 +148,7 @@ reporter = ["dot"]
 reporter = ["console", "teamcity"]
 ```
 
-### Debug Options
+### Debug options
 
 | Configuration | CLI Flag          | Type    | Description                                   |
 |---------------|-------------------|---------|-----------------------------------------------|
@@ -151,12 +157,11 @@ reporter = ["console", "teamcity"]
 | `backtrace`   | `--backtrace`     | String  | Enable stack traces ("full")                  |
 | `-`           | `--verbose`       | Count   | Enable level-1 executor debug logs (CLI only) |
 
-`--verbose` is currently binary in practice: default level `0`, and level `1`
-when `--verbose` is passed once. Higher user-selected levels are not
-supported yet.
+`--verbose` is currently binary in practice: default level `0`, and level `1` when `--verbose` is passed once. Higher user-selected levels are not supported yet.
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test]
 debug = false
 debug-port = 12345
@@ -167,35 +172,36 @@ backtrace = "full"
 acton test --verbose --filter "debug.*"
 ```
 
-### Coverage Options
+### Coverage options
 
 | Configuration                      | CLI Flag                      | Type    | Description                                                    |
 |------------------------------------|-------------------------------|---------|----------------------------------------------------------------|
 | `[test.coverage].enabled`          | `--coverage`                  | Boolean | Enable code coverage                                           |
 | `[test.coverage].format`           | `--coverage-format`           | String  | Coverage output format (`lcov`, `text`)                        |
 | `[test.coverage].output-file`      | `--coverage-file`             | String  | Path to save the coverage report                               |
+| `[test.coverage].minimum-percent`  | `--coverage-minimum-percent`  | Number  | Fail when the blended coverage score is below this percentage  |
 | `[test.coverage].include-wrappers` | `--coverage-include-wrappers` | Boolean | Include files from the `@wrappers` mapping in coverage reports |
 | `[test.coverage].include-tests`    | `--coverage-include-tests`    | Boolean | Include `.test.tolk` files in coverage reports                 |
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test.coverage]
 enabled = true
 format = "lcov"
+minimum-percent = 80
 include-wrappers = true
 include-tests = true
 ```
 
-### Fuzz Options
+`--coverage-minimum-percent` is ignored when the run also starts Test UI with `--ui`.
 
-These defaults apply only to parameterized tests that explicitly opt in with
-`@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`.
-Per-test annotations can override them with
-`@test.fuzz({ runs: ..., max_test_rejects: ..., seed: ... })`.
-When `max-test-rejects` is omitted, Acton uses `runs * 256`.
+### Fuzz options
 
-See [Fuzz Testing](/docs/testing/fuzz-testing) for annotation syntax,
-helper APIs, supported parameter types, and failure reporting.
+These defaults apply only to parameterized tests that explicitly opt in with `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`. Per-test annotations can override them with
+`@test.fuzz({ runs: ..., max_test_rejects: ..., seed: ... })`. When `max-test-rejects` is omitted, Acton uses `runs * 256`.
+
+See the [fuzz testing](/docs/testing/fuzz-testing) guide for annotation syntax, helper APIs, supported parameter types, and failure reporting.
 
 | Configuration                    | CLI Flag | Type    | Description                                                        |
 |----------------------------------|----------|---------|--------------------------------------------------------------------|
@@ -203,70 +209,129 @@ helper APIs, supported parameter types, and failure reporting.
 | `[test.fuzz].max-test-rejects`   | -        | Integer | Maximum `assume(...)` rejections before the fuzz test fails        |
 | `[test.fuzz].seed`               | `--fuzz-seed` | Integer | Seed for reproducible fuzz input generation                    |
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test.fuzz]
 runs = 512
 max-test-rejects = 4096
 seed = 42
 ```
 
-### Profiling Options
+### Profiling options
 
-| Configuration  | CLI Flag         | Type    | Description                                                           |
-|----------------|------------------|---------|-----------------------------------------------------------------------|
-| `fail-on-diff` | `--fail-on-diff` | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+| Configuration               | CLI Flag                      | Type    | Description                                                           |
+|-----------------------------|-------------------------------|---------|-----------------------------------------------------------------------|
+| `fail-on-diff`              | `--fail-on-diff`              | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+| `gas-profile`               | `--gas-profile`               | String  | Path to write a gas-weighted execution profile                        |
+| `gas-profile-format`        | `--gas-profile-format`        | String  | Gas profile output format (`cpuprofile`, `collapsed`)                 |
+| `gas-profile-include-tests` | `--gas-profile-include-tests` | Boolean | Include `.test.tolk` unit-test get-method execution in the profile    |
 
 `fail-on-diff` is applied when running baseline comparison mode with
 `--baseline-snapshot <FILE>`.
+Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
+Combine `--gas-profile <FILE>` with `--ui` to browse the profile as a
+flamegraph in Test UI. Add `--gas-profile-include-tests` when the expensive
+work is executed directly from `.test.tolk` unit-test get methods.
 
-**Examples:**
-```toml
+Examples:
+
+```acton-toml title="Acton.toml"
 [test]
 fail-on-diff = true
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 ```
 
 ```bash
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
+acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+acton test --gas-profile build/gas.cpuprofile --gas-profile-include-tests --ui
 ```
 
-### JUnit Options
+### Mutation testing options
+
+These defaults apply when the run is started with `acton test --mutate --mutate-contract <NAME>`.
+
+| Configuration                     | CLI Flag                      | Type    | Description                                                                       |
+|-----------------------------------|-------------------------------|---------|-----------------------------------------------------------------------------------|
+| `[test.mutation].diff`            | `--mutation-diff`             | String  | Limit mutation testing to changed lines in `worktree`, `ref`, or `branch` scope   |
+| `[test.mutation].diff-ref`        | `--mutation-diff-ref`         | String  | Base ref used by `ref` mode and optional override for `branch` mode               |
+| `[test.mutation].mutation-levels` | `--mutation-levels`           | Array   | Run only selected levels such as `critical`, `major`, or `minor`                  |
+| `[test.mutation].rules-file`      | `--mutation-rules-file`       | String  | Path to a JSON file with custom query-based mutation rules                        |
+| `[test.mutation].minimum-percent` | `--mutation-minimum-percent`  | Number  | Fail when the mutation score is below this percentage                             |
+| `[test.mutation].disable-rules`   | `--mutation-disable-rules`    | Array   | Disable selected built-in or custom mutation rules                                |
+
+Examples:
+
+```acton-toml title="Acton.toml"
+[test.mutation]
+diff = "branch"
+diff-ref = "origin/main"
+mutation-levels = ["critical", "major"]
+rules-file = "mutation-rules.json"
+minimum-percent = 85
+disable-rules = ["replace_plus_with_minus"]
+```
+
+### JUnit options
 
 | Configuration     | CLI Flag        | Type    | Description                      |
 |-------------------|-----------------|---------|----------------------------------|
 | `junit-path`      | `--junit-path`  | String  | JUnit XML output directory       |
 | `junit-merge`     | `--junit-merge` | Boolean | Merge all suites into one file   |
-| `fork-net`        | `--fork-net`    | String  | Network to fork from             |
 
-### Fork Testing Options
+Examples:
 
-| Configuration       | CLI Flag              | Type      | Description                                                                                          |
-|:--------------------|:----------------------|:----------|:-----------------------------------------------------------------------------------------------------|
-| `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or a custom network defined in `[networks]`). |
-| `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                  |
-
-**Examples:**
-```toml
-[test]
-fork-net = "mainnet"
-```
-
-Use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` in the
-environment when the built-in fork target needs TonCenter authentication.
-
-Using a custom network:
-```toml
-[networks.my-local-node]
-api = { v2 = "http://localhost:8081/api/v2/jsonRPC" }
-
-[test]
-fork-net = "my-local-node"
-```
-
-**Examples:**
-```toml
+```acton-toml title="Acton.toml"
 [test]
 # Custom JUnit output directory
 junit-path = "custom-reports"
 junit-merge = true
+```
+
+### Test UI options
+
+| Configuration | CLI Flag    | Type    | Description                              |
+|---------------|-------------|---------|------------------------------------------|
+| `ui`          | `--ui`      | Boolean | Start the browser Test UI after the run  |
+| `ui-port`     | `--ui-port` | Integer | UI server port, defaulting to `12344`    |
+
+Examples:
+
+```acton-toml title="Acton.toml"
+[test]
+ui = true
+ui-port = 23456
+```
+
+### Fork testing options
+
+| Configuration       | CLI Flag              | Type      | Description                                                                                                              |
+|:--------------------|:----------------------|:----------|:-------------------------------------------------------------------------------------------------------------------------|
+| `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or `custom:<name>` for a custom network defined in `[networks]`). |
+| `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                                      |
+
+The fork uses state and network configuration from the same masterchain block.
+When `fork-block-number` is set, it also uses that block's Unix time; otherwise,
+it uses the current system Unix time.
+
+Examples:
+
+```acton-toml title="Acton.toml"
+[test]
+fork-net = "mainnet"
+```
+
+Use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` to supply fork targets with higher RPS limits.
+
+Using a custom network:
+
+```acton-toml title="Acton.toml"
+[networks.archive-rpc]
+api = { v2 = "https://your-rpc.example/api/v2/jsonRPC" }
+
+[test]
+fork-net = "custom:archive-rpc"
 ```

@@ -20,9 +20,7 @@ use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::symbol_resolver::resolve;
 use tolk_syntax::HasName;
-use tolk_ty::TypeDb;
-use tolk_ty::TypeInterner;
-use tolk_ty::infer;
+use tolk_ty::{FileBodyTypes, TypeDb, TypeInterner, WorkspaceBodyTypes, infer};
 use walkdir::WalkDir;
 
 mod check_explain;
@@ -155,8 +153,22 @@ pub fn check_cmd(
         })
         .unwrap_or(CheckOutputFormat::Plain);
     let is_plain_report = output_format == CheckOutputFormat::Plain;
+    if fix && !is_plain_report {
+        anyhow::bail!(
+            "{} can only be used with plain output format; pass {} {} or remove {}",
+            "--fix".yellow(),
+            "--output-format".yellow(),
+            "plain".green(),
+            "--fix".yellow()
+        )
+    }
     if is_plain_report && output_file.is_some() {
-        anyhow::bail!("output_file cannot be used with plain output format")
+        anyhow::bail!(
+            "{} cannot be used with plain output format; pass {} {}",
+            "--output-file".yellow(),
+            "--output-format".yellow(),
+            "json|sarif|github|gitlab".green()
+        )
     }
 
     let max_warnings = config
@@ -646,7 +658,7 @@ fn check_root_file(
     let mut interner = TypeInterner::new();
     let mut type_db = TypeDb::new(&mut interner, file_db, &index);
 
-    let mut body_types = HashMap::new();
+    let mut body_types = WorkspaceBodyTypes::default();
 
     let files_to_check = index.reachable_files(file_info.id());
 
@@ -654,7 +666,7 @@ fn check_root_file(
         let Some(file_to_infer) = file_db.get_by_id(*file_to_check) else {
             continue;
         };
-        let mut file_body_types = HashMap::new();
+        let mut file_body_types = FileBodyTypes::default();
 
         for decl in file_to_infer.source().top_levels() {
             let Some(index_decl) = file_to_infer.find_declaration(&decl) else {

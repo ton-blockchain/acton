@@ -1,9 +1,0 @@
-Error: Wallet nonexistent-wallet not found. No wallets configured in wallets.toml or global.wallets.toml.
-To add a wallet use acton wallet new or add the following to wallets.toml manually:
-
-[wallets.deployer]
-kind = "v5r1"
-workchain = 0
-keys = { [MNEMONIC] }
-
-See [ACTON_DOCS_URL]/tutorial/setup-wallets for more information

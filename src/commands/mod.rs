@@ -1,8 +1,8 @@
+pub mod abi_args;
 pub mod build;
 pub mod check;
 pub mod common;
 pub mod compile;
-pub mod create_app;
 pub mod disasm;
 pub mod doc;
 pub mod docgen;
@@ -22,6 +22,7 @@ pub mod retrace;
 pub mod rpc;
 pub mod run;
 pub mod script;
+pub mod studio;
 pub mod test;
 pub mod up;
 pub mod verify;

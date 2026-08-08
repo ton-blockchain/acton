@@ -3,7 +3,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const RULE_CODE: &str = "E018";
+const RULE_CODE: &str = "S007";
 
 fn run_simple_test_with_mappings(
     group: &str,
@@ -143,8 +143,8 @@ fn test_check_import_path_can_use_mappings_skips_already_mapped_import() {
         .run()
         .success();
     assert!(
-        !output.get_normalized_stderr().contains("E018"),
-        "E018 should not be emitted for imports that already use mappings:\n{}",
+        !output.get_normalized_stderr().contains("S007"),
+        "S007 should not be emitted for imports that already use mappings:\n{}",
         output.get_normalized_stderr()
     );
 }

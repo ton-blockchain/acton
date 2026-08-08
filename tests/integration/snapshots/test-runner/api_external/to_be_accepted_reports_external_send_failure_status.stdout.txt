@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/external_api.test.tolk (1 test)
+  ✗ toBeAccepted reports external send failure status [TIME]
+    └─ Error: expect(actual).toBeAccepted()
+        ├─ Status: external send failed before producing transactions
+        ├─ Reason: external send failed before contract acceptance
+        └─ at tests/external_api.test[LINE]
+              Expectation<ExternalSendResult>.toBeAccepted             at ../lib/emulation/network[LINE]
+              test toBeAccepted reports external send failure status   at tests/external_api.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

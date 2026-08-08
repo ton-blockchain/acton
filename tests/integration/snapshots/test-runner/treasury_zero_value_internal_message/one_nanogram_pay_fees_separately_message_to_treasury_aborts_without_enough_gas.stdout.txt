@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling ownership_relay
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/treasury_zero_value.test.tolk (1 test)
+  ✓ one nanogram pay fees separately message to treasury aborts without enough gas [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── SendOwnershipAssigned 1 GRAM -> ownership_relay B                           gas=1831
+           └── OwnershipAssigned 0.000000001 GRAM -> recipient C                       compute phase skipped aborted
+       
+       txCount=2
+
+ ✓ 1 passed in 1 file

@@ -29,7 +29,7 @@ This command only works when the resolved project root already contains a local
 
 #### Options
 
-{{#options}}
+{{#options command="acton hooks new"}}
 
 {{#option "`--template` _template_" }}
 Hook scaffold template to create.

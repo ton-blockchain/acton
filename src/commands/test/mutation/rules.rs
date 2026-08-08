@@ -951,162 +951,162 @@ fun f() {
 
     #[test]
     fn replace_plus_with_minus_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a + b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a - b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a + b; }";
+        let after = r"fun f(a: int, b: int) { val result = a - b; }";
         assert_rule_mutates_to("replace_plus_with_minus", before, after);
     }
 
     #[test]
     fn replace_minus_with_plus_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a - b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a + b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a - b; }";
+        let after = r"fun f(a: int, b: int) { val result = a + b; }";
         assert_rule_mutates_to("replace_minus_with_plus", before, after);
     }
 
     #[test]
     fn replace_multiply_with_divide_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a * b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a / b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a * b; }";
+        let after = r"fun f(a: int, b: int) { val result = a / b; }";
         assert_rule_mutates_to("replace_multiply_with_divide", before, after);
     }
 
     #[test]
     fn replace_divide_with_multiply_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a / b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a * b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a / b; }";
+        let after = r"fun f(a: int, b: int) { val result = a * b; }";
         assert_rule_mutates_to("replace_divide_with_multiply", before, after);
     }
 
     #[test]
     fn replace_equal_with_not_equal_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a == b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a != b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a == b; }";
+        let after = r"fun f(a: int, b: int) { val result = a != b; }";
         assert_rule_mutates_to("replace_equal_with_not_equal", before, after);
     }
 
     #[test]
     fn replace_not_equal_with_equal_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a != b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a == b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a != b; }";
+        let after = r"fun f(a: int, b: int) { val result = a == b; }";
         assert_rule_mutates_to("replace_not_equal_with_equal", before, after);
     }
 
     #[test]
     fn replace_less_than_with_less_or_equal_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a < b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a < b; }";
+        let after = r"fun f(a: int, b: int) { val result = a <= b; }";
         assert_rule_mutates_to("replace_less_than_with_less_or_equal", before, after);
     }
 
     #[test]
     fn replace_greater_than_with_greater_or_equal_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a > b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a > b; }";
+        let after = r"fun f(a: int, b: int) { val result = a >= b; }";
         assert_rule_mutates_to("replace_greater_than_with_greater_or_equal", before, after);
     }
 
     #[test]
     fn replace_less_or_equal_with_less_than_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a <= b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a < b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a <= b; }";
+        let after = r"fun f(a: int, b: int) { val result = a < b; }";
         assert_rule_mutates_to("replace_less_or_equal_with_less_than", before, after);
     }
 
     #[test]
     fn replace_greater_or_equal_with_greater_than_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a >= b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a > b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a >= b; }";
+        let after = r"fun f(a: int, b: int) { val result = a > b; }";
         assert_rule_mutates_to("replace_greater_or_equal_with_greater_than", before, after);
     }
 
     #[test]
     fn replace_true_with_false_changes_source() {
-        let before = r#"fun f() { val result = true; }"#;
-        let after = r#"fun f() { val result = false; }"#;
+        let before = r"fun f() { val result = true; }";
+        let after = r"fun f() { val result = false; }";
         assert_rule_mutates_to("replace_true_with_false", before, after);
     }
 
     #[test]
     fn replace_false_with_true_changes_source() {
-        let before = r#"fun f() { val result = false; }"#;
-        let after = r#"fun f() { val result = true; }"#;
+        let before = r"fun f() { val result = false; }";
+        let after = r"fun f() { val result = true; }";
         assert_rule_mutates_to("replace_false_with_true", before, after);
     }
 
     #[test]
     fn replace_plus_assign_with_minus_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value += b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value -= b; }";
         assert_rule_mutates_to("replace_plus_assign_with_minus_assign", before, after);
     }
 
     #[test]
     fn replace_minus_assign_with_plus_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value -= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value += b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value -= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value += b; }";
         assert_rule_mutates_to("replace_minus_assign_with_plus_assign", before, after);
     }
 
     #[test]
     fn replace_logical_and_with_logical_or_changes_source() {
-        let before = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
-        let after = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
+        let before = r"fun f(left: bool, right: bool) { val result = left && right; }";
+        let after = r"fun f(left: bool, right: bool) { val result = left || right; }";
         assert_rule_mutates_to("replace_logical_and_with_logical_or", before, after);
     }
 
     #[test]
     fn replace_logical_or_with_logical_and_changes_source() {
-        let before = r#"fun f(left: bool, right: bool) { val result = left || right; }"#;
-        let after = r#"fun f(left: bool, right: bool) { val result = left && right; }"#;
+        let before = r"fun f(left: bool, right: bool) { val result = left || right; }";
+        let after = r"fun f(left: bool, right: bool) { val result = left && right; }";
         assert_rule_mutates_to("replace_logical_or_with_logical_and", before, after);
     }
 
     #[test]
     fn replace_bitwise_and_with_bitwise_or_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a & b; }";
+        let after = r"fun f(a: int, b: int) { val result = a | b; }";
         assert_rule_mutates_to("replace_bitwise_and_with_bitwise_or", before, after);
     }
 
     #[test]
     fn replace_bitwise_or_with_bitwise_and_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a | b; }";
+        let after = r"fun f(a: int, b: int) { val result = a & b; }";
         assert_rule_mutates_to("replace_bitwise_or_with_bitwise_and", before, after);
     }
 
     #[test]
     fn replace_bitwise_and_with_bitwise_xor_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a & b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a & b; }";
+        let after = r"fun f(a: int, b: int) { val result = a ^ b; }";
         assert_rule_mutates_to("replace_bitwise_and_with_bitwise_xor", before, after);
     }
 
     #[test]
     fn replace_bitwise_or_with_bitwise_xor_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a | b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a | b; }";
+        let after = r"fun f(a: int, b: int) { val result = a ^ b; }";
         assert_rule_mutates_to("replace_bitwise_or_with_bitwise_xor", before, after);
     }
 
     #[test]
     fn replace_bitwise_xor_with_bitwise_and_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a & b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a ^ b; }";
+        let after = r"fun f(a: int, b: int) { val result = a & b; }";
         assert_rule_mutates_to("replace_bitwise_xor_with_bitwise_and", before, after);
     }
 
     #[test]
     fn replace_bitwise_xor_with_bitwise_or_changes_source() {
-        let before = r#"fun f(a: int, b: int) { val result = a ^ b; }"#;
-        let after = r#"fun f(a: int, b: int) { val result = a | b; }"#;
+        let before = r"fun f(a: int, b: int) { val result = a ^ b; }";
+        let after = r"fun f(a: int, b: int) { val result = a | b; }";
         assert_rule_mutates_to("replace_bitwise_xor_with_bitwise_or", before, after);
     }
 
     #[test]
     fn replace_bitwise_and_assign_with_bitwise_or_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value &= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value |= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_and_assign_with_bitwise_or_assign",
             before,
@@ -1116,8 +1116,8 @@ fun f() {
 
     #[test]
     fn replace_bitwise_and_assign_with_bitwise_xor_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value &= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value ^= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_and_assign_with_bitwise_xor_assign",
             before,
@@ -1127,8 +1127,8 @@ fun f() {
 
     #[test]
     fn replace_bitwise_or_assign_with_bitwise_and_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value |= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value &= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_or_assign_with_bitwise_and_assign",
             before,
@@ -1138,8 +1138,8 @@ fun f() {
 
     #[test]
     fn replace_bitwise_or_assign_with_bitwise_xor_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value |= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value ^= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_or_assign_with_bitwise_xor_assign",
             before,
@@ -1149,8 +1149,8 @@ fun f() {
 
     #[test]
     fn replace_bitwise_xor_assign_with_bitwise_and_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value &= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value ^= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value &= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_xor_assign_with_bitwise_and_assign",
             before,
@@ -1160,8 +1160,8 @@ fun f() {
 
     #[test]
     fn replace_bitwise_xor_assign_with_bitwise_or_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value ^= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value |= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value ^= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value |= b; }";
         assert_rule_mutates_to(
             "replace_bitwise_xor_assign_with_bitwise_or_assign",
             before,
@@ -1171,8 +1171,8 @@ fun f() {
 
     #[test]
     fn replace_left_shift_assign_with_right_shift_assign_changes_source() {
-        let before = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
-        let after = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
+        let before = r"fun f(value: int) { var result = value; result <<= 1; }";
+        let after = r"fun f(value: int) { var result = value; result >>= 1; }";
         assert_rule_mutates_to(
             "replace_left_shift_assign_with_right_shift_assign",
             before,
@@ -1182,8 +1182,8 @@ fun f() {
 
     #[test]
     fn replace_right_shift_assign_with_left_shift_assign_changes_source() {
-        let before = r#"fun f(value: int) { var result = value; result >>= 1; }"#;
-        let after = r#"fun f(value: int) { var result = value; result <<= 1; }"#;
+        let before = r"fun f(value: int) { var result = value; result >>= 1; }";
+        let after = r"fun f(value: int) { var result = value; result <<= 1; }";
         assert_rule_mutates_to(
             "replace_right_shift_assign_with_left_shift_assign",
             before,
@@ -1193,85 +1193,85 @@ fun f() {
 
     #[test]
     fn replace_left_shift_with_right_shift_changes_source() {
-        let before = r#"fun f(value: int) { val result = value << 1; }"#;
-        let after = r#"fun f(value: int) { val result = value >> 1; }"#;
+        let before = r"fun f(value: int) { val result = value << 1; }";
+        let after = r"fun f(value: int) { val result = value >> 1; }";
         assert_rule_mutates_to("replace_left_shift_with_right_shift", before, after);
     }
 
     #[test]
     fn replace_right_shift_with_left_shift_changes_source() {
-        let before = r#"fun f(value: int) { val result = value >> 1; }"#;
-        let after = r#"fun f(value: int) { val result = value << 1; }"#;
+        let before = r"fun f(value: int) { val result = value >> 1; }";
+        let after = r"fun f(value: int) { val result = value << 1; }";
         assert_rule_mutates_to("replace_right_shift_with_left_shift", before, after);
     }
 
     #[test]
     fn remove_logical_not_changes_source() {
-        let before = r#"fun f(flag: bool) { val result = !flag; }"#;
-        let after = r#"fun f(flag: bool) { val result = flag; }"#;
+        let before = r"fun f(flag: bool) { val result = !flag; }";
+        let after = r"fun f(flag: bool) { val result = flag; }";
         assert_rule_mutates_to("remove_logical_not", before, after);
     }
 
     #[test]
     fn remove_bitwise_not_changes_source() {
-        let before = r#"fun f(value: int) { val result = ~value; }"#;
-        let after = r#"fun f(value: int) { val result = value; }"#;
+        let before = r"fun f(value: int) { val result = ~value; }";
+        let after = r"fun f(value: int) { val result = value; }";
         assert_rule_mutates_to("remove_bitwise_not", before, after);
     }
 
     #[test]
     fn replace_multiply_assign_with_divide_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value *= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value /= b; }";
         assert_rule_mutates_to("replace_multiply_assign_with_divide_assign", before, after);
     }
 
     #[test]
     fn replace_divide_assign_with_multiply_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value /= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value /= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value *= b; }";
         assert_rule_mutates_to("replace_divide_assign_with_multiply_assign", before, after);
     }
 
     #[test]
     fn replace_multiply_assign_with_modulo_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value *= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value %= b; }";
         assert_rule_mutates_to("replace_multiply_assign_with_modulo_assign", before, after);
     }
 
     #[test]
     fn replace_modulo_assign_with_multiply_assign_changes_source() {
-        let before = r#"fun f(a: int, b: int) { var value = a; value %= b; }"#;
-        let after = r#"fun f(a: int, b: int) { var value = a; value *= b; }"#;
+        let before = r"fun f(a: int, b: int) { var value = a; value %= b; }";
+        let after = r"fun f(a: int, b: int) { var value = a; value *= b; }";
         assert_rule_mutates_to("replace_modulo_assign_with_multiply_assign", before, after);
     }
 
     #[test]
     fn remove_unary_minus_changes_source() {
-        let before = r#"fun f(value: int) { val result = -value; }"#;
-        let after = r#"fun f(value: int) { val result = value; }"#;
+        let before = r"fun f(value: int) { val result = -value; }";
+        let after = r"fun f(value: int) { val result = value; }";
         assert_rule_mutates_to("remove_unary_minus", before, after);
     }
 
     #[test]
     fn replace_if_condition_with_true_changes_source() {
-        let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
-        let after = r#"fun f(flag: bool) { if (true) { throw 1; } }"#;
+        let before = r"fun f(flag: bool) { if (flag) { throw 1; } }";
+        let after = r"fun f(flag: bool) { if (true) { throw 1; } }";
         assert_rule_mutates_to("replace_if_condition_with_true", before, after);
     }
 
     #[test]
     fn replace_if_condition_with_false_changes_source() {
-        let before = r#"fun f(flag: bool) { if (flag) { throw 1; } }"#;
-        let after = r#"fun f(flag: bool) { if (false) { throw 1; } }"#;
+        let before = r"fun f(flag: bool) { if (flag) { throw 1; } }";
+        let after = r"fun f(flag: bool) { if (false) { throw 1; } }";
         assert_rule_mutates_to("replace_if_condition_with_false", before, after);
     }
 
     #[test]
     fn replace_while_condition_with_false_changes_source() {
-        let before = r#"fun f(flag: bool) { var keep = flag; while (keep) { keep = false; } }"#;
-        let after = r#"fun f(flag: bool) { var keep = flag; while (false) { keep = false; } }"#;
+        let before = r"fun f(flag: bool) { var keep = flag; while (keep) { keep = false; } }";
+        let after = r"fun f(flag: bool) { var keep = flag; while (false) { keep = false; } }";
         assert_rule_mutates_to("replace_while_condition_with_false", before, after);
     }
 

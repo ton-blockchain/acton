@@ -1,0 +1,4216 @@
+Step 1 (before):
+  Code:
+    176|
+    177| get fun `test txcursor can split and resume a forwarded chain`() {
+    178|     val deployer = testing.treasury("deployer");
+                                             ^^^^^^^^^^
+    179|     val forwarder = Forwarder.fromEmpty();
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 2 (step_in):
+  Code:
+    176|
+    177| get fun `test txcursor can split and resume a forwarded chain`() {
+    178|     val deployer = testing.treasury("deployer");
+                 ^^^^^^^^
+    179|     val forwarder = Forwarder.fromEmpty();
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_in):
+  Code:
+    177| get fun `test txcursor can split and resume a forwarded chain`() {
+    178|     val deployer = testing.treasury("deployer");
+    179|     val forwarder = Forwarder.fromEmpty();
+                             ^^^^^^^^^^^^^^^^^^^^^
+    180|     val receiver = Receiver.fromStorage({
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_in):
+  Code:
+    116| fun Forwarder.fromEmpty(): Forwarder {
+    117|     val init = ContractState {
+    118|         code: build("forwarder"),
+                             ^^^^^^^^^^^
+    119|         data: createEmptyCell(),
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_in):
+  Code:
+    117|     val init = ContractState {
+    118|         code: build("forwarder"),
+    119|         data: createEmptyCell(),
+                       ^^^^^^^^^^^^^^^^^
+    120|     };
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_in):
+  Code:
+    115|
+    116| fun Forwarder.fromEmpty(): Forwarder {
+    117|     val init = ContractState {
+                 ^^^^
+    118|         code: build("forwarder"),
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_in):
+  Code:
+    119|         data: createEmptyCell(),
+    120|     };
+    121|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+                                               ^^^^^^^^^^^^^^^
+    122|     return Forwarder { address, init };
+  Variables:
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = empty cell
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 8 (step_in):
+  Code:
+    120|     };
+    121|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    122|     return Forwarder { address, init };
+                                ^^^^^^^
+    123| }
+  Variables:
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = empty cell
+    address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      raw = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 9 (step_in):
+  Code:
+    120|     };
+    121|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    122|     return Forwarder { address, init };
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    123| }
+  Variables:
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = empty cell
+    address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      raw = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    (return value): Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 10 (step_in):
+  Code:
+    177| get fun `test txcursor can split and resume a forwarded chain`() {
+    178|     val deployer = testing.treasury("deployer");
+    179|     val forwarder = Forwarder.fromEmpty();
+                 ^^^^^^^^^
+    180|     val receiver = Receiver.fromStorage({
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 11 (step_in):
+  Code:
+    179|     val forwarder = Forwarder.fromEmpty();
+    180|     val receiver = Receiver.fromStorage({
+    181|         received: 0,
+                 ^^^^^^^^^^^
+    182|         lastQueryId: 0,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 12 (step_in):
+  Code:
+    180|     val receiver = Receiver.fromStorage({
+    181|         received: 0,
+    182|         lastQueryId: 0,
+                 ^^^^^^^^^^^^^^
+    183|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 13 (step_in):
+  Code:
+    178|     val deployer = testing.treasury("deployer");
+    179|     val forwarder = Forwarder.fromEmpty();
+    180|     val receiver = Receiver.fromStorage({
+                            ^
+    181|         received: 0,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 14 (step_in):
+  Code:
+    152| fun Receiver.fromStorage(storage: ReceiverStorage): Receiver {
+    153|     val init = ContractState {
+    154|         code: build("receiver"),
+                             ^^^^^^^^^^
+    155|         data: storage.toCell(),
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 15 (step_in):
+  Code:
+    153|     val init = ContractState {
+    154|         code: build("receiver"),
+    155|         data: storage.toCell(),
+                       ^^^^^^^^^^^^^^^^
+    156|     };
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 16 (step_in):
+  Code:
+    151|
+    152| fun Receiver.fromStorage(storage: ReceiverStorage): Receiver {
+    153|     val init = ContractState {
+                 ^^^^
+    154|         code: build("receiver"),
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 17 (step_in):
+  Code:
+    155|         data: storage.toCell(),
+    156|     };
+    157|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+                                               ^^^^^^^^^^^^^^^
+    158|     return Receiver { address, init };
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 18 (step_in):
+  Code:
+    156|     };
+    157|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    158|     return Receiver { address, init };
+                               ^^^^^^^
+    159| }
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 96 bits, 0 refs, hash: [HASH]
+    address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 19 (step_in):
+  Code:
+    156|     };
+    157|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    158|     return Receiver { address, init };
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    159| }
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 96 bits, 0 refs, hash: [HASH]
+    address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    (return value): Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 20 (step_in):
+  Code:
+    178|     val deployer = testing.treasury("deployer");
+    179|     val forwarder = Forwarder.fromEmpty();
+    180|     val receiver = Receiver.fromStorage({
+                 ^^^^^^^^
+    181|         received: 0,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 21 (step_in):
+  Code:
+    183|     });
+    184|
+    185|     expect(forwarder.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+                                                                ^^^^^^^^
+    186|         to: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 22 (step_in):
+  Code:
+    125| fun Forwarder.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    126|     return net.send(from, createMessage({
+    127|         bounce: config.bounce,
+                 ^^^^^^^^^^^^^^^^^^^^^
+    128|         value: config.value,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 23 (step_in):
+  Code:
+    126|     return net.send(from, createMessage({
+    127|         bounce: config.bounce,
+    128|         value: config.value,
+                 ^^^^^^^^^^^^^^^^^^^
+    129|         dest: { stateInit: self.init },
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 24 (step_in):
+  Code:
+    127|         bounce: config.bounce,
+    128|         value: config.value,
+    129|         dest: { stateInit: self.init },
+                         ^^^^^^^^^^^^^^^^^^^^
+    130|     }));
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 25 (step_in):
+  Code:
+    124|
+    125| fun Forwarder.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    126|     return net.send(from, createMessage({
+                                   ^
+    127|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 26 (step_in):
+  Code:
+      1| import "../counter_messages"
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      4|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 81602
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 27 (step_in):
+  Code:
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+      4|     if (in.body.isEmpty()) {
+             ^^
+      5|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 81602
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 28 (step_in):
+  Code:
+    124|
+    125| fun Forwarder.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    126|     return net.send(from, createMessage({
+             ^
+    127|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000 (last seen)
+      bounce = <optimized out>
+    (return value): BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 29 (step_in):
+  Code:
+    183|     });
+    184|
+    185|     expect(forwarder.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    186|         to: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 30 (step_in):
+  Code:
+    184|
+    185|     expect(forwarder.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+    186|         to: forwarder.address,
+                     ^^^^^^^^^^^^^^^^^
+    187|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 31 (step_in):
+  Code:
+    183|     });
+    184|
+    185|     expect(forwarder.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+                                                                                                    ^
+    186|         to: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 32 (step_in):
+  Code:
+    186|         to: forwarder.address,
+    187|     });
+    188|     expect(receiver.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+                                                               ^^^^^^^^
+    189|         to: receiver.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 33 (step_in):
+  Code:
+    161| fun Receiver.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    162|     return net.send(from, createMessage({
+    163|         bounce: config.bounce,
+                 ^^^^^^^^^^^^^^^^^^^^^
+    164|         value: config.value,
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 34 (step_in):
+  Code:
+    162|     return net.send(from, createMessage({
+    163|         bounce: config.bounce,
+    164|         value: config.value,
+                 ^^^^^^^^^^^^^^^^^^^
+    165|         dest: { stateInit: self.init },
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 35 (step_in):
+  Code:
+    163|         bounce: config.bounce,
+    164|         value: config.value,
+    165|         dest: { stateInit: self.init },
+                         ^^^^^^^^^^^^^^^^^^^^
+    166|     }));
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 36 (step_in):
+  Code:
+    160|
+    161| fun Receiver.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    162|     return net.send(from, createMessage({
+                                   ^
+    163|         bounce: config.bounce,
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 37 (step_in):
+  Code:
+      6| }
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      9|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 107647
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 38 (step_in):
+  Code:
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+      9|     if (in.body.isEmpty()) {
+             ^^
+     10|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 107647
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 39 (step_in):
+  Code:
+    160|
+    161| fun Receiver.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    162|     return net.send(from, createMessage({
+             ^
+    163|         bounce: config.bounce,
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    config: SendParams
+      value: coins = 1000000000 (last seen)
+      bounce = <optimized out>
+    (return value): BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 40 (step_in):
+  Code:
+    186|         to: forwarder.address,
+    187|     });
+    188|     expect(receiver.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    189|         to: receiver.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 41 (step_in):
+  Code:
+    187|     });
+    188|     expect(receiver.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+    189|         to: receiver.address,
+                     ^^^^^^^^^^^^^^^^
+    190|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 42 (step_in):
+  Code:
+    186|         to: forwarder.address,
+    187|     });
+    188|     expect(receiver.deploy(deployer.address, { value: ton("1") })).toHaveSuccessfulDeploy({
+                                                                                                   ^
+    189|         to: receiver.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 43 (step_in):
+  Code:
+    190|     });
+    191|
+    192|     val trigger = forwarder.createTriggerMessage(receiver.address, 42, { value: ton("0.5") });
+                                                                                         ^^^^^^^^^^
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 44 (step_in):
+  Code:
+    138| ): OutMessage {
+    139|     return createMessage({
+    140|         bounce: config.bounce,
+                 ^^^^^^^^^^^^^^^^^^^^^
+    141|         value: config.value,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 45 (step_in):
+  Code:
+    139|     return createMessage({
+    140|         bounce: config.bounce,
+    141|         value: config.value,
+                 ^^^^^^^^^^^^^^^^^^^
+    142|         dest: self.address,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 46 (step_in):
+  Code:
+    140|         bounce: config.bounce,
+    141|         value: config.value,
+    142|         dest: self.address,
+                 ^^^^^^^^^^^^^^^^^^
+    143|         body: TriggerForward { queryId, target },
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 47 (step_in):
+  Code:
+    141|         value: config.value,
+    142|         dest: self.address,
+    143|         body: TriggerForward { queryId, target },
+                                        ^^^^^^^
+    144|     });
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 48 (step_in):
+  Code:
+    137|     config: SendParams = {},
+    138| ): OutMessage {
+    139|     return createMessage({
+                    ^
+    140|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 49 (step_in):
+  Code:
+    137|     config: SendParams = {},
+    138| ): OutMessage {
+    139|     return createMessage({
+             ^
+    140|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000 (last seen)
+      bounce = <optimized out>
+    (return value): OutMessage
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 50 (step_in):
+  Code:
+    190|     });
+    191|
+    192|     val trigger = forwarder.createTriggerMessage(receiver.address, 42, { value: ton("0.5") });
+                 ^^^^^^^
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 51 (step_in):
+  Code:
+    191|
+    192|     val trigger = forwarder.createTriggerMessage(receiver.address, 42, { value: ton("0.5") });
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    194|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 52 (step_in):
+  Code:
+    191|
+    192|     val trigger = forwarder.createTriggerMessage(receiver.address, 42, { value: ton("0.5") });
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+                 ^^^^^^
+    194|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 53 (step_in):
+  Code:
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+    194|
+    195|     val firstHop = cursor.executeN(1);
+                                            ^
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 54 (step_in):
+  Code:
+      1| import "../counter_messages"
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      4|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 55 (step_in):
+  Code:
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+      4|     if (in.body.isEmpty()) {
+             ^^
+      5|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 56 (step_in):
+  Code:
+      6|     }
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+                 ^^^
+      9|     createMessage({
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 57 (step_in):
+  Code:
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+             ^
+     10|         bounce: false,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42 (not loaded)
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e (not loaded)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 58 (step_in):
+  Code:
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+     10|         bounce: false,
+                 ^^^^^^^^^^^^^
+     11|         value: ton("0.2"),
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 59 (step_in):
+  Code:
+      9|     createMessage({
+     10|         bounce: false,
+     11|         value: ton("0.2"),
+                        ^^^^^^^^^^
+     12|         dest: msg.target,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 60 (step_in):
+  Code:
+     10|         bounce: false,
+     11|         value: ton("0.2"),
+     12|         dest: msg.target,
+                 ^^^^^^^^^^^^^^^^
+     13|         body: Notify {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 61 (step_in):
+  Code:
+     11|         value: ton("0.2"),
+     12|         dest: msg.target,
+     13|         body: Notify {
+                 ^
+     14|             queryId: msg.queryId,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 62 (step_in):
+  Code:
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+             ^
+     10|         bounce: false,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 63 (step_in):
+  Code:
+     14|             queryId: msg.queryId,
+     15|         },
+     16|     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     17| }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 42 (last seen)
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 64 (step_in):
+  Code:
+    193|     val cursor = testing.createTraceIterationCursor(deployer.address, trigger);
+    194|
+    195|     val firstHop = cursor.executeN(1);
+                 ^^^^^^^^
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 65 (step_in):
+  Code:
+    194|
+    195|     val firstHop = cursor.executeN(1);
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+             ^^^^^^^^^^^^^^^^
+    197|         from: deployer.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 66 (step_in):
+  Code:
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+    197|         from: deployer.address,
+    198|         to: forwarder.address,
+                     ^^^^^^^^^^^^^^^^^
+    199|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 67 (step_in):
+  Code:
+    195|     val firstHop = cursor.executeN(1);
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+    197|         from: deployer.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^
+    198|         to: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 68 (step_in):
+  Code:
+    194|
+    195|     val firstHop = cursor.executeN(1);
+    196|     expect(firstHop).toHaveSuccessfulTx<TriggerForward>({
+                                                                 ^
+    197|         from: deployer.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 69 (step_in):
+  Code:
+    198|         to: forwarder.address,
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+                             ^^^^^^^^
+    201|     expect(cursor.isDone()).toEqual(false);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 70 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+                                                   ^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 71 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+                    ^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 72 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 73 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received: uint32 = 0
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 74 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Variables:
+    (return value): int = 0
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 75 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 76 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 77 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 78 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    (return value): int = 0
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 79 (step_in):
+  Code:
+    198|         to: forwarder.address,
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    201|     expect(cursor.isDone()).toEqual(false);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 80 (step_in):
+  Code:
+    198|         to: forwarder.address,
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+                                                 ^
+    201|     expect(cursor.isDone()).toEqual(false);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 81 (step_in):
+  Code:
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+    201|     expect(cursor.isDone()).toEqual(false);
+                           ^^^^^^
+    202|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 82 (step_in):
+  Code:
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+    201|     expect(cursor.isDone()).toEqual(false);
+             ^^^^^^^^^^^^^^^^^^^^^^^
+    202|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 83 (step_in):
+  Code:
+    199|     });
+    200|     expect(receiver.received()).toEqual(0);
+    201|     expect(cursor.isDone()).toEqual(false);
+                                             ^^^^^
+    202|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 84 (step_in):
+  Code:
+    203|     val receiverHop = cursor.executeTill<Notify>({
+    204|         from: forwarder.address,
+    205|         to: receiver.address,
+                     ^^^^^^^^^^^^^^^^
+    206|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 85 (step_in):
+  Code:
+    202|
+    203|     val receiverHop = cursor.executeTill<Notify>({
+    204|         from: forwarder.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+    205|         to: receiver.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 86 (step_in):
+  Code:
+    201|     expect(cursor.isDone()).toEqual(false);
+    202|
+    203|     val receiverHop = cursor.executeTill<Notify>({
+                                                          ^
+    204|         from: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 87 (step_in):
+  Code:
+      6| }
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      9|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 88 (step_in):
+  Code:
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+      9|     if (in.body.isEmpty()) {
+             ^^
+     10|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 89 (step_in):
+  Code:
+     11|     }
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+                 ^^^
+     14|     var storage = ReceiverStorage.load();
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 90 (step_in):
+  Code:
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+                           ^^^^^^^^^^^^^^^^^^^^^^
+     15|     storage.received += 1;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+    msg: Notify (lazy)
+      queryId: uint64 = 42 (not loaded)
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 91 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 92 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received: uint32 = 0
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 93 (step_in):
+  Code:
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+                 ^^^^^^^
+     15|     storage.received += 1;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 42 (not loaded)
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 94 (step_in):
+  Code:
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+     15|     storage.received += 1;
+             ^^^^^^^^^^^^^^^^^^^^^
+     16|     storage.lastQueryId = msg.queryId;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 42 (not loaded)
+    storage: ReceiverStorage
+      received: uint32 = 0
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 95 (step_in):
+  Code:
+     14|     var storage = ReceiverStorage.load();
+     15|     storage.received += 1;
+     16|     storage.lastQueryId = msg.queryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     17|     storage.save();
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 42 (not loaded)
+    storage: ReceiverStorage
+      received: uint32 = 1
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 96 (step_in):
+  Code:
+     15|     storage.received += 1;
+     16|     storage.lastQueryId = msg.queryId;
+     17|     storage.save();
+                     ^^^^
+     18| }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 4000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 42
+    storage: ReceiverStorage
+      received: uint32 = 1
+      lastQueryId: uint64 = 42
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 97 (step_in):
+  Code:
+     43|
+     44| fun ReceiverStorage.save(self) {
+     45|     contract.setData(self.toCell());
+                              ^^^^^^^^^^^^^
+     46| }
+  Variables:
+    self: ReceiverStorage
+      received: uint32 = 1
+      lastQueryId: uint64 = 42
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 98 (step_in):
+  Code:
+    201|     expect(cursor.isDone()).toEqual(false);
+    202|
+    203|     val receiverHop = cursor.executeTill<Notify>({
+                 ^^^^^^^^^^^
+    204|         from: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 99 (step_in):
+  Code:
+    205|         to: receiver.address,
+    206|     });
+    207|     expect(receiverHop).toHaveSuccessfulTx<Notify>({
+             ^^^^^^^^^^^^^^^^^^^
+    208|         from: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 100 (step_in):
+  Code:
+    207|     expect(receiverHop).toHaveSuccessfulTx<Notify>({
+    208|         from: forwarder.address,
+    209|         to: receiver.address,
+                     ^^^^^^^^^^^^^^^^
+    210|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 101 (step_in):
+  Code:
+    206|     });
+    207|     expect(receiverHop).toHaveSuccessfulTx<Notify>({
+    208|         from: forwarder.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+    209|         to: receiver.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 102 (step_in):
+  Code:
+    205|         to: receiver.address,
+    206|     });
+    207|     expect(receiverHop).toHaveSuccessfulTx<Notify>({
+                                                            ^
+    208|         from: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 103 (step_in):
+  Code:
+    209|         to: receiver.address,
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+                             ^^^^^^^^
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 104 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+                                                   ^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 105 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+                    ^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 106 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 107 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received: uint32 = 1
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 108 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Variables:
+    (return value): int = 1
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 109 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 110 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 111 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 112 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    (return value): int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 113 (step_in):
+  Code:
+    209|         to: receiver.address,
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 114 (step_in):
+  Code:
+    209|         to: receiver.address,
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+                                                 ^
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 115 (step_in):
+  Code:
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+                             ^^^^^^^^^^^
+    213|     expect(cursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 116 (step_in):
+  Code:
+    172|
+    173| fun Receiver.lastQueryId(self): int {
+    174|     return net.runGetMethod(self.address, "lastQueryId");
+                                                   ^^^^^^^^^^^^^
+    175| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 117 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+                    ^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 118 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 119 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received = <optimized out>
+      lastQueryId: uint64 = 42
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 120 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Variables:
+    (return value): int = 42
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 121 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 122 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 123 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 124 (step_in):
+  Code:
+    172|
+    173| fun Receiver.lastQueryId(self): int {
+    174|     return net.runGetMethod(self.address, "lastQueryId");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    175| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    (return value): int = 42
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 125 (step_in):
+  Code:
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    213|     expect(cursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 126 (step_in):
+  Code:
+    210|     });
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+                                                    ^^
+    213|     expect(cursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 127 (step_in):
+  Code:
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+    213|     expect(cursor.isDone()).toEqual(true);
+                           ^^^^^^
+    214|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 128 (step_in):
+  Code:
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+    213|     expect(cursor.isDone()).toEqual(true);
+             ^^^^^^^^^^^^^^^^^^^^^^^
+    214|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 129 (step_in):
+  Code:
+    211|     expect(receiver.received()).toEqual(1);
+    212|     expect(receiver.lastQueryId()).toEqual(42);
+    213|     expect(cursor.isDone()).toEqual(true);
+                                             ^^^^
+    214|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 130 (step_in):
+  Code:
+    213|     expect(cursor.isDone()).toEqual(true);
+    214|
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+                                                                                               ^^^^^^^^^^
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 131 (step_in):
+  Code:
+    138| ): OutMessage {
+    139|     return createMessage({
+    140|         bounce: config.bounce,
+                 ^^^^^^^^^^^^^^^^^^^^^
+    141|         value: config.value,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 132 (step_in):
+  Code:
+    139|     return createMessage({
+    140|         bounce: config.bounce,
+    141|         value: config.value,
+                 ^^^^^^^^^^^^^^^^^^^
+    142|         dest: self.address,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 133 (step_in):
+  Code:
+    140|         bounce: config.bounce,
+    141|         value: config.value,
+    142|         dest: self.address,
+                 ^^^^^^^^^^^^^^^^^^
+    143|         body: TriggerForward { queryId, target },
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 134 (step_in):
+  Code:
+    141|         value: config.value,
+    142|         dest: self.address,
+    143|         body: TriggerForward { queryId, target },
+                                        ^^^^^^^
+    144|     });
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 135 (step_in):
+  Code:
+    137|     config: SendParams = {},
+    138| ): OutMessage {
+    139|     return createMessage({
+                    ^
+    140|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000
+      bounce = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 136 (step_in):
+  Code:
+    137|     config: SendParams = {},
+    138| ): OutMessage {
+    139|     return createMessage({
+             ^
+    140|         bounce: config.bounce,
+  Variables:
+    self: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      raw = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    queryId = <optimized out>
+    config: SendParams
+      value: coins = 500000000 (last seen)
+      bounce = <optimized out>
+    (return value): OutMessage
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 137 (step_in):
+  Code:
+    213|     expect(cursor.isDone()).toEqual(true);
+    214|
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+                 ^^^^^^^^^^^^^
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 138 (step_in):
+  Code:
+    214|
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 139 (step_in):
+  Code:
+    214|
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+                 ^^^^^^^^^^^^
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 140 (step_in):
+  Code:
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+                                             ^^^^^^^^^^^^^^^^^^^
+    218|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 141 (step_in):
+  Code:
+      1| import "../counter_messages"
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      4|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 142 (step_in):
+  Code:
+      2|
+      3| fun onInternalMessage(in: InMessage) {
+      4|     if (in.body.isEmpty()) {
+             ^^
+      5|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 143 (step_in):
+  Code:
+      6|     }
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+                 ^^^
+      9|     createMessage({
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 144 (step_in):
+  Code:
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+             ^
+     10|         bounce: false,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH]
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43 (not loaded)
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e (not loaded)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 145 (step_in):
+  Code:
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+     10|         bounce: false,
+                 ^^^^^^^^^^^^^
+     11|         value: ton("0.2"),
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 146 (step_in):
+  Code:
+      9|     createMessage({
+     10|         bounce: false,
+     11|         value: ton("0.2"),
+                        ^^^^^^^^^^
+     12|         dest: msg.target,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 147 (step_in):
+  Code:
+     10|         bounce: false,
+     11|         value: ton("0.2"),
+     12|         dest: msg.target,
+                 ^^^^^^^^^^^^^^^^
+     13|         body: Notify {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 148 (step_in):
+  Code:
+     11|         value: ton("0.2"),
+     12|         dest: msg.target,
+     13|         body: Notify {
+                 ^
+     14|             queryId: msg.queryId,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 149 (step_in):
+  Code:
+      7|
+      8|     val msg = lazy TriggerForward.fromSlice(in.body);
+      9|     createMessage({
+             ^
+     10|         bounce: false,
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 150 (step_in):
+  Code:
+     14|             queryId: msg.queryId,
+     15|         },
+     16|     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     17| }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 500000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 65024
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 363 bits, 0 refs, hash: [HASH] (last seen)
+    msg: TriggerForward (lazy)
+      queryId: uint64 = 43 (last seen)
+      target: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 151 (step_in):
+  Code:
+      6| }
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+      9|     if (in.body.isEmpty()) {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 152 (step_in):
+  Code:
+      7|
+      8| fun onInternalMessage(in: InMessage) {
+      9|     if (in.body.isEmpty()) {
+             ^^
+     10|         return;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 153 (step_in):
+  Code:
+     11|     }
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+                 ^^^
+     14|     var storage = ReceiverStorage.load();
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 154 (step_in):
+  Code:
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+                           ^^^^^^^^^^^^^^^^^^^^^^
+     15|     storage.received += 1;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH]
+    msg: Notify (lazy)
+      queryId: uint64 = 43 (not loaded)
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 155 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 156 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received: uint32 = 1
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 157 (step_in):
+  Code:
+     12|
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+                 ^^^^^^^
+     15|     storage.received += 1;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 43 (not loaded)
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 158 (step_in):
+  Code:
+     13|     val msg = lazy Notify.fromSlice(in.body);
+     14|     var storage = ReceiverStorage.load();
+     15|     storage.received += 1;
+             ^^^^^^^^^^^^^^^^^^^^^
+     16|     storage.lastQueryId = msg.queryId;
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 43 (not loaded)
+    storage: ReceiverStorage
+      received: uint32 = 1
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 159 (step_in):
+  Code:
+     14|     var storage = ReceiverStorage.load();
+     15|     storage.received += 1;
+     16|     storage.lastQueryId = msg.queryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     17|     storage.save();
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 43 (not loaded)
+    storage: ReceiverStorage
+      received: uint32 = 2
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 160 (step_in):
+  Code:
+     15|     storage.received += 1;
+     16|     storage.lastQueryId = msg.queryId;
+     17|     storage.save();
+                     ^^^^
+     18| }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      valueCoins: coins = 200000000
+      valueExtra: map<int32, varuint32> = {}
+      originalForwardFee: coins = 44446
+      createdLt: uint64 = 6000001
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 96 bits, 0 refs, hash: [HASH] (last seen)
+    msg: Notify (lazy)
+      queryId: uint64 = 43
+    storage: ReceiverStorage
+      received: uint32 = 2
+      lastQueryId: uint64 = 43
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 161 (step_in):
+  Code:
+     43|
+     44| fun ReceiverStorage.save(self) {
+     45|     contract.setData(self.toCell());
+                              ^^^^^^^^^^^^^
+     46| }
+  Variables:
+    self: ReceiverStorage
+      received: uint32 = 2
+      lastQueryId: uint64 = 43
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 162 (step_in):
+  Code:
+    215|     val secondTrigger = forwarder.createTriggerMessage(receiver.address, 43, { value: ton("0.5") });
+    216|     val secondCursor = testing.createTraceIterationCursor(deployer.address, secondTrigger);
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+                 ^^^^^^^^^^^^
+    218|
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 163 (step_in):
+  Code:
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+    218|
+    219|     expect(allRemaining).toHaveSuccessfulTx<TriggerForward>({
+             ^^^^^^^^^^^^^^^^^^^^
+    220|         from: deployer.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 164 (step_in):
+  Code:
+    219|     expect(allRemaining).toHaveSuccessfulTx<TriggerForward>({
+    220|         from: deployer.address,
+    221|         to: forwarder.address,
+                     ^^^^^^^^^^^^^^^^^
+    222|     });
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 165 (step_in):
+  Code:
+    218|
+    219|     expect(allRemaining).toHaveSuccessfulTx<TriggerForward>({
+    220|         from: deployer.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^
+    221|         to: forwarder.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 166 (step_in):
+  Code:
+    217|     val allRemaining = secondCursor.executeAllRemaining();
+    218|
+    219|     expect(allRemaining).toHaveSuccessfulTx<TriggerForward>({
+                                                                     ^
+    220|         from: deployer.address,
+  Variables:
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 167 (step_in):
+  Code:
+    221|         to: forwarder.address,
+    222|     });
+    223|     expect(allRemaining).toHaveSuccessfulTx<Notify>({
+             ^^^^^^^^^^^^^^^^^^^^
+    224|         from: forwarder.address,
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 168 (step_in):
+  Code:
+    223|     expect(allRemaining).toHaveSuccessfulTx<Notify>({
+    224|         from: forwarder.address,
+    225|         to: receiver.address,
+                     ^^^^^^^^^^^^^^^^
+    226|     });
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 169 (step_in):
+  Code:
+    222|     });
+    223|     expect(allRemaining).toHaveSuccessfulTx<Notify>({
+    224|         from: forwarder.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+    225|         to: receiver.address,
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 170 (step_in):
+  Code:
+    221|         to: forwarder.address,
+    222|     });
+    223|     expect(allRemaining).toHaveSuccessfulTx<Notify>({
+                                                             ^
+    224|         from: forwarder.address,
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState = (last seen)
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 171 (step_in):
+  Code:
+    225|         to: receiver.address,
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+                             ^^^^^^^^
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 172 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+                                                   ^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 173 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+                    ^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 174 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 175 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received: uint32 = 2
+      lastQueryId = <optimized out>
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 176 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Variables:
+    (return value): int = 2
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 177 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 178 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 179 (step_in):
+  Code:
+     21|
+     22| get fun received(): int {
+     23|     return ReceiverStorage.load().received;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     24| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 180 (step_in):
+  Code:
+    168|
+    169| fun Receiver.received(self): int {
+    170|     return net.runGetMethod(self.address, "received");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    171| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    (return value): int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 181 (step_in):
+  Code:
+    225|         to: receiver.address,
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 182 (step_in):
+  Code:
+    225|         to: receiver.address,
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+                                                 ^
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 183 (step_in):
+  Code:
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+                             ^^^^^^^^^^^
+    229|     expect(secondCursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 184 (step_in):
+  Code:
+    172|
+    173| fun Receiver.lastQueryId(self): int {
+    174|     return net.runGetMethod(self.address, "lastQueryId");
+                                                   ^^^^^^^^^^^^^
+    175| }
+  Variables:
+    self: Receiver
+      address: address = 0:5559575c74f0a43117ddd2bf41296739a76277fbecb4fa032a358222ccb45a9e
+      init: ContractState = (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 185 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+                    ^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 186 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                                             ^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 187 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Variables:
+    (return value): ReceiverStorage
+      received = <optimized out>
+      lastQueryId: uint64 = 43
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 188 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Variables:
+    (return value): int = 43
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 189 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 190 (step_in):
+  Code:
+     39|
+     40| fun ReceiverStorage.load(): ReceiverStorage {
+     41|     return ReceiverStorage.fromCell(contract.getData());
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 191 (step_in):
+  Code:
+     25|
+     26| get fun lastQueryId(): int {
+     27|     return ReceiverStorage.load().lastQueryId;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     28| }
+  Registers:
+    c4 (storage): Cell<ReceiverStorage> = 96 bits, 0 refs, hash: [HASH]
+      decoded: ReceiverStorage
+      bits = 96
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 192 (step_in):
+  Code:
+    172|
+    173| fun Receiver.lastQueryId(self): int {
+    174|     return net.runGetMethod(self.address, "lastQueryId");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    175| }
+  Variables:
+    self: Receiver
+      address: address = cell{[BOC_HEX]}
+      init: ContractState = (last seen)
+    (return value): int = 43
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 193 (step_in):
+  Code:
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    229|     expect(secondCursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver
+      address: address = cell{[BOC_HEX]}
+      init: ContractState = (last seen)
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 194 (step_in):
+  Code:
+    226|     });
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+                                                    ^^
+    229|     expect(secondCursor.isDone()).toEqual(true);
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver = (last seen)
+      address: address = cell{[BOC_HEX]}
+      init: ContractState
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 195 (step_in):
+  Code:
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+    229|     expect(secondCursor.isDone()).toEqual(true);
+                                 ^^^^^^
+    230| }
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver = (last seen)
+      address: address = cell{[BOC_HEX]}
+      init: ContractState
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 196 (step_in):
+  Code:
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+    229|     expect(secondCursor.isDone()).toEqual(true);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    230| }
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver = (last seen)
+      address: address = cell{[BOC_HEX]}
+      init: ContractState
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor = (last seen)
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 197 (step_in):
+  Code:
+    227|     expect(receiver.received()).toEqual(2);
+    228|     expect(receiver.lastQueryId()).toEqual(43);
+    229|     expect(secondCursor.isDone()).toEqual(true);
+                                                   ^^^^
+    230| }
+  Variables:
+    deployer: Treasury = (last seen)
+      address: address = not a TVM slice
+    forwarder: Forwarder = (last seen)
+      address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
+      init: ContractState
+    receiver: Receiver = (last seen)
+      address: address = cell{[BOC_HEX]}
+      init: ContractState
+    trigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    cursor: TxCursor = (last seen)
+      id: int = 1
+    firstHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    receiverHop: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    secondTrigger: OutMessage = (last seen)
+      messageCell: cell = 779 bits, 0 refs, hash: [HASH]
+    secondCursor: TxCursor = (last seen)
+      id: int = 2
+    allRemaining: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell

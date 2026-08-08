@@ -1,31 +1,59 @@
 use super::handlers::utils::get_extra;
-use super::handlers::*;
-use crate::localnet::Localnet;
+use super::handlers::{
+    change_account_state, clear_checkpoints, create_checkpoint, delete_checkpoint, detect_address,
+    detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1, estimate_fee_v3,
+    export_checkpoint, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
+    get_address_information, get_address_information_v3, get_address_state,
+    get_adjacent_transactions_v3, get_block_header, get_block_transactions,
+    get_block_transactions_ext, get_blocks_v3, get_config_all, get_config_param,
+    get_consensus_block, get_dns_records, get_extended_address_information, get_jetton_burns,
+    get_jetton_masters, get_jetton_transfers, get_jetton_wallets, get_libraries,
+    get_masterchain_block_shard_state_v3, get_masterchain_block_shards_v3, get_masterchain_info,
+    get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_multisig_orders,
+    get_multisig_wallets, get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers,
+    get_out_msg_queue_size, get_pending_actions_v3, get_pending_traces_v3,
+    get_pending_transactions_v3, get_shard_account_cell, get_shards, get_startup_accounts,
+    get_status, get_token_data, get_top_accounts_by_balance_v3, get_traces, get_transactions,
+    get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
+    get_transactions_v3, get_verified_source, get_vesting, get_wallet_information,
+    get_wallet_information_v3, get_wallet_states_v3, import_checkpoint, increase_time,
+    jetton_faucet, json_rpc, list_checkpoints, load_state, lookup_block, mine_blocks, pack_address,
+    restore_checkpoint, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
+    send_boc_return_hash, send_internal_message, send_message_v3, set_mining_mode,
+    set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
+    source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
+    try_locate_source_tx, try_locate_tx, unpack_address,
+};
+use crate::server::{NetworkConditions, ServerState};
 use axum::{
     Json, Router,
-    http::{HeaderValue, Method, StatusCode, request::Parts},
+    extract::{DefaultBodyLimit, Request, State},
+    http::{Method, StatusCode, header},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-#[cfg(not(debug_assertions))]
-use include_dir::{Dir, include_dir};
 use serde_json::json;
-#[cfg(debug_assertions)]
-use std::path::PathBuf;
+use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::sleep;
+use ton_api::toncenter::{v2::responses::TonlibErrorResponse, v3::responses::RequestError};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
-use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-#[cfg(debug_assertions)]
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::compression::CompressionLayer;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-#[cfg(not(debug_assertions))]
-static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../acton-localnet-ui/dist");
+fn rate_limit_period(requests_per_second: NonZeroU32) -> Duration {
+    let nanoseconds = 1_000_000_000u64.div_ceil(u64::from(requests_per_second.get()));
+    Duration::from_nanos(nanoseconds)
+}
 
-pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router {
-    let api_v2_router = Router::new()
+pub fn create_router(state: ServerState) -> Router {
+    let rate_limit_rps = state.rate_limit_rps;
+    let mut api_v2_router = Router::new()
         .route("/v2", post(json_rpc))
         .route("/v2/jsonRPC", post(json_rpc))
         .route("/v2/v2/jsonRPC", post(json_rpc))
@@ -38,6 +66,7 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         .route("/v2/packAddress", get(pack_address))
         .route("/v2/unpackAddress", get(unpack_address))
         .route("/v2/getAddressInformation", get(get_address_information))
+        .route("/v2/getShardAccountCell", get(get_shard_account_cell))
         .route("/v2/getAddressBalance", get(get_address_balance))
         .route("/v2/getAddressState", get(get_address_state))
         .route("/v2/getLibraries", get(get_libraries))
@@ -45,6 +74,8 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
             "/v2/getExtendedAddressInformation",
             get(get_extended_address_information),
         )
+        .route("/v2/getWalletInformation", get(get_wallet_information))
+        .route("/v2/getTokenData", get(get_token_data))
         .route("/v2/getTransactions", get(get_transactions))
         .route("/v2/getTransactionsStd", get(get_transactions_std))
         .route("/v2/tryLocateTx", get(try_locate_tx))
@@ -65,44 +96,130 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         .route("/v2/shards", get(get_shards))
         .route("/v2/lookupBlock", get(lookup_block));
 
-    let api_v3_router = Router::new()
+    let mut api_v3_router = Router::new()
         .route("/v3/traces", get(get_traces))
         .route("/v3/accountStates", get(get_account_states_v3))
+        .route("/v3/addressBook", get(get_address_book_v3))
+        .route("/v3/metadata", get(get_metadata_v3))
         .route("/v3/addressInformation", get(get_address_information_v3))
+        .route("/v3/walletInformation", get(get_wallet_information_v3))
+        .route("/v3/masterchainInfo", get(get_masterchain_info_v3))
+        .route(
+            "/v3/masterchainBlockShardState",
+            get(get_masterchain_block_shard_state_v3),
+        )
+        .route(
+            "/v3/masterchainBlockShards",
+            get(get_masterchain_block_shards_v3),
+        )
         .route("/v3/transactions", get(get_transactions_v3))
+        .route("/v3/messages", get(get_messages_v3))
+        .route(
+            "/v3/adjacentTransactions",
+            get(get_adjacent_transactions_v3),
+        )
+        .route("/v3/walletStates", get(get_wallet_states_v3))
+        .route(
+            "/v3/topAccountsByBalance",
+            get(get_top_accounts_by_balance_v3),
+        )
+        .route("/v3/blocks", get(get_blocks_v3))
+        .route(
+            "/v3/transactionsByMasterchainBlock",
+            get(get_transactions_by_masterchain_block_v3),
+        )
         .route(
             "/v3/transactionsByMessage",
             get(get_transactions_by_message_v3),
         )
         .route("/v3/pendingTransactions", get(get_pending_transactions_v3))
+        .route("/v3/pendingActions", get(get_pending_actions_v3))
+        .route("/v3/pendingTraces", get(get_pending_traces_v3))
         .route("/v3/message", post(send_message_v3))
+        .route("/v3/estimateFee", post(estimate_fee_v3))
         .route("/v3/runGetMethod", post(run_get_method_v3))
         .route("/v3/jetton/masters", get(get_jetton_masters))
         .route("/v3/jetton/wallets", get(get_jetton_wallets))
-        .route("/v3/nft/items", get(get_nft_items));
+        .route("/v3/jetton/transfers", get(get_jetton_transfers))
+        .route("/v3/jetton/burns", get(get_jetton_burns))
+        .route("/v3/nft/items", get(get_nft_items))
+        .route("/v3/nft/collections", get(get_nft_collections))
+        .route("/v3/nft/sales", get(get_nft_sales))
+        .route("/v3/nft/transfers", get(get_nft_transfers))
+        .route("/v3/dns/records", get(get_dns_records))
+        .route("/v3/multisig/orders", get(get_multisig_orders))
+        .route("/v3/multisig/wallets", get(get_multisig_wallets))
+        .route("/v3/vesting", get(get_vesting));
 
-    let emulate_router = Router::new().route("/emulate/v1/emulateTrace", post(emulate_trace_v1));
+    let mut emulate_router = Router::new()
+        .route("/emulate/v1/emulateTrace", post(emulate_trace_v1))
+        .route(
+            "/emulate/v1/emulateTonConnect",
+            post(emulate_ton_connect_v1),
+        );
+    let streaming_router = Router::new()
+        .route("/streaming/v2/sse", post(streaming_sse))
+        .route("/streaming/v2/ws", get(streaming_ws));
+
+    let api_v2_conditions = state.network_conditions.clone();
+    api_v2_router = api_v2_router.layer(middleware::from_fn(move |request, next| {
+        delay_response(request, next, api_v2_conditions.clone())
+    }));
+    let api_v3_conditions = state.network_conditions.clone();
+    api_v3_router = api_v3_router.layer(middleware::from_fn(move |request, next| {
+        delay_response(request, next, api_v3_conditions.clone())
+    }));
+    let emulate_conditions = state.network_conditions.clone();
+    emulate_router = emulate_router.layer(middleware::from_fn(move |request, next| {
+        delay_response(request, next, emulate_conditions.clone())
+    }));
 
     let mut api_router = Router::new()
         .merge(api_v2_router)
         .merge(api_v3_router)
-        .merge(emulate_router);
-    let admin_router = Router::new()
-        .route("/faucet", post(faucet))
+        .merge(emulate_router)
+        .merge(streaming_router)
+        .fallback(handle_unknown_api);
+    let acton_router = Router::new()
+        .route("/acton_fundAccount", post(faucet))
+        .route("/acton_fundJetton", post(jetton_faucet))
+        .route("/acton_getVerifiedSource", get(get_verified_source))
+        .route("/acton_buildSourceTrace", post(build_source_trace))
+        .route("/acton_dumpState", get(dump_state))
         .route(
-            "/address-name",
-            get(get_address_name).post(set_address_name),
+            "/acton_loadState",
+            post(load_state).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
-        .route("/compiler-abi", get(get_compiler_abi))
-        .route("/compiler-abis", post(register_compiler_abis))
+        .route("/acton_createCheckpoint", post(create_checkpoint))
+        .route("/acton_listCheckpoints", get(list_checkpoints))
+        .route("/acton_restoreCheckpoint", post(restore_checkpoint))
+        .route("/acton_deleteCheckpoint", post(delete_checkpoint))
+        .route("/acton_clearCheckpoints", post(clear_checkpoints))
+        .route("/acton_exportCheckpoint", get(export_checkpoint))
         .route(
-            "/state-source",
-            get(get_state_source).post(set_state_source),
-        );
+            "/acton_importCheckpoint",
+            post(import_checkpoint).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
+        )
+        .route("/acton_setShardAccount", post(set_shard_account))
+        .route("/acton_changeAccountState", post(change_account_state))
+        .route("/acton_sendInternalMessage", post(send_internal_message))
+        .route("/acton_getStartupAccounts", get(get_startup_accounts))
+        .route("/acton_setNetworkConditions", post(set_network_conditions))
+        .route("/acton_setMiningMode", post(set_mining_mode))
+        .route("/acton_mine", post(mine_blocks))
+        .route("/acton_increaseTime", post(increase_time))
+        .route("/acton_setTime", post(set_time))
+        .route(
+            "/acton_setNextBlockTimestamp",
+            post(set_next_block_timestamp),
+        )
+        .route("/acton_nodeInfo", get(get_status));
 
-    if let Some(limit) = rate_limit_rps {
+    if let Some(limit) = rate_limit_rps.and_then(NonZeroU32::new) {
+        let period = rate_limit_period(limit);
+        let limit = limit.get();
         let mut governor_config = GovernorConfigBuilder::default();
-        governor_config.per_second(1).burst_size(limit);
+        governor_config.period(period).burst_size(limit);
         let mut governor_config = governor_config.key_extractor(GlobalKeyExtractor);
         let governor_config = Arc::new(
             governor_config
@@ -114,54 +231,124 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         api_router = api_router.layer(governor_layer);
     }
 
+    let mut api_entry_router = Router::new().nest("/api", api_router);
+    let mut control_router = acton_router;
+    if let Some(auth_token) = state.auth_token.clone() {
+        let api_auth_token = auth_token.clone();
+        api_entry_router = api_entry_router.layer(middleware::from_fn(move |request, next| {
+            require_auth(request, next, api_auth_token.clone())
+        }));
+        control_router = control_router.layer(middleware::from_fn(move |request, next| {
+            require_auth(request, next, auth_token.clone())
+        }));
+    }
+    api_entry_router = api_entry_router.layer(public_api_cors());
+
+    let protected_router = Router::new().merge(api_entry_router).merge(control_router);
+
     let app = Router::new()
-        .nest("/api", api_router)
-        .nest("/admin", admin_router)
-        .layer(loopback_cors())
+        .merge(protected_router)
+        .fallback(handle_unknown_route)
         .layer(TraceLayer::new_for_http())
-        .with_state(node);
+        .with_state(state);
 
-    #[cfg(debug_assertions)]
-    let app = {
-        let dist_path = PathBuf::from(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../acton-localnet-ui/dist"
-        ));
-        app.fallback_service(
-            ServeDir::new(&dist_path).fallback(ServeFile::new(dist_path.join("index.html"))),
-        )
-    };
-
-    #[cfg(not(debug_assertions))]
-    let app = app.fallback(handle_embedded_ui);
-
-    app
+    app.layer(CompressionLayer::new())
 }
 
-fn loopback_cors() -> CorsLayer {
+async fn delay_response(request: Request, next: Next, conditions: NetworkConditions) -> Response {
+    let response = next.run(request).await;
+    let delay_ms = conditions.response_delay_ms();
+    if delay_ms > 0 {
+        sleep(Duration::from_millis(delay_ms)).await;
+    }
+    response
+}
+
+async fn require_auth(request: Request, next: Next, auth_token: Arc<str>) -> Response {
+    if request.method() == Method::OPTIONS || request_has_valid_auth(&request, &auth_token) {
+        return next.run(request).await;
+    }
+
+    unauthorized_response()
+}
+
+fn unauthorized_response() -> Response {
+    tonlib_error_response(
+        StatusCode::UNAUTHORIZED,
+        "Unauthorized: missing or invalid localnet API token",
+    )
+}
+
+fn tonlib_error_response(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(TonlibErrorResponse {
+            ok: false,
+            error: error.into(),
+            code: i32::from(status.as_u16()),
+            extra: get_extra(),
+            jsonrpc: None,
+            id: None,
+        }),
+    )
+        .into_response()
+}
+
+fn request_error_response(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(RequestError {
+            code: Some(i32::from(status.as_u16())),
+            error: error.into(),
+        }),
+    )
+        .into_response()
+}
+
+fn request_has_valid_auth(request: &Request, auth_token: &str) -> bool {
+    bearer_token_matches(request, auth_token)
+        || api_key_matches(request, auth_token)
+        || websocket_query_token_matches(request, auth_token)
+}
+
+fn bearer_token_matches(request: &Request, auth_token: &str) -> bool {
+    request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        == Some(auth_token)
+}
+
+fn api_key_matches(request: &Request, auth_token: &str) -> bool {
+    request
+        .headers()
+        .get("x-api-key")
+        .and_then(|value| value.to_str().ok())
+        == Some(auth_token)
+}
+
+fn websocket_query_token_matches(request: &Request, auth_token: &str) -> bool {
+    let path = request
+        .uri()
+        .path()
+        .strip_prefix("/api")
+        .unwrap_or_else(|| request.uri().path());
+    if path != "/streaming/v2/ws" {
+        return false;
+    }
+
+    request.uri().query().is_some_and(|query| {
+        url::form_urlencoded::parse(query.as_bytes())
+            .any(|(key, value)| key == "token" && value == auth_token)
+    })
+}
+
+fn public_api_cors() -> CorsLayer {
     CorsLayer::new()
-        .allow_origin(AllowOrigin::predicate(
-            |origin: &HeaderValue, _request_parts: &Parts| is_loopback_origin(origin),
-        ))
+        .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any)
-}
-
-fn is_loopback_origin(origin: &HeaderValue) -> bool {
-    let Ok(origin) = origin.to_str() else {
-        return false;
-    };
-    let Ok(uri) = origin.parse::<axum::http::Uri>() else {
-        return false;
-    };
-    matches!(uri.scheme_str(), Some("http" | "https")) && uri.host().is_some_and(is_loopback_host)
-}
-
-fn is_loopback_host(host: &str) -> bool {
-    host.eq_ignore_ascii_case("localhost")
-        || host == "127.0.0.1"
-        || host == "::1"
-        || host == "[::1]"
 }
 
 fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -> Response {
@@ -214,26 +401,28 @@ fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -
     }
 }
 
-#[cfg(not(debug_assertions))]
-async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
-    let path = uri.path().trim_start_matches('/');
-    let path = if path.is_empty() { "index.html" } else { path };
-
-    if let Some(file) = UI_DIR.get_file(path) {
-        let content_type = match path.split('.').next_back() {
-            Some("html") => "text/html",
-            Some("js") => "application/javascript",
-            Some("css") => "text/css",
-            Some("svg") => "image/svg+xml",
-            Some("png") => "image/png",
-            Some("json") => "application/json",
-            _ => "application/octet-stream",
-        };
-        return (([("content-type", content_type)]), file.contents()).into_response();
+async fn handle_unknown_api(request: Request) -> Response {
+    let path = request
+        .uri()
+        .path()
+        .strip_prefix("/api")
+        .unwrap_or_else(|| request.uri().path());
+    if path == "/v2" || path.starts_with("/v2/") {
+        tonlib_error_response(StatusCode::NOT_FOUND, "Not Found")
+    } else {
+        request_error_response(StatusCode::NOT_FOUND, "Not Found")
     }
+}
 
-    if let Some(index) = UI_DIR.get_file("index.html") {
-        return (([("content-type", "text/html")]), index.contents()).into_response();
+async fn handle_unknown_route(State(state): State<ServerState>, request: Request) -> Response {
+    if request.uri().path().starts_with("/acton_") {
+        if let Some(auth_token) = state.auth_token.as_deref()
+            && request.method() != Method::OPTIONS
+            && !request_has_valid_auth(&request, auth_token)
+        {
+            return unauthorized_response();
+        }
+        return tonlib_error_response(StatusCode::NOT_FOUND, "Not Found");
     }
 
     StatusCode::NOT_FOUND.into_response()

@@ -24,10 +24,13 @@ serde_json = { workspace = true }
 toml_edit = { workspace = true }
 owo-colors = { workspace = true }
 reqwest = { workspace = true }
+tycho-types = { workspace = true }
 urlencoding = { workspace = true }
+url = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
 indicatif = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
+tolk-linter = { workspace = true }
 parse-changelog = { version = "0.6.15", default-features = false }

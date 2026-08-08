@@ -1,0 +1,157 @@
+import {Search} from "lucide-react"
+import {useMemo, useState} from "react"
+import type {FC} from "react"
+
+import type {NftItem} from "../api/types"
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {isNftItemNsfw} from "../nftSafetyRegistry"
+
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
+import {NftImage} from "./NftImage"
+import {NFT_CARD_IMAGE_SOURCE_KEYS, getImageSources} from "./imageFallbacks"
+import styles from "./Nfts.module.css"
+
+interface NftsProps {
+  readonly items: NftItem[]
+  readonly emptyLabel?: string
+  readonly searchLabel?: string
+  readonly onAddressClick?: (addr: string, event?: ExplorerNavigationClickEvent) => void
+}
+
+const getContentString = (content: Record<string, unknown>, key: string): string | undefined => {
+  const value = content[key]
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function getCollectionName(item: NftItem): string | undefined {
+  return (
+    getContentString(item.content, "collection_name") ||
+    getContentString(item.content, "collection")
+  )
+}
+
+function getNftDisplayName(item: NftItem): string {
+  const collectionName = getCollectionName(item)
+  return getContentString(item.content, "name") || `${collectionName || "NFT"} #${item.index}`
+}
+
+export const Nfts: FC<NftsProps> = ({
+  items,
+  emptyLabel = "No NFTs found",
+  searchLabel = "Search collectibles",
+  onAddressClick,
+}) => {
+  const [query, setQuery] = useState("")
+  const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
+  const normalizedQuery = query.trim().toLowerCase()
+  const eligibleItems = useMemo(
+    () => items.filter(item => !hiddenAddresses.has(item.address) && !isNftItemNsfw(item)),
+    [hiddenAddresses, items],
+  )
+  const visibleItems = useMemo(() => {
+    if (!normalizedQuery) return eligibleItems
+
+    return eligibleItems.filter(item => {
+      const name = getNftDisplayName(item)
+      const collectionName = getCollectionName(item) || item.collection_address || ""
+      const searchable = [
+        name,
+        collectionName,
+        item.address,
+        item.collection_address,
+        item.owner_address,
+        String(item.index),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+
+      return searchable.includes(normalizedQuery)
+    })
+  }, [eligibleItems, normalizedQuery])
+
+  if (eligibleItems.length === 0) {
+    return <div className={styles.empty}>{emptyLabel}</div>
+  }
+
+  return (
+    <div className={styles.container}>
+      <label className={styles.searchBox}>
+        <Search size={16} aria-hidden="true" />
+        <input
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Search"
+          aria-label={searchLabel}
+        />
+      </label>
+      <div className={styles.list}>
+        {visibleItems.map(item => {
+          const name = getNftDisplayName(item)
+          const collectionName = getCollectionName(item)
+          const imageSources = getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
+          const isScam = item.is_scam === true
+
+          return (
+            <div
+              key={item.address}
+              className={styles.nftItem}
+              onClick={event => onAddressClick?.(item.address, event)}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  onAddressClick?.(item.address)
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <div className={styles.imageFrame}>
+                <NftImage
+                  sources={imageSources}
+                  alt={name}
+                  className={styles.nftImage}
+                  blurredClassName={styles.blurredImage}
+                  collectionName={collectionName}
+                  blurred={isScam}
+                  onNsfw={() => {
+                    setHiddenAddresses(current => new Set(current).add(item.address))
+                  }}
+                />
+                {isScam && <span className={styles.scamLabel}>SCAM</span>}
+              </div>
+              <div className={styles.nftInfo}>
+                {collectionName && <div className={styles.collectionName}>{collectionName}</div>}
+                <div className={styles.nftName}>{name}</div>
+                <div className={styles.nftMetaLine}>
+                  <span>#{item.index}</span>
+                  <span className={styles.nftAddress}>
+                    <ExplorerAddressChip address={item.address} copyable={false} variant="plain" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {visibleItems.length === 0 && <div className={styles.empty}>No matching collectibles</div>}
+    </div>
+  )
+}
+
+export const NftsSkeleton: FC = () => (
+  <div className={styles.container} aria-label="Loading collection items">
+    <div className={`${styles.searchBox} ${styles.skeleton}`} />
+    <div className={styles.list}>
+      {Array.from({length: 6}, (_, index) => (
+        <div key={index} className={styles.nftItem} aria-hidden="true">
+          <div className={`${styles.imageFrame} ${styles.skeleton}`} />
+          <div className={styles.nftInfo}>
+            <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+            <div className={styles.skeletonLine} />
+            <div className={`${styles.skeletonLine} ${styles.skeletonLineMedium}`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)

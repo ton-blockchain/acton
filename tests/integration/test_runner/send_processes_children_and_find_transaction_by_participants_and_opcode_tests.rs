@@ -360,7 +360,7 @@ get fun `test ag send external runs handler`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     expect(txs).toHaveSuccessfulTx();
@@ -385,10 +385,10 @@ get fun `test ag send external repeatable`() {
 
     val first = net.sendExternal(
         net.createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }),
-    )!;
+    ).unwrap();
     val second = net.sendExternal(
         net.createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }),
-    )!;
+    ).unwrap();
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-cli-trace",
+  "scopeName": "source.acton-cli-trace",
+  "patterns": [
+    {
+      "include": "#tree"
+    },
+    {
+      "include": "source.acton-trace"
+    },
+    {
+      "include": "source.acton-cli"
+    }
+  ],
+  "repository": {
+    "tree": {
+      "patterns": [
+        {
+          "match": "[\\u2502\\u251C\\u2514\\u2500]+",
+          "name": "punctuation.definition.tree.acton-cli-trace"
+        }
+      ]
+    }
+  }
+}

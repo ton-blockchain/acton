@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (0 tests)
+
+ ✓ 0 passed in 1 file
+
+No tests found in selected test files. Add tests or adjust the selection.

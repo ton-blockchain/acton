@@ -20,5 +20,8 @@ max_line_length = 100
 indent_size = 4
 max_line_length = 120
 
+[*.{js,ts,jsx,tsx}]
+max_line_length = 100
+
 [docs/**]
 max_line_length = 100

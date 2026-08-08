@@ -1,0 +1,24 @@
+.pill {
+  width: fit-content;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.verified {
+  color: var(--acton-color-status-passed-text);
+  background: var(--acton-color-status-passed-surface);
+  border-color: color-mix(in srgb, var(--acton-color-status-passed) 35%, transparent);
+}
+
+.unverified {
+  color: var(--acton-color-status-failed-text);
+  background: var(--acton-color-status-failed-surface);
+  border-color: color-mix(in srgb, var(--acton-color-status-failed) 35%, transparent);
+}

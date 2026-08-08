@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 reqwest = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 urlencoding = { workspace = true }
@@ -22,6 +23,11 @@ ton-networks = { workspace = true }
 toncenter-keys = { workspace = true }
 log = { workspace = true }
 tvm-ffi = { workspace = true }
+
+[dev-dependencies]
+ton = { workspace = true }
+tungstenite = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

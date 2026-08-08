@@ -1,0 +1,3 @@
+[[PackageOverrides]]
+ecosystem = "Go"
+ignore = true

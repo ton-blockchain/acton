@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ foo [TIME]
+    └─ Test output:
+       Counter: cell{[BOC_HEX]}
+
+ ✓ 1 passed in 1 file

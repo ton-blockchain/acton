@@ -1,0 +1,11 @@
+Error: Baseline test suite failed before mutation testing. Fix failing tests or adjust the mutation test selection.
+
+Running tests
+
+ TEST  [ROOT]
+
+ > tests/mutation.test.tolk (0 tests)
+
+ ✓ 0 passed in 1 file
+
+No tests matched filter does-not-match, please check the filter spelling/pattern.

@@ -16,6 +16,12 @@ Acton shells out to `npx` and runs the upstream
 `@ton/convert-func-to-tolk` package. Standard input, output, and error are
 forwarded directly to the converter process.
 
+This command is best used as one step in a broader migration workflow. For
+existing FunC and TypeScript projects, see the
+[FunC to Tolk migration skill](https://ton-blockchain.github.io/acton/docs/agent-skills/func2tolk) guide, which explains
+how to use `acton func2tolk` with the `$func2tolk` skill, Acton project
+setup, wrappers, tests, and debugging.
+
 ## Options
 
 ### Conversion Options
@@ -69,7 +75,7 @@ That means converter downloads are not reused across runs.
 
 Acton runs:
 
-```text
+```text noCopy title="terminal"
 npx --yes @ton/convert-func-to-tolk@<version> ...
 ```
 

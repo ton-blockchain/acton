@@ -1,0 +1,63 @@
+.endpointText {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  color: var(--acton-color-text);
+  font-weight: 500;
+}
+
+.timeCell {
+  white-space: nowrap;
+}
+
+.directionBadge {
+  min-width: 34px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.directionCell {
+  padding-inline: 4px !important;
+}
+
+.directionIn {
+  color: var(--acton-color-status-passed);
+  background: var(--acton-color-status-passed-surface);
+}
+
+.directionOut {
+  color: var(--acton-color-status-failed);
+  background: var(--acton-color-status-failed-surface);
+}
+
+.opcodeValue {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  color: var(--acton-color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.valueText {
+  display: block;
+  width: 100%;
+  text-align: right;
+}
+
+.valueEmpty {
+  color: var(--acton-color-text-muted);
+}

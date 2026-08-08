@@ -1,0 +1,140 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`streamed actions keep the selected order, remove duplicates, and cap large traces 1`] = `
+{
+  "ascending": {
+    "actions": [
+      {
+        "action_id": "old-action-0",
+        "trace_end_lt": "3000",
+        "trace_id": "old",
+      },
+      {
+        "action_id": "new-action-0",
+        "trace_end_lt": "4000",
+        "trace_id": "new",
+      },
+      {
+        "action_id": "bulk-action-0",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-1",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-2",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-3",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-4",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-5",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-6",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-7",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-8",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-9",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+    ],
+    "collapsedTraceIds": [
+      "bulk",
+    ],
+  },
+  "descending": {
+    "actions": [
+      {
+        "action_id": "new-action-0",
+        "trace_end_lt": "4000",
+        "trace_id": "new",
+      },
+      {
+        "action_id": "bulk-action-0",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-1",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-2",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-3",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-4",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-5",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-6",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-7",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-8",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "bulk-action-9",
+        "trace_end_lt": "5000",
+        "trace_id": "bulk",
+      },
+      {
+        "action_id": "old-action-0",
+        "trace_end_lt": "3000",
+        "trace_id": "old",
+      },
+    ],
+    "collapsedTraceIds": [
+      "bulk",
+    ],
+  },
+}
+`;

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "fift",
+  "scopeName": "source.fift",
+  "fileTypes": ["fif"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#stack_words"
+    },
+    {
+      "include": "#program_words"
+    },
+    {
+      "include": "#control_words"
+    },
+    {
+      "include": "#literals"
+    },
+    {
+      "include": "#commands"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.fift"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.fift",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.fift"
+            }
+          ]
+        },
+        {
+          "match": "abort\"[^\"]*\"",
+          "name": "string.quoted.double.abort.fift"
+        },
+        {
+          "match": "\\.\"[^\"]*\"",
+          "name": "string.quoted.double.print.fift"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b-?[0-9]+(/-?[0-9]+)?\\b",
+          "name": "constant.numeric.decimal.fift"
+        },
+        {
+          "match": "\\b0x[0-9a-fA-F]+\\b",
+          "name": "constant.numeric.hex.fift"
+        },
+        {
+          "match": "\\b0b[01]+\\b",
+          "name": "constant.numeric.binary.fift"
+        }
+      ]
+    },
+    "stack_words": {
+      "patterns": [
+        {
+          "match": "\\b(dup|drop|swap|rot|-rot|over|tuck|nip|2dup|2drop|2swap|pick|roll|-roll|exch|exch2|\\?dup)\\b",
+          "name": "keyword.operator.stack.fift"
+        }
+      ]
+    },
+    "program_words": {
+      "patterns": [
+        {
+          "match": "\\b(PROGRAM|END>c|PROC|PROCINLINE|DECLPROC|DECLMETHOD)\\b",
+          "name": "keyword.control.program.fift"
+        },
+        {
+          "match": "\\b(CALLDICT|INLINECALLDICT)\\b",
+          "name": "keyword.control.call.fift"
+        }
+      ]
+    },
+    "control_words": {
+      "patterns": [
+        {
+          "match": "\\b(if|ifnot|cond|until|while|times)\\b",
+          "name": "keyword.control.flow.fift"
+        },
+        {
+          "match": "\\b(include)\\b",
+          "name": "keyword.control.import.fift"
+        }
+      ]
+    },
+    "literals": {
+      "patterns": [
+        {
+          "match": "\\b(true|false)\\b",
+          "name": "constant.language.boolean.fift"
+        },
+        {
+          "match": "b\\{[01]+\\}",
+          "name": "constant.other.binary-slice.fift"
+        },
+        {
+          "match": "x\\{[0-9a-fA-F_]+\\}",
+          "name": "constant.other.hex-slice.fift"
+        },
+        {
+          "match": "B\\{[0-9a-fA-F_]+\\}",
+          "name": "constant.other.hex-bytes.fift"
+        },
+        {
+          "match": "char .",
+          "name": "constant.character.fift"
+        }
+      ]
+    },
+    "commands": {
+      "patterns": [
+        {
+          "match": "\\b[A-Z][A-Z0-9_]*\\b",
+          "name": "keyword.other.command.fift"
+        }
+      ]
+    }
+  }
+}

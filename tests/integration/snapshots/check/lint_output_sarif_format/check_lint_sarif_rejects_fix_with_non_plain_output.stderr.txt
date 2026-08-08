@@ -1,0 +1,1 @@
+Error: --fix can only be used with plain output format; pass --output-format plain or remove --fix

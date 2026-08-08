@@ -82,18 +82,36 @@ pub(crate) struct CreditPhase {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ComputePhase {
-    pub skipped: bool,
-    pub success: bool,
-    pub msg_state_used: bool,
-    pub account_activated: bool,
-    pub gas_fees: String,
-    pub gas_used: String,
-    pub gas_limit: String,
-    pub mode: i32,
-    pub exit_code: i32,
-    pub vm_steps: u32,
-    pub vm_init_state_hash: String,
-    pub vm_final_state_hash: String,
+    #[serde(default)]
+    pub skipped: Option<bool>,
+    #[serde(default)]
+    pub success: Option<bool>,
+    #[serde(default)]
+    pub msg_state_used: Option<bool>,
+    #[serde(default)]
+    pub account_activated: Option<bool>,
+    #[serde(default)]
+    pub gas_fees: Option<String>,
+    #[serde(default)]
+    pub gas_used: Option<String>,
+    #[serde(default)]
+    pub gas_limit: Option<String>,
+    #[serde(default)]
+    pub gas_credit: Option<String>,
+    #[serde(default)]
+    pub mode: Option<i32>,
+    #[serde(default)]
+    pub exit_code: Option<i32>,
+    #[serde(default)]
+    pub exit_arg: Option<i32>,
+    #[serde(default)]
+    pub vm_steps: Option<u32>,
+    #[serde(default)]
+    pub vm_init_state_hash: Option<String>,
+    #[serde(default)]
+    pub vm_final_state_hash: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,7 +210,7 @@ pub struct TraceInMessage {
     pub sender: Option<IntAddr>,
     /// Contract address that received the message.
     pub contract: IntAddr,
-    /// Amount of nanoton sent with the message.
+    /// Amount of nanograms sent with the message.
     pub amount: Option<u64>,
     /// Opcode extracted from the message body.
     pub opcode: Option<u32>,
@@ -219,24 +237,26 @@ pub struct TraceEmulatedTx {
     pub c5: Option<Cell>,
     /// Detailed VM execution logs.
     pub vm_logs: Arc<str>,
+    /// Missing global-library hashes reported by the native emulator.
+    pub missing_libraries: Vec<String>,
 }
 
 /// Breakdown of money movements and fees within the transaction.
 ///
-/// All values are in nanoton (10^-9 TON).
+/// All values are in nanograms (10^-9 GRAM).
 ///
 /// # Example
 ///
 /// ```ignore
 /// let money = &result.money;
-/// println!("Fees: {} nanoton", money.total_fees);
-/// println!("Balance after: {} nanoton", money.balance_after);
+/// println!("Fees: {} nanograms", money.total_fees);
+/// println!("Balance after: {} nanograms", money.balance_after);
 /// ```
 #[derive(Debug, Clone)]
 pub struct TraceMoneyResult {
     /// Balance of the account **before** the transaction execution.
     pub balance_before: u64,
-    /// Sum of all nanotons sent via *internal* outgoing messages.
+    /// Sum of all nanograms sent via *internal* outgoing messages.
     /// External messages are excluded as they carry no value.
     pub sent_total: u64,
     /// Total fees of the transaction (including storage, gas and action fees).
@@ -271,63 +291,6 @@ pub struct TraceResult {
     pub money: TraceMoneyResult,
     /// Full details of the emulated transaction execution results.
     pub emulated_tx: TraceEmulatedTx,
-}
-
-// --- API State Types ---
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub(crate) enum StateFromAPI {
-    #[serde(rename = "uninit")]
-    Uninit,
-    #[serde(rename = "active")]
-    Active {
-        data: Option<String>,
-        code: Option<String>,
-    },
-    #[serde(rename = "frozen")]
-    Frozen {
-        #[serde(rename = "stateHash")]
-        state_hash: String,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AccountFromAPI {
-    pub balance: AccountBalance,
-    pub state: StateFromAPI,
-    pub last: Option<LastTxRef>,
-    #[serde(rename = "storageStat")]
-    pub storage_stat: Option<StorageStat>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AccountBalance {
-    pub coins: String,
-    pub currencies: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LastTxRef {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StorageStat {
-    #[serde(rename = "lastPaid")]
-    pub last_paid: u64,
-    #[serde(rename = "duePayment")]
-    pub due_payment: Option<String>,
-    pub used: StorageUsed,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StorageUsed {
-    pub bits: u64,
-    pub cells: u64,
-    #[serde(rename = "publicCells")]
-    pub public_cells: Option<u64>,
 }
 
 // --- Blocks API ---
@@ -415,4 +378,72 @@ pub(crate) struct RawTransactionBlock {
 pub(crate) struct TransactionTransactionsResponse {
     pub blocks: Vec<RawTransactionBlock>,
     pub boc: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_toncenter_v3_transaction_with_skipped_compute_phase() {
+        let value = serde_json::json!({
+            "transactions": [{
+                "account": "0:F7E97472D4849F481F339A5490281B1AE5B99E8B1016C03EAF51484E5D7BABF1",
+                "hash": "6BOT/kLF43JNLlC5hACgFtni2TjHC9s2Beaig0EDe0w=",
+                "lt": "66023973000007",
+                "now": 1777378799,
+                "mc_block_seqno": 123,
+                "trace_id": "HVJuGGDRxhB6vGFpyLDfa7o0qlHIrSd3RRuLYG5falo=",
+                "prev_trans_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "prev_trans_lt": "0",
+                "orig_status": "active",
+                "end_status": "active",
+                "total_fees": "0",
+                "total_fees_extra_currencies": {},
+                "description": {
+                    "type": "ord",
+                    "aborted": true,
+                    "destroyed": false,
+                    "credit_first": true,
+                    "storage_ph": {
+                        "storage_fees_collected": "0",
+                        "status_change": "unchanged"
+                    },
+                    "credit_ph": {
+                        "credit": "1"
+                    },
+                    "compute_ph": {
+                        "skipped": true,
+                        "reason": "no_gas"
+                    }
+                },
+                "block_ref": {
+                    "workchain": 0,
+                    "shard": "-9223372036854775808",
+                    "seqno": 1
+                },
+                "account_state_before": {
+                    "hash": "before"
+                },
+                "account_state_after": {
+                    "hash": "after"
+                },
+                "emulated": false
+            }],
+            "address_book": {}
+        });
+
+        let data: TransactionData = serde_json::from_value(value)
+            .expect("skipped compute phase response should deserialize");
+        let compute = data.transactions[0]
+            .description
+            .compute_ph
+            .as_ref()
+            .expect("compute phase should be present");
+
+        assert_eq!(compute.skipped, Some(true));
+        assert_eq!(compute.reason.as_deref(), Some("no_gas"));
+        assert_eq!(compute.success, None);
+        assert_eq!(compute.exit_code, None);
+    }
 }

@@ -1,4 +1,4 @@
-name: Check release binaries
+name: Build release binaries
 
 on:
   workflow_call:
@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -53,12 +53,13 @@ jobs:
         run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0
+          tool: just@1.52.0
           fallback: none
 
       - name: Install LLVM and Clang (don't cache)
+        timeout-minutes: 10
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -84,13 +85,14 @@ jobs:
         with:
           no-cache: true
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           CC: clang-16
           CXX: clang++-16
-        run: |
-          just build-ui
-          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
@@ -132,7 +134,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -147,9 +149,9 @@ jobs:
         run: rustup target add "${TARGET_NAME}"
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0
+          tool: just@1.52.0
           fallback: none
 
       - name: Download TON objects archive
@@ -170,10 +172,11 @@ jobs:
         with:
           no-cache: true
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
-        run: |
-          just build-ui
-          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
@@ -190,5 +193,70 @@ jobs:
           path: |
             acton-${{ env.TARGET_NAME }}.tar.gz
             acton-${{ env.TARGET_NAME }}.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+  generate-dist-manifest:
+    name: Generate cargo-dist local manifest
+    needs:
+      - build-linux
+      - build-macos
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    env:
+      DIST_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+      LOCAL_DIST_MANIFEST: local-dist-manifest.json
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install cached dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/
+
+      - name: Fetch Acton archive artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+
+      - name: Generate cargo-dist local manifest
+        shell: bash
+        # language=Bash
+        run: |
+          chmod +x ~/.cargo/bin/dist
+
+          dist manifest \
+            --artifacts=local \
+            --tag "${DIST_TAG}" \
+            --allow-dirty \
+            --output-format=json \
+            --no-local-paths > "${LOCAL_DIST_MANIFEST}"
+
+      - name: Generate cargo-dist release binaries manifest
+        shell: bash
+        # language=Bash
+        run: |
+          python3 .github/scripts/generate-checksums-dist-manifest.py \
+            --manifest "${LOCAL_DIST_MANIFEST}" \
+            --artifacts-dir target/distrib \
+            --output target/distrib/acton-dist-manifest.json
+
+          echo "manifest checksums generated successfully"
+          cat target/distrib/acton-dist-manifest.json
+
+      - name: Upload cargo-dist local manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-build-release-binaries-dist-manifest
+          path: target/distrib/acton-dist-manifest.json
           retention-days: 1
           if-no-files-found: error

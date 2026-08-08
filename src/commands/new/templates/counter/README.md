@@ -14,8 +14,8 @@ deployment script.
   underflow, and invalid-message flows.
 - `scripts/deploy.tolk` deploys the contract with the deployer wallet as owner,
   then reads the owner and counter value back after deployment.
-- `.github/workflows/ci.yml` runs build, test, lint, and format checks on
-  GitHub Actions.
+- `.github/workflows/contracts.yml` runs build, format, lint, and test checks
+  on GitHub Actions.
 
 ## Build
 
@@ -48,7 +48,7 @@ acton run deploy-emulation
 
 The deployment script expects a wallet named `deployer`.
 
-1. Create a local wallet and request testnet TON:
+1. Create a local wallet and request testnet GRAM:
 
 ```bash
 acton wallet new --name deployer --local --airdrop
@@ -77,12 +77,12 @@ there, depending on the network you use. Acton loads `.env` automatically.
 
 ## CI
 
-The generated project includes `.github/workflows/ci.yml`, which runs:
+The generated project includes `.github/workflows/contracts.yml`, which runs:
 
 - `acton build`
-- `acton test`
-- `acton check --output-format github`
 - `acton fmt --check`
+- `acton check --output-format github`
+- `acton test`
 
 ## Documentation
 

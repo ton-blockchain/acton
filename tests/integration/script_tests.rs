@@ -1,19 +1,34 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, spawn_toncenter_v2_mock,
-    spawn_toncenter_v2_mock_with_capture, toncenter_v2_error_response,
-    toncenter_v2_seqno_ok_response,
+    ToncenterV2MockResponse, ToncenterV3MockResponse, append_custom_network,
+    append_custom_network_with_urls, format_captured_requests, mocked_config_boc64,
+    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
+    toncenter_v2_account_info_ok_response, toncenter_v2_block_header_ok_response,
+    toncenter_v2_config_all_ok_response, toncenter_v2_error_response,
+    toncenter_v2_fork_snapshot_responses, toncenter_v2_get_libraries_ok_response,
+    toncenter_v2_latest_fork_snapshot_responses, toncenter_v2_send_boc_ok_response,
+    toncenter_v2_seqno_ok_response, toncenter_v2_shard_account_cell_ok_response,
+    write_fork_account_cache_summary,
 };
+use acton_config::color::ColorMode;
 
+use base64::Engine;
 use std::fs;
+use std::net::TcpListener;
 use std::thread;
 use std::time::{Duration, Instant};
-use ton_executor::DEFAULT_CONFIG_DICT;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder};
+use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
+use tycho_types::models::{
+    Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
+    StdAddr, StdAddrFormat, StorageInfo,
+};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";
+const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
+const AUTO_LOAD_LIBRARY_REMOTE_ADDRESS: &str = "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ";
 
 const WAIT_FOR_TRACE_MESSAGES: &str = r"
 struct (0x91000001) TriggerForward {
@@ -71,6 +86,49 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const ACCEPT_THEN_THROW_EXTERNAL_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+fun onExternalMessage() {
+    acceptExternalMessage();
+    throw 10;
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const ACCEPT_EXTERNAL_ONCE_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+struct Storage {
+    externalCount: uint32
+}
+
+fun loadStorage() {
+    val data = contract.getData();
+    val slice = data.beginParse();
+    if (slice.remainingBitsCount() == 0 && slice.remainingRefsCount() == 0) {
+        return Storage { externalCount: 0 };
+    }
+    return Storage.fromCell(data);
+}
+
+fun onExternalMessage() {
+    var storage = loadStorage();
+    if (storage.externalCount != 0) {
+        throw 10;
+    }
+
+    acceptExternalMessage();
+    storage.externalCount = 1;
+    contract.setData(storage.toCell());
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const WAIT_FOR_TRACE_SCRIPT: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
@@ -104,7 +162,7 @@ fun main() {
         dest: {
             stateInit: receiverInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("RECEIVER_DEPLOY_NULL");
         return;
     }
@@ -115,7 +173,7 @@ fun main() {
         dest: {
             stateInit: forwarderInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("FORWARDER_DEPLOY_NULL");
         return;
     }
@@ -129,11 +187,15 @@ fun main() {
         },
     }));
 
-    val trace = txs.waitForTrace(true, 30, 100);
+    val trace = txs.waitForTrace(true, 40, 25);
     if (trace == null) {
         println("TRACE_NULL");
         return;
     }
+
+    println("TRACE_OUTPUT_BEGIN");
+    println(trace);
+    println("TRACE_OUTPUT_END");
 
     val receiverCount: int = net.runGetMethod(receiverAddress, "received");
     println("TRACE_READY=true");
@@ -175,7 +237,7 @@ fun main() {
         dest: {
             stateInit: receiverInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("RECEIVER_DEPLOY_NULL");
         return;
     }
@@ -186,7 +248,7 @@ fun main() {
         dest: {
             stateInit: forwarderInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("FORWARDER_DEPLOY_NULL");
         return;
     }
@@ -200,7 +262,7 @@ fun main() {
         },
     }));
 
-    val root = txs.waitForFirstTransaction(true, 30, 100);
+    val root = txs.waitForFirstTransaction(true, 40, 25);
     if (root == null) {
         println("ROOT_NULL");
         return;
@@ -213,51 +275,231 @@ fun main() {
     println("RECEIVER_CONTRACT={}", receiverAddress);
 }
 "#;
+
+const WAIT_FOR_TRACE_TIMEOUT_PRINT_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"),
+    }));
+
+    println(txs.waitForTrace(false, 1, 1));
+}
+"#;
+
+const UNFUNDED_WALLET_WAIT_FOR_FIRST_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"),
+    }));
+
+    println(txs.waitForFirstTransaction(false, 1, 1));
+}
+"#;
+
+const FAILED_ROOT_WAIT_FOR_FIRST_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val targetInit = ContractState {
+        code: build("accept_then_throw_external"),
+        data: createEmptyCell(),
+    };
+    val targetAddress = AutoDeployAddress {
+        stateInit: targetInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: targetInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val result = net.sendExternal(
+        net.createExternalMessage(targetAddress, createEmptyCell()),
+    );
+
+    println(result.waitForFirstTransaction(false, 40, 100));
+}
+"#;
+
+const SEED_EXTERNAL_TRANSACTION_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val targetInit = ContractState {
+        code: build("accept_external_once"),
+        data: createEmptyCell(),
+    };
+    val targetAddress = AutoDeployAddress {
+        stateInit: targetInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: {
+            stateInit: targetInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("DEPLOY_NULL");
+        return;
+    }
+
+    val result = net.sendExternal(
+        net.createExternalMessage(targetAddress, createEmptyCell()),
+    );
+    if (result.waitForFirstTransaction(true, 40, 25) == null) {
+        println("SEED_NULL");
+        return;
+    }
+
+    println("SEEDED=true");
+}
+"#;
+
+const WAIT_FOR_REJECTED_REPLAY_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {
+    val targetInit = ContractState {
+        code: build("accept_external_once"),
+        data: createEmptyCell(),
+    };
+    val targetAddress = AutoDeployAddress {
+        stateInit: targetInit,
+    }.calculateAddress();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(targetAddress, createEmptyCell()),
+    );
+
+    println(result.waitForFirstTransaction(false, 1, 1));
+}
+"#;
+
+const FORK_LOCALNET_DEPLOY_SCRIPT: &str = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress {
+        stateInit: receiverInit,
+    }.calculateAddress();
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress {
+        stateInit: forwarderInit,
+    }.calculateAddress();
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: receiverInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("RECEIVER_DEPLOY_NULL");
+        return;
+    }
+
+    if (net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: forwarderInit,
+        },
+    })).waitForFirstTransaction(true, 40, 25) == null) {
+        println("FORWARDER_DEPLOY_NULL");
+        return;
+    }
+
+    println("FORWARDER_CONTRACT={}", forwarderAddress);
+    println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
 const REMOTE_GLOBAL_VERSION: u32 = 777;
 const REMOTE_GLOBAL_CAPABILITIES: u64 = 0x1234;
-
-fn build_global_version_cell(version: u32, capabilities: u64) -> Cell {
-    let mut builder = CellBuilder::new();
-    builder
-        .store_u8(0xc4)
-        .expect("must store GlobalVersion tag");
-    builder
-        .store_u32(version)
-        .expect("must store GlobalVersion version");
-    builder
-        .store_u64(capabilities)
-        .expect("must store GlobalVersion capabilities");
-    builder.build().expect("must build GlobalVersion cell")
-}
-
-fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
-    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
-    config
-        .set(8, build_global_version_cell(version, capabilities))
-        .expect("must update global version config param");
-    let root = config
-        .root()
-        .clone()
-        .expect("default blockchain config must have a root");
-    Boc::encode_base64(root)
-}
 
 fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "mocked-live-shape",
             "result": {
                 "@type": "configInfo",
                 "config": {
                     "@type": "tvm.cell",
                     "bytes": config_boc64
-                },
-                "@extra": "mocked-live-shape"
+                }
             }
         })
         .to_string(),
     }
+}
+
+fn remote_shard_account_script_source() -> String {
+    r#"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val shard = scripts.fetchShardAccount(address("__REMOTE_ADDRESS__"));
+    if (shard == null) {
+        println("SCRIPT_FORK_SHARD_NULL");
+        return;
+    }
+
+    println("SCRIPT_FORK_LAST_LT={}", shard!.lastTransLt);
+}
+"#
+    .replace(
+        "__REMOTE_ADDRESS__",
+        "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
+    )
 }
 
 fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
@@ -294,6 +536,14 @@ keys = { mnemonic-file = "mnemonic.txt" }
     .expect("failed to write wallets.toml");
 
     project
+}
+
+fn find_unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("failed to reserve an unused local port")
+        .local_addr()
+        .expect("failed to inspect reserved local port")
+        .port()
 }
 
 fn script_body_project(project_name: &str) -> ProjectBuilder {
@@ -388,6 +638,8 @@ keys = {{ mnemonic-file = "mnemonic.txt" }}
 }
 
 fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
+    use std::fmt::Write as _;
+
     let (v2_url, v3_url) = if let Some(root_url) = base_url.strip_suffix("/api/v2") {
         (format!("{root_url}/api/v2"), format!("{root_url}/api/v3"))
     } else {
@@ -396,13 +648,14 @@ fn append_localnet_network(project_path: &std::path::Path, base_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 
@@ -448,6 +701,104 @@ fn wait_until_address_state_active(
     }
 }
 
+fn latest_localnet_seqno(node: &crate::support::localnet::LocalnetHandle) -> u64 {
+    let response = node.get_json("/api/v2/getMasterchainInfo");
+    response["result"]["last"]["seqno"]
+        .as_u64()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected getMasterchainInfo result.last.seqno in response:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            )
+        })
+}
+
+fn fork_localnet_trigger_script(forwarder_address: &str, receiver_address: &str) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: address("__FORWARDER_ADDRESS__"),
+        body: TriggerForward {
+            target: address("__RECEIVER_ADDRESS__"),
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 40, 25);
+    if (trace == null) {
+        println("TRIGGER_TRACE_NULL");
+        return;
+    }
+
+    println("BROADCAST_TRIGGERED=true");
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+}
+
+fn fork_localnet_trace_script(
+    forwarder_address: &str,
+    receiver_address: &str,
+    expected_before: u32,
+    expected_after: u32,
+) -> String {
+    r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/wait_for_trace_messages"
+
+fun main() {
+    val forwarder = address("__FORWARDER_ADDRESS__");
+    val receiver = address("__RECEIVER_ADDRESS__");
+    val sender = testing.treasury("fork_sender");
+
+    val before: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_BEFORE={}", before);
+    if (before != __EXPECTED_BEFORE__) {
+        throw 9101;
+    }
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: forwarder,
+        body: TriggerForward {
+            target: receiver,
+        },
+    }));
+
+    val trace = txs.waitForTrace(true, 3, 1);
+    if (trace == null) {
+        println("FORK_TRACE_NULL");
+        return;
+    }
+
+    println("FORK_TRACE_BEGIN");
+    println(trace);
+    println("FORK_TRACE_END");
+
+    val after: int = net.runGetMethod(receiver, "received");
+    println("FORK_RECEIVER_AFTER={}", after);
+    if (after != __EXPECTED_AFTER__) {
+        throw 9102;
+    }
+}
+"#
+    .replace("__FORWARDER_ADDRESS__", forwarder_address)
+    .replace("__RECEIVER_ADDRESS__", receiver_address)
+    .replace("__EXPECTED_BEFORE__", &expected_before.to_string())
+    .replace("__EXPECTED_AFTER__", &expected_after.to_string())
+}
+
 #[test]
 fn test_script_simple_execution() {
     let project = ProjectBuilder::new("script-simple")
@@ -488,7 +839,7 @@ fn test_script_debug_logs_are_hidden_without_verbose_flag() {
         .success()
         .assert_not_contains("stack(0 values)")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_debug_logs_are_hidden_without_verbose_flag.stdout.txt",
+            "integration/snapshots/script/test_script_debug_logs_are_hidden_without_verbose_flag.stdout.txt",
         );
 }
 
@@ -512,7 +863,7 @@ fn test_script_verbose_flag_is_accepted() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_verbose_flag_is_accepted.stdout.txt",
+            "integration/snapshots/script/test_script_verbose_flag_is_accepted.stdout.txt",
         );
 }
 
@@ -538,7 +889,7 @@ fn test_script_rejects_verbose_level_above_one() {
         .failure()
         .assert_stderr_contains("Verbosity levels above 1 are not supported yet")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_rejects_verbose_level_above_one.stderr.txt",
+            "integration/snapshots/script/test_script_rejects_verbose_level_above_one.stderr.txt",
         );
 }
 
@@ -628,7 +979,7 @@ fn test_script_hides_transaction_bodies_without_show_bodies_flag() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
+            "integration/snapshots/script/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
         );
 }
 
@@ -643,8 +994,565 @@ fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
+            "integration/snapshots/script/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
         );
+}
+
+#[test]
+fn test_script_trace_uses_script_imported_abi_for_message_names() {
+    let project = ProjectBuilder::new("script-imported-abi-message-names")
+        .file(
+            "contracts/script_only_messages",
+            r"
+struct (0xF8000003) ScriptOnlyTraceMsg {
+    queryId: uint64
+    amount: coins
+}
+",
+        )
+        .contract(
+            "opaque_sink",
+            r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .script_file(
+            "print_imported_abi_txs",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/script_only_messages"
+
+fun main() {
+    val sender = testing.treasury("sender");
+    val init = ContractState {
+        code: build("opaque_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: sinkAddress,
+        body: ScriptOnlyTraceMsg {
+            queryId: 17,
+            amount: ton("0.03"),
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/print_imported_abi_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_trace_uses_script_imported_abi_for_message_names.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_trace_uses_built_abi_for_external_out_message_names() {
+    let project = ProjectBuilder::new("script-built-abi-external-out-message-names")
+        .file(
+            "contracts/script_external_trigger_messages",
+            r"
+struct (0xF8000004) TriggerExternalNotice {
+    queryId: uint64
+}
+",
+        )
+        .file(
+            "contracts/script_external_catalog",
+            r"
+struct (0xF8000005) ScriptOnlyExternalNotice {
+    queryId: uint64
+}
+
+contract ScriptExternalCatalog {
+    outgoingMessages: ScriptOnlyExternalNotice
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract(
+            "external_emitter",
+            r#"
+import "script_external_trigger_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy TriggerExternalNotice.fromSlice(in.body);
+    createExternalLogMessage({
+        dest: createAddressNone(),
+        body: beginCell()
+            .storeUint(0xF8000005, 32)
+            .storeUint(msg.queryId, 64)
+            .endCell(),
+    }).send(SEND_MODE_REGULAR);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "print_built_abi_external_out_txs",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/script_external_trigger_messages"
+
+fun main() {
+    val _ = build("script_external_catalog", "contracts/script_external_catalog.tolk");
+
+    val sender = testing.treasury("sender");
+    val init = ContractState {
+        code: build("external_emitter"),
+        data: createEmptyCell(),
+    };
+    val emitterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: emitterAddress,
+        body: TriggerExternalNotice {
+            queryId: 33,
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/print_built_abi_external_out_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_trace_uses_built_abi_for_external_out_message_names.stdout.txt",
+        );
+}
+
+const PRECOMPILED_SCRIPT_REMOTE_CONTRACT: &str = r"
+struct (0xF8200002) PrecompiledRemotePing {
+    queryId: uint64
+}
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract PrecompiledRemoteSink {
+    incomingMessages: PrecompiledRemotePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy PrecompiledRemotePing.fromSlice(in.body);
+    throw Errors.NotOwner;
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const PRECOMPILED_SCRIPT_REMOTE_TYPES: &str = r"
+struct (0xF8200002) PrecompiledRemotePing {
+    queryId: uint64
+}
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract PrecompiledRemoteSink {
+    incomingMessages: PrecompiledRemotePing
+}
+";
+
+const EXPLICIT_BOC_PATH_RUNTIME_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun ping(): int {
+    return 7;
+}
+";
+
+const INVALID_EXPLICIT_BOC_PATH_TYPES: &str = r"
+contract Precompiled {
+    incomingMessages: MissingMessage
+}
+";
+
+fn compiled_precompiled_script_remote_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("script-boc-send-result-abi-source")
+        .contract_with_output(
+            "precompiled_remote_sink",
+            PRECOMPILED_SCRIPT_REMOTE_CONTRACT,
+            "contracts/precompiled_remote_sink.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(
+        source_project
+            .path()
+            .join("contracts/precompiled_remote_sink.boc"),
+    )
+    .expect("must read compiled precompiled script remote boc bytes")
+}
+
+fn compiled_explicit_boc_path_runtime_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("script-explicit-boc-path-source")
+        .contract_with_output(
+            "precompiled",
+            EXPLICIT_BOC_PATH_RUNTIME_CONTRACT,
+            "contracts/precompiled.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(source_project.path().join("contracts/precompiled.boc"))
+        .expect("must read compiled explicit BoC path runtime bytes")
+}
+
+fn explicit_boc_path_script() -> &'static str {
+    r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val code = build("precompiled", "contracts/precompiled.boc");
+
+    val sender = testing.treasury("deployer");
+    val init = ContractState {
+        code,
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    println("PING={}", net.runGetMethod<int>(address, "ping"));
+}
+"#
+}
+
+#[test]
+fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract() {
+    let project = ProjectBuilder::new("script-send-result-abi-from-address")
+        .mapping("@acton", "../lib")
+        .file(
+            "contracts/script_remote_messages",
+            r"
+struct (0xF8200001) ScriptRemotePing {
+    queryId: uint64
+}
+",
+        )
+        .contract(
+            "script_remote_sink",
+            r#"
+import "script_remote_messages"
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract ScriptRemoteSink {
+    incomingMessages: ScriptRemotePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptRemotePing.fromSlice(in.body);
+    throw Errors.NotOwner;
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "prepare_remote",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val sender = testing.treasury("remote_prepare_sender");
+    val init = ContractState {
+        code: build("script_remote_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    if (!testing.saveSnapshot("world-state.json")) {
+        println("SAVE_FAILED");
+        return;
+    }
+
+    println("REMOTE_SINK={}", sinkAddress);
+}
+"#,
+        )
+        .script_file(
+            "send_remote",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../wrappers/ScriptRemoteSink.gen"
+
+fun main(sinkAddress: address) {
+    if (!testing.loadSnapshot("world-state.json")) {
+        println("LOAD_FAILED");
+        return;
+    }
+
+    val sender = testing.treasury("remote_call_sender");
+    val sink = ScriptRemoteSink.fromAddress(sinkAddress);
+    val txs = sink.sendScriptRemotePing(sender.address, 7, { value: ton("0.1") });
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("script_remote_sink")
+        .run()
+        .success();
+
+    let prepare_output = project
+        .acton()
+        .script("scripts/prepare_remote.tolk")
+        .run()
+        .success();
+    let remote_address = prepare_output
+        .get_stdout()
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("REMOTE_SINK=")
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .expect("prepare script must print remote sink address");
+
+    project
+        .acton()
+        .script("scripts/send_remote.tolk")
+        .arg(&remote_address)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_explicit_boc_path_ignores_missing_manifest_types() {
+    let boc_bytes = compiled_explicit_boc_path_runtime_boc_bytes();
+    let project = ProjectBuilder::new("script-explicit-boc-missing-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/missing.types.tolk")
+        .script_file("explicit_boc_path", explicit_boc_path_script())
+        .build();
+
+    project
+        .acton()
+        .script("scripts/explicit_boc_path.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_explicit_boc_path_ignores_missing_manifest_types.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_explicit_boc_path_ignores_invalid_manifest_types() {
+    let boc_bytes = compiled_explicit_boc_path_runtime_boc_bytes();
+    let project = ProjectBuilder::new("script-explicit-boc-invalid-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+        .raw_file(
+            "contracts/precompiled.types.tolk",
+            INVALID_EXPLICIT_BOC_PATH_TYPES,
+        )
+        .script_file("explicit_boc_path", explicit_boc_path_script())
+        .build();
+
+    project
+        .acton()
+        .script("scripts/explicit_boc_path.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_explicit_boc_path_ignores_invalid_manifest_types.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_boc_contract_with_types() {
+    let boc_bytes = compiled_precompiled_script_remote_boc_bytes();
+    let project = ProjectBuilder::new("script-send-result-abi-from-address-boc")
+        .mapping("@acton", "../lib")
+        .contract_from_boc_with_types(
+            "precompiled_remote_sink",
+            boc_bytes,
+            "contracts/precompiled_remote_sink.types.tolk",
+        )
+        .raw_file(
+            "contracts/precompiled_remote_sink.types.tolk",
+            PRECOMPILED_SCRIPT_REMOTE_TYPES,
+        )
+        .script_file(
+            "prepare_remote",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val sender = testing.treasury("remote_boc_prepare_sender");
+    val init = ContractState {
+        code: build("precompiled_remote_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    if (!testing.saveSnapshot("world-state.json")) {
+        println("SAVE_FAILED");
+        return;
+    }
+
+    println("REMOTE_SINK={}", sinkAddress);
+}
+"#,
+        )
+        .script_file(
+            "send_remote",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../wrappers/PrecompiledRemoteSink.gen"
+
+fun main(sinkAddress: address) {
+    if (!testing.loadSnapshot("world-state.json")) {
+        println("LOAD_FAILED");
+        return;
+    }
+
+    val sender = testing.treasury("remote_boc_call_sender");
+    val sink = PrecompiledRemoteSink.fromAddress(sinkAddress);
+    val txs = sink.sendPrecompiledRemotePing(sender.address, 7, { value: ton("0.1") });
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("precompiled_remote_sink")
+        .run()
+        .success();
+
+    let prepare_output = project
+        .acton()
+        .script("scripts/prepare_remote.tolk")
+        .run()
+        .success();
+    let remote_address = prepare_output
+        .get_stdout()
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("REMOTE_SINK=")
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .expect("prepare script must print remote sink address");
+
+    let send_output = project
+        .acton()
+        .script("scripts/send_remote.tolk")
+        .arg(&remote_address)
+        .run()
+        .success();
+    crate::common::assertion().eq(
+        format!("{}\n", send_output.get_stdout().trim_end()),
+        snapbox::file!(
+            "snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_boc_contract_with_types.stdout.txt"
+        ),
+    );
 }
 
 #[test]
@@ -724,6 +1632,28 @@ fn test_script_with_args() {
 }
 
 #[test]
+fn test_script_accepts_hyphenated_trailing_args() {
+    let project = ProjectBuilder::new("script-hyphenated-args")
+        .script_file(
+            "args",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/args.tolk")
+        .arg("--dry-run")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_accepts_hyphenated_trailing_args.stderr.txt",
+        );
+}
+
+#[test]
 fn test_script_with_tolk_number_formats() {
     let project = ProjectBuilder::new("script-number-formats")
         .script_file(
@@ -795,7 +1725,7 @@ fn test_script_typed_args_print_stdout_snapshot() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_typed_args_print_stdout_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_typed_args_print_stdout_snapshot.stdout.txt",
         );
 }
 
@@ -804,9 +1734,9 @@ fn test_script_bool_arg_rejects_numeric_alias() {
     let project = ProjectBuilder::new("script-bool-numeric-arg")
         .script_file(
             "bool",
-            r#"
+            r"
             fun main(flag: bool) {}
-        "#,
+        ",
         )
         .build();
 
@@ -817,7 +1747,7 @@ fn test_script_bool_arg_rejects_numeric_alias() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
+            "integration/snapshots/script/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
         );
 }
 
@@ -846,7 +1776,7 @@ fn test_script_missing_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_missing_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_missing_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -855,9 +1785,9 @@ fn test_script_extra_args_reports_count_error() {
     let project = ProjectBuilder::new("script-extra-args")
         .script_file(
             "args",
-            r#"
+            r"
             fun main(a: int, b: int) {}
-        "#,
+        ",
         )
         .build();
 
@@ -870,7 +1800,7 @@ fn test_script_extra_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_extra_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_extra_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -879,9 +1809,9 @@ fn test_script_arg_type_mismatch_reports_type_error() {
     let project = ProjectBuilder::new("script-arg-type-mismatch")
         .script_file(
             "cell",
-            r#"
+            r"
             fun main(a: cell) {}
-        "#,
+        ",
         )
         .build();
 
@@ -892,7 +1822,7 @@ fn test_script_arg_type_mismatch_reports_type_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
+            "integration/snapshots/script/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
         );
 }
 
@@ -901,9 +1831,9 @@ fn test_script_map_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-map-arg")
         .script_file(
             "map",
-            r#"
+            r"
             fun main(items: map<int32, int32>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -914,7 +1844,7 @@ fn test_script_map_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_map_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_map_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -923,9 +1853,9 @@ fn test_script_dict_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-dict-arg")
         .script_file(
             "dict",
-            r#"
+            r"
             fun main(items: dict) {}
-        "#,
+        ",
         )
         .build();
 
@@ -936,7 +1866,7 @@ fn test_script_dict_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_dict_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_dict_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -945,9 +1875,9 @@ fn test_script_array_unknown_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-array-args")
         .script_file(
             "array",
-            r#"
+            r"
             fun main(t: array<unknown>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -958,7 +1888,7 @@ fn test_script_array_unknown_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -987,7 +1917,7 @@ fn test_script_array_arg_print_stdout_snapshot() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_array_arg_print_stdout_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_array_arg_print_stdout_snapshot.stdout.txt",
         );
 }
 
@@ -996,9 +1926,9 @@ fn test_script_unknown_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-unknown-cell-arg")
         .script_file(
             "unknown",
-            r#"
+            r"
             fun main(value: unknown) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1009,7 +1939,7 @@ fn test_script_unknown_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1018,9 +1948,9 @@ fn test_script_tuple_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-tuple-arg")
         .script_file(
             "tuple",
-            r#"
+            r"
             fun main(t: tuple) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1031,7 +1961,7 @@ fn test_script_tuple_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1040,9 +1970,9 @@ fn test_script_lisp_list_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-lisp-list-arg")
         .script_file(
             "list",
-            r#"
+            r"
             fun main(items: lisp_list<int>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1053,7 +1983,7 @@ fn test_script_lisp_list_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1062,7 +1992,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Abc {
                 a: int,
                 b: int,
@@ -1070,7 +2000,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
             }
 
             fun main(a: Abc) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1081,7 +2011,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1090,13 +2020,13 @@ fn test_script_nullable_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-nullable-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Foo {
                 a: int32,
             }
 
             fun main(a: Foo?) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1107,7 +2037,7 @@ fn test_script_nullable_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1116,13 +2046,13 @@ fn test_script_array_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-array-struct-arg")
         .script_file(
             "item",
-            r#"
+            r"
             struct Foo {
                 a: int32,
             }
 
             fun main(items: array<Foo>) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1133,7 +2063,7 @@ fn test_script_array_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1142,7 +2072,7 @@ fn test_script_struct_flat_args_reports_count_error() {
     let project = ProjectBuilder::new("script-struct-flat-args")
         .script_file(
             "item",
-            r#"
+            r"
             struct Abc {
                 a: int,
                 b: int,
@@ -1150,7 +2080,7 @@ fn test_script_struct_flat_args_reports_count_error() {
             }
 
             fun main(a: Abc) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1163,7 +2093,7 @@ fn test_script_struct_flat_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_struct_flat_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_struct_flat_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -1172,11 +2102,11 @@ fn test_script_alias_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-alias-arg")
         .script_file(
             "alias",
-            r#"
+            r"
             type ItemId = int;
 
             fun main(id: ItemId) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1187,7 +2117,7 @@ fn test_script_alias_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_alias_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_alias_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1196,7 +2126,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-nested-struct-arg")
         .script_file(
             "nested",
-            r#"
+            r"
             struct Inner {
                 value: int,
             }
@@ -1206,7 +2136,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
             }
 
             fun main(arg: Outer) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1217,7 +2147,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1343,7 +2273,9 @@ fn test_script_with_bits_arg() {
         .arg(&cell_hex)
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_script_with_bits_arg.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_with_bits_arg.stdout.txt",
+        );
 }
 
 #[test]
@@ -1351,10 +2283,10 @@ fn test_script_builder_arg_reports_unsupported_type() {
     let project = ProjectBuilder::new("script-builder-args")
         .script_file(
             "builder",
-            r#"
+            r"
             fun main(a: builder) {}
 
-        "#,
+        ",
         )
         .build();
 
@@ -1370,17 +2302,22 @@ fn test_script_builder_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_builder_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_builder_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
 #[test]
-fn test_script_any_address_arg_reports_unsupported_type() {
+fn test_script_with_any_address_arg() {
     let project = ProjectBuilder::new("script-any-address-arg")
         .script_file(
             "address",
             r#"
-            fun main(a: any_address) {}
+            import "../../lib/io"
+
+            fun main(a: any_address, none: any_address) {
+                println("internal: {}", a.isInternal());
+                println("none: {}", none.isNone());
+            }
         "#,
         )
         .build();
@@ -1389,10 +2326,11 @@ fn test_script_any_address_arg_reports_unsupported_type() {
         .acton()
         .script("scripts/address.tolk")
         .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .arg("addr_none")
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_with_any_address_arg.stdout.txt",
         );
 }
 
@@ -1401,9 +2339,9 @@ fn test_script_cell_arg_rejects_prefixed_hex() {
     let project = ProjectBuilder::new("script-cell-prefixed-arg")
         .script_file(
             "cell",
-            r#"
+            r"
             fun main(a: cell) {}
-        "#,
+        ",
         )
         .build();
 
@@ -1419,7 +2357,7 @@ fn test_script_cell_arg_rejects_prefixed_hex() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
+            "integration/snapshots/script/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
         );
 }
 
@@ -1520,7 +2458,7 @@ fn test_script_with_invalid_arg() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_with_invalid_arg.stderr.txt",
+            "integration/snapshots/script/test_script_with_invalid_arg.stderr.txt",
         );
 }
 
@@ -1559,7 +2497,7 @@ fn test_script_to_calculate_storage_fee() {
         .arg(&(60 * 60 * 24 * 365).to_string())
         .run()
         .success()
-        .assert_contains("0.258139024 TON");
+        .assert_contains("0.258139024 GRAM");
 }
 
 // ========================================
@@ -1586,7 +2524,7 @@ fn test_script_compilation_error() {
         .failure()
         .assert_stderr_contains("undefined symbol")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_compilation_error.stderr.txt",
+            "integration/snapshots/script/test_script_compilation_error.stderr.txt",
         );
 }
 
@@ -1700,7 +2638,9 @@ fn test_script_custom_exit_code() {
         .run()
         .code(1);
 
-    output.assert_snapshot_matches("integration/snapshots/test_script_custom_exit_code.stdout.txt");
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_custom_exit_code.stdout.txt",
+    );
 }
 
 #[test]
@@ -1730,7 +2670,7 @@ fn test_script_custom_exit_code_from_abi_shows_single_name() {
         .code(1)
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
+            "integration/snapshots/script/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
         );
 }
 
@@ -1754,7 +2694,9 @@ fn test_script_success_exit_code() {
         .script("scripts/success.tolk")
         .run()
         .code(0)
-        .assert_snapshot_matches("integration/snapshots/test_script_success_exit_code.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_success_exit_code.stdout.txt",
+        );
 }
 
 #[test]
@@ -1779,7 +2721,7 @@ fn test_script_known_exit_code_shows_description_and_phase() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_known_exit_code_shows_description_and_phase.stdout.txt",
+            "integration/snapshots/script/test_script_known_exit_code_shows_description_and_phase.stdout.txt",
         );
 }
 
@@ -1813,7 +2755,7 @@ fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
+            "integration/snapshots/script/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
         );
 }
 
@@ -1852,7 +2794,7 @@ fn test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name()
         .code(1)
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
+            "integration/snapshots/script/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
         );
 }
 
@@ -1878,7 +2820,7 @@ fn test_script_invalid_message_exit_code_shows_description_and_phase() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_invalid_message_exit_code_shows_description_and_phase.stdout.txt",
+            "integration/snapshots/script/test_script_invalid_message_exit_code_shows_description_and_phase.stdout.txt",
         );
 }
 
@@ -1912,7 +2854,7 @@ fn test_script_assert_failure_formats_detailed_output() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_assert_failure_formats_detailed_output.stdout.txt",
+            "integration/snapshots/script/test_script_assert_failure_formats_detailed_output.stdout.txt",
         );
 }
 
@@ -1966,7 +2908,7 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_to_have_tx_not_found_shows_transaction_search_details.stdout.txt",
+            "integration/snapshots/script/test_script_to_have_tx_not_found_shows_transaction_search_details.stdout.txt",
         );
 }
 
@@ -1994,7 +2936,7 @@ fn test_script_run_get_method_on_undeployed_contract_shows_actionable_error() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_run_get_method_on_undeployed_contract_shows_actionable_error.stdout.txt",
+            "integration/snapshots/script/test_script_run_get_method_on_undeployed_contract_shows_actionable_error.stdout.txt",
         );
 }
 
@@ -2039,7 +2981,331 @@ fn test_script_run_get_method_on_contract_without_code_shows_actionable_error() 
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_run_get_method_on_contract_without_code_shows_actionable_error.stdout.txt",
+            "integration/snapshots/script/test_script_run_get_method_on_contract_without_code_shows_actionable_error.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_run_get_method_failure_shows_nested_get_method_error() {
+    let project = ProjectBuilder::new("script-get-method-nested-failure")
+        .contract(
+            "failing_getter",
+            r"
+            fun onInternalMessage(_: InMessage) {}
+            fun onBouncedMessage(_: InMessageBounced) {}
+
+            get fun fail_get(): int {
+                throw 123;
+            }
+        ",
+        )
+        .script_file(
+            "get_nested_failure",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+
+            fun main() {
+                val deployer = testing.treasury("deployer");
+                val init = ContractState {
+                    code: build("failing_getter"),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                net.send(deployer.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: { stateInit: init },
+                }));
+
+                val _: int = net.runGetMethod(address, "fail_get");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/get_nested_failure.tolk")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_run_get_method_failure_shows_nested_get_method_error.stdout.txt",
+        );
+}
+
+fn script_get_method_missing_library_project(name: &str) -> Project {
+    ProjectBuilder::new(name)
+        .contract(
+            "getter",
+            r"
+            fun onInternalMessage(_: InMessage) {}
+            fun onBouncedMessage(_: InMessageBounced) {}
+
+            get fun currentCounter(): int {
+                return 123;
+            }
+        ",
+        )
+        .script_file(
+            "get_missing_library",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+            import "../../lib/types/message"
+            import "../../lib/types/transaction"
+            import "../../lib/tlb/maybe"
+            import "@stdlib/exotic-cells"
+
+            fun replaceCodeWithMissingLibraryReference(contractAddress: address): void {
+                val shard = testing.getShardAccount(contractAddress);
+                expect(shard).toBeNotNull();
+
+                val account = shard!.account.load();
+                expect(account is TlbAccountInfo).toBeTrue();
+
+                if (account is TlbAccountInfo && account.storage.state is TlbAccountStateActive) {
+                    val stateInit = account.storage.state.stateInit;
+                    val patchedAccount = TlbAccountInfo {
+                        addr: account.addr,
+                        storageStat: account.storageStat,
+                        storage: {
+                            lastTransLt: account.storage.lastTransLt,
+                            balance: account.storage.balance,
+                            state: TlbAccountStateActive {
+                                stateInit: StateInit {
+                                    fixedPrefixLength: stateInit.fixedPrefixLength,
+                                    special: stateInit.special,
+                                    code: build("getter").toLibraryReference(),
+                                    data: stateInit.data,
+                                    library: stateInit.library,
+                                },
+                            },
+                        },
+                    };
+                    var patchedShard = shard!;
+                    patchedShard.account = (patchedAccount as TlbAccount).toCell();
+                    testing.setShardAccount(contractAddress, patchedShard);
+                }
+            }
+
+            fun main() {
+                val deployer = testing.treasury("deployer");
+                val init = ContractState {
+                    code: build("getter"),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                val deployRes = net.send(
+                    deployer.address,
+                    createMessage({
+                        bounce: false,
+                        value: ton("1"),
+                        dest: {
+                            stateInit: init,
+                        },
+                    }),
+                );
+                expect(deployRes).toHaveSuccessfulDeploy({ to: address });
+
+                replaceCodeWithMissingLibraryReference(address);
+
+                val _: int = net.runGetMethod(address, "currentCounter");
+            }
+        "#,
+        )
+        .build()
+}
+
+const AUTO_LOAD_LIBRARY_GETTER: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounter(): int {
+    return 123;
+}
+";
+
+fn auto_load_get_method_library_project(name: &str) -> Project {
+    let script = r#"
+        import "../../lib/emulation/network"
+        import "../../lib/io"
+
+        fun main() {
+            val counter = net.runGetMethod<int>(
+                address("__REMOTE_ADDRESS__"),
+                "currentCounter",
+            );
+            println("AUTO_LOADED_COUNTER={}", counter);
+        }
+    "#
+    .replace("__REMOTE_ADDRESS__", AUTO_LOAD_LIBRARY_REMOTE_ADDRESS);
+
+    ProjectBuilder::new(name)
+        .contract("getter", AUTO_LOAD_LIBRARY_GETTER)
+        .script_file("auto_load_get_method_library", &script)
+        .build()
+}
+
+fn compile_getter_code(project: &Project) -> Cell {
+    let output = project
+        .acton()
+        .compile("contracts/getter.tolk")
+        .base64_only()
+        .run()
+        .success();
+    Boc::decode_base64(output.get_stdout().trim()).expect("compiled getter BoC must decode")
+}
+
+fn shard_account_with_code_ref(code_ref: Cell) -> ShardAccount {
+    let (address, _) =
+        StdAddr::from_str_ext(AUTO_LOAD_LIBRARY_REMOTE_ADDRESS, StdAddrFormat::any())
+            .expect("remote address must parse");
+    ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(Account {
+            balance: CurrencyCollection::new(1_000_000_000),
+            address: IntAddr::Std(address),
+            last_trans_lt: 777,
+            state: AccountState::Active(StateInit {
+                code: Some(code_ref),
+                data: Some(Cell::default()),
+                ..Default::default()
+            }),
+            storage_stat: StorageInfo::default(),
+        })))
+        .expect("shard account must serialize"),
+        last_trans_hash: HashBytes([0x33; 32]),
+        last_trans_lt: 777,
+    }
+}
+
+fn auto_load_library_responses(
+    library_code: &Cell,
+    include_library: bool,
+) -> Vec<ToncenterV2MockResponse> {
+    let code_ref = CellBuilder::build_library(library_code.repr_hash());
+    let shard_account = shard_account_with_code_ref(code_ref);
+    let mut responses = toncenter_v2_latest_fork_snapshot_responses(123_456);
+    responses.push(toncenter_v2_shard_account_cell_ok_response(&shard_account));
+    if include_library {
+        responses.push(toncenter_v2_get_libraries_ok_response(&Boc::encode_base64(
+            library_code,
+        )));
+    } else {
+        responses.push(toncenter_v2_error_response(404, "mock library not found"));
+    }
+    responses
+}
+
+#[test]
+fn test_script_auto_loads_missing_get_method_library_from_net() {
+    let project = auto_load_get_method_library_project("script-auto-load-get-method-library");
+    let library_code = compile_getter_code(&project);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(auto_load_library_responses(&library_code, true));
+    append_custom_network(
+        project.path(),
+        "script-auto-load-lib",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/auto_load_get_method_library.tolk")
+        .fork_net("custom:script-auto-load-lib")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_auto_loads_missing_get_method_library_from_net.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("auto-load-library-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write auto-load library request log");
+    output.assert_file_snapshot_matches(
+        "auto-load-library-requests.txt",
+        "integration/snapshots/script/test_script_auto_loads_missing_get_method_library_from_net.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_auto_load_missing_get_method_library_keeps_failure_when_remote_missing() {
+    let project =
+        auto_load_get_method_library_project("script-auto-load-get-method-library-missing");
+    let library_code = compile_getter_code(&project);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(auto_load_library_responses(&library_code, false));
+    append_custom_network(
+        project.path(),
+        "script-auto-load-lib-missing",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/auto_load_get_method_library.tolk")
+        .fork_net("custom:script-auto-load-lib-missing")
+        .run()
+        .failure();
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_auto_load_missing_get_method_library_keeps_failure_when_remote_missing.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project
+            .path()
+            .join("auto-load-missing-library-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write auto-load missing library request log");
+    output.assert_file_snapshot_matches(
+        "auto-load-missing-library-requests.txt",
+        "integration/snapshots/script/test_script_auto_load_missing_get_method_library_keeps_failure_when_remote_missing.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_run_get_method_missing_library_reference_shows_failure() {
+    let project = script_get_method_missing_library_project("script-get-method-missing-library");
+
+    project
+        .acton()
+        .script("scripts/get_missing_library.tolk")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_run_get_method_missing_library_reference_shows_failure.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_run_get_method_missing_library_reference_with_backtrace_full_shows_failure() {
+    let project =
+        script_get_method_missing_library_project("script-get-method-missing-library-backtrace");
+
+    project
+        .acton()
+        .script("scripts/get_missing_library.tolk")
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_run_get_method_missing_library_reference_with_backtrace_full_shows_failure.stdout.txt",
         );
 }
 
@@ -2065,7 +3331,9 @@ fn test_script_output_snapshot() {
         .script("scripts/output.tolk")
         .run()
         .code(0)
-        .assert_snapshot_matches("integration/snapshots/test_script_output_snapshot.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_output_snapshot.stdout.txt",
+        );
 }
 
 #[test]
@@ -2092,7 +3360,7 @@ fn test_script_multi_arg_println_helpers_snapshot() {
         .run()
         .code(0)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
         );
 }
 
@@ -2122,7 +3390,7 @@ fn test_script_invalid_network() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_invalid_network.stderr.txt",
+            "integration/snapshots/script/test_script_invalid_network.stderr.txt",
         );
 }
 
@@ -2138,7 +3406,7 @@ fn test_script_empty_script_file() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_empty_script_file.stderr.txt",
+            "integration/snapshots/script/test_script_empty_script_file.stderr.txt",
         );
 }
 
@@ -2163,7 +3431,7 @@ fn test_script_no_main_function() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_no_main_function.stderr.txt",
+            "integration/snapshots/script/test_script_no_main_function.stderr.txt",
         );
 }
 
@@ -2176,7 +3444,9 @@ fn test_script_empty_path() {
         .script("")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches("integration/snapshots/test_script_empty_path.stderr.txt");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_empty_path.stderr.txt",
+        );
 }
 
 #[test]
@@ -2210,7 +3480,7 @@ fn test_script_file_without_read_permission() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_file_without_read_permission.stderr.txt",
+            "integration/snapshots/script/test_script_file_without_read_permission.stderr.txt",
         );
 }
 
@@ -2265,7 +3535,7 @@ keys = { mnemonic-file = "mnemonic.txt" }
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_with_wallets.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet_with_wallets.stderr.txt",
         );
 }
 
@@ -2310,7 +3580,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet.stderr.txt",
         );
 }
 
@@ -2356,7 +3626,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_empty_config.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet_empty_config.stderr.txt",
         );
 }
 
@@ -2424,7 +3694,7 @@ keys = { mnemonic-file = "mnemonic.txt" }
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_wallet_exposes_key_helpers_for_v5.stdout.txt",
+            "integration/snapshots/script/test_script_broadcast_wallet_exposes_key_helpers_for_v5.stdout.txt",
         );
 }
 
@@ -2453,7 +3723,7 @@ fn test_script_wallet_key_pair_requires_open_broadcast_wallet() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wallet_key_pair_requires_open_broadcast_wallet.stdout.txt",
+        "integration/snapshots/script/test_script_wallet_key_pair_requires_open_broadcast_wallet.stdout.txt",
     );
 }
 
@@ -2482,7 +3752,7 @@ fn test_script_wallet_id_requires_open_broadcast_wallet() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wallet_id_requires_open_broadcast_wallet.stdout.txt",
+        "integration/snapshots/script/test_script_wallet_id_requires_open_broadcast_wallet.stdout.txt",
     );
 }
 
@@ -2511,7 +3781,7 @@ fn test_script_broadcast_treasury_recommends_wallet_api() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_treasury_recommends_wallet_api.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_treasury_recommends_wallet_api.stdout.txt",
     );
 }
 
@@ -2530,14 +3800,13 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2")
         .run()
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2559,17 +3828,74 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account")
         .run()
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_localnet_unavailable_shows_start_hint() {
+    let project = build_broadcast_wallet_error_project("script-broadcast-localnet-unavailable");
+    let port = find_unused_local_port();
+    append_localnet_network(project.path(), &format!("http://127.0.0.1:{port}/api/v2"));
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("localnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_localnet_unavailable_shows_start_hint.stdout.txt",
+    );
+}
+
+#[test]
+fn test_script_broadcast_localnet_unavailable_colors_start_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-localnet-unavailable-color");
+    let port = find_unused_local_port();
+    append_localnet_network(project.path(), &format!("http://127.0.0.1:{port}/api/v2"));
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("localnet")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .run()
+        .failure();
+
+    output.assert_stdout_svg_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_localnet_unavailable_colors_start_hint.stdout.svg",
+    );
+}
+
+#[test]
+fn test_script_broadcast_testnet_unavailable_shows_doctor_hint() {
+    let project = build_broadcast_wallet_error_project("script-broadcast-testnet-unavailable");
+    let port = find_unused_local_port();
+    let testnet_v2_url = format!("http://127.0.0.1:{port}/api/v2");
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("testnet")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &testnet_v2_url)
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_testnet_unavailable_shows_doctor_hint.stdout.txt",
+    );
 }
 
 #[test]
@@ -2588,14 +3914,13 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("localnet")
         .run()
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2708,7 +4033,10 @@ fun main() {
 
     write_localnet_wallet_config(&project, "deployer");
 
-    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    let node = project
+        .localnet()
+        .args(["--accounts", "deployer", "--block-interval-ms", "2000"])
+        .start();
     append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
 
     let deploy_output = project
@@ -2719,6 +4047,7 @@ fun main() {
         .success();
     let counter_address = extract_marker_value(&deploy_output.get_stdout(), "COUNTER_ADDRESS=");
     wait_until_address_state_active(&node, &counter_address, Duration::from_secs(12));
+    let fork_block_number = latest_localnet_seqno(&node).to_string();
 
     fs::write(
         project.path().join("scripts/query_counter.tolk"),
@@ -2740,9 +4069,376 @@ fun main() {{
         .acton()
         .script("scripts/query_counter.tolk")
         .verify_network("localnet")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number)
         .run()
         .success()
         .assert_contains("On-chain counter: 7");
+
+    node.stop();
+}
+
+#[test]
+fn test_script_historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    let config_boc64 = mocked_config_boc64(REMOTE_GLOBAL_VERSION, REMOTE_GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+    ]);
+
+    let project = ProjectBuilder::new("script-historical-fork-snapshot")
+        .script_file(
+            "show_fork_snapshot",
+            r#"
+import "../../lib/emulation/config"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val version = testing.getConfig().getGlobalVersion();
+    println("version={}, capabilities={}", version.version, version.capabilities);
+    println("testing-now={}, blockchain-now={}", testing.getNow(), blockchain.now());
+}
+"#,
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-fork-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/show_fork_snapshot.tolk")
+        .fork_net("custom:script-fork-snapshot")
+        .arg("--fork-block-number")
+        .arg(&FORK_SEQNO.to_string())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_historical_fork_uses_block_config_and_time.stdout.txt",
+    );
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("script-fork-snapshot-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured fork snapshot requests");
+    output.assert_file_snapshot_matches(
+        "script-fork-snapshot-requests.txt",
+        "integration/snapshots/script/test_script_historical_fork_uses_block_config_and_time.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
+    let last_hash_bytes = [0x33_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let mut responses = toncenter_v2_fork_snapshot_responses(654_321, 1_700_000_321);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 202, &last_hash_b64),
+    ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("script-fork-block-number-forwarded")
+        .script_file("fork_block_query", &remote_shard_account_script_source())
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-remote-block",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .script("scripts/fork_block_query.tolk")
+        .fork_net("custom:script-remote-block")
+        .arg("--fork-block-number")
+        .arg("654321")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("script-fork-block-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write captured script fork-block request log");
+    output.assert_file_snapshot_matches(
+        "script-fork-block-requests.txt",
+        "integration/snapshots/script/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_block_number_reuses_persistent_account_cache_between_runs() {
+    let last_hash_bytes = [0x88_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 765432_u64;
+    let mut responses = toncenter_v2_fork_snapshot_responses(fork_block_number, 1_700_000_432);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 707, &last_hash_b64),
+    ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("script-fork-block-cache")
+        .script_file(
+            "fork_block_cache_query",
+            &remote_shard_account_script_source(),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-remote-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .script("scripts/fork_block_cache_query.tolk")
+        .fork_net("custom:script-remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.first.stdout.txt",
+        );
+
+    let output = project
+        .acton()
+        .script("scripts/fork_block_cache_query.tolk")
+        .fork_net("custom:script-remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.second.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "script-remote-cache",
+        fork_block_number,
+        "script-fork-block-cache-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "script-fork-block-cache-summary.txt",
+        "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.summary.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace() {
+    let project = build_localnet_wait_project(
+        "script-fork-localnet-explicit-block-trace",
+        "deploy_fork_targets",
+        FORK_LOCALNET_DEPLOY_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_fork_targets.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    let deploy_stdout = deploy_output.get_stdout();
+    let forwarder_address = extract_marker_value(&deploy_stdout, "FORWARDER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("forwarder address must be present")
+        .to_string();
+    let receiver_address = extract_marker_value(&deploy_stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+
+    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    let deploy_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_deploy_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 1, 2),
+    )
+    .expect("failed to write fork trace script for deploy block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_deploy_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&deploy_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.deploy_block.stdout.txt",
+        );
+
+    fs::write(
+        project.path().join("scripts/broadcast_trigger.tolk"),
+        fork_localnet_trigger_script(&forwarder_address, &receiver_address),
+    )
+    .expect("failed to write broadcast trigger script");
+
+    project
+        .acton()
+        .script("scripts/broadcast_trigger.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .assert_contains("BROADCAST_TRIGGERED=true");
+
+    let triggered_seqno = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_trace_at_triggered_block.tolk"),
+        fork_localnet_trace_script(&forwarder_address, &receiver_address, 2, 3),
+    )
+    .expect("failed to write fork trace script for triggered block");
+
+    project
+        .acton()
+        .script("scripts/fork_trace_at_triggered_block.tolk")
+        .fork_net("localnet")
+        .arg("--fork-block-number")
+        .arg(&triggered_seqno)
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
+        );
+
+    node.stop();
+}
+
+#[test]
+#[ignore = "benchmark scenario for local fork account cache perf tracking"]
+fn test_script_fork_localnet_account_cache_benchmark() {
+    let project = build_localnet_wait_project(
+        "script-fork-localnet-cache-benchmark",
+        "deploy_fork_targets",
+        FORK_LOCALNET_DEPLOY_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_fork_targets.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    let deploy_stdout = deploy_output.get_stdout();
+    let receiver_address = extract_marker_value(&deploy_stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    let fork_block_number = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_cache_benchmark_query.tolk"),
+        format!(
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {{
+    val received: int = net.runGetMethod(address("{receiver_address}"), "received");
+    println("BENCH_RECEIVED={{}}", received);
+}}
+"#
+        ),
+    )
+    .expect("failed to write fork cache benchmark query script");
+
+    let run_query = |no_fork_cache: bool| -> Duration {
+        let mut command = project
+            .acton()
+            .script("scripts/fork_cache_benchmark_query.tolk")
+            .fork_net("localnet")
+            .arg("--fork-block-number")
+            .arg(&fork_block_number);
+        if no_fork_cache {
+            command = command.arg("--no-fork-cache");
+        }
+
+        let started = Instant::now();
+        command.run().success().assert_contains("BENCH_RECEIVED=1");
+        started.elapsed()
+    };
+
+    run_query(true);
+
+    let runs = 3_u32;
+    let mut uncached_total = Duration::ZERO;
+    for _ in 0..runs {
+        uncached_total += run_query(true);
+    }
+
+    let warm_cache = run_query(false);
+
+    let mut cached_total = Duration::ZERO;
+    for _ in 0..runs {
+        cached_total += run_query(false);
+    }
+
+    let uncached_avg_ms = uncached_total.as_secs_f64() * 1000.0 / f64::from(runs);
+    let cached_avg_ms = cached_total.as_secs_f64() * 1000.0 / f64::from(runs);
+    let warm_cache_ms = warm_cache.as_secs_f64() * 1000.0;
+    let speedup = uncached_avg_ms / cached_avg_ms.max(0.001);
+
+    eprintln!(
+        "fork account cache benchmark: runs={runs} uncached_avg_ms={uncached_avg_ms:.2} cached_avg_ms={cached_avg_ms:.2} warm_cache_ms={warm_cache_ms:.2} speedup={speedup:.2}x"
+    );
 
     node.stop();
 }
@@ -2770,7 +4466,79 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_rejects_non_numeric_fork_block_number() {
+    let project = ProjectBuilder::new("script-invalid-fork-block")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("hello");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--fork-block-number")
+        .arg("not-a-seqno")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_rejects_non_numeric_fork_block_number.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tonconnect_requires_net() {
+    let project = ProjectBuilder::new("script-tonconnect-requires-net")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_tonconnect_requires_net.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_tonconnect_rejects_localnet() {
+    let project = ProjectBuilder::new("script-tonconnect-localnet")
+        .script_file(
+            "hello",
+            r"
+            fun main() {}
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/hello.tolk")
+        .with_net("localnet")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_tonconnect_rejects_localnet.stderr.txt",
         );
 }
 
@@ -2795,24 +4563,47 @@ fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
+        "integration/snapshots/script/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
     );
 
-    let stdout = output.get_stdout();
-    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
-        .split_whitespace()
-        .next()
-        .expect("forwarder address must be present")
-        .to_string();
-    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
-        .split_whitespace()
-        .next()
-        .expect("receiver address must be present")
-        .to_string();
-    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
-    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
-
     node.stop();
+}
+
+#[test]
+fn test_script_wait_for_trace_timeout_prints_null() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-trace-timeout-prints-null",
+        "wait_for_trace_timeout",
+        WAIT_FOR_TRACE_TIMEOUT_PRINT_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let (v2_url, v2_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    let (v3_url, v3_handle, _) = spawn_toncenter_v3_mock(vec![ToncenterV3MockResponse {
+        status: 200,
+        body: serde_json::json!({ "traces": [] }).to_string(),
+    }]);
+    append_custom_network_with_urls(project.path(), "mock-trace-timeout", &v2_url, &v3_url);
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_trace_timeout.tolk")
+        .verify_network("custom:mock-trace-timeout")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_wait_for_trace_timeout_prints_null.stdout.txt",
+        )
+        .assert_not_contains("not a TVM tuple");
+
+    v2_handle.join().expect("mock toncenter v2 must finish");
+    v3_handle.join().expect("mock toncenter v3 must finish");
 }
 
 #[test]
@@ -2836,22 +4627,152 @@ fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
+        "integration/snapshots/script/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
     );
 
-    let stdout = output.get_stdout();
-    let forwarder_address = extract_marker_value(&stdout, "FORWARDER_CONTRACT=")
-        .split_whitespace()
-        .next()
-        .expect("forwarder address must be present")
-        .to_string();
-    let receiver_address = extract_marker_value(&stdout, "RECEIVER_CONTRACT=")
-        .split_whitespace()
-        .next()
-        .expect("receiver address must be present")
-        .to_string();
-    wait_until_address_state_active(&node, &forwarder_address, Duration::from_secs(12));
-    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    node.stop();
+}
+
+#[test]
+fn test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet() {
+    let project = ProjectBuilder::new("script-wait-ignores-old-transaction-localnet")
+        .contract("accept_external_once", ACCEPT_EXTERNAL_ONCE_CONTRACT)
+        .script_file(
+            "seed_external_transaction",
+            SEED_EXTERNAL_TRANSACTION_SCRIPT,
+        )
+        .script_file("wait_for_rejected_replay", WAIT_FOR_REJECTED_REPLAY_SCRIPT)
+        .build();
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let seed_output = project
+        .acton()
+        .script("scripts/seed_external_transaction.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    seed_output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.seed.stdout.txt",
+    );
+
+    thread::sleep(Duration::from_secs(2));
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_rejected_replay.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_wait_for_first_transaction_ignores_transaction_before_script_start_on_localnet.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
+fn test_script_uses_localnet_auth_token_env() {
+    let project = build_localnet_wait_project(
+        "script-localnet-auth-token-env",
+        "wait_for_first_transaction",
+        WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project
+        .localnet()
+        .require_auth()
+        .args(["--accounts", "deployer"])
+        .start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_first_transaction.tolk")
+        .verify_network("localnet")
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_uses_localnet_auth_token_env.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
+fn test_script_unfunded_wallet_wait_for_first_transaction_repro_on_localnet() {
+    let project = ProjectBuilder::new("script-unfunded-wallet-wait-localnet")
+        .script_file(
+            "unfunded_wallet_wait",
+            UNFUNDED_WALLET_WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+        )
+        .build();
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/unfunded_wallet_wait.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_unfunded_wallet_wait_for_first_transaction_repro_on_localnet.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
+fn test_script_wait_for_first_transaction_returns_null_when_root_tx_failed_on_localnet() {
+    let project = ProjectBuilder::new("script-wait-root-failed-localnet")
+        .contract(
+            "accept_then_throw_external",
+            ACCEPT_THEN_THROW_EXTERNAL_CONTRACT,
+        )
+        .script_file(
+            "wait_root_failed",
+            FAILED_ROOT_WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+        )
+        .build();
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_root_failed.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    output
+        .assert_not_contains("Transaction successfully applied!")
+        .assert_stderr_contains("root transaction failed")
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_wait_for_first_transaction_returns_null_when_root_tx_failed_on_localnet.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_wait_for_first_transaction_returns_null_when_root_tx_failed_on_localnet.stderr.txt",
+        );
 
     node.stop();
 }
@@ -2876,14 +4797,13 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-missing-account-with-init")
         .run()
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2909,14 +4829,13 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .verify_network("custom:mock-v2-wallet-rejection-with-init")
         .run()
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2944,6 +4863,8 @@ fn test_script_address_print_default() {
 
 #[test]
 fn test_script_address_print_fork_testnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("script-simple")
         .script_file(
             "hello",
@@ -2959,16 +4880,23 @@ fn test_script_address_print_fork_testnet() {
 
     let output = project
         .acton()
+        .env(
+            TEST_TONCENTER_TESTNET_V2_URL_ENV,
+            &format!("{mock_url}/api/v2"),
+        )
         .script("scripts/hello.tolk")
         .fork_net("testnet")
         .run()
         .success();
 
     output.assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
 fn test_script_address_print_fork_mainnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("script-simple")
         .script_file(
             "hello",
@@ -2984,12 +4912,17 @@ fn test_script_address_print_fork_mainnet() {
 
     let output = project
         .acton()
+        .env(
+            TEST_TONCENTER_MAINNET_V2_URL_ENV,
+            &format!("{mock_url}/api/v2"),
+        )
         .script("scripts/hello.tolk")
         .fork_net("mainnet")
         .run()
         .success();
 
     output.assert_contains("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
@@ -3208,7 +5141,7 @@ fn test_script_env_vars_support_coins() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_env_vars_support_coins.stdout.txt",
+            "integration/snapshots/script/test_script_env_vars_support_coins.stdout.txt",
         );
 }
 
@@ -3296,7 +5229,9 @@ fn test_println_nullable_values() {
         .script("scripts/env.tolk")
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_println_nullable_values.stderr.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_nullable_values.stderr.txt",
+        );
 }
 
 #[test]
@@ -3323,7 +5258,7 @@ fn test_println_non_empty_map_values() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_non_empty_map_values.stderr.txt",
+            "integration/snapshots/println/test_println_non_empty_map_values.stderr.txt",
         );
 }
 
@@ -3351,7 +5286,9 @@ fn test_println_empty_map_values() {
         .script("scripts/map_empty_values.tolk")
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_println_empty_map_values.stderr.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_empty_map_values.stderr.txt",
+        );
 }
 
 #[test]
@@ -3399,7 +5336,7 @@ fn test_println_map_supported_key_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_supported_key_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_supported_key_types.stderr.txt",
         );
 }
 
@@ -3473,7 +5410,7 @@ fn test_println_map_supported_value_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_supported_value_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_supported_value_types.stderr.txt",
         );
 }
 
@@ -3510,7 +5447,7 @@ fn test_println_map_fallback_for_unformattable_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_fallback_for_unformattable_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_fallback_for_unformattable_types.stderr.txt",
         );
 }
 
@@ -3545,7 +5482,7 @@ fn test_println_map_retyped_from_low_level_dict_parse_failures() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
+            "integration/snapshots/println/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
         );
 }
 
@@ -3580,7 +5517,7 @@ fn test_println_map_struct_value_falls_back_to_raw_hex() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
+            "integration/snapshots/println/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
         );
 }
 
@@ -3815,7 +5752,7 @@ fun main() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_snapshot.stdout.txt",
         );
 }
 
@@ -3917,10 +5854,10 @@ fun main() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
         )
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
         );
 }
 
@@ -3953,7 +5890,6 @@ fun main() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/show_config.tolk")
         .verify_network("custom:mock-v2-config")
         .run()

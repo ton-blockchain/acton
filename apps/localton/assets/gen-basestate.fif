@@ -1,0 +1,25 @@
+#!/usr/bin/create-state -s
+"TonUtil.fif" include
+"Asm.fif" include
+"Lists.fif" include
+
+def? $1 { @' $1 } { "" } cond constant suffix
+{ suffix $+ } : +suffix
+
+wc_base setworkchain
+GLOBAL_ID setglobalid
+
+// LOCALTON_IMPORTED_ACCOUNTS
+
+create_state
+
+cr ."initial basechain state is:" cr dup <s csr. cr
+dup 31 boc+>B
+dup "basestate0.boc" tuck B>file
+."(Initial basechain state saved to file " type .")" cr
+Bhashu dup =: basestate0_fhash
+."file hash=" dup 64x. space 256 u>B dup B>base64url type cr
+"basestate0" +suffix +".fhash" B>file
+hashu dup =: basestate0_rhash
+."root hash=" dup 64x. space 256 u>B dup B>base64url type cr
+"basestate0" +suffix +".rhash" B>file

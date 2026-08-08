@@ -332,7 +332,7 @@ export function DeployBatch({
           >
             {busy
               ? 'Awaiting wallet…'
-              : `Deploy ${n || 0} Item${n === 1 ? '' : 's'} · ${totalGas} TON`}
+              : `Deploy ${n || 0} Item${n === 1 ? '' : 's'} · ${totalGas} GRAM`}
           </Button>
         </CardContent>
       </Card>
@@ -368,9 +368,9 @@ export function DeployBatch({
               v={contentMode === 'shared' ? 'Shared URI' : 'Unique per item'}
               mono={false}
             />
-            <KV k="Per-Item Fee" v="0.03 TON" mono={false} />
-            <KV k="Batch Fee" v="0.15 TON" mono={false} />
-            <KV k="Total Cost" v={`${totalGas} TON`} />
+            <KV k="Per-Item Fee" v="0.03 GRAM" mono={false} />
+            <KV k="Batch Fee" v="0.15 GRAM" mono={false} />
+            <KV k="Total Cost" v={`${totalGas} GRAM`} />
           </div>
 
           <div className="mt-4">

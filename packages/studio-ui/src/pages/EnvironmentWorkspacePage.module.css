@@ -1,0 +1,73 @@
+.statePage {
+  min-height: 100%;
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+}
+
+.stateContent {
+  min-height: 100%;
+  width: min(100%, 72rem);
+  margin: 0 auto;
+  padding: var(--acton-space-8) var(--acton-space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stateMessage {
+  display: grid;
+  justify-items: center;
+  gap: var(--acton-space-2);
+  text-align: center;
+}
+
+.stateIcon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: var(--acton-space-1);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  display: grid;
+  place-items: center;
+}
+
+.stateIcon[data-error="true"] {
+  color: var(--acton-color-danger-text);
+}
+
+.loadingIcon {
+  animation: environment-spin 900ms linear infinite;
+}
+
+.stateTitle {
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.stateDescription {
+  max-width: 30rem;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.errorDetails {
+  width: min(100%, 60rem);
+  margin-top: var(--acton-space-6);
+  text-align: left;
+}
+
+.stateActions {
+  min-height: 2rem;
+  margin-top: var(--acton-space-5);
+  display: flex;
+  justify-content: center;
+}
+
+@keyframes environment-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,6 @@
+Error: Failed to start localnet on [LOCALHOST_ADDR]
+Set another port with [localnet].port in Acton.toml
+Or stop the process currently listening on that port
+
+Caused by:
+  Address already in use ([OS_ERROR])

@@ -1,27 +1,13 @@
 ---
-title: "Mutation Rules"
+title: "Mutation rules"
 description: "Reference of all available mutation rules in Acton"
 ---
 
-This page lists all 49 mutation rules available in Acton, categorized by their type.
+Acton ships 49 built-in [mutation](/docs/testing/mutation-testing/overview) rules, categorized by their type. Use rule IDs with `acton test --mutation-disable-rules <RULE>` or `[test.mutation].disable-rules` inside `Acton.toml`.
 
-Use rule IDs with `acton test --mutation-disable-rules <RULE>` or
-`[test.mutation].disable-rules` inside `Acton.toml`.
+## Critical rules
 
-Use mutation levels with `acton test --mutation-levels critical,major` or
-`[test.mutation].mutation-levels = ["critical", "major"]`.
-
-Use changed-line filtering with `acton test --mutation-diff worktree` or
-`[test.mutation].diff = "branch"`.
-
-For when to use `worktree`, `ref`, or `branch`, see
-[Mutation Testing](/docs/testing/mutation-testing/overview).
-
-## Critical Rules
-
-These rules affect control flow, assertions, storage persistence, and contract
-upgrade or external-message semantics. Mutations in this category that survive
-are often indicators of missing tests for security-critical behavior.
+These rules affect control flow, assertions, storage persistence, and contract upgrade or external-message semantics. Mutations in this category that survive are often indicators of missing tests for security-critical behavior.
 
 | Rule                                      | Description                                   | Explanation                                                                                                               |
 |-------------------------------------------|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
@@ -37,7 +23,7 @@ are often indicators of missing tests for security-critical behavior.
 | `replace_while_condition_with_false`      | Replace while condition with `false`          | The loop execution path is not fully covered.                                                                             |
 | `remove_logical_not`                      | Remove logical NOT (`!`)                      | The logical negation is not fully covered.                                                                                |
 
-## Arithmetic Rules
+## Arithmetic rules
 
 These rules mutate arithmetic operations to ensure calculations are verified by tests.
 
@@ -55,7 +41,7 @@ These rules mutate arithmetic operations to ensure calculations are verified by 
 | `replace_minus_assign_with_plus_assign`      | Replace `-=` with `+=`   |
 | `remove_unary_minus`                         | Remove unary minus (`-`) |
 
-## Comparison Rules
+## Comparison rules
 
 These rules mutate comparison operators to check if boundary conditions are tested.
 
@@ -68,7 +54,7 @@ These rules mutate comparison operators to check if boundary conditions are test
 | `replace_less_or_equal_with_less_than`       | Replace `<=` with `<`  |
 | `replace_greater_or_equal_with_greater_than` | Replace `>=` with `>`  |
 
-## Boolean & Logical Rules
+## Boolean and logical rules
 
 These rules invert boolean values and logical operators.
 
@@ -79,7 +65,7 @@ These rules invert boolean values and logical operators.
 | `replace_logical_and_with_logical_or` | Replace `&&` with `\|\|`    |
 | `replace_logical_or_with_logical_and` | Replace `\|\|` with `&&`    |
 
-## Bitwise Rules
+## Bitwise rules
 
 These rules mutate bitwise operators, compound bitwise assignments, and shifts.
 

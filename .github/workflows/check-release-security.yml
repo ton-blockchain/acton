@@ -28,3 +28,9 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
+
+  template-deps:
+    uses: ./.github/workflows/check-template-deps.yml
+    secrets: inherit
+    permissions:
+      contents: read

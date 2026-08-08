@@ -1,0 +1,205 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 16px;
+  background-color: var(--vscode-sideBar-background);
+  color: var(--vscode-sideBar-foreground);
+  font-family: var(--vscode-font-family), sans-serif;
+  overflow-y: auto;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.walletList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-grow: 1;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgb(var(--vscode-sideBar-background-rgb, 0, 0, 0), 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  gap: 12px;
+}
+
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--vscode-button-background);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingText {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.empty {
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 24px;
+  font-size: 13px;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background-color: rgb(0 0 0 / 30%);
+  z-index: 999;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 50%);
+  padding: 20px;
+  z-index: 1000;
+  width: 90%;
+  max-width: 340px;
+  border-radius: 4px;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  font-weight: 500;
+}
+
+.formGroup input,
+.formGroup textarea {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  padding: 6px 10px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.selectWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.selectWrapper select {
+  width: 100%;
+  background-color: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  padding: 6px 10px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 30px;
+}
+
+.selectWrapper::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--vscode-dropdown-foreground);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.formGroup input:focus,
+.selectWrapper select:focus,
+.formGroup textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.checkboxGroup input {
+  margin: 0;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.formActions button {
+  padding: 6px 16px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 13px;
+  border: none;
+  font-weight: 500;
+}
+
+.primaryButton {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.primaryButton:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.formActions button[type="button"] {
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.formActions button[type="button"]:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}

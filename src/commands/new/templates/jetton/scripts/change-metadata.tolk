@@ -1,3 +1,4 @@
+import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@wrappers/JettonMinter.gen"
@@ -12,9 +13,9 @@ fun main() {
         admin.address,
         0,
         buildJettonMetadataCell(metadata),
-        { bounce: false, value: ton("0.05") },
+        { bounce: false, value: grams("0.05") },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     printJettonMinterInfo(minter, "JETTON");
 }

@@ -1,11 +1,24 @@
 use crate::support::TestOutputExt;
 use crate::support::compilation::extract_compiled_contracts;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{Project, ProjectBuilder, TestConfig};
 use acton_config::color::ColorMode;
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const SIMPLE_CONTRACT_WITH_GAS_DRIFT: &str = r"
+fun onInternalMessage(_: InMessage) {
+    var extra = 0;
+    repeat (8) {
+        extra += 1;
+    }
+    if (extra == 0) {
+        throw 900;
+    }
+}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
@@ -101,6 +114,296 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const PROFILED_TEST_WITH_FAILURE: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-transaction`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployer = testing.treasury("deployer");
+    val deployMessage = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    val deployResult = net.send(deployer.address, deployMessage);
+    expect(deployResult.size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    });
+    val pingResult = net.send(deployer.address, ping);
+    expect(pingResult.size()).toEqual(2);
+}
+"#;
+
+const PROFILE_MESSAGES: &str = r"
+struct (0xFA170001) ProfilePing {
+    queryId: uint64
+}
+";
+
+const PROFILE_ABI_CONTRACT: &str = r#"
+import "profile_messages"
+
+contract ProfileTarget {
+    incomingMessages: ProfilePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ProfilePing.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const PROFILE_UNKNOWN_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const PROFILED_TYPED_OPCODE_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+import "../contracts/profile_messages"
+
+get fun `test-profiled-typed-opcode`() {
+    val init = ContractState {
+        code: build("target"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val sender = testing.treasury("sender");
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: address });
+
+    val first = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+        body: ProfilePing { queryId: 1 },
+    }));
+    expect(first.size()).toEqual(1);
+
+    val second = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+        body: ProfilePing { queryId: 2 },
+    }));
+    expect(second.size()).toEqual(1);
+}
+"#;
+
+const PROFILED_UNKNOWN_OPCODE_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-unknown-opcode`() {
+    val init = ContractState {
+        code: build("target"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val sender = testing.treasury("sender");
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: address });
+
+    val result = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+        body: beginCell().storeUint(0xFA170099, 32).storeUint(1, 64).endCell(),
+    }));
+    expect(result.size()).toEqual(1);
+}
+"#;
+
+const GAS_PROFILED_UNIT_TEST: &str = r"
+struct X {
+    seed: int
+}
+
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    if (result == 0) {
+        throw 901;
+    }
+}
+";
+
+const GAS_PROFILED_MESSAGE_CONTRACT: &str = r"
+fun touchOne(): int {
+    return 1;
+}
+
+fun onInternalMessage(_: InMessage) {
+    touchOne();
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const GAS_PROFILED_DEEP_STACK_CONTRACT: &str = r"
+@noinline
+fun profileLeaf(seed: int): int {
+    var acc = seed;
+    repeat (5) {
+        acc += seed;
+        acc *= 2;
+    }
+    return acc;
+}
+
+@noinline
+fun profileLevelFour(seed: int): int {
+    return profileLeaf(seed + 4);
+}
+
+@noinline
+fun profileLevelThree(seed: int): int {
+    return profileLevelFour(seed + 3);
+}
+
+@noinline
+fun profileLevelTwo(seed: int): int {
+    return profileLevelThree(seed + 2);
+}
+
+@noinline
+fun profileLevelOne(seed: int): int {
+    return profileLevelTwo(seed + 1);
+}
+
+fun onInternalMessage(_: InMessage) {
+    val result = profileLevelOne(1);
+    if (result == 0) {
+        throw 701;
+    }
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const GAS_PROFILED_MESSAGES_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test gas profile contract entrypoints`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployer = testing.treasury("deployer");
+
+    val deploy = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    expect(net.send(deployer.address, deploy).size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.01"),
+        dest: address,
+    });
+    expect(net.send(deployer.address, ping).size()).toEqual(1);
+}
+"#;
+
+const GAS_PROFILED_DEEP_STACK_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test gas profile deep stack`() {
+    val init = ContractState {
+        code: build("deep"),
+        data: createEmptyCell(),
+    };
+
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployer = testing.treasury("deployer");
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    })).size()).toEqual(1);
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    })).size()).toEqual(1);
+}
+"#;
+
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build"
 import "../../lib/testing/expect"
@@ -125,6 +428,118 @@ get fun `{test_name}`() {{
 }}
 "#
     )
+}
+
+fn append_acton_toml(project: &Project, content: &str) {
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("should read generated Acton.toml");
+    acton_toml.push_str(content);
+    fs::write(&acton_toml_path, acton_toml).expect("should update generated Acton.toml");
+}
+
+fn read_project_json(project: &Project, relative_path: &str) -> serde_json::Value {
+    let full_path = project.path().join(relative_path);
+    let content = fs::read_to_string(&full_path)
+        .unwrap_or_else(|err| panic!("should read {}: {err}", full_path.display()));
+    serde_json::from_str(&content)
+        .unwrap_or_else(|err| panic!("should parse {}: {err}", full_path.display()))
+}
+
+fn write_project_json(project: &Project, relative_path: &str, value: &serde_json::Value) {
+    let full_path = project.path().join(relative_path);
+    let content = format!(
+        "{}\n",
+        serde_json::to_string_pretty(value)
+            .unwrap_or_else(|err| panic!("should serialize {relative_path}: {err}"))
+    );
+    fs::write(&full_path, content)
+        .unwrap_or_else(|err| panic!("should write {}: {err}", full_path.display()));
+}
+
+fn normalize_profile_snapshot_file(project: &Project, relative_path: &str) {
+    let mut snapshot = read_project_json(project, relative_path);
+    snapshot["timestamp"] = serde_json::json!(0);
+    write_project_json(project, relative_path, &snapshot);
+}
+
+fn typed_profile_project(project_name: &str) -> Project {
+    ProjectBuilder::new(project_name)
+        .file("contracts/profile_messages", PROFILE_MESSAGES)
+        .contract("target", PROFILE_ABI_CONTRACT)
+        .test_file("profile", PROFILED_TYPED_OPCODE_TEST)
+        .build()
+}
+
+fn profile_trace_drift_project(project_name: &str) -> Project {
+    let project = ProjectBuilder::new(project_name)
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let mut baseline = read_project_json(&project, "profile-baseline.json");
+    baseline["timestamp"] = serde_json::json!(0);
+    write_project_json(&project, "profile-baseline.json", &baseline);
+
+    fs::write(
+        project.path().join("contracts/simple.tolk"),
+        SIMPLE_CONTRACT_WITH_GAS_DRIFT,
+    )
+    .expect("Failed to write drifted contract file");
+
+    project
+}
+
+fn fail_fast_project(project_name: &str, configured_fail_fast: Option<bool>) -> ProjectBuilder {
+    let builder = ProjectBuilder::new(project_name)
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test first pass`() {
+                expect(1).toEqual(1);
+            }
+
+            get fun `test second fail`() {
+                expect(1).toEqual(2);
+            }
+
+            get fun `test third pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test fourth pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        );
+
+    if let Some(fail_fast) = configured_fail_fast {
+        builder.with_test_config(TestConfig {
+            fail_fast: Some(fail_fast),
+            ..TestConfig::default()
+        })
+    } else {
+        builder
+    }
 }
 
 fn body_printing_test_project(project_name: &str) -> ProjectBuilder {
@@ -239,6 +654,93 @@ fn test_run_specific_test_file() {
         .assert_passed(1)
         .assert_contains("in file 1")
         .assert_not_contains("in file 2");
+}
+
+#[test]
+fn test_run_multiple_explicit_test_files() {
+    let project = ProjectBuilder::new("multiple-explicit-test-files")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in selected file 1`() {
+                expect(1).toEqual(1);
+                println("selected file 1");
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in selected file 2`() {
+                expect(2).toEqual(2);
+                println("selected file 2");
+            }
+        "#,
+        )
+        .test_file(
+            "test3",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in unselected file 3`() {
+                expect(3).toEqual(3);
+                println("unselected file 3");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .paths(&["tests/test1.test.tolk", "tests/test2.test.tolk"])
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_contains("selected file 1")
+        .assert_contains("selected file 2")
+        .assert_not_contains("unselected file 3")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_run_multiple_explicit_test_files.stdout.txt",
+        );
+}
+
+#[test]
+fn test_run_multiple_paths_deduplicates_overlapping_test_files() {
+    let project = ProjectBuilder::new("multiple-overlapping-test-paths")
+        .contract("simple", SIMPLE_CONTRACT)
+        .raw_file(
+            "tests/selected/test1.test.tolk",
+            &passing_test_file(NESTED_TEST_IMPORT, "test overlapping file 1", 1),
+        )
+        .raw_file(
+            "tests/selected/test2.test.tolk",
+            &passing_test_file(NESTED_TEST_IMPORT, "test overlapping file 2", 2),
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .paths(&[
+            "tests/selected",
+            "tests/selected/test1.test.tolk",
+            "tests/selected/test2.test.tolk",
+        ])
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_run_multiple_paths_deduplicates_overlapping_test_files.stdout.txt",
+        );
 }
 
 #[test]
@@ -436,37 +938,7 @@ fn test_exclude_flag_filters_test_files() {
 
 #[test]
 fn test_fail_fast() {
-    let project = ProjectBuilder::new("fail-fast")
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "test1",
-            r#"
-            import "../../lib/testing/expect"
-
-            get fun `test first pass`() {
-                expect(1).toEqual(1);
-            }
-
-            get fun `test second fail`() {
-                expect(1).toEqual(2);
-            }
-
-            get fun `test third pass`() {
-                expect(1).toEqual(1);
-            }
-        "#,
-        )
-        .test_file(
-            "test2",
-            r#"
-            import "../../lib/testing/expect"
-
-            get fun `test fourth pass`() {
-                expect(1).toEqual(1);
-            }
-        "#,
-        )
-        .build();
+    let project = fail_fast_project("fail-fast", None).build();
 
     // Without fail-fast: should fail but run all tests
     project
@@ -496,6 +968,68 @@ fn test_fail_fast() {
         .assert_not_contains("third pass")
         .assert_not_contains("fourth pass")
         .assert_snapshot_matches("integration/snapshots/flags/test_with_fail_fast.stdout.txt");
+}
+
+#[test]
+fn test_fail_fast_config_stops_after_first_failure() {
+    let project = fail_fast_project("fail-fast-config", Some(true)).build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_passed(1)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_config_stops_after_first_failure.stdout.txt",
+        );
+}
+
+#[test]
+fn test_fail_fast_flag_overrides_false_config() {
+    let project = fail_fast_project("fail-fast-cli-overrides-config", Some(false)).build();
+
+    project
+        .acton()
+        .test()
+        .fail_fast()
+        .run()
+        .failure()
+        .assert_passed(1)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_flag_overrides_false_config.stdout.txt",
+        );
+}
+
+#[test]
+fn test_fail_fast_false_flag_overrides_true_config() {
+    let project = fail_fast_project("fail-fast-false-cli-overrides-config", Some(true)).build();
+
+    project
+        .acton()
+        .test()
+        .arg("--fail-fast=false")
+        .run()
+        .failure()
+        .assert_passed(3)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_contains("third pass")
+        .assert_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_false_flag_overrides_true_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -550,6 +1084,48 @@ fn test_junit_path_flag_writes_report_to_custom_directory() {
 }
 
 #[test]
+fn test_junit_path_flag_overrides_configured_path() {
+    let project = ProjectBuilder::new("test-junit-path-overrides-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            &passing_test_file(ROOT_TEST_IMPORT, "test junit custom path", 1),
+        )
+        .with_test_config(TestConfig {
+            reporters: Some(vec!["junit".to_owned()]),
+            junit_path: Some("configured-reports".to_owned()),
+            ..TestConfig::default()
+        })
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--junit-path")
+        .arg("cli-reports")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_junit_path_flag_overrides_configured_path.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "cli-reports/TEST-test.test.tolk.xml",
+            "integration/snapshots/flags/test_junit_path_flag_overrides_configured_path.xml.gen",
+        );
+
+    let configured_report = project
+        .path()
+        .join("configured-reports/TEST-test.test.tolk.xml");
+    assert!(
+        !configured_report.exists(),
+        "configured junit report should not be written when --junit-path is set: {}",
+        configured_report.display()
+    );
+}
+
+#[test]
 fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
     let project = ProjectBuilder::new("test-clear-cache-flag")
         .contract("simple", SIMPLE_CONTRACT)
@@ -557,6 +1133,10 @@ fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
             "test",
             &passing_test_file(ROOT_TEST_IMPORT, "test-clear-cache", 1),
         )
+        .with_test_config(TestConfig {
+            reporters: Some(vec!["console".to_owned()]),
+            ..TestConfig::default()
+        })
         .build();
 
     let first_run = project.acton().test().run().success();
@@ -586,6 +1166,34 @@ fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/flags/test_clear_cache_flag_recompiles_contracts_before_running_tests.stdout.txt",
+        );
+}
+
+#[test]
+fn test_invalid_test_fork_net_config_reports_error() {
+    let project = ProjectBuilder::new("test-invalid-fork-net-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            &passing_test_file(ROOT_TEST_IMPORT, "test invalid fork net config", 1),
+        )
+        .build();
+
+    append_acton_toml(
+        &project,
+        r#"
+[test]
+fork-net = "bogus"
+"#,
+    );
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_invalid_test_fork_net_config_reports_error.stderr.txt",
         );
 }
 
@@ -680,6 +1288,52 @@ fn test_manifest_path_accepts_relative_path_from_parent() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/flags/test_manifest_path_accepts_relative_path_from_parent.stdout.txt",
+        );
+}
+
+#[test]
+fn test_project_root_loads_dotenv_from_selected_project() {
+    let project = ProjectBuilder::new("project-root-dotenv")
+        .raw_file(".env", "ACTON_PROJECT_CONTEXT=selected-project\n")
+        .script_file(
+            "dotenv",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                println("project context: {}", env<string>("ACTON_PROJECT_CONTEXT"));
+            }
+            "#,
+        )
+        .build();
+    project.acton().init().run().success();
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+    let script_path = project.path().join("scripts/dotenv.tolk");
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg(
+            project
+                .path()
+                .to_str()
+                .expect("Project path should be valid UTF-8"),
+        )
+        .script(
+            script_path
+                .to_str()
+                .expect("Script path should be valid UTF-8"),
+        )
+        .current_dir(project_parent)
+        .env_remove("ACTON_PROJECT_CONTEXT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_project_root_loads_dotenv_from_selected_project.stdout.txt",
         );
 }
 
@@ -806,9 +1460,15 @@ fn test_project_root_build_works_from_nested_directory() {
         .arg("--project-root")
         .arg("..")
         .build()
+        .arg("--output-sources")
+        .arg("../.studio/sources")
         .current_dir(&nested_dir)
         .run()
-        .success();
+        .success()
+        .assert_file_snapshot_matches(
+            ".studio/sources/simple.source.json",
+            "integration/snapshots/flags/test_project_root_build_from_nested_directory.source.json",
+        );
 
     assert!(
         project.path().join("build/simple.json").exists(),
@@ -1171,6 +1831,404 @@ fn test_snapshot_nested_output_creates_parent_directories() {
 }
 
 #[test]
+fn test_gas_profile_flag_exports_devtools_profile_for_unit_test() {
+    let project = ProjectBuilder::new("gas-profile-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .with_gas_profile_include_tests()
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_flag_exports_devtools_profile_for_unit_test.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_format_collapsed_exports_collapsed_stacks_for_unit_test() {
+    let project = ProjectBuilder::new("gas-profile-collapsed-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .with_gas_profile_include_tests()
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_format_collapsed_exports_collapsed_stacks_for_unit_test.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_defaults_to_messages_only() {
+    let project = ProjectBuilder::new("gas-profile-default-messages-only")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_defaults_to_messages_only.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_messages_prefix_entrypoints_with_contract_name() {
+    let project = ProjectBuilder::new("gas-profile-message-entrypoints")
+        .contract("simple", GAS_PROFILED_MESSAGE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_MESSAGES_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_messages_prefix_entrypoints_with_contract_name.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_collapsed_records_deep_contract_stack_samples() {
+    let project = ProjectBuilder::new("gas-profile-deep-stack-collapsed")
+        .contract("deep", GAS_PROFILED_DEEP_STACK_CONTRACT)
+        .test_file("profile", GAS_PROFILED_DEEP_STACK_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_collapsed_records_deep_contract_stack_samples.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_devtools_records_deep_contract_stack_samples() {
+    let project = ProjectBuilder::new("gas-profile-deep-stack-cpuprofile")
+        .contract("deep", GAS_PROFILED_DEEP_STACK_CONTRACT)
+        .test_file("profile", GAS_PROFILED_DEEP_STACK_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_devtools_records_deep_contract_stack_samples.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_snapshot_records_abi_opcode_stats() {
+    let project = typed_profile_project("profiling-abi-opcode-stats");
+    project.acton().init().run().success();
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("typed-profile.json")
+        .run()
+        .success();
+
+    normalize_profile_snapshot_file(&project, "typed-profile.json");
+    output
+        .assert_contains("ProfilePing")
+        .assert_file_snapshot_matches(
+            "typed-profile.json",
+            "integration/snapshots/flags/test_gas_snapshot_records_abi_opcode_stats.json",
+        );
+}
+
+#[test]
+fn test_gas_snapshot_uses_hex_opcode_when_abi_name_is_unknown() {
+    let project = ProjectBuilder::new("profiling-unknown-opcode-stats")
+        .contract("target", PROFILE_UNKNOWN_CONTRACT)
+        .test_file("profile", PROFILED_UNKNOWN_OPCODE_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("unknown-profile.json")
+        .run()
+        .success();
+
+    normalize_profile_snapshot_file(&project, "unknown-profile.json");
+    output
+        .assert_contains("0xfa170099")
+        .assert_file_snapshot_matches(
+            "unknown-profile.json",
+            "integration/snapshots/flags/test_gas_snapshot_uses_hex_opcode_when_abi_name_is_unknown.json",
+        );
+}
+
+#[test]
+fn test_snapshot_save_failure_exits_non_zero() {
+    let project = ProjectBuilder::new("profiling-snapshot-save-failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    fs::create_dir(project.path().join("profile-output.json"))
+        .expect("Failed to create directory at snapshot output path");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-output.json")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_snapshot_save_failure_exits_non_zero.stderr.txt",
+        );
+}
+
+#[test]
+fn test_profile_compare_mode_does_not_overwrite_snapshot_argument() {
+    let project = typed_profile_project("profiling-compare-keeps-snapshot");
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let mut baseline = read_project_json(&project, "profile-baseline.json");
+    baseline["timestamp"] = serde_json::json!(0);
+    write_project_json(&project, "profile-baseline.json", &baseline);
+
+    let candidate_path = project.path().join("candidate-profile.json");
+    let candidate_content = "{\"sentinel\":true}\n";
+    fs::write(&candidate_path, candidate_content)
+        .unwrap_or_else(|err| panic!("should write {}: {err}", candidate_path.display()));
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("candidate-profile.json")
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let actual_candidate = fs::read_to_string(&candidate_path)
+        .unwrap_or_else(|err| panic!("should read {}: {err}", candidate_path.display()));
+    assert_eq!(
+        actual_candidate, candidate_content,
+        "compare mode must not overwrite an explicit snapshot target"
+    );
+    output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_profile_compare_mode_does_not_overwrite_snapshot_argument.stdout.txt",
+    );
+}
+
+#[test]
+fn test_profile_baseline_with_only_opcode_stats_prints_opcode_comparison() {
+    let project = typed_profile_project("profiling-opcodes-only-baseline");
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let mut baseline = read_project_json(&project, "profile-baseline.json");
+    baseline["timestamp"] = serde_json::json!(0);
+    baseline["trace_chains"] = serde_json::json!({});
+    write_project_json(&project, "profile-baseline.json", &baseline);
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_profile_baseline_with_only_opcode_stats_prints_opcode_comparison.stdout.txt",
+    );
+}
+
+#[test]
+fn test_profile_baseline_with_only_trace_stats_prints_chain_comparison() {
+    let project = typed_profile_project("profiling-traces-only-baseline");
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let mut baseline = read_project_json(&project, "profile-baseline.json");
+    baseline["timestamp"] = serde_json::json!(0);
+    baseline["opcodes"] = serde_json::json!({});
+    write_project_json(&project, "profile-baseline.json", &baseline);
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_profile_baseline_with_only_trace_stats_prints_chain_comparison.stdout.txt",
+    );
+}
+
+#[test]
+fn test_profile_baseline_comparison_renders_cli_diff_after_drift() {
+    let project = ProjectBuilder::new("profiling-baseline-cli-diff")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+
+    let mut baseline = read_project_json(&project, "profile-baseline.json");
+    baseline["timestamp"] = serde_json::json!(0);
+    write_project_json(&project, "profile-baseline.json", &baseline);
+
+    fs::write(
+        project.path().join("tests/profile.test.tolk"),
+        PROFILED_TEST_WITH_DRIFT,
+    )
+    .expect("Failed to write drifted test file");
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_profile_baseline_comparison_renders_cli_diff_after_drift.stdout.txt",
+    );
+}
+
+#[test]
+fn test_profile_baseline_comparison_renders_per_trace_drift() {
+    let project = profile_trace_drift_project("profiling-baseline-trace-cli-diff");
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--clear-cache")
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success();
+    output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_profile_baseline_comparison_renders_per_trace_drift.stdout.txt",
+    );
+}
+
+#[test]
+fn test_profile_baseline_comparison_renders_per_trace_drift_color_snapshot() {
+    let project = profile_trace_drift_project("profiling-baseline-trace-cli-diff-color");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .with_reporter("dot")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .arg("--clear-cache")
+        .arg("--baseline-snapshot")
+        .arg("profile-baseline.json")
+        .run()
+        .success()
+        .assert_stdout_svg_snapshot_matches(
+            "integration/snapshots/flags/test_profile_baseline_comparison_renders_per_trace_drift_color.stdout.svg",
+        );
+}
+
+#[test]
 fn test_fail_on_diff_exits_non_zero_for_profile_drift() {
     let project = ProjectBuilder::new("profiling-fail-on-diff")
         .contract("simple", SIMPLE_CONTRACT)
@@ -1248,7 +2306,31 @@ fn test_fail_on_diff_succeeds_when_profile_matches_baseline() {
 }
 
 #[test]
-fn test_baseline_missing_without_fail_on_diff_warns_and_succeeds() {
+fn test_profiling_tables_are_hidden_when_tests_fail() {
+    let project = ProjectBuilder::new("profiling-hidden-on-test-failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST_WITH_FAILURE)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("missing-baseline.json")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stderr.txt",
+        );
+}
+
+#[test]
+fn test_baseline_missing_without_fail_on_diff_fails() {
     let project = ProjectBuilder::new("profiling-baseline-missing-non-strict")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file("profile", PROFILED_TEST)
@@ -1262,10 +2344,9 @@ fn test_baseline_missing_without_fail_on_diff_warns_and_succeeds() {
         .arg("--baseline-snapshot")
         .arg("missing-baseline.json")
         .run()
-        .success()
-        .assert_contains("CHAIN GAS & FEES SUMMARY")
+        .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/flags/test_baseline_missing_without_fail_on_diff_warns_and_succeeds.stderr.txt",
+            "integration/snapshots/flags/test_baseline_missing_without_fail_on_diff_fails.stderr.txt",
         );
 }
 
@@ -1292,7 +2373,7 @@ fn test_baseline_missing_with_fail_on_diff_fails() {
 }
 
 #[test]
-fn test_baseline_invalid_without_fail_on_diff_warns_and_succeeds() {
+fn test_baseline_invalid_without_fail_on_diff_fails() {
     let project = ProjectBuilder::new("profiling-baseline-invalid-non-strict")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file("profile", PROFILED_TEST)
@@ -1309,10 +2390,9 @@ fn test_baseline_invalid_without_fail_on_diff_warns_and_succeeds() {
         .arg("--baseline-snapshot")
         .arg("invalid-baseline.json")
         .run()
-        .success()
-        .assert_contains("CHAIN GAS & FEES SUMMARY")
+        .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/flags/test_baseline_invalid_without_fail_on_diff_warns_and_succeeds.stderr.txt",
+            "integration/snapshots/flags/test_baseline_invalid_without_fail_on_diff_fails.stderr.txt",
         );
 }
 
@@ -1375,6 +2455,7 @@ fn test_up_rejects_conflicting_flag_combinations() {
         (&["--force", "--list"], &["--force", "--list"]),
         (&["--force", "--check"], &["--force", "--check"]),
         (&["--list", "--check"], &["--list", "--check"]),
+        (&["--yes", "--list", "--check"], &["--list", "--check"]),
     ];
 
     for (args, expected_needles) in cases {

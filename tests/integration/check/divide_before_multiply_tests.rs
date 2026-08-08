@@ -14,7 +14,7 @@ fn run_divide_before_multiply_test(content: &str, name: &str) {
         .acton()
         .check()
         .arg("--enable-only")
-        .arg("E025")
+        .arg("E019")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

@@ -1,4 +1,4 @@
-warning[E011]: message should be properly named
+warning[S005]: message should be properly named
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val msg = createMessage({
@@ -8,4 +8,4 @@ warning[E011]: message should be properly named
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E011
+For example: acton check --explain S005

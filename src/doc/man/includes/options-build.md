@@ -27,11 +27,24 @@ Directory for generated dependency helper files such as
 Defaults to `[build].gen-dir` when configured, otherwise `gen/`.
 {{/option}}
 
+{{#option "`--output-abi` _dir_" }}
+Directory for contract ABI JSON files.
+
+Defaults to `[build].output-abi` when configured, otherwise `build/abi/`.
+{{/option}}
+
 {{#option "`--output-fift` _dir_" }}
 Directory for compiled Fift output for `.tolk` contracts.
 
 Defaults to `[build].output-fift` when configured. If neither the flag nor the
 config value is set, Acton does not write `.fif` files.
+{{/option}}
+
+{{#option "`--output-sources` _dir_" }}
+Directory for source registration artifacts generated from `.tolk` contracts.
+
+Defaults to `[build].output-sources` when configured. If neither the flag nor
+the config value is set, Acton does not write source registration artifacts.
 {{/option}}
 
 {{#option "`--info`" }}

@@ -13,19 +13,21 @@ import "@contracts/storage"
 struct JettonWallet {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
 fun JettonWallet.fromStorage(
     storage: WalletStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): JettonWallet {
     val stateInit = ContractState {
         code: build("JettonWallet"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return JettonWallet { address, stateInit };
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
+    return JettonWallet { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -41,7 +43,11 @@ fun JettonWallet.deploy(self, from: address, config: SendParams = {}): SendResul
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }
@@ -55,22 +61,24 @@ fun JettonWallet.sendAskToTransfer(
     sendExcessesTo: address?,
     customPayload: cell?,
     forwardTonAmount: coins,
-    forwardPayload: ForwardPayloadRemainder,
+    forwardPayload: PayloadInline | PayloadInRef,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x0f8a7ea5, 32)
+        .storeAny(queryId)
+        .storeAny(jettonAmount)
+        .storeAny(transferRecipient)
+        .storeAny(sendExcessesTo)
+        .storeAny(customPayload)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: AskToTransfer {
-            queryId,
-            jettonAmount,
-            transferRecipient,
-            sendExcessesTo,
-            customPayload,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: AskToTransfer.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }
@@ -101,31 +109,33 @@ fun JettonWallet.sendInternalTransferStep(
     transferInitiator: address?,
     sendExcessesTo: address?,
     forwardTonAmount: coins,
-    forwardPayload: ForwardPayloadRemainder,
+    forwardPayload: PayloadInline | PayloadInRef,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x178d4519, 32)
+        .storeAny(queryId)
+        .storeAny(jettonAmount)
+        .storeAny(transferInitiator)
+        .storeAny(sendExcessesTo)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: InternalTransferStep {
-            queryId,
-            jettonAmount,
-            transferInitiator,
-            sendExcessesTo,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: InternalTransferStep.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }
 
-fun JettonWallet.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+fun JettonWallet.sendTopUpGrams(self, from: address, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: TopUpTons {},
+        body: TopUpGrams {},
     });
     return net.send(from, genericMsg);
 }

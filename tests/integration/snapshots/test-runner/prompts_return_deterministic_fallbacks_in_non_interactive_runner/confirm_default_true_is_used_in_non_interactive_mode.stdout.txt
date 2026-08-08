@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/prompt_wrappers_default_true.test.tolk (1 test)
+  ✓ confirm default true in non interactive mode [TIME]
+
+ ✓ 1 passed in 1 file

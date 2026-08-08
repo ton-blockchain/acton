@@ -1,0 +1,253 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-sizing: border-box;
+}
+
+.loading {
+  text-align: center;
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
+  background-color: var(--acton-color-surface-raised);
+  border-radius: 16px;
+  border: 1px solid var(--acton-color-border);
+}
+
+.accountIssue {
+  display: block;
+  min-height: 150px;
+  padding: 20px 24px;
+  border: 0;
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--acton-color-status-failed-surface) 72%, transparent),
+      color-mix(in srgb, var(--acton-color-surface-raised) 94%, var(--acton-color-status-failed))
+    ),
+    var(--acton-color-surface-raised);
+  box-sizing: border-box;
+}
+
+.accountIssueContent {
+  min-width: 0;
+}
+
+.accountIssueEyebrow {
+  margin-bottom: 6px;
+  color: var(--acton-color-status-failed);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 16px;
+}
+
+.accountIssueTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 1.25rem;
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 28px;
+}
+
+.accountIssueDescription {
+  max-width: 72ch;
+  margin: 8px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.accountIssueHint {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 76ch;
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-raised);
+  border-radius: 10px;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 18px;
+}
+
+.accountIssueHintLabel {
+  flex: 0 0 auto;
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.accountIssueHintText {
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.topSection {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.topSectionSingle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.topSectionEqual {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.topSection > :first-child {
+  min-width: 0;
+  height: 100%;
+}
+
+.contextColumn {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+
+.contextColumn > [data-account-context-card="jetton"],
+.contextColumn > [data-account-context-card="nft"]:only-child {
+  flex: 1;
+}
+
+.metadataDialogContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-5);
+}
+
+.metadataOverview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--acton-space-4);
+}
+
+.metadataIdentity {
+  min-width: 0;
+}
+
+.metadataTokenTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadataTokenImage {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.metadataNftImage {
+  border-radius: var(--acton-radius-panel);
+}
+
+.blurredImage {
+  filter: blur(12px);
+}
+
+.metadataSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4) var(--acton-space-6);
+  margin: 0;
+  padding: var(--acton-space-4) 0;
+  border-top: 1px solid var(--acton-color-border);
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.metadataRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-1);
+  min-width: 0;
+}
+
+.metadataLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.35;
+}
+
+.metadataValue {
+  min-width: 0;
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.metadataDescription {
+  max-width: 56ch;
+  margin: var(--acton-space-1) 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .topSection {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .container {
+    padding: 12px 8px 28px;
+    gap: 12px;
+  }
+
+  .accountIssue {
+    min-height: 0;
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .accountIssueTitle {
+    font-size: 1.125rem;
+    line-height: 24px;
+  }
+
+  .metadataDialogContent {
+    gap: var(--acton-space-4);
+  }
+
+  .metadataTokenImage {
+    width: 60px;
+    height: 60px;
+  }
+
+  .metadataSummary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--acton-space-3);
+  }
+}

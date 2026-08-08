@@ -13,6 +13,10 @@ fn build_fs_project(project_name: &str, test_code: &str) -> Project {
         .build()
 }
 
+fn to_tolk_string_literal(value: &str) -> String {
+    serde_json::to_string(value).expect("string literal must serialize")
+}
+
 #[test]
 fn fs_read_bytes_supports_binary_content_and_path_normalization() {
     let project = build_fs_project(
@@ -359,4 +363,114 @@ get fun `test fs exists corner cases`() {
     std::fs::write(fixtures_dir.join("existing.txt"), "ok").expect("Failed to create fixture");
 
     project.acton().test().run().success().assert_passed(1);
+}
+
+#[test]
+fn fs_helpers_reject_absolute_and_parent_escape_paths() {
+    let absolute_outside = tempfile::NamedTempFile::new().expect("failed to create outside file");
+    std::fs::write(absolute_outside.path(), "absolute-secret")
+        .expect("failed to write outside file");
+    let absolute_outside_literal =
+        to_tolk_string_literal(&absolute_outside.path().to_string_lossy());
+
+    let project = build_fs_project(
+        "w-stdlib-fs-rejects-path-escapes",
+        &format!(
+            r#"
+get fun `test fs rejects path escapes`() {{
+    val absoluteOutside = {absolute_outside_literal};
+    val payload = beginCell().storeUint(0x44, 8).toSlice();
+
+    expect(fs.readFile("../outside-secret.txt")).toBeNull();
+    expect(fs.readBytes("../outside-secret.txt")).toBeNull();
+    expect(fs.exists("../outside-secret.txt")).toBeFalse();
+    expect(fs.writeString("../escaped-write.txt", "x")).toBeFalse();
+    expect(fs.writeBytes("../escaped-write.bin", payload)).toBeFalse();
+
+    expect(fs.readFile(absoluteOutside)).toBeNull();
+    expect(fs.readBytes(absoluteOutside)).toBeNull();
+    expect(fs.exists(absoluteOutside)).toBeFalse();
+    expect(fs.writeString(absoluteOutside, "x")).toBeFalse();
+    expect(fs.writeBytes(absoluteOutside, payload)).toBeFalse();
+}}
+"#
+        ),
+    );
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("project must have parent directory");
+    let parent_secret_path = project_parent.join("outside-secret.txt");
+    std::fs::write(&parent_secret_path, "parent-secret").expect("failed to write parent secret");
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/fs_read_write_bytes_and_exists/fs_helpers_reject_absolute_and_parent_escape_paths.stdout.txt",
+        );
+
+    let absolute_content = std::fs::read_to_string(absolute_outside.path())
+        .expect("outside file must remain readable");
+    assert_eq!(absolute_content, "absolute-secret");
+    let parent_content =
+        std::fs::read_to_string(parent_secret_path).expect("parent file must remain readable");
+    assert_eq!(parent_content, "parent-secret");
+    assert!(!project_parent.join("escaped-write.txt").exists());
+    assert!(!project_parent.join("escaped-write.bin").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn fs_helpers_reject_symlink_escapes() {
+    use std::os::unix::fs::symlink;
+
+    let project = build_fs_project(
+        "w-stdlib-fs-rejects-symlink-escapes",
+        r#"
+get fun `test fs rejects symlink escapes`() {
+    expect(fs.exists("fixtures/outside-link.txt")).toBeFalse();
+    expect(fs.readFile("fixtures/outside-link.txt")).toBeNull();
+    expect(fs.writeString("fixtures/outside-link.txt", "changed")).toBeFalse();
+
+    expect(fs.writeString("fixtures/outside-dir-link/new.txt", "changed")).toBeFalse();
+    expect(fs.exists("fixtures/outside-dir-link/new.txt")).toBeFalse();
+}
+"#,
+    );
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("project must have parent directory");
+    let outside_secret_path = project_parent.join("symlink-secret.txt");
+    let outside_dir = project_parent.join("symlink-outside-dir");
+    std::fs::write(&outside_secret_path, "symlink-secret").expect("failed to write secret");
+    std::fs::create_dir_all(&outside_dir).expect("failed to create outside dir");
+
+    let fixtures_dir = project.path().join("fixtures");
+    std::fs::create_dir_all(&fixtures_dir).expect("failed to create fixtures directory");
+    symlink(&outside_secret_path, fixtures_dir.join("outside-link.txt"))
+        .expect("failed to create outside file symlink");
+    symlink(&outside_dir, fixtures_dir.join("outside-dir-link"))
+        .expect("failed to create outside dir symlink");
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/fs_read_write_bytes_and_exists/fs_helpers_reject_symlink_escapes.stdout.txt",
+        );
+
+    let outside_content =
+        std::fs::read_to_string(outside_secret_path).expect("outside file must remain readable");
+    assert_eq!(outside_content, "symlink-secret");
+    assert!(!outside_dir.join("new.txt").exists());
 }

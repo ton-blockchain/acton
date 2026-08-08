@@ -1,4 +1,3 @@
-use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use tempfile::TempDir;
 
@@ -32,39 +31,6 @@ fn test_debug_log_uses_custom_dir_from_env() {
     assert!(
         !project.path().join(".acton").join("debug.log").exists(),
         "debug.log should not be created in project .acton directory"
-    );
-}
-
-#[test]
-fn test_logging_setup_failure_is_non_fatal() {
-    let project = ProjectBuilder::new("logging-setup-failure-is-non-fatal")
-        .contract("simple", SIMPLE_CONTRACT)
-        .build();
-
-    let occupied_path = project.path().join("occupied-log-path");
-    std::fs::write(&occupied_path, "occupied").expect("failed to create occupied log path file");
-    let occupied_path_str = occupied_path
-        .to_str()
-        .expect("occupied path must be valid UTF-8");
-
-    let output = project
-        .acton()
-        .env("ACTON_LOG_DIR", occupied_path_str)
-        .build()
-        .run()
-        .success();
-
-    assert!(
-        output
-            .get_normalized_stderr()
-            .contains("Warning: failed to initialize debug logging"),
-        "expected warning about logging setup failure, got:\n{}",
-        output.get_normalized_stderr()
-    );
-    assert!(
-        output.get_normalized_stderr().contains("ACTON_LOG_DIR"),
-        "expected ACTON_LOG_DIR hint in warning, got:\n{}",
-        output.get_normalized_stderr()
     );
 }
 

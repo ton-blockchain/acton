@@ -7,29 +7,48 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generated-source": "bunx fumadocs-mdx",
-    "lint:links": "bun ./scripts/validate-link.ts"
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
+    "generated-source": "bun ./scripts/generate-openapi-docs.ts && bunx fumadocs-mdx",
+    "lint:links": "bun run lint:links:internal && bun run lint:links:external",
+    "lint:links:internal": "bun ./scripts/validate-links-internal.ts",
+    "lint:links:external": "bun ./scripts/validate-links-external.ts",
+    "lint:navigation": "bun ./scripts/validate-navigation.ts",
+    "lint:code-block-line-length": "bun ./scripts/validate-code-block-line-length.ts",
+    "docs-lint": "bun run lint:links:internal && bun run lint:navigation && bun run lint:code-block-line-length"
+  },
+  "overrides": {
+    "minimatch": "10.2.5",
+    "postcss": "8.5.18",
+    "sharp": "0.35.3"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
+    "@scalar/api-client-react": "2.0.36",
+    "@shikijs/transformers": "^4.0.2",
     "class-variance-authority": "^0.7.1",
     "fumadocs-core": "^16.7.14",
     "fumadocs-mdx": "^14.2.13",
+    "fumadocs-openapi": "10.6.8",
     "fumadocs-twoslash": "^3.2.0",
     "fumadocs-ui": "^16.7.14",
     "geist": "^1.5.1",
     "gsap": "^3.13.0",
+    "json-schema-typed": "^8.0.2",
     "lucide-react": "^0.555.0",
-    "next": "16.2.3",
+    "mermaid": "^11.15.0",
+    "next": "16.2.12",
     "ogl": "^1.0.11",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-icons": "^5.5.0",
+    "react-medium-image-zoom": "^5.4.3",
     "remark-directive": "^4.0.0",
     "remark-directive-rehype": "^0.4.2",
     "tailwind-merge": "^3.4.0",
     "twoslash": "^0.3.8",
-    "unist-util-visit": "^5.0.0"
+    "unist-util-visit": "^5.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
@@ -41,8 +60,31 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
-    "next-validate-link": "^1.6.4",
+    "next-validate-link": "^1.6.6",
+    "prettier": "3.4.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
-  }
+  },
+  "prettier": {
+    "arrowParens": "avoid",
+    "bracketSpacing": false,
+    "printWidth": 100,
+    "semi": false,
+    "singleQuote": false,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "useTabs": false,
+    "overrides": [
+      {
+        "files": [
+          "*.yaml",
+          "*.yml"
+        ],
+        "options": {
+          "tabWidth": 2
+        }
+      }
+    ]
+  },
+  "packageManager": "bun@1.3.14"
 }

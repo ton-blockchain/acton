@@ -56,7 +56,7 @@ Generate a new wallet.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet new"}}
 
 {{#option "`--name` _name_" }}
 Wallet name.
@@ -83,7 +83,7 @@ Use a secure native store for mnemonic storage when available.
 {{/option}}
 
 {{#option "`--airdrop`" }}
-Request testnet TON after wallet creation.
+Request testnet GRAM after wallet creation.
 {{/option}}
 
 {{#option "`--faucet-url` _url_" }}
@@ -113,7 +113,7 @@ Import an existing mnemonic-based wallet.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet import"}}
 
 {{#option "_mnemonics_..." }}
 Mnemonic words for the wallet.
@@ -153,7 +153,7 @@ List configured wallets.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet list"}}
 
 {{#option "`-b`, `--balance`" }}
 Fetch and print wallet balances.
@@ -186,7 +186,7 @@ Sign an external message body with the selected wallet.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet sign"}}
 
 {{#option "_name_" }}
 Wallet name.
@@ -218,7 +218,7 @@ Request faucet funds for a wallet.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet airdrop"}}
 
 {{#option "_name_" }}
 Wallet name.
@@ -259,7 +259,7 @@ Remove a wallet from configuration.
 
 #### Options
 
-{{#options}}
+{{#options command="acton wallet remove"}}
 
 {{#option "_name_" }}
 Wallet name.
@@ -330,7 +330,8 @@ For `wallet airdrop`, the selected backend depends on `--net`.
 
 - `testnet` requests a PoW challenge from the faucet, solves it locally, and
   submits a claim
-- `localnet` sends a fixed faucet transfer through Localnet
+- `localnet` sends a fixed faucet transfer through Localnet and waits until the
+  wallet balance includes the credited amount
 
 After a successful interactive testnet `wallet airdrop`, Acton briefly waits
 for the balance to appear and lets you skip that wait by pressing `Enter`,
@@ -422,4 +423,4 @@ wallets, the keyring ID usually matches the wallet name.
 
 - `acton help localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
-- [Wallet setup guide](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)
+- [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

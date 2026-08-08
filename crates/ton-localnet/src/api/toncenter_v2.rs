@@ -1,339 +1,723 @@
-use crate::localnet::{
-    LocalnetAccountState, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
-    LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
-    LocalnetTransaction, LocalnetTransactionId,
+//! Localnet-to-`TonCenter` v2 response adapters.
+//!
+//! Known `OpenAPI` deviations:
+//! - `map_run_get_method` adds local `vm_log` to the legacy `RunGetMethodResult`;
+//! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
+//!   operations.
+
+use crate::api::toncenter_v2_account_state::{
+    V2ExtendedAccountState, read_v2_extended_account_state,
 };
-use crate::storage::AccountStatus;
-use crate::types::{Addr, BocBytes};
+use crate::api::toncenter_wallet::{V2WalletState, V2WalletVersion};
+use crate::localnet::{
+    LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
+    LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
+    LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
+    LocalnetTransaction, LocalnetTransactionId, LocalnetTransactionsPage,
+};
+use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMeta};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
+use anyhow::Context;
 use base64::Engine;
 use serde_json::value::Value;
-use tvm_ffi::json_stack::{legacy_stack_to_json, stack_to_json};
-use tvm_ffi::stack::Tuple;
+use ton_api::toncenter::v2 as response;
+use ton_indexer_contracts::{WalletType, categorize_wallet};
+use tvm_ffi::json_stack::{legacy_stack_to_json, std_stack_from_tuple};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
+use tycho_types::cell::HashBytes as CellHashBytes;
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 
 #[must_use]
-pub fn map_block_id(id: &LocalnetBlockId) -> Value {
-    serde_json::json!({
-        "@type": "ton.blockIdExt",
-        "workchain": id.workchain,
-        "shard": id.shard.to_string(),
-        "seqno": id.seqno,
-        "root_hash": id.root_hash.to_base64(),
-        "file_hash": id.file_hash.to_base64()
+pub fn map_block_id(id: &LocalnetBlockId) -> response::TonBlockIdExt {
+    response::TonBlockIdExt {
+        type_field: "ton.blockIdExt".to_owned(),
+        workchain: id.workchain,
+        shard: id.shard.to_string(),
+        seqno: u64::from(id.seqno),
+        root_hash: id.root_hash.to_base64(),
+        file_hash: id.file_hash.to_base64(),
+    }
+}
+
+pub fn map_transactions(txs: &[LocalnetTransaction]) -> Vec<response::Transaction> {
+    txs.iter().map(map_transaction).collect()
+}
+
+pub fn map_transactions_std(page: &LocalnetTransactionsPage) -> response::RawTransactions {
+    response::RawTransactions {
+        type_field: "raw.transactions".to_owned(),
+        transactions: page.transactions.iter().map(map_transaction_std).collect(),
+        previous_transaction_id: map_internal_transaction_id(&page.previous_transaction_id),
+    }
+}
+
+pub fn map_transaction(tx: &LocalnetTransaction) -> response::Transaction {
+    response::Transaction {
+        type_field: "ext.transaction".to_owned(),
+        address: map_account_address(&tx.address),
+        account: tx.address.to_string(),
+        utime: u64::from(tx.utime),
+        data: tx.data.to_base64(),
+        transaction_id: map_internal_transaction_id(&tx.transaction_id),
+        fee: tx.total_fees.to_string(),
+        storage_fee: tx.storage_fees.to_string(),
+        other_fee: tx.other_fees.to_string(),
+        in_msg: map_message(&tx.in_msg),
+        out_msgs: tx.out_msgs.iter().filter_map(map_message).collect(),
+    }
+}
+
+pub fn map_transaction_std(tx: &LocalnetTransaction) -> response::RawTransaction {
+    response::RawTransaction {
+        type_field: "raw.transaction".to_owned(),
+        address: map_account_address(&tx.address),
+        utime: u64::from(tx.utime),
+        data: tx.data.to_base64(),
+        transaction_id: map_internal_transaction_id(&tx.transaction_id),
+        fee: tx.total_fees.to_string(),
+        storage_fee: tx.storage_fees.to_string(),
+        other_fee: tx.other_fees.to_string(),
+        in_msg: map_message_std(&tx.in_msg),
+        out_msgs: tx.out_msgs.iter().filter_map(map_message_std).collect(),
+    }
+}
+
+pub fn map_transaction_ext(tx: &LocalnetTransaction) -> response::TransactionExt {
+    response::TransactionExt {
+        type_field: "raw.transactionExt".to_owned(),
+        address: map_account_address(&tx.address),
+        account: tx.address.to_string(),
+        utime: u64::from(tx.utime),
+        data: tx.data.to_base64(),
+        transaction_id: map_internal_transaction_id(&tx.transaction_id),
+        fee: tx.total_fees.to_string(),
+        storage_fee: tx.storage_fees.to_string(),
+        other_fee: tx.other_fees.to_string(),
+        in_msg: map_message_std(&tx.in_msg),
+        out_msgs: tx.out_msgs.iter().filter_map(map_message_std).collect(),
+    }
+}
+
+#[must_use]
+pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::Message> {
+    if msg.hash.is_zero() {
+        return None;
+    }
+    let mapped_data = map_decoded_message_data(msg);
+    Some(response::Message::Full(Box::new(response::MessageFull {
+        hash: msg.hash.to_base64(),
+        source: msg
+            .source
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_default(),
+        destination: msg
+            .destination
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_default(),
+        value: msg.value.to_string(),
+        fwd_fee: msg.fwd_fee.to_string(),
+        ihr_fee: msg.ihr_fee.to_string(),
+        created_lt: msg.created_lt.to_string(),
+        body_hash: msg.body_hash.to_base64(),
+        msg_data: mapped_data.data,
+        extra_currencies: map_extra_currencies(&msg.extra_currencies),
+        message: mapped_data.message,
+        message_decode_error: mapped_data.decode_error,
+    })))
+}
+
+#[must_use]
+pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> Option<response::MessageStd> {
+    if msg.hash.is_zero() {
+        return None;
+    }
+    Some(response::MessageStd {
+        type_field: "raw.message".to_owned(),
+        hash: msg.hash.to_base64(),
+        source: map_optional_account_address(msg.source.as_ref()),
+        destination: map_optional_account_address(msg.destination.as_ref()),
+        value: msg.value.to_string(),
+        fwd_fee: msg.fwd_fee.to_string(),
+        ihr_fee: msg.ihr_fee.to_string(),
+        created_lt: msg.created_lt.to_string(),
+        body_hash: msg.body_hash.to_base64(),
+        msg_data: map_raw_message_data(msg),
+        extra_currencies: map_extra_currencies(&msg.extra_currencies),
     })
 }
 
-#[allow(clippy::ptr_arg)]
-pub fn map_transactions(txs: &Vec<LocalnetTransaction>) -> Value {
-    txs.iter().map(map_transaction).collect::<Vec<_>>().into()
+#[must_use]
+pub fn map_account_state(s: &LocalnetAccountState) -> response::AddressInformation {
+    response::AddressInformation {
+        type_field: "raw.fullAccountState".to_owned(),
+        balance: response::StringOrNumber::String(s.balance.to_string()),
+        extra_currencies: map_extra_currencies(&s.extra_currencies),
+        last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
+        block_id: map_block_id(&s.block_id),
+        code: encode_optional_boc(s.code.as_ref()),
+        data: encode_optional_boc(s.data.as_ref()),
+        frozen_hash: s
+            .frozen_hash
+            .as_ref()
+            .map(Hash256::to_base64)
+            .unwrap_or_default(),
+        sync_utime: s.sync_utime,
+        state: map_account_status(&s.state).to_owned(),
+        suspended: false,
+    }
 }
 
-pub fn map_transactions_std(txs: &[LocalnetTransaction], limit: usize) -> Value {
-    let (txs_to_return, previous_id) = if txs.len() > limit {
-        (
-            txs[..limit].to_vec(),
-            txs.get(limit)
-                .map(|tx| tx.transaction_id.clone())
+#[must_use]
+pub const fn map_account_status(status: &AccountStatus) -> &'static str {
+    match status {
+        AccountStatus::Active => "active",
+        AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
+        AccountStatus::Frozen => "frozen",
+    }
+}
+
+pub fn map_extended_account_state(
+    s: &LocalnetAccountState,
+    requested_address: &str,
+) -> anyhow::Result<response::ExtendedAddressInformation> {
+    let (account_state, revision) = map_extended_account_state_kind(s)?;
+    Ok(response::ExtendedAddressInformation {
+        type_field: "fullAccountState".to_owned(),
+        address: response::AccountAddress {
+            type_field: "accountAddress".to_owned(),
+            account_address: s
+                .address
+                .as_user_friendly_with_flags_from(requested_address)?,
+        },
+        balance: s.balance.to_string(),
+        extra_currencies: map_extra_currencies(&s.extra_currencies),
+        last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
+        block_id: map_block_id(&s.block_id),
+        sync_utime: s.sync_utime,
+        account_state,
+        revision,
+    })
+}
+
+fn map_extended_account_state_kind(
+    state: &LocalnetAccountState,
+) -> anyhow::Result<(response::AccountStateKind, i32)> {
+    if state.code.is_none() {
+        return Ok((
+            response::AccountStateKind::Uninited {
+                frozen_hash: state
+                    .frozen_hash
+                    .as_ref()
+                    .map(Hash256::to_base64)
+                    .unwrap_or_default(),
+            },
+            0,
+        ));
+    }
+
+    if let Some(account) = read_v2_extended_account_state(state)? {
+        return Ok(match account {
+            V2ExtendedAccountState::Standard(wallet) => {
+                let seqno = i32::from_be_bytes(wallet.seqno.to_be_bytes());
+                let wallet_id = i64::from(u32::from_be_bytes(
+                    wallet
+                        .wallet_id
+                        .context("Specialized V2 wallet state has no wallet ID")?
+                        .to_be_bytes(),
+                ));
+                match wallet.version {
+                    V2WalletVersion::V3R1 => {
+                        (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 1)
+                    }
+                    V2WalletVersion::V3R2 => {
+                        (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 2)
+                    }
+                    V2WalletVersion::V4R2 => {
+                        (response::AccountStateKind::WalletV4 { wallet_id, seqno }, 2)
+                    }
+                    version => {
+                        anyhow::bail!("Unsupported specialized V2 wallet state: {version:?}")
+                    }
+                }
+            }
+            V2ExtendedAccountState::HighloadV1 {
+                revision,
+                wallet_id,
+                seqno,
+            } => (
+                response::AccountStateKind::WalletHighloadV1 {
+                    wallet_id: i64::from(wallet_id),
+                    seqno: i32::from_be_bytes(seqno.to_be_bytes()),
+                },
+                revision,
+            ),
+            V2ExtendedAccountState::HighloadV2 {
+                revision,
+                wallet_id,
+            } => (
+                response::AccountStateKind::WalletHighloadV2 {
+                    wallet_id: i64::from(wallet_id),
+                },
+                revision,
+            ),
+            V2ExtendedAccountState::Dns {
+                revision,
+                wallet_id,
+            } => (
+                response::AccountStateKind::Dns {
+                    wallet_id: i64::from(wallet_id),
+                },
+                revision,
+            ),
+        });
+    }
+
+    Ok((
+        response::AccountStateKind::Raw {
+            code: encode_optional_boc(state.code.as_ref()),
+            data: encode_optional_boc(state.data.as_ref()),
+            frozen_hash: state
+                .frozen_hash
+                .as_ref()
+                .map(Hash256::to_base64)
                 .unwrap_or_default(),
-        )
-    } else {
-        (txs.to_vec(), LocalnetTransactionId::default())
+        },
+        0,
+    ))
+}
+
+#[must_use]
+pub fn wallet_type_name_from_code_hash(code_hash: Option<&Hash256>) -> Option<&'static str> {
+    let code_hash = code_hash?;
+    let wallet_type = categorize_wallet(CellHashBytes(code_hash.0));
+    match wallet_type {
+        WalletType::Unknown
+        | WalletType::WalletHighloadV1R1
+        | WalletType::WalletHighloadV1R2
+        | WalletType::WalletHighloadV2
+        | WalletType::WalletHighloadV2R1
+        | WalletType::WalletHighloadV2R2
+        | WalletType::WalletHighloadV3R1
+        | WalletType::WalletPreprocessedV2
+        | WalletType::WalletVesting => None,
+        WalletType::WalletV1R1 => Some("wallet v1 r1"),
+        WalletType::WalletV1R2 => Some("wallet v1 r2"),
+        WalletType::WalletV1R3 => Some("wallet v1 r3"),
+        WalletType::WalletV2R1 => Some("wallet v2 r1"),
+        WalletType::WalletV2R2 => Some("wallet v2 r2"),
+        WalletType::WalletV3R1 => Some("wallet v3 r1"),
+        WalletType::WalletV3R2 => Some("wallet v3 r2"),
+        WalletType::WalletV4R1 => Some("wallet v4 r1"),
+        WalletType::WalletV4R2 => Some("wallet v4 r2"),
+        WalletType::WalletV5Beta => Some("wallet v5 beta"),
+        WalletType::WalletV5R1 => Some("wallet v5 r1"),
+    }
+}
+
+#[must_use]
+pub fn map_wallet_seqno(result: &LocalnetRunGetMethodResult) -> Option<u32> {
+    if result.exit_code != 0 {
+        return None;
+    }
+
+    let stack_cell = Boc::decode(&result.stack).ok()?;
+    let stack = Tuple::deserialize(&stack_cell)
+        .ok()?
+        .unwrap_single()
+        .unwrap_tuple();
+    let Some(TupleItem::Int(value)) = stack.first() else {
+        return None;
+    };
+    value.to_str_radix(10).parse().ok()
+}
+
+#[must_use]
+pub(crate) fn map_wallet_information(
+    s: &LocalnetAccountState,
+    wallet: Option<&V2WalletState>,
+) -> response::WalletInformation {
+    response::WalletInformation {
+        type_field: "ext.accounts.walletInformation".to_owned(),
+        wallet: wallet.is_some(),
+        balance: s.balance.to_string(),
+        account_state: map_account_status(&s.state).to_owned(),
+        last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
+        wallet_type: wallet.map(|wallet| wallet.version.name().to_owned()),
+        seqno: wallet.map(|wallet| i64::from(i32::from_be_bytes(wallet.seqno.to_be_bytes()))),
+        wallet_id: wallet.and_then(|wallet| wallet.wallet_id),
+        is_signature_allowed: wallet.and_then(|wallet| wallet.is_signature_allowed),
+    }
+}
+
+#[must_use]
+pub fn map_token_data(
+    info: &LocalnetAddressInfo,
+    jetton_wallet_code: Option<&BocBytes>,
+) -> Option<response::TokenData> {
+    if let Some(master) = info.jetton_master.as_ref() {
+        return Some(response::TokenData::JettonMaster {
+            address: master.address.to_string(),
+            contract_type: "jetton_master".to_owned(),
+            total_supply: master.total_supply.to_string(),
+            mintable: master.mintable,
+            admin_address: master.admin_address.as_ref().map(ToString::to_string),
+            jetton_content: map_token_content(&master.jetton_content),
+            jetton_wallet_code: jetton_wallet_code
+                .map(BocBytes::to_base64)
+                .unwrap_or_default(),
+        });
+    }
+
+    if let Some(wallet) = info.jetton_wallet.as_ref() {
+        return Some(response::TokenData::JettonWallet {
+            address: wallet.address.to_string(),
+            contract_type: "jetton_wallet".to_owned(),
+            balance: wallet.balance.to_string(),
+            owner: wallet.owner_address.to_string(),
+            jetton: wallet.jetton_address.to_string(),
+            mintless_is_claimed: wallet.mintless_is_claimed,
+            jetton_wallet_code: jetton_wallet_code
+                .map(BocBytes::to_base64)
+                .unwrap_or_default(),
+        });
+    }
+
+    if let Some(collection) = info.nft_collection.as_ref() {
+        return Some(map_nft_collection_data(collection));
+    }
+
+    info.nft_item
+        .as_ref()
+        .map(|item| map_nft_item_data(item, info.dns.as_ref()))
+}
+
+fn map_nft_collection_data(collection: &NftCollectionMeta) -> response::TokenData {
+    response::TokenData::NftCollection {
+        address: collection.address.to_string(),
+        contract_type: "nft_collection".to_owned(),
+        next_item_index: collection.next_item_index.clone(),
+        owner_address: collection.owner_address.as_ref().map(ToString::to_string),
+        collection_content: map_token_content(&collection.collection_content),
+    }
+}
+
+fn map_nft_item_data(item: &NftItemMeta, dns: Option<&DnsRecordMeta>) -> response::TokenData {
+    response::TokenData::NftItem {
+        address: item.address.to_string(),
+        contract_type: "nft_item".to_owned(),
+        init: item.init,
+        index: item.index.clone(),
+        collection_address: item.collection_address.as_ref().map(ToString::to_string),
+        owner_address: item.owner_address.as_ref().map(ToString::to_string),
+        content: dns.map_or_else(
+            || response::NftContent::Token(map_token_content(&item.content)),
+            map_dns_content,
+        ),
+    }
+}
+
+fn map_dns_content(record: &DnsRecordMeta) -> response::NftContent {
+    response::NftContent::Dns(Box::new(response::DnsContent {
+        domain: record.domain.clone(),
+        data: response::DnsRecordSet {
+            dns_next_resolver: record.next_resolver.as_ref().map(|address| {
+                response::DnsRecord::NextResolver {
+                    resolver: map_smc_address(address),
+                }
+            }),
+            wallet: record
+                .wallet
+                .as_ref()
+                .map(|address| response::DnsRecord::SmcAddress {
+                    smc_addr: map_smc_address(address),
+                }),
+            site: record
+                .site_adnl
+                .map(|hash| response::DnsRecord::AdnlAddress {
+                    adnl_addr: hash.to_hex(),
+                }),
+            storage: record
+                .storage_bag_id
+                .map(|hash| response::DnsRecord::StorageAddress {
+                    bag_id: hash.to_hex(),
+                }),
+            ..Default::default()
+        },
+    }))
+}
+
+fn map_smc_address(address: &Addr) -> response::SmcAddress {
+    response::SmcAddress {
+        type_field: "addr_std".to_owned(),
+        workchain_id: address.workchain,
+        address: Hash256(address.addr).to_hex(),
+    }
+}
+
+fn map_token_content(content: &Value) -> response::TokenContent {
+    let Some(map) = content.as_object() else {
+        return response::TokenContent {
+            kind: "onchain".to_owned(),
+            data: content.clone(),
+        };
     };
 
-    serde_json::json!({
-        "@type": "raw.transactions",
-        "transactions": txs_to_return
-            .iter()
-            .map(map_transaction_std)
-            .collect::<Vec<_>>(),
-        "previous_transaction_id": map_internal_transaction_id(&previous_id)
-    })
-}
-
-pub fn map_transaction(tx: &LocalnetTransaction) -> Value {
-    serde_json::json!({
-        "@type": "ext.transaction",
-        "hash": tx.hash.to_base64(),
-        "address": { "@type": "accountAddress", "account_address": tx.address.to_string() },
-        "account": tx.address.to_string(),
-        "utime": tx.utime,
-        "data": base64::engine::general_purpose::STANDARD.encode(&tx.data),
-        "success": tx.success,
-        "exit_code": tx.exit_code,
-        "transaction_id": map_internal_transaction_id(&tx.transaction_id),
-        "fee": tx.total_fees.to_string(),
-        "storage_fee": tx.storage_fees.to_string(),
-        "other_fee": tx.other_fees.to_string(),
-        "in_msg": map_message(&tx.in_msg),
-        "out_msgs": tx.out_msgs.iter().map(map_message).collect::<Vec<_>>()
-    })
-}
-
-pub fn map_transaction_std(tx: &LocalnetTransaction) -> Value {
-    serde_json::json!({
-        "@type": "raw.transaction",
-        "address": map_account_address(&tx.address),
-        "utime": tx.utime,
-        "data": base64::engine::general_purpose::STANDARD.encode(&tx.data),
-        "transaction_id": map_internal_transaction_id(&tx.transaction_id),
-        "fee": tx.total_fees.to_string(),
-        "storage_fee": tx.storage_fees.to_string(),
-        "other_fee": tx.other_fees.to_string(),
-        "in_msg": map_message_std(&tx.in_msg),
-        "out_msgs": tx.out_msgs.iter().map(map_message_std).collect::<Vec<_>>()
-    })
-}
-
-#[must_use]
-pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Value {
-    if msg.hash.0 == [0; 32] {
-        return serde_json::json!({ "@type": "msg.message" });
+    if map.len() == 1
+        && let Some(uri) = map.get("uri").and_then(Value::as_str)
+    {
+        return response::TokenContent {
+            kind: "offchain".to_owned(),
+            data: Value::String(uri.to_owned()),
+        };
     }
-    serde_json::json!({
-        "@type": "raw.message",
-        "hash": msg.hash.to_base64(),
-        "opcode": msg.opcode.map(|op| format!("0x{op:08x}")),
-        "source": msg.source.as_ref().map(ToString::to_string).unwrap_or_default(),
-        "destination": msg.destination.as_ref().map(ToString::to_string).unwrap_or_default(),
-        "value": msg.value.to_string(),
-        "fwd_fee": msg.fwd_fee.to_string(),
-        "ihr_fee": msg.ihr_fee.to_string(),
-        "created_lt": msg.created_lt.to_string(),
-        "body_hash": msg.body_hash.to_base64(),
-        "msg_data": {
-            "@type": "msg.dataRaw",
-            "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
-            "init_state": base64::engine::general_purpose::STANDARD.encode(&msg.init_state)
-        },
-        "extra_currencies": []
-    })
-}
 
-#[must_use]
-pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> Value {
-    if msg.hash.0 == [0; 32] {
-        return serde_json::json!({ "@type": "msg.message" });
+    response::TokenContent {
+        kind: "onchain".to_owned(),
+        data: content.clone(),
     }
-    serde_json::json!({
-        "@type": "raw.message",
-        "hash": msg.hash.to_base64(),
-        "source": map_optional_account_address(msg.source.as_ref()),
-        "destination": map_optional_account_address(msg.destination.as_ref()),
-        "value": msg.value.to_string(),
-        "fwd_fee": msg.fwd_fee.to_string(),
-        "ihr_fee": msg.ihr_fee.to_string(),
-        "created_lt": msg.created_lt.to_string(),
-        "body_hash": msg.body_hash.to_base64(),
-        "msg_data": {
-            "@type": "msg.dataRaw",
-            "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
-            "init_state": base64::engine::general_purpose::STANDARD.encode(&msg.init_state)
-        },
-        "extra_currencies": []
-    })
 }
 
 #[must_use]
-pub fn map_account_state(s: &LocalnetAccountState) -> Value {
-    serde_json::json!({
-        "@type": "raw.fullAccountState",
-        "balance": s.balance.to_string(),
-        "extra_currencies": [],
-        "last_transaction_id": map_internal_transaction_id(&s.last_transaction_id),
-        "block_id": map_block_id(&s.block_id),
-        "code": encode_optional_boc(s.code.as_ref()),
-        "data": encode_optional_boc(s.data.as_ref()),
-        "frozen_hash": s.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
-        "sync_utime": s.sync_utime,
-        "state": match s.state {
-            AccountStatus::Active => "active",
-            AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
-            AccountStatus::Frozen => "frozen",
-            // there is no nonexist in toncenter v2
+pub fn map_shard_account_cell(boc: &BocBytes) -> response::TvmCell {
+    response::TvmCell {
+        type_field: "tvm.cell".to_owned(),
+        bytes: boc.to_base64(),
+    }
+}
+
+pub const MAX_RUN_GET_METHOD_STACK_DEPTH: usize = 100;
+
+#[derive(Debug, thiserror::Error)]
+#[error("Result stack depth >= {MAX_RUN_GET_METHOD_STACK_DEPTH}")]
+pub struct RunGetMethodStackDepthError;
+
+pub fn map_run_get_method(
+    r: &LocalnetRunGetMethodResult,
+) -> anyhow::Result<response::RunGetMethodResult> {
+    let stack = decode_run_get_method_stack(r)?;
+    ensure_legacy_stack_depth(&stack)?;
+
+    Ok(response::RunGetMethodResult {
+        type_field: "smc.runResult".to_owned(),
+        gas_used: response::StringOrNumber::Unsigned(r.gas_used),
+        stack: legacy_stack_to_json(&stack)?,
+        exit_code: r.exit_code,
+        block_id: map_block_id(&r.block_id),
+        last_transaction_id: map_internal_transaction_id(&r.last_transaction_id),
+        vm_log: Some(r.vm_log.to_string()),
+    })
+}
+
+pub fn map_run_get_method_std(
+    r: &LocalnetRunGetMethodResult,
+) -> anyhow::Result<response::RunGetMethodStdResult> {
+    let stack = decode_run_get_method_stack(r)?;
+    ensure_std_stack_depth(&stack)?;
+
+    Ok(response::RunGetMethodStdResult {
+        type_field: "smc.runResult".to_owned(),
+        gas_used: i64::try_from(r.gas_used)?,
+        stack: std_stack_from_tuple(&stack),
+        exit_code: r.exit_code,
+    })
+}
+
+fn decode_run_get_method_stack(r: &LocalnetRunGetMethodResult) -> anyhow::Result<Tuple> {
+    let stack_cell = Boc::decode(&r.stack)?;
+    Tuple::deserialize(&stack_cell)
+}
+
+fn ensure_std_stack_depth(stack: &Tuple) -> anyhow::Result<()> {
+    ensure_stack_depth(stack.0.iter().map(|item| (item, 1)))
+}
+
+fn ensure_legacy_stack_depth(stack: &Tuple) -> anyhow::Result<()> {
+    ensure_stack_depth(stack.0.iter().flat_map(|item| match item {
+        TupleItem::Tuple(tuple) => tuple.0.iter().map(|item| (item, 1)).collect(),
+        _ => Vec::new(),
+    }))
+}
+
+fn ensure_stack_depth<'a>(
+    entries: impl IntoIterator<Item = (&'a TupleItem, usize)>,
+) -> anyhow::Result<()> {
+    let mut pending = entries.into_iter().collect::<Vec<_>>();
+    while let Some((entry, depth)) = pending.pop() {
+        if depth >= MAX_RUN_GET_METHOD_STACK_DEPTH {
+            return Err(RunGetMethodStackDepthError.into());
         }
-    })
+        if let TupleItem::Tuple(tuple) = entry {
+            pending.extend(tuple.0.iter().map(|item| (item, depth + 1)));
+        }
+    }
+    Ok(())
 }
 
 #[must_use]
-pub fn map_extended_account_state(s: &LocalnetAccountState) -> Value {
-    serde_json::json!({
-        "@type": "fullAccountState",
-        "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
-        "balance": s.balance.to_string(),
-        "extra_currencies": [],
-        "last_transaction_id": map_internal_transaction_id(&s.last_transaction_id),
-        "block_id": map_block_id(&s.block_id),
-        "sync_utime": s.sync_utime,
-        "account_state": match s.state {
-            AccountStatus::Nonexist => serde_json::json!({
-                "@type": "uninited.accountState",
-                "frozen_hash": ""
-            }),
-            _ => serde_json::json!({
-                "@type": "raw.accountState",
-                "code": encode_optional_boc(s.code.as_ref()),
-                "data": encode_optional_boc(s.data.as_ref()),
-                "frozen_hash": s.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default()
-            }),
-        },
-        "revision": 0
-    })
+pub fn map_block_transactions(block: &LocalnetBlockTransactions) -> response::BlockTransactions {
+    response::BlockTransactions {
+        type_field: "blocks.transactions".to_owned(),
+        id: map_block_id(&block.id),
+        req_count: block.requested_count,
+        incomplete: block.incomplete,
+        transactions: block
+            .transactions
+            .iter()
+            .map(|transaction| response::ShortTxId {
+                type_field: "blocks.shortTxId".to_owned(),
+                mode: 135,
+                account: transaction.address.to_string(),
+                lt: transaction.transaction_id.lt.to_string(),
+                hash: transaction.hash.to_base64(),
+            })
+            .collect(),
+    }
 }
 
 #[must_use]
-pub fn map_run_get_method(r: &LocalnetRunGetMethodResult, is_legacy: bool) -> Value {
-    let stack_cell = Boc::decode(&r.stack).unwrap_or_default();
-    let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
-    let stack_json: Value = if is_legacy {
-        Value::Array(legacy_stack_to_json(&stack_tuple).unwrap_or_default())
-    } else {
-        Value::Array(stack_to_json(&stack_tuple).unwrap_or_default())
-    };
+pub fn map_send_boc(_: &LocalnetAcceptedExternalMessage) -> response::ResultOk {
+    response::ResultOk {
+        type_field: "ok".to_owned(),
+    }
+}
 
-    let stack = match stack_json {
-        Value::Array(a) => a,
-        v => vec![v],
-    };
-
-    serde_json::json!({
-        "@type": "smc.runResult",
-        "gas_used": r.gas_used,
-        "stack": stack,
-        "exit_code": r.exit_code,
-        "vm_log": r.vm_log,
-        "block_id": map_block_id(&r.block_id),
-        "last_transaction_id": map_internal_transaction_id(&r.last_transaction_id),
-    })
+pub fn map_block_transactions_ext(
+    bt: &LocalnetBlockTransactions,
+) -> response::BlockTransactionsExt {
+    response::BlockTransactionsExt {
+        type_field: "blocks.transactionsExt".to_owned(),
+        id: map_block_id(&bt.id),
+        req_count: bt.requested_count,
+        incomplete: bt.incomplete,
+        transactions: bt.transactions.iter().map(map_transaction_ext).collect(),
+    }
 }
 
 #[must_use]
-pub fn map_block_transactions(_: &LocalnetBlockTransactions) -> Value {
-    serde_json::json!({
-      "@type": "ok",
-    })
-}
-
-pub fn map_block_transactions_ext(bt: &LocalnetBlockTransactions) -> Value {
-    serde_json::json!({
-        "@type": "blocks.transactionsExt",
-        "id": map_block_id(&bt.id),
-        "req_count": bt.transactions.len(),
-        "incomplete": false,
-        "transactions": bt.transactions.iter().map(map_transaction).collect::<Vec<_>>()
-    })
+pub fn map_masterchain_info(mi: &LocalnetMasterchainInfo) -> response::MasterchainInfo {
+    response::MasterchainInfo {
+        type_field: "blocks.masterchainInfo".to_owned(),
+        last: map_block_id(&mi.last),
+        state_root_hash: mi.state_root_hash.to_base64(),
+        init: map_block_id(&mi.init),
+    }
 }
 
 #[must_use]
-pub fn map_masterchain_info(mi: &LocalnetMasterchainInfo) -> Value {
-    serde_json::json!({
-        "@type": "blocks.masterchainInfo",
-        "last": map_block_id(&mi.last),
-        "state_root_hash": mi.state_root_hash.to_base64(),
-        "init": map_block_id(&mi.init)
-    })
+pub fn map_consensus_block(cb: &LocalnetConsensusBlock) -> response::ConsensusBlock {
+    response::ConsensusBlock {
+        type_field: "ext.blocks.consensusBlock".to_owned(),
+        consensus_block: cb.consensus_block,
+        timestamp: cb.timestamp,
+    }
 }
 
 #[must_use]
-pub fn map_consensus_block(cb: &LocalnetConsensusBlock) -> Value {
-    serde_json::json!({
-        "@type": "ext.blocks.consensusBlock",
-        "consensus_block": cb.consensus_block,
-        "timestamp": cb.timestamp
-    })
-}
-
-#[must_use]
-pub fn map_libraries(libs: &[LocalnetLibrary]) -> Value {
-    serde_json::json!({
-        "@type": "smc.libraryResult",
-        "result": libs
+pub fn map_libraries(libs: &[LocalnetLibrary]) -> response::LibraryResult {
+    response::LibraryResult {
+        type_field: "smc.libraryResult".to_owned(),
+        result: libs
             .iter()
             .filter_map(|lib| lib.data.as_ref().map(|data| (lib, data)))
-            .map(|(lib, data)| {
-                serde_json::json!({
-                    "@type": "smc.libraryEntry",
-                    "hash": lib.hash.to_base64(),
-                    "data": base64::engine::general_purpose::STANDARD.encode(data),
-                })
+            .map(|(lib, data)| response::LibraryEntry {
+                type_field: "smc.libraryEntry".to_owned(),
+                hash: lib.hash.to_base64(),
+                data: data.to_base64(),
             })
-            .collect::<Vec<_>>()
-    })
-}
-
-#[must_use]
-pub fn map_send_boc_return_hash(bt: &LocalnetBlockTransactions) -> Value {
-    let msg_hash = bt
-        .msg_hash
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
-        .unwrap_or_default();
-    let mut mapped = serde_json::json!({
-        "@type": "ok",
-        "hash": msg_hash
-    });
-    if let Some(hash_norm) = bt
-        .msg_hash_norm
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
-        && let Some(root) = mapped.as_object_mut()
-    {
-        root.insert("hash_norm".to_string(), Value::String(hash_norm));
+            .collect(),
     }
-    mapped
 }
 
 #[must_use]
-pub fn map_block_header(bh: &LocalnetBlockHeader) -> Value {
-    serde_json::json!({
-        "@type": "ton.blockHeader",
-        "id": map_block_id(&bh.id),
-        "gen_utime": bh.gen_utime,
-        "start_lt": bh.start_lt.to_string(),
-        "end_lt": bh.end_lt.to_string(),
-        "prev_seqno": bh.prev_seqno
-    })
-}
-
-#[allow(clippy::ptr_arg)]
-pub fn map_shards(shards: &Vec<LocalnetBlockId>) -> Value {
-    serde_json::json!({
-        "@type": "blocks.shards",
-        "shards": shards.iter().map(map_block_id).collect::<Vec<_>>()
-    })
+pub fn map_send_boc_return_hash(
+    message: &LocalnetAcceptedExternalMessage,
+) -> response::ExtMessageInfo {
+    response::ExtMessageInfo {
+        type_field: "raw.extMessageInfo".to_owned(),
+        hash: message.msg_hash.to_base64(),
+        hash_norm: message.msg_hash_norm.to_base64(),
+    }
 }
 
 #[must_use]
-pub fn map_lookup_block(id: &LocalnetBlockId) -> Value {
+pub fn map_send_internal_message(
+    message: &LocalnetAcceptedInternalMessage,
+) -> response::InternalMessageInfo {
+    response::InternalMessageInfo {
+        type_field: "ok".to_owned(),
+        hash: message.msg_hash.to_base64(),
+    }
+}
+
+#[must_use]
+pub fn map_block_header(bh: &LocalnetBlockHeader) -> response::BlockHeader {
+    response::BlockHeader {
+        type_field: "blocks.header".to_owned(),
+        id: map_block_id(&bh.id),
+        global_id: bh.global_id,
+        version: bh.version,
+        after_merge: bh.after_merge,
+        after_split: bh.after_split,
+        before_split: bh.before_split,
+        want_merge: bh.want_merge,
+        want_split: bh.want_split,
+        validator_list_hash_short: bh.validator_list_hash_short,
+        catchain_seqno: bh.catchain_seqno,
+        min_ref_mc_seqno: bh.min_ref_mc_seqno,
+        is_key_block: bh.is_key_block,
+        prev_key_block_seqno: bh.prev_key_block_seqno,
+        start_lt: bh.start_lt.to_string(),
+        end_lt: bh.end_lt.to_string(),
+        gen_utime: bh.gen_utime,
+        prev_blocks: bh.prev_blocks.iter().map(map_block_id).collect(),
+    }
+}
+
+pub fn map_shards(shards: &[LocalnetBlockId]) -> response::Shards {
+    response::Shards {
+        type_field: "blocks.shards".to_owned(),
+        shards: shards.iter().map(map_block_id).collect(),
+    }
+}
+
+#[must_use]
+pub fn map_lookup_block(id: &LocalnetBlockId) -> response::TonBlockIdExt {
     map_block_id(id)
 }
 
 #[must_use]
-pub fn map_config_info(config: &BocBytes) -> Value {
-    serde_json::json!({
-        "@type": "configInfo",
-        "config": {
-            "@type": "tvm.cell",
-            "bytes": base64::engine::general_purpose::STANDARD.encode(config),
-        }
-    })
+pub fn map_config_info(config: &BocBytes) -> response::ConfigInfo {
+    response::ConfigInfo {
+        type_field: "configInfo".to_owned(),
+        config: response::TvmCell {
+            type_field: "tvm.cell".to_owned(),
+            bytes: config.to_base64(),
+        },
+    }
 }
 
 #[must_use]
-pub fn map_out_msg_queue_sizes(mi: &LocalnetMasterchainInfo) -> Value {
-    serde_json::json!({
-        "@type": "blocks.outMsgQueueSizes",
-        "shards": [{
-            "@type": "blocks.outMsgQueueSize",
-            "id": map_block_id(&mi.last),
-            "size": 0
+pub fn map_out_msg_queue_sizes(mi: &LocalnetMasterchainInfo) -> response::OutMsgQueueSizes {
+    response::OutMsgQueueSizes {
+        type_field: "blocks.outMsgQueueSizes".to_owned(),
+        shards: vec![response::OutMsgQueueSize {
+            type_field: "blocks.outMsgQueueSize".to_owned(),
+            id: map_block_id(&mi.last),
+            size: 0,
         }],
-        "ext_msg_queue_size_limit": 0
-    })
+        ext_msg_queue_size_limit: 0,
+    }
 }
 
 #[must_use]
-pub fn map_detect_address(addr: &StdAddr, flags: Base64StdAddrFlags, given_type: &str) -> Value {
+pub fn map_detect_address(
+    addr: &StdAddr,
+    flags: Base64StdAddrFlags,
+    given_type: &str,
+) -> response::DetectAddress {
     let bounceable_b64 = DisplayBase64StdAddr {
         addr,
         flags: Base64StdAddrFlags {
@@ -372,36 +756,36 @@ pub fn map_detect_address(addr: &StdAddr, flags: Base64StdAddrFlags, given_type:
     }
     .to_string();
 
-    serde_json::json!({
-        "@type": "ext.utils.detectedAddress",
-        "raw_form": addr.to_string(),
-        "bounceable": {
-            "@type": "ext.utils.detectedAddressVariant",
-            "b64": bounceable_b64,
-            "b64url": bounceable_b64url,
+    response::DetectAddress {
+        type_field: "ext.utils.detectedAddress".to_owned(),
+        raw_form: addr.to_string(),
+        bounceable: response::DetectAddressBase64Variant {
+            type_field: "ext.utils.detectedAddressVariant".to_owned(),
+            b64: bounceable_b64,
+            b64url: bounceable_b64url,
         },
-        "non_bounceable": {
-            "@type": "ext.utils.detectedAddressVariant",
-            "b64": non_bounceable_b64,
-            "b64url": non_bounceable_b64url,
+        non_bounceable: response::DetectAddressBase64Variant {
+            type_field: "ext.utils.detectedAddressVariant".to_owned(),
+            b64: non_bounceable_b64,
+            b64url: non_bounceable_b64url,
         },
-        "given_type": given_type,
-        "test_only": flags.testnet
-    })
+        given_type: given_type.to_owned(),
+        test_only: flags.testnet,
+    }
 }
 
 #[must_use]
-pub fn map_detect_hash(hash: &crate::types::Hash256) -> Value {
-    serde_json::json!({
-        "@type": "ext.utils.detectedHash",
-        "b64": hash.to_base64(),
-        "b64url": base64::engine::general_purpose::URL_SAFE.encode(hash.0),
-        "hex": hash.to_hex(),
-    })
+pub fn map_detect_hash(hash: &Hash256) -> response::DetectHash {
+    response::DetectHash {
+        type_field: "ext.utils.detectedHash".to_owned(),
+        b64: hash.to_base64(),
+        b64url: base64::engine::general_purpose::URL_SAFE.encode(hash.0),
+        hex: hash.to_hex(),
+    }
 }
 
 #[must_use]
-pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> Value {
+pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> String {
     DisplayBase64StdAddr {
         addr,
         flags: Base64StdAddrFlags {
@@ -411,37 +795,540 @@ pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> Value {
         },
     }
     .to_string()
-    .into()
 }
 
 #[must_use]
-pub fn map_unpack_address(addr: &StdAddr) -> Value {
-    addr.to_string().into()
+pub fn map_unpack_address(addr: &StdAddr) -> String {
+    addr.to_string()
 }
 
 fn encode_optional_boc(data: Option<&BocBytes>) -> String {
-    data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
-        .unwrap_or_default()
+    data.map(BocBytes::to_base64).unwrap_or_default()
 }
 
-fn map_internal_transaction_id(id: &LocalnetTransactionId) -> Value {
-    serde_json::json!({
-        "@type": "internal.transactionId",
-        "lt": id.lt.to_string(),
-        "hash": id.hash.to_base64()
-    })
+fn map_internal_transaction_id(id: &LocalnetTransactionId) -> response::InternalTransactionId {
+    response::InternalTransactionId {
+        type_field: "internal.transactionId".to_owned(),
+        lt: id.lt.to_string(),
+        hash: id.hash.to_base64(),
+    }
 }
 
-fn map_account_address(addr: &Addr) -> Value {
-    serde_json::json!({
-        "@type": "accountAddress",
-        "account_address": addr.to_string()
-    })
+fn map_account_address(addr: &Addr) -> response::AccountAddress {
+    response::AccountAddress {
+        type_field: "accountAddress".to_owned(),
+        account_address: addr.as_user_friendly(),
+    }
 }
 
-fn map_optional_account_address(addr: Option<&Addr>) -> Value {
-    serde_json::json!({
-        "@type": "accountAddress",
-        "account_address": addr.map(ToString::to_string).unwrap_or_default()
-    })
+fn map_optional_account_address(addr: Option<&Addr>) -> response::AccountAddress {
+    response::AccountAddress {
+        type_field: "accountAddress".to_owned(),
+        account_address: addr
+            .copied()
+            .map(Addr::as_user_friendly)
+            .unwrap_or_default(),
+    }
+}
+
+fn map_raw_message_data(msg: &crate::localnet::LocalnetMessage) -> response::MessageData {
+    response::MessageData::Raw {
+        body: msg.body.to_base64(),
+        init_state: msg.init_state.to_base64(),
+    }
+}
+
+struct MappedMessageData {
+    data: response::MessageData,
+    message: Option<String>,
+    decode_error: Option<String>,
+}
+
+fn map_decoded_message_data(msg: &crate::localnet::LocalnetMessage) -> MappedMessageData {
+    if msg.opcode == Some(0)
+        && let Ok(cell) = Boc::decode(&msg.body)
+        && let Ok(mut body) = cell.as_slice()
+        && body.load_u32().is_ok()
+        && let Some(bytes) = Tuple::parse_snake_bytes_slice(&mut body)
+        && let Ok(message) = String::from_utf8(bytes.clone())
+    {
+        return MappedMessageData {
+            data: response::MessageData::Text {
+                text: base64::engine::general_purpose::STANDARD.encode(bytes),
+            },
+            message: Some(message),
+            decode_error: None,
+        };
+    }
+
+    match legacy_message_body(msg) {
+        Ok(message) => MappedMessageData {
+            data: map_raw_message_data(msg),
+            message: Some(message),
+            decode_error: None,
+        },
+        Err(error) => MappedMessageData {
+            data: map_raw_message_data(msg),
+            message: None,
+            decode_error: Some(format!("Failed to decode message body: {error}")),
+        },
+    }
+}
+
+fn legacy_message_body(msg: &crate::localnet::LocalnetMessage) -> anyhow::Result<String> {
+    let cell = Boc::decode(&msg.body)?;
+    let mut body = cell.as_slice()?;
+    let bit_len = body.size_bits();
+    let mut bytes = vec![0; usize::from(bit_len.div_ceil(8))];
+    body.load_raw(&mut bytes, bit_len)?;
+    Ok(format!(
+        "{}\n",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
+fn map_extra_currencies(currencies: &[ExtraCurrency]) -> Vec<response::ExtraCurrencyBalance> {
+    currencies
+        .iter()
+        .map(|currency| response::ExtraCurrencyBalance {
+            type_field: "extraCurrency".to_owned(),
+            id: i32::from_be_bytes(currency.id.to_be_bytes()),
+            amount: response::StringOrNumber::String(currency.amount.to_string()),
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::toncenter_wallet::read_v2_wallet_state;
+    use crate::storage::{DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
+    use serde_json::json;
+    use ton::ton_core::traits::tlb::TLB;
+    use ton::ton_wallet::WalletVersion;
+    use tycho_types::cell::{Cell, CellBuilder, CellFamily};
+
+    const V5_BETA_CODE_BOC: &str =
+        "te6cckEBAQEAIwAIQgLkzzsvTG1qYeoPK1RH0mZ4WyavNjfbLe7mvNGqgm80Eg3NjhE=";
+
+    fn addr(hex_byte: u8) -> Addr {
+        format!("0:{}", format!("{hex_byte:02x}").repeat(32))
+            .parse()
+            .expect("valid address")
+    }
+
+    fn account_state(code_hash: Option<Hash256>) -> LocalnetAccountState {
+        LocalnetAccountState {
+            address: addr(0x11),
+            account_state_hash: Hash256([0x22; 32]),
+            balance: 123,
+            extra_currencies: Vec::new(),
+            code: None,
+            code_hash,
+            data: None,
+            data_hash: None,
+            last_transaction_id: LocalnetTransactionId {
+                lt: 42,
+                hash: Hash256([0x33; 32]),
+            },
+            block_id: LocalnetBlockId::first(),
+            state: AccountStatus::Active,
+            sync_utime: 0,
+            frozen_hash: None,
+        }
+    }
+
+    fn set_wallet_code(account: &mut LocalnetAccountState, version: WalletVersion) {
+        let code = BocBytes::from(
+            WalletVersion::get_code(version)
+                .expect("wallet code must exist")
+                .to_boc()
+                .expect("wallet code must serialize"),
+        );
+        account.code_hash = Some(code.hash().expect("wallet code must hash"));
+        account.code = Some(code);
+    }
+
+    fn run_get_method_result(stack: Tuple) -> LocalnetRunGetMethodResult {
+        let stack = stack.serialize().expect("stack must serialize");
+        LocalnetRunGetMethodResult {
+            gas_used: 17,
+            stack: BocBytes::from(Boc::encode(stack)),
+            exit_code: 0,
+            vm_log: "vm log".into(),
+            block_id: LocalnetBlockId::first(),
+            last_transaction_id: LocalnetTransactionId::default(),
+        }
+    }
+
+    fn nested_tuple_item(depth: usize) -> TupleItem {
+        if depth == 1 {
+            TupleItem::Int(1.into())
+        } else {
+            TupleItem::Tuple(Tuple(vec![nested_tuple_item(depth - 1)]))
+        }
+    }
+
+    #[test]
+    fn wallet_information_maps_known_wallet_code_hash() {
+        let wallet = V2WalletState {
+            version: V2WalletVersion::V4R2,
+            seqno: u32::MAX,
+            wallet_id: Some(42),
+            is_signature_allowed: None,
+        };
+        let mapped = map_wallet_information(&account_state(None), Some(&wallet));
+
+        assert_eq!(mapped.type_field, "ext.accounts.walletInformation");
+        assert!(mapped.wallet);
+        assert_eq!(mapped.wallet_type.as_deref(), Some("wallet v4 r2"));
+        assert_eq!(mapped.seqno, Some(-1));
+        assert_eq!(mapped.wallet_id, Some(42));
+        assert_eq!(mapped.balance, "123");
+        assert_eq!(mapped.account_state, "active");
+    }
+
+    #[test]
+    fn wallet_information_maps_unknown_wallet_code_hash() {
+        let mapped = map_wallet_information(&account_state(Some(Hash256([0x44; 32]))), None);
+
+        assert!(!mapped.wallet);
+        assert!(mapped.wallet_type.is_none());
+        assert!(mapped.seqno.is_none());
+    }
+
+    #[test]
+    fn wallet_information_parses_only_upstream_v5_beta_hash() {
+        let mut data = CellBuilder::new();
+        data.store_bit(false).expect("signature flag must store");
+        data.store_u32(u32::MAX).expect("seqno must store");
+        data.store_u32(u32::MAX).expect("wallet id must store");
+        let data = data.build().expect("wallet data must build");
+        let mut account = account_state(Some(Hash256([0x44; 32])));
+        account.code = Some(BocBytes::from(
+            base64::engine::general_purpose::STANDARD
+                .decode(V5_BETA_CODE_BOC)
+                .expect("V5 beta code BOC must decode"),
+        ));
+        account.data = Some(BocBytes::from(Boc::encode(data)));
+
+        let wallet = read_v2_wallet_state(&account)
+            .expect("V5 beta data must parse")
+            .expect("V5 beta code must be recognized");
+        let mapped = map_wallet_information(&account, Some(&wallet));
+        assert_eq!(wallet.version.name(), "wallet v5 beta");
+        assert_eq!(mapped.seqno, Some(-1));
+        assert_eq!(mapped.wallet_id, Some(-1));
+        assert_eq!(mapped.is_signature_allowed, Some(false));
+
+        account.code = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+        account.code_hash = Some(
+            Hash256::from_base64("89fKU0k97trCizgZhqhJQDy6w9LFhHea8IEGWvCsS5M=")
+                .expect("upstream V5 beta hash must parse"),
+        );
+        assert!(
+            read_v2_wallet_state(&account)
+                .expect("unknown code must not fail")
+                .is_none(),
+            "cached code hash must not classify a different code BOC"
+        );
+    }
+
+    #[test]
+    fn wallet_information_rejects_known_wallet_with_missing_data() {
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+
+        assert!(read_v2_wallet_state(&account).is_err());
+        assert!(!map_wallet_information(&account, None).wallet);
+
+        let mut highload = account_state(None);
+        set_wallet_code(&mut highload, WalletVersion::HLV2R2);
+        highload.data = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+        assert!(
+            read_v2_wallet_state(&highload)
+                .expect("highload wallet must be a supported negative case")
+                .is_none()
+        );
+        assert!(!map_wallet_information(&highload, None).wallet);
+    }
+
+    #[test]
+    fn wallet_information_accepts_upstream_prefix_only_data() {
+        let mut data = CellBuilder::new();
+        data.store_u32(u32::MAX).expect("seqno must store");
+        data.store_u32(u32::MAX).expect("wallet id must store");
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+        account.data = Some(BocBytes::from(Boc::encode(
+            data.build().expect("wallet prefix must build"),
+        )));
+
+        let wallet = read_v2_wallet_state(&account)
+            .expect("wallet prefix must parse")
+            .expect("V4 code must be recognized");
+        assert_eq!(wallet.seqno, u32::MAX);
+        assert_eq!(wallet.wallet_id, Some(-1));
+    }
+
+    #[test]
+    fn extended_account_state_rejects_malformed_recognized_wallet_data() {
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+        account.data = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+
+        let error = map_extended_account_state(&account, &account.address.to_string())
+            .expect_err("recognized wallet with malformed data must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("Failed to parse V4R2 wallet data")
+        );
+    }
+
+    #[test]
+    fn extended_account_state_uses_uninited_for_missing_code() {
+        let account = account_state(None);
+        let mapped = map_extended_account_state(&account, &account.address.to_string())
+            .expect("code-less account must map");
+
+        assert!(matches!(
+            mapped.account_state,
+            response::AccountStateKind::Uninited { .. }
+        ));
+    }
+
+    #[test]
+    fn wallet_seqno_parses_success_stack() {
+        let result = run_get_method_result(Tuple(vec![TupleItem::Int(9.into())]));
+
+        assert_eq!(map_wallet_seqno(&result), Some(9));
+    }
+
+    #[test]
+    fn run_get_method_std_maps_canonical_response() {
+        let cell = Cell::default();
+        let result = run_get_method_result(Tuple(vec![
+            TupleItem::Int((-7).into()),
+            TupleItem::Cell(cell.clone()),
+            TupleItem::Slice(cell),
+            TupleItem::Tuple(Tuple(vec![TupleItem::Int(9.into())])),
+        ]));
+
+        let mapped = map_run_get_method_std(&result).unwrap();
+
+        assert_eq!(mapped.gas_used, 17);
+        assert_eq!(mapped.exit_code, 0);
+        assert_eq!(mapped.stack.len(), 4);
+        assert_eq!(
+            serde_json::to_value(&mapped.stack[0]).unwrap(),
+            json!({
+                "@type": "tvm.stackEntryNumber",
+                "number": {"@type": "tvm.numberDecimal", "number": "-7"}
+            })
+        );
+        assert!(
+            serde_json::to_value(mapped)
+                .unwrap()
+                .get("block_id")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn run_get_method_mappers_reject_invalid_stack_boc() {
+        let mut result = run_get_method_result(Tuple::default());
+        result.stack = BocBytes(vec![1, 2, 3]);
+
+        assert!(map_run_get_method(&result).is_err());
+        assert!(map_run_get_method_std(&result).is_err());
+    }
+
+    #[test]
+    fn run_get_method_mappers_enforce_upstream_depth_limit() {
+        let std_allowed = run_get_method_result(Tuple(vec![nested_tuple_item(99)]));
+        let std_rejected = run_get_method_result(Tuple(vec![nested_tuple_item(100)]));
+        let legacy_allowed = run_get_method_result(Tuple(vec![nested_tuple_item(100)]));
+        let legacy_rejected = run_get_method_result(Tuple(vec![nested_tuple_item(101)]));
+
+        assert!(map_run_get_method_std(&std_allowed).is_ok());
+        assert!(
+            map_run_get_method_std(&std_rejected)
+                .unwrap_err()
+                .downcast_ref::<RunGetMethodStackDepthError>()
+                .is_some()
+        );
+        assert!(map_run_get_method(&legacy_allowed).is_ok());
+        assert!(
+            map_run_get_method(&legacy_rejected)
+                .unwrap_err()
+                .downcast_ref::<RunGetMethodStackDepthError>()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn token_data_maps_jetton_master_with_wallet_code() {
+        let wallet_code = BocBytes(vec![1, 2, 3]);
+        let master = JettonMasterMeta {
+            address: addr(0xaa),
+            admin_address: Some(addr(0xbb)),
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            jetton_content: json!({
+                "name": "Local Token",
+                "symbol": "LOC",
+                "decimals": "9",
+            }),
+            jetton_wallet_code_hash: Hash256([3; 32]),
+            last_transaction_lt: 4,
+            mintable: true,
+            total_supply: 1000,
+        };
+        let info = LocalnetAddressInfo {
+            address: master.address,
+            code_hash: Some(master.code_hash),
+            dns: None,
+            jetton_wallet: None,
+            jetton_master: Some(master),
+            nft_item: None,
+            nft_collection: None,
+        };
+
+        let mapped = map_token_data(&info, Some(&wallet_code)).expect("jetton data must map");
+
+        let response::TokenData::JettonMaster {
+            contract_type,
+            total_supply,
+            jetton_wallet_code,
+            jetton_content,
+            ..
+        } = mapped
+        else {
+            panic!("expected jetton master token data");
+        };
+        assert_eq!(contract_type, "jetton_master");
+        assert_eq!(total_supply, "1000");
+        assert_eq!(jetton_wallet_code, "AQID");
+        assert_eq!(jetton_content.kind, "onchain");
+        assert_eq!(jetton_content.data["symbol"].as_str(), Some("LOC"));
+    }
+
+    #[test]
+    fn token_data_maps_mintless_jetton_wallet() {
+        let wallet_code = BocBytes(vec![1, 2, 3]);
+        let wallet = JettonWalletMeta {
+            address: addr(0xaa),
+            balance: 1000,
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            jetton_address: addr(0xbb),
+            jetton_wallet_code_hash: Hash256([3; 32]),
+            last_transaction_lt: 4,
+            mintless_is_claimed: Some(true),
+            owner_address: addr(0xcc),
+        };
+        let info = LocalnetAddressInfo {
+            address: wallet.address,
+            code_hash: Some(wallet.code_hash),
+            dns: None,
+            jetton_wallet: Some(wallet),
+            jetton_master: None,
+            nft_item: None,
+            nft_collection: None,
+        };
+
+        let mapped = map_token_data(&info, Some(&wallet_code)).expect("wallet data must map");
+
+        assert_eq!(
+            serde_json::to_value(mapped).unwrap(),
+            json!({
+                "@type": "ext.tokens.jettonWalletData",
+                "address": addr(0xaa).to_string(),
+                "contract_type": "jetton_wallet",
+                "balance": "1000",
+                "owner": addr(0xcc).to_string(),
+                "jetton": addr(0xbb).to_string(),
+                "mintless_is_claimed": true,
+                "jetton_wallet_code": "AQID",
+            })
+        );
+    }
+
+    #[test]
+    fn token_data_maps_typed_dns_records() {
+        let item = NftItemMeta {
+            address: addr(0xaa),
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            collection_address: Some(addr(0xbb)),
+            owner_address: Some(addr(0xcc)),
+            content: json!({"uri": "https://example.test/item.json"}),
+            index: "7".to_owned(),
+            init: true,
+            last_transaction_lt: 4,
+        };
+        let dns = DnsRecordMeta {
+            nft_item_address: item.address,
+            nft_item_owner: item.owner_address,
+            domain: "example.ton".to_owned(),
+            next_resolver: Some(addr(0x11)),
+            wallet: Some(addr(0x22)),
+            site_adnl: Some(Hash256([0x33; 32])),
+            storage_bag_id: Some(Hash256([0x44; 32])),
+        };
+        let info = LocalnetAddressInfo {
+            address: item.address,
+            code_hash: Some(item.code_hash),
+            dns: Some(dns),
+            jetton_wallet: None,
+            jetton_master: None,
+            nft_item: Some(item),
+            nft_collection: None,
+        };
+
+        let mapped = map_token_data(&info, None).expect("DNS NFT data must map");
+
+        assert_eq!(
+            serde_json::to_value(mapped).unwrap(),
+            json!({
+                "@type": "ext.tokens.nftItemData",
+                "address": addr(0xaa).to_string(),
+                "contract_type": "nft_item",
+                "init": true,
+                "index": "7",
+                "collection_address": addr(0xbb).to_string(),
+                "owner_address": addr(0xcc).to_string(),
+                "content": {
+                    "domain": "example.ton",
+                    "data": {
+                        "dns_next_resolver": {
+                            "@type": "dns_next_resolver",
+                            "resolver": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": Hash256([0x11; 32]).to_hex(),
+                            },
+                        },
+                        "wallet": {
+                            "@type": "dns_smc_address",
+                            "smc_addr": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": Hash256([0x22; 32]).to_hex(),
+                            },
+                        },
+                        "site": {
+                            "@type": "dns_adnl_address",
+                            "adnl_addr": Hash256([0x33; 32]).to_hex(),
+                        },
+                        "storage": {
+                            "@type": "dns_storage_address",
+                            "bag_id": Hash256([0x44; 32]).to_hex(),
+                        },
+                    },
+                },
+            })
+        );
+    }
 }

@@ -1,0 +1,10 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/remote_cache_block.test.tolk (1 test)
+  ✓ persistent fork block cache [TIME]
+
+ ✓ 1 passed in 1 file

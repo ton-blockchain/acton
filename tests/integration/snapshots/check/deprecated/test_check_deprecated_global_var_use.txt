@@ -1,4 +1,4 @@
-warning[E004]: usage of deprecated symbol
+warning[E003]: usage of deprecated symbol
   --> [ROOT]/contracts/main[LINE]
   |
 6 |                 foo;
@@ -8,4 +8,4 @@ warning[E004]: usage of deprecated symbol
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E004
+For example: acton check --explain E003

@@ -1,6 +1,6 @@
 use crate::modules::release::{
-    ACTON_TOML_PATH, CARGO_LOCK_PATH, CARGO_TOML_PATH, DEFAULT_BRANCH_NAME, GITHUB_REPOSITORY_URL,
-    PACKAGE_JSON_PATH, ReleaseContext, check_current_branch_is_master,
+    ACTON_TOML_PATH, CARGO_LOCK_PATH, CARGO_TOML_PATH, DEFAULT_BRANCH_NAME, DOCS_VERSIONS_PATH,
+    GITHUB_REPOSITORY_URL, PACKAGE_JSON_PATH, ReleaseContext, check_current_branch_is_master,
     check_local_master_matches_remote, check_master_github_build_succeeded,
     check_no_uncommitted_changes, check_release_tag_does_not_exist, check_release_version_format,
     confirm_expected_yes, create_release_tag, push_release_commit_and_tag,
@@ -128,6 +128,7 @@ fn bump_versions_from_tag(context: &ReleaseContext) -> Result<()> {
     update_toml_file(CARGO_TOML_PATH, |document| {
         document["workspace"]["package"]["version"] = toml_edit::value(&context.version);
     })?;
+    update_docs_versions_file(&context.version)?;
     run_cargo_lock_update()?;
 
     Ok(())
@@ -138,6 +139,7 @@ fn create_version_bump_commit(context: &ReleaseContext) -> Result<()> {
         ACTON_TOML_PATH,
         CARGO_TOML_PATH,
         CARGO_LOCK_PATH,
+        DOCS_VERSIONS_PATH,
         PACKAGE_JSON_PATH,
     ];
 
@@ -176,6 +178,16 @@ fn update_toml_file(path: &str, update: impl FnOnce(&mut toml_edit::DocumentMut)
     update(&mut document);
 
     fs::write(path, document.to_string()).with_context(|| format!("failed to write {path}"))
+}
+
+fn update_docs_versions_file(version: &str) -> Result<()> {
+    let contents = docs_versions_file_contents(version);
+    fs::write(DOCS_VERSIONS_PATH, contents)
+        .with_context(|| format!("failed to write {DOCS_VERSIONS_PATH}"))
+}
+
+fn docs_versions_file_contents(version: &str) -> String {
+    format!("acton_version={version}\n")
 }
 
 fn run_yq_update(path: &str, field: &str, version: &str) -> Result<()> {

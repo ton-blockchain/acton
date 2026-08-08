@@ -9,9 +9,9 @@ use std::str::FromStr;
 use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions;
 use tasm_core::types::{ArgValue, Code, Instruction};
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
+use tolk_source_map::SourceLocation;
 use ton_api::{Network, TonApiClient};
-use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
@@ -42,6 +42,10 @@ pub fn disasm_cmd(
     let mut resolved_network = network.clone();
 
     let boc_data = if let Some(string) = boc_string {
+        if string.trim().is_empty() {
+            anyhow::bail!("{} cannot be empty", "--string".yellow());
+        }
+
         string
     } else if let Some(path) = boc_file {
         if !fs::exists(&path).unwrap_or(false) {
@@ -65,6 +69,10 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
+        if addr.trim().is_empty() {
+            anyhow::bail!("{} cannot be empty", "--address".yellow());
+        }
+
         let fetched = remote::fetch_contract_boc(network, &addr)?;
         resolved_network = Some(fetched.network);
         fetched.boc
@@ -237,14 +245,14 @@ impl DisasmSourceBlockBuilder {
 }
 
 struct DisasmBlockCollector<'a> {
-    source_map: &'a TolkSourceMap,
+    source_map: &'a SourceMap,
     block_indexes: HashMap<SourceLocationKey, usize>,
     blocks: Vec<DisasmSourceBlockBuilder>,
     current_line: usize,
 }
 
 impl<'a> DisasmBlockCollector<'a> {
-    fn new(source_map: &'a TolkSourceMap) -> Self {
+    fn new(source_map: &'a SourceMap) -> Self {
         Self {
             source_map,
             block_indexes: HashMap::new(),
@@ -285,7 +293,7 @@ impl<'a> DisasmBlockCollector<'a> {
                 }
             }
             Instruction::Ref(instr) => self.collect_arg(&instr.code, location.as_ref()),
-            Instruction::ExoticCell(_) => {}
+            Instruction::ExoticCell(_) | Instruction::Slice(_) => {}
         }
     }
 
@@ -371,7 +379,7 @@ fn write_output_file(output_path: &str, output: &str) -> anyhow::Result<()> {
 }
 
 fn instruction_source_location(
-    source_map: &TolkSourceMap,
+    source_map: &SourceMap,
     instruction: &Instruction,
     offset: Option<u16>,
 ) -> Option<SourceLocation> {
@@ -386,11 +394,14 @@ fn instruction_source_location(
         Instruction::ExoticCell(instr) => {
             cell_source_location(source_map, instr.source_cell.as_ref(), offset)
         }
+        Instruction::Slice(instr) => {
+            cell_source_location(source_map, instr.source_cell.as_ref(), offset)
+        }
     }
 }
 
 fn cell_source_location(
-    source_map: &TolkSourceMap,
+    source_map: &SourceMap,
     cell: Option<&Cell>,
     offset: u16,
 ) -> Option<SourceLocation> {
@@ -400,7 +411,7 @@ fn cell_source_location(
 }
 
 fn first_instruction_location(
-    source_map: &TolkSourceMap,
+    source_map: &SourceMap,
     instructions: &[Instruction],
     offsets: Option<&[u16]>,
 ) -> Option<SourceLocation> {
@@ -426,6 +437,6 @@ fn extract_library_hash_from_instruction(instruction: &Instruction) -> Option<Ha
 
             None
         }
-        Instruction::Plain(_) | Instruction::Ref(_) => None,
+        Instruction::Plain(_) | Instruction::Ref(_) | Instruction::Slice(_) => None,
     }
 }

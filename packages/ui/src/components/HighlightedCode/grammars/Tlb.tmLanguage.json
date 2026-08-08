@@ -1,0 +1,206 @@
+{
+  "name": "tl-b",
+  "displayName": "TL-B",
+  "scopeName": "source.tlb",
+  "fileTypes": ["tlb"],
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#constructors"
+    },
+    {
+      "include": "#typeDefinitions"
+    },
+    {
+      "include": "#typeParameters"
+    },
+    {
+      "include": "#fields"
+    },
+    {
+      "include": "#hashExpressions"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#primitiveTypes"
+    },
+    {
+      "include": "#arrays"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#declarations"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.tlb",
+          "begin": "//",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.line.double-slash.tlb"
+            }
+          },
+          "end": "$"
+        },
+        {
+          "name": "comment.block.tlb",
+          "begin": "\\s*/\\*",
+          "beginCaptures": {
+            "0": {
+              "name": "comment.block.begin.tlb punctuation.definition.comment.begin.tlb"
+            }
+          },
+          "end": "\\*/",
+          "endCaptures": {
+            "0": {
+              "name": "comment.block.end.tlb punctuation.definition.comment.end.tlb"
+            }
+          }
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(\\$[01_]+|#[0-9a-fA-F_]*)",
+          "captures": {
+            "1": {"name": "entity.name.type.constructor.tlb"},
+            "2": {"name": "constant.numeric.constructor-tag.tlb"}
+          }
+        }
+      ]
+    },
+    "typeParameters": {
+      "patterns": [
+        {
+          "match": "\\{([A-Z][a-zA-Z0-9]*):Type\\}",
+          "captures": {
+            "1": {"name": "support.type.parameter.tlb"}
+          }
+        },
+        {
+          "match": "\\{([a-z][a-zA-Z0-9]*):([^}]+)\\}",
+          "captures": {
+            "1": {"name": "variable.parameter.tlb"},
+            "2": {"name": "support.type.parameter.tlb"}
+          }
+        }
+      ]
+    },
+    "fields": {
+      "patterns": [
+        {
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)",
+          "captures": {
+            "1": {"name": "variable.other.property.tlb"},
+            "2": {"name": "keyword.operator.colon.tlb"}
+          }
+        },
+        {
+          "match": "\\^\\s*\\(([^)]+)\\)",
+          "captures": {
+            "1": {"patterns": [{"include": "#expressions"}]},
+            "0": {"name": "keyword.operator.reference.tlb"}
+          }
+        }
+      ]
+    },
+    "hashExpressions": {
+      "patterns": [
+        {
+          "match": "(##)\\s*\\(([^)]+)\\)",
+          "captures": {
+            "1": {"name": "entity.name.function.macro.tlb"},
+            "2": {"patterns": [{"include": "#expressions"}]}
+          }
+        },
+        {
+          "match": "(##|~)",
+          "name": "entity.name.function.macro.tlb"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(\\+|\\-|\\*|\\|<=|>=|!=|=|<|>|\\^|~|\\?)",
+          "name": "keyword.operator.tlb"
+        }
+      ]
+    },
+    "primitiveTypes": {
+      "patterns": [
+        {
+          "match": "\\b((u)?int\\d+|Type|Bit|Maybe)\\b",
+          "name": "support.type.primitive.tlb"
+        }
+      ]
+    },
+    "arrays": {
+      "patterns": [
+        {
+          "begin": "\\[",
+          "end": "\\]",
+          "patterns": [{"include": "#expressions"}],
+          "name": "meta.array.tlb"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b\\d+\\b",
+          "name": "constant.numeric.decimal.tlb"
+        },
+        {
+          "match": "\\b0x[0-9a-fA-F]+\\b",
+          "name": "constant.numeric.hex.tlb"
+        }
+      ]
+    },
+    "expressions": {
+      "patterns": [
+        {"include": "#hashExpressions"},
+        {"include": "#operators"},
+        {"include": "#primitiveTypes"},
+        {"include": "#arrays"},
+        {"include": "#numbers"},
+        {
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+          "name": "variable.other.tlb"
+        }
+      ]
+    },
+    "typeDefinitions": {
+      "patterns": [
+        {
+          "match": "=\\s*([A-Z][a-zA-Z0-9]*)(?:\\s+([a-zA-Z0-9_\\s]+))?\\s*(?:X)?\\s*;",
+          "captures": {
+            "1": {"name": "entity.name.class.tlb"},
+            "2": {"patterns": [{"include": "#expressions"}]}
+          }
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)#([0-9a-fA-F]+)",
+          "captures": {
+            "1": {"name": "entity.name.type.tlb"},
+            "2": {"name": "constant.numeric.hex.tlb"}
+          }
+        }
+      ]
+    }
+  }
+}

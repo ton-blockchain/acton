@@ -1,7 +1,7 @@
 use crate::integration::check::run_rule_test;
 use function_name::named;
 
-const RULE_CODE: &str = "E032";
+const RULE_CODE: &str = "E026";
 
 fn run_simple_test(content: &str, name: &str) {
     run_rule_test("unused_expression", RULE_CODE, content, name);

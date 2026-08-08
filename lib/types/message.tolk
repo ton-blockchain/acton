@@ -10,14 +10,14 @@
 /// if (action != null) {
 ///     val msg = action.loadMessage<Transfer>();
 ///     val body = msg.loadBody();
-///     println("Transfer amount: {:ton}", body.amount);
-/// }
+///     println("Transfer amount: {:gram}", body.amount);
 ///
-/// // Parsing a generic message to check opcode
-/// val genericMsg = action.loadGenericMessage();
-/// val opcode = genericMsg.loadOpcode();
-/// if (opcode == 0x12345678) {
-///     // handle specific opcode...
+///     // Parsing a generic message to check opcode
+///     val genericMsg = action.loadGenericMessage();
+///     val opcode = genericMsg.loadOpcode();
+///     if (opcode == 0x12345678) {
+///         // handle specific opcode...
+///     }
 /// }
 /// ```
 
@@ -183,9 +183,9 @@ struct (0b11) TlbExtMsgInfoRelaxed {
     createdAt: uint32
 }
 
-/// Represents a currency collection as TON amount + extra currencies.
+/// Represents a currency collection as GRAM amount + extra currencies.
 struct TlbCurrencyCollection {
-    /// Amount in nanoton.
+    /// Amount in nanograms.
     grams: coins
     /// Extra currencies.
     other: map<int32, varuint32>

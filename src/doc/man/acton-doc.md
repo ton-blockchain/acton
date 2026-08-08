@@ -2,7 +2,7 @@
 
 ## Name
 
-acton-doc --- Look up built-in reference documentation from the CLI
+acton-doc --- Look up reference documentation and contract ABIs from the CLI
 
 ## Synopsis
 
@@ -10,12 +10,43 @@ acton-doc --- Look up built-in reference documentation from the CLI
 
 ## Description
 
-Look up built-in reference documentation from the terminal.
+Look up reference documentation from the terminal.
 
-At the moment, `acton doc` provides TVM instruction lookup through the `tvm`
-subcommand.
+`acton doc` provides contract ABI lookup through the `abi` subcommand and TVM
+instruction lookup through the `tvm` subcommand.
 
 ## Subcommands
+
+### acton doc abi
+
+Print compiler ABI JSON for a local or bundled contract name, or for a code hash
+registered in the Acton verifier.
+
+#### Synopsis
+
+`acton doc abi` _contract-or-code-hash_
+
+#### Options
+
+{{#options command="acton doc abi"}}
+
+{{#option "_contract-or-code-hash_" }}
+Local or bundled contract name, local contract id, or verifier code hash.
+{{/option}}
+
+{{/options}}
+
+#### Behavior
+
+`acton doc abi` first looks at local contracts from `Acton.toml`, then falls
+back to the bundled ABI catalog. If the argument is a 64-character hexadecimal
+code hash, optionally prefixed with `0x`, Acton queries the verifier.
+
+- local lookup accepts the contract id, display name, or ABI contract name
+- bundled catalog lookup accepts the catalog display name or ABI contract name
+- verifier lookup uses the same 24-hour project cache as `acton rpc`
+- an expired verifier cache entry remains available during verifier outages
+- output is always formatted compiler ABI JSON
 
 ### acton doc tvm
 
@@ -27,7 +58,7 @@ Lookup TVM instructions by exact name or fuzzy search query.
 
 #### Options
 
-{{#options}}
+{{#options command="acton doc tvm"}}
 
 {{#option "_instruction_..." }}
 Instruction names or search queries.
@@ -70,10 +101,10 @@ With `--find`, each argument is treated as a search query.
 
 Currently available documentation namespaces:
 
+- `abi`
 - `tvm`
 
-Additional namespaces may be added in future releases; `acton doc tvm` is the
-current built-in reference surface.
+Additional namespaces may be added in future releases.
 
 ## Exit Status
 
@@ -115,6 +146,13 @@ current built-in reference surface.
    ```bash
    acton doc tvm SENDRAWMSG
    acton doc tvm SENRAWMSG --find
+   ```
+
+5. Print contract ABI:
+
+   ```bash
+   acton doc abi WalletV4r2
+   acton doc abi counter
    ```
 
 ## See Also

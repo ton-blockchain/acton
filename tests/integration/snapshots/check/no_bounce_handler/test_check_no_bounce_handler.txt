@@ -1,4 +1,4 @@
-warning[E008]: contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist
+warning[E007]: contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val reply = createMessage({
@@ -10,4 +10,4 @@ warning[E008]: contract sends a message that may bounce but `onBouncedMessage` h
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E008
+For example: acton check --explain E007

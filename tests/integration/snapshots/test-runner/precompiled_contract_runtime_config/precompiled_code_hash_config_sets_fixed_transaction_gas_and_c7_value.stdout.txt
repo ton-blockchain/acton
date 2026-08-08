@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/precompiled_runtime.test.tolk (1 test)
+  ✓ precompiled fixed gas and c7 [TIME]
+
+ ✓ 1 passed in 1 file

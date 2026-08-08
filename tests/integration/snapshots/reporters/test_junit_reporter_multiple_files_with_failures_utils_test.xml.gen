@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="test-results" tests="2" failures="1" errors="0">
+    <testsuite name="utils.test.tolk" tests="2" disabled="0" errors="0" failures="1" timestamp="[DATE]" [TIME]>
+        <properties>
+            <property name="file.path" value="[ROOT]/tests/utils.test.tolk"/>
+        </properties>
+        <testcase name="test pow2 basic" classname="utils.test.tolk" [TIME]>
+        </testcase>
+        <testcase name="test pow2 edge" classname="utils.test.tolk" [TIME]>
+            <failure message="expect(&lt;actual&gt;).toEqual(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/utils.test[LINE]
+expect(actual).toEqual(expected)
+(
+    1,
+    2
+)
+at tests/utils.test[LINE]</failure>
+        </testcase>
+    </testsuite>
+</testsuites>

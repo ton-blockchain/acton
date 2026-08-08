@@ -1,5 +1,11 @@
 * text=auto eol=lf
 
+# e2e tests
+crates/**/e2e/__image_snapshots__/*.png filter=lfs diff=lfs merge=lfs -text
+packages/ui-e2e/e2e/__image_snapshots__/**/*.png filter=lfs diff=lfs merge=lfs -text
+
+docs/**/*.png filter=lfs diff=lfs merge=lfs -text
+
 # Generated schema
 crates/acton-config/schemas/*.json linguist-generated=true text=auto eol=lf
 
@@ -8,9 +14,10 @@ docs linguist-documentation
 
 # Generated CLI command docs from `acton docgen`
 docs/content/docs/commands/*.mdx linguist-generated text=auto eol=lf
-docs/content/docs/standard_library/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/rules/*.mdx linguist-generated text=auto eol=lf
 docs/content/docs/standard_library/**/*.mdx linguist-generated text=auto eol=lf
-docs/content/docs/tolk_standard_library/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/standard_library/*.mdx linguist-generated text=auto eol=lf
 docs/content/docs/tolk_standard_library/**/*.mdx linguist-generated text=auto eol=lf
+docs/content/docs/tolk_standard_library/*.mdx linguist-generated text=auto eol=lf
 src/doc/man/generated_txt/*.txt linguist-generated text=auto eol=lf
 src/etc/man/*.1 linguist-generated text=auto eol=lf

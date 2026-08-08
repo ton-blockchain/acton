@@ -11,9 +11,9 @@ fun main() {
     val res = minter.sendClaimMinterAdmin(
         claimer.address,
         0,
-        { bounce: false, value: ton("0.05") },
+        { bounce: false, value: grams("0.05") },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     println("JETTON CLAIM_SENDER={}", claimer.address);
     printJettonMinterInfo(minter, "JETTON");

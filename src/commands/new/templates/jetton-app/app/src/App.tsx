@@ -12,7 +12,6 @@ import {
 import { DeployPage } from './pages/DeployPage';
 import { ManagePage } from './pages/ManagePage';
 import { useRouter } from './lib/router';
-import './styles.css';
 
 type Theme = 'dark' | 'light';
 
@@ -23,7 +22,7 @@ const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-export function App() {
+export default function App() {
   const { page, network, address, go, setTestnet, setAddress } = useRouter();
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('jm-theme');

@@ -14,7 +14,8 @@ Print a diagnostic report for the current Acton environment.
 
 The report is intended to help debug project resolution, manifest parsing,
 wallet and library overlays, bundled standard-library state, native emulator
-and Tolk library metadata, logging paths, and relevant environment variables.
+and Tolk library metadata, logging paths, relevant environment variables, and
+API reachability from the current machine.
 
 ## Display Options
 
@@ -37,7 +38,13 @@ and Tolk library metadata, logging paths, and relevant environment variables.
 - native emulator/Tolk version metadata, including the TON commit hash and date
   embedded in the linked libraries
 - resolved logging directory and debug log path
-- selected environment variables such as `HOME`, `SHELL`, and `NO_COLOR`
+- selected environment variables such as `HOME`, `SHELL`, `NO_COLOR`, and
+  `ACTON_DISABLE_AUTO_STDLIB`
+- `ACTON_USE_PROXY`, which opts Acton CLI HTTP clients into `HTTP_PROXY`,
+  `HTTPS_PROXY`, `ALL_PROXY`, and system proxy settings. Acton ignores those
+  proxy settings by default to avoid macOS sandbox proxy autodetection crashes.
+- API reachability checks for the default TON API backends and verifier backend
+  config endpoint.
 
 ## Path And Overlay Checks
 
@@ -59,6 +66,24 @@ The stdlib section reports whether `.acton/tolk-stdlib` is:
 - `healthy`
 - `outdated`
 - `unknown-version`
+
+## API Reachability
+
+After the local environment report, `acton doctor` probes the default remote
+services Acton commonly uses:
+
+- TonCenter v2 and v3 for mainnet and testnet
+- TonHub v4 for mainnet and testnet
+- DTON GraphQL
+- the verifier backend configuration file
+
+The command prints a healthy/total count and per-endpoint status. These checks
+use short timeouts and are diagnostic only: failed API probes are reported in
+the output but do not by themselves make `acton doctor` exit with status `1`.
+
+Set `DTON_API_KEY` to use your own DTON key. For controlled environments,
+`ACTON_DOCTOR_API_TARGETS_JSON` can replace the default probe list with a JSON
+array of targets.
 
 ## Exit Status
 

@@ -1,37 +1,35 @@
 ---
-title: "Gas Profiling with Snapshots"
-description: "Learn how to profile gas and fees of transaction chains with --snapshot and baseline comparison"
+title: "Gas profiling and snapshots"
+description: "Profile gas hot paths, inspect flamegraphs in Test UI, and compare gas snapshots in CI"
 ---
 
-Gas profiling helps you track performance regressions in tests by measuring gas and fee metrics for opcodes and full transaction chains.
+Gas profiling records gas and fee metrics for message opcodes and transaction chains. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs. For source-level hot paths, Acton can also write gas-weighted execution profiles with `--gas-profile` and render them in Test UI.
 
 ## What gets profiled
 
-When profiling is enabled, Acton prints:
+Snapshot profiling tracks aggregate gas and fee metrics:
 
-- **Opcode gas table** (min/max/avg per opcode or message opcode name)
-- **Chain gas & fees summary** (per test)
-- **Chain gas & fees details** (per trace inside each test)
+- Opcode gas usage table: min, max, and avg gas per opcode or message opcode name.
+- Per test gas and fees summary.
+- Per trace gas and fees details inside each test.
 
-For chain-level metrics, Acton tracks:
+For chain-level metrics, Acton tracks: transaction count, gas used, gas fee, forward fee, and the total fee.
 
-- transaction count
-- gas used
-- gas fee
-- forward fee
-- total fee
+Source-level execution profiles track sampled VM execution stacks and weight each sample by gas delta. They answer questions such as "which function inside this contract consumed gas?" instead of only "which trace consumed gas?"
 
-## Quick Start
+Profiling artifacts are collected after the selected tests pass. If any selected test fails, Acton skips snapshot writing, comparison tables, and gas profile files for that run.
 
-### 1. Create a baseline snapshot
+## Quick start
+
+### Create a baseline snapshot
 
 ```bash
 acton test --snapshot gas-baseline.json
 ```
 
-This runs tests and saves a JSON snapshot with opcode and trace-chain stats.
+This runs tests and writes a JSON snapshot of opcode and trace-chain statistics:
 
-```text
+```acton-gas-report noCopy title="terminal"
  GAS USAGE
 
 ───────────────────────────────────────────────
@@ -46,12 +44,12 @@ This runs tests and saves a JSON snapshot with opcode and trace-chain stats.
 ──────────────────────────────────────────────────────────────────────────────────────────────────
  Test                    Traces   Tx   Gas Used   Gas Fee         Forward Fee       Total Fee
 ──────────────────────────────────────────────────────────────────────────────────────────────────
- test increase counter        4    4       2789   0.0011156 TON   0.002000284 TON   0.0011156 TON
- test reset counter           5    5       4138   0.0016552 TON   0.002266953 TON   0.0016552 TON
- test unknown message         5    5       2568   0.0010272 TON   0.002266953 TON   0.0010272 TON
+ test increase counter        4    4       2789   0.0011156 GRAM   0.002000284 GRAM   0.0011156 GRAM
+ test reset counter           5    5       4138   0.0016552 GRAM   0.002266953 GRAM   0.0016552 GRAM
+ test unknown message         5    5       2568   0.0010272 GRAM   0.002266953 GRAM   0.0010272 GRAM
 ```
 
-### 2. Compare current run with baseline
+### Compare current run with baseline
 
 ```bash
 acton test --baseline-snapshot gas-baseline.json
@@ -59,7 +57,7 @@ acton test --baseline-snapshot gas-baseline.json
 
 This prints comparison tables with diffs for opcode gas and chain metrics.
 
-```text
+```acton-gas-report noCopy title="terminal"
  GAS USAGE COMPARISON
 
 Baseline: gas-baseline.json (3 opcodes, captured 2026-02-28 14:49:39 UTC)
@@ -78,36 +76,81 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
 ──────────────────────────────────────────────────────────────────────────────────
  Test                    Traces   Tx   Gas Used   Gas Fee          Total Fee
 ──────────────────────────────────────────────────────────────────────────────────
- test increase counter        4    4       2789    0.0011156 TON    0.0011156 TON
-                              4    4       2651    0.0010604 TON    0.0010604 TON
-                                           -138   -0.0000552 TON   -0.0000552 TON
- test reset counter           5    5       4138    0.0016552 TON    0.0016552 TON
-                              5    5       4000       0.0016 TON       0.0016 TON
-                                           -138   -0.0000552 TON   -0.0000552 TON
- test unknown message         5    5       2568    0.0010272 TON    0.0010272 TON
+ test increase counter        4    4       2789    0.0011156 GRAM    0.0011156 GRAM
+                              4    4       2651    0.0010604 GRAM    0.0010604 GRAM
+                                           -138   -0.0000552 GRAM   -0.0000552 GRAM
+ test reset counter           5    5       4138    0.0016552 GRAM    0.0016552 GRAM
+                              5    5       4000       0.0016 GRAM       0.0016 GRAM
+                                           -138   -0.0000552 GRAM   -0.0000552 GRAM
+ test unknown message         5    5       2568    0.0010272 GRAM    0.0010272 GRAM
 ```
 
-```text
+```acton-gas-report noCopy title="terminal"
  CHAIN GAS & FEES · test increase counter
 
 ────────────────────────────────────────────────────────────────────────────────────────────
  Trace             Tx Count   Gas Used   Gas Fee          Fwd Fee            Total Fee
 ────────────────────────────────────────────────────────────────────────────────────────────
- Trace 1                  1        309    0.0001236 TON    0.000539205 TON    0.0001236 TON
- Trace 2                  1        309    0.0001236 TON    0.000547738 TON    0.0001236 TON
- Trace 3                  1        635     0.000254 TON    0.000646672 TON     0.000254 TON
-                          1        635     0.000254 TON    0.000629605 TON     0.000254 TON
-                                                          -0.000017067 TON
- increase counter         1       1536    0.0006144 TON    0.000266669 TON    0.0006144 TON
-                          1       1398    0.0005592 TON    0.000266669 TON    0.0005592 TON
-                                  -138   -0.0000552 TON                      -0.0000552 TON
+ Trace 1                  1        309    0.0001236 GRAM    0.000539205 GRAM    0.0001236 GRAM
+ Trace 2                  1        309    0.0001236 GRAM    0.000547738 GRAM    0.0001236 GRAM
+ Trace 3                  1        635     0.000254 GRAM    0.000646672 GRAM     0.000254 GRAM
+                          1        635     0.000254 GRAM    0.000629605 GRAM     0.000254 GRAM
+                                                          -0.000017067 GRAM
+ increase counter         1       1536    0.0006144 GRAM    0.000266669 GRAM    0.0006144 GRAM
+                          1       1398    0.0005592 GRAM    0.000266669 GRAM    0.0005592 GRAM
+                                  -138   -0.0000552 GRAM                      -0.0000552 GRAM
 ```
 
-<Callout type="tip" title="How to read row groups">
+<Callout type="idea" title="How to read row groups">
   In comparison tables, changed chains are shown as baseline row, current row, and diff row.
 </Callout>
 
-### 2.1 Fail CI on drift
+### Write a source-level execution profile
+
+```bash
+acton test --gas-profile build/gas.cpuprofile
+```
+
+This writes a Chrome DevTools-compatible `.cpuprofile` where sample weights are
+gas deltas rather than elapsed time. For flamegraph-style tooling, use folded
+stacks:
+
+```bash
+acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+```
+
+Execution profiles record contract message transactions by default. Add
+`--gas-profile-include-tests` if you also need `.test.tolk` unit-test get-method
+execution in the profile. This is useful when the expensive work is called
+directly from a unit test:
+
+```tolk
+get fun `test heavy job`() {
+    var x = X.create();
+    x.heavyJob();
+}
+```
+
+### Inspect profiles in Test UI
+
+Run the UI together with a gas profile:
+
+```bash
+acton test --gas-profile build/gas.cpuprofile --ui
+```
+
+Test UI adds a top-level `Profile` tab when a gas profile is available. The
+profile is grouped by contract, and each contract view shows a flamegraph plus
+details for the selected frame: source location, total gas, self gas, and share
+inside the contract.
+
+When `--gas-profile-include-tests` is enabled, tests with recorded unit
+execution also get a `Profile` tab next to `Info`, `Transactions`, and `Logs`.
+That per-test view hides Acton runtime frames from `@acton`/`.acton` paths so
+the test hot path stays focused on user code. Exported `cpuprofile` and
+`collapsed` files remain complete and unfiltered.
+
+### Fail CI on drift
 
 Use strict mode to return non-zero exit code when baseline and current profile differ:
 
@@ -115,14 +158,14 @@ Use strict mode to return non-zero exit code when baseline and current profile d
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 ```
 
-You can also enable it by default in `Acton.toml`:
+To enable it by default, set the `fail-on-diff` to `true` in the `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 fail-on-diff = true
 ```
 
-### 3. Update baseline intentionally
+### Update the baseline on purpose
 
 If changes are expected, recreate baseline:
 
@@ -131,10 +174,10 @@ acton test --snapshot gas-baseline.json
 ```
 
 <Callout type="info" title="Compare mode does not overwrite snapshot">
-If you pass both `--snapshot` and `--baseline-snapshot`, Acton runs in compare mode and does not rewrite the snapshot file.
+  With both `--snapshot` and `--baseline-snapshot`, Acton runs in compare mode and does not rewrite the snapshot file.
 </Callout>
 
-## Naming trace chains for readable reports
+## Name trace chains for readable reports
 
 Chain reports are much easier to read when traces have explicit names.
 
@@ -153,37 +196,31 @@ get fun `test transfer flow`() {
 
 Without custom names, traces are shown as `Trace 1`, `Trace 2`, and so on.
 
-## How snapshot matching works
+## How baseline matching works
 
-Baseline comparison is key-based rather than fuzzy.
+Baseline comparison is key-based rather than fuzzy. Opcode rows are keyed by the resolved opcode label.
 
-- Opcode rows are keyed by the resolved opcode label.
-- If ABI metadata resolves the opcode, the key is the message name such as
-  `IncreaseCounter`.
-- Otherwise the key falls back to the raw hex opcode such as `0x00000999`.
+If ABI metadata resolves the opcode, the key is the message name such as `IncreaseCounter`. Otherwise, the key falls back to the raw hex opcode such as `0x00000999`.
 
 Trace-chain rows are keyed by a stable internal snapshot key:
 
-```text
+```text noCopy
 <test-name>::trace#<1-based trace index>
 ```
 
-That key comes from the test name plus the 1-based position of the trace in
-that test's execution order. `trace_name` is stored only for display. Renaming a
-trace with `giveName(...)` makes reports easier to read, but it does not change
-how baseline matching works.
+That key comes from the test name plus the 1-based position of the trace in that test's execution order. `trace_name` is stored only for display. Renaming a trace with `giveName(...)` makes reports easier to read, but it does not change how baseline matching works.
 
-## Reading comparison output
+## Read comparison output
 
 In baseline comparison mode:
 
-- New opcodes/traces are shown as `NEW`
+- New opcodes and traces are shown as `NEW`
 - Higher usage is highlighted as regression
 - Lower usage is highlighted as improvement
 - Unchanged rows are dimmed
 
-<Callout type="tip" title="Stabilize test data first">
-For meaningful diffs, keep tests deterministic: fixed inputs, stable send order, and no random/time-dependent behavior unless explicitly controlled.
+<Callout type="idea" title="Stabilize test data first">
+  For meaningful diffs, keep tests deterministic: use fixed inputs, stable send order, and no random or time-dependent behavior unless controlled explicitly.
 </Callout>
 
 ## Snapshot file format
@@ -217,49 +254,41 @@ Gas snapshot is stored as JSON with this high-level structure:
 
 ```
 
-## Useful flags to combine with profiling
+## Flags that pair well with profiling
 
 ```bash
 # Profile only selected tests
 acton test --filter "transfer.*" --snapshot gas-baseline.json
 
-# Profile one suite/file
-acton test tests/wallet.test.tolk --baseline-snapshot gas-baseline.json
+# Profile one or more suites/files
+acton test tests/wallet.test.tolk tests/jetton --baseline-snapshot gas-baseline.json
 ```
 
 ## Troubleshooting
 
-### Baseline file is missing or invalid
-
-Default behavior: Acton prints a warning and continues without baseline comparison.
-
-With strict mode (`--fail-on-diff` or `[test].fail-on-diff = true`), Acton exits with error.
-
-### Snapshot is not created
+### Snapshot file was not created
 
 Snapshot is written only when:
 
-- `--snapshot` is set
-- `--baseline-snapshot` is **not** set
-- profiling collected at least one opcode or trace-chain metric
+- `--snapshot` is set;
+- `--baseline-snapshot` is **not** set;
+- selected tests passed;
+- profiling collected at least one opcode or trace-chain metric.
 
 ### Trace names changed but diff mapping is still stable
 
-Trace comparison is matched by stable snapshot key (`<test-name>::trace#<index>`), while `trace_name` is used for display.
+Trace comparison is matched by stable snapshot key, while `trace_name` is used for display: `<test-name>::trace#<index>`.
 
 ### `--fail-on-diff` is stricter than the tables
 
-The comparison tables mainly show aggregated numbers such as averages and fee
-totals. Strict drift detection compares the full snapshot content except for the
-top-level `timestamp`.
+The comparison tables mainly show aggregated numbers such as averages and fee totals. Strict drift detection compares the full snapshot content except for the top-level `timestamp`.
 
 That means `--fail-on-diff` treats these as real drift:
 
 - opcode sample-count changes
-- `min_gas` / `max_gas` / `avg_gas` changes
+- `min_gas`, `max_gas`, or `avg_gas` changes
 - differences in per-opcode `all_values`
 - per-trace `tx_count` or fee changes
 - changed `trace_name` for the same snapshot key
 
-For stable CI baselines, keep both the execution order and the profiled test
-data deterministic.
+For stable CI baselines, keep both the execution order and the profiled test data deterministic.

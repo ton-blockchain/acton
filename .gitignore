@@ -1,7 +1,9 @@
 # Acton project directories
 .acton/
+.studio/
 /objs
 /build
+.test/
 
 # Rust build artifacts
 target/
@@ -21,7 +23,9 @@ docs/out
 **/dist
 **/node_modules
 **/target
+**/.wrangler
 **/.eslintcache
+test-results/
 crates/ton-ls/editors/zed/grammars/*/
 
 # OS files
@@ -29,6 +33,8 @@ crates/ton-ls/editors/zed/grammars/*/
 Thumbs.db
 
 .env
+.worktree/
+apps/actonscan-backend/data/
 
 gen/
 *.mnemonic
@@ -38,4 +44,9 @@ toncenter-*.json
 libraries.toml
 AGENTS.md
 block.tlb
+!packages/localnet-ui/src/explorer/cell-inspector/block.tlb
 debug.entitlements
+.codegraph/
+.playwright-mcp/
+.mcp.json
+crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/

@@ -1,0 +1,25 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/external_api.test.tolk (1 test)
+  ✗ external send result giveName reports external vm [EXIT_STATUS] [TIME]
+    └─ Error: ExternalSendResult.unwrap()
+        ├─ Status: external message was not accepted
+        ├─ Reason: External message not accepted by smart contract
+        ├─ Compute phase failed: Dictionary error
+        ├─ at tests/external_api.test[LINE]
+        │     ExternalSendResult.unwrap                                          at ../lib/emulation/network[LINE]
+        │     ExternalSendResult.giveName                                        at ../lib/emulation/network[LINE]
+        │     test external send result giveName reports external vm [EXIT_STATUS]   at tests/external_api.test[LINE]
+        └─ onExternalMessage backtrace:
+              onExternalMessage   at contracts/external[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

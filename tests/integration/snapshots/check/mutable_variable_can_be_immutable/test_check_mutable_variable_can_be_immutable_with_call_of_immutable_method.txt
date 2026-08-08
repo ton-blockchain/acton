@@ -1,4 +1,4 @@
-warning[E003]: variable can be immutable
+warning[E002]: variable can be immutable
   --> [ROOT]/contracts/main[LINE]
   |
 6 |                 var a = Foo { a: 10 };
@@ -14,4 +14,4 @@ help: use `val` instead
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E003
+For example: acton check --explain E002

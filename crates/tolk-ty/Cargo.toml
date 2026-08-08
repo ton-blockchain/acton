@@ -20,6 +20,7 @@ rustc-hash = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 dunce = { workspace = true }
+expect-test = { workspace = true }
 
 [lints]
 workspace = true

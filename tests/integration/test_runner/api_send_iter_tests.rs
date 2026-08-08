@@ -528,6 +528,78 @@ get fun `test send iter execute till predicate search params`() {
 }
 
 #[test]
+fn send_iter_execute_till_supports_send_mode_predicate_search_param() {
+    run_send_iter_success(
+        "n-lib-api-send-iter-execute-till-send-mode",
+        r#"
+import "../../lib/io"
+
+get fun `test send iter execute till send mode search param`() {
+    val sender = testing.treasury("sender");
+
+    val forwarderInit = ContractState {
+        code: build("forwarder"),
+        data: createEmptyCell(),
+    };
+    val forwarderAddress = AutoDeployAddress { stateInit: forwarderInit }.calculateAddress();
+
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: forwarderInit },
+    }))).toHaveSuccessfulDeploy({ to: forwarderAddress });
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: receiverInit },
+    }))).toHaveSuccessfulDeploy({ to: receiverAddress });
+
+    val iter = testing.createTraceIterationCursor(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest: forwarderAddress,
+        body: TriggerForward {
+            queryId: 78,
+            target: receiverAddress,
+        },
+    }));
+
+    val segment = iter.executeTill<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+        sendMode: fun(mode: uint32): bool {
+            println("executeTill.sendMode={}", mode);
+            return mode == SEND_MODE_PAY_FEES_SEPARATELY;
+        },
+    });
+
+    expect(segment).toHaveLength(2);
+    expect(segment).toHaveSuccessfulTx<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    });
+    expect(segment.findTransaction<Notify>({
+        from: forwarderAddress,
+        to: receiverAddress,
+        sendMode: SEND_MODE_REGULAR,
+    })).toBeNull();
+    expect(iter.isDone()).toBeTrue();
+    expect(net.runGetMethod<int>(receiverAddress, "received")).toEqual(1);
+}
+"#,
+        "send_iter_execute_till_supports_send_mode_predicate_search_param",
+    );
+}
+
+#[test]
 fn send_iter_execute_till_can_stop_on_first_transaction_only() {
     build_send_iter_project("n-lib-api-send-iter-execute-till-first-match")
         .test_file(

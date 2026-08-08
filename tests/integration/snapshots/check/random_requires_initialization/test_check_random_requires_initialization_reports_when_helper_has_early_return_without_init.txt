@@ -1,4 +1,4 @@
-warning[E024]: random generator must be initialized before `random.uint256`/`random.range` call
+warning[E018]: random generator must be initialized before `random.uint256`/`random.range` call
    --> [ROOT]/contracts/main[LINE]
    |
 11 |                 val _value = random.uint256();
@@ -6,7 +6,7 @@ warning[E024]: random generator must be initialized before `random.uint256`/`ran
    |
    = add `random.initialize(...)` or `random.initializeBy(...)` before this call
 
-warning[E024]: random initialization exists, but it is not guaranteed on all execution paths
+warning[E018]: random initialization exists, but it is not guaranteed on all execution paths
   --> [ROOT]/contracts/main[LINE]
   |
 6 |                 random.initializeBy(1);
@@ -14,4 +14,4 @@ warning[E024]: random initialization exists, but it is not guaranteed on all exe
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E024
+For example: acton check --explain E018

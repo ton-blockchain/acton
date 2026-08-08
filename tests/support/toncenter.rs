@@ -1,5 +1,10 @@
 #![allow(dead_code)]
 
+use crate::common::strip_ansi;
+use crate::support::TestOutputExt;
+use crate::support::localnet::LocalnetHandle;
+use crate::support::project::{ActonCommand, Project, ProjectBuilder};
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
@@ -9,12 +14,19 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use ton::ton_core::types::TonAddress;
+use ton_api::toncenter::v2::responses;
+use ton_executor::DEFAULT_CONFIG_DICT;
+use ton_localnet::types::Addr;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::HashBytes;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
 use tycho_types::dict::{Dict, RawDict};
-use tycho_types::models::{IntAddr, StdAddr};
+use tycho_types::models::{
+    Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
+    OwnedMessage, ShardAccount, StateInit, StdAddr,
+};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
@@ -34,6 +46,238 @@ pub(crate) struct CapturedToncenterRequest {
     pub(crate) path: String,
     pub(crate) headers: Vec<(String, String)>,
     pub(crate) body: Vec<u8>,
+}
+
+pub(crate) const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
+
+pub(crate) const TON_CONNECT_WALLETS_CONFIG: &str = r#"[wallets.wallet_v1]
+kind = "v1r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v2]
+kind = "v2r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v3_r1]
+kind = "v3r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v3]
+kind = "v3r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v4_r1]
+kind = "v4r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v4]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v5]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
+
+pub(crate) fn test_std_addr(byte: u8) -> StdAddr {
+    StdAddr::new(0, HashBytes([byte; 32]))
+}
+
+pub(crate) fn same_std_address(left: &str, right: &str) -> bool {
+    Addr::parse(left)
+        .ok()
+        .zip(Addr::parse(right).ok())
+        .is_some_and(|(left, right)| left == right)
+}
+
+pub(crate) fn bounceable_user_friendly_address(address: &str) -> String {
+    Addr::parse(address)
+        .expect("test address must parse")
+        .as_user_friendly()
+}
+
+pub(crate) fn summarize_v2_account_state(state: &responses::AccountStateKind) -> serde_json::Value {
+    match state {
+        responses::AccountStateKind::Raw {
+            code,
+            data,
+            frozen_hash,
+        } => serde_json::json!({
+            "type": "raw.accountState",
+            "code_present": !code.is_empty(),
+            "data_present": !data.is_empty(),
+            "frozen_hash": frozen_hash,
+        }),
+        responses::AccountStateKind::WalletV3 { wallet_id, seqno } => serde_json::json!({
+            "type": "wallet.v3.accountState",
+            "wallet_id": wallet_id,
+            "seqno": seqno,
+        }),
+        responses::AccountStateKind::WalletV4 { wallet_id, seqno } => serde_json::json!({
+            "type": "wallet.v4.accountState",
+            "wallet_id": wallet_id,
+            "seqno": seqno,
+        }),
+        responses::AccountStateKind::WalletHighloadV1 { wallet_id, seqno } => {
+            serde_json::json!({
+                "type": "wallet.highload.v1.accountState",
+                "wallet_id": wallet_id,
+                "seqno": seqno,
+            })
+        }
+        responses::AccountStateKind::WalletHighloadV2 { wallet_id } => serde_json::json!({
+            "type": "wallet.highload.v2.accountState",
+            "wallet_id": wallet_id,
+        }),
+        responses::AccountStateKind::Dns { wallet_id } => serde_json::json!({
+            "type": "dns.accountState",
+            "wallet_id": wallet_id,
+        }),
+        responses::AccountStateKind::RWallet { .. } => {
+            let mut value = serde_json::to_value(state).expect("rwallet state must serialize");
+            value["type"] = value["@type"].take();
+            value
+                .as_object_mut()
+                .expect("state must be an object")
+                .remove("@type");
+            value
+        }
+        responses::AccountStateKind::PChan { .. } => {
+            let mut value = serde_json::to_value(state).expect("pchan state must serialize");
+            value["type"] = value["@type"].take();
+            value
+                .as_object_mut()
+                .expect("state must be an object")
+                .remove("@type");
+            value
+        }
+        responses::AccountStateKind::Uninited { frozen_hash } => serde_json::json!({
+            "type": "uninited.accountState",
+            "frozen_hash": frozen_hash,
+        }),
+    }
+}
+
+pub(crate) fn v2_extra_currencies(
+    currencies: &[responses::ExtraCurrencyBalance],
+) -> std::collections::BTreeMap<i32, String> {
+    currencies
+        .iter()
+        .map(|currency| {
+            let amount = match &currency.amount {
+                ton_api::toncenter::v2::StringOrNumber::String(value) => value.clone(),
+                ton_api::toncenter::v2::StringOrNumber::Number(value) => value.to_string(),
+                ton_api::toncenter::v2::StringOrNumber::Unsigned(value) => value.to_string(),
+            };
+            (currency.id, amount)
+        })
+        .collect()
+}
+
+pub(crate) fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {
+    build_internal_message_boc_with_currency_and_body(
+        source,
+        target,
+        CurrencyCollection::new(value),
+        Cell::empty_cell(),
+    )
+}
+
+pub(crate) fn build_internal_message_boc_with_currency_and_body(
+    source: StdAddr,
+    target: StdAddr,
+    value: CurrencyCollection,
+    body: Cell,
+) -> Vec<u8> {
+    let message = OwnedMessage {
+        info: MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: IntAddr::Std(source),
+            dst: IntAddr::Std(target),
+            value,
+            ihr_fee: Default::default(),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        }),
+        init: None,
+        body: CellSliceParts::from(body),
+        layout: None,
+    };
+
+    BocRepr::encode(message).expect("internal message must encode")
+}
+
+pub(crate) fn active_shard_account_boc64(
+    address: StdAddr,
+    code: Cell,
+    data: Option<Cell>,
+    balance: u128,
+) -> String {
+    let account = Account {
+        address: IntAddr::Std(address),
+        storage_stat: Default::default(),
+        last_trans_lt: 0,
+        balance: CurrencyCollection::new(balance),
+        state: AccountState::Active(StateInit {
+            code: Some(code),
+            data,
+            ..Default::default()
+        }),
+    };
+    let shard_account = ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(account)))
+            .expect("active test account must serialize"),
+        last_trans_hash: HashBytes::ZERO,
+        last_trans_lt: 0,
+    };
+    let mut builder = CellBuilder::new();
+    shard_account
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("test shard account must serialize");
+    Boc::encode_base64(builder.build().expect("test shard account cell must build"))
+}
+
+pub(crate) fn build_text_comment_body(parts: &[&str]) -> Cell {
+    assert!(
+        !parts.is_empty(),
+        "text comment must contain at least one part"
+    );
+
+    let mut next = None;
+    for (index, part) in parts.iter().enumerate().rev() {
+        let mut builder = CellBuilder::new();
+        if index == 0 {
+            builder
+                .store_u32(0)
+                .expect("text comment opcode must store");
+        }
+        let bit_len = u16::try_from(part.len() * 8).expect("text comment part must fit one cell");
+        builder
+            .store_raw(part.as_bytes(), bit_len)
+            .expect("text comment bytes must store");
+        if let Some(next) = next {
+            builder
+                .store_reference(next)
+                .expect("text comment continuation must store");
+        }
+        next = Some(builder.build().expect("text comment cell must build"));
+    }
+
+    next.expect("parts is not empty")
 }
 
 pub(crate) fn spawn_toncenter_v2_mock(
@@ -210,13 +454,14 @@ pub(crate) fn append_custom_network(project_path: &Path, network_name: &str, v2_
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with custom network");
 }
@@ -230,13 +475,14 @@ pub(crate) fn append_custom_network_with_urls(
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.{network_name}]
 api = {{ v2 = "{v2_url}", v3 = "{v3_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with custom network");
 }
@@ -245,28 +491,240 @@ pub(crate) fn append_localnet_network(project_path: &Path, v2_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r#"
 
 [networks.localnet]
 api = {{ v2 = "{v2_url}" }}
 "#
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with localnet network");
 }
 
-pub(crate) fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "stack": [["num", "0x0"]],
-                "exit_code": 0
-            }
-        })
-        .to_string(),
+pub(crate) fn append_localnet_with_base_url(project_path: &Path, base_url: &str) {
+    append_custom_network_with_urls(
+        project_path,
+        "localnet",
+        &format!("{base_url}/api/v2"),
+        &format!("{base_url}/api/v3"),
+    );
+}
+
+pub(crate) fn jetton_v1_action_project(name: &str) -> Project {
+    ProjectBuilder::new(name)
+        .contract_from_boc_with_types(
+            "JettonV1Master",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/JettonV1Master.boc"
+            )
+            .to_vec(),
+            "types/jetton_v1_master.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "JettonV1Wallet",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/JettonV1Wallet.boc"
+            )
+            .to_vec(),
+            "types/jetton_v1_wallet.types.tolk",
+        )
+        .file(
+            "types/jetton_v1_master.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/jetton_v1_master.types.tolk"
+            ),
+        )
+        .file(
+            "types/jetton_v1_wallet.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/jetton_v1_wallet.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/JettonV1Master.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/JettonV1Master.gen.tolk"
+            ),
+        )
+        .file(
+            "wrappers/JettonV1Wallet.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/JettonV1Wallet.gen.tolk"
+            ),
+        )
+        .script_file(
+            "jetton",
+            include_str!("../integration/testdata/toncenter_v3_actions/jetton.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build()
+}
+
+pub(crate) fn with_nft_v1_action_fixtures(project: ProjectBuilder) -> ProjectBuilder {
+    project
+        .contract_from_boc_with_types(
+            "NftV1Collection",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/NftV1Collection.boc"
+            )
+            .to_vec(),
+            "types/nft_v1_collection.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "NftV1Item",
+            include_bytes!("../integration/testdata/toncenter_v3_actions/contracts/NftV1Item.boc")
+                .to_vec(),
+            "types/nft_v1_item.types.tolk",
+        )
+        .file(
+            "types/nft_v1_collection.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/nft_v1_collection.types.tolk"
+            ),
+        )
+        .file(
+            "types/nft_v1_item.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/nft_v1_item.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/NftV1Collection.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/NftV1Collection.gen.tolk"
+            ),
+        )
+        .file(
+            "wrappers/NftV1Item.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/NftV1Item.gen.tolk"
+            ),
+        )
+}
+
+pub(crate) fn nft_v1_action_project(name: &str) -> Project {
+    with_nft_v1_action_fixtures(ProjectBuilder::new(name))
+        .script_file(
+            "nft",
+            include_str!("../integration/testdata/toncenter_v3_actions/nft.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build()
+}
+
+pub(crate) fn run_localnet_action_project(
+    project: &Project,
+    script_path: &str,
+) -> (LocalnetHandle, String) {
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .before_start(ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_with_base_url(project.path(), &node.base_url());
+    let output = project
+        .acton()
+        .script(script_path)
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    (node, output)
+}
+
+pub(crate) fn find_v2_transaction_block(
+    node: &LocalnetHandle,
+    minimum_transactions: usize,
+) -> (u32, responses::BlockTransactions) {
+    let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
+        node.get_json_as("/api/v2/getMasterchainInfo");
+    for seqno in (1..=masterchain.result.last.seqno).rev() {
+        let seqno = u32::try_from(seqno).expect("localnet seqno must fit u32");
+        let response: responses::TonlibResponse<responses::BlockTransactions> =
+            node.get_json_as(&format!(
+                "/api/v2/getBlockTransactions?workchain=0&shard={}&seqno={seqno}&count=10000",
+                i64::MIN
+            ));
+        if response.result.transactions.len() >= minimum_transactions {
+            return (seqno, response.result);
+        }
     }
+    panic!("fixture has no block with {minimum_transactions} transactions");
+}
+
+pub(crate) fn find_v2_internal_message(
+    node: &LocalnetHandle,
+) -> (responses::TransactionExt, responses::MessageStd) {
+    find_v2_internal_message_matching(node, |message| {
+        !message.source.account_address.is_empty()
+            && !message.destination.account_address.is_empty()
+            && message.created_lt.parse::<u64>().is_ok_and(|lt| lt > 0)
+    })
+    .expect("fixture has no internal message")
+}
+
+pub(crate) fn find_v2_internal_message_by_hash(
+    node: &LocalnetHandle,
+    hash: &str,
+) -> (responses::TransactionExt, responses::MessageStd) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(result) =
+            find_v2_internal_message_matching(node, |message| message.hash == hash)
+        {
+            return result;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "fixture has no internal message with hash {hash}"
+        );
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn find_v2_internal_message_matching(
+    node: &LocalnetHandle,
+    mut predicate: impl FnMut(&responses::MessageStd) -> bool,
+) -> Option<(responses::TransactionExt, responses::MessageStd)> {
+    let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
+        node.get_json_as("/api/v2/getMasterchainInfo");
+    for seqno in (1..=masterchain.result.last.seqno).rev() {
+        let response: responses::TonlibResponse<responses::BlockTransactionsExt> = node
+            .get_json_as(&format!(
+                "/api/v2/getBlockTransactionsExt?workchain=0&shard={}&seqno={seqno}&count=10000",
+                i64::MIN
+            ));
+        for transaction in response.result.transactions {
+            let Some(message) = transaction.in_msg.clone() else {
+                continue;
+            };
+            if predicate(&message) {
+                return Some((transaction, message));
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {
+    let cleaned = strip_ansi(output);
+    let value = cleaned
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix(marker))
+        .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"));
+    let address = value.split_once(" (").map_or(value, |(address, _)| address);
+    Addr::parse(address)
+        .unwrap_or_else(|error| panic!("Invalid address `{value}` printed for {marker}: {error}"))
+        .to_string()
+}
+
+pub(crate) fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
+    toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(0.into())], 0)
 }
 
 pub(crate) fn toncenter_v2_run_get_method_ok_response(
@@ -276,13 +734,388 @@ pub(crate) fn toncenter_v2_run_get_method_ok_response(
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
             "result": {
+                "@type": "smc.runResult",
+                "gas_used": "0",
                 "stack": legacy_stack_to_json(&Tuple(stack)).expect("stack must serialize to legacy json"),
-                "exit_code": exit_code
+                "exit_code": exit_code,
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": "0",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
             }
         })
         .to_string(),
     }
+}
+
+pub(crate) fn toncenter_v2_account_info_ok_response(
+    balance: i64,
+    state: &str,
+    lt: u64,
+    hash: &str,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "raw.fullAccountState",
+                "balance": balance.to_string(),
+                "extra_currencies": [],
+                "code": "",
+                "data": "",
+                "state": state,
+                "frozen_hash": "",
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": lt.to_string(),
+                    "hash": hash,
+                },
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "sync_utime": 0,
+                "suspended": false
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
+    balance: i64,
+    code_boc64: &str,
+    data_boc64: &str,
+    state: &str,
+    frozen_hash: &str,
+    lt: &str,
+    hash: &str,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "raw.fullAccountState",
+                "balance": balance.to_string(),
+                "extra_currencies": [],
+                "code": code_boc64,
+                "data": data_boc64,
+                "state": state,
+                "frozen_hash": frozen_hash,
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": lt,
+                    "hash": hash,
+                },
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "sync_utime": 0,
+                "suspended": false
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "blocks.masterchainInfo",
+                "last": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "init": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_block_header_ok_response(
+    seqno: u64,
+    gen_utime: u32,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "blocks.header",
+                "id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "global_id": -239,
+                "version": 0,
+                "after_merge": false,
+                "after_split": false,
+                "before_split": false,
+                "want_merge": false,
+                "want_split": false,
+                "validator_list_hash_short": 0,
+                "catchain_seqno": 0,
+                "min_ref_mc_seqno": 0,
+                "is_key_block": false,
+                "prev_key_block_seqno": 0,
+                "start_lt": "0",
+                "end_lt": "1",
+                "gen_utime": gen_utime,
+                "prev_blocks": []
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_config_all_ok_response(config_boc64: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "configInfo",
+                "config": {
+                    "@type": "tvm.cell",
+                    "bytes": config_boc64
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn mocked_global_version_cell(version: u32, capabilities: u64) -> Cell {
+    let mut global_version = CellBuilder::new();
+    global_version
+        .store_u8(0xc4)
+        .expect("must store GlobalVersion tag");
+    global_version
+        .store_u32(version)
+        .expect("must store GlobalVersion version");
+    global_version
+        .store_u64(capabilities)
+        .expect("must store GlobalVersion capabilities");
+
+    global_version
+        .build()
+        .expect("must build GlobalVersion cell")
+}
+
+pub(crate) fn mocked_config_boc64(version: u32, capabilities: u64) -> String {
+    let mut config = DEFAULT_CONFIG_DICT.as_ref().clone();
+    config
+        .set(8, mocked_global_version_cell(version, capabilities))
+        .expect("must update global version config param");
+    Boc::encode_base64(
+        config
+            .root()
+            .clone()
+            .expect("default blockchain config must have a root"),
+    )
+}
+
+pub(crate) fn toncenter_v2_fork_snapshot_responses(
+    seqno: u64,
+    gen_utime: u32,
+) -> Vec<ToncenterV2MockResponse> {
+    vec![
+        toncenter_v2_block_header_ok_response(seqno, gen_utime),
+        toncenter_v2_config_all_ok_response(ton_executor::DEFAULT_CONFIG),
+    ]
+}
+
+pub(crate) fn toncenter_v2_latest_fork_snapshot_responses(
+    seqno: u64,
+) -> Vec<ToncenterV2MockResponse> {
+    vec![
+        toncenter_v2_masterchain_info_ok_response(seqno),
+        toncenter_v2_config_all_ok_response(ton_executor::DEFAULT_CONFIG),
+    ]
+}
+
+pub(crate) fn toncenter_v2_shard_account_cell_ok_response(
+    shard_account: &ShardAccount,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {
+                "@type": "tvm.cell",
+                "bytes": Boc::encode_base64(to_cell(shard_account))
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn format_captured_requests(requests: &[CapturedToncenterRequest]) -> String {
+    let mut out = String::new();
+    for request in requests {
+        let _ = writeln!(out, "{} {}", request.method, request.path);
+    }
+    out
+}
+
+pub(crate) fn write_fork_account_cache_summary(
+    project_path: &Path,
+    network_name: &str,
+    fork_block_number: u64,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_files:\n");
+    let cache_dir = project_path
+        .join("build")
+        .join("cache")
+        .join(network_name)
+        .join(fork_block_number.to_string());
+    match fs::read_dir(cache_dir) {
+        Ok(entries) => {
+            let mut file_names = entries
+                .map(|entry| {
+                    entry
+                        .expect("failed to read fork account cache directory entry")
+                        .file_name()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect::<Vec<_>>();
+            file_names.sort();
+            if file_names.is_empty() {
+                out.push_str("<empty>\n");
+            } else {
+                for file_name in file_names {
+                    let _ = writeln!(out, "{file_name}");
+                }
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache directory: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache summary");
+}
+
+pub(crate) fn write_fork_account_cache_tree_summary(
+    project_path: &Path,
+    network_name: &str,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_tree:\n");
+    let cache_root = project_path.join("build").join("cache").join(network_name);
+    match collect_cache_tree_entries(&cache_root) {
+        Ok(entries) if entries.is_empty() => out.push_str("<empty>\n"),
+        Ok(entries) => {
+            for entry in entries {
+                let _ = writeln!(out, "{entry}");
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache tree: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache tree summary");
+}
+
+fn collect_cache_tree_entries(root: &Path) -> std::io::Result<Vec<String>> {
+    fn collect(
+        root: &Path,
+        relative_prefix: &Path,
+        entries: &mut Vec<String>,
+    ) -> std::io::Result<()> {
+        let mut children = fs::read_dir(root)?.collect::<Result<Vec<_>, _>>()?;
+        children.sort_by_key(fs::DirEntry::file_name);
+
+        for child in children {
+            let child_name = child.file_name();
+            let child_relative = relative_prefix.join(&child_name);
+            let file_type = child.file_type()?;
+            if file_type.is_dir() {
+                entries.push(format!("{}/", child_relative.to_string_lossy()));
+                collect(&child.path(), &child_relative, entries)?;
+            } else if file_type.is_file() {
+                entries.push(child_relative.to_string_lossy().into_owned());
+            }
+        }
+
+        Ok(())
+    }
+
+    let mut entries = Vec::new();
+    collect(root, Path::new(""), &mut entries)?;
+    Ok(entries)
 }
 
 pub(crate) fn toncenter_v2_verify_registry_address_response(
@@ -316,7 +1149,9 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
         status,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": i32::from(status),
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -325,7 +1160,12 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
 pub(crate) fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
-        body: "{}".to_string(),
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {"@type": "ok"}
+        })
+        .to_string(),
     }
 }
 
@@ -334,7 +1174,9 @@ pub(crate) fn toncenter_v2_send_boc_error_response(error: &str) -> ToncenterV2Mo
         status: 500,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": 500,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -345,7 +1187,9 @@ pub(crate) fn toncenter_v2_send_boc_client_error_response(error: &str) -> Toncen
         status: 400,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": 400,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -356,9 +1200,12 @@ pub(crate) fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2M
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
+                "@type": "smc.libraryResult",
                 "result": [{
-                    "found": true,
+                    "@type": "smc.libraryEntry",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "data": data
                 }]
             }
@@ -377,6 +1224,7 @@ pub(crate) fn toncenter_v3_account_states_ok_response(
         body: serde_json::json!({
             "accounts": [{
                 "address": address,
+                "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 "balance": "0",
                 "code_boc": code_boc,
                 "status": status

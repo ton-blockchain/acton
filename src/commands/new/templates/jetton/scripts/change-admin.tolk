@@ -17,9 +17,9 @@ fun main() {
         admin.address,
         0,
         nextAdmin,
-        { bounce: false, value: ton("0.05") },
+        { bounce: false, value: grams("0.05") },
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     println("JETTON NEXT_ADMIN_REQUESTED={}", nextAdmin);
     printJettonMinterInfo(minter, "JETTON");

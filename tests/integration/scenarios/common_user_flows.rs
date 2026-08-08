@@ -66,6 +66,8 @@ fn create_project_and_run_tests() {
     session.send_line("foobar", "failed to enter project name");
     session.expect("Template:");
     session.send_line("", "failed to accept default template");
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
     session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
     session.send_line("", "failed to keep default no-advanced choice");
     session.expect("Created new Acton project");
@@ -84,7 +86,7 @@ fn create_project_and_run_tests() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
+            "integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
         )
         .assert_file_exists("foobar/Acton.toml")
         .assert_file_exists("foobar/contracts/Empty.tolk")
@@ -93,7 +95,7 @@ fn create_project_and_run_tests() {
         .assert_file_exists("foobar/wrappers/Empty.gen.tolk")
         .assert_file_exists("foobar/scripts/deploy.tolk")
         .assert_file_exists("foobar/README.md")
-        .assert_file_exists("foobar/.github/workflows/ci.yml");
+        .assert_file_exists("foobar/.github/workflows/contracts.yml");
 }
 
 // Source scenario: tests/scenarios/common_user_flows.yaml
@@ -116,7 +118,6 @@ fn deploy_script_fails_when_toncenter_is_unavailable() {
 
     let output = project
         .acton()
-        .env("ACTON_DISABLE_SYSTEM_PROXY", "1")
         .script("scripts/deploy.tolk")
         .current_dir(&project_dir)
         .verify_network("custom:toncenter-down")
@@ -125,6 +126,6 @@ fn deploy_script_fails_when_toncenter_is_unavailable() {
 
     mock_handle.join().expect("mock toncenter v2 must finish");
     output.assert_snapshot_matches(
-        "integration/snapshots/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt",
+        "integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt",
     );
 }

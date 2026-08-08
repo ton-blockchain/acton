@@ -1,0 +1,32 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (2 tests)
+  ✓ passing [TIME]
+  ✗ failing [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            true,
+            false
+        )
+      └─ at tests/test.test[LINE]
+
+ ✓ 1 passed, ✗ 1 failed in 1 file
+
+Some tests failed.
+
+ COVERAGE  
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                  Covered   Total Lines   % Lines   Covered   Total Branches   % Branches   Score 
+───────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                   2             3     66.7%         1                2        50.0%   60.0% 
+ code/validator.tolk         2             3     66.7%         1                2        50.0%   60.0% 
+
+Text coverage file saved in coverage.txt

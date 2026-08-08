@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acton signData e2e dApp</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">TON CONNECT E2E FIXTURE</p>
+      <h1>Sign data on localnet</h1>
+      <p class="lead">
+        This temporary dApp creates a real TON Connect session and requests text or cell
+        signatures.
+      </p>
+
+      <section aria-labelledby="connection-heading">
+        <h2 id="connection-heading">Connection</h2>
+        <p id="status" role="status">Not connected</p>
+        <button id="connect" type="button">Create connection</button>
+        <label for="connection-url">TON Connect URL</label>
+        <textarea id="connection-url" rows="5" readonly></textarea>
+      </section>
+
+      <section aria-labelledby="signature-heading">
+        <h2 id="signature-heading">Signature</h2>
+        <p>Choose a human-readable text payload or a cell described by a TL-B schema.</p>
+        <div class="signature-actions">
+          <button id="sign-text" type="button" disabled>Request text signature</button>
+          <button id="sign-cell" type="button" disabled>Request cell signature</button>
+        </div>
+        <pre id="result" role="log" aria-label="Signature result">No signature yet</pre>
+      </section>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

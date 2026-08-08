@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/env_slice_string_mismatch.test.tolk (1 test)
+  ✗ bp stdlib env slice string typed mismatch [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        slice{736c6963652d76616c7565} != slice-value
+      └─ at tests/env_slice_string_mismatch.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

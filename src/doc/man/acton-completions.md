@@ -53,7 +53,7 @@ Dynamic completions are recommended when your shell supports them.
 
 Add this to `~/.zshrc`:
 
-```bash
+```acton-cli
 source <(COMPLETE=zsh acton)
 ```
 
@@ -61,7 +61,7 @@ source <(COMPLETE=zsh acton)
 
 Add this to `~/.bashrc`:
 
-```bash
+```acton-cli
 source <(COMPLETE=bash acton)
 ```
 
@@ -82,13 +82,13 @@ installation patterns include:
 
 For the current shell session:
 
-```bash
+```acton-cli
 source <(acton completions bash)
 ```
 
 For a persistent setup, either append to `~/.bashrc`:
 
-```bash
+```acton-cli
 acton completions bash >> ~/.bashrc
 ```
 
@@ -102,7 +102,7 @@ acton completions bash | sudo tee /usr/share/bash-completion/completions/acton
 
 Zsh usually expects the completion file in a directory listed in `$fpath`:
 
-```bash
+```acton-cli
 mkdir -p ~/.zsh/completions
 acton completions zsh > ~/.zsh/completions/_acton
 echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
@@ -117,7 +117,7 @@ source ~/.zshrc
 
 ### Fish
 
-```bash
+```acton-cli
 acton completions fish > ~/.config/fish/completions/acton.fish
 ```
 
@@ -133,7 +133,7 @@ For a persistent setup, add the generated script to your PowerShell profile.
 
 ### Elvish
 
-```bash
+```acton-cli
 acton completions elvish > ~/.elvish/completions/acton.elv
 ```
 
@@ -159,7 +159,7 @@ source ~/.config/nushell/completions/acton.nu
 
 After installation, try:
 
-```bash
+```acton-cli
 acton <TAB>
 acton test --<TAB>
 ```

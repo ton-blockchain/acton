@@ -1,0 +1,48 @@
+[package]
+name = "acton-studio"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+axum = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true }
+dunce = { workspace = true }
+futures = { workspace = true }
+fs2 = { workspace = true }
+hex = { workspace = true }
+include_dir = { workspace = true }
+reqwest = { workspace = true, features = ["stream"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+ton = { workspace = true }
+ton-api = { workspace = true }
+toncenter-keys = { workspace = true }
+tower-http = { workspace = true, features = ["fs"] }
+tracing = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
+uuid = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
+tempfile = { workspace = true }
+tower = { workspace = true, features = ["util"] }
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

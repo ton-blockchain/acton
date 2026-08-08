@@ -1,0 +1,3 @@
+  Installing standard library [ACTON_VERSION]
+version=777, capabilities=4660
+testing-now=1700000320, blockchain-now=1700000320

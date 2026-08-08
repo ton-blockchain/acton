@@ -1,0 +1,36 @@
+[package]
+name = "tree-sitter-toml-ng"
+description = "TOML grammar for tree-sitter"
+version = "0.7.0"
+license = "MIT"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "toml"]
+categories = ["parsing", "text-editors"]
+authors = ["Ika <ikatyang@gmail.com>", "Amaan Qureshi <amaanq12@gmail.com>"]
+repository = "https://github.com/tree-sitter-grammars/tree-sitter-toml"
+edition = "2021"
+autoexamples = false
+publish = false
+
+build = "bindings/rust/build.rs"
+include = [
+  "bindings/rust/*",
+  "grammar.js",
+  "queries/*",
+  "src/*",
+  "tree-sitter.json",
+  "LICENSE",
+]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
+tree-sitter-language = { workspace = true }
+
+[dev-dependencies]
+tree-sitter = { workspace = true }

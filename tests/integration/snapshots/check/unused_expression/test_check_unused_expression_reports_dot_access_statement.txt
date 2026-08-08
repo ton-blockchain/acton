@@ -1,4 +1,4 @@
-warning[E032]: unused expression has no effect
+warning[E026]: unused expression has no effect
   --> [ROOT]/contracts/main[LINE]
   |
 8 |             point.x;
@@ -8,4 +8,4 @@ warning[E032]: unused expression has no effect
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E032
+For example: acton check --explain E026

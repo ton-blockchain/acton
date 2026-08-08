@@ -14,13 +14,12 @@ use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ton::ton_core::types::TonAddress;
-use ton::ton_wallet::{
-    Mnemonic, TonWallet, WALLET_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET,
-    WORDLIST_EN_SET, WalletVersion,
-};
+use ton::ton_wallet::{Mnemonic, TonWallet, WALLET_ID_DEFAULT, WORDLIST_EN_SET, WalletVersion};
 use ton_retrace::Network;
 
+const WALLET_MESSAGE_TTL_SECONDS: u64 = 600;
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
 
@@ -28,6 +27,18 @@ type MnemonicBundle = BTreeMap<String, String>;
 
 static KEYRING_BUNDLE_CACHE: LazyLock<Mutex<HashMap<String, MnemonicBundle>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn wallet_message_expire_at(network: &Network) -> anyhow::Result<u32> {
+    if matches!(network, Network::Localnet) {
+        return Ok(u32::MAX);
+    }
+
+    let expires_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .saturating_add(Duration::from_secs(WALLET_MESSAGE_TTL_SECONDS))
+        .as_secs();
+    Ok(expires_at.try_into().unwrap_or(u32::MAX))
+}
 
 fn format_ton_address(address: &TonAddress, testnet: bool, bounceable: bool) -> String {
     address.to_base64(!testnet, bounceable, true)
@@ -269,7 +280,7 @@ pub fn open_wallets(
         let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
-        let wallet_id = wallet_id(wallet_version, net);
+        let wallet_id = wallet_id_from_global_id(wallet_version, config.network_global_id(net));
 
         let ton_wallet = TonWallet::new_with_params(
             wallet_version,
@@ -288,7 +299,7 @@ pub fn open_wallets(
                     .address_testnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.clone())),
-                _ => None,
+                Network::Custom(_) => None,
             };
 
             if let Some(expected_addr) = expected_address {
@@ -312,7 +323,7 @@ pub fn open_wallets(
                             Network::Testnet | Network::Localnet => {
                                 expected.address_testnet.as_deref()
                             }
-                            _ => None,
+                            Network::Custom(_) => None,
                         }
                         .unwrap_or("<unknown>");
                         anyhow::bail!(
@@ -388,14 +399,19 @@ pub fn open_selected_wallets(
 }
 
 #[must_use]
-pub const fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
+pub const fn wallet_id(wallet: WalletVersion, network: &Network) -> i32 {
+    let network_global_id = if matches!(network, Network::Mainnet) {
+        config::MAINNET_GLOBAL_ID
+    } else {
+        config::TESTNET_GLOBAL_ID
+    };
+    wallet_id_from_global_id(wallet, network_global_id)
+}
+
+#[must_use]
+pub const fn wallet_id_from_global_id(wallet: WalletVersion, network_global_id: i32) -> i32 {
     match wallet {
-        WalletVersion::V5R1 => {
-            if net.uses_testnet_address_format() {
-                return WALLET_V5R1_ID_DEFAULT_TESTNET;
-            }
-            WALLET_V5R1_ID_DEFAULT
-        }
+        WalletVersion::V5R1 => network_global_id ^ i32::MIN,
         _ => WALLET_ID_DEFAULT,
     }
 }
@@ -466,3 +482,29 @@ const PBKDF_ITERATIONS_SEED: NonZeroU32 = match NonZeroU32::new(PBKDF_ITERATIONS
     Some(v) => v,
     None => panic!("PBKDF_ITERATIONS / 256 must be non-zero"),
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ton::ton_wallet::{WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET};
+
+    #[test]
+    fn wallet_v5_derives_id_from_network_global_id() {
+        assert_eq!(
+            wallet_id(WalletVersion::V5R1, &Network::Custom("development".into())),
+            WALLET_V5R1_ID_DEFAULT_TESTNET
+        );
+        assert_eq!(
+            wallet_id_from_global_id(WalletVersion::V5R1, config::TESTNET_GLOBAL_ID),
+            WALLET_V5R1_ID_DEFAULT_TESTNET
+        );
+        assert_eq!(
+            wallet_id_from_global_id(WalletVersion::V5R1, config::MAINNET_GLOBAL_ID),
+            WALLET_V5R1_ID_DEFAULT
+        );
+        assert_eq!(
+            wallet_id_from_global_id(WalletVersion::V4R2, config::TESTNET_GLOBAL_ID),
+            WALLET_ID_DEFAULT
+        );
+    }
+}

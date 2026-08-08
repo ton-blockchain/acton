@@ -1,12 +1,63 @@
 #![cfg(test)]
 use crate::common::ExecutorVerbosity;
 use crate::message::Executor;
-use crate::message::types::RunTransactionArgs;
+use crate::message::types::{PrevBlockId, PrevBlocksInfo, RunTransactionArgs};
 use crate::{DEFAULT_CONFIG, EXT_METHOD_STACK_ALL_ITEMS};
+use num_bigint::BigInt;
 use std::ffi::c_char;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
 
 const MESSAGE_B64: &str = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
 const SHARD_ACCOUNT_B64: &str = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
+
+#[test]
+fn prev_blocks_info_serializes_real_c7_tuple_shape() -> anyhow::Result<()> {
+    let latest = PrevBlockId {
+        workchain: 0,
+        shard: i64::MIN,
+        seqno: 42,
+        root_hash: [0x11; 32],
+        file_hash: [0x12; 32],
+    };
+    let key_block = PrevBlockId {
+        workchain: -1,
+        shard: -1,
+        seqno: 40,
+        root_hash: [0x21; 32],
+        file_hash: [0x22; 32],
+    };
+    let sparse = PrevBlockId {
+        workchain: 0,
+        shard: i64::MIN,
+        seqno: 0,
+        root_hash: [0; 32],
+        file_hash: [0; 32],
+    };
+
+    let encoded =
+        PrevBlocksInfo::new(vec![latest], key_block, vec![sparse]).to_stack_entry_boc_base64()?;
+    let cell = Boc::decode_base64(&encoded)?;
+    let mut parser = cell.as_slice_allow_exotic();
+    let TupleItem::Tuple(Tuple(fields)) = tvm_ffi::serde::parse_tuple_item(&mut parser)? else {
+        panic!("prev_blocks_info must serialize as a tuple item");
+    };
+
+    assert_eq!(fields.len(), 3);
+    let TupleItem::Tuple(last_mc_blocks) = &fields[0] else {
+        panic!("last_mc_blocks must be a tuple");
+    };
+    let TupleItem::Tuple(first_block) = &last_mc_blocks[0] else {
+        panic!("block id must be a tuple");
+    };
+
+    assert_eq!(first_block.len(), 5);
+    assert_eq!(
+        first_block[1],
+        TupleItem::Int(BigInt::from(i64::MIN as u64))
+    );
+    Ok(())
+}
 
 #[test]
 fn test_executor() -> anyhow::Result<()> {

@@ -1,0 +1,12 @@
+Manage Acton Studio
+
+Usage: acton[EXE] studio [OPTIONS] <COMMAND>
+
+Commands:
+  start  Start Acton Studio
+
+Options:
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --manifest-path <PATH>  Path to Acton.toml
+      --project-root <PATH>   Path to project root
+  -h, --help                  Print help

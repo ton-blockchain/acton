@@ -85,9 +85,19 @@ pub(crate) mod type_substitutor;
 pub(crate) mod type_unify;
 pub(crate) mod types;
 
+use rustc_hash::FxHashMap;
+use tolk_resolver::{FileId, SymbolId};
+
 pub use flow_inference::InferenceResult;
 pub use global_usages::{GlobalUsage, GlobalUsages};
-pub use type_db::TypeDb;
+pub use overload_resolution::method_ids_for_completion;
+pub use type_db::{TypeDb, TypeDbCache};
 pub use type_inference::infer;
 pub use type_interner::{TyId, TypeInterner};
 pub use types::{AddressKind, IntTy, TyData};
+
+/// Inference results for every top-level declaration in one source file.
+pub type FileBodyTypes = FxHashMap<SymbolId, InferenceResult>;
+
+/// Inference results grouped by source file for a complete workspace snapshot.
+pub type WorkspaceBodyTypes = FxHashMap<FileId, FileBodyTypes>;

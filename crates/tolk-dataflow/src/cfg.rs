@@ -302,13 +302,13 @@ impl ControlFlowGraph {
             if options.include_spans
                 && let Some(span) = node.span
             {
-                label.push_str(&format!("\nspan:{}-{}", span.start, span.end));
+                let _ = write!(label, "\nspan:{}-{}", span.start, span.end);
             }
 
             if options.include_reads_writes {
                 let reads = format_locals(&node.reads);
                 let writes = format_locals(&node.writes);
-                label.push_str(&format!("\nR:[{reads}]\nW:[{writes}]"));
+                let _ = write!(label, "\nR:[{reads}]\nW:[{writes}]");
             }
 
             let shape = match node.kind {

@@ -1,3 +1,4 @@
+import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@wrappers/utils"
@@ -17,8 +18,8 @@ fun main() {
         JETTON_DEFAULT_MINT_AMOUNT,
     );
 
-    val res = minter.sendMint(admin.address, recipient, mintAmount, 1, ton("0.08"));
-    res.waitForFirstTransaction();
+    val res = minter.sendMint(admin.address, recipient, mintAmount, 1, grams("0.08"));
+    println(res.waitForTrace());
 
     printJettonMinterInfo(minter, "JETTON");
     printJettonWalletInfo(minter, recipient, "JETTON_RECIPIENT");

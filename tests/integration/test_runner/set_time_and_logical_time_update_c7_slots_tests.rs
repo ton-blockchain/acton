@@ -354,3 +354,45 @@ get fun `test aj stdlib vm cell from hex invalid`() {
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_hex_reports_invalid_hex.stdout.txt",
     );
 }
+
+#[test]
+fn cell_from_base64_decodes_valid_boc_base64() {
+    run_success_case(
+        "aj-stdlib-vm-cell-from-base64-valid",
+        r#"
+get fun `test aj stdlib vm cell from base64 valid`() {
+    val decoded = parseCellFromBase64("te6ccgEBAQEAAgAAAA==");
+    expect(decoded).toEqual(createEmptyCell());
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_decodes_valid_boc_base64.stdout.txt",
+    );
+}
+
+#[test]
+fn cell_from_base64_trims_surrounding_whitespace() {
+    run_success_case(
+        "aj-stdlib-vm-cell-from-base64-trims-whitespace",
+        r#"
+get fun `test aj stdlib vm cell from base64 trims whitespace`() {
+    val decoded = parseCellFromBase64("  te6ccgEBAQEAAgAAAA==  ");
+    expect(decoded).toEqual(createEmptyCell());
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_trims_surrounding_whitespace.stdout.txt",
+    );
+}
+
+#[test]
+fn cell_from_base64_reports_invalid_base64() {
+    run_failure_case(
+        "aj-stdlib-vm-cell-from-base64-invalid",
+        r#"
+get fun `test aj stdlib vm cell from base64 invalid`() {
+    val _ = parseCellFromBase64("not-base64");
+}
+"#,
+        "Failed to decode cell base64 not-base64",
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_reports_invalid_base64.stdout.txt",
+    );
+}

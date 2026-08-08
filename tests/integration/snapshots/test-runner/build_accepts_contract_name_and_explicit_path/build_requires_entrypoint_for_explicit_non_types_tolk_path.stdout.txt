@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_helper_path.test.tolk (1 test)
+  ✗ build explicit non types path without entrypoint [TIME]
+    └─ Error: Compilation failed: the contract has no entrypoint; forgot `fun onInternalMessage(...)`?
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

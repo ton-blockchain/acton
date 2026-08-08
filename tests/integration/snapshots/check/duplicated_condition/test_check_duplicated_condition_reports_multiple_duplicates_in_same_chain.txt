@@ -1,4 +1,4 @@
-warning[E026]: duplicated condition in conditional chain
+warning[E020]: duplicated condition in conditional chain
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 if (a > 7) {
@@ -9,7 +9,7 @@ warning[E026]: duplicated condition in conditional chain
   |
   = remove duplicated condition or change it
 
-warning[E026]: duplicated condition in conditional chain
+warning[E020]: duplicated condition in conditional chain
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 if (a > 7) {
@@ -20,7 +20,7 @@ warning[E026]: duplicated condition in conditional chain
   |
   = remove duplicated condition or change it
 
-warning[E026]: duplicated condition in conditional chain
+warning[E020]: duplicated condition in conditional chain
   --> [ROOT]/contracts/main[LINE]
   |
 7 |                 } else if (a > 7) {
@@ -33,4 +33,4 @@ warning[E026]: duplicated condition in conditional chain
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E026
+For example: acton check --explain E020

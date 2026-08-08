@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use tempfile::TempDir;
 
 const NET_TEST_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
@@ -55,11 +56,18 @@ get fun `test s lib api enable broadcast requires configured wallet`() {
 }
 "#,
     );
+    let home_temp = TempDir::new().expect("failed to create isolated HOME");
+    let home = home_temp
+        .path()
+        .to_str()
+        .expect("temporary HOME path must be UTF-8")
+        .to_string();
 
     ProjectBuilder::new("s-lib-api-enable-broadcast-wallet-lookup")
         .test_file("wallet_mode", &source)
         .build()
         .acton()
+        .env("HOME", &home)
         .test()
         .run()
         .code(1)

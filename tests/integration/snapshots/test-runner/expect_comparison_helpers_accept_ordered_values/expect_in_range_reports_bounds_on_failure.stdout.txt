@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_behavior.test.tolk (1 test)
+  ✗ ad stdlib in range failure [TIME]
+    └─ Error: 11 is not in range [5, 10]
+      └─ at tests/expect_behavior.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

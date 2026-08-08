@@ -21,7 +21,7 @@ use tolk_ty::InferenceResult;
 ///
 /// fun main() {
 ///     add(1, 2);
-/// //  ^^^^^^^^^ E007: result of pure function is not used
+/// //  ^^^^^^^^^ E006: result of pure function is not used
 /// }
 /// ```
 #[derive(ViolationMetadata)]

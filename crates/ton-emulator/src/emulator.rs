@@ -78,6 +78,7 @@ pub struct PreparedSendTransaction {
     pub run_args: RunTransactionArgs,
     /// Resolved destination code cell, if known.
     pub code: Option<Cell>,
+    is_external: bool,
     destination: StdAddr,
     shard_account_before: ShardAccount,
 }
@@ -183,9 +184,9 @@ impl Emulator {
             .parse::<Message<'_>>()
             .context("Failed to parse message")?;
 
-        let dst = match &msg.info {
-            MsgInfo::Int(addr) => addr.dst.clone(),
-            MsgInfo::ExtIn(addr) => addr.dst.clone(),
+        let (dst, is_external) = match &msg.info {
+            MsgInfo::Int(addr) => (addr.dst.clone(), false),
+            MsgInfo::ExtIn(addr) => (addr.dst.clone(), true),
             MsgInfo::ExtOut(_) => {
                 anyhow::bail!("Send transaction only support internal and external-in messages")
             }
@@ -197,13 +198,24 @@ impl Emulator {
 
         let shard_account_before = state.get_account(&dst);
         let code = Self::get_code_cell(&msg, &shard_account_before);
+
+        let libs_owner = match &msg.info {
+            MsgInfo::Int(info) => match &info.src {
+                IntAddr::Std(src) => src.address,
+                IntAddr::Var(_) => dst.address,
+            },
+            MsgInfo::ExtIn(_) => dst.address,
+            MsgInfo::ExtOut(_) => unreachable!("external-out messages are rejected above"),
+        };
+        let libs = Self::execution_libs(libs, state, &libs_owner)?;
+
         let run_args = RunTransactionArgs {
-            libs: libs.clone().into_root().map(Boc::encode_base64),
+            libs: libs.into_root().map(Boc::encode_base64),
             shard_account: Boc::encode_base64(&to_cell(&shard_account_before)?),
             now: state.get_now(),
             lt: state.get_lt(),
-            random_seed: None,
-            ignore_chksig: false,
+            random_seed: state.get_random_seed(),
+            ignore_chksig: state.ignore_chksig(),
             debug_enabled: true,
             prev_blocks_info: None,
             is_tick_tock: None,
@@ -214,6 +226,7 @@ impl Emulator {
             message_b64: msg_b64,
             run_args,
             code,
+            is_external,
             destination: dst,
             shard_account_before,
         })
@@ -230,6 +243,7 @@ impl Emulator {
         let PreparedSendTransaction {
             code,
             destination,
+            is_external,
             shard_account_before,
             ..
         } = prepared;
@@ -241,9 +255,12 @@ impl Emulator {
                 result
             }
             EmulationResult::Error(mut err) => {
+                let external_not_accepted = err.external_not_accepted
+                    || (is_external && is_external_not_accepted_error(&err.error));
                 err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
+                    external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs,
@@ -364,14 +381,15 @@ impl Emulator {
 
         let shard_account_before = state.get_account(addr);
         let code = Self::get_address_code_cell(&shard_account_before);
+        let execution_libs = Self::execution_libs(libs, state, &addr.address)?;
 
         let args = RunTransactionArgs {
-            libs: libs.clone().into_root().map(Boc::encode_base64),
+            libs: execution_libs.into_root().map(Boc::encode_base64),
             shard_account: Boc::encode_base64(&to_cell(&shard_account_before)?),
             now: state.get_now(),
             lt: state.get_lt(),
-            random_seed: None,
-            ignore_chksig: false,
+            random_seed: state.get_random_seed(),
+            ignore_chksig: state.ignore_chksig(),
             debug_enabled: true,
             prev_blocks_info: None,
             is_tick_tock: Some(true),
@@ -392,6 +410,7 @@ impl Emulator {
                 err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(vec![SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
+                    external_not_accepted: err.external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs: Some(executor_logs),
@@ -514,11 +533,20 @@ impl Emulator {
         Ok(message_cell)
     }
 
-    pub(crate) fn compute_in_msg_fwd_fee(
+    pub fn compute_in_msg_fwd_fee(
         config: Arc<Dict<u32, Cell>>,
         message: &RelaxedMessage<'_>,
         is_masterchain: bool,
     ) -> anyhow::Result<Tokens> {
+        let (total, first_part) = Self::compute_message_fwd_fee(config, message, is_masterchain)?;
+        Ok(total.saturating_sub(first_part))
+    }
+
+    pub fn compute_message_fwd_fee<T: Store + ?Sized>(
+        config: Arc<Dict<u32, Cell>>,
+        message: &T,
+        is_masterchain: bool,
+    ) -> anyhow::Result<(Tokens, Tokens)> {
         let message_cell = to_cell(message)?;
         let root_bits = u64::from(message_cell.bit_len());
         let mut stats = message_cell
@@ -542,7 +570,7 @@ impl Emulator {
         // Then GETORIGINALFWDFEE restores total from that value.
         let total = prices.compute_fwd_fee(stats);
         let first_part = prices.get_first_part(total);
-        Ok(total.saturating_sub(first_part))
+        Ok((total, first_part))
     }
 
     fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
@@ -614,6 +642,34 @@ impl Emulator {
             }
         }
     }
+
+    fn execution_libs(
+        libs: &Dict<HashBytes, LibDescr>,
+        state: &WorldState,
+        owner: &HashBytes,
+    ) -> anyhow::Result<Dict<HashBytes, LibDescr>> {
+        let mut libs = libs.clone();
+        for (hash, lib) in state.libs() {
+            let mut publishers = Dict::new();
+            publishers.add(owner, ())?;
+
+            libs.add(
+                hash,
+                LibDescr {
+                    lib: lib.clone(),
+                    publishers,
+                },
+            )?;
+        }
+        Ok(libs)
+    }
+}
+
+#[must_use]
+pub fn is_external_not_accepted_error(error: &str) -> bool {
+    error.contains("external_not_accepted")
+        || error.contains("External message not accepted")
+        || error.contains("inbound external message rejected")
 }
 
 /// The result of a message emulation.
@@ -685,6 +741,21 @@ impl SendMessageResultSuccess {
             return None;
         };
         Some(info.gas_used.into())
+    }
+
+    /// Returns the initial gas base used to execute the computation phase.
+    #[must_use]
+    pub fn initial_gas(&self) -> Option<u64> {
+        let info = self.transaction.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let ComputePhase::Executed(info) = info.compute_phase else {
+            return None;
+        };
+        let gas_limit = u64::from(info.gas_limit);
+        let gas_credit = info.gas_credit.map(u32::from).map_or(0, u64::from);
+        Some(gas_limit.saturating_add(gas_credit))
     }
 }
 

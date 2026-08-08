@@ -20,7 +20,7 @@ use tolk_syntax::{AstNode, InstanceArg};
 /// fun main() {
 ///     val bar = 1;
 ///     val foo = Foo { bar: bar };
-///     //              ^^^^^^^^ E001: field initialization can be folded
+///     //              ^^^^^^^^ S003: field initialization can be folded
 /// }
 /// ```
 ///

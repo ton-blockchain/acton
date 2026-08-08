@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/output.test.tolk (1 test)
+console no capture stdout
+  ✓ console no capture verbose output [TIME]
+    └─ Test output:
+       stack(0 values) :
+
+ ✓ 1 passed in 1 file

@@ -16,7 +16,8 @@ use tolk_ty::GlobalUsages;
 /// Inconsistent naming makes code harder to read and maintain.
 /// This rule enforces:
 /// - `camelCase` for variables, functions, methods, and struct fields
-/// - `PascalCase` for structs, enums, enum members, and type aliases
+/// - `PascalCase` for structs, enums, enum members, type aliases, and type
+///   parameters
 /// - `SCREAMING_SNAKE_CASE` for constants
 ///
 /// ### Example
@@ -44,6 +45,11 @@ use tolk_ty::GlobalUsages;
 ///
 /// fun badFunctionName() {}
 /// ```
+///
+/// ### Behavior notes
+/// - Names that start with `_` are ignored.
+/// - Get method names are ignored because external standards commonly require
+///   `snake_case` names such as `get_wallet_info`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct NameCaseChecker;
@@ -116,7 +122,7 @@ fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId
             span: symbol.name_span,
             message: Some(format!("not {case_name}: `{}`", symbol.name)),
             is_primary: true,
-            tags: vec![DiagnosticTag::Unnecessary],
+            tags: vec![],
         }])
         .with_fixes(vec![Fix {
             message: format!("rename to {case_name}: {correct_case}"),

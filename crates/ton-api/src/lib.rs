@@ -1,24 +1,41 @@
 use anyhow::{Context, anyhow};
-use num_bigint::{BigInt, ToBigInt};
+use num_bigint::BigInt;
 use reqwest::blocking::Response;
-use reqwest::header::USER_AGENT;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::HashMap;
+use std::env;
+use std::ffi::OsStr;
 use std::fmt;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub use ton_networks::{CustomNetworkUrls, Network};
+use toncenter::{v2, v3};
 use toncenter_keys::api_key as toncenter_api_key;
-use tvm_ffi::json_stack::{json_to_legacy_stack, json_to_stack};
 use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
+
+mod deployment;
+mod offchain;
+pub mod toncenter;
+
+pub use deployment::{DeploymentCandidate, extract_deployment_candidates};
+pub use offchain::OffchainJsonResolver;
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
 const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
 const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
+const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
+const TEST_TONCENTER_RETRY_BACKOFF_MS_ENV: &str = "ACTON_TEST_TONCENTER_RETRY_BACKOFF_MS";
+const TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV: &str =
+    "ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
+pub const MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR: &str = "masterchain-snapshots";
+const MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION: u32 = 2;
+const MASTERCHAIN_SNAPSHOT_CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
 
@@ -26,10 +43,41 @@ const fn user_agent() -> &'static str {
     concat!("acton/", env!("CARGO_PKG_VERSION"))
 }
 
+fn http_client_builder() -> reqwest::blocking::ClientBuilder {
+    let builder = reqwest::blocking::Client::builder().user_agent(user_agent());
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn async_http_client_builder() -> reqwest::ClientBuilder {
+    let builder = reqwest::Client::builder().user_agent(user_agent());
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn proxy_enabled() -> bool {
+    proxy_enabled_from_value(env::var_os(USE_PROXY_ENV).as_deref())
+}
+
+fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
+    value.is_some_and(|value| {
+        let value = value.to_string_lossy();
+        let value = value.trim();
+        value == "1" || value == "true"
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SendBocErrorKind {
     MissingAccountState,
     RejectedBeforeExecution,
+    TransportFailure,
     Other,
 }
 
@@ -73,17 +121,121 @@ pub struct TonApiClient {
     custom_networks: HashMap<String, CustomNetworkUrls>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MasterchainSnapshot {
+    pub seqno: u64,
+    pub gen_utime: u32,
+    pub config: Cell,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MasterchainSnapshotCacheEntry {
+    schema_version: u32,
+    network: Network,
+    v2_url: String,
+    seqno: u64,
+    fetched_at: u64,
+    gen_utime: Option<u32>,
+    config_boc64: String,
+}
+
+struct CachedMasterchainSnapshot {
+    fetched_at: u64,
+    gen_utime: Option<u32>,
+    config: Cell,
+}
+
+impl MasterchainSnapshotCacheEntry {
+    fn new(
+        network: &Network,
+        v2_url: String,
+        snapshot: &MasterchainSnapshot,
+        gen_utime: Option<u32>,
+        fetched_at: u64,
+    ) -> Self {
+        Self {
+            schema_version: MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION,
+            network: network.clone(),
+            v2_url,
+            seqno: snapshot.seqno,
+            fetched_at,
+            gen_utime,
+            config_boc64: Boc::encode_base64(&snapshot.config),
+        }
+    }
+
+    fn into_cached_snapshot(self) -> anyhow::Result<CachedMasterchainSnapshot> {
+        Ok(CachedMasterchainSnapshot {
+            fetched_at: self.fetched_at,
+            gen_utime: self.gen_utime,
+            config: Boc::decode_base64(&self.config_boc64)
+                .context("Failed to decode cached blockchain config BOC")?,
+        })
+    }
+}
+
+fn masterchain_snapshot_cache_path(cache_dir: &Path, network: &Network, seqno: u64) -> PathBuf {
+    let network = match network {
+        Network::Mainnet => "mainnet".to_owned(),
+        Network::Testnet => "testnet".to_owned(),
+        Network::Localnet => "localnet".to_owned(),
+        Network::Custom(name) => format!("custom-{}", urlencoding::encode(name)),
+    };
+    cache_dir.join(network).join(format!("{seqno}.json"))
+}
+
+fn read_masterchain_snapshot_cache(
+    path: &Path,
+    network: &Network,
+    v2_url: &str,
+    seqno: u64,
+) -> Option<CachedMasterchainSnapshot> {
+    let entry =
+        serde_json::from_slice::<MasterchainSnapshotCacheEntry>(&fs::read(path).ok()?).ok()?;
+    if entry.schema_version != MASTERCHAIN_SNAPSHOT_CACHE_SCHEMA_VERSION
+        || entry.network != *network
+        || entry.v2_url != v2_url
+        || entry.seqno != seqno
+    {
+        return None;
+    }
+
+    entry.into_cached_snapshot().ok()
+}
+
+fn write_masterchain_snapshot_cache(
+    path: &Path,
+    entry: &MasterchainSnapshotCacheEntry,
+) -> anyhow::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("Masterchain snapshot cache path has no parent"))?;
+    fs::create_dir_all(parent)?;
+    fs::write(path, serde_json::to_vec_pretty(entry)?)?;
+    Ok(())
+}
+
+fn masterchain_snapshot_cache_entry_is_fresh(fetched_at: u64, now: u64) -> bool {
+    fetched_at
+        .checked_add(MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs())
+        .is_some_and(|expires_at| now < expires_at)
+}
+
+fn unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 impl TonApiClient {
     pub fn new(
         network: Network,
         custom_networks: HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<TonApiClient> {
-        let mut client_builder = reqwest::blocking::ClientBuilder::new()
+        let client_builder = http_client_builder()
             .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
             .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS));
-        if should_disable_system_proxy() {
-            client_builder = client_builder.no_proxy();
-        }
 
         Ok(TonApiClient {
             client: client_builder
@@ -107,7 +259,7 @@ impl TonApiClient {
     }
 
     fn build_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.get(url).header(USER_AGENT, user_agent());
+        let mut request = self.client.get(url);
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);
@@ -117,13 +269,48 @@ impl TonApiClient {
     }
 
     fn build_post_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.post(url).header(USER_AGENT, user_agent());
+        let mut request = self.client.post(url);
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);
         }
 
         request
+    }
+
+    fn get_json<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        transport_error_context: &str,
+        response_error_context: &str,
+    ) -> anyhow::Result<T> {
+        let response = self.send_with_retry(|| self.build_request(url), transport_error_context)?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
+        }
+        response.json().context(response_error_context.to_owned())
+    }
+
+    fn get_v2_result<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &impl Serialize,
+    ) -> anyhow::Result<T> {
+        let url = format!(
+            "{}{path}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(query),
+            "Failed to send TonCenter v2 request",
+        )?;
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+        let response: v2::TonlibResponse<T> = response
+            .json()
+            .context("Failed to parse TonCenter v2 response")?;
+        Ok(response.result)
     }
 
     fn send_with_retry<F>(
@@ -178,8 +365,9 @@ impl TonApiClient {
 
         if let Some(last) = *last_request {
             let elapsed = last.elapsed();
-            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
-                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+            let min_interval = toncenter_min_request_interval();
+            if elapsed < min_interval {
+                let wait_for = min_interval - elapsed;
                 log::debug!("throttle for {wait_for:?}");
                 std::thread::sleep(wait_for);
             }
@@ -199,6 +387,10 @@ impl TonApiClient {
     }
 
     fn http_retry_backoff(attempt: usize) -> Duration {
+        if let Some(duration) = test_retry_backoff_override() {
+            return duration;
+        }
+
         let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
         Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
     }
@@ -209,7 +401,7 @@ impl TonApiClient {
     }
 
     /// Get account state from `TonCenter`
-    pub fn get_account_state(&self, address: &str) -> anyhow::Result<AccountState> {
+    pub fn get_account_state(&self, address: &str) -> anyhow::Result<v3::AccountStateFull> {
         let accounts = self.get_account_states(&[address])?;
         accounts
             .into_iter()
@@ -218,7 +410,10 @@ impl TonApiClient {
     }
 
     /// Get multiple account states from `TonCenter`
-    pub fn get_account_states(&self, addresses: &[&str]) -> anyhow::Result<Vec<AccountState>> {
+    pub fn get_account_states(
+        &self,
+        addresses: &[&str],
+    ) -> anyhow::Result<Vec<v3::AccountStateFull>> {
         if addresses.is_empty() {
             return Ok(vec![]);
         }
@@ -241,18 +436,10 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterResponse {
-            accounts: Vec<AccountState>,
-        }
-
-        let data: TonCenterResponse = response
+        let data: v3::AccountStatesResponse = response
             .json()
             .context("Failed to parse TonCenter response")?;
 
@@ -264,7 +451,7 @@ impl TonApiClient {
         let state = self.get_account_state(address)?;
 
         if state.status != "active" {
-            return Err(anyhow!("Contract is not active (status: {})", state.status));
+            anyhow::bail!("Contract is not active (status: {})", state.status);
         }
 
         state
@@ -278,22 +465,37 @@ impl TonApiClient {
         address: &str,
         method: &str,
         stack: &[serde_json::Value],
-    ) -> anyhow::Result<GetMethodResult> {
+    ) -> anyhow::Result<v2::RunGetMethodResult> {
+        self.run_get_method_at_block(address, method, stack, None)
+    }
+
+    /// Run get method on contract at a specific masterchain block, when provided.
+    pub fn run_get_method_at_block(
+        &self,
+        address: &str,
+        method: &str,
+        stack: &[serde_json::Value],
+        seqno: Option<u64>,
+    ) -> anyhow::Result<v2::RunGetMethodResult> {
         let url = format!(
             "{}/jsonRPC",
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
-        let json = serde_json::json!({
-            "id": "1",
-            "jsonrpc": "2.0",
-            "method": "runGetMethod",
-            "params": {
-                "address": address,
-                "method": method,
-                "stack": stack
-            }
-        });
+        let seqno = seqno
+            .map(u32::try_from)
+            .transpose()
+            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let json = v2::JsonRpcRequest::new(
+            "1",
+            "runGetMethod",
+            v2::RunGetMethodRequest {
+                address: address.to_owned(),
+                method: v2::StringOrNumber::String(method.to_owned()),
+                stack: stack.to_vec(),
+                seqno: seqno.map(Into::into),
+            },
+        );
 
         let response = self.send_with_retry(
             || self.build_post_request(&url).json(&json),
@@ -307,16 +509,11 @@ impl TonApiClient {
             anyhow::bail!("Run get method failed: {error_text}");
         }
 
-        #[derive(Deserialize)]
-        struct JsonRpcResponse {
-            result: GetMethodResult,
-        }
-
-        let result: JsonRpcResponse = response
+        let result: v2::JsonRpcResponse<v2::RunGetMethodResult> = response
             .json()
             .context("Failed to parse runGetMethod response")?;
 
-        Ok(result.result)
+        Ok(result.into_result())
     }
 
     /// Get wallet seqno
@@ -359,14 +556,18 @@ impl TonApiClient {
             .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
         let url = format!("{base_url}/sendBoc");
 
-        let json = serde_json::json!({ "boc": boc });
+        let json = v2::SendBocRequest {
+            boc: boc.to_owned(),
+        };
 
         let response = self
             .send_with_retry(
                 || self.build_post_request(&url).json(&json),
                 "Failed to send BOC",
             )
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+            .map_err(|err| {
+                SendBocError::new(SendBocErrorKind::TransportFailure, format!("{err:#}"))
+            })?;
 
         if !response.status().is_success() {
             return Err(Self::handle_send_boc_fail(response));
@@ -375,7 +576,7 @@ impl TonApiClient {
         Ok(())
     }
 
-    pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
+    pub fn get_masterchain_info(&self) -> anyhow::Result<v2::TonlibResponse<v2::MasterchainInfo>> {
         let url = format!(
             "{}/getMasterchainInfo",
             self.network.toncenter_v2_url(&self.custom_networks)?
@@ -390,33 +591,217 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoResponse {
-            pub result: TonCenterMasterchainInfoResult,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoResult {
-            pub last: TonCenterMasterchainInfoLastBlock,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoLastBlock {
-            pub seqno: u64,
-        }
-
-        let data: TonCenterMasterchainInfoResponse = response
+        response
             .json()
-            .context("Failed to parse TonCenter response")?;
+            .context("Failed to parse TonCenter response")
+    }
 
-        Ok(data.result.last.seqno)
+    pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
+        Ok(self.get_masterchain_info()?.result.last.seqno)
+    }
+
+    pub fn get_masterchain_snapshot(
+        &self,
+        seqno: Option<u64>,
+    ) -> anyhow::Result<MasterchainSnapshot> {
+        let use_current_time = seqno.is_none();
+        let seqno = seqno.map_or_else(|| self.get_last_block_seqno(), Ok)?;
+        let gen_utime = if use_current_time {
+            u32::try_from(unix_timestamp()).context("Current Unix time does not fit u32")?
+        } else {
+            self.get_masterchain_block_time(seqno)?
+        };
+        let config = self.get_config_all(Some(seqno))?;
+
+        Ok(MasterchainSnapshot {
+            seqno,
+            gen_utime,
+            config,
+        })
+    }
+
+    fn get_masterchain_block_time(&self, seqno: u64) -> anyhow::Result<u32> {
+        let request_seqno =
+            u32::try_from(seqno).context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let header = self.get_block_header_v2(&v2::BlockHeaderRequest {
+            workchain: (-1).into(),
+            shard: v2::StringOrNumber::String(i64::MIN.to_string()),
+            seqno: request_seqno.into(),
+            root_hash: None,
+            file_hash: None,
+        })?;
+        Ok(header.gen_utime)
+    }
+
+    pub fn get_masterchain_snapshot_cached(
+        &self,
+        seqno: Option<u64>,
+        cache_dir: &Path,
+    ) -> anyhow::Result<MasterchainSnapshot> {
+        let use_current_time = seqno.is_none();
+        let seqno = seqno.map_or_else(|| self.get_last_block_seqno(), Ok)?;
+        let now = unix_timestamp();
+        let current_gen_utime = use_current_time
+            .then(|| u32::try_from(now).context("Current Unix time does not fit u32"))
+            .transpose()?;
+        let v2_url = self.network.toncenter_v2_url(&self.custom_networks)?;
+        let cache_path = masterchain_snapshot_cache_path(cache_dir, &self.network, seqno);
+        let cached = read_masterchain_snapshot_cache(&cache_path, &self.network, &v2_url, seqno);
+        if let Some(cached) = cached.as_ref()
+            && masterchain_snapshot_cache_entry_is_fresh(cached.fetched_at, now)
+        {
+            let gen_utime = match current_gen_utime.or(cached.gen_utime) {
+                Some(gen_utime) => gen_utime,
+                None => self.get_masterchain_block_time(seqno)?,
+            };
+            let snapshot = MasterchainSnapshot {
+                seqno,
+                gen_utime,
+                config: cached.config.clone(),
+            };
+            if cached.gen_utime.is_none() && !use_current_time {
+                let entry = MasterchainSnapshotCacheEntry::new(
+                    &self.network,
+                    v2_url,
+                    &snapshot,
+                    Some(gen_utime),
+                    cached.fetched_at,
+                );
+                if let Err(error) = write_masterchain_snapshot_cache(&cache_path, &entry) {
+                    log::debug!(
+                        "Failed to update masterchain snapshot cache {}: {error:#}",
+                        cache_path.display()
+                    );
+                }
+            }
+            return Ok(snapshot);
+        }
+
+        let snapshot = if let Some(gen_utime) = current_gen_utime {
+            self.get_config_all(Some(seqno))
+                .map(|config| MasterchainSnapshot {
+                    seqno,
+                    gen_utime,
+                    config,
+                })
+        } else {
+            self.get_masterchain_snapshot(Some(seqno))
+        };
+        match snapshot {
+            Ok(snapshot) => {
+                let entry = MasterchainSnapshotCacheEntry::new(
+                    &self.network,
+                    v2_url,
+                    &snapshot,
+                    (!use_current_time).then_some(snapshot.gen_utime),
+                    now,
+                );
+                if let Err(error) = write_masterchain_snapshot_cache(&cache_path, &entry) {
+                    log::debug!(
+                        "Failed to write masterchain snapshot cache {}: {error:#}",
+                        cache_path.display()
+                    );
+                }
+                Ok(snapshot)
+            }
+            Err(error) => {
+                if let Some(cached) = cached {
+                    let Some(gen_utime) = current_gen_utime.or(cached.gen_utime) else {
+                        return Err(error);
+                    };
+                    log::debug!(
+                        "Failed to refresh masterchain snapshot for {} at seqno {seqno}: {error:#}; using stale cache",
+                        self.network
+                    );
+                    return Ok(MasterchainSnapshot {
+                        seqno,
+                        gen_utime,
+                        config: cached.config,
+                    });
+                }
+                Err(error)
+            }
+        }
+    }
+
+    pub fn get_blocks_v3(&self, raw_query: &str) -> anyhow::Result<v3::BlocksResponse> {
+        let mut url = format!(
+            "{}/blocks",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send blocks request",
+            "Failed to parse blocks response",
+        )
+    }
+
+    pub fn get_transactions_v3(&self, raw_query: &str) -> anyhow::Result<v3::TransactionsResponse> {
+        let mut url = format!(
+            "{}/transactions",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
+        if !raw_query.is_empty() {
+            url.push('?');
+            url.push_str(raw_query);
+        }
+        self.get_json(
+            &url,
+            "Failed to send transactions request",
+            "Failed to parse transactions response",
+        )
+    }
+
+    pub fn get_shards(&self, seqno: u32) -> anyhow::Result<v2::Shards> {
+        let url = format!(
+            "{}/getShards?seqno={seqno}",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
+        let response: v2::TonlibResponse<v2::Shards> = self.get_json(
+            &url,
+            "Failed to send getShards request",
+            "Failed to parse getShards response",
+        )?;
+        Ok(response.result)
+    }
+
+    pub fn get_block_header_v2(
+        &self,
+        request: &v2::BlockHeaderRequest,
+    ) -> anyhow::Result<v2::BlockHeader> {
+        self.get_v2_result("/getBlockHeader", request)
+    }
+
+    pub fn get_block_transactions_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactions> {
+        self.get_v2_result("/getBlockTransactions", request)
+    }
+
+    pub fn get_block_transactions_ext_v2(
+        &self,
+        request: &v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<v2::BlockTransactionsExt> {
+        self.get_v2_result("/getBlockTransactionsExt", request)
+    }
+
+    pub fn lookup_block_v2(
+        &self,
+        request: &v2::LookupBlockRequest,
+    ) -> anyhow::Result<v2::TonBlockIdExt> {
+        self.get_v2_result("/lookupBlock", request)
     }
 
     pub fn get_account_info(
         &self,
         seqno: Option<u64>,
         address: &str,
-    ) -> anyhow::Result<TonCenterAccountInfoResult> {
+    ) -> anyhow::Result<v2::AddressInformation> {
         let url = format!(
             "{}/getAddressInformation?address={}{}",
             self.network.toncenter_v2_url(&self.custom_networks)?,
@@ -435,16 +820,43 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize, Debug)]
-        struct TonCenterAccountInfoResponse {
-            pub result: TonCenterAccountInfoResult,
-        }
-
-        let data: TonCenterAccountInfoResponse = response
+        let data: v2::TonlibResponse<v2::AddressInformation> = response
             .json()
             .context("Failed to parse TonCenter response")?;
 
         Ok(data.result)
+    }
+
+    pub fn get_shard_account_cell(
+        &self,
+        seqno: Option<u64>,
+        address: &str,
+    ) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getShardAccountCell?address={}{}",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
+            urlencoding::encode(address),
+            seqno
+                .map(|seqno| format!("&seqno={seqno}"))
+                .unwrap_or_default(),
+        );
+
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send getShardAccountCell request to TonCenter",
+        )?;
+
+        if !response.status().is_success() {
+            return Err(Self::handle_fail(response));
+        }
+
+        let data: v2::TonlibResponse<v2::TvmCell> = response
+            .json()
+            .context("Failed to parse getShardAccountCell response")?;
+
+        let cell_boc = data.result.bytes;
+
+        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
     }
 
     pub fn get_library_by_hash(&self, hash: &HashBytes) -> anyhow::Result<Cell> {
@@ -466,82 +878,33 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterLibrariesResponse {
-            ok: bool,
-            result: TonCenterLibrariesResult,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterLibrariesResult {
-            result: Vec<TonCenterLibraryData>,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterLibraryData {
-            found: Option<bool>,
-            data: Option<String>,
-        }
-
-        let data: TonCenterLibrariesResponse = response
+        let data: v2::TonlibResponse<v2::LibraryResult> = response
             .json()
             .context("Failed to parse TonCenter libraries response")?;
 
-        if !data.ok || data.result.result.is_empty() {
-            anyhow::bail!("Library with hash {hash_hex} not found");
-        }
-        let first = &data.result.result[0];
-        if first.found == Some(false) {
-            anyhow::bail!("Library with hash {hash_hex} not found");
-        }
-        let boc_data = first
-            .data
-            .as_deref()
+        let boc_data = data
+            .result
+            .result
+            .first()
+            .map(|entry| entry.data.as_str())
             .ok_or_else(|| anyhow::anyhow!("Library with hash {hash_hex} not found"))?;
 
         Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
     }
 
-    pub fn get_config_all(&self) -> anyhow::Result<Cell> {
-        let url = format!(
-            "{}/getConfigAll",
-            self.network.toncenter_v2_url(&self.custom_networks)?,
-        );
-
-        let response = self.send_with_retry(
-            || self.build_request(&url),
-            "Failed to send request to TonCenter for blockchain config",
+    pub fn get_config_all(&self, seqno: Option<u64>) -> anyhow::Result<Cell> {
+        let seqno = seqno
+            .map(u32::try_from)
+            .transpose()
+            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let data: v2::ConfigInfo = self.get_v2_result(
+            "/getConfigAll",
+            &v2::ConfigAllRequest {
+                seqno: seqno.map(Into::into),
+            },
         )?;
 
-        if !response.status().is_success() {
-            return Err(Self::handle_fail(response));
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigAllResponse {
-            ok: bool,
-            result: TonCenterConfigInfo,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigInfo {
-            config: TonCenterConfigCell,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigCell {
-            bytes: String,
-        }
-
-        let data: TonCenterConfigAllResponse = response
-            .json()
-            .context("Failed to parse TonCenter getConfigAll response")?;
-
-        if !data.ok {
-            anyhow::bail!("TonCenter returned ok=false for getConfigAll");
-        }
-
-        Boc::decode_base64(&data.result.config.bytes)
+        Boc::decode_base64(&data.config.bytes)
             .context("Failed to decode blockchain config BOC data")
     }
 
@@ -558,7 +921,7 @@ impl TonApiClient {
         limit: Option<u32>,
         lt: Option<String>,
         hash: Option<String>,
-    ) -> anyhow::Result<Vec<TonCenterTransaction>> {
+    ) -> anyhow::Result<Vec<v2::Transaction>> {
         let url = format!(
             "{}/getTransactions",
             self.network.toncenter_v2_url(&self.custom_networks)?
@@ -581,18 +944,10 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterTransactionsResponse {
-            result: Vec<TonCenterTransaction>,
-        }
-
-        let data: TonCenterTransactionsResponse = response
+        let data: v2::TonlibResponse<Vec<v2::Transaction>> = response
             .json()
             .context("Failed to parse getTransactions response")?;
 
@@ -615,26 +970,16 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterBalanceResponse {
-            ok: bool,
-            result: String,
-        }
-
-        let data: TonCenterBalanceResponse = response
+        let data: v2::TonlibResponse<v2::StringOrNumber> = response
             .json()
             .context("Failed to parse getAddressBalance response")?;
 
-        if !data.ok {
-            anyhow::bail!("TonCenter returned ok=false for getAddressBalance");
-        }
-
-        data.result.parse::<BigInt>().map_err(Into::into)
+        data.result.to_bigint()
     }
 
     fn handle_fail(response: Response) -> anyhow::Error {
         let status = response.status();
-        let Ok(data) = response.json::<TonCenterErrorResponse>() else {
+        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
             return anyhow!("TonCenter API returned status: {status}");
         };
 
@@ -652,7 +997,7 @@ impl TonApiClient {
 
     fn handle_send_boc_fail(response: Response) -> SendBocError {
         let status = response.status();
-        let Ok(data) = response.json::<TonCenterErrorResponse>() else {
+        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
             return SendBocError::new(
                 SendBocErrorKind::Other,
                 format!("TonCenter API returned status: {status}"),
@@ -666,6 +1011,22 @@ impl TonApiClient {
 
         SendBocError::new(classify_toncenter_send_boc_error(&raw_msg), raw_msg)
     }
+}
+
+fn test_retry_backoff_override() -> Option<Duration> {
+    let value = env::var(TEST_TONCENTER_RETRY_BACKOFF_MS_ENV).ok()?;
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    value.parse::<u64>().ok().map(Duration::from_millis)
+}
+
+fn toncenter_min_request_interval() -> Duration {
+    env::var(TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map_or(TONCENTER_MIN_REQUEST_INTERVAL, Duration::from_millis)
 }
 
 fn classify_toncenter_send_boc_error(raw_msg: &str) -> SendBocErrorKind {
@@ -708,333 +1069,6 @@ fn normalize_toncenter_error_message(raw_msg: &str) -> Option<&'static str> {
     None
 }
 
-#[derive(Deserialize, Clone)]
-pub struct AccountState {
-    pub address: String,
-    pub balance: Option<String>,
-    pub code_boc: Option<String>,
-    pub status: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GetMethodResult {
-    pub stack: Vec<serde_json::Value>,
-    pub exit_code: i32,
-}
-
-impl GetMethodResult {
-    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvm_ffi::stack::Tuple> {
-        match json_to_legacy_stack(self.stack.clone()) {
-            Ok(tuple) => Ok(tuple),
-            Err(legacy_err) => json_to_stack(self.stack.clone()).with_context(|| {
-                format!(
-                    "Failed to parse stack as legacy and std formats. Legacy error: {legacy_err}"
-                )
-            }),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct TonCenterAccountInfoResult {
-    pub balance: StringOrNumber,
-    pub code: String,
-    pub data: String,
-    pub state: String,
-    pub frozen_hash: String,
-    pub last_transaction_id: TonCenterAccountInfoLastTransactionId,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct TonCenterAccountInfoLastTransactionId {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum StringOrNumber {
-    Str(String),
-    Num(i64),
-}
-
-impl StringOrNumber {
-    pub fn to_bigint(&self) -> anyhow::Result<BigInt> {
-        match self {
-            StringOrNumber::Str(str) => str.parse::<BigInt>().map_err(Into::into),
-            StringOrNumber::Num(num) => num
-                .to_bigint()
-                .ok_or_else(|| anyhow!("cannot convert {num} to bigint")),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterTransaction {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub utime: u64,
-    pub data: String,
-    pub transaction_id: TonCenterTransactionId,
-    pub fee: String,
-    pub storage_fee: String,
-    pub other_fee: String,
-    pub in_msg: Option<TonCenterMessage>,
-    pub out_msgs: Vec<TonCenterMessage>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterTransactionId {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterMessage {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub value: String,
-    pub fwd_fee: Option<String>,
-    pub ihr_fee: Option<String>,
-    pub created_lt: Option<String>,
-    pub hash: Option<String>,
-    pub body_hash: Option<String>,
-    pub message: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct TonCenterErrorResponse {
-    #[allow(dead_code)]
-    ok: bool,
-    error: String,
-}
-
-/// TonCenter v3 transaction summary returned by `/api/v3/transactionsByMessage` and
-/// embedded inside `/api/v3/traces` responses.
-///
-/// `/traces` does not ship the raw Transaction BoC — callers reconstruct a synthetic
-/// `Transaction` cell from the structured fields below.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3TransactionSummary {
-    pub account: String,
-    pub hash: String,
-    pub lt: String,
-    #[serde(default)]
-    pub now: u32,
-    #[serde(default)]
-    pub prev_trans_hash: Option<String>,
-    #[serde(default)]
-    pub prev_trans_lt: Option<String>,
-    #[serde(default)]
-    pub orig_status: Option<String>,
-    #[serde(default)]
-    pub end_status: Option<String>,
-    #[serde(default)]
-    pub total_fees: Option<String>,
-    #[serde(default)]
-    pub total_fees_extra_currencies: HashMap<String, String>,
-    #[serde(default)]
-    pub description: Option<V3TxDescription>,
-    #[serde(default)]
-    pub in_msg: Option<V3MessageSummary>,
-    #[serde(default)]
-    pub out_msgs: Vec<V3MessageSummary>,
-    #[serde(default)]
-    pub account_state_before: Option<V3AccountStateRef>,
-    #[serde(default)]
-    pub account_state_after: Option<V3AccountStateRef>,
-}
-
-/// Opaque pointer to the account state before/after the transaction executed. Only the
-/// `hash` is used today — it feeds `state_update` so synthesized tx cells match their
-/// on-chain `repr_hash`.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3AccountStateRef {
-    #[serde(default)]
-    pub hash: Option<String>,
-}
-
-/// v3 transaction description. Only the subset of fields consumed during synthesis is
-/// deserialized; everything else is skipped so unknown flags from future toncenter
-/// versions don't break us.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3TxDescription {
-    #[serde(default, rename = "type")]
-    pub ty: Option<String>,
-    #[serde(default)]
-    pub aborted: Option<bool>,
-    #[serde(default)]
-    pub destroyed: Option<bool>,
-    #[serde(default)]
-    pub credit_first: Option<bool>,
-    #[serde(default)]
-    pub compute_ph: Option<V3ComputePhase>,
-    #[serde(default)]
-    pub action: Option<V3ActionPhase>,
-    #[serde(default)]
-    pub storage_ph: Option<V3StoragePhase>,
-    #[serde(default)]
-    pub credit_ph: Option<V3CreditPhase>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3CreditPhase {
-    #[serde(default)]
-    pub due_fees_collected: Option<String>,
-    #[serde(default)]
-    pub credit: Option<String>,
-    #[serde(default)]
-    pub credit_extra_currencies: HashMap<String, String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3ComputePhase {
-    #[serde(default)]
-    pub skipped: Option<bool>,
-    #[serde(default)]
-    pub success: Option<bool>,
-    #[serde(default)]
-    pub msg_state_used: Option<bool>,
-    #[serde(default)]
-    pub account_activated: Option<bool>,
-    #[serde(default)]
-    pub gas_fees: Option<String>,
-    #[serde(default)]
-    pub gas_used: Option<String>,
-    #[serde(default)]
-    pub gas_limit: Option<String>,
-    #[serde(default)]
-    pub gas_credit: Option<String>,
-    #[serde(default)]
-    pub mode: Option<i8>,
-    #[serde(default)]
-    pub exit_code: Option<i32>,
-    #[serde(default)]
-    pub exit_arg: Option<i32>,
-    #[serde(default)]
-    pub vm_steps: Option<u32>,
-    #[serde(default)]
-    pub vm_init_state_hash: Option<String>,
-    #[serde(default)]
-    pub vm_final_state_hash: Option<String>,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3ActionPhase {
-    #[serde(default)]
-    pub success: Option<bool>,
-    #[serde(default)]
-    pub valid: Option<bool>,
-    #[serde(default)]
-    pub no_funds: Option<bool>,
-    #[serde(default)]
-    pub status_change: Option<String>,
-    #[serde(default)]
-    pub result_code: Option<i32>,
-    #[serde(default)]
-    pub result_arg: Option<i32>,
-    // `tot_actions` is the on-wire name; `total_actions` is accepted as a fallback so old
-    // fixtures and forks that never shortened the key still deserialize.
-    #[serde(default, alias = "total_actions")]
-    pub tot_actions: Option<u16>,
-    #[serde(default)]
-    pub spec_actions: Option<u16>,
-    #[serde(default)]
-    pub skipped_actions: Option<u16>,
-    #[serde(default)]
-    pub msgs_created: Option<u16>,
-    #[serde(default)]
-    pub total_fwd_fees: Option<String>,
-    #[serde(default)]
-    pub total_action_fees: Option<String>,
-    #[serde(default)]
-    pub action_list_hash: Option<String>,
-    #[serde(default)]
-    pub tot_msg_size: Option<V3StorageUsedShort>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3StorageUsedShort {
-    #[serde(default)]
-    pub cells: Option<String>,
-    #[serde(default)]
-    pub bits: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3StoragePhase {
-    #[serde(default)]
-    pub storage_fees_collected: Option<String>,
-    #[serde(default)]
-    pub storage_fees_due: Option<String>,
-    #[serde(default)]
-    pub status_change: Option<String>,
-}
-
-/// v3 message summary (embedded in `in_msg` / `out_msgs` of each transaction). Contains
-/// enough to reconstruct a full `Message` cell without querying raw BoCs.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3MessageSummary {
-    #[serde(default)]
-    pub hash: Option<String>,
-    #[serde(default)]
-    pub source: Option<String>,
-    #[serde(default)]
-    pub destination: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub value_extra_currencies: Option<HashMap<String, String>>,
-    #[serde(default)]
-    pub fwd_fee: Option<String>,
-    #[serde(default)]
-    pub ihr_fee: Option<String>,
-    #[serde(default)]
-    pub created_lt: Option<String>,
-    #[serde(default)]
-    pub created_at: Option<String>,
-    #[serde(default)]
-    pub ihr_disabled: Option<bool>,
-    #[serde(default)]
-    pub bounce: Option<bool>,
-    #[serde(default)]
-    pub bounced: Option<bool>,
-    #[serde(default)]
-    pub import_fee: Option<String>,
-    #[serde(default)]
-    pub message_content: Option<V3MessageContent>,
-    #[serde(default)]
-    pub init_state: Option<V3MessageContent>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3MessageContent {
-    #[serde(default)]
-    pub hash: Option<String>,
-    #[serde(default)]
-    pub body: Option<String>,
-}
-
-/// TonCenter v3 trace envelope returned by `/api/v3/traces`.
-///
-/// Only the fields actually used by acton are deserialized. `transactions_order` lists
-/// transactions in their natural parent-first order; each entry keys into `transactions`.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3Trace {
-    pub trace_id: String,
-    pub transactions_order: Vec<String>,
-    pub transactions: HashMap<String, V3TransactionSummary>,
-    /// Set by the indexer when the trace exceeds its `MaxTraceTransactions` threshold —
-    /// in that case `transactions`/`transactions_order` are truncated and retries won't
-    /// help, so callers should bail rather than return a partial `SendResultList`.
-    #[serde(default)]
-    pub is_incomplete: bool,
-}
-
 impl TonApiClient {
     /// Fetch traces that include a message with the given hash using toncenter v3.
     ///
@@ -1046,16 +1080,32 @@ impl TonApiClient {
         &self,
         msg_hash: &str,
         limit: u32,
-    ) -> anyhow::Result<Vec<V3Trace>> {
+    ) -> anyhow::Result<Vec<v3::Trace>> {
+        self.get_traces_by_hash_param("msg_hash", msg_hash, limit)
+    }
+
+    /// Fetch a trace by its root transaction hash using toncenter v3.
+    pub fn get_traces_by_tx_hash(
+        &self,
+        tx_hash: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<v3::Trace>> {
+        self.get_traces_by_hash_param("tx_hash", tx_hash, limit)
+    }
+
+    fn get_traces_by_hash_param(
+        &self,
+        hash_param: &str,
+        hash: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<v3::Trace>> {
         let url = format!(
             "{}/traces",
             self.network.toncenter_v3_url(&self.custom_networks)?
         );
 
-        let params: Vec<(&str, String)> = vec![
-            ("msg_hash", msg_hash.to_owned()),
-            ("limit", limit.to_string()),
-        ];
+        let params: Vec<(&str, String)> =
+            vec![(hash_param, hash.to_owned()), ("limit", limit.to_string())];
 
         let response = self.send_with_retry(
             || self.build_request(&url).query(&params),
@@ -1063,31 +1113,39 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter v3 traces returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter v3 traces returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct Resp {
-            traces: Vec<V3Trace>,
-        }
-
-        let data: Resp = response.json().context("Failed to parse traces response")?;
+        let data: v3::TracesResponse =
+            response.json().context("Failed to parse traces response")?;
         Ok(data.traces)
     }
 }
 
-fn should_disable_system_proxy() -> bool {
-    std::env::var("ACTON_DISABLE_SYSTEM_PROXY")
-        .map(|value| value.trim() == "1")
-        .unwrap_or(false)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::normalize_toncenter_error_message;
+    use super::*;
+    use std::ffi::OsStr;
+    use std::sync::Arc;
+
+    #[test]
+    fn acton_use_proxy_is_disabled_by_default() {
+        assert!(!proxy_enabled_from_value(None));
+    }
+
+    #[test]
+    fn acton_use_proxy_accepts_1_or_true() {
+        for value in ["1", "true"] {
+            assert!(proxy_enabled_from_value(Some(OsStr::new(value))));
+        }
+    }
+
+    #[test]
+    fn acton_use_proxy_rejects_other_values() {
+        for value in ["", "0", "false", "TRUE", "yes"] {
+            assert!(!proxy_enabled_from_value(Some(OsStr::new(value))));
+        }
+    }
 
     #[test]
     fn normalize_toncenter_error_message_maps_missing_account_state() {
@@ -1123,5 +1181,80 @@ mod tests {
             normalize_toncenter_error_message("mock toncenter failure"),
             None,
         );
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_round_trips() {
+        let temp_dir = tempfile::tempdir().expect("temporary cache directory");
+        let network = Network::Custom(Arc::from("snapshot-test"));
+        let snapshot = MasterchainSnapshot {
+            seqno: 123_456,
+            gen_utime: 1_700_000_000,
+            config: Cell::default(),
+        };
+        let entry = MasterchainSnapshotCacheEntry::new(
+            &network,
+            "http://127.0.0.1:8080/api/v2".to_owned(),
+            &snapshot,
+            Some(snapshot.gen_utime),
+            100,
+        );
+        let path = masterchain_snapshot_cache_path(temp_dir.path(), &network, snapshot.seqno);
+
+        write_masterchain_snapshot_cache(&path, &entry).expect("write snapshot cache");
+        let cached = read_masterchain_snapshot_cache(
+            &path,
+            &network,
+            "http://127.0.0.1:8080/api/v2",
+            snapshot.seqno,
+        )
+        .expect("read snapshot cache");
+
+        assert_eq!(cached.gen_utime, Some(snapshot.gen_utime));
+        assert_eq!(cached.config.repr_hash(), snapshot.config.repr_hash());
+        let latest_cached = MasterchainSnapshotCacheEntry::new(
+            &network,
+            "http://127.0.0.1:8080/api/v2".to_owned(),
+            &snapshot,
+            None,
+            100,
+        )
+        .into_cached_snapshot()
+        .expect("decode latest snapshot cache");
+        assert_eq!(latest_cached.gen_utime, None);
+        assert!(
+            read_masterchain_snapshot_cache(
+                &path,
+                &network,
+                "http://127.0.0.1:8081/api/v2",
+                snapshot.seqno,
+            )
+            .is_none(),
+            "cache from another endpoint must not be reused"
+        );
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_expires_after_ttl() {
+        assert!(masterchain_snapshot_cache_entry_is_fresh(
+            100,
+            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs() - 1
+        ));
+        assert!(!masterchain_snapshot_cache_entry_is_fresh(
+            100,
+            100 + MASTERCHAIN_SNAPSHOT_CACHE_TTL.as_secs()
+        ));
+    }
+
+    #[test]
+    fn masterchain_snapshot_cache_separates_builtin_and_custom_networks() {
+        let root = Path::new("/tmp/acton-project/build/cache/masterchain-snapshots");
+        let builtin = masterchain_snapshot_cache_path(root, &Network::Mainnet, 42);
+        let custom =
+            masterchain_snapshot_cache_path(root, &Network::Custom(Arc::from("mainnet")), 42);
+
+        assert_ne!(builtin, custom);
+        assert_eq!(builtin, root.join("mainnet").join("42.json"));
+        assert_eq!(custom, root.join("custom-mainnet").join("42.json"));
     }
 }

@@ -333,6 +333,7 @@ pub fn has_fmt_ignore(ctx: &Context<'_>, comments: Option<&Vec<Comment>>) -> boo
     })
 }
 
+#[must_use]
 pub fn has_inline_line_comment_in_subtree(ctx: &Context<'_>, root: Node<'_>) -> bool {
     let root_start = root.start_byte();
     let root_end = root.end_byte();

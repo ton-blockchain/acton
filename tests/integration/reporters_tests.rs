@@ -127,7 +127,9 @@ fn test_teamcity_reporter_basic_passing() {
         .assert_contains("##teamcity[testStarted")
         .assert_contains("##teamcity[testFinished")
         .assert_contains("##teamcity[testSuiteFinished")
-        .assert_snapshot_matches("integration/snapshots/test_teamcity_basic_passing.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_teamcity_basic_passing.stdout.txt",
+        );
 }
 
 #[test]
@@ -144,7 +146,7 @@ fn test_teamcity_reporter_with_failing_test() {
         .assert_contains("##teamcity[testFailed")
         .assert_contains("exit_code=10")
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_with_failing_test.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_with_failing_test.stdout.txt",
         );
 }
 
@@ -174,7 +176,7 @@ fn test_teamcity_reporter_with_get_method_failure() {
         .assert_contains("##teamcity[testFailed")
         .assert_contains("Cannot execute get method")
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_with_get_method_failure.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_with_get_method_failure.stdout.txt",
         );
 }
 
@@ -195,7 +197,7 @@ fn test_teamcity_reporter_with_fuzz_failure_includes_seed_and_inputs() {
         .assert_contains("Fuzz seed: 17")
         .assert_contains("Inputs: value=0")
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_with_fuzz_failure.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_with_fuzz_failure.stdout.txt",
         );
 }
 
@@ -213,7 +215,7 @@ fn test_teamcity_reporter_with_skipped_test() {
         .assert_contains("##teamcity[testSuiteStarted")
         .assert_contains("##teamcity[testSuiteFinished")
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_with_skipped_test.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_with_skipped_test.stdout.txt",
         );
 }
 
@@ -236,10 +238,12 @@ fn test_junit_reporter_basic_passing() {
             "test-results/TEST-counter.test.tolk.xml",
             r#"<testcase name="test should increase counter""#,
         )
-        .assert_snapshot_matches("integration/snapshots/test_junit_basic_passing.stdout.txt")
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_basic_passing.stdout.txt",
+        )
         .assert_file_snapshot_matches(
             "test-results/TEST-counter.test.tolk.xml",
-            "integration/snapshots/test_junit_basic_passing.xml.gen",
+            "integration/snapshots/reporters/test_junit_basic_passing.xml.gen",
         );
 }
 
@@ -257,9 +261,11 @@ fn test_junit_reporter_with_failing_test() {
         .assert_contains("exit_code=10")
         .assert_file_snapshot_matches(
             "test-results/TEST-counter.test.tolk.xml",
-            "integration/snapshots/test_junit_reporter_with_failing_test.xml.gen",
+            "integration/snapshots/reporters/test_junit_reporter_with_failing_test.xml.gen",
         )
-        .assert_snapshot_matches("integration/snapshots/test_junit_with_failing_test.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_with_failing_test.stdout.txt",
+        );
 }
 
 #[test]
@@ -278,9 +284,135 @@ fn test_junit_reporter_with_fuzz_failure_includes_seed_and_inputs() {
         .assert_contains("Fuzz case 1/2")
         .assert_file_snapshot_matches(
             "test-results/TEST-test.test.tolk.xml",
-            "integration/snapshots/test_junit_reporter_with_fuzz_failure.xml.gen",
+            "integration/snapshots/reporters/test_junit_reporter_with_fuzz_failure.xml.gen",
         )
-        .assert_snapshot_matches("integration/snapshots/test_junit_with_fuzz_failure.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_with_fuzz_failure.stdout.txt",
+        );
+}
+
+#[test]
+fn test_junit_reporter_includes_captured_stdout_and_stderr() {
+    ProjectBuilder::new("junit_captured_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test junit captured output`() {
+                println("junit stdout <&>");
+                eprintln("junit stderr <&>");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            "test-results/TEST-output.test.tolk.xml",
+            "integration/snapshots/reporters/test_junit_reporter_includes_captured_stdout_and_stderr.xml.gen",
+        );
+}
+
+#[test]
+fn test_junit_reporter_keeps_captured_output_with_no_capture() {
+    ProjectBuilder::new("junit_no_capture_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test junit no capture output`() {
+                println("junit no capture stdout");
+                debug.dumpStack();
+                eprintln("junit no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .verbose()
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            "test-results/TEST-output.test.tolk.xml",
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.xml.gen",
+        );
+}
+
+#[test]
+fn test_dot_reporter_no_capture_prints_live_output_once() {
+    ProjectBuilder::new("dot_no_capture_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test dot no capture output`() {
+                println("dot no capture stdout");
+                eprintln("dot no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("dot")
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_dot_reporter_no_capture_prints_live_output_once.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_dot_reporter_no_capture_prints_live_output_once.stderr.txt",
+        );
+}
+
+#[test]
+fn test_console_reporter_no_capture_keeps_verbose_debug_output_after_test() {
+    ProjectBuilder::new("console_no_capture_verbose_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test console no capture verbose output`() {
+                println("console no capture stdout");
+                debug.dumpStack();
+                eprintln("console no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .verbose()
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_console_reporter_no_capture_keeps_verbose_debug_output_after_test.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_console_reporter_no_capture_keeps_verbose_debug_output_after_test.stderr.txt",
+        );
 }
 
 #[test]
@@ -296,7 +428,7 @@ fn test_multiple_reporters_console_and_teamcity() {
         .assert_contains("✓")
         .assert_contains("##teamcity[testSuiteStarted")
         .assert_snapshot_matches(
-            "integration/snapshots/test_multiple_reporters_console_teamcity.stdout.txt",
+            "integration/snapshots/reporters/test_multiple_reporters_console_teamcity.stdout.txt",
         );
 }
 
@@ -343,15 +475,56 @@ fn test_teamcity_reporter_multiple_files() {
         .assert_failed(1)
         .assert_contains("##teamcity[testSuiteStarted")
         .assert_contains("##teamcity[testSuiteFinished")
-        .assert_snapshot_matches("integration/snapshots/test_teamcity_multiple_files.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_teamcity_multiple_files.stdout.txt",
+        );
+}
+
+#[test]
+fn test_teamcity_reporter_with_skipped_and_todo_tests() {
+    ProjectBuilder::new("teamcity_skip_todo")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "skip_todo",
+            r#"
+            import "../../lib/testing/expect"
+
+            @test.skip("skip | ' []")
+            get fun `test teamcity skipped`() {
+                expect(1).toEqual(2);
+            }
+
+            @test.todo("todo | ' []")
+            get fun `test teamcity todo`() {
+                expect(1).toEqual(2);
+            }
+
+            get fun `test teamcity passes`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .success()
+        .assert_skipped(1)
+        .assert_todo(1)
+        .assert_contains("##teamcity[testIgnored")
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_teamcity_with_skipped_and_todo_tests.stdout.txt",
+        );
 }
 
 #[test]
 fn test_teamcity_reporter_escapes_location_hint_special_chars() {
     let project = ProjectBuilder::new("teamcity_location_hint_escape")
         .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "escape",
+        .raw_file(
+            "tests/teamcity '[] .test.tolk",
             r"
             get fun `test teamcity '|[]`() {
             }
@@ -368,7 +541,7 @@ fn test_teamcity_reporter_escapes_location_hint_special_chars() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_reporter_escapes_location_hint_special_chars.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_reporter_escapes_location_hint_special_chars.stdout.txt",
         );
 }
 
@@ -384,7 +557,7 @@ fn test_teamcity_reporter_comparison_failure_snapshots_complex_values() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_teamcity_comparison_failures_complex_values.stdout.txt",
+            "integration/snapshots/reporters/test_teamcity_comparison_failures_complex_values.stdout.txt",
         );
 }
 
@@ -431,14 +604,14 @@ fn test_junit_reporter_multiple_files_with_failures() {
         .assert_failed(1)
         .assert_file_snapshot_matches(
             "test-results/TEST-wallet.test.tolk.xml",
-            "integration/snapshots/test_junit_reporter_multiple_files_with_failures_wallet_test.xml.gen",
+            "integration/snapshots/reporters/test_junit_reporter_multiple_files_with_failures_wallet_test.xml.gen",
         )
         .assert_file_snapshot_matches(
             "test-results/TEST-utils.test.tolk.xml",
-            "integration/snapshots/test_junit_reporter_multiple_files_with_failures_utils_test.xml.gen",
+            "integration/snapshots/reporters/test_junit_reporter_multiple_files_with_failures_utils_test.xml.gen",
         )
         .assert_snapshot_matches(
-            "integration/snapshots/test_junit_multiple_files_with_failures.stdout.txt",
+            "integration/snapshots/reporters/test_junit_multiple_files_with_failures.stdout.txt",
         );
 }
 
@@ -473,7 +646,7 @@ fn test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs()
         .assert_passed(2)
         .assert_file_snapshot_matches(
             "test-results/junit-results.xml",
-            "integration/snapshots/test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs.xml.gen",
+            "integration/snapshots/reporters/test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs.xml.gen",
         );
 }
 
@@ -515,7 +688,7 @@ fn test_junit_reporter_with_merge() {
         .assert_file_contains("test-results/junit-results.xml", r"<testsuite")
         .assert_file_snapshot_matches(
             "test-results/junit-results.xml",
-            "integration/snapshots/test_junit_with_merge.xml.gen",
+            "integration/snapshots/reporters/test_junit_with_merge.xml.gen",
         );
 }
 

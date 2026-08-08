@@ -1,0 +1,43 @@
+{
+  "opcodes": {
+    "0xfa170099": {
+      "all_values": [
+        253
+      ],
+      "avg_gas": 253,
+      "max_gas": 253,
+      "min_gas": 253,
+      "samples": 1
+    }
+  },
+  "timestamp": 0,
+  "trace_chains": {
+    "test-profiled-unknown-opcode::trace#1": {
+      "test_name": "test-profiled-unknown-opcode",
+      "total_fees": 20601,
+      "total_forward_fees": 89157,
+      "total_gas_fees": 20601,
+      "total_gas_used": 309,
+      "trace_name": "Trace 1",
+      "tx_count": 1
+    },
+    "test-profiled-unknown-opcode::trace#2": {
+      "test_name": "test-profiled-unknown-opcode",
+      "total_fees": 16868,
+      "total_forward_fees": 63113,
+      "total_gas_fees": 16868,
+      "total_gas_used": 253,
+      "trace_name": "Trace 2",
+      "tx_count": 1
+    },
+    "test-profiled-unknown-opcode::trace#3": {
+      "test_name": "test-profiled-unknown-opcode",
+      "total_fees": 16868,
+      "total_forward_fees": 44446,
+      "total_gas_fees": 16868,
+      "total_gas_used": 253,
+      "trace_name": "Trace 3",
+      "tx_count": 1
+    }
+  }
+}

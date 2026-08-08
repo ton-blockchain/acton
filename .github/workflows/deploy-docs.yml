@@ -2,6 +2,11 @@ name: Deploy Docs
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     branches:
       - master
     paths:
@@ -24,6 +29,7 @@ permissions: { }
 jobs:
   build:
     name: Build docs
+    if:  github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
@@ -31,8 +37,10 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
+          lfs: true
           persist-credentials: false
 
       - name: Setup Bun
@@ -57,9 +65,13 @@ jobs:
         working-directory: docs
         run: bun run generated-source
 
-      - name: Lint Check links
+      - name: Check docs formatting
         working-directory: docs
-        run: bun run lint:links
+        run: bun run fmt:check
+
+      - name: Lint Check docs
+        working-directory: docs
+        run: bun run docs-lint
 
       - name: Build docs
         working-directory: docs

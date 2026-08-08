@@ -1,0 +1,741 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
+#[path = "../../support.rs"]
+mod support;
+#[path = "definition/upstream.rs"]
+mod upstream;
+
+use expect_test::{Expect, expect};
+use std::fmt::Write as _;
+use support::MarkedSource;
+use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::{
+    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position, ProfileSummary,
+    WorkspaceConfig,
+};
+
+fn case_tolk_definition(
+    uri: &str,
+    source: &str,
+    configure: impl FnOnce(&mut LanguageService),
+    expect: Expect,
+) {
+    let marked = MarkedSource::parse(source);
+    let carets = marked
+        .markers()
+        .iter()
+        .filter(|marker| marker.name == "caret" || marker.name.starts_with("caret:"))
+        .collect::<Vec<_>>();
+    assert!(
+        !carets.is_empty(),
+        "Tolk definition test must contain a caret marker"
+    );
+    let uri = DocumentUri::from(uri);
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    configure(&mut service);
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let mut rendered = String::new();
+    for caret in carets {
+        let locations = service
+            .definition(&uri, caret.position)
+            .expect("definition request should succeed");
+        if !rendered.is_empty() {
+            rendered.push('\n');
+        }
+        rendered.push_str(&render_definition(caret.position, &locations));
+    }
+    expect.assert_eq(&rendered);
+}
+
+#[test]
+fn resolves_function_in_same_file() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun helper(): int { return 1; }
+            fun main(): int { return <caret>helper(); }
+        ",
+        |_| {},
+        expect![[r"
+            1:25 -> file:///fixture/main.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_stdlib_method_on_string_literal() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            fun main() {
+                val valid = "abc-123".begin<caret>Parse();
+            }
+        "#,
+        |_| {},
+        expect![[r"
+            1:31 -> file:///__tolk_stdlib__/common.tolk 1079:11 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_compiler_provided_builtin() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            fun main() {
+                __expect_<caret>lazy("value");
+            }
+        "#,
+        |_| {},
+        expect![[r"
+            1:13 -> file:///__tolk_stdlib__/builtin.tolk 112:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_backticked_method_name() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun int.`~increment`(self): int { return self + 1; }
+            fun main(value: int) {
+                value.`~inc<caret>rement`();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            2:15 -> file:///fixture/main.tolk 0:8 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_sized_builtin_type_to_its_family() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun main(value: int<caret>32) {}
+        ",
+        |_| {},
+        expect![[r"
+            0:19 -> file:///__tolk_stdlib__/common.tolk 63:5 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_method_on_null_coalescing_expression() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            global callOrder: tuple;
+            fun int.double(self) { return self * 2; }
+            fun get(value: int?, fallback: int) {
+                callOrder.push(value);
+                return value ?? fallback;
+            }
+            fun main(value: int?) {
+                return (get(value, 5) ?? get(100, 10)).dou<caret>ble();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            7:46 -> file:///fixture/main.tolk 1:8 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_field_on_generic_struct_parameter() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Wrapper<T> {
+                value: T
+            }
+
+            fun read<T>(wrapper: Wrapper<T>): T {
+                return wrapper.va<caret>lue;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            5:21 -> file:///fixture/main.tolk 1:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_nested_generic_object_literal_fields_from_cast_hint() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Wrapper<T> {
+                value: T
+            }
+
+            fun main() {
+                return ({ va<caret:outer>lue: { va<caret:inner>lue: 1 } } }
+                    as Wrapper<Wrapper<int8>>);
+            }
+        ",
+        |_| {},
+        expect![[r"
+            5:16 -> file:///fixture/main.tolk 1:4 resolved
+            5:25 -> file:///fixture/main.tolk 1:4 resolved"]],
+    );
+}
+
+#[test]
+fn accepts_file_uri_with_authority() {
+    case_tolk_definition(
+        "file://fixture/main.tolk",
+        r"
+            fun helper(): int { return 1; }
+            fun main(): int { return <caret>helper(); }
+        ",
+        |_| {},
+        expect![[r"
+            1:25 -> file://fixture/main.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_imports_whose_file_uri_contains_encoded_path_bytes() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            import "my lib"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///fixture/my%20lib.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("encoded provider file should be added");
+        },
+        expect![[r"
+            1:25 -> file:///fixture/my%20lib.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn accepts_plain_virtual_uri() {
+    case_tolk_definition(
+        "workspace/main.tolk",
+        r"
+            fun helper(): int { return 1; }
+            fun main(): int { return <caret>helper(); }
+        ",
+        |_| {},
+        expect![[r"
+            1:25 -> workspace/main.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_imported_function() {
+    case_tolk_definition(
+        "acton://fixture/main.tolk",
+        r#"
+            import "lib"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "acton://fixture/lib.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r"
+            1:25 -> acton://fixture/lib.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_relative_import_path_but_not_the_import_keyword() {
+    case_tolk_definition(
+        "acton://fixture/main.tolk",
+        r#"
+            im<caret:keyword>port "<caret:path>lib"
+            fun main() {}
+        "#,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "acton://fixture/lib.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r#"
+            0:2 unresolved
+            0:8 -> acton://fixture/lib.tolk 0:0 resolved"#]],
+    );
+}
+
+#[test]
+fn unresolved_import_path_has_no_definition() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            import "<caret>missing"
+            fun main() {}
+        "#,
+        |_| {},
+        expect![["0:8 unresolved"]],
+    );
+}
+
+#[test]
+fn removes_provider_file_from_workspace() {
+    let main_uri = DocumentUri::from("acton://fixture/main.tolk");
+    let lib_uri = DocumentUri::from("acton://fixture/lib.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    service
+        .add_source_file(
+            LANGUAGE_ID,
+            lib_uri.clone(),
+            "fun helper(): int { return 1; }\n",
+        )
+        .expect("provider file should be added");
+    service
+        .open_document(
+            main_uri.clone(),
+            LANGUAGE_ID,
+            1,
+            "import \"lib\"\nfun main(): int { return helper(); }\n",
+        )
+        .expect("main file should open");
+
+    let before = service
+        .definition(&main_uri, Position::new(1, 25))
+        .expect("definition should resolve before removal");
+
+    service
+        .remove_source_file(LANGUAGE_ID, &lib_uri)
+        .expect("provider file should be removed");
+    let after = service
+        .definition(&main_uri, Position::new(1, 25))
+        .expect("definition should not fail after removal");
+    let actual = format!(
+        "before: {}\nafter: {}",
+        render_definition(Position::new(1, 25), &before),
+        render_definition(Position::new(1, 25), &after),
+    );
+    expect![[r"
+        before: 1:25 -> acton://fixture/lib.tolk 0:4 resolved
+        after: 1:25 unresolved"]]
+    .assert_eq(&actual);
+}
+
+#[test]
+fn resolves_imported_function_through_acton_toml_mapping() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@lib/helper"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new(
+                        "file:///workspace",
+                        Some(DocumentUri::from("file:///workspace/Acton.toml")),
+                        r#"
+                            [package]
+                            name = "fixture"
+                            version = "0.1.0"
+
+                            [import-mappings]
+                            lib = "./src/lib"
+                        "#,
+                    ),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/src/lib/helper.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r"
+            1:25 -> file:///workspace/src/lib/helper.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_mapped_import_path() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@lib/<caret>helper"
+            fun main() {}
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new(
+                        "file:///workspace",
+                        Some(DocumentUri::from("file:///workspace/Acton.toml")),
+                        r#"
+                            [package]
+                            name = "fixture"
+                            version = "0.1.0"
+
+                            [import-mappings]
+                            lib = "./src/lib"
+                        "#,
+                    ),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/src/lib/helper.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r#"
+            0:13 -> file:///workspace/src/lib/helper.tolk 0:0 resolved"#]],
+    );
+}
+
+#[test]
+fn resolves_stdlib_import_to_external_root() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@stdlib/<caret:import>common"
+            fun main(): int { return <caret:symbol>stdlibHelper(); }
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new("file:///workspace", None, "")
+                        .with_tolk_stdlib_root_uri("file:///workspace/.acton/tolk-stdlib"),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/.acton/tolk-stdlib/common.tolk",
+                    "fun stdlibHelper(): int { return 1; }\n",
+                )
+                .expect("provider stdlib file should be added");
+        },
+        expect![[r"
+            0:16 -> file:///workspace/.acton/tolk-stdlib/common.tolk 0:0 resolved
+            1:25 -> file:///workspace/.acton/tolk-stdlib/common.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_local_variable() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun main(): int {
+                var value = 1;
+                return <caret>value;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            2:11 -> file:///fixture/main.tolk 1:8 resolved"]],
+    );
+}
+
+#[test]
+fn declarations_resolve_to_themselves() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun <caret:function>helper(): int { return 1; }
+            fun main(): int {
+                var <caret:local>value = helper();
+                return value;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            0:4 -> file:///fixture/main.tolk 0:4 resolved
+            2:8 -> file:///fixture/main.tolk 2:8 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_instance_method_and_field_with_type_inference() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Storage {
+                counter: int
+            }
+            fun Storage.save(self) {}
+            fun main() {
+                var storage = Storage { counter: 1 };
+                storage.<caret:method>save();
+                storage.<caret:field>counter;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            6:12 -> file:///fixture/main.tolk 3:12 resolved
+            7:12 -> file:///fixture/main.tolk 1:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_stdlib_static_and_generic_methods() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Storage {
+                counter: int
+            }
+            fun main() {
+                Storage.<caret:from_cell>fromCell(contract.getData());
+                contract.<caret:get_data>getData();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            4:12 -> file:///__tolk_stdlib__/common.tolk 483:6 resolved
+            5:13 -> file:///__tolk_stdlib__/common.tolk 378:13 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_chained_generic_stdlib_methods() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Body {
+                value: int
+            }
+            fun main() {
+                val body = Body { value: 1 };
+                beginCell()
+                    .<caret:store_uint>storeUint(1, 32)
+                    .<caret:store_slice>storeSlice(body.<caret:to_cell>toCell().<caret:begin_parse>beginParse())
+                    .<caret:end_cell>endCell();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            6:9 -> file:///__tolk_stdlib__/common.tolk 1320:12 resolved
+            7:9 -> file:///__tolk_stdlib__/common.tolk 1325:12 resolved
+            7:25 -> file:///__tolk_stdlib__/common.tolk 473:6 resolved
+            7:34 -> file:///__tolk_stdlib__/common.tolk 562:12 resolved
+            8:9 -> file:///__tolk_stdlib__/common.tolk 1299:12 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_fields_in_counter_contract_body() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            tolk 1.0
+
+            struct Storage {
+                id: uint32
+                counter: uint32
+            }
+
+            fun Storage.load() {
+                return Storage.fromCell(contract.getData())
+            }
+
+            fun Storage.save(mutate self) {
+                contract.setData(self.toCell())
+            }
+
+            struct (0x7e8764ef) IncreaseCounter {
+                queryId: uint64 = 0
+                increaseBy: uint32
+            }
+
+            struct (0x3a752f06) ResetCounter {
+                queryId: uint64
+            }
+
+            type AllowedMessage = IncreaseCounter | ResetCounter
+
+            fun onInternalMessage(in: InMessage) {
+                val msg = lazy AllowedMessage.fromSlice(in.body);
+
+                match (msg) {
+                    IncreaseCounter => {
+                        var storage = lazy Storage.load();
+
+                        storage.<caret:counter>counter += msg.<caret:increase_by>increaseBy;
+                        storage.<caret:save>save();
+                    }
+
+                    ResetCounter => {
+                        var storage = lazy Storage.load();
+
+                        storage.counter = 0;
+                        storage.save();
+                    }
+
+                    else => {
+                        assert (in.body.isEmpty()) throw 0xFFFF
+                    }
+                }
+            }
+        ",
+        |_| {},
+        expect![[r"
+            33:20 -> file:///fixture/main.tolk 4:4 resolved
+            33:35 -> file:///fixture/main.tolk 17:4 resolved
+            34:20 -> file:///fixture/main.tolk 11:12 resolved"]],
+    );
+}
+
+#[test]
+fn unresolved_reference_is_rendered() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun main(): int { return <caret>missing(); }
+        ",
+        |_| {},
+        expect![[r"
+            0:25 unresolved"]],
+    );
+}
+
+#[test]
+fn open_document_overrides_provider_file() {
+    let main = MarkedSource::parse(
+        r#"
+            import "lib"
+            fun main(): int { return <caret>helper(); }
+        "#,
+    );
+    let main_uri = DocumentUri::from("acton://fixture/main.tolk");
+    let lib_uri = DocumentUri::from("acton://fixture/lib.tolk");
+
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    service
+        .add_source_file(
+            LANGUAGE_ID,
+            lib_uri.clone(),
+            "fun helper(): int { return 1; }\n",
+        )
+        .expect("provider file should be added");
+    service
+        .open_document(main_uri.clone(), LANGUAGE_ID, 1, main.source().to_owned())
+        .expect("main document should open");
+    service
+        .open_document(
+            lib_uri,
+            LANGUAGE_ID,
+            1,
+            "\nfun helper(): int { return 2; }\n",
+        )
+        .expect("open lib document should override provider file");
+
+    let caret = main.marker("caret");
+    let locations = service
+        .definition(&main_uri, caret.position)
+        .expect("definition request should succeed");
+    expect![[r"
+        1:25 -> acton://fixture/lib.tolk 1:4 resolved"]]
+    .assert_eq(&render_definition(caret.position, &locations));
+}
+
+#[test]
+fn records_definition_profile_spans() {
+    let marked = MarkedSource::parse(
+        r"
+            fun helper() {}
+            fun main() { <caret>helper(); }
+        ",
+    );
+    let uri = DocumentUri::from("file:///fixture/profiled.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(TolkLanguage::new());
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let locations = service
+        .definition(&uri, marked.marker("caret").position)
+        .expect("definition request should succeed");
+    let summary = service.profiler().summary();
+    let actual = format!(
+        "locations={} definition={} tolk.definition={}",
+        locations.len(),
+        event_count(summary, "definition"),
+        event_count(summary, "tolk.definition.resolve"),
+    );
+    expect!["locations=1 definition=1 tolk.definition=1"].assert_eq(&actual);
+}
+
+fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
+    summary
+        .events
+        .iter()
+        .filter(|event| event.name == name)
+        .count()
+}
+
+fn render_definition(caret_position: Position, locations: &[Location]) -> String {
+    if locations.is_empty() {
+        return format!("{} unresolved", format_position(caret_position));
+    }
+
+    let mut locations = locations.to_vec();
+    locations.sort_by(|left, right| {
+        (
+            left.uri.as_str(),
+            left.range.start.line,
+            left.range.start.character,
+        )
+            .cmp(&(
+                right.uri.as_str(),
+                right.range.start.line,
+                right.range.start.character,
+            ))
+    });
+
+    let mut output = String::new();
+    for location in locations {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        let _ = write!(
+            output,
+            "{} -> {} {} resolved",
+            format_position(caret_position),
+            location.uri,
+            format_position(location.range.start)
+        );
+    }
+    output
+}
+
+fn format_position(position: Position) -> String {
+    format!("{}:{}", position.line, position.character)
+}

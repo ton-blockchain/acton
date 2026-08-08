@@ -34,7 +34,7 @@ fun onInternalMessage(in: InMessage) {
     }
 
     if (msg.queryId == 20) {
-        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
         return;
     }
 
@@ -49,7 +49,7 @@ fun onInternalMessage(in: InMessage) {
     if (msg.queryId == 40) {
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: msg.queryId },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -61,6 +61,39 @@ fun onBouncedMessage(_: InMessageBounced) {
     throw ERR_BOUNCE;
 }
 "#;
+
+const AE_ROUTE_MESSAGES: &str = r"
+struct (0xAE220001) RouteToSink {
+    queryId: uint64
+    sink: address
+}
+
+struct (0xAE220002) SourceOnlyNotice {
+    queryId: uint64
+}
+";
+
+const AE_ROUTE_SOURCE_CONTRACT: &str = r#"
+import "route_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy RouteToSink.fromSlice(in.body);
+    createMessage({
+        bounce: false,
+        value: grams("0.1"),
+        dest: msg.sink,
+        body: SourceOnlyNotice { queryId: msg.queryId },
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+"#;
+
+const AE_ROUTE_SINK_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+";
 
 const TEST_PRELUDE: &str = r#"
 import "../../lib/build"
@@ -94,7 +127,7 @@ fun deployHarness() {
 
     val deployMsg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: harness.init,
         },
@@ -108,7 +141,7 @@ fun deployHarness() {
 fun sendPing(sender: Treasury, harness: Harness, queryId: uint64): SendResultList {
     val msg = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId },
     });
@@ -177,6 +210,67 @@ get fun `test ae successful tx search filters`() {
 }
 
 #[test]
+fn to_have_tx_failure_decodes_expected_opcode_from_source_abi_when_destination_misses_it() {
+    let test_code = r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/testing/expect"
+import "../contracts/route_messages"
+
+fun deployContract(sender: Treasury, contractName: string): address {
+    val init = ContractState {
+        code: build(contractName),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployRes = net.send(sender.address, createMessage({
+        bounce: false,
+        value: grams("1"),
+        dest: { stateInit: init },
+    }));
+    expect(deployRes).toHaveSuccessfulDeploy({ to: address });
+    return address;
+}
+
+get fun `test expected opcode name falls back to source abi`() {
+    val sender = testing.treasury("sender");
+    val source = deployContract(sender, "source");
+    val sink = deployContract(sender, "sink");
+
+    val res = net.send(sender.address, createMessage({
+        bounce: false,
+        value: grams("0.5"),
+        dest: source,
+        body: RouteToSink { queryId: 7, sink },
+    }));
+
+    expect(res).toHaveTx({
+        from: source,
+        to: sink,
+        opcode: SourceOnlyNotice.__getDeclaredPackPrefix(),
+        value: grams("0.2"),
+    });
+}
+"#;
+
+    ProjectBuilder::new("ae-stdlib-tx-failure-opcode-name-from-source-abi")
+        .file("contracts/route_messages", AE_ROUTE_MESSAGES)
+        .contract("source", AE_ROUTE_SOURCE_CONTRACT)
+        .contract("sink", AE_ROUTE_SINK_CONTRACT)
+        .test_file("tx_expect", test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_tx_failure_decodes_expected_opcode_from_source_abi.stdout.txt",
+        );
+}
+
+#[test]
 fn to_have_failed_tx_matches_compute_exit_code_filter() {
     run_success_case(
         "ae-stdlib-failed-tx-compute-exit-filter",
@@ -234,7 +328,7 @@ get fun `test ae bounced tx opcode filter`() {
 
     val trigger = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId: 40 },
     });
@@ -249,7 +343,7 @@ get fun `test ae bounced tx opcode filter`() {
 
     val bouncedMsg = createMessage({
         bounce: false,
-        value: ton("0.3"),
+        value: grams("0.3"),
         dest: harness.address,
         body: bouncedBody,
     }).bounced();

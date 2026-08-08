@@ -1,1 +1,1 @@
-Error: Failed to decode BoC data as hex or base64
+Error: --string cannot be empty

@@ -11,8 +11,8 @@ DESCRIPTION
 
        The report is intended to help debug project resolution, manifest
        parsing, wallet and library overlays, bundled standard-library state,
-       native emulator and Tolk library metadata, logging paths, and relevant
-       environment variables.
+       native emulator and Tolk library metadata, logging paths, relevant
+       environment variables, and API reachability from the current machine.
 
 DISPLAY OPTIONS
        --color when
@@ -52,7 +52,16 @@ REPORT SECTIONS
 
        o  resolved logging directory and debug log path
 
-       o  selected environment variables such as HOME, SHELL, and NO_COLOR
+       o  selected environment variables such as HOME, SHELL, NO_COLOR, and
+          ACTON_DISABLE_AUTO_STDLIB
+
+       o  ACTON_USE_PROXY, which opts Acton CLI HTTP clients into HTTP_PROXY,
+          HTTPS_PROXY, ALL_PROXY, and system proxy settings. Acton ignores
+          those proxy settings by default to avoid macOS sandbox proxy
+          autodetection crashes.
+
+       o  API reachability checks for the default TON API backends and verifier
+          backend config endpoint.
 
 PATH AND OVERLAY CHECKS
        For each reported path, Acton shows whether it exists, whether it
@@ -78,6 +87,27 @@ STDLIB HEALTH
        o  outdated
 
        o  unknown-version
+
+API REACHABILITY
+       After the local environment report, acton doctor probes the default
+       remote services Acton commonly uses:
+
+       o  TonCenter v2 and v3 for mainnet and testnet
+
+       o  TonHub v4 for mainnet and testnet
+
+       o  DTON GraphQL
+
+       o  the verifier backend configuration file
+
+       The command prints a healthy/total count and per-endpoint status. These
+       checks use short timeouts and are diagnostic only: failed API probes are
+       reported in the output but do not by themselves make acton doctor exit
+       with status 1.
+
+       Set DTON_API_KEY to use your own DTON key. For controlled environments,
+       ACTON_DOCTOR_API_TARGETS_JSON can replace the default probe list with a
+       JSON array of targets.
 
 EXIT STATUS
        o  0: The diagnostic report was produced successfully.

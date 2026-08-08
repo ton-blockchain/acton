@@ -4,12 +4,12 @@ import "messages"
 import "types"
 
 contract NftItem {
-    author: "The Tolk Team"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard NFT Item. TEP-62 and TEP-64 compliant"
-    incomingMessages: AllowedMessageToNftItem
     storage: NftItemStorage
     storageAtDeployment: NftItemStorageNotInitialized
+    incomingMessages: AllowedMessageToNftItem
 }
 
 type AllowedMessageToNftItem =
@@ -43,10 +43,17 @@ fun onInternalMessage(in: InMessage) {
         AskToChangeOwnership => {
             assert (in.senderAddress == storage.ownerAddress) throw Errors.NotFromOwner;
 
+            // validate Either format: bit 0 = inline (any payload follows),
+            // bit 1 = ref (must be exactly 1 bit + 1 ref)
+            val (fwdBits, fwdRefs) = msg.forwardPayload.remainingBitsAndRefsCount();
+            assert (fwdBits != 0) throw Errors.IncorrectForwardPayload;
+            if (msg.forwardPayload.preloadUint(1) != 0) {
+                assert (fwdBits == 1 && fwdRefs == 1) throw Errors.IncorrectForwardPayload;
+            }
             assert (msg.newOwnerAddress.getWorkchain() == BASECHAIN) throw Errors.InvalidWorkchain;
 
             val fwdFee = in.originalForwardFee;
-            var restAmount = contract.getOriginalBalance() - MIN_TONS_FOR_STORAGE;
+            var restAmount = contract.getOriginalBalance() - MIN_GRAMS_FOR_STORAGE;
             if (msg.forwardTonAmount != 0) {
                 restAmount -= (msg.forwardTonAmount + fwdFee);
             }

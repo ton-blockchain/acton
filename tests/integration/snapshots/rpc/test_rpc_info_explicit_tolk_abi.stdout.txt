@@ -1,0 +1,22 @@
+Basic Information
+  Network:           mock
+  Raw Address:       0:2222222222222222222222222222222222222222222222222222222222222222
+  Status:            active
+  Contract:          ExplicitCounter
+  Balance:           1.234 GRAM
+  Last Tx LT:        999
+  Last Tx Hash:      c0ffee
+  Code Hash:         0x270906fd171b9c43f37a353059a73fbc02e0568188ec30186af846caefd09b8c
+  Data Hash:         0x14b1b536ff08a2e98a9767b0b177e691dd70b69aa437f2c44f438e2a19fc3928
+
+Storage
+  Storage {
+      id: 7,
+      owner: [WALLET_ADDRESS_BASE],
+      counter: 42,
+  }
+
+Get Methods
+  currentCounter(): int
+
+hint: To run get method: acton rpc call --net custom:mock 0:2222222222222222222222222222222222222222222222222222222222222222 <METHOD> [ARGS...]

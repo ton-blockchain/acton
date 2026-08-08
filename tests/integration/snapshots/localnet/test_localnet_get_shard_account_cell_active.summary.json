@@ -1,0 +1,27 @@
+{
+  "http": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": true,
+    "data_present": true,
+    "frozen_hash_present": false,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "active"
+  },
+  "json_rpc": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": true,
+    "data_present": true,
+    "frozen_hash_present": false,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "active"
+  },
+  "same_cell_bytes": true
+}

@@ -3,7 +3,7 @@ use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::retrace;
-use acton_config::color::OwoColorize;
+use acton_config::{color::OwoColorize, test::BacktraceMode};
 use acton_debug::exit_codes;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -12,11 +12,15 @@ use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 #[derive(Debug, Clone)]
 pub(crate) struct ConsoleConfig {
     pub show_output: bool,
+    pub project_root: PathBuf,
 }
 
 impl Default for ConsoleConfig {
     fn default() -> Self {
-        Self { show_output: true }
+        Self {
+            show_output: true,
+            project_root: PathBuf::from("."),
+        }
     }
 }
 
@@ -58,11 +62,10 @@ impl ConsoleReporter {
 
 impl TestReporter for ConsoleReporter {
     fn on_testing_started(&mut self) -> anyhow::Result<()> {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
         println!(
             "\n{} {}\n",
             " TEST ".bold().on_blue(),
-            cwd.display().dimmed()
+            self.config.project_root.display().dimmed()
         );
         Ok(())
     }
@@ -135,8 +138,7 @@ impl TestReporter for ConsoleReporter {
     ) -> anyhow::Result<()> {
         self.count_suites += 1;
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let relative = pathdiff::diff_paths(file_path, cwd);
+        let relative = pathdiff::diff_paths(file_path, &self.config.project_root);
         let relative_path = relative.unwrap_or_else(|| file_path.to_owned());
 
         println!(
@@ -264,18 +266,17 @@ impl TestReporter for ConsoleReporter {
             };
 
             let formatter = FormatterContext {
-                contract_abi: test.abi.clone(),
                 accounts: Cow::Borrowed(&failure_context.accounts),
                 build_cache: Cow::Borrowed(&failure_context.build_cache),
                 emulations: Cow::Borrowed(&failure_context.emulations),
                 known_addresses: Cow::Borrowed(&failure_context.known_addresses),
                 known_code_cells: Cow::Borrowed(&failure_context.known_code_cells),
                 show_bodies: test.show_bodies,
-                has_wallets_config: false,
-                available_wallets: vec![],
+                has_wallets_config: failure_context.has_wallets_config,
+                available_wallets: failure_context.available_wallets.clone(),
                 backtrace: test.backtrace,
-                fork_net: None,
-                network: None,
+                fork_net: failure_context.fork_net.clone(),
+                network: failure_context.network.clone(),
             };
 
             match &failure_context.get_result {
@@ -288,17 +289,20 @@ impl TestReporter for ConsoleReporter {
             }
         }
 
-        if self.config.show_output
-            && let Some(exec) = &test.execution
-        {
-            if !exec.stdout.trim().is_empty() {
+        if let Some(exec) = &test.execution {
+            if self.config.show_output && !exec.stdout.trim().is_empty() {
                 println!("    {} Test output:", "└─".dimmed());
                 for line in exec.stdout.trim().lines() {
                     println!("       {line}");
                 }
+            } else if !exec.debug_output.trim().is_empty() {
+                println!("    {} Test output:", "└─".dimmed());
+                for line in exec.debug_output.trim().lines() {
+                    println!("       {line}");
+                }
             }
 
-            if !exec.stderr.trim().is_empty() {
+            if self.config.show_output && !exec.stderr.trim().is_empty() {
                 println!("    {} Test stderr:", "└─".dimmed());
                 for line in exec.stderr.trim().lines() {
                     println!("       {}", line.bright_red());
@@ -328,7 +332,7 @@ fn process_test_fail(
     }
 
     if let Some(assert_failure) = &exec.assert_failure {
-        process_assert_failure(assert_failure, test, &fmt);
+        process_assert_failure(assert_failure, test, &fmt, result);
         // since assertions set the exit code to 567, we don't want to process exit codes
         return;
     }
@@ -347,7 +351,12 @@ fn process_test_fail(
     }
 }
 
-fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
+fn process_assert_failure(
+    failure: &AssertFailure,
+    test: &TestReport,
+    fmt: &FormatterContext<'_>,
+    result: &GetMethodResultSuccess,
+) {
     if let AssertFailure::GetMethod(failure) = &failure {
         let formatted = fmt.format_get_method_assert_failure(failure);
         let mut lines = formatted.lines();
@@ -389,17 +398,127 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         return;
     }
 
+    if let AssertFailure::WalletNotFound(failure) = &failure {
+        let formatted = fmt.format_wallet_not_found_message(failure);
+        let has_location = failure.location.is_some();
+        for (idx, line) in formatted.lines().enumerate() {
+            if idx == 0 {
+                let branch = if has_location { "├─" } else { "└─" };
+                println!(
+                    "    {} {} {}",
+                    branch.dimmed(),
+                    "Error:".bright_red(),
+                    FormatterContext::highlight_actual_expected(line)
+                );
+            } else if line.trim().is_empty() {
+                if has_location {
+                    println!("    {}", "│".dimmed());
+                } else {
+                    println!();
+                }
+            } else {
+                let prefix = if has_location { "│" } else { " " };
+                println!("    {} {}", prefix.dimmed(), line);
+            }
+        }
+
+        if let Some(location) = failure.location.as_ref() {
+            println!("    {} at {}", "└─".dimmed(), location.format().dimmed());
+        }
+        return;
+    }
+
+    if let AssertFailure::ExternalSendNotAccepted(failure) = &failure {
+        println!(
+            "    {} {} {}",
+            "└─".dimmed(),
+            "Error:".bright_red(),
+            FormatterContext::highlight_actual_expected(&failure.message)
+        );
+
+        let mut details = Vec::new();
+        let status = if failure.external_not_accepted {
+            "external message was not accepted"
+        } else {
+            "external send failed before producing transactions"
+        };
+        details.push(format!("{} {}", "Status:", status.yellow()));
+        details.push(format!("{} {}", "Reason:", failure.reason.yellow()));
+        let mut matcher_backtrace = assertion_backtrace_lines(test, result);
+        matcher_backtrace.retain(|line| !line.contains("ExternalSendResult.__failExternalSend"));
+        let contract_backtrace = external_send_contract_backtrace_lines(fmt, test, failure);
+        if let Some((label, description)) = fmt.format_external_not_accepted_vm_result(failure) {
+            details.push(format!("{} {}", label, description.yellow()));
+            if test.backtrace.is_none() {
+                details.push(format!(
+                    "Re-run with {} to get more information",
+                    "--backtrace full".yellow()
+                ));
+            }
+        }
+        if !failure.missing_libraries.is_empty() {
+            details.push(format!(
+                "{} {}",
+                "Missing libraries:".dimmed(),
+                failure.missing_libraries.join(", ").yellow()
+            ));
+        }
+        let has_contract_backtrace = !contract_backtrace.is_empty();
+        let has_location = failure.location.is_some();
+
+        for (idx, detail) in details.iter().enumerate() {
+            let has_next = idx + 1 < details.len() || has_location || has_contract_backtrace;
+            let branch = if has_next { "├─" } else { "└─" };
+            println!("        {} {}", branch.dimmed(), detail);
+        }
+
+        if let Some(location) = &failure.location {
+            let branch = if has_contract_backtrace {
+                "├─"
+            } else {
+                "└─"
+            };
+            let nested_branch = if has_contract_backtrace { "│" } else { " " };
+            println!(
+                "        {} at {}",
+                branch.dimmed(),
+                location.format().dimmed()
+            );
+            for line in matcher_backtrace {
+                println!("        {}     {line}", nested_branch.dimmed());
+            }
+        }
+
+        if has_contract_backtrace {
+            println!("        {} onExternalMessage backtrace:", "└─".dimmed());
+            for line in contract_backtrace {
+                println!("              {line}");
+            }
+        }
+
+        return;
+    }
+
     if let Some(message) = &failure.message() {
         if message.is_empty() {
             println!("    {}", "└─".dimmed());
         } else {
             let highlighted_message = FormatterContext::highlight_actual_expected(message);
+            let mut lines = highlighted_message.lines();
+            let Some(first_line) = lines.next() else {
+                println!("    {}", "└─".dimmed());
+                return;
+            };
+            let detail_lines = lines.collect::<Vec<_>>();
             println!(
                 "    {} {} {}",
                 "└─".dimmed(),
                 "Error:".bright_red(),
-                highlighted_message
+                first_line
             );
+            for line in detail_lines {
+                println!("{line}");
+            }
         }
     } else {
         println!("    {}", "└─".dimmed());
@@ -411,8 +530,9 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         let diff_output = fmt.format_tuple_diff(
             &failure.left,
             &failure.right,
-            &failure.left_type,
-            &failure.right_type,
+            failure.left_ty_idx,
+            failure.right_ty_idx,
+            &failure.source_map,
         );
 
         for line in diff_output.lines() {
@@ -423,7 +543,8 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     if let AssertFailure::Bin(failure) = &failure
         && failure.operator == "!="
     {
-        let value = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
+        let value =
+            fmt.format_tuple_value(&failure.left, failure.left_ty_idx, &failure.source_map, 8);
         println!("       Values are equal but expected to be different:");
         println!("         {}", value.dimmed());
     }
@@ -431,8 +552,10 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     if let AssertFailure::Bin(failure) = &failure
         && failure.is_ord()
     {
-        let left = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
-        let right = fmt.format_tuple_value(&failure.right, &failure.right_type, 8);
+        let left =
+            fmt.format_tuple_value(&failure.left, failure.left_ty_idx, &failure.source_map, 8);
+        let right =
+            fmt.format_tuple_value(&failure.right, failure.right_ty_idx, &failure.source_map, 8);
 
         println!("        Actual:   {}", left.red());
         println!("        Expected: {}", right.green());
@@ -444,21 +567,21 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionNotFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
-        let tx_tree = fmt.format(&failure.txs);
+        let params = fmt.format_search_transaction_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let to_addr = failure.params.to.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let diff_output = format!(
             "{tx_tree}\nCannot find transaction from {} to {}\nwith:\n{}",
-            fmt.format_address(&failure.txs, &from_addr),
-            fmt.format_address(&failure.txs, &to_addr),
+            fmt.format_address(&failure.txs, from_addr.as_ref()),
+            fmt.format_address(&failure.txs, to_addr.as_ref()),
             params.join("\n"),
         );
 
@@ -468,24 +591,24 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionIsFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
-        let tx_tree = fmt.format(&failure.txs);
+        let params = fmt.format_search_transaction_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
 
         let from_addr2 = failure.params.from.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let to_addr2 = failure.params.to.as_ref().and_then(|dp| match dp {
             crate::context::DisplayParam::Value(a) => Some(a.clone()),
-            _ => None,
+            crate::context::DisplayParam::Function => None,
         });
         let from_to = if failure.params.from.is_none() && failure.params.to.is_none() {
             ""
         } else {
             &format!(
                 " from {} to {}",
-                fmt.format_address(&failure.txs, &from_addr2),
-                fmt.format_address(&failure.txs, &to_addr2),
+                fmt.format_address(&failure.txs, from_addr2.as_ref()),
+                fmt.format_address(&failure.txs, to_addr2.as_ref()),
             )
         };
 
@@ -500,9 +623,99 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         }
     }
 
-    if let Some(location) = &failure.location() {
-        println!("      {} at {}", "└─".dimmed(), location.format().dimmed());
+    if let AssertFailure::ExternalMessageNotFound(failure) = &failure {
+        let params = fmt.format_external_message_search_parameters(failure);
+        let tx_tree = fmt.format_transaction_list(&failure.txs);
+        let diff_output = format!(
+            "{tx_tree}\nCannot find external message {}\n{}{}",
+            failure.message_name.purple().bold(),
+            if params.is_empty() { "" } else { "with:\n" },
+            params.join("\n"),
+        );
+
+        for line in diff_output.lines() {
+            println!("        {line}");
+        }
     }
+
+    let suppress_backtrace = matches!(
+        failure,
+        AssertFailure::TransactionNotFound(_)
+            | AssertFailure::TransactionIsFound(_)
+            | AssertFailure::ExternalMessageNotFound(_)
+    );
+    let backtrace = if suppress_backtrace {
+        Vec::new()
+    } else {
+        assertion_backtrace_lines(test, result)
+    };
+    if let Some(location) = &failure.location() {
+        let branch = if backtrace.is_empty() {
+            "└─"
+        } else {
+            "├─"
+        };
+        println!(
+            "      {} at {}",
+            branch.dimmed(),
+            location.format().dimmed()
+        );
+    }
+
+    if !backtrace.is_empty() {
+        println!("      {} Backtrace:", "└─".dimmed());
+        for line in backtrace {
+            println!("            {line}");
+        }
+    }
+}
+
+fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess) -> Vec<String> {
+    if test.backtrace != Some(BacktraceMode::Full) {
+        return Vec::new();
+    }
+
+    retrace::find_exception_info(&result.vm_log, &test.source_map)
+        .map(|info| FormatterContext::format_backtrace(&info.backtrace))
+        .unwrap_or_default()
+}
+
+fn external_send_contract_backtrace_lines(
+    fmt: &FormatterContext<'_>,
+    test: &TestReport,
+    failure: &crate::context::ExternalSendNotAcceptedFailure,
+) -> Vec<String> {
+    if test.backtrace != Some(BacktraceMode::Full) {
+        return Vec::new();
+    }
+
+    let vm_log = failure
+        .diagnostic_id
+        .and_then(|diagnostic_id| fmt.emulations.find_failed_message(diagnostic_id))
+        .and_then(|message| message.vm_log.as_deref());
+    let Some(vm_log) = vm_log.filter(|log| !log.is_empty()) else {
+        return Vec::new();
+    };
+    let Some(destination) = failure.destination.as_ref() else {
+        return Vec::new();
+    };
+
+    let code = FormatterContext::account_code(&fmt.accounts, destination);
+    let Some((_, build)) = fmt.build_cache.result_for_code(&code) else {
+        return Vec::new();
+    };
+    let Some(info) = retrace::find_exception_info(vm_log, &build.source_map) else {
+        return Vec::new();
+    };
+
+    let mut lines = FormatterContext::format_backtrace(&info.backtrace);
+    if lines.is_empty() {
+        lines.push(format!(
+            "at {}",
+            FormatterContext::format_location(&info.loc).dimmed()
+        ));
+    }
+    lines
 }
 
 fn process_nonzero_exit_code(
@@ -560,7 +773,7 @@ fn process_nonzero_exit_code(
         ));
     }
 
-    if let Some(info) = exit_codes::find(exit_code) {
+    if let Some(info) = exit_codes::find_for_phase(exit_code, exit_codes::ExitCodePhase::Compute) {
         groups.push((info.description.dimmed().to_string(), Vec::new()));
         groups.push((format!("Phase: {}", info.phase.dimmed()), Vec::new()));
     } else if let Some(info) = &exit_code_info {

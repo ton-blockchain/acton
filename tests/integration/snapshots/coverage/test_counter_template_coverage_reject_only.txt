@@ -1,0 +1,99 @@
+Coverage Summary:
+Lines: 4/25 (16.00%)
+Total Hits: 8
+
+File: [ROOT]/contracts/Counter.tolk
+Annotated Code:
+ 1   | import "types"                                                                                 |
+ 2   |                                                                                                |
+ 3   | contract Counter {                                                                             |
+ 4   |     author: "Acton User"                                                                       |
+ 5   |     version: "1.0.0"                                                                           |
+ 6   |     description: "Simple counter contract with owner-controlled updates"                       |
+ 7   |     storage: Storage                                                                           |
+ 8   |     incomingMessages: AllowedMessage                                                           |
+ 9   | }                                                                                              |
+10   |                                                                                                |
+11   | type AllowedMessage =                                                                          |
+12   |     | IncreaseCounter                                                                          |
+13   |     | DecreaseCounter                                                                          |
+14   |     | ResetCounter                                                                             |
+15   |                                                                                                |
+16 ✓ | fun onInternalMessage(in: InMessage) {                                                         | hits:2 branches:true=0 false=2
+17 ✓ |     val msg = lazy AllowedMessage.fromSlice(in.body);                                          | hits:2
+18   |                                                                                                |
+19 ✓ |     match (msg) {                                                                              | hits:2 branches:site0 true=0 false=2; site1 true=0 false=2; site2 true=0 false=2
+20 ✗ |         IncreaseCounter => {                                                                   | hits:0
+21 ✗ |             var storage = lazy Storage.load();                                                 | hits:0
+22 ✗ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:0
+23   |                                                                                                |
+24 ✗ |             storage.counter += msg.increaseBy;                                                 | hits:0
+25 ✗ |             storage.save();                                                                    | hits:0
+26   |         }                                                                                      |
+27 ✗ |         DecreaseCounter => {                                                                   | hits:0
+28 ✗ |             var storage = lazy Storage.load();                                                 | hits:0
+29 ✗ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:0
+30 ✗ |             assert (storage.counter >= msg.decreaseBy) throw Errors.CounterUnderflow;          | hits:0
+31   |                                                                                                |
+32 ✗ |             storage.counter -= msg.decreaseBy;                                                 | hits:0
+33 ✗ |             storage.save();                                                                    | hits:0
+34   |         }                                                                                      |
+35 ✗ |         ResetCounter => {                                                                      | hits:0
+36 ✗ |             var storage = lazy Storage.load();                                                 | hits:0
+37 ✗ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:0
+38   |                                                                                                |
+39 ✗ |             storage.counter = 0;                                                               | hits:0
+40 ✗ |             storage.save();                                                                    | hits:0
+41   |         }                                                                                      |
+42   |         else => {                                                                              |
+43 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;                            | hits:2 branches:throw=1 continue=1
+44   |         }                                                                                      |
+45   |     }                                                                                          |
+46   | }                                                                                              |
+47   |                                                                                                |
+48   | fun onBouncedMessage(_in: InMessageBounced) {}                                                 |
+49   |                                                                                                |
+50   | get fun currentCounter(): int {                                                                |
+51 ✗ |     val storage = lazy Storage.load();                                                         | hits:0
+52   |                                                                                                |
+53 ✗ |     return storage.counter;                                                                    | hits:0
+54   | }                                                                                              |
+55   |                                                                                                |
+56   | get fun owner(): address {                                                                     |
+57 ✗ |     val storage = lazy Storage.load();                                                         | hits:0
+58   |                                                                                                |
+59 ✗ |     return storage.owner;                                                                      | hits:0
+60   | }                                                                                              |
+
+File: [ROOT]/contracts/types.tolk
+Annotated Code:
+ 1   | enum Errors {                                             |
+ 2   |     NotOwner = 100                                        |
+ 3   |     CounterUnderflow = 0x1001                             |
+ 4   |     InvalidMessage = 0xFFFF                               |
+ 5   | }                                                         |
+ 6   |                                                           |
+ 7   | struct Storage {                                          |
+ 8   |     id: uint32                                            |
+ 9   |     owner: address                                        |
+10   |     counter: uint32                                       |
+11   | }                                                         |
+12   |                                                           |
+13   | fun Storage.load(): Storage {                             |
+14   |     return Storage.fromCell(contract.getData());          |
+15   | }                                                         |
+16   |                                                           |
+17   | fun Storage.save(self) {                                  |
+18 ✗ |     contract.setData(self.toCell());                      | hits:0
+19   | }                                                         |
+20   |                                                           |
+21   | struct (0x7e8764ef) IncreaseCounter {                     |
+22   |     increaseBy: uint32                                    |
+23   | }                                                         |
+24   |                                                           |
+25   | struct (0x283b4c3f) DecreaseCounter {                     |
+26   |     decreaseBy: uint32                                    |
+27   | }                                                         |
+28   |                                                           |
+29   | struct (0x3a752f06) ResetCounter {}                       |
+

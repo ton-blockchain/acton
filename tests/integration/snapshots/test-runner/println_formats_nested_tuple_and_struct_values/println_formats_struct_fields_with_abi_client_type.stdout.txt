@@ -1,0 +1,20 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling ar_formatter_types
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/io_nested_formatter.test.tolk (1 test)
+  ✓ ar stdlib println abi client type fields [TIME]
+    └─ Test output:
+       ClientTypedPayloadHolder {
+           payload: slice{cafe},
+       }
+       holder=ClientTypedPayloadHolder {
+           payload: slice{cafe},
+       }
+
+ ✓ 1 passed in 1 file

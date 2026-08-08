@@ -1,0 +1,2 @@
+// generated ts wrapper
+export const marker = "ts";

@@ -6,7 +6,7 @@
      Running tests
 xx
 
-✗ test dot gas limit exceeded: Gas limit exceeded: used 122166, limit 100
+✗ test dot gas limit exceeded: Gas limit exceeded: used 122056, limit 100
 
 ✗ test dot wrong expected [EXIT_STATUS]: Expected exit_code=42, got=99
   exit_code=99

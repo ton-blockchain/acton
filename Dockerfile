@@ -7,6 +7,7 @@ RUN apt-get update \
         libgcc-s1 \
         libssl3 \
         libstdc++6 \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY dist/docker/acton /usr/local/bin/acton
@@ -17,8 +18,8 @@ ENTRYPOINT ["/usr/local/bin/acton"]
 
 LABEL org.opencontainers.image.title="Acton" \
       org.opencontainers.image.description="TON smart contract development toolkit" \
-      org.opencontainers.image.url="https://ton.org" \
+      org.opencontainers.image.url="https://ton-blockchain.github.io/acton/" \
       org.opencontainers.image.source="https://github.com/ton-blockchain/acton" \
-      org.opencontainers.image.documentation="https://docs.ton.org" \
+      org.opencontainers.image.documentation="https://ton-blockchain.github.io/acton/docs/welcome" \
       org.opencontainers.image.vendor="TON Core" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"

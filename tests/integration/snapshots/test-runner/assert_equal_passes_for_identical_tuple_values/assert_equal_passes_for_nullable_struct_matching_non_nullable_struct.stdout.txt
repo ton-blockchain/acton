@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/assert_equal_nullable_struct.test.tolk (1 test)
+  ✓ ek stdlib assert equal pass nullable struct [TIME]
+
+ ✓ 1 passed in 1 file

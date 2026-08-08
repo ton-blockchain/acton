@@ -1,5 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::{
+    append_custom_network, format_captured_requests, spawn_toncenter_v2_mock_with_capture,
+    toncenter_v2_latest_fork_snapshot_responses,
+};
+use std::fs;
 
 const DO_CONFIG_IMPORTS: &str = r#"
 import "../../lib/emulation/config"
@@ -71,5 +76,64 @@ get fun `test do stdlib config global version non zero roundtrip`() {
 }
 ",
         "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/config_global_version_roundtrip_supports_non_zero_values.stdout.txt",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn get_config_stays_local_when_broadcast_flag_enabled_in_test_runner() {
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock_with_capture(toncenter_v2_latest_fork_snapshot_responses(123_456));
+    let source = format!(
+        "{DO_CONFIG_IMPORTS}\n{}\n",
+        r"
+get fun `test do stdlib get config stays local with broadcast flag`() {
+    var config = testing.getConfig();
+    val localVersion = GlobalVersion {
+        version: 909090,
+        capabilities: 808080,
+    };
+
+    config.setGlobalVersion(localVersion);
+    expect(testing.setConfig(config)).toBeTrue();
+
+    net.enableBroadcast();
+    expect(net.isBroadcasting()).toBeTrue();
+
+    val updated = testing.getConfig().getGlobalVersion();
+    expect(updated.version).toEqual(localVersion.version);
+    expect(updated.capabilities).toEqual(localVersion.capabilities);
+}
+"
+    );
+
+    let project = ProjectBuilder::new("do-stdlib-get-config-broadcast-flag-local")
+        .test_file("do_config_global_version", &source)
+        .build();
+    append_custom_network(project.path(), "mock-config-unused", &mock_url);
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--fork-net")
+        .arg("custom:mock-config-unused")
+        .run()
+        .success();
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/get_config_stays_local_when_broadcast_flag_enabled_in_test_runner.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("get-config-fork-requests.txt"),
+        format_captured_requests(&captured),
+    )
+    .expect("failed to write captured fork requests");
+    output.assert_file_snapshot_matches(
+        "get-config-fork-requests.txt",
+        "integration/snapshots/test-runner/config_global_version_roundtrip_supports_zero_values/get_config_stays_local_when_broadcast_flag_enabled_in_test_runner.requests.txt",
     );
 }

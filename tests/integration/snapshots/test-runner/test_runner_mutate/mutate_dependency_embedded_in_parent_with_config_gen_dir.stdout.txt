@@ -1,0 +1,20 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Session:  [MUTATION_SESSION_ID]
+Contract: dependency
+Source:   contracts/dependency.tolk
+IDs:      2
+Files:    1
+Mutants:  1
+
+  ◉ Mutation 2/3 contracts/dependency[LINE] Replace + with - KILLED
+
+    Total mutants        1
+  ✓ Killed               1
+  ✗ Survived             0
+  ! Compile errors       0
+
+  ◆ Mutation Score       100.0%
+
+✓ Excellent! All mutants were killed!
+

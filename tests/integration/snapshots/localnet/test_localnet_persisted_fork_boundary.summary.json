@@ -1,0 +1,8 @@
+{
+  "fork_boundary_preserved": true,
+  "head_preserved": true,
+  "local_block_not_replaced_by_source": true,
+  "local_block_preserved": true,
+  "source_advanced": true,
+  "source_now_has_same_seqno": true
+}

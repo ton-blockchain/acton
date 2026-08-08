@@ -1,0 +1,3 @@
+Error: Wallet nonexistent not found in wallets.toml or global.wallets.toml
+Available wallets:
+  deployer

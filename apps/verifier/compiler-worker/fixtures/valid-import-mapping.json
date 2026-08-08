@@ -1,0 +1,18 @@
+{
+  "language": "tolk",
+  "compiler_version": "1.4.1",
+  "entrypoint": "main.tolk",
+  "import_mappings": {
+    "@contracts": "contracts"
+  },
+  "sources": [
+    {
+      "path": "main.tolk",
+      "content": "import \"@contracts/lib\"\n\nfun onInternalMessage(in: InMessage) {\n    helper();\n}\n"
+    },
+    {
+      "path": "contracts/lib.tolk",
+      "content": "fun helper() {}\n"
+    }
+  ]
+}

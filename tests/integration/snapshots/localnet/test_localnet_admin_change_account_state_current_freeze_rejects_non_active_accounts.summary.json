@@ -1,0 +1,60 @@
+{
+  "already_frozen": {
+    "after_failed_freeze": {
+      "address_matches": true,
+      "balance_positive": true,
+      "cell_type": "tvm.cell",
+      "code_present": false,
+      "data_present": false,
+      "frozen_hash_present": true,
+      "last_trans_hash_nonzero": false,
+      "last_trans_lt": "zero",
+      "ok": true,
+      "state": "frozen"
+    },
+    "freeze_current": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Account is already frozen",
+      "ok": false
+    },
+    "set": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": null
+    }
+  },
+  "nonexist": {
+    "freeze_current": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Cannot freeze non-existing account from current state",
+      "ok": false
+    }
+  },
+  "uninit": {
+    "after_failed_freeze": {
+      "address_matches": true,
+      "balance_positive": true,
+      "cell_type": "tvm.cell",
+      "code_present": false,
+      "data_present": false,
+      "frozen_hash_present": false,
+      "last_trans_hash_nonzero": false,
+      "last_trans_lt": "zero",
+      "ok": true,
+      "state": "uninitialized"
+    },
+    "freeze_current": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Cannot freeze uninitialized account from current state",
+      "ok": false
+    },
+    "set": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": null
+    }
+  }
+}

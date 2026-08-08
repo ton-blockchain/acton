@@ -21,7 +21,7 @@ use tree_sitter::Node;
 /// struct Foo {}
 ///
 /// fun Foo.bar(self, a: int): int {
-/// //          ^^^^ E009: method can be static
+/// //          ^^^^ S004: method can be static
 ///     return a + 1;
 /// }
 /// ```

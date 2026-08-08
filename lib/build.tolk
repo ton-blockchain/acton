@@ -3,7 +3,7 @@
 /// `build()` is a host-assisted helper for tests, scripts, and emulation
 /// scenarios. It returns a code cell; it does not deploy the contract by
 /// itself.
-///
+
 /// Build a contract with a specified name and optional path.
 ///
 /// `name` is the contract name in `Acton.toml` (the key in `[contracts.<name>]`), not
@@ -49,6 +49,8 @@
 /// - `.tolk` paths go through the runtime build pipeline: Acton can reuse an
 ///   in-memory cache for the current run and the shared file cache under
 ///   `build/cache` across runs.
+/// - `.types.tolk` paths are compiled with no entrypoint required, so interface
+///   files can be built explicitly when needed.
 /// - `.boc` paths bypass compilation entirely. Acton just reads the file,
 ///   decodes the code cell, and returns it.
 /// - Because `.boc` mode does not compile anything, it does not populate or

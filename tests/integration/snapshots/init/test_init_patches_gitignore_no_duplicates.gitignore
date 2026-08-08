@@ -1,0 +1,15 @@
+.acton/
+wallets.toml
+
+# Acton related files
+.studio/
+gen/
+build/
+lcov.info
+libraries.toml
+global.libraries.toml
+
+# Mnemonic and wallet files
+.env
+*.mnemonic
+global.wallets.toml

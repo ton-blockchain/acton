@@ -26,7 +26,9 @@ struct scripts
 
 /// `ActonWallet` is a wallet created or registered by `acton wallet` CLI command.
 /// Use `scripts.wallet("name")` to "connect" a wallet by name.
-/// Available wallets are stored in `Acton.toml` either project-wise (local) or system-wise (global).
+/// Configured wallets are stored in project `wallets.toml` or global
+/// `global.wallets.toml`; with `--tonconnect`, `scripts.wallet(...)` resolves to
+/// the connected TON Connect wallet address.
 struct ActonWallet {
     address: address
 }
@@ -80,8 +82,9 @@ fun ActonWallet.rawSign(self, data: int): slice {
 }
 
 /// Creates a new wallet for use in scripts. Unlike `testing.treasury`, the wallet
-/// can refer to a real wallet described in Acton.toml, and therefore can be used
-/// in scripts launched with `--net` to execute transactions on the real blockchain.
+/// can refer to a real wallet from `wallets.toml` or `global.wallets.toml`, or to
+/// the connected TON Connect wallet, and therefore can be used in scripts launched
+/// with `--net` to execute transactions on the real blockchain.
 ///
 /// Without `--net`, the wallet refers to an internal wallet, created in the
 /// same way as in `testing.treasury`.
@@ -98,7 +101,7 @@ fun ActonWallet.rawSign(self, data: int): slice {
 ///         counter: 0,
 ///     });
 ///
-///     val result = counter.deploy(deployer.address, ton("0.05"));
+///     val result = counter.deploy(deployer.address, grams("0.05"));
 ///     result.waitForFirstTransaction();
 ///
 ///     println("Deployed counter to {}", counter.address);
@@ -130,7 +133,7 @@ fun scripts.wallet(name: string): ActonWallet {
 /// ```tolk
 /// val state = scripts.fetchAccountState(contract.address);
 /// if (state != null) {
-///     println("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:gram}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -147,7 +150,7 @@ fun scripts.fetchAccountState(addr: address): TlbAccountInfo? {
 /// ```tolk
 /// val storageFee = scripts.fetchAccountStorageFee(contract.address, 86400); // 1 day
 /// if (storageFee != null) {
-///     println("Daily storage fee: {:ton}", storageFee);
+///     println("Daily storage fee: {:gram}", storageFee);
 /// }
 /// ```
 fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
@@ -161,7 +164,7 @@ fun scripts.fetchAccountStorageFee(addr: address, seconds: int): coins? {
 /// Example:
 /// ```tolk
 /// val balance = scripts.fetchAccountBalance(address);
-/// println("{:ton}", balance);
+/// println("{:gram}", balance);
 /// ```
 fun scripts.fetchAccountBalance(of: address): coins {
     return impl.getAccountBalance(of);

@@ -1,0 +1,398 @@
+{
+  "schema_version": 1,
+  "templates": [
+    {
+      "id": "empty",
+      "aliases": [],
+      "category": "starter",
+      "description": "Minimal project skeleton",
+      "supports_app": true,
+      "scaffolds": [
+        {
+          "kind": "standard",
+          "includes_typescript_app": false,
+          "deploy_script": "scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script scripts/deploy.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "Empty",
+              "name": "Empty",
+              "src": "contracts/Empty.tolk"
+            }
+          ]
+        },
+        {
+          "kind": "app",
+          "includes_typescript_app": true,
+          "deploy_script": "contracts/scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script contracts/scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script contracts/scripts/deploy.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "Empty",
+              "name": "Empty",
+              "src": "contracts/src/Empty.tolk"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "counter",
+      "aliases": [],
+      "category": "starter",
+      "description": "Simple counter contract",
+      "supports_app": true,
+      "scaffolds": [
+        {
+          "kind": "standard",
+          "includes_typescript_app": false,
+          "deploy_script": "scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script scripts/deploy.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "Counter",
+              "name": "Counter",
+              "src": "contracts/Counter.tolk"
+            }
+          ]
+        },
+        {
+          "kind": "app",
+          "includes_typescript_app": true,
+          "deploy_script": "contracts/scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script contracts/scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script contracts/scripts/deploy.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "Counter",
+              "name": "Counter",
+              "src": "contracts/src/Counter.tolk"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jetton",
+      "aliases": [],
+      "category": "token",
+      "description": "Jetton minter and wallet contracts",
+      "supports_app": true,
+      "scaffolds": [
+        {
+          "kind": "standard",
+          "includes_typescript_app": false,
+          "deploy_script": "scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script scripts/deploy.tolk --net testnet"
+            },
+            {
+              "alias": "jetton-mint",
+              "command": "acton script scripts/mint.tolk"
+            },
+            {
+              "alias": "jetton-transfer",
+              "command": "acton script scripts/transfer.tolk"
+            },
+            {
+              "alias": "jetton-info",
+              "command": "acton script scripts/info.tolk"
+            },
+            {
+              "alias": "jetton-change-admin",
+              "command": "acton script scripts/change-admin.tolk"
+            },
+            {
+              "alias": "jetton-change-metadata",
+              "command": "acton script scripts/change-metadata.tolk"
+            },
+            {
+              "alias": "jetton-claim-admin",
+              "command": "acton script scripts/claim-admin.tolk"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "JettonMinter",
+              "name": "JettonMinter",
+              "src": "contracts/JettonMinter.tolk"
+            },
+            {
+              "id": "JettonWallet",
+              "name": "JettonWallet",
+              "src": "contracts/JettonWallet.tolk"
+            }
+          ]
+        },
+        {
+          "kind": "app",
+          "includes_typescript_app": true,
+          "deploy_script": "contracts/scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script contracts/scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script contracts/scripts/deploy.tolk --net testnet"
+            },
+            {
+              "alias": "jetton-mint",
+              "command": "acton script contracts/scripts/mint.tolk"
+            },
+            {
+              "alias": "jetton-transfer",
+              "command": "acton script contracts/scripts/transfer.tolk"
+            },
+            {
+              "alias": "jetton-info",
+              "command": "acton script contracts/scripts/info.tolk"
+            },
+            {
+              "alias": "jetton-change-admin",
+              "command": "acton script contracts/scripts/change-admin.tolk"
+            },
+            {
+              "alias": "jetton-change-metadata",
+              "command": "acton script contracts/scripts/change-metadata.tolk"
+            },
+            {
+              "alias": "jetton-claim-admin",
+              "command": "acton script contracts/scripts/claim-admin.tolk"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "JettonMinter",
+              "name": "JettonMinter",
+              "src": "contracts/src/JettonMinter.tolk"
+            },
+            {
+              "id": "JettonWallet",
+              "name": "JettonWallet",
+              "src": "contracts/src/JettonWallet.tolk"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nft",
+      "aliases": [],
+      "category": "nft",
+      "description": "NFT collection and item contracts",
+      "supports_app": true,
+      "scaffolds": [
+        {
+          "kind": "standard",
+          "includes_typescript_app": false,
+          "deploy_script": "scripts/deploy-collection.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script scripts/deploy-collection.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script scripts/deploy-collection.tolk --net testnet"
+            },
+            {
+              "alias": "nft-deploy-item",
+              "command": "acton script scripts/deploy-item.tolk"
+            },
+            {
+              "alias": "nft-deploy-batch",
+              "command": "acton script scripts/deploy-batch.tolk"
+            },
+            {
+              "alias": "nft-transfer-item",
+              "command": "acton script scripts/transfer-item.tolk"
+            },
+            {
+              "alias": "nft-change-admin",
+              "command": "acton script scripts/change-admin.tolk"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "NftCollection",
+              "name": "NftCollection",
+              "src": "contracts/NftCollection.tolk"
+            },
+            {
+              "id": "NftItem",
+              "name": "NftItem",
+              "src": "contracts/NftItem.tolk"
+            }
+          ]
+        },
+        {
+          "kind": "app",
+          "includes_typescript_app": true,
+          "deploy_script": "contracts/scripts/deploy-collection.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script contracts/scripts/deploy-collection.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script contracts/scripts/deploy-collection.tolk --net testnet"
+            },
+            {
+              "alias": "nft-deploy-item",
+              "command": "acton script contracts/scripts/deploy-item.tolk"
+            },
+            {
+              "alias": "nft-deploy-batch",
+              "command": "acton script contracts/scripts/deploy-batch.tolk"
+            },
+            {
+              "alias": "nft-transfer-item",
+              "command": "acton script contracts/scripts/transfer-item.tolk"
+            },
+            {
+              "alias": "nft-change-admin",
+              "command": "acton script contracts/scripts/change-admin.tolk"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "NftCollection",
+              "name": "NftCollection",
+              "src": "contracts/src/NftCollection.tolk"
+            },
+            {
+              "id": "NftItem",
+              "name": "NftItem",
+              "src": "contracts/src/NftItem.tolk"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "w5-extension",
+      "aliases": [
+        "w5-plugin"
+      ],
+      "category": "wallet",
+      "description": "Wallet V5 extension contract and subscription example",
+      "supports_app": true,
+      "scaffolds": [
+        {
+          "kind": "standard",
+          "includes_typescript_app": false,
+          "deploy_script": "scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script scripts/deploy.tolk --net testnet"
+            },
+            {
+              "alias": "install-extension",
+              "command": "acton script scripts/install-extension.tolk --net testnet"
+            },
+            {
+              "alias": "delete-extension",
+              "command": "acton script scripts/delete-extension.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "SimpleExtension",
+              "name": "SimpleExtension",
+              "src": "contracts/SimpleExtension.tolk"
+            },
+            {
+              "id": "WalletV5",
+              "name": "WalletV5",
+              "src": "contracts/walletv5/WalletV5.tolk"
+            }
+          ]
+        },
+        {
+          "kind": "app",
+          "includes_typescript_app": true,
+          "deploy_script": "contracts/scripts/deploy.tolk",
+          "scripts": [
+            {
+              "alias": "deploy-emulation",
+              "command": "acton script contracts/scripts/deploy.tolk"
+            },
+            {
+              "alias": "deploy-testnet",
+              "command": "acton script contracts/scripts/deploy.tolk --net testnet"
+            },
+            {
+              "alias": "install-extension",
+              "command": "acton script contracts/scripts/install-extension.tolk --net testnet"
+            },
+            {
+              "alias": "delete-extension",
+              "command": "acton script contracts/scripts/delete-extension.tolk --net testnet"
+            }
+          ],
+          "contracts": [
+            {
+              "id": "SimpleExtension",
+              "name": "SimpleExtension",
+              "src": "contracts/src/SimpleExtension.tolk"
+            },
+            {
+              "id": "WalletV5",
+              "name": "WalletV5",
+              "src": "contracts/src/walletv5/WalletV5.tolk"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

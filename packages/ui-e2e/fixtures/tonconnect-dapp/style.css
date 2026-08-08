@@ -1,0 +1,119 @@
+:root {
+  color: rgb(23 23 23);
+  background: rgb(242 240 233);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+main {
+  width: min(760px, calc(100% - 40px));
+  margin: 64px auto;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: rgb(107 103 95);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 12px;
+  font-size: clamp(36px, 7vw, 64px);
+  line-height: 0.96;
+  letter-spacing: -0.045em;
+}
+
+.lead {
+  max-width: 600px;
+  color: rgb(89 85 78);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+section {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid rgb(213 208 197);
+  background: rgb(255 253 248);
+}
+
+h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+label {
+  display: block;
+  margin: 18px 0 8px;
+  color: rgb(107 103 95);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+button,
+textarea,
+pre {
+  font: inherit;
+}
+
+button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgb(23 23 23);
+  border-radius: 4px;
+  color: white;
+  background: rgb(23 23 23);
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.signature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+textarea,
+pre {
+  width: 100%;
+  border: 1px solid rgb(213 208 197);
+  border-radius: 4px;
+  color: rgb(36 33 29);
+  background: rgb(247 244 236);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+textarea {
+  padding: 12px;
+  resize: vertical;
+}
+
+pre {
+  min-height: 72px;
+  margin: 16px 0 0;
+  padding: 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

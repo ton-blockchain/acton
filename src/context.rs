@@ -1,33 +1,56 @@
 use crate::file_build_cache::FileBuildCache;
 use crate::retrace::TolkTraceInfo;
+use crate::tonconnect::TonConnectContext;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
 use acton_debug::replayer::StepMode;
 use acton_debug::{ChildDebugContextSpec, ReplayerDebugSession};
+use log::warn;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
+use std::path::{Component, Path, PathBuf};
+use std::str::FromStr;
+use std::sync::{Arc, LazyLock};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::types_kernel::TyIdx;
+use tolk_source_map::SourceLocation;
 use ton::ton_wallet::TonWallet;
-use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
-use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
+use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
 
 #[derive(Debug)]
 pub struct DebugStopRequested;
+
+// Keep in sync with `impl.treasuryCode()` in `lib/emulation/testing.tolk`.
+pub(crate) const TREASURY_CODE_BOC64: &str = "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe";
+
+static TREASURY_CODE_HASH: LazyLock<HashBytes> = LazyLock::new(|| {
+    let code =
+        Boc::decode_base64(TREASURY_CODE_BOC64).expect("testing.treasury code BoC must be valid");
+    code_lookup_hash(&code)
+});
+
+#[must_use]
+pub(crate) fn is_treasury_code_hash(code_hash: &HashBytes) -> bool {
+    code_hash == &*TREASURY_CODE_HASH
+}
+
+#[must_use]
+pub(crate) fn is_treasury_code(code: &Cell) -> bool {
+    is_treasury_code_hash(&code_lookup_hash(code))
+}
 
 impl std::fmt::Display for DebugStopRequested {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,6 +60,7 @@ impl std::fmt::Display for DebugStopRequested {
 
 impl std::error::Error for DebugStopRequested {}
 
+#[must_use]
 pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
     err.downcast_ref::<DebugStopRequested>().is_some()
 }
@@ -45,9 +69,10 @@ pub fn is_debug_stop_requested(err: &anyhow::Error) -> bool {
 pub struct AssertBinFailure {
     pub operator: String,
     pub left: Tuple,
-    pub left_type: String,
+    pub left_ty_idx: TyIdx,
     pub right: Tuple,
-    pub right_type: String,
+    pub right_ty_idx: TyIdx,
+    pub source_map: Arc<SourceMap>,
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
 }
@@ -82,9 +107,9 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
-    pub source_map: Arc<TolkSourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub missing_libraries: Vec<String>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractABI>>,
     pub caller_trace: Option<TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
@@ -109,6 +134,7 @@ pub struct TransactionNotFoundParams {
     pub bounced: Option<DisplayParam<bool>>,
     pub opcode: Option<DisplayParam<u32>>,
     pub action_exit_code: Option<DisplayParam<i32>>,
+    pub send_mode: Option<DisplayParam<u32>>,
     pub compute_phase_skipped: Option<DisplayParam<bool>>,
     pub body: Option<DisplayParam<Cell>>,
     pub state_init: Option<DisplayParam<Cell>>,
@@ -138,6 +164,7 @@ pub struct ParsedSearchParams {
     pub bounced: Option<SearchField>,
     pub opcode: Option<SearchField>,
     pub action_exit_code: Option<SearchField>,
+    pub send_mode: Option<SearchField>,
     pub compute_phase_skipped: Option<SearchField>,
     pub body: Option<SearchField>,
     pub state_init: Option<SearchField>,
@@ -147,9 +174,30 @@ pub struct ParsedSearchParams {
 pub struct TransactionGenericAssertFailure {
     pub message: Option<String>,
     pub location: Option<SourceLocation>,
-    pub txs: TupleItem,
+    pub txs: Vec<TupleItem>,
     pub parsed_txs: Vec<Transaction>,
     pub params: TransactionNotFoundParams,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalMessageNotFoundFailure {
+    pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+    pub txs: Vec<TupleItem>,
+    pub message_name: String,
+    pub opcode: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalSendNotAcceptedFailure {
+    pub message: String,
+    pub reason: String,
+    pub external_not_accepted: bool,
+    pub vm_exit_code: Option<i32>,
+    pub diagnostic_id: Option<u64>,
+    pub missing_libraries: Vec<String>,
+    pub destination: Option<StdAddr>,
+    pub location: Option<SourceLocation>,
 }
 
 #[derive(Debug, Clone)]
@@ -167,6 +215,8 @@ pub enum AssertFailure {
     GetMethod(GetMethodAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
+    ExternalMessageNotFound(ExternalMessageNotFoundFailure),
+    ExternalSendNotAccepted(ExternalSendNotAcceptedFailure),
     WalletNotFound(WalletNotFoundFailure),
 }
 
@@ -178,9 +228,17 @@ impl AssertFailure {
             AssertFailure::Decimal(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
             AssertFailure::GetMethod(_) | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
+            AssertFailure::ExternalSendNotAccepted(arg) => {
+                if arg.external_not_accepted {
+                    Some("External message was not accepted".to_owned())
+                } else {
+                    Some("External send failed before producing transactions".to_owned())
+                }
+            }
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
                 arg.message.clone()
             }
+            AssertFailure::ExternalMessageNotFound(arg) => arg.message.clone(),
         }
     }
 
@@ -194,6 +252,8 @@ impl AssertFailure {
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
                 arg.location.clone()
             }
+            AssertFailure::ExternalMessageNotFound(arg) => arg.location.clone(),
+            AssertFailure::ExternalSendNotAccepted(arg) => arg.location.clone(),
             AssertFailure::WalletNotFound(arg) => arg.location.clone(),
         }
     }
@@ -222,22 +282,22 @@ impl BuildCache {
     pub fn memoize(
         &mut self,
         name: &str,
+        display_name: &str,
         path: &Path,
         code: &str,
         code_hash: HashBytes,
-        source_map: Arc<TolkSourceMap>,
-        abi: Option<Arc<ContractAbi>>,
-        compiler_abi: Option<Arc<CompilerContractABI>>,
+        source_map: Arc<SourceMap>,
+        abi: Option<Arc<ContractABI>>,
     ) {
         self.built.insert(
             path.to_owned(),
             CompilationResult {
                 name: name.to_owned(),
+                display_name: display_name.to_owned(),
                 code_boc64: code.to_owned(),
                 code_hash,
                 source_map,
                 abi,
-                compiler_abi,
             },
         );
     }
@@ -245,22 +305,157 @@ impl BuildCache {
     #[must_use]
     pub fn result_for_code(&self, code: &Option<Cell>) -> Option<(PathBuf, CompilationResult)> {
         let Some(code) = code else { return None };
-        let code_hash = code.repr_hash();
+        let code_hash = code_lookup_hash(code);
         self.built
             .iter()
-            .find(|(_, result)| &result.code_hash == code_hash)
+            .find(|(_, result)| result.code_hash == code_hash)
             .map(|(name, result)| ((*name).clone(), (*result).clone()))
     }
+
+    #[must_use]
+    pub(crate) fn prioritized_results(
+        &self,
+        preferred: impl IntoIterator<Item = CompilationResult>,
+    ) -> Vec<CompilationResult> {
+        let mut results = Vec::new();
+        let mut seen = FxHashSet::default();
+        for preferred in preferred {
+            if seen.insert(Self::result_key(&preferred)) {
+                results.push(preferred);
+            }
+        }
+
+        let mut fallback_results = self.built.iter().collect::<Vec<_>>();
+        fallback_results.sort_by(|(left_path, left), (right_path, right)| {
+            left.name
+                .cmp(&right.name)
+                .then_with(|| left_path.cmp(right_path))
+        });
+        for (_, result) in fallback_results {
+            if seen.insert(Self::result_key(result)) {
+                results.push(result.clone());
+            }
+        }
+
+        results
+    }
+
+    #[must_use]
+    pub(crate) fn message_name_by_opcode(
+        &self,
+        opcode: u32,
+        preferred: impl IntoIterator<Item = CompilationResult>,
+    ) -> Option<String> {
+        self.prioritized_results(preferred)
+            .into_iter()
+            .find_map(|result| result.message_name_by_opcode(opcode))
+    }
+
+    fn result_key(result: &CompilationResult) -> String {
+        format!("{}:{}", result.name, result.code_hash)
+    }
+}
+
+pub(crate) fn code_lookup_hash(code: &Cell) -> HashBytes {
+    if code.is_exotic() {
+        let mut code_slice = code.as_slice_allow_exotic();
+        // Fift's `hash>libref` stores tag 2 followed by the real code hash. Accounts
+        // deployed through that library reference still need to resolve to the source
+        // map and ABI of the compiled ordinary code.
+        if code_slice.load_uint(8) == Ok(2)
+            && let Ok(hash) = code_slice.load_u256()
+        {
+            return hash;
+        }
+    }
+
+    *code.repr_hash()
 }
 
 #[derive(Debug, Clone)]
 pub struct CompilationResult {
     pub name: String,
+    pub display_name: String,
     pub code_boc64: String,
     pub code_hash: HashBytes,
-    pub source_map: Arc<TolkSourceMap>,
-    pub abi: Option<Arc<ContractAbi>>,
-    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractABI>>,
+}
+
+impl CompilationResult {
+    #[must_use]
+    pub(crate) fn message_name_by_opcode(&self, opcode: u32) -> Option<String> {
+        ContractABI::find_message_name_by_opcode_with_symbols(
+            self.source_map.as_ref(),
+            self.abi.as_deref(),
+            opcode,
+        )
+        .map(str::to_owned)
+    }
+}
+
+pub(crate) fn compile_project_contract_with_cache(
+    acton_config: &ActonConfig,
+    project_root: &Path,
+    contract_id: &str,
+    contract: &ContractConfig,
+    need_debug_info: bool,
+    file_cache: Option<&mut FileBuildCache>,
+) -> anyhow::Result<(PathBuf, CompilationResult)> {
+    let path = contract.absolute_source_path(project_root);
+    let path_display = path.display().to_string();
+
+    let result = if let Some(file_cache) = file_cache {
+        if let Some(cached) = file_cache.get(&path_display, need_debug_info, false, 2, "1.4") {
+            tolk_compiler::compiler::CompilerResultSuccess {
+                fift_code: cached.fift_code.unwrap_or_default(),
+                code_boc64: cached.code_boc64,
+                code_hash_hex: cached.code_hash_hex,
+                source_map: cached.source_map,
+                debug_marks_base64: cached.debug_marks_base64,
+                symbol_types_json: cached.symbol_types_json,
+                debug_marks_json: cached.debug_marks_json,
+                abi: cached.abi,
+            }
+        } else {
+            let result = compile_project_contract(acton_config, &path, need_debug_info)?;
+            if let Err(err) =
+                file_cache.put(&path_display, &result, need_debug_info, false, 2, "1.4")
+            {
+                warn!("Failed to cache build for {path_display}: {err}");
+            }
+            result
+        }
+    } else {
+        compile_project_contract(acton_config, &path, need_debug_info)?
+    };
+
+    Ok((
+        path,
+        CompilationResult {
+            name: contract_id.to_owned(),
+            display_name: contract.display_name(contract_id).to_owned(),
+            code_boc64: result.code_boc64,
+            code_hash: HashBytes::from_str(&result.code_hash_hex)?,
+            source_map: Arc::new(result.source_map.unwrap_or_default()),
+            abi: result.abi.map(Into::into),
+        },
+    ))
+}
+
+fn compile_project_contract(
+    acton_config: &ActonConfig,
+    path: &Path,
+    need_debug_info: bool,
+) -> anyhow::Result<tolk_compiler::compiler::CompilerResultSuccess> {
+    let mappings = acton_config.mappings();
+    match tolk_compiler::Compiler::new(2)
+        .with_mappings(&mappings)
+        .compile(path, need_debug_info)
+    {
+        tolk_compiler::CompilerResult::Success(result) => Ok(result),
+        tolk_compiler::CompilerResult::Error(error) => anyhow::bail!("{}", error.message.trim()),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -295,6 +490,7 @@ pub struct Emulations {
     pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
     pub trace_position_by_tx_lt: FxHashMap<u64, TracePosition>,
     pub trace_names: FxHashMap<u64, String>,
+    pub traces_hidden_from_ui: FxHashSet<u64>,
     pub get_methods: Vec<GetMethodResultSuccess>,
 }
 
@@ -306,7 +502,9 @@ pub struct TracePosition {
 
 #[derive(Clone, Debug)]
 pub struct FailedSendMessageResult {
+    pub diagnostic_id: u64,
     pub error: String,
+    pub external_not_accepted: bool,
     pub vm_log: Option<String>,
     pub vm_exit_code: Option<i64>,
     pub executor_logs: Option<Arc<str>>,
@@ -319,11 +517,21 @@ impl Emulations {
         let root_lt = trace_transactions.first()?.transaction.lt;
         self.trace_names.get(&root_lt).map(String::as_str)
     }
+
+    #[must_use]
+    pub fn is_trace_hidden_from_ui(&self, trace_transactions: &[SendMessageResultSuccess]) -> bool {
+        let Some(root_lt) = trace_transactions.first().map(|tx| tx.transaction.lt) else {
+            return false;
+        };
+
+        self.traces_hidden_from_ui.contains(&root_lt)
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct EmulationsState {
     pub results: FxHashMap<String, Emulations>,
+    next_failed_message_id: u64,
 }
 
 impl Default for EmulationsState {
@@ -337,6 +545,7 @@ impl EmulationsState {
     pub fn new() -> Self {
         Self {
             results: FxHashMap::default(),
+            next_failed_message_id: 1,
         }
     }
 
@@ -357,7 +566,8 @@ impl EmulationsState {
     }
 
     pub fn save_message(&mut self, env_name: &str, message: Vec<SendMessageResult>) -> usize {
-        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let (successful_messages, failed_messages) =
+            split_send_message_results(&message, &mut self.next_failed_message_id);
         let emulations = self.emulations_mut(env_name);
         emulations.messages.push(successful_messages);
         emulations.failed_messages.push(failed_messages);
@@ -376,7 +586,8 @@ impl EmulationsState {
         trace_index: usize,
         message: Vec<SendMessageResult>,
     ) -> usize {
-        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let (successful_messages, failed_messages) =
+            split_send_message_results(&message, &mut self.next_failed_message_id);
         let emulations = self.emulations_mut(env_name);
 
         if trace_index >= emulations.messages.len()
@@ -413,6 +624,7 @@ impl EmulationsState {
                 failed_messages: vec![],
                 trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
+                traces_hidden_from_ui: FxHashSet::default(),
                 get_methods: vec![],
             })
             .get_methods
@@ -424,14 +636,17 @@ impl EmulationsState {
             return;
         };
 
-        let trace_root_lt = emulations
-            .trace_position_by_tx_lt
-            .get(&lt)
-            .and_then(|position| emulations.messages.get(position.trace_index))
-            .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
-            .unwrap_or(lt);
-
+        let trace_root_lt = trace_root_lt_for(emulations, lt);
         emulations.trace_names.insert(trace_root_lt, trace_name);
+    }
+
+    pub fn hide_trace_from_ui(&mut self, env_name: &str, lt: u64) {
+        let Some(emulations) = self.results.get_mut(env_name) else {
+            return;
+        };
+
+        let trace_root_lt = trace_root_lt_for(emulations, lt);
+        emulations.traces_hidden_from_ui.insert(trace_root_lt);
     }
 
     #[must_use]
@@ -486,6 +701,14 @@ impl EmulationsState {
         self.find_tx_by_lt(lt).map(|res| &res.missing_libraries)
     }
 
+    #[must_use]
+    pub fn find_failed_message(&self, diagnostic_id: u64) -> Option<&FailedSendMessageResult> {
+        self.results
+            .values()
+            .flat_map(|result| result.failed_messages.iter().flatten())
+            .find(|message| message.diagnostic_id == diagnostic_id)
+    }
+
     fn emulations_mut(&mut self, env_name: &str) -> &mut Emulations {
         self.results
             .entry(env_name.to_owned())
@@ -495,13 +718,24 @@ impl EmulationsState {
                 failed_messages: vec![],
                 trace_position_by_tx_lt: FxHashMap::default(),
                 trace_names: FxHashMap::default(),
+                traces_hidden_from_ui: FxHashSet::default(),
                 get_methods: vec![],
             })
     }
 }
 
+fn trace_root_lt_for(emulations: &Emulations, lt: u64) -> u64 {
+    emulations
+        .trace_position_by_tx_lt
+        .get(&lt)
+        .and_then(|position| emulations.messages.get(position.trace_index))
+        .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
+        .unwrap_or(lt)
+}
+
 fn split_send_message_results(
     message: &[SendMessageResult],
+    next_failed_message_id: &mut u64,
 ) -> (Vec<SendMessageResultSuccess>, Vec<FailedSendMessageResult>) {
     let successful_messages = message
         .iter()
@@ -515,13 +749,19 @@ fn split_send_message_results(
         .iter()
         .filter_map(|m| match m {
             SendMessageResult::Success(_) => None,
-            SendMessageResult::Error(error) => Some(FailedSendMessageResult {
-                error: error.error.clone(),
-                vm_log: error.vm_log.clone(),
-                vm_exit_code: error.vm_exit_code,
-                executor_logs: error.executor_logs.clone(),
-                missing_libraries: error.missing_libraries.clone(),
-            }),
+            SendMessageResult::Error(error) => {
+                let diagnostic_id = *next_failed_message_id;
+                *next_failed_message_id = diagnostic_id.saturating_add(1);
+                Some(FailedSendMessageResult {
+                    diagnostic_id,
+                    error: error.error.clone(),
+                    external_not_accepted: error.external_not_accepted,
+                    vm_log: error.vm_log.clone(),
+                    vm_exit_code: error.vm_exit_code,
+                    executor_logs: error.executor_logs.clone(),
+                    missing_libraries: error.missing_libraries.clone(),
+                })
+            }
         })
         .collect::<Vec<_>>();
 
@@ -564,6 +804,7 @@ pub struct PendingMessageStep {
     pub message: Cell,
     pub from: Option<IntAddr>,
     pub parent_lt: Option<u64>,
+    pub send_mode: Option<u32>,
 }
 
 pub struct MessageCursor {
@@ -609,6 +850,7 @@ impl MessageIterState {
                     message,
                     from,
                     parent_lt: None,
+                    send_mode: None,
                 }]),
                 libs_owner,
                 trace_index: None,
@@ -643,12 +885,19 @@ impl MessageIterState {
         Some(())
     }
 
-    pub fn push_child_message(&mut self, id: u64, message: Cell, parent_lt: u64) -> Option<()> {
+    pub fn push_child_message(
+        &mut self,
+        id: u64,
+        message: Cell,
+        parent_lt: u64,
+        send_mode: Option<u32>,
+    ) -> Option<()> {
         let cursor = self.cursors.get_mut(&id)?;
         cursor.pending.push_back(PendingMessageStep {
             message,
             from: None,
             parent_lt: Some(parent_lt),
+            send_mode,
         });
         Some(())
     }
@@ -707,15 +956,18 @@ impl Wallet {
 pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
-    pub abi: Arc<ContractAbi>,
+    pub abi: Option<Arc<ContractABI>>,
+    pub source_map: Arc<SourceMap>,
     pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
+    pub tonconnect: Option<TonConnectContext>,
     pub build_override: BTreeMap<String, Cell>, // contract name -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
     pub running_id: Arc<str>,
+    pub execution_mode: ExecutionMode,
     /// The compiled code of the currently running test contract (for c3 in `run_continuation`).
     pub test_code: Option<Cell>,
 }
@@ -731,6 +983,13 @@ pub struct Context<'a> {
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,
     pub network: Option<Network>,
+    pub execution_started_at: i64,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ExecutionMode {
+    Test,
+    Script,
 }
 
 #[derive(Debug, Clone)]
@@ -738,6 +997,7 @@ pub struct IoContext {
     pub stdout_buffer: String,
     pub stderr_buffer: String,
     pub capture_output: bool,
+    pub live_output: bool,
 }
 
 pub struct AssertsContext<'a> {
@@ -775,6 +1035,53 @@ impl Context<'_> {
             .unwrap_or(&Network::Testnet)
             .clone()
     }
+
+    #[must_use]
+    pub fn can_broadcast_to_network(&self) -> bool {
+        self.env.execution_mode == ExecutionMode::Script && self.is_broadcasting
+    }
+
+    #[must_use]
+    pub fn resolve_project_read_path(&self, path: &str) -> Option<PathBuf> {
+        let path = self.resolve_project_relative_path(path)?;
+        let project_root = dunce::canonicalize(&self.env.project_root).ok()?;
+        let canonical_path = dunce::canonicalize(path).ok()?;
+        canonical_path
+            .starts_with(project_root)
+            .then_some(canonical_path)
+    }
+
+    #[must_use]
+    pub fn resolve_project_write_path(&self, path: &str) -> Option<PathBuf> {
+        let path = self.resolve_project_relative_path(path)?;
+        let project_root = dunce::canonicalize(&self.env.project_root).ok()?;
+
+        if let Ok(canonical_path) = dunce::canonicalize(&path) {
+            return canonical_path.starts_with(&project_root).then_some(path);
+        }
+
+        let parent = path.parent()?;
+        let canonical_parent = dunce::canonicalize(parent).ok()?;
+        canonical_parent.starts_with(&project_root).then_some(path)
+    }
+
+    fn resolve_project_relative_path(&self, path: &str) -> Option<PathBuf> {
+        let mut relative_path = PathBuf::new();
+        for component in Path::new(path).components() {
+            match component {
+                Component::CurDir => {}
+                Component::Normal(part) => relative_path.push(part),
+                Component::ParentDir => {
+                    if !relative_path.pop() {
+                        return None;
+                    }
+                }
+                Component::Prefix(_) | Component::RootDir => return None,
+            }
+        }
+
+        Some(self.env.project_root.join(relative_path))
+    }
 }
 
 impl Env<'_> {
@@ -792,6 +1099,13 @@ impl Env<'_> {
             .find(|(_, wallet)| &wallet.address() == addr)?;
 
         Some(found.1.clone())
+    }
+
+    #[must_use]
+    pub fn find_tonconnect_by_address(&self, addr: &StdAddr) -> Option<&TonConnectContext> {
+        self.tonconnect
+            .as_ref()
+            .filter(|tonconnect| tonconnect.wallet.address == *addr)
     }
 
     #[must_use]
@@ -819,12 +1133,12 @@ impl ChainContext<'_> {
     #[must_use]
     pub fn build_libs_with_hash_owner(&self, owner: &HashBytes) -> Dict<HashBytes, LibDescr> {
         let mut libs = Dict::<HashBytes, LibDescr>::new();
-        for lib in &self.world_state.libs() {
+        for (hash, lib) in self.world_state.libs() {
             let mut publishers = Dict::new();
             publishers.add(owner, ()).ok();
 
             libs.add(
-                lib.repr_hash(),
+                hash,
                 LibDescr {
                     lib: lib.clone(),
                     publishers,
@@ -903,6 +1217,34 @@ mod tests {
     }
 
     #[test]
+    fn build_cache_matches_library_reference_to_real_code_hash() {
+        let mut code_builder = CellBuilder::new();
+        code_builder.store_uint(0xcafe, 16).unwrap();
+        let code = code_builder.build().unwrap();
+        let library_reference = CellBuilder::build_library(code.repr_hash());
+
+        let mut cache = BuildCache::new();
+        let path = PathBuf::from("w5/contracts/WalletV5.tolk");
+        cache.built.insert(
+            path.clone(),
+            CompilationResult {
+                name: "WalletV5".to_owned(),
+                display_name: "WalletV5".to_owned(),
+                code_boc64: String::new(),
+                code_hash: *code.repr_hash(),
+                source_map: Arc::new(SourceMap::default()),
+                abi: None,
+            },
+        );
+
+        let resolved = cache
+            .result_for_code(&Some(library_reference))
+            .expect("library reference should resolve to compiled code");
+
+        assert_eq!(resolved.0, path);
+    }
+
+    #[test]
     fn message_iter_peek_does_not_consume_until_advanced() {
         let mut state = MessageIterState::new();
         let root = Cell::default();
@@ -952,7 +1294,7 @@ mod tests {
         assert!(state.is_done(cursor_id));
 
         state
-            .push_child_message(cursor_id, child.clone(), 777)
+            .push_child_message(cursor_id, child.clone(), 777, Some(1))
             .expect("cursor should accept child messages while still open");
 
         let (pending, owner) = state
@@ -960,6 +1302,7 @@ mod tests {
             .expect("child must become pending");
         assert_eq!(owner, dummy_hash(3));
         assert_eq!(pending.parent_lt, Some(777));
+        assert_eq!(pending.send_mode, Some(1));
         assert_eq!(pending.message, child);
         assert!(!state.is_done(cursor_id));
     }

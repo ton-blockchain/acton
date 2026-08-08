@@ -1,0 +1,10 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI get-method stack accepts a Toncenter cell result for an ABI address 1`] = `
+[
+  {
+    "type": "slice",
+    "value": "te6cckEBAQEAJAAAQ4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBK7IKd",
+  },
+]
+`;

@@ -19,8 +19,7 @@ fn test_color_always_disasm_error_contains_ansi_and_matches_svg_snapshot() {
         .arg("always")
         .disasm()
         .arg("--string")
-        .arg("aaa")
-        .arg("file.boc")
+        .arg("not_valid_hex_or_base64")
         .run()
         .failure();
 
@@ -45,8 +44,7 @@ fn test_color_never_disasm_error_has_no_ansi() {
         .arg("never")
         .disasm()
         .arg("--string")
-        .arg("aaa")
-        .arg("file.boc")
+        .arg("not_valid_hex_or_base64")
         .run()
         .failure();
 
@@ -119,8 +117,7 @@ fn test_color_auto_disasm_force_color_env_enables_ansi_on_non_tty() {
         .env("CLICOLOR_FORCE", "0")
         .disasm()
         .arg("--string")
-        .arg("aaa")
-        .arg("file.boc")
+        .arg("not_valid_hex_or_base64")
         .run()
         .failure();
 
@@ -147,8 +144,7 @@ fn test_color_auto_disasm_without_force_has_no_ansi_on_non_tty() {
         .env("CLICOLOR_FORCE", "0")
         .disasm()
         .arg("--string")
-        .arg("aaa")
-        .arg("file.boc")
+        .arg("not_valid_hex_or_base64")
         .run()
         .failure();
 
@@ -171,8 +167,7 @@ fn test_color_auto_disasm_no_color_overrides_force_color() {
         .env("CLICOLOR_FORCE", "1")
         .disasm()
         .arg("--string")
-        .arg("aaa")
-        .arg("file.boc")
+        .arg("not_valid_hex_or_base64")
         .run()
         .failure();
 

@@ -1,8 +1,9 @@
 use super::{
-    TestReport, TestReporter, TestStatus, TestSuiteStats, escape_xml, extract_suite_name,
+    TestReport, TestReporter, TestStatus, TestSuiteStats, extract_suite_name,
     format_fuzz_failure_context,
 };
 use crate::commands::test::TestDescriptor;
+use crate::formatter::FormatterContext;
 use acton_config::config::project_root as configured_project_root;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 use std::collections::BTreeMap;
@@ -60,7 +61,7 @@ impl JUnitReporter {
             TestStatus::Failed => {
                 let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                 if let Some(ref message) = test.message {
-                    status.set_message(escape_xml(message).as_str());
+                    status.set_message(message);
                 }
                 status.set_type("AssertionError");
                 let mut description_lines = Vec::new();
@@ -71,6 +72,13 @@ impl JUnitReporter {
                     && let Some(fuzz) = &execution.fuzz
                 {
                     description_lines.push(format_fuzz_failure_context(fuzz));
+                }
+                if let Some(detailed_message) = test
+                    .detailed_message
+                    .as_deref()
+                    .filter(|message| !message.trim().is_empty())
+                {
+                    description_lines.push(FormatterContext::strip_ansi_text(detailed_message));
                 }
                 if !description_lines.is_empty() {
                     status.set_description(description_lines.join("\n"));

@@ -1,0 +1,4 @@
+Error: Another Acton Studio instance is already running for [ROOT]
+
+Caused by:
+  Resource temporarily unavailable ([OS_ERROR])

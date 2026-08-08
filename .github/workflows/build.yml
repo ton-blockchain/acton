@@ -1,12 +1,23 @@
-name: Trunk Build
+name: Build Trunk
 
 on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "apps/**"
+      - "docs/**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
   push:
     branches:
       - master
+    paths-ignore:
+      - "apps/**"
   workflow_dispatch:
 
 concurrency:
@@ -15,13 +26,9 @@ concurrency:
 
 permissions: { }
 
-env:
-  ENABLE_MIRRORING_RELEASE: 'true'
-  PUBLIC_ACTON_REPOSITORY: i582/acton-public
-
 jobs:
   build-linux:
-    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}${{ matrix.abi }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: &runner_linux_strategy
       matrix:
         include:
@@ -31,7 +38,7 @@ jobs:
             sys: linux
             abi: gnu
     runs-on: ${{ matrix.runner }}
-    if: true
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -40,9 +47,30 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Check changed paths
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          packages_only=false
+
+          if [[ -n "${BASE_SHA}" ]] &&
+             ! git diff --quiet "${BASE_SHA}" "${GITHUB_SHA}" -- packages/ &&
+             git diff --quiet "${BASE_SHA}" "${GITHUB_SHA}" -- . ':(exclude)packages/**'
+          then
+            packages_only=true
+          fi
+
+          echo "packages_only=${packages_only}" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -54,9 +82,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive
@@ -73,6 +101,7 @@ jobs:
           tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Install LLVM and Clang
+        timeout-minutes: 5
         # language=Bash
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -93,15 +122,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Restore Playwright cache
+        id: ui-e2e-playwright-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-ui-e2e-playwright-cache-path |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-playwright-
+
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
           CC: clang-16
           CXX: clang++-16
         # language=Bash
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
@@ -110,7 +150,40 @@ jobs:
         run: |
           acton --help
 
+      - name: Run Test UI E2E
+        id: test-ui-e2e
+        env:
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
+        run: just test-ui-e2e-run
+
+      - name: Upload Test UI E2E artifacts
+        if: failure() && steps.test-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-ui-e2e-results
+          path: test-results/acton-test-ui-e2e
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Run Explorer UI E2E
+        # TODO: Re-enable after fixing Explorer UI E2E.
+        if: false
+        id: explorer-ui-e2e
+        env:
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
+        run: just test-explorer-ui-e2e-run
+
+      - name: Upload Explorer UI E2E artifacts
+        if: failure() && steps.explorer-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: explorer-ui-e2e-results
+          path: test-results/acton-ui-e2e
+          retention-days: 1
+          if-no-files-found: ignore
+
       - name: Run tests
+        if: steps.changes.outputs.packages_only != 'true'
         run: |
           just test
 
@@ -120,6 +193,13 @@ jobs:
         with:
           path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+
+      - name: Save Playwright cache
+        if: github.ref == 'refs/heads/master' && steps.ui-e2e-playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-ui-e2e-playwright-cache-path
+          key: ${{ steps.ui-e2e-playwright-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -149,7 +229,7 @@ jobs:
     name: Lint Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
-    if: true
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
@@ -158,7 +238,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -172,9 +252,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.45.1
+          tool: just@1.52.0,cargo-shear@1.13.1,typos@1.47.2
           fallback: none
 
       - name: Download TON objects archive
@@ -194,54 +274,6 @@ jobs:
         run: |
           just check-ci
 
-  ui:
-    name: UI (${{ matrix.sys }}-${{ matrix.arch }})
-    strategy: *runner_linux_strategy
-    runs-on: ${{ matrix.runner }}
-    if: true
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-
-      - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
-        with:
-          tool: just@1.49.0
-          fallback: none
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-
-      - name: Restore Bun cache
-        id: bun-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: &linux-lint-ui-bun-cache-path |
-            ~/.bun/install/cache
-          key: ${{ runner.os }}-${{ runner.arch }}-lint-ui-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-lint-ui-
-
-      - name: Install UI dependencies
-        run: bun ci
-
-      - name: Run UI checks
-        run: |
-          just check-ui-ci
-
-      - name: Save Bun cache
-        if: github.ref == 'refs/heads/master' && steps.bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: *linux-lint-ui-bun-cache-path
-          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
-
   build-macos:
     name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     strategy: &runner_macos_strategy
@@ -252,7 +284,7 @@ jobs:
             vendor: apple
             sys: darwin
     runs-on: ${{ matrix.runner }}
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     env:
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
@@ -261,9 +293,30 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Check changed paths
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          packages_only=false
+
+          if [[ -n "${BASE_SHA}" ]] &&
+             ! git diff --quiet "${BASE_SHA}" "${GITHUB_SHA}" -- packages/ &&
+             git diff --quiet "${BASE_SHA}" "${GITHUB_SHA}" -- . ':(exclude)packages/**'
+          then
+            packages_only=true
+          fi
+
+          echo "packages_only=${packages_only}" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -275,9 +328,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive
@@ -306,12 +359,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Build UI
+        run: just build-ui
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
-        run: |
-          just build-ui
-          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
+        run: cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
@@ -321,6 +375,7 @@ jobs:
           acton --help
 
       - name: Run tests
+        if: steps.changes.outputs.packages_only != 'true'
         run: |
           just test
 
@@ -357,9 +412,9 @@ jobs:
 
   create-trunk-release:
     name: Create Trunk Release
-    needs: [ build-linux, build-macos, lint, ui ]
+    needs: [ build-linux, build-macos, lint ]
     runs-on: ubicloud-standard-2-ubuntu-2204
-    if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
+    if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
 
     permissions:
       actions: write
@@ -372,36 +427,6 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
-
-      - name: Delete download artifacts
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ github.token }}
-          # language=JavaScript
-          script: |
-            const {
-              data: artifacts,
-            } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-
-            if (artifacts.total_count === 0) {
-              core.warning('No downloadable artifacts to delete');
-              return;
-            } else {
-              core.info(`Found ${artifacts.total_count} artifacts to delete`);
-            }
-
-            for (const artifact of artifacts.artifacts) {
-              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-              });
-            }
 
       - name: Display structure of downloaded files
         run: ls -lhR artifacts
@@ -433,34 +458,4 @@ jobs:
             --title "Trunk" \
             --notes "${release_notes}" \
             --target "${GITHUB_SHA}" \
-            --prerelease
-
-      - name: Delete previous trunk (mirror)
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-        # language=Bash
-        run: |
-          gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" --cleanup-tag -y || true
-
-          gh api repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk -X DELETE || true
-
-      - name: Create trunk release (mirror)
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-        # language=Bash
-        run: |
-          release_notes=$(cat <<EOF
-          Automated trunk build of Acton.
-
-          Built from source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
-          EOF
-          )
-
-          gh release create trunk \
-            --repo "${PUBLIC_ACTON_REPOSITORY}" \
-            artifacts/* \
-            --title "Trunk" \
-            --notes "${release_notes}" \
             --prerelease

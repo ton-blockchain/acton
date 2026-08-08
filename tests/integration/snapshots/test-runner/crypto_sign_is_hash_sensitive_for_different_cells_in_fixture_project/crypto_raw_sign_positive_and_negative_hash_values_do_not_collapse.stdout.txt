@@ -1,14 +1,5 @@
   Installing standard library [ACTON_VERSION]
    Compiling contracts
-No contracts section found in Acton.toml. Add at least one contract.
-To add a contract add the following section to Acton.toml:
-
-[contracts.MyContract]
-display-name = "MyContract"
-src = "contracts/MyContract.tolk"
-depends = []
-
-See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
      Running tests
 
  TEST  [ROOT]
@@ -17,7 +8,7 @@ See [ACTON_DOCS_URL]/building/reference/#contracts-section for more information
   ✗ ba-stdlib-raw-sign-positive-negative-hash-values [TIME]
     └─ Error: expect(actual).toNotEqual(expected)
        Values are equal but expected to be different:
-         [BOC_HEX]
+         slice{[HEX]}
       └─ at tests/crypto_signing_edges.test[LINE]
 
  ✗ 1 failed in 1 file

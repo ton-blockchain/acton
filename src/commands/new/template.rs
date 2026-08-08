@@ -3,10 +3,13 @@ use include_dir::{Dir, include_dir};
 use serde::Serialize;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 static EMPTY_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty");
+
+static EMPTY_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty-app");
 
 static COUNTER_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/counter");
@@ -26,8 +29,21 @@ static NFT_TEMPLATE_DIR: Dir<'static> =
 static NFT_APP_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft-app");
 
+static W5_EXTENSION_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension");
+
+static W5_EXTENSION_APP_TEMPLATE_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension-app");
+
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
 const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
+const AUTHOR_PLACEHOLDER: &str = "__ACTON_AUTHOR__";
+
+#[derive(Clone, Copy)]
+struct TemplateRenderContext<'a> {
+    npm_package_name: Option<&'a str>,
+    author: Option<&'a str>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ProjectLayout {
@@ -103,12 +119,20 @@ pub(super) struct ContractTemplate {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(super) struct ExtraScript {
+    pub alias: &'static str,
+    pub script: &'static str,
+    pub net: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(super) struct ProjectScaffold {
     base_dir: &'static Dir<'static>,
     app_overlay_dir: Option<&'static Dir<'static>>,
     layout: ProjectLayout,
     contracts: &'static [ContractTemplate],
     deploy_script: &'static str,
+    extra_scripts: &'static [ExtraScript],
 }
 
 impl ProjectScaffold {
@@ -131,6 +155,21 @@ impl ProjectScaffold {
     pub(super) fn contract_src(&self, contract: &ContractTemplate) -> String {
         self.layout.remap_path(contract.src)
     }
+
+    #[must_use]
+    pub(super) fn extra_scripts(&self) -> Vec<(String, String)> {
+        self.extra_scripts
+            .iter()
+            .map(|script| {
+                let path = self.layout.remap_path(script.script);
+                let cmd = match script.net {
+                    Some(net) => format!("acton script {path} --net {net}"),
+                    None => format!("acton script {path}"),
+                };
+                (script.alias.to_owned(), cmd)
+            })
+            .collect()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -148,6 +187,8 @@ pub(super) struct TemplateCatalog {
 #[derive(Debug, Clone, Serialize)]
 struct TemplateCatalogEntry {
     id: &'static str,
+    aliases: &'static [&'static str],
+    category: &'static str,
     description: &'static str,
     supports_app: bool,
     scaffolds: Vec<TemplateScaffoldInfo>,
@@ -157,7 +198,15 @@ struct TemplateCatalogEntry {
 struct TemplateScaffoldInfo {
     kind: &'static str,
     includes_typescript_app: bool,
+    deploy_script: String,
+    scripts: Vec<TemplateScriptInfo>,
     contracts: Vec<TemplateContractInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TemplateScriptInfo {
+    alias: String,
+    command: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -211,12 +260,37 @@ const NFT_CONTRACTS: [ContractTemplate; 2] = [
     },
 ];
 
+const W5_EXTENSION_CONTRACTS: [ContractTemplate; 2] = [
+    ContractTemplate {
+        id: "SimpleExtension",
+        name: "SimpleExtension",
+        src: "contracts/SimpleExtension.tolk",
+        depends: &[],
+    },
+    ContractTemplate {
+        id: "WalletV5",
+        name: "WalletV5",
+        src: "contracts/walletv5/WalletV5.tolk",
+        depends: &[],
+    },
+];
+
 const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     base_dir: &EMPTY_TEMPLATE_DIR,
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
+};
+
+const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &EMPTY_TEMPLATE_DIR,
+    app_overlay_dir: Some(&EMPTY_APP_TEMPLATE_DIR),
+    layout: ProjectLayout::App,
+    contracts: &EMPTY_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -225,6 +299,7 @@ const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -233,6 +308,7 @@ const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: &[],
 };
 
 const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -241,6 +317,7 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: JETTON_EXTRA_SCRIPTS,
 };
 
 const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -249,14 +326,72 @@ const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
+    extra_scripts: JETTON_EXTRA_SCRIPTS,
 };
+
+const JETTON_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "jetton-mint",
+        script: "scripts/mint.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-transfer",
+        script: "scripts/transfer.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-info",
+        script: "scripts/info.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-change-admin",
+        script: "scripts/change-admin.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-change-metadata",
+        script: "scripts/change-metadata.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-claim-admin",
+        script: "scripts/claim-admin.tolk",
+        net: None,
+    },
+];
+
+const NFT_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "nft-deploy-item",
+        script: "scripts/deploy-item.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-deploy-batch",
+        script: "scripts/deploy-batch.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-transfer-item",
+        script: "scripts/transfer-item.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-change-admin",
+        script: "scripts/change-admin.tolk",
+        net: None,
+    },
+];
 
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     base_dir: &NFT_TEMPLATE_DIR,
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
-    deploy_script: "scripts/deployCollection.tolk",
+    deploy_script: "scripts/deploy-collection.tolk",
+    extra_scripts: NFT_EXTRA_SCRIPTS,
 };
 
 const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -264,7 +399,39 @@ const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     app_overlay_dir: Some(&NFT_APP_TEMPLATE_DIR),
     layout: ProjectLayout::App,
     contracts: &NFT_CONTRACTS,
-    deploy_script: "scripts/deployCollection.tolk",
+    deploy_script: "scripts/deploy-collection.tolk",
+    extra_scripts: NFT_EXTRA_SCRIPTS,
+};
+
+const W5_EXTENSION_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "install-extension",
+        script: "scripts/install-extension.tolk",
+        net: Some("testnet"),
+    },
+    ExtraScript {
+        alias: "delete-extension",
+        script: "scripts/delete-extension.tolk",
+        net: Some("testnet"),
+    },
+];
+
+const W5_EXTENSION_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    app_overlay_dir: None,
+    layout: ProjectLayout::Standard,
+    contracts: &W5_EXTENSION_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
+};
+
+const W5_EXTENSION_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
+    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    app_overlay_dir: Some(&W5_EXTENSION_APP_TEMPLATE_DIR),
+    layout: ProjectLayout::App,
+    contracts: &W5_EXTENSION_CONTRACTS,
+    deploy_script: "scripts/deploy.tolk",
+    extra_scripts: W5_EXTENSION_EXTRA_SCRIPTS,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -273,6 +440,8 @@ pub enum ProjectTemplate {
     Counter,
     Jetton,
     Nft,
+    #[value(alias = "w5-plugin")]
+    W5Extension,
 }
 
 impl ProjectTemplate {
@@ -283,6 +452,25 @@ impl ProjectTemplate {
             Self::Counter => "counter",
             Self::Jetton => "jetton",
             Self::Nft => "nft",
+            Self::W5Extension => "w5-extension",
+        }
+    }
+
+    #[must_use]
+    pub const fn aliases(self) -> &'static [&'static str] {
+        match self {
+            Self::W5Extension => &["w5-plugin"],
+            _ => &[],
+        }
+    }
+
+    #[must_use]
+    pub const fn category(self) -> &'static str {
+        match self {
+            Self::Empty | Self::Counter => "starter",
+            Self::Jetton => "token",
+            Self::Nft => "nft",
+            Self::W5Extension => "wallet",
         }
     }
 
@@ -293,6 +481,7 @@ impl ProjectTemplate {
             Self::Counter => "Simple counter contract",
             Self::Jetton => "Jetton minter and wallet contracts",
             Self::Nft => "NFT collection and item contracts",
+            Self::W5Extension => "Wallet V5 extension contract and subscription example",
         }
     }
 }
@@ -305,7 +494,7 @@ impl std::fmt::Display for ProjectTemplate {
 
 const EMPTY_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     default_scaffold: EMPTY_SCAFFOLD,
-    app_scaffold: None,
+    app_scaffold: Some(EMPTY_APP_SCAFFOLD),
 };
 
 const COUNTER_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
@@ -323,12 +512,18 @@ const NFT_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
     app_scaffold: Some(NFT_APP_SCAFFOLD),
 };
 
+const W5_EXTENSION_TEMPLATE_DEFINITION: TemplateDefinition = TemplateDefinition {
+    default_scaffold: W5_EXTENSION_SCAFFOLD,
+    app_scaffold: Some(W5_EXTENSION_APP_SCAFFOLD),
+};
+
 const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefinition {
     match template {
         ProjectTemplate::Empty => &EMPTY_TEMPLATE_DEFINITION,
         ProjectTemplate::Counter => &COUNTER_TEMPLATE_DEFINITION,
         ProjectTemplate::Jetton => &JETTON_TEMPLATE_DEFINITION,
         ProjectTemplate::Nft => &NFT_TEMPLATE_DEFINITION,
+        ProjectTemplate::W5Extension => &W5_EXTENSION_TEMPLATE_DEFINITION,
     }
 }
 
@@ -338,6 +533,7 @@ pub(super) fn get_available_templates() -> Vec<ProjectTemplate> {
         ProjectTemplate::Counter,
         ProjectTemplate::Jetton,
         ProjectTemplate::Nft,
+        ProjectTemplate::W5Extension,
     ]
 }
 
@@ -353,6 +549,8 @@ pub(super) fn template_catalog() -> TemplateCatalog {
 
             TemplateCatalogEntry {
                 id: template.as_str(),
+                aliases: template.aliases(),
+                category: template.category(),
                 description: template.description(),
                 supports_app: definition.app_scaffold.is_some(),
                 scaffolds,
@@ -383,9 +581,31 @@ pub(super) const fn project_scaffold(
 }
 
 fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
+    let mut scripts = vec![
+        TemplateScriptInfo {
+            alias: "deploy-emulation".to_owned(),
+            command: format!("acton script {}", scaffold.deploy_script_path()),
+        },
+        TemplateScriptInfo {
+            alias: "deploy-testnet".to_owned(),
+            command: format!(
+                "acton script {} --net testnet",
+                scaffold.deploy_script_path()
+            ),
+        },
+    ];
+    scripts.extend(
+        scaffold
+            .extra_scripts()
+            .into_iter()
+            .map(|(alias, command)| TemplateScriptInfo { alias, command }),
+    );
+
     TemplateScaffoldInfo {
         kind: scaffold.layout().as_str(),
         includes_typescript_app: scaffold.layout().includes_typescript_app(),
+        deploy_script: scaffold.deploy_script_path(),
+        scripts,
         contracts: scaffold
             .contracts()
             .iter()
@@ -398,30 +618,105 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
     }
 }
 
+/// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
+/// without contract-specific wrappers, for `acton init --create-dapp`.
+pub fn extract_standalone_app_scaffold(
+    target_dir: &Path,
+    npm_package_name: &str,
+) -> std::io::Result<()> {
+    extract_template_dir(
+        &EMPTY_APP_TEMPLATE_DIR,
+        target_dir,
+        false,
+        true,
+        TemplateRenderContext {
+            npm_package_name: Some(npm_package_name),
+            author: None,
+        },
+    )
+}
+
 pub(super) fn create_project_from_scaffold(
     scaffold: ProjectScaffold,
     target_dir: &Path,
     include_agents: bool,
     npm_package_name: Option<&str>,
+    author: &str,
 ) -> anyhow::Result<()> {
+    let render_context = TemplateRenderContext {
+        npm_package_name,
+        author: Some(author),
+    };
+
     if let Some(overlay_dir) = scaffold.app_overlay_dir {
-        extract_base_for_app_layout(scaffold.base_dir, target_dir)?;
-        extract_template_dir(overlay_dir, target_dir, include_agents, npm_package_name)?;
+        extract_base_for_app_layout(scaffold.base_dir, target_dir, render_context)?;
+        extract_template_dir(
+            overlay_dir,
+            target_dir,
+            include_agents,
+            false,
+            render_context,
+        )?;
     } else {
         extract_template_dir(
             scaffold.base_dir,
             target_dir,
             include_agents,
-            npm_package_name,
+            false,
+            render_context,
         )?;
     }
     Ok(())
 }
 
-fn extract_base_for_app_layout(dir: &Dir<'static>, base_path: &Path) -> std::io::Result<()> {
+pub(super) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: bool) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    if let Some(overlay_dir) = scaffold.app_overlay_dir {
+        paths.extend(
+            template_files(scaffold.base_dir)
+                .into_iter()
+                .filter_map(|path| remap_for_app_layout(&path)),
+        );
+        paths.extend(
+            template_files(overlay_dir)
+                .into_iter()
+                .filter(|path| !should_skip_entry(path, include_agents, false)),
+        );
+    } else {
+        paths.extend(
+            template_files(scaffold.base_dir)
+                .into_iter()
+                .filter(|path| !should_skip_entry(path, include_agents, false)),
+        );
+    }
+
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+fn template_files(dir: &Dir<'static>) -> Vec<PathBuf> {
+    let mut paths = dir
+        .files()
+        .map(|file| file.path().to_path_buf())
+        .collect::<Vec<_>>();
+
+    for subdir in dir.dirs() {
+        paths.extend(template_files(subdir));
+    }
+
+    paths
+}
+
+fn extract_base_for_app_layout(
+    dir: &Dir<'static>,
+    base_path: &Path,
+    render_context: TemplateRenderContext<'_>,
+) -> std::io::Result<()> {
     for entry in dir.entries() {
         if let Some(subdir) = entry.as_dir() {
-            extract_base_for_app_layout(subdir, base_path)?;
+            extract_base_for_app_layout(subdir, base_path, render_context)?;
             continue;
         }
 
@@ -430,10 +725,7 @@ fn extract_base_for_app_layout(dir: &Dir<'static>, base_path: &Path) -> std::io:
                 continue;
             };
             let target = base_path.join(remapped);
-            if let Some(parent) = target.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(target, file.contents())?;
+            write_template_file(&target, entry.path(), file.contents(), render_context)?;
         }
     }
     Ok(())
@@ -446,11 +738,11 @@ const APP_LAYOUT_REMAPPINGS: &[(&str, &str)] = &[
     ("wrappers/", "contracts/wrappers/"),
 ];
 
-fn remap_for_app_layout(path: &Path) -> Option<std::path::PathBuf> {
+fn remap_for_app_layout(path: &Path) -> Option<PathBuf> {
     let path_str = path.to_str()?;
     for &(from, to) in APP_LAYOUT_REMAPPINGS {
         if let Some(rest) = path_str.strip_prefix(from) {
-            return Some(std::path::PathBuf::from(format!("{to}{rest}")));
+            return Some(PathBuf::from(format!("{to}{rest}")));
         }
     }
     None
@@ -460,10 +752,11 @@ fn extract_template_dir(
     dir: &Dir<'static>,
     base_path: &Path,
     include_agents: bool,
-    npm_package_name: Option<&str>,
+    skip_wrappers_ts: bool,
+    render_context: TemplateRenderContext<'_>,
 ) -> std::io::Result<()> {
     for entry in dir.entries() {
-        if !include_agents && should_skip_entry(entry.path()) {
+        if should_skip_entry(entry.path(), include_agents, skip_wrappers_ts) {
             continue;
         }
 
@@ -471,34 +764,80 @@ fn extract_template_dir(
 
         if let Some(subdir) = entry.as_dir() {
             fs::create_dir_all(&path)?;
-            extract_template_dir(subdir, base_path, include_agents, npm_package_name)?;
+            extract_template_dir(
+                subdir,
+                base_path,
+                include_agents,
+                skip_wrappers_ts,
+                render_context,
+            )?;
             continue;
         }
 
         if let Some(file) = entry.as_file() {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            if let Some(package_name) = npm_package_name
-                && matches!(
-                    entry.path().to_str(),
-                    Some("package.json" | "package-lock.json")
-                )
-            {
-                let content = String::from_utf8_lossy(file.contents())
-                    .replace(NPM_PACKAGE_NAME_PLACEHOLDER, package_name);
-                fs::write(path, content)?;
-            } else {
-                fs::write(path, file.contents())?;
-            }
+            write_template_file(&path, entry.path(), file.contents(), render_context)?;
         }
     }
 
     Ok(())
 }
 
-fn should_skip_entry(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME))
+fn write_template_file(
+    target: &Path,
+    template_path: &Path,
+    contents: &[u8],
+    render_context: TemplateRenderContext<'_>,
+) -> std::io::Result<()> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    if let Some(content) = render_template_file(template_path, contents, render_context) {
+        fs::write(target, content)
+    } else {
+        fs::write(target, contents)
+    }
+}
+
+fn render_template_file(
+    path: &Path,
+    contents: &[u8],
+    render_context: TemplateRenderContext<'_>,
+) -> Option<String> {
+    let mut rendered = if let Some(package_name) = render_context.npm_package_name
+        && matches!(path.to_str(), Some("package.json" | "package-lock.json"))
+    {
+        Some(String::from_utf8_lossy(contents).replace(NPM_PACKAGE_NAME_PLACEHOLDER, package_name))
+    } else {
+        None
+    };
+
+    if let Some(author) = render_context.author
+        && path
+            .extension()
+            .is_some_and(|ext| ext == OsStr::new("tolk"))
+    {
+        let content =
+            rendered.get_or_insert_with(|| String::from_utf8_lossy(contents).into_owned());
+        *content = content.replace(AUTHOR_PLACEHOLDER, &escape_tolk_string_content(author));
+    }
+
+    rendered
+}
+
+fn escape_tolk_string_content(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+fn should_skip_entry(path: &Path, include_agents: bool, skip_wrappers_ts: bool) -> bool {
+    (!include_agents
+        && path
+            .file_name()
+            .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME)))
+        || (skip_wrappers_ts && path.starts_with("wrappers-ts"))
 }

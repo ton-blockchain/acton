@@ -34,7 +34,7 @@ OPTIONS
            Write output to a file instead of standard output.
 
        --enable-only code[,code…]_
-           Enable only selected lint rules, for example E001,S001.
+           Enable only selected lint rules, for example S003,S001.
 
        --explain code
            Print an explanation for a lint rule.
@@ -93,7 +93,7 @@ BEHAVIOR
        o  contracts with non-.tolk sources such as precompiled .boc entries are
           not lint roots
 
-       o  single-file mode relaxes E014 (acton-import-in-contract)
+       o  single-file mode relaxes E010 (acton-import-in-contract)
 
        o  targets ending with .tolk are treated as file paths; other targets
           are resolved as contract names from Acton.toml
@@ -104,9 +104,13 @@ BEHAVIOR
        o  inline suppressions use rule names, for example //
           check-disable-next-line unused-variable, write-only-variable
 
-       o  suppressions apply only to the immediately following line and match
-          diagnostic names, including compiler-error and parse-error;
-          diagnostic codes such as C001 are not matched
+       o  suppressions apply only to suppressible linter diagnostics on the
+          immediately following line and match diagnostic names; diagnostic
+          codes such as C001 are not matched
+
+       o  compiler and parser diagnostics reported as compiler-error or
+          parse-error are emitted outside suppressible lint processing and are
+          not disabled by check-disable-next-line or [lint.rules]
 
        o  --fix applies only linter-provided fixes; diagnostics without a safe
           fix remain in the report
@@ -117,7 +121,7 @@ BEHAVIOR
           forced to allow
 
        o  --enable-only selectors must resolve to exactly one rule; in
-          practice, use full rule codes such as E003 for stability
+          practice, use full rule codes such as E002 for stability
 
        o  excluded files still participate in import/type resolution, but lint
           diagnostics for excluded non-root files are filtered out
@@ -159,7 +163,7 @@ EXAMPLES
 
        5. Run only selected rules:
 
-              acton check --enable-only E001,S001
+              acton check --enable-only S003,S001
 
        6. List rule metadata as JSON:
 
@@ -176,8 +180,7 @@ EXAMPLES
 SEE ALSO
        o  acton help fmt
 
-       o  Linting guide
-          <https://ton-blockchain.github.io/acton/docs/linting/overview>
+       o  Linting guide <https://ton-blockchain.github.io/acton/docs/lint>
 
        o  Linter rules
           <https://ton-blockchain.github.io/acton/docs/rules/overview>

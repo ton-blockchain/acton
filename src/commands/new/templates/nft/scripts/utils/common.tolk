@@ -1,5 +1,6 @@
 import "@stdlib/strings"
 import "@acton/build"
+import "@acton/env"
 import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
@@ -10,7 +11,6 @@ import "@wrappers/NftCollection.gen"
 import "@wrappers/NftItem.gen"
 
 const ONCHAIN_CONTENT_PREFIX = 0x00
-const SNAKE_PREFIX = 0x00
 
 const NFT_DEFAULT_COLLECTION_NAME = "SomeNFT"
 const NFT_DEFAULT_COLLECTION_DESCRIPTION = "Some NFT collection"
@@ -37,8 +37,8 @@ fun buildOnchainMetadata(info: NftCollectionInfo): cell {
         .endCell();
 }
 
-fun promptNftWallet(message: string): ActonWallet {
-    return scripts.wallet(promptWallet(message));
+fun promptNftWallet(envName: string, message: string): ActonWallet {
+    return scripts.wallet(env<string>(envName) ?? promptWallet(message));
 }
 
 fun promptNftAddress(message: string, default: address? = null): address {
@@ -82,7 +82,7 @@ fun deployNftCollection(deployer: ActonWallet, info: NftCollectionInfo): NftColl
     val collection = NftCollection.fromStorage(
         makeNftCollectionStorage(deployer.address, info),
     );
-    val res = collection.deploy(deployer.address, { value: ton("0.05"), bounce: false });
+    val res = collection.deploy(deployer.address, { value: grams("0.05"), bounce: false });
     res.waitForFirstTransaction();
     return collection;
 }
@@ -98,9 +98,9 @@ fun deployNftItem(
         deployer.address,
         0,
         itemIndex,
-        ton("0.03"),
+        grams("0.03"),
         { ownerAddress: owner, content: itemContent },
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
     res.waitForFirstTransaction();
     return NftItem.fromAddress(collection.getNftAddressByIndex(itemIndex));
@@ -115,7 +115,7 @@ fun deployNftBatch(
     var deployList: map<uint64, BatchDeployDictItem> = [];
     var i = 0;
     val nextItemIndex = collection.getCollectionData().nextItemIndex;
-    val perItemAmount = ton("0.03");
+    val perItemAmount = grams("0.03");
 
     while (i < count) {
         val index = (nextItemIndex + i);
@@ -139,7 +139,7 @@ fun deployNftBatch(
         i += 1;
     }
 
-    val messageValue = perItemAmount * count + ton("0.1");
+    val messageValue = perItemAmount * count + grams("0.1");
     return collection.sendBatchDeployNfts(
         deployer.address,
         0,

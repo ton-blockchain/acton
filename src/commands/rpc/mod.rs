@@ -1,23 +1,31 @@
-use crate::commands::common::error_fmt;
+use crate::commands::common::format_nanograms;
+use crate::context::code_lookup_hash;
+use crate::contract_interface::{
+    compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
+};
 use crate::file_build_cache::FileBuildCache;
-use acton_config::color::OwoColorize;
+use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::{ActonConfig, ContractConfig, project_root as configured_project_root};
+use acton_debug::{PrettyAddressFormat, PrettyRenderOptions, render_unpacked_value_as_tolk_type};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
-use num_bigint::{BigInt, Sign};
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use ton_abi::abi_serde::Data as CompilerAbiData;
-use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::{ABIGetMethod, ContractABI};
+use tolk_compiler::dynamic_unpack;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
-};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
+
+mod call;
+mod info;
+mod trace;
+mod verifier;
 
 #[derive(Subcommand, Clone)]
 pub enum RpcCommand {
@@ -27,125 +35,188 @@ pub enum RpcCommand {
         address: String,
         #[arg(
             long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
+        #[arg(long, help = "Masterchain block seqno to query account state at")]
+        block_number: Option<u64>,
+        #[arg(
+            long,
             help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
         )]
         net: Option<String>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(long, help = "Skip domain inspectors such as jetton detection")]
+        raw: bool,
+    },
+    #[command(about = "Call a contract get-method through TonCenter")]
+    Call {
+        #[arg(help = "Contract address in friendly or raw format")]
+        address: String,
+        #[arg(help = "Get-method name")]
+        method: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
+        #[arg(
+            help = "Arguments to pass to the get-method",
+            allow_hyphen_values = true
+        )]
+        args: Vec<String>,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            help = "Masterchain block seqno to query account state and run get-method at"
+        )]
+        block_number: Option<u64>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(
+            long,
+            conflicts_with = "raw",
+            help = "Include ABI field comments in the result"
+        )]
+        with_comments: bool,
+        #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
+        raw: bool,
+    },
+    #[command(about = "Print the latest masterchain block info returned by TonCenter")]
+    Block {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Print the latest masterchain block number for a network")]
+    BlockNumber {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Render a TonCenter v3 trace as a decoded transaction tree")]
+    Trace {
+        #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
+        hash: String,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            conflicts_with_all = ["tree", "verbose"],
+            help = "Print only the trace summary"
+        )]
+        summary: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "verbose"],
+            help = "Print the trace summary and transaction tree (default)"
+        )]
+        tree: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "tree"],
+            help = "Print the summary, tree, and stable per-transaction fields"
+        )]
+        verbose: bool,
+        #[arg(long, help = "Print decoded message bodies in the transaction tree")]
+        show_bodies: bool,
     },
 }
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
-        RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
+        RpcCommand::Info {
+            address,
+            abi,
+            block_number,
+            net,
+            json,
+            raw,
+        } => info::rpc_info_cmd(&address, abi.as_deref(), net, block_number, json, raw),
+        RpcCommand::Call {
+            address,
+            method,
+            abi,
+            args,
+            net,
+            block_number,
+            json,
+            with_comments,
+            raw,
+        } => call::rpc_call_cmd(
+            &address,
+            &method,
+            &args,
+            call::RpcCallOptions {
+                abi,
+                net,
+                block_number,
+                json,
+                with_comments,
+                raw,
+            },
+        ),
+        RpcCommand::Block { net } => rpc_block_cmd(net),
+        RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
+        RpcCommand::Trace {
+            hash,
+            net,
+            summary,
+            tree: _,
+            verbose,
+            show_bodies,
+        } => trace::rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
 }
 
-fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
-    let (address, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
-        .map_err(|_| anyhow!("Invalid address"))
-        .with_context(|| error_fmt::invalid_address(address))?;
-
-    let network = net
-        .as_deref()
-        .map(Network::from_str)
-        .transpose()?
-        .unwrap_or(Network::Testnet);
-
+fn rpc_block_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
-    let remote = client
-        .get_account_info(None, &address.to_string())
-        .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
-
-    let balance = remote.balance.to_bigint()?;
-    let code = TonApiClient::decode_optional_cell(&remote.code)?;
-    let data = TonApiClient::decode_optional_cell(&remote.data)?;
-
-    let matched_contract = code
-        .as_ref()
-        .map(|code| find_local_contract_match(code.repr_hash(), &config))
-        .transpose()?
-        .flatten();
-
-    let decoded_storage = match (&data, matched_contract.as_ref()) {
-        (Some(data), Some(contract)) => contract
-            .compiler_abi
-            .as_ref()
-            .map(|abi| decode_storage_json(data, abi, &network))
-            .transpose()?,
-        _ => None,
-    };
-
-    print_section("Remote Account");
-    print_kv("Network", network.to_string());
-    print_kv(
-        "Address",
-        format_std_address(&address, &network).cyan().to_string(),
-    );
-    print_kv("Raw Address", address.to_string().cyan().to_string());
-    print_kv("Status", format_account_status(&remote.state));
-    print_kv("Balance", format_nanotons(&balance).white().to_string());
-    print_kv("Last Tx LT", remote.last_transaction_id.lt.as_str());
-    print_kv(
-        "Last Tx Hash",
-        remote
-            .last_transaction_id
-            .hash
-            .as_str()
-            .yellow()
-            .to_string(),
-    );
-
-    if let Some(code) = &code {
-        print_kv("Code Hash", format_hash(code.repr_hash()));
-    }
-    if let Some(data) = &data {
-        print_kv("Data Hash", format_hash(data.repr_hash()));
-    }
-    if remote.state == "frozen" && !remote.frozen_hash.is_empty() {
-        print_kv(
-            "Frozen Hash",
-            remote.frozen_hash.as_str().yellow().to_string(),
-        );
-    }
-
-    if code.is_some() {
-        print_section("Local Match");
-        if let Some(contract) = &matched_contract {
-            print_kv(
-                "Contract",
-                format!("{} ({})", contract.contract_id, contract.contract_name)
-                    .green()
-                    .to_string(),
-            );
-            if let Some(abi) = &contract.abi {
-                print_kv("ABI", abi.name.as_str().green().to_string());
-            }
-        } else {
-            print_kv("Contract", "<none>".dimmed().to_string());
-        }
-    }
-
-    match decoded_storage {
-        Some(decoded_storage) => {
-            print_section("Decoded Storage");
-            print_yaml_value(None, &decoded_storage, 2);
-        }
-        None if data.is_some() && matched_contract.is_some() => {
-            print_section("Decoded Storage");
-            println!("  {}", "<unavailable>".dimmed());
-        }
-        None if data.is_some() => {
-            print_section("Decoded Storage");
-            println!("  {}", "<local ABI not found>".dimmed());
-        }
-        None => {}
-    }
+    let block = client
+        .get_masterchain_info()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{}", serde_json::to_string_pretty(&block)?);
 
     Ok(())
 }
 
-fn load_rpc_config() -> anyhow::Result<ActonConfig> {
+fn rpc_block_number_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let seqno = client
+        .get_last_block_seqno()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{seqno}");
+
+    Ok(())
+}
+
+pub(super) fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
+    net.as_deref()
+        .map(Network::from_str)
+        .transpose()
+        .map(|network| network.unwrap_or(Network::Testnet))
+}
+
+pub(crate) fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     let manifest_path = acton_config::config::manifest_path();
     match ActonConfig::load() {
         Ok(config) => Ok(config),
@@ -159,27 +230,222 @@ fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     }
 }
 
-#[derive(Clone)]
-struct LocalContractMatch {
-    contract_id: String,
-    contract_name: String,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+pub(crate) struct ContractMatch {
+    pub(crate) contract_name: String,
+    pub(crate) abi: Option<Arc<ContractABI>>,
+    pub(crate) source: ContractMatchSource,
 }
 
-fn find_local_contract_match(
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContractMatchSource {
+    Explicit,
+    Local,
+    Catalog,
+    Verifier,
+}
+
+impl ContractMatchSource {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Explicit => "explicit",
+            Self::Local => "local",
+            Self::Catalog => "catalog",
+            Self::Verifier => "verifier",
+        }
+    }
+}
+
+pub(crate) fn load_explicit_contract_match(
+    path: Option<&Path>,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let extension = path.extension().and_then(|extension| extension.to_str());
+    let abi = if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("json")) {
+        let bytes = fs::read(path)
+            .with_context(|| format!("Failed to read ABI file {}", path.display()))?;
+        serde_json::from_slice::<ContractABI>(&bytes)
+            .with_context(|| format!("Failed to parse compiler ABI JSON from {}", path.display()))?
+    } else if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("tolk")) {
+        if !path.is_file() {
+            anyhow::bail!("Tolk ABI source not found: {}", path.display());
+        }
+        let compiler = tolk_compiler::Compiler::new(2)
+            .with_allow_no_entrypoint(true)
+            .with_mappings(&config.mappings());
+        match compiler.compile(path, false) {
+            tolk_compiler::CompilerResult::Success(result) => result.abi.ok_or_else(|| {
+                anyhow!(
+                    "Tolk ABI source {} did not produce compiler ABI",
+                    path.display()
+                )
+            })?,
+            tolk_compiler::CompilerResult::Error(error) => {
+                anyhow::bail!(
+                    "Failed to compile Tolk ABI source {}: {}",
+                    path.display(),
+                    error.message.trim_end()
+                );
+            }
+        }
+    } else {
+        anyhow::bail!(
+            "Unsupported ABI file {}: expected a .json or .tolk file",
+            path.display()
+        );
+    };
+
+    Ok(Some(ContractMatch {
+        contract_name: abi.contract_name.clone(),
+        abi: Some(Arc::new(abi)),
+        source: ContractMatchSource::Explicit,
+    }))
+}
+
+pub(super) fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
-    let manifest_path = acton_config::config::manifest_path();
-    if !manifest_path.exists() {
-        return Ok(None);
+) -> anyhow::Result<Option<ContractMatch>> {
+    for candidate in load_local_contract_candidates(config)? {
+        if &candidate.code_hash == code_hash {
+            return Ok(Some(ContractMatch {
+                contract_name: candidate.contract_name,
+                abi: candidate.abi,
+                source: ContractMatchSource::Local,
+            }));
+        }
     }
 
+    Ok(None)
+}
+
+pub(crate) fn find_contract_match_for_code(
+    code: &Cell,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let code_hash = code_lookup_hash(code);
+    let local_match = find_local_contract_match(&code_hash, config)?;
+    if local_match
+        .as_ref()
+        .is_some_and(|matched| matched.abi.is_some())
+    {
+        return Ok(local_match);
+    }
+
+    let Some(fallback_match) = find_fallback_contract_match(&code_hash) else {
+        return Ok(local_match);
+    };
+    let Some(mut local_match) = local_match else {
+        return Ok(Some(fallback_match));
+    };
+
+    local_match.abi = fallback_match.abi;
+    local_match.source = fallback_match.source;
+    Ok(Some(local_match))
+}
+
+pub(crate) fn find_fallback_contract_match(code_hash: &HashBytes) -> Option<ContractMatch> {
+    let code_hash = code_hash.to_string();
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_code_hash(&code_hash) {
+        return Some(ContractMatch {
+            contract_name: catalog_contract.display_name.clone(),
+            abi: Some(catalog_contract.abi()),
+            source: ContractMatchSource::Catalog,
+        });
+    }
+
+    match find_verifier_abi_by_code_hash(&code_hash) {
+        Ok(Some(abi)) => Some(ContractMatch {
+            contract_name: abi.contract_name.clone(),
+            abi: Some(abi),
+            source: ContractMatchSource::Verifier,
+        }),
+        Ok(None) => None,
+        Err(err) => {
+            warn!("Skipping verifier ABI lookup for code hash {code_hash}: {err:#}");
+            None
+        }
+    }
+}
+
+pub(crate) fn find_verifier_abi_by_code_hash(
+    code_hash: &str,
+) -> anyhow::Result<Option<Arc<ContractABI>>> {
+    verifier::find_abi(code_hash)
+}
+
+pub(crate) fn find_local_contract_by_config_name(
+    contract_name: &str,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
     let Some(contracts) = config.contracts() else {
         return Ok(None);
     };
+    let normalized = normalize_contract_lookup_name(contract_name);
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
     let mut file_cache = FileBuildCache::new(None).ok();
+    for (contract_id, contract) in contracts {
+        if !contract_config_matches_name(contract_id, contract, &normalized) {
+            continue;
+        }
+
+        let candidate =
+            load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())?;
+        return Ok(Some(ContractMatch {
+            contract_name: candidate.contract_name,
+            abi: candidate.abi,
+            source: ContractMatchSource::Local,
+        }));
+    }
+
+    Ok(None)
+}
+
+pub(crate) fn find_local_contract_by_abi_name(
+    contract_name: &str,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let normalized = normalize_contract_lookup_name(contract_name);
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
+    for candidate in load_local_contract_candidates(config)? {
+        if candidate
+            .abi
+            .as_ref()
+            .is_some_and(|abi| normalize_contract_lookup_name(&abi.contract_name) == normalized)
+        {
+            return Ok(Some(ContractMatch {
+                contract_name: candidate.contract_name,
+                abi: candidate.abi,
+                source: ContractMatchSource::Local,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+fn load_local_contract_candidates(
+    config: &ActonConfig,
+) -> anyhow::Result<Vec<LocalContractCandidate>> {
+    let manifest_path = acton_config::config::manifest_path();
+    if !manifest_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let Some(contracts) = config.contracts() else {
+        return Ok(Vec::new());
+    };
+    let mut file_cache = FileBuildCache::new(None).ok();
+    let mut candidates = Vec::new();
 
     for (contract_id, contract) in contracts {
         let candidate =
@@ -191,25 +457,33 @@ fn find_local_contract_match(
                     continue;
                 }
             };
-        if &candidate.code_hash == code_hash {
-            return Ok(Some(LocalContractMatch {
-                contract_id: candidate.contract_id,
-                contract_name: candidate.contract_name,
-                abi: candidate.abi,
-                compiler_abi: candidate.compiler_abi,
-            }));
-        }
+        candidates.push(candidate);
     }
 
-    Ok(None)
+    Ok(candidates)
+}
+
+fn contract_config_matches_name(
+    contract_id: &str,
+    contract: &ContractConfig,
+    normalized_name: &str,
+) -> bool {
+    normalize_contract_lookup_name(contract_id) == normalized_name
+        || normalize_contract_lookup_name(contract.display_name(contract_id)) == normalized_name
+}
+
+fn normalize_contract_lookup_name(name: &str) -> String {
+    name.trim().to_ascii_lowercase()
 }
 
 struct LocalContractCandidate {
+    contract_path: PathBuf,
     contract_id: String,
     contract_name: String,
+    code_boc64: String,
     code_hash: HashBytes,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Option<Arc<SourceMap>>,
 }
 
 fn load_local_contract_candidate(
@@ -219,34 +493,54 @@ fn load_local_contract_candidate(
     mut file_cache: Option<&mut FileBuildCache>,
 ) -> anyhow::Result<LocalContractCandidate> {
     let contract_path = contract.absolute_source_path(configured_project_root());
-    if contract_path.extension().is_some_and(|ext| ext == "boc") {
-        let boc = fs::read(&contract_path)
-            .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-        let code = Boc::decode(boc)
-            .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
+    if is_boc_path(&contract_path) {
+        let precompiled = read_precompiled_boc(&contract_path, &contract.src)?;
+        let interface = compile_optional_contract_interface_with_cache(
+            config,
+            configured_project_root(),
+            contract_id,
+            contract,
+            file_cache,
+        )?;
+        let (abi, source_map) = interface.map_or((None, None), |interface| {
+            (
+                Some(Arc::new(interface.abi)),
+                Some(Arc::new(interface.source_map)),
+            )
+        });
         return Ok(LocalContractCandidate {
+            contract_path,
             contract_id: contract_id.to_owned(),
             contract_name: contract.display_name(contract_id).to_owned(),
-            code_hash: *code.repr_hash(),
-            abi: None,
-            compiler_abi: None,
+            code_boc64: precompiled.code_boc64,
+            code_hash: precompiled.code_hash,
+            abi,
+            source_map,
         });
     }
 
     let contract_path_key = contract_path.to_string_lossy().to_string();
     let cached = file_cache
         .as_mut()
-        .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.3"));
-    let (code_boc64, compiler_abi) = if let Some(cached) = cached {
-        (cached.code_boc64, cached.abi.map(Arc::new))
+        .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.4"));
+    let (code_boc64, abi, source_map) = if let Some(cached) = cached {
+        (
+            cached.code_boc64,
+            cached.abi.map(Arc::new),
+            cached.source_map.map(Arc::new),
+        )
     } else {
         let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
         match compiler.compile(&contract_path, false) {
             tolk_compiler::CompilerResult::Success(result) => {
                 if let Some(cache) = file_cache.as_mut() {
-                    let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.3");
+                    let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.4");
                 }
-                (result.code_boc64, result.abi.map(Arc::new))
+                (
+                    result.code_boc64,
+                    result.abi.map(Arc::new),
+                    result.source_map.map(Arc::new),
+                )
             }
             tolk_compiler::CompilerResult::Error(err) => {
                 return Err(anyhow!(err.message)
@@ -257,146 +551,157 @@ fn load_local_contract_candidate(
 
     let code = Boc::decode_base64(&code_boc64)
         .with_context(|| format!("Failed to decode code for {}", contract_path.display()))?;
-    let content = fs::read_to_string(&contract_path)
-        .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-    let path = contract_path.to_string_lossy();
-    let abi = Arc::new(contract_abi(content.into(), &path, &config.mappings()));
 
     Ok(LocalContractCandidate {
+        contract_path,
         contract_id: contract_id.to_owned(),
         contract_name: contract.display_name(contract_id).to_owned(),
+        code_boc64,
         code_hash: *code.repr_hash(),
-        abi: Some(abi),
-        compiler_abi,
+        abi,
+        source_map,
     })
 }
 
-fn decode_storage_json(
-    data: &Cell,
-    abi: &CompilerContractABI,
-    network: &Network,
-) -> anyhow::Result<serde_json::Value> {
-    let storage_ty = abi
-        .storage
-        .storage_at_deployment_ty
-        .as_ref()
-        .or(abi.storage.storage_ty.as_ref())
-        .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
-    let mut parser = data.as_slice_allow_exotic();
-    let decoded = compiler_abi_serde::decode(&mut parser, abi, storage_ty)
-        .context("Failed to decode storage with compiler ABI")?;
-    if parser.size_bits() != 0 || parser.size_refs() != 0 {
-        anyhow::bail!(
-            "Storage cell has {} extra bits and {} extra refs after ABI decode",
-            parser.size_bits(),
-            parser.size_refs()
-        );
+fn decode_storage(data: &Cell, abi: &ContractABI, network: &Network) -> anyhow::Result<String> {
+    let mut storage_candidates = Vec::new();
+    if let Some(storage_ty_idx) = abi.storage.storage_ty_idx {
+        storage_candidates.push(storage_ty_idx);
     }
-    Ok(compiler_data_to_json(&decoded, network))
-}
+    if let Some(storage_ty_idx) = abi.storage.storage_at_deployment_ty_idx
+        && !storage_candidates.contains(&storage_ty_idx)
+    {
+        storage_candidates.push(storage_ty_idx);
+    }
+    if storage_candidates.is_empty() {
+        anyhow::bail!("Contract ABI does not declare storage");
+    }
 
-fn compiler_data_to_json(data: &CompilerAbiData, network: &Network) -> serde_json::Value {
-    match data {
-        CompilerAbiData::Null => serde_json::Value::Null,
-        CompilerAbiData::Number(value) => serde_json::Value::String(value.to_string()),
-        CompilerAbiData::Bool(value) => serde_json::Value::Bool(*value),
-        CompilerAbiData::String(value) | CompilerAbiData::Symbol(value) => {
-            serde_json::Value::String(value.clone())
-        }
-        CompilerAbiData::Address(value) => {
-            serde_json::Value::String(format_int_address(value, network))
-        }
-        CompilerAbiData::ExtAddress(value) => serde_json::json!({
-            "bits": value.data_bit_len,
-            "hex": hex::encode(&value.data),
-        }),
-        CompilerAbiData::Cell(value) | CompilerAbiData::RemainingBitsAndRefs(value) => {
-            serde_json::json!({
-                "boc64": Boc::encode_base64(value.clone()),
-            })
-        }
-        CompilerAbiData::Bits((bytes, bit_len)) => serde_json::json!({
-            "bits": bit_len,
-            "hex": hex::encode(bytes),
-        }),
-        CompilerAbiData::Array(values) => serde_json::Value::Array(
-            values
-                .iter()
-                .map(|value| compiler_data_to_json(value, network))
-                .collect(),
-        ),
-        CompilerAbiData::Map(values) => serde_json::Value::Array(
-            values
-                .iter()
-                .map(|(key, value)| {
-                    serde_json::json!({
-                        "key": compiler_data_to_json(key, network),
-                        "value": compiler_data_to_json(value, network),
-                    })
-                })
-                .collect(),
-        ),
-        CompilerAbiData::Object(object) => {
-            let mut result = serde_json::Map::new();
-            for field in &object.fields {
-                result.insert(
-                    field.name.clone(),
-                    compiler_data_to_json(&field.value, network),
-                );
+    let mut errors = Vec::new();
+    let (storage_ty_idx, decoded) = storage_candidates
+        .into_iter()
+        .find_map(|storage_ty_idx| {
+            let mut parser = data.as_slice_allow_exotic();
+            let decoded = match dynamic_unpack::unpack_from_slice(&mut parser, abi, storage_ty_idx)
+            {
+                Ok(decoded) => decoded,
+                Err(err) => {
+                    errors.push(format!(
+                        "{}: failed to decode storage with compiler ABI: {err:#}",
+                        abi.render_param_type(storage_ty_idx)
+                    ));
+                    return None;
+                }
+            };
+            if parser.size_bits() != 0 || parser.size_refs() != 0 {
+                errors.push(format!(
+                    "{}: storage cell has {} extra bits and {} extra refs after type decode",
+                    abi.render_param_type(storage_ty_idx),
+                    parser.size_bits(),
+                    parser.size_refs()
+                ));
+                return None;
             }
-            serde_json::Value::Object(result)
-        }
+            Some((storage_ty_idx, decoded))
+        })
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to decode storage with compiler ABI candidates: {}",
+                errors.join("; ")
+            )
+        })?;
+
+    let rendered = render_unpacked_value_as_tolk_type(abi, decoded, storage_ty_idx);
+    let options = PrettyRenderOptions {
+        address_format: pretty_address_format(network),
+        address_labels: Default::default(),
+        colorize: colors_enabled(),
+    };
+    Ok(rendered.to_pretty_string(options))
+}
+
+const fn pretty_address_format(network: &Network) -> PrettyAddressFormat {
+    if network.uses_testnet_address_format() {
+        PrettyAddressFormat::Testnet
+    } else {
+        PrettyAddressFormat::Mainnet
     }
 }
 
-fn format_int_address(address: &IntAddr, network: &Network) -> String {
+pub(super) fn format_int_address(address: &IntAddr, network: &Network) -> String {
     match address {
         IntAddr::Std(address) => format_std_address(address, network),
         IntAddr::Var(address) => IntAddr::Var(address.clone()).to_string(),
     }
 }
 
-fn format_std_address(address: &StdAddr, network: &Network) -> String {
+pub(super) fn format_std_address(address: &StdAddr, network: &Network) -> String {
     DisplayBase64StdAddr {
         addr: address,
         flags: Base64StdAddrFlags {
             testnet: network.uses_testnet_address_format(),
             bounceable: true,
-            base64_url: false,
+            base64_url: true,
         },
     }
     .to_string()
 }
 
-fn format_nanotons(value: &BigInt) -> String {
-    let sign = if value.sign() == Sign::Minus { "-" } else { "" };
-    let digits = value.to_str_radix(10);
-    let digits = digits.trim_start_matches('-');
-
-    let formatted = if digits.len() <= 9 {
-        let fractional = format!("{digits:0>9}");
-        trim_fractional(format!("0.{fractional}"))
-    } else {
-        let (whole, fractional) = digits.split_at(digits.len() - 9);
-        trim_fractional(format!("{whole}.{fractional}"))
-    };
-
-    format!("{sign}{formatted} TON")
-}
-
 const LABEL_WIDTH: usize = 18;
 
-fn print_section(title: &str) {
+pub(super) fn print_section_title(title: &str) {
+    println!("{}", title.bold().cyan());
+}
+
+pub(super) fn print_section(title: &str) {
     println!("\n{}", title.bold().cyan());
 }
 
-fn print_kv(label: &str, value: impl AsRef<str>) {
+pub(super) fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!(
         "  {} {}",
         format!("{key:<LABEL_WIDTH$}").dimmed(),
         value.as_ref()
     );
+}
+
+fn print_indented_block(value: &str, indent: usize) {
+    let prefix = " ".repeat(indent);
+    for line in value.lines() {
+        println!("{prefix}{line}");
+    }
+}
+
+fn print_get_methods(abi: &ContractABI) {
+    if abi.get_methods.is_empty() {
+        println!("  {}", "none".dimmed());
+        return;
+    }
+
+    for method in &abi.get_methods {
+        println!("  {}", format_get_method_signature_colored(abi, method));
+    }
+}
+
+fn print_get_method_hint(address: &str, network: &Network, block_number: Option<u64>) {
+    let net_arg = format_rpc_network_arg(network);
+    let block_arg = block_number
+        .map(|block_number| format!(" --block-number {block_number}"))
+        .unwrap_or_default();
+    let command = format!("acton rpc call --net {net_arg}{block_arg} {address} <METHOD> [ARGS...]");
+
+    println!(
+        "\n{}",
+        format!("hint: To run get method: {command}").dimmed()
+    );
+}
+
+fn format_rpc_network_arg(network: &Network) -> String {
+    match network {
+        Network::Custom(name) => format!("custom:{name}"),
+        Network::Mainnet | Network::Testnet | Network::Localnet => network.to_string(),
+    }
 }
 
 fn format_account_status(status: &str) -> String {
@@ -412,126 +717,41 @@ fn format_hash(hash: &HashBytes) -> String {
     format!("0x{hash}").yellow().to_string()
 }
 
-fn print_yaml_value(key: Option<&str>, value: &serde_json::Value, indent: usize) {
-    let prefix = " ".repeat(indent);
-    match value {
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {
-            let scalar = format_yaml_scalar(value);
-            match key {
-                Some(key) => println!("{prefix}{} {scalar}", format!("{key}:").dimmed()),
-                None => println!("{prefix}{scalar}"),
-            }
-        }
-        serde_json::Value::Array(values) => {
-            if let Some(key) = key {
-                if values.is_empty() {
-                    println!("{prefix}{} []", format!("{key}:").dimmed());
-                } else {
-                    println!("{prefix}{}", format!("{key}:").dimmed());
-                }
-            } else if values.is_empty() {
-                println!("{prefix}[]");
-            }
-
-            let next_indent = indent + usize::from(key.is_some()) * 2;
-            for item in values {
-                print_yaml_array_item(item, next_indent);
-            }
-        }
-        serde_json::Value::Object(map) => {
-            if let Some(key) = key {
-                if map.is_empty() {
-                    println!("{prefix}{} {{}}", format!("{key}:").dimmed());
-                } else {
-                    println!("{prefix}{}", format!("{key}:").dimmed());
-                }
-            } else if map.is_empty() {
-                println!("{prefix}{{}}");
-            }
-
-            let next_indent = indent + usize::from(key.is_some()) * 2;
-            for (child_key, child_value) in map {
-                print_yaml_value(Some(child_key), child_value, next_indent);
-            }
-        }
-    }
+pub(super) fn format_get_method_signature(abi: &ContractABI, method: &ABIGetMethod) -> String {
+    format_get_method_signature_with_name(
+        method.name.to_owned(),
+        format_get_method_signature_suffix(abi, method),
+    )
 }
 
-fn print_yaml_array_item(value: &serde_json::Value, indent: usize) {
-    let prefix = " ".repeat(indent);
-    match value {
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {
-            println!("{prefix}- {}", format_yaml_scalar(value));
-        }
-        serde_json::Value::Array(values) => {
-            if values.is_empty() {
-                println!("{prefix}- []");
-            } else {
-                println!("{prefix}-");
-                for child in values {
-                    print_yaml_array_item(child, indent + 2);
-                }
-            }
-        }
-        serde_json::Value::Object(map) => {
-            if map.is_empty() {
-                println!("{prefix}- {{}}");
-            } else {
-                println!("{prefix}-");
-                for (child_key, child_value) in map {
-                    print_yaml_value(Some(child_key), child_value, indent + 2);
-                }
-            }
-        }
-    }
+pub(super) fn format_get_method_signature_colored(
+    abi: &ContractABI,
+    method: &ABIGetMethod,
+) -> String {
+    format_get_method_signature_with_name(
+        method.name.yellow().to_string(),
+        format_get_method_signature_suffix(abi, method)
+            .dimmed()
+            .to_string(),
+    )
 }
 
-fn format_yaml_scalar(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Null => "null".dimmed().to_string(),
-        serde_json::Value::Bool(true) => "true".green().to_string(),
-        serde_json::Value::Bool(false) => "false".bright_red().to_string(),
-        serde_json::Value::Number(value) => value.to_string().white().to_string(),
-        serde_json::Value::String(value) => colorize_scalar_string(value),
-        serde_json::Value::Array(_) | serde_json::Value::Object(_) => unreachable!(),
-    }
+pub(super) fn format_get_method_signature_with_name(
+    method_name: String,
+    signature_suffix: String,
+) -> String {
+    format!("{method_name}{signature_suffix}")
 }
 
-fn colorize_scalar_string(value: &str) -> String {
-    if looks_like_address(value) {
-        value.cyan().to_string()
-    } else if looks_like_hash(value) {
-        value.yellow().to_string()
-    } else {
-        value.to_string()
-    }
-}
-
-fn looks_like_address(value: &str) -> bool {
-    value.starts_with("EQ")
-        || value.starts_with("UQ")
-        || value.starts_with("kQ")
-        || value.starts_with("0:")
-        || value.starts_with("-1:")
-}
-
-fn looks_like_hash(value: &str) -> bool {
-    let stripped = value.strip_prefix("0x").unwrap_or(value);
-    stripped.len() == 64 && stripped.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
-
-fn trim_fractional(mut formatted: String) -> String {
-    while formatted.ends_with('0') {
-        formatted.pop();
-    }
-    if formatted.ends_with('.') {
-        formatted.pop();
-    }
-    formatted
+pub(super) fn format_get_method_signature_suffix(
+    abi: &ContractABI,
+    method: &ABIGetMethod,
+) -> String {
+    let params = method
+        .parameters
+        .iter()
+        .map(|param| format!("{}: {}", param.name, abi.render_type(param.ty_idx)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("({}): {}", params, abi.render_type(method.return_ty_idx))
 }

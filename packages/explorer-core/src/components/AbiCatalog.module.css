@@ -1,0 +1,433 @@
+.tableFrame {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-raised);
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.textInput {
+  height: 38px;
+  background: var(--acton-color-surface-raised);
+}
+
+.primaryButton,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primaryButton {
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  background: var(--acton-color-text);
+  color: var(--acton-color-surface);
+  font-size: var(--acton-font-size-sm);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
+}
+
+.primaryButton:hover:not(:disabled),
+.iconButton:hover {
+  filter: brightness(0.97);
+}
+
+.tableScroller {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-compact);
+  line-height: 1.35;
+}
+
+.table th,
+.table td {
+  box-sizing: border-box;
+  padding: 0 var(--acton-space-4);
+  color: var(--acton-color-text);
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: var(--acton-space-5);
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: var(--acton-space-5);
+}
+
+.table th {
+  height: 2.25rem;
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table td {
+  height: 2.875rem;
+  border-top: 1px solid var(--acton-color-border);
+  font-weight: var(--acton-font-weight-normal);
+}
+
+.table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.table th:first-child,
+.table td:first-child {
+  width: 42%;
+}
+
+.tableRow {
+  background: var(--acton-color-surface-raised);
+  cursor: pointer;
+  transition: background-color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.tableRow:hover,
+.tableRow:focus-within {
+  background: var(--acton-color-surface-row);
+}
+
+.nameCell {
+  min-width: 0;
+  width: fit-content;
+}
+
+.primaryCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 3px;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-weight: 650;
+}
+
+.nameLine {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.nameText,
+.primaryCell small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameText {
+  color: var(--acton-color-text);
+  text-decoration: none;
+}
+
+.environmentBadge {
+  flex: 0 0 auto;
+  position: relative;
+  top: -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 13%, var(--acton-color-surface-raised));
+  color: color-mix(in srgb, #16a34a 78%, var(--acton-color-text));
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.primaryCell small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+}
+
+.table .formButtonRow td {
+  height: auto;
+  padding: 0;
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 5%,
+    var(--acton-color-surface-raised)
+  );
+}
+
+.registerAbiButton {
+  min-width: 0;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--acton-space-5);
+  border: 0;
+  background: transparent;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-weight: 750;
+  letter-spacing: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.registerAbiButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registerAbiButton:hover {
+  background: var(--acton-color-surface-row);
+}
+
+.registerAbiButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.expandedFormRow td {
+  height: auto;
+  padding: 16px;
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 4%,
+    var(--acton-color-surface-raised)
+  );
+}
+
+.abiInlineForm {
+  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formSubmitButton {
+  align-self: flex-start;
+  min-width: 160px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.jsonField {
+  grid-column: 1 / -1;
+}
+
+.localNote {
+  max-width: 640px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: -2px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.localNote svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.codeHashList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codeHashRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.empty,
+.emptyPage {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.875rem;
+  padding: var(--acton-space-4) var(--acton-space-5);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.emptyPage,
+.detailsSkeleton {
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+}
+
+.emptyPage {
+  min-height: 180px;
+  padding: var(--acton-space-8);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.links a:hover {
+  color: var(--acton-color-text);
+}
+
+.links a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.links span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  text-transform: capitalize;
+}
+
+.skeletonList,
+.detailsSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.detailsSkeleton {
+  min-height: 300px;
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 0.5fr) minmax(180px, 0.7fr);
+  gap: 16px;
+  min-height: 34px;
+  align-items: center;
+}
+
+.skeletonRow span,
+.detailsSkeleton span {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 14%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
+.detailsSkeleton span:nth-child(1) {
+  width: min(320px, 64%);
+}
+
+.detailsSkeleton span:nth-child(2) {
+  width: min(520px, 84%);
+}
+
+.detailsSkeleton span:nth-child(3) {
+  width: min(420px, 72%);
+}
+
+@keyframes skeletonPulse {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

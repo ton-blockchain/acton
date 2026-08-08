@@ -1,0 +1,17 @@
+.inlineSamples,
+.placementGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.placementGrid {
+  justify-content: center;
+  gap: var(--acton-space-4);
+  padding-block: var(--acton-space-8);
+}

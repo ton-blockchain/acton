@@ -7,11 +7,11 @@ import "sharding"
 import "storage"
 
 contract JettonMinter {
-    author: "Your Name"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard Jetton Minter. TEP-74 and TEP-89 compliant"
-    incomingMessages: AllowedMessageToMinter
     storage: MinterStorage
+    incomingMessages: AllowedMessageToMinter
 }
 
 type AllowedMessageToMinter =
@@ -23,7 +23,7 @@ type AllowedMessageToMinter =
     | DropMinterAdmin
     | ChangeMinterMetadata
     | UpgradeMinterCode
-    | TopUpTons
+    | TopUpGrams
 
 fun onBouncedMessage(in: InMessageBounced) {
     in.bouncedBody.skipBouncedPrefix();
@@ -106,7 +106,7 @@ fun onInternalMessage(in: InMessage) {
 
             val internalTransferMsg = lazy msg
                 .internalTransferMsg
-                .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp as int32 });
+                .load({ throwIfOpcodeDoesNotMatch: Errors.InvalidOp });
             val forwardTonAmount = internalTransferMsg.forwardTonAmount;
             internalTransferMsg.forwardPayload.checkIsCorrectTlbEither();
 
@@ -115,8 +115,8 @@ fun onInternalMessage(in: InMessage) {
             storage.totalSupply += internalTransferMsg.jettonAmount;
             storage.save();
 
-            reserveToncoinsOnBalance(
-                ton("0.01"),
+            reserveGramsOnBalance(
+                grams("0.01"),
                 RESERVE_MODE_EXACT_AMOUNT,
             );
 
@@ -171,8 +171,8 @@ fun onInternalMessage(in: InMessage) {
             contract.setData(msg.newData);
         }
 
-        TopUpTons => {
-            // just accept tons
+        TopUpGrams => {
+            // just accept grams
         }
 
         else => throw 0xFFFF,

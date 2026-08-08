@@ -1,0 +1,15 @@
+ScalarReply {
+    signed: -123,
+    unsigned: 123,
+    amount: 1500000000,
+    ok: true,
+    title: "hello",
+    owner: [WALLET_ADDRESS_BASE],
+    anyOwner: [WALLET_ADDRESS_BASE],
+    maybeOwner: [WALLET_ADDRESS_BASE],
+    missingOwner: null,
+    optionalInt: null,
+    cellValue: [BOC_HEX],
+    sliceValue: slice{[HEX]},
+    bitsValue: slice{aabbccdd},
+}

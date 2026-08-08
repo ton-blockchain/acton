@@ -2,7 +2,9 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ContractConfig, DependencyKind};
 use anyhow::anyhow;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::fmt::Write as _;
 use std::fs;
+use std::path::Path;
 
 pub(super) fn build_dependency_graph(
     contracts: &[(&String, &ContractConfig)],
@@ -143,7 +145,7 @@ pub(super) fn generate_dependency_graph_dot(
             continue;
         };
         let label = format!("{}\\n({})", config.display_name(key), key);
-        dot_content.push_str(&format!("    \"{key}\" [label=\"{label}\"];\n"));
+        let _ = writeln!(dot_content, "    \"{key}\" [label=\"{label}\"];");
     }
 
     dot_content.push('\n');
@@ -162,16 +164,34 @@ pub(super) fn generate_dependency_graph_dot(
                     DependencyKind::LibraryRef => " library ref ",
                 };
 
-                dot_content.push_str(&format!(
-                    "    \"{key}\" -> \"{dep_name}\" [label=\"{label}\", labeldistance=3];\n"
-                ));
+                let _ = writeln!(
+                    dot_content,
+                    "    \"{key}\" -> \"{dep_name}\" [label=\"{label}\", labeldistance=3];"
+                );
             }
         }
     }
 
     dot_content.push_str("}\n");
 
-    fs::write(output_path, &dot_content)?;
+    let output = Path::new(output_path);
+    if let Some(parent_dir) = output.parent().filter(|path| !path.as_os_str().is_empty()) {
+        fs::create_dir_all(parent_dir).map_err(|err| {
+            anyhow!(
+                "Failed to create directory for --graph output {}: {}",
+                parent_dir.display(),
+                err
+            )
+        })?;
+    }
+
+    fs::write(output, &dot_content).map_err(|err| {
+        anyhow!(
+            "Failed to write --graph output {}: {}",
+            output.display(),
+            err
+        )
+    })?;
     println!(
         "   {} dependency graph: {}",
         "Generated".cyan(),

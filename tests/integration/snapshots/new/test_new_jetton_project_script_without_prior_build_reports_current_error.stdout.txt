@@ -1,0 +1,10 @@
+Script finished with [EXIT_STATUS] 7
+  Description: Type check error
+  Phase: Compute phase
+  Re-run with --backtrace full to get more information
+Compilation failed: Generated dependency helper @gen/JettonWallet.code.tolk is missing while compiling contract JettonMinter.
+Run acton build JettonMinter or acton build before acton script, then retry.
+
+[ROOT]/foobar/contracts/JettonMinter[LINE]: error: Failed to import: [NOT_FOUND]
+   1 | import "@gen/JettonWallet.code"
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^

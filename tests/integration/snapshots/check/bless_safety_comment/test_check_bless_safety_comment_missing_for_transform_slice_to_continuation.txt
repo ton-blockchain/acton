@@ -1,4 +1,4 @@
-warning[E023]: converting slice to continuation requires safety comment
+warning[E017]: converting slice to continuation requires safety comment
   --> [ROOT]/contracts/main[LINE]
   |
 3 |             fun transformSliceToContinuation(code: slice): continuation asm "BLESS";
@@ -13,4 +13,4 @@ warning[E023]: converting slice to continuation requires safety comment
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E023
+For example: acton check --explain E017

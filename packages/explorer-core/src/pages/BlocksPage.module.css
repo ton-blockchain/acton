@@ -1,0 +1,537 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 4px 0 2px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.79px;
+  line-height: 40px;
+}
+
+.blocksLayout {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.blocksTransactionsTable {
+  grid-column: 1 / -1;
+}
+
+.blocksTableGrid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.blocksTableFrame {
+  min-width: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.blocksTableTitle {
+  height: 52px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  display: flex;
+  align-items: center;
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.blockTransactionsLoadMore {
+  min-height: 52px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.blockTransactionsLoadMoreCell {
+  padding: 0 !important;
+}
+
+.blockTransactionsLoadMoreError {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-sm);
+}
+
+.blocksHashCell {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.blocksHashText {
+  min-width: 0;
+  color: var(--acton-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blocksLink {
+  max-width: 100%;
+  padding: 3px 4px;
+  margin-left: -4px;
+  border-radius: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blocksMonoCell {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.blocksExitCodeFailure {
+  color: var(--acton-color-danger-text);
+}
+
+.blockDetailToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.blockDateForm {
+  width: 332px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.blockDateHint,
+.blockDateError {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.blockDateHint {
+  color: var(--acton-color-text-muted);
+}
+
+.blockDateError {
+  color: var(--acton-color-danger-text);
+}
+
+.blockDateActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.blockDateForm input::-webkit-datetime-edit-day-field:focus,
+.blockDateForm input::-webkit-datetime-edit-month-field:focus,
+.blockDateForm input::-webkit-datetime-edit-year-field:focus,
+.blockDateForm input::-webkit-datetime-edit-hour-field:focus,
+.blockDateForm input::-webkit-datetime-edit-minute-field:focus,
+.blockDateForm input::-webkit-datetime-edit-second-field:focus,
+.blockDateForm input::-webkit-datetime-edit-ampm-field:focus {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
+  border-radius: 4px;
+}
+
+.blockDateForm input::selection {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+[data-theme="dark"] .blockDateForm input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.72;
+}
+
+.blockDetailControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+}
+
+.blockHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.favoriteActionActive {
+  color: #d3a416;
+}
+
+.favoriteActionActive:hover:not(:disabled) {
+  color: #d3a416;
+}
+
+.favoriteIconActive {
+  fill: currentColor;
+}
+
+.blockExplorerLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 2rem;
+  box-sizing: border-box;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.blockExplorerLink:hover {
+  color: var(--acton-color-accent);
+  background: transparent;
+}
+
+.blockExplorerLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.blockCopyButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.blockExplorerLink {
+  padding: 0 4px;
+  color: var(--acton-color-text-muted);
+}
+
+.blockActionSeparator {
+  width: 1px;
+  height: 18px;
+  margin-inline: 2px;
+  background: var(--acton-color-border);
+}
+
+.blockDetailsPanel {
+  min-width: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface-raised);
+  overflow: hidden;
+  box-sizing: border-box;
+  line-height: 1.6;
+}
+
+.blockDetailRow {
+  min-width: 0;
+  display: flex;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.blockDetailRow:last-child {
+  border-bottom: 0;
+}
+
+.blockDetailLabel {
+  width: 160px;
+  flex: 0 0 160px;
+  padding: var(--acton-space-2) var(--acton-space-3);
+  border-right: 1px solid var(--acton-color-border);
+  box-sizing: border-box;
+  color: var(--acton-color-text-muted);
+  display: flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  font-weight: var(--acton-font-weight-emphasis);
+  letter-spacing: 0.2px;
+}
+
+.blockDetailGrid {
+  min-width: 0;
+  width: 100%;
+  padding: var(--acton-space-2) var(--acton-space-3);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--acton-space-3) var(--acton-space-4);
+  align-items: start;
+}
+
+.blockHashesGrid {
+  grid-template-columns: 1fr;
+  gap: var(--acton-space-2);
+}
+
+.blockFourColumnGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.blockSixColumnGrid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.blockDetailItem {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.blockDetailItemLabel {
+  color: var(--acton-color-text-subtle);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
+.blockDetailValue {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--acton-color-text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.blockDetailDocLink {
+  color: var(--acton-color-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+}
+
+.blockDetailDocLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.blockDetailDocLink svg {
+  position: relative;
+  top: -1px;
+}
+
+.blockDetailSecondaryValue {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+}
+
+.blockDetailInlineActions {
+  width: 100%;
+}
+
+.blockDetailValueText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.blockReferenceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.blockDetailsPanel .skeletonLine {
+  align-self: flex-start;
+  background: transparent;
+}
+
+.blockDetailsPanel .skeletonLine::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
+  transform: translateY(-50%);
+}
+
+.blockDetailsPanel .skeletonLine::after {
+  top: 50%;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: 10px;
+  border-radius: 999px;
+  transform: translate(-100%, -50%);
+  animation-name: blockDetailSkeletonShimmer;
+}
+
+.blockDetailsPanel .blockDetailLabel,
+.blockDetailsPanel .blockDetailGrid {
+  box-sizing: border-box;
+}
+
+.blocksTableState {
+  min-height: 96px;
+  padding: 18px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+}
+
+.skeletonLine {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
+  display: block;
+  height: 11px;
+  border-radius: 999px;
+}
+
+.skeletonLine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: skeletonShimmer 1300ms ease-in-out infinite;
+}
+
+.blockDetailSkeletonValue,
+.blockDetailSkeletonValueWide {
+  width: min(112px, 72%);
+  height: 18.85px;
+}
+
+.blockDetailSkeletonValueWide {
+  width: min(520px, 72%);
+}
+
+.blockDetailSkeletonHashValue {
+  height: 19.3671875px;
+}
+
+.blockDetailSkeletonChipValue {
+  height: 22.9px;
+}
+
+.blockSixColumnGrid .blockDetailSkeletonValue {
+  width: 32px;
+}
+
+@keyframes skeletonShimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes blockDetailSkeletonShimmer {
+  to {
+    transform: translate(100%, -50%);
+  }
+}
+
+@media (max-width: 1100px) {
+  .blocksTableGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .blockDetailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .hero,
+  .blockDetailControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .blockHeaderActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 18px 16px 32px;
+    gap: 14px;
+  }
+
+  .blocksLayout {
+    gap: 14px;
+  }
+
+  .blockDetailRow {
+    display: block;
+  }
+
+  .blockDetailLabel {
+    width: 100%;
+    min-height: 38px;
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .blockDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .blockHeaderActions {
+    gap: 6px;
+  }
+
+  .blockActionSeparator {
+    display: none;
+  }
+}

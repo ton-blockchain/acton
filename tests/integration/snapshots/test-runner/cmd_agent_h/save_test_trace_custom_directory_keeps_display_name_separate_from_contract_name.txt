@@ -1,0 +1,3 @@
+trace_contracts: simple
+contract_json_name: simple
+contract_json_display_name: Pool/Wallet

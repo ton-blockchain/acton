@@ -1,9 +1,17 @@
 #![cfg(test)]
 use crate::emulator::Emulator;
-use crate::{AccountsState, LocalAccountsState, WorldState, WorldStateSnapshot};
+use crate::world_state::{RemoteLibraryCache, RemoteSnapshotCache};
+use crate::{
+    AccountsState, LocalAccountsState, RemoteAccountState, WorldState, WorldStateSnapshot,
+};
 use anyhow::Context;
+use std::sync::Arc;
+use ton_networks::Network;
+use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::dict::Dict;
+use tycho_types::models::LibDescr;
 use tycho_types::models::config::{BlockchainConfigParams, MsgForwardPrices};
 use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, OwnedRelaxedMessage,
@@ -60,6 +68,37 @@ fn shard_account(
         last_trans_hash: HashBytes([0x42; 32]),
         last_trans_lt: 1_234_567,
     })
+}
+
+fn decode_libs_arg(libs_boc64: &str) -> anyhow::Result<Dict<HashBytes, LibDescr>> {
+    let libs_root = Boc::decode_base64(libs_boc64)?;
+    let mut libs_slice = libs_root.as_slice_allow_exotic();
+    Ok(Dict::<HashBytes, LibDescr>::load_from_root_ext(
+        &mut libs_slice,
+        Cell::empty_context(),
+    )?)
+}
+
+#[test]
+fn remote_account_retrieve_error_uses_current_lt_marker() -> anyhow::Result<()> {
+    let remote = RemoteAccountState::new(
+        Network::Custom(Arc::from("unit-missing-remote-network")),
+        None,
+        RemoteSnapshotCache::default(),
+        RemoteLibraryCache::default(),
+        false,
+    );
+    let mut state = WorldState::new(AccountsState::Remote(remote), None)?;
+    let address = std_addr(0, 0xaa);
+
+    let current_lt = state.get_lt();
+    let account = state.get_account(&address);
+
+    assert!(account.account.load()?.0.is_none());
+    assert_eq!(account.last_trans_hash, HashBytes::ZERO);
+    assert_eq!(account.last_trans_lt, current_lt);
+
+    Ok(())
 }
 
 fn make_internal_relaxed_message(
@@ -204,6 +243,158 @@ fn compute_in_msg_fwd_fee_uses_workchain_specific_prices() -> anyhow::Result<()>
 }
 
 #[test]
+fn prepare_send_transaction_preserves_valid_remote_previous_lts() -> anyhow::Result<()> {
+    let account_addr = std_addr(0, 0x45);
+    let mut account = shard_account(
+        account_addr.clone(),
+        123_456_789,
+        Some(body_with_u32(0x1234_5678)?),
+    )?;
+    let mut optional_account = account.account.load()?;
+    let large_lt = 74_118_931_000_008;
+    optional_account
+        .0
+        .as_mut()
+        .expect("test account must exist")
+        .last_trans_lt = large_lt + 1;
+    account.account = Lazy::new(&optional_account)?;
+    let last_trans_hash = HashBytes([0x99; 32]);
+    account.last_trans_hash = last_trans_hash;
+    account.last_trans_lt = large_lt;
+
+    let mut state = new_world_state()?;
+    state.update_account(&account_addr, &account);
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        IntAddr::Std(account_addr),
+        body_with_u32(0xabcd_ef01)?,
+    );
+    let libs = Default::default();
+
+    let prepared = Emulator::prepare_send_transaction(&mut state, to_cell(&message)?, &libs, None)?;
+    let executor_account =
+        Boc::decode_base64(&prepared.run_args.shard_account)?.parse::<ShardAccount>()?;
+    let account = executor_account
+        .account
+        .load()?
+        .0
+        .expect("executor account must exist");
+
+    assert_eq!(prepared.run_args.lt, large_lt + 1_000_000);
+    assert_eq!(account.last_trans_lt, large_lt + 1);
+    assert_eq!(executor_account.last_trans_lt, large_lt);
+    assert_eq!(executor_account.last_trans_hash, last_trans_hash);
+    Ok(())
+}
+
+#[test]
+fn prepare_send_transaction_uses_world_state_ignore_chksig() -> anyhow::Result<()> {
+    let account_addr = std_addr(0, 0x45);
+    let account = shard_account(
+        account_addr.clone(),
+        123_456_789,
+        Some(body_with_u32(0x1234_5678)?),
+    )?;
+
+    let mut state = new_world_state()?;
+    state.set_ignore_chksig(true);
+    state.update_account(&account_addr, &account);
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        IntAddr::Std(account_addr),
+        body_with_u32(0xabcd_ef01)?,
+    );
+    let libs = Default::default();
+
+    let prepared = Emulator::prepare_send_transaction(&mut state, to_cell(&message)?, &libs, None)?;
+
+    assert!(prepared.run_args.ignore_chksig);
+    Ok(())
+}
+
+#[test]
+fn prepare_send_transaction_merges_fresh_world_state_libraries() -> anyhow::Result<()> {
+    let account_addr = std_addr(0, 0x46);
+    let account = shard_account(
+        account_addr.clone(),
+        123_456_789,
+        Some(body_with_u32(0x1234_5678)?),
+    )?;
+
+    let mut state = new_world_state()?;
+    state.update_account(&account_addr, &account);
+
+    let stale_libs = Dict::<HashBytes, LibDescr>::new();
+    let library = body_with_u32(0xcafe_babe)?;
+    let library_hash = *library.repr_hash();
+    state.register_lib(library.clone());
+
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        IntAddr::Std(account_addr),
+        body_with_u32(0xabcd_ef01)?,
+    );
+
+    let prepared =
+        Emulator::prepare_send_transaction(&mut state, to_cell(&message)?, &stale_libs, None)?;
+    let libs_boc64 = prepared
+        .run_args
+        .libs
+        .context("prepared transaction must include world state libraries")?;
+    let libs = decode_libs_arg(&libs_boc64)?;
+
+    let loaded = libs
+        .get(library_hash)?
+        .context("prepared transaction must include registered library")?;
+    assert_eq!(loaded.lib, library);
+    Ok(())
+}
+
+#[test]
+fn prepare_send_transaction_uses_preloaded_remote_account_library() -> anyhow::Result<()> {
+    let account_addr = std_addr(0, 0x47);
+    let library = body_with_u32(0xd00d_f00d)?;
+    let library_hash = *library.repr_hash();
+    let code_ref = CellBuilder::build_library(&library_hash);
+    let account = shard_account(account_addr.clone(), 123_456_789, Some(code_ref))?;
+
+    let library_cache = RemoteLibraryCache::new();
+    library_cache.insert(library_hash, library.clone());
+    let mut remote = RemoteAccountState::new(
+        Network::Custom(Arc::from("unit-cached-library-network")),
+        None,
+        RemoteSnapshotCache::default(),
+        library_cache,
+        false,
+    );
+    remote.accounts.insert(account_addr.clone(), account);
+    let mut state = WorldState::new(AccountsState::Remote(remote), None)?;
+
+    let stale_libs = Dict::<HashBytes, LibDescr>::new();
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        IntAddr::Std(account_addr),
+        body_with_u32(0xabcd_ef01)?,
+    );
+
+    assert!(state.libs().is_empty());
+    let prepared =
+        Emulator::prepare_send_transaction(&mut state, to_cell(&message)?, &stale_libs, None)?;
+    assert_eq!(state.find_lib_by_hash(&library_hash), Some(library.clone()));
+
+    let libs_boc64 = prepared
+        .run_args
+        .libs
+        .context("prepared transaction must include preloaded remote libraries")?;
+    let libs = decode_libs_arg(&libs_boc64)?;
+    let loaded = libs
+        .get(library_hash)?
+        .context("prepared transaction must include preloaded remote library")?;
+    assert_eq!(loaded.lib, library);
+    Ok(())
+}
+
+#[test]
 fn world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()> {
     let mut state = new_world_state()?;
     state.set_now(1_717_171_717);
@@ -230,6 +421,37 @@ fn world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()> {
 }
 
 #[test]
+fn world_state_snapshot_round_trip_preserves_ignore_chksig() -> anyhow::Result<()> {
+    let mut state = new_world_state()?;
+    state.set_ignore_chksig(true);
+
+    let snapshot = state.snapshot()?;
+    let json = serde_json::to_string(&snapshot)?;
+    let decoded_snapshot: WorldStateSnapshot = serde_json::from_str(&json)?;
+    let restored = WorldState::from_snapshot(decoded_snapshot)?;
+
+    assert!(snapshot.ignore_chksig);
+    assert!(restored.ignore_chksig());
+    Ok(())
+}
+
+#[test]
+fn world_state_snapshot_missing_ignore_chksig_defaults_false() -> anyhow::Result<()> {
+    let state = new_world_state()?;
+    let mut snapshot_json = serde_json::to_value(state.snapshot()?)?;
+    snapshot_json
+        .as_object_mut()
+        .expect("snapshot must serialize to an object")
+        .remove("ignore_chksig");
+
+    let decoded_snapshot: WorldStateSnapshot = serde_json::from_value(snapshot_json)?;
+    let restored = WorldState::from_snapshot(decoded_snapshot)?;
+
+    assert!(!restored.ignore_chksig());
+    Ok(())
+}
+
+#[test]
 fn world_state_find_lib_by_hash_returns_registered_library() -> anyhow::Result<()> {
     let mut state = new_world_state()?;
     let first = body_with_u32(0xcafe_babe)?;
@@ -238,9 +460,11 @@ fn world_state_find_lib_by_hash_returns_registered_library() -> anyhow::Result<(
 
     state.register_lib(first);
     state.register_lib(second.clone());
+    state.register_lib(second.clone());
 
     assert_eq!(state.find_lib_by_hash(&second_hash), Some(second));
     assert!(state.find_lib_by_hash(&HashBytes([0xff; 32])).is_none());
+    assert_eq!(state.libs().len(), 2);
 
     Ok(())
 }

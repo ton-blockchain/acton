@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/confirm_empty_input_default.test.tolk (1 test)
+  ✓ confirm empty input defaults [TIME]
+
+ ✓ 1 passed in 1 file

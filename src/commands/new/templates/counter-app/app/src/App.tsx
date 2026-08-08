@@ -321,19 +321,6 @@ export default function App() {
             </div>
             Counter dApp
           </div>
-          <nav
-            className="flex gap-0.5 p-[3px] h-10 rounded-full items-center max-sm:h-9"
-            style={{ background: theme === 'light' ? '#F0F1F3' : '#19191B' }}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full px-4 h-[34px] text-[15px] font-bold max-sm:h-[30px] max-sm:px-3.5 max-sm:text-[13px] bg-[#0098EA] text-white hover:bg-[#0098EA] hover:text-white"
-              type="button"
-            >
-              Counter
-            </Button>
-          </nav>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -397,7 +384,7 @@ export default function App() {
               </dt>
               <dd className="text-[13px] font-medium">
                 {walletBalance.data
-                  ? `${walletBalance.data} TON`
+                  ? `${walletBalance.data} GRAM`
                   : 'Connect to load'}
               </dd>
             </div>
@@ -438,7 +425,7 @@ export default function App() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="deploy-value">Deploy value (TON)</Label>
+                  <Label htmlFor="deploy-value">Deploy value (GRAM)</Label>
                   <Input
                     id="deploy-value"
                     inputMode="decimal"
@@ -545,7 +532,7 @@ export default function App() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="message-value">Message value (TON)</Label>
+                    <Label htmlFor="message-value">Message value (GRAM)</Label>
                     <Input
                       id="message-value"
                       inputMode="decimal"

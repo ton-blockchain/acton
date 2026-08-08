@@ -1,0 +1,33 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  background: var(--acton-color-text-subtle);
+  border-radius: 999px;
+}
+
+.status[data-status="active"] {
+  color: var(--acton-color-success);
+}
+
+.status[data-status="active"] .dot {
+  background: var(--acton-color-success);
+}
+
+.status[data-status="frozen"] {
+  color: var(--acton-color-warning-text);
+}
+
+.status[data-status="frozen"] .dot {
+  background: var(--acton-color-warning);
+}

@@ -1,0 +1,32 @@
+.value {
+  max-width: 100%;
+  min-width: 0;
+  font-size: var(--acton-font-size-xs);
+}
+
+.code,
+.tooltipCode {
+  font-family: var(--acton-font-mono);
+  font-size: inherit;
+}
+
+.code {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tooltipCode {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tooltipContent {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--acton-space-2);
+  width: 100%;
+}

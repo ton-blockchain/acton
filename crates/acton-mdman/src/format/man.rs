@@ -37,6 +37,8 @@ impl super::Formatter for ManFormatter {
         params: &[&str],
         block: &str,
         _man_name: &str,
+        _command_path: &str,
+        _arg_id: Option<&str>,
     ) -> Result<String, Error> {
         let rendered_options = params
             .iter()

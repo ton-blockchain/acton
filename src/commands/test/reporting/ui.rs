@@ -1,5 +1,7 @@
 use crate::commands::common::error_fmt;
+use crate::commands::test::profiling::UiGasProfileReport;
 use crate::commands::test::reporting::{FuzzExecutionContext, TestReport, TestReporter};
+use crate::commands::test::trace;
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use anyhow::Context;
@@ -7,11 +9,12 @@ use axum::{
     Router,
     extract::{Path as AxumPath, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::{IntoResponse, Json, Response},
     routing::get,
 };
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -20,7 +23,7 @@ use tower_http::services::ServeDir;
 
 // Static directory containing UI assets, embedded into the binary during release builds.
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/crates/acton-test-ui/dist");
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/packages/test-ui/dist");
 
 #[cfg(target_os = "macos")]
 static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
@@ -34,6 +37,7 @@ pub(crate) struct UiServerState {
     pub project_root: String,
     pub project_root_path: PathBuf,
     pub coverage_lcov: Option<Arc<str>>,
+    pub gas_profile: Option<Arc<UiGasProfileReport>>,
 }
 
 pub(crate) struct UiReporter {
@@ -60,17 +64,22 @@ struct UiTestReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     detailed_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    failed_transactions: Option<Vec<crate::commands::test::trace::TransactionInfo>>,
+    failed_transactions: Option<Vec<trace::TransactionInfo>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     failed_transaction_context: Option<crate::commands::test::reporting::FailedTransactionContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     details: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    location: Option<ton_source_map::SourceLocation>,
+    location: Option<tolk_source_map::SourceLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     execution: Option<UiExecutionSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     trace_path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct UiApiError {
+    error: String,
 }
 
 impl From<&TestReport> for UiTestReport {
@@ -133,6 +142,7 @@ pub(crate) async fn start_ui_server(
     trace_dir: Option<String>,
     project_root: String,
     coverage_lcov: Option<String>,
+    gas_profile: Option<UiGasProfileReport>,
     listener: std::net::TcpListener,
 ) -> anyhow::Result<()> {
     let project_root_path =
@@ -146,6 +156,7 @@ pub(crate) async fn start_ui_server(
         project_root,
         project_root_path,
         coverage_lcov: coverage_lcov.map(Arc::<str>::from),
+        gas_profile: gas_profile.map(Arc::new),
     });
 
     let app = build_ui_api_router(state);
@@ -155,7 +166,7 @@ pub(crate) async fn start_ui_server(
     let app = {
         let dist_path = PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/crates/acton-test-ui/dist"
+            "/packages/test-ui/dist"
         ));
         app.fallback_service(
             ServeDir::new(&dist_path).fallback(ServeDir::new(dist_path.join("index.html"))),
@@ -191,11 +202,17 @@ fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
         .route("/api/contract/{name}", get(handle_api_contract))
         .route("/api/file", get(handle_api_file))
         .route("/api/coverage.lcov", get(handle_api_coverage_lcov))
+        .route("/api/gas-profile", get(handle_api_gas_profile))
         .route("/api/config", get(handle_api_config))
+        .route("/api/health", get(handle_api_health))
         .with_state(state)
 }
 
 fn open_browser(url: &str) {
+    if std::env::var_os("ACTON_INTERNAL_SKIP_BROWSER").is_some() {
+        return;
+    }
+
     #[cfg(target_os = "macos")]
     {
         let chromium_browsers = [
@@ -290,6 +307,10 @@ async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl Int
     Json(reports)
 }
 
+async fn handle_api_health() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
+}
+
 #[derive(Deserialize)]
 struct TestLogsQuery {
     file_path: String,
@@ -363,11 +384,15 @@ async fn handle_api_file(
 #[derive(Serialize)]
 struct ConfigResponse {
     project_root: String,
+    coverage_available: bool,
+    gas_profile_available: bool,
 }
 
 async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     Json(ConfigResponse {
         project_root: state.project_root.clone(),
+        coverage_available: state.coverage_lcov.is_some(),
+        gas_profile_available: state.gas_profile.is_some(),
     })
 }
 
@@ -383,24 +408,72 @@ async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> im
         .into_response()
 }
 
+async fn handle_api_gas_profile(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
+    let Some(gas_profile) = &state.gas_profile else {
+        return StatusCode::NO_CONTENT.into_response();
+    };
+
+    Json(gas_profile.as_ref()).into_response()
+}
+
 async fn handle_api_trace(
     AxumPath(name): AxumPath<String>,
     State(state): State<Arc<UiServerState>>,
 ) -> impl IntoResponse {
     let Some(trace_dir) = &state.trace_dir else {
-        return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
+        return api_error(
+            StatusCode::NOT_FOUND,
+            "Trace export is not enabled for this Test UI run",
+        );
     };
 
+    let requested = Path::new(&name);
+    let trace_candidate = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        trace_dir.join(requested)
+    };
+
+    if !trace_candidate.exists() {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+
     let Some(trace_path) = resolve_path_within_root(trace_dir, Path::new(&name)) else {
-        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+        warn!(
+            "Test UI rejected trace '{}' because it resolves outside {}",
+            name,
+            trace_dir.display()
+        );
+        return api_error(
+            StatusCode::FORBIDDEN,
+            format!("Trace path '{name}' is outside the configured trace directory"),
+        );
     };
 
     match tokio::fs::read_to_string(trace_path).await {
-        Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
-            Ok(json) => Json(json).into_response(),
-            Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Invalid trace JSON").into_response(),
-        },
-        Err(_) => (StatusCode::NOT_FOUND, "Trace not found").into_response(),
+        Ok(content) => {
+            if content.trim().is_empty() {
+                return StatusCode::NO_CONTENT.into_response();
+            }
+
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(json) => Json(json).into_response(),
+                Err(err) => {
+                    warn!("Test UI failed to parse trace '{name}': {err}");
+                    api_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Trace file '{name}' is not valid JSON: {err}"),
+                    )
+                }
+            }
+        }
+        Err(err) => {
+            warn!("Test UI failed to read trace '{name}': {err}");
+            api_error(
+                StatusCode::NOT_FOUND,
+                format!("Trace file '{name}' could not be read: {err}"),
+            )
+        }
     }
 }
 
@@ -413,7 +486,7 @@ async fn handle_api_contract(
     };
 
     let contracts_dir = trace_dir.join("contracts");
-    let contract_name = format!("{name}.json");
+    let contract_name = trace::contract_file_name(&name);
     let Some(contract_path) = resolve_path_within_root(&contracts_dir, Path::new(&contract_name))
     else {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();
@@ -436,6 +509,16 @@ fn resolve_path_within_root(root: &Path, requested: &Path) -> Option<PathBuf> {
     };
     let candidate = dunce::canonicalize(candidate).ok()?;
     candidate.starts_with(root).then_some(candidate)
+}
+
+fn api_error(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(UiApiError {
+            error: error.into(),
+        }),
+    )
+        .into_response()
 }
 
 fn non_empty_text(value: &str) -> Option<String> {

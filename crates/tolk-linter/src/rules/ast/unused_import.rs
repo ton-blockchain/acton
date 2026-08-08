@@ -16,7 +16,7 @@ use tolk_resolver::resolve_index::Resolved;
 /// ### Example
 /// ```tolk twoslash
 /// import "other.tolk";
-/// //      ^^^^^^^^^^ E006: unused import
+/// //      ^^^^^^^^^^ E005: unused import
 ///
 /// fun main() {
 ///     println("hello");

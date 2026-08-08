@@ -1,7 +1,14 @@
 [files]
 extend-exclude = [
   "dist-workspace.toml",
-  "docs/**",
+  "docs/.next/**",
+  "docs/.source/**",
+  "docs/bun.lock",
+  "docs/grammars/**",
+  "docs/node_modules/**",
+  "docs/out/**",
+  "docs/public/resources/**",
+  "docs/src/lib/og/**",
   "block.tlb",
   "crates/tasm-core/spec/**",
   "crates/tolk-compiler/assets/**",
@@ -10,13 +17,29 @@ extend-exclude = [
   "src/commands/new/templates/*/app/**",
   "src/commands/new/templates/*/wrappers-ts/**",
   "src/commands/new/templates/*/package-lock.json",
+  "crates/acton-abi-catalog/data/data-abis.json",
+  "*.csv",
+  "crates/ton-liteapi/src/tl/schemas/**",
+  "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json",
+  "packages/explorer-core/src/cell-inspector/block.tlb.generated.ts",
+  "packages/address-registry/src/mainnet.json",
+  "packages/address-registry/src/testnet.json",
 ]
 
 [default]
 extend-ignore-re = [
+  "\\b[a-zA-Z0-9_+/\\-]{48,}\\b", # user-friendly addresses
   "\\bADDD\\b",
   "\\bTrUe\\b",
   "\\balse\\b",
   "\\b(?:test-)?ba-stdlib-[A-Za-z0-9-]+\\b",
-  "[dD]arcula"
+  "[dD]arcula",
+  "Ba",
+  "Inferrable",
+  "readed",
+  "authentificate",
+  "authentification",
+  "ba",
+  "lazer",
+  "\\b(?:vart|fo|FO|Fo|tou|overfl|bui|tru|TNam)\\b", # completion prefixes
 ]

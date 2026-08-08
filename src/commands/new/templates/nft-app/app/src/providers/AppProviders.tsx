@@ -5,7 +5,7 @@ import { TonConnectUIProvider, THEME } from '@tonconnect/ui-react';
 import { queryClient } from '../lib/ton';
 
 const manifestUrl =
-  'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json';
+  'https://ton-blockchain.github.io/acton/tonconnect-manifest.json';
 
 const darkColors = {
   background: {

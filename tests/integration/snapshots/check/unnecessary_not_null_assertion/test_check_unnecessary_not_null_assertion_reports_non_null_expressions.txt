@@ -1,0 +1,47 @@
+warning[E031]: unnecessary not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val direct = nonNullable!;
+  |                                         ^ this expression has non-null type `int`
+  |
+  = remove `!`; `int` cannot be `null` here
+
+help: remove the unnecessary `!`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val direct = nonNullable!;
+  |                                         ^
+
+warning[E031]: unnecessary not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+4 |                 val coalesced = (nullable ?? 0)!;
+  |                                                ^ this expression has non-null type `int`
+  |
+  = remove `!`; `int` cannot be `null` here
+
+help: remove the unnecessary `!`
+  --> [ROOT]/contracts/main[LINE]
+  |
+4 |                 val coalesced = (nullable ?? 0)!;
+  |                                                ^
+
+warning[E031]: unnecessary not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                     val smartCasted = nullable!;
+  |                                               ^ this expression has non-null type `int`
+  |
+  = remove `!`; `int` cannot be `null` here
+
+help: remove the unnecessary `!`
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                     val smartCasted = nullable!;
+  |                                               ^
+
+
+3 issues can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E031

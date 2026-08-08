@@ -31,6 +31,16 @@ use format::Formatter;
 /// Mapping of `(name, section)` of a man page to a URL.
 pub type ManMap = HashMap<(String, u8), String>;
 
+/// Structured metadata to render under an option in Markdown output.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OptionMeta {
+    pub label: String,
+    pub value: String,
+}
+
+/// Mapping of `(man_name, option_key)` to structured option metadata.
+pub type OptionMetaMap = HashMap<(String, String), Vec<OptionMeta>>;
+
 /// A man section.
 pub type Section = u8;
 
@@ -61,9 +71,21 @@ pub fn convert(
     url: Option<Url>,
     man_map: ManMap,
 ) -> Result<String, Error> {
+    convert_with_option_meta(file, format, url, man_map, OptionMetaMap::new())
+}
+
+/// Converts the handlebars markdown file and enriches Markdown option blocks
+/// with structured metadata.
+pub fn convert_with_option_meta(
+    file: &Path,
+    format: Format,
+    url: Option<Url>,
+    man_map: ManMap,
+    option_meta: OptionMetaMap,
+) -> Result<String, Error> {
     let formatter: Box<dyn Formatter + Send + Sync> = match format {
         Format::Man => Box::new(format::man::ManFormatter::new(url)),
-        Format::Md => Box::new(format::md::MdFormatter::new(man_map)),
+        Format::Md => Box::new(format::md::MdFormatter::new(man_map, option_meta)),
         Format::Text => Box::new(format::text::TextFormatter::new(url)),
     };
     let expanded = hbs::expand(file, &*formatter)?;
@@ -139,4 +161,61 @@ pub fn extract_section(file: &Path) -> Result<Section, Error> {
         )
     })?;
     Ok(section)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Format, ManMap, OptionMeta, OptionMetaMap, convert_with_option_meta};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn convert_with_option_meta_enriches_markdown_options() {
+        let test_dir = temp_test_dir("convert_with_option_meta_enriches_markdown_options");
+        fs::create_dir_all(test_dir.join("includes")).expect("must create includes dir");
+        let source_path = test_dir.join("acton-test.md");
+        fs::write(
+            &source_path,
+            r#"# acton-test(1)
+
+## Options
+
+{{#options command="acton test"}}
+
+{{#option "`--baseline-snapshot` _path_" id="baseline_snapshot"}}
+Compare gas usage against a snapshot.
+{{/option}}
+
+{{/options}}
+"#,
+        )
+        .expect("must write source");
+
+        let mut option_meta = OptionMetaMap::new();
+        option_meta.insert(
+            ("acton test".to_owned(), "baseline_snapshot".to_owned()),
+            vec![OptionMeta {
+                label: "Requires".to_owned(),
+                value: "`--snapshot`".to_owned(),
+            }],
+        );
+
+        let rendered =
+            convert_with_option_meta(&source_path, Format::Md, None, ManMap::new(), option_meta)
+                .expect("must render markdown");
+
+        assert!(rendered.contains("<CommandOptionMeta label=\"Requires\">"));
+        assert!(rendered.contains("`--snapshot`"));
+
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    fn temp_test_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        PathBuf::from("/tmp").join(format!("acton-mdman-{name}-{}-{nanos}", std::process::id()))
+    }
 }

@@ -1,0 +1,159 @@
+SETCP 0
+DUP
+PUSHCONT {
+    DROP
+    SWAP
+    CTOS
+    PUSHINT_4 2
+    SDSKIPFIRST
+    LDI 1
+    LDI 1
+    LDMSGADDR
+    OVER
+    XCHG_IJ s3 s4
+    XCHG2 s6 s6
+    TUPLE 4
+    SETGLOB 1
+    XCHG_0I s2
+    SETGLOB 2
+    PUSHCTR c4
+    CTOS
+    LDI 1
+    SWAP
+    PUSHCONT_SHORT {
+        LDU 32
+        LDU 32
+        ROTREV
+        BLKDROP2 1 2
+    }
+    PUSHCONT_SHORT {
+        PUSHINT_16 257
+        LDIX
+        SWAP
+        SWAP
+        ENDS
+        PUSHINT_4 0
+    }
+    IFELSE
+    XCHG_0I s3
+    PUSHCONT_SHORT {
+        BLKDROP 3
+    }
+    IFJMP
+    PUSHINT_4 0
+    PUSH s2
+    SBITS
+    DUP
+    GTINT 31
+    PUSHCONT_SHORT {
+        NIP
+        XCHG_0I s2
+        LDU 32
+        XCHG_0I s3
+    }
+    IF
+    OVER
+    PUSHINT_LONG 2221695272
+    EQUAL
+    PUSHCONT {
+        DROP2
+        SWAP
+        PUSHINT_16 257
+        LDIX
+        LDU 32
+        ROTREV
+        BLKDROP2 2 1
+        XCHG_1I s1 s2
+        ADD
+        NEWC
+        PUSHINT_4 -1
+        SWAP
+        STI 1
+        ROTREV
+        XCHG_0I s2
+        STU 32
+        STU 32
+        ENDC
+        POPCTR c4
+    }
+    IFJMP
+    POP s3
+    EQINT 0
+    XCHG_0I s2
+    LESSINT 33
+    XCHG_1I s1 s2
+    AND
+    IFJMPREF {
+        SWAP
+        NEWC
+        PUSHINT_4 -1
+        SWAP
+        STI 1
+        ROTREV
+        XCHG_0I s2
+        STU 32
+        STU 32
+        ENDC
+        POPCTR c4
+    }
+    DROP2
+    THROW 130
+}
+IFNOTJMP
+ref {
+    DICTPUSHCONST 19 [
+        65536 => {
+            PUSHCTR c4
+            CTOS
+            LDI 1
+            SWAP
+            PUSHCONT_SHORT {
+                LDU 32
+                LDU 32
+                ROTREV
+                BLKDROP2 1 2
+            }
+            PUSHCONT_SHORT {
+                PUSHINT_16 257
+                LDIX
+                SWAP
+                SWAP
+                ENDS
+                PUSHINT_4 0
+            }
+            IFELSE
+            CALLREF {
+                DUP
+            }
+            BLKDROP2 2 1
+        }
+        105872 => {
+            PUSHCTR c4
+            CTOS
+            LDI 1
+            SWAP
+            PUSHCONT_SHORT {
+                LDU 32
+                LDU 32
+                ROTREV
+                BLKDROP2 1 2
+            }
+            PUSHCONT_SHORT {
+                PUSHINT_16 257
+                LDIX
+                SWAP
+                SWAP
+                ENDS
+                PUSHINT_4 0
+            }
+            IFELSE
+            CALLREF {
+                OVER
+            }
+            BLKDROP2 2 1
+        }
+    ]
+    DICTIGETJMPZ
+    THROWARG 11
+}
+

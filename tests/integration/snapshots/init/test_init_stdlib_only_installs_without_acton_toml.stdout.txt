@@ -1,0 +1,3 @@
+  Installing standard library [ACTON_VERSION]
+
+✓ Updated Acton standard library

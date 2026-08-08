@@ -1,0 +1,15 @@
+*
+
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!build.rs
+!src/
+!crates/
+crates/**/target/
+!xtask/
+
+!apps/
+apps/*
+!apps/actonscan-backend/
+apps/actonscan-backend/target/

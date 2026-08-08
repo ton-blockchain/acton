@@ -1,0 +1,33 @@
+.samples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.sample {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--acton-space-3);
+  min-width: 0;
+  padding: var(--acton-space-5);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-card);
+  background: var(--acton-color-surface-raised);
+}
+
+.label,
+.result {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.result {
+  min-height: 1.35em;
+}
+
+@media (max-width: 760px) {
+  .samples {
+    grid-template-columns: 1fr;
+  }
+}

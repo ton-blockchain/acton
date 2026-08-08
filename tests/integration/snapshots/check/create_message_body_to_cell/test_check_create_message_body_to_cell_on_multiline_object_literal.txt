@@ -1,4 +1,4 @@
-warning[E035]: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
+warning[E029]: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance
    --> [ROOT]/contracts/main[LINE]
    |  
  8 |                   val msg = createMessage({
@@ -16,4 +16,4 @@ warning[E035]: explicit `.toCell()` on `createMessage` body is usually unnecessa
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E035
+For example: acton check --explain E029

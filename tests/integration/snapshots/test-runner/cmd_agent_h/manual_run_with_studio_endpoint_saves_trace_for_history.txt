@@ -1,0 +1,4 @@
+run_source: manual
+trace_dir: .studio/tests/traces/manual-studio-trace
+trace_path: test_studio_history_trace_trace.json
+transactions: 4

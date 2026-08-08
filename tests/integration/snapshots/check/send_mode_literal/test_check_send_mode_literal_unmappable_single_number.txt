@@ -1,4 +1,4 @@
-warning[E016]: send mode should use SEND_MODE_* constants
+warning[E012]: send mode should use SEND_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
 8 |                 deployMessage.send(4);
@@ -8,4 +8,4 @@ warning[E016]: send mode should use SEND_MODE_* constants
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E016
+For example: acton check --explain E012

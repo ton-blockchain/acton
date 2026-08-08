@@ -37,7 +37,7 @@ Publish a contract or arbitrary code as a library.
 
 #### Options
 
-{{#options}}
+{{#options command="acton library publish"}}
 
 {{#option "_contract-name_" }}
 Contract name to publish.
@@ -55,6 +55,8 @@ Requested publication duration such as `100d` or `1y`.
 
 {{#option "`--wallet` _wallet_" }}
 Wallet to use for the publication transaction.
+
+Cannot be used with `--tonconnect`.
 {{/option}}
 
 {{#option "`--net` _network_" }}
@@ -63,8 +65,21 @@ Network to use.
 Defaults to `testnet`.
 {{/option}}
 
-{{#option "`--amount` _ton_" }}
-Explicit TON amount to send.
+{{#option "`--tonconnect`" }}
+Use TON Connect wallet approval for the publication transaction.
+
+Supported only with `--net mainnet` and `--net testnet`. When enabled, Acton
+opens a local TON Connect page and uses the wallet selected in the browser.
+{{/option}}
+
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port.
+
+Defaults to `52258`.
+{{/option}}
+
+{{#option "`--amount` _gram_" }}
+Explicit GRAM amount to send.
 
 Overrides duration-based estimation.
 {{/option}}
@@ -93,7 +108,7 @@ Fetch library code from the blockchain by hash.
 
 #### Options
 
-{{#options}}
+{{#options command="acton library fetch"}}
 
 {{#option "_hash_" }}
 Library code hash.
@@ -134,7 +149,7 @@ Show information about a deployed library.
 
 #### Options
 
-{{#options}}
+{{#options command="acton library info"}}
 
 {{#option "_name_" }}
 Library name to inspect.
@@ -157,7 +172,7 @@ Top up a library account for additional storage time.
 
 #### Options
 
-{{#options}}
+{{#options command="acton library topup"}}
 
 {{#option "_library-name_" }}
 Library name to top up.
@@ -167,14 +182,30 @@ Library name to top up.
 Requested additional storage duration such as `100d` or `1y`.
 {{/option}}
 
-{{#option "`--amount` _ton_" }}
-Explicit TON amount to send.
+{{#option "`--amount` _gram_" }}
+Explicit GRAM amount to send.
 
 Overrides duration-based estimation.
 {{/option}}
 
 {{#option "`--wallet` _wallet_" }}
 Wallet to use for the top-up transaction.
+
+Cannot be used with `--tonconnect`.
+{{/option}}
+
+{{#option "`--tonconnect`" }}
+Use TON Connect wallet approval for the top-up transaction.
+
+Supported only for libraries stored with `network = "mainnet"` or
+`network = "testnet"`. When enabled, Acton opens a local TON Connect page and
+uses the wallet selected in the browser.
+{{/option}}
+
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port.
+
+Defaults to `52258`.
 {{/option}}
 
 {{#option "`-y`, `--yes`" }}
@@ -219,10 +250,18 @@ one-off overrides or CI.
 
 ## Amount Estimation
 
-For `publish` and `topup`, `--duration` is used to estimate the required TON
+For `publish` and `topup`, `--duration` is used to estimate the required GRAM
 amount from the library size and storage duration.
 
 If `--amount` is passed, it overrides that estimate completely.
+
+## TON Connect
+
+`publish` and `topup` can send their transactions through TON Connect with
+`--tonconnect`. The connected wallet supplies the sender address and approves
+the internal message in the wallet UI. TON Connect is available only for
+mainnet and testnet; use configured Acton wallets for localnet and custom
+networks.
 
 ## Metadata Files
 
@@ -281,7 +320,19 @@ Saved library metadata typically includes:
    acton library topup Math --duration 1y
    ```
 
-5. Fetch raw code into a BoC file:
+5. Publish with TON Connect:
+
+   ```bash
+   acton library publish Math --net mainnet --tonconnect
+   ```
+
+6. Top up with TON Connect:
+
+   ```bash
+   acton library topup Math --tonconnect
+   ```
+
+7. Fetch raw code into a BoC file:
 
    ```bash
    acton library fetch <HASH> --output build/math-lib.boc

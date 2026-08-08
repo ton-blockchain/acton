@@ -1,0 +1,196 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.sample {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-4);
+  justify-items: start;
+  align-content: space-between;
+  min-height: 8rem;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.sampleText {
+  display: grid;
+  gap: var(--acton-space-2);
+}
+
+.sampleText h4 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  text-transform: capitalize;
+}
+
+.sampleText p {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.5;
+}
+
+.sampleAction {
+  display: flex;
+  align-items: flex-start;
+  min-height: 1.5rem;
+}
+
+.embeddedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
+  min-width: 0;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.rowLabel,
+.rowValue {
+  min-width: 0;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+}
+
+.rowLabel {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.rowValue {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.utilityTable {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-raised);
+  overflow: hidden;
+}
+
+.utilityTable th,
+.utilityTable td {
+  padding: var(--acton-space-3) var(--acton-space-4);
+  border-bottom: 1px solid var(--acton-color-border);
+  vertical-align: middle;
+}
+
+.utilityTable tr:last-child th,
+.utilityTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.utilityTable th {
+  width: 9rem;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.4;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.utilityTable td {
+  min-width: 0;
+}
+
+.utilityCell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--acton-space-2) var(--acton-space-3);
+  min-width: 0;
+}
+
+.utilityValue {
+  min-width: 0;
+  flex: 1 1 12rem;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.utilityActions {
+  display: inline-flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2) var(--acton-space-3);
+  max-width: 100%;
+  min-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.utilityTable td:hover .utilityActions,
+.utilityTable td:focus-within .utilityActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (pointer: coarse) {
+  .utilityActions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .embeddedRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .utilityTable th,
+  .utilityTable td,
+  .utilityTable tr,
+  .utilityTable tbody {
+    display: block;
+  }
+
+  .utilityTable th {
+    width: auto;
+    padding-bottom: var(--acton-space-1);
+    border-bottom: 0;
+  }
+
+  .utilityTable td {
+    padding-top: 0;
+  }
+
+  .utilityCell {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--acton-space-2);
+  }
+
+  .utilityActions {
+    flex-wrap: wrap;
+    gap: var(--acton-space-2) var(--acton-space-3);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

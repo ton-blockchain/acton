@@ -24,7 +24,7 @@ use tree_sitter::Node;
 ///
 /// fun main() {
 ///     oldFunction();
-/// //  ^^^^^^^^^^^ E004: usage of deprecated symbol
+/// //  ^^^^^^^^^^^ E003: usage of deprecated symbol
 /// }
 /// ```
 #[derive(ViolationMetadata)]

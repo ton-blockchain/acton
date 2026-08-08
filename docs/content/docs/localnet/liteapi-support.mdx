@@ -1,0 +1,171 @@
+---
+title: "LiteAPI Support"
+description: "LiteServer binary API coverage in Acton local development node"
+---
+
+Acton localnet can expose a `LiteServer`-compatible binary endpoint for tools
+that talk to TON nodes through LiteAPI instead of TonCenter HTTP APIs. The
+endpoint is intended for local indexing, ABI discovery, and get-method execution
+against the localnet state. It returns real TON block cells for the local
+basechain and masterchain streams, but it is not a validator liteserver.
+
+## Endpoint
+
+LiteAPI is disabled by default. Enable it with `--liteapi`:
+
+```bash
+acton localnet start --liteapi
+```
+
+When Localnet runs on HTTP port `5411`, LiteAPI listens on TCP port `5412` by
+default. Set another port explicitly with `--liteapi-port`:
+
+```bash
+acton localnet start --liteapi --liteapi-port 15000
+```
+
+Startup output prints both values:
+
+```text
+Starting Localnet server on http://127.0.0.1:5411
+Starting Localnet LiteAPI on tcp://127.0.0.1:5412
+     Key LiteAPI public key: <base64-ed25519-public-key>
+```
+
+Use the printed TCP address and public key in client configs. For TON global
+config JSON, `127.0.0.1` is usually encoded as integer `2130706433`.
+
+```json
+{
+  "liteservers": [
+    {
+      "ip": 2130706433,
+      "port": 5412,
+      "id": {
+        "@type": "pub.ed25519",
+        "key": "<base64-ed25519-public-key>"
+      }
+    }
+  ]
+}
+```
+
+<Callout type="info">
+The localnet LiteAPI key is stable across runs, but the docs intentionally show a
+sample value. Copy the key from the `acton localnet start` output.
+</Callout>
+
+## Advertised Capabilities
+
+`liteServer.getVersion` and `liteServer.getMasterchainInfoExt` report:
+
+| Field | Value | Meaning |
+|-------|-------|---------|
+| `version` | `0x101` | LiteServer protocol version `1.1`. |
+| `capabilities` | `6` | `+2` for `masterchainInfoExt`, `+4` for `runSmcMethod`. |
+
+Localnet does not advertise capability `+1` because general block proof-chain
+construction between distinct masterchain blocks is not implemented. Several
+responses still include Merkle proofs that tonlib can validate for local block
+roots and state roots, but those proofs are scoped to the local development
+chain and do not include validator signatures or consensus proof chains.
+
+## Supported Methods
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `liteServer.getMasterchainInfo` | Supported | Returns the latest localnet block id and zero-state id. |
+| `liteServer.getMasterchainInfoExt` | Supported | Reports localnet version, capabilities, latest block, and time metadata. |
+| `liteServer.getTime` | Supported | Returns current wall-clock Unix time. |
+| `liteServer.getVersion` | Supported | Reports version `0x101` and capabilities `6`. |
+| `liteServer.getBlock` | Supported | Returns the stored block BoC for the requested masterchain or basechain block. |
+| `liteServer.getBlockHeader` | Supported | Returns block id and a MerkleProof of the stored block root; tonlib extracts header fields from the proof. |
+| `liteServer.sendMessage` | Supported | Accepts an external-in message BoC and queues it for localnet execution. |
+| `liteServer.getAccountState` | Supported | Returns account state with local block/state proofs accepted by tonlib account-state validation. |
+| `liteServer.getAccountStatePrunned` | Supported | Same localnet behavior as `getAccountState`. |
+| `liteServer.runSmcMethod` | Limited | Supports mode `0` and result bit `4`; proof, `init_c7`, and library-extra modes are rejected. |
+| `liteServer.getBlockProof` | Limited | Supports only the degenerate proof where `known_block` and `target_block` are the same block. |
+| `liteServer.getShardInfo` | Limited | Returns the local single-shard descriptor; shard proof validation is not implemented. |
+| `liteServer.getAllShardsInfo` | Limited | Returns local all-shards data; tonlib shard-list proof validation is not implemented. |
+| `liteServer.getOneTransaction` | Limited | Returns transaction data by account and logical time; transaction proof validation is not implemented. |
+| `liteServer.getTransactions` | Supported | Returns account transactions as a multi-root BoC plus containing block ids. |
+| `liteServer.lookupBlock` | Supported | Resolves by seqno, logical time, or Unix time in the single localnet shard. |
+| `liteServer.lookupBlockWithProof` | Supported | Resolves masterchain and basechain blocks with local Merkle proofs for tonlib lookup validation. |
+| `liteServer.listBlockTransactions` | Limited | Supports `count`, `after`, and `want_proof`; `reverse_order` is not implemented. |
+| `liteServer.listBlockTransactionsExt` | Limited | Supports `count`, `after`, and `want_proof`; returns transaction cells as a multi-root BoC; `reverse_order` is not implemented. |
+| `liteServer.getConfigAll` | Limited | Returns local config data with masterchain state/config proofs; `param_list` filtering is not applied. |
+| `liteServer.getConfigParams` | Limited | Returns local config data with masterchain state/config proofs; `param_list` filtering is not applied. |
+| `liteServer.getLibraries` | Limited | Returns locally known public libraries for raw LiteAPI clients; tonlib proof-validated library lookup is not implemented. |
+| `liteServer.getLibrariesWithProof` | Limited | Returns library data; state/data proof validation is not implemented. |
+| `liteServer.getShardBlockProof` | Limited | Returns the local shard-block link shape; shard-block proof validation is not implemented. |
+| `liteServer.waitMasterchainSeqno` wrapper | Supported | Waits until localnet reaches the requested seqno or the request timeout expires. |
+
+`runSmcMethod` uses the same execution path as localnet `runGetMethod`: it reads
+code, data, balance, libraries, previous block info, and virtual time from the
+requested localnet block. Missing or non-runnable accounts are reported with
+LiteServer-style exit code `-256`.
+
+## Unsupported Methods
+
+Unsupported methods return `liteServer.error`.
+
+| Method | Status | Reason |
+|--------|--------|--------|
+| `liteServer.getState` | Not supported | Full block-state BoC export is not implemented. |
+| `liteServer.getValidatorStats` | Not supported | Localnet does not emulate validator statistics. |
+| `liteServer.getOutMsgQueueSizes` | Not supported | Out-message queue size snapshots are not modeled. |
+| `liteServer.getBlockOutMsgQueueSize` | Not supported | Block queue proof/data is not modeled. |
+| `liteServer.getDispatchQueueInfo` | Not supported | Dispatch queue state is not modeled. |
+| `liteServer.getDispatchQueueMessages` | Not supported | Dispatch queue messages are not modeled. |
+| `liteServer.nonfinal.getValidatorGroups` | Not supported | Non-final validator group API is outside the current localnet model. |
+| `liteServer.nonfinal.getCandidate` | Not supported | Non-final candidate API is outside the current localnet model. |
+| `liteServer.nonfinal.getPendingShardBlocks` | Not supported | Pending shard-block candidate API is outside the current localnet model. |
+
+## Limitations
+
+The localnet LiteAPI implementation is designed for local indexing and execution
+tooling, not trustless validator-grade verification.
+
+- Localnet mines one executable basechain shard block in workchain `0` and one
+  matching masterchain block in workchain `-1` for each seqno. The masterchain
+  block carries shard/config/history metadata for LiteAPI discovery; executable
+  transactions live on the basechain shard block.
+- Masterchain transaction lists are empty by construction. Use the basechain
+  shard block returned by shard discovery or lookup calls to enumerate executed
+  transactions.
+- `getBlockProof` returns a complete proof only when the proof starts and ends at
+  the same block. This is enough for clients that sanity-check their configured
+  trusted block, but it is not a general block proof chain.
+- Account-state `proof` and `shard_proof` fields are shaped as two-root BoCs
+  with exotic Merkle proof cells and enough local block/state data for tonlibjson
+  account-state validation, but they are still local compatibility payloads, not
+  validator-grade proofs.
+- Header, lookup, config, account-state, and transaction-list proof fields are
+  built from local block and state roots. They are intended for local tonlib
+  validation, not trustless verification against validator signatures.
+- `getShardInfo`, `getAllShardsInfo`, `getShardBlockProof`, and library proof
+  methods still return data shapes without the proof payloads that tonlib expects
+  for secure validation.
+- Generated block BoCs are real TON `Block` cells with transaction data and a
+  `state_update`, but they intentionally omit validator consensus artifacts:
+  signatures, key-block proof chains, shard split/merge history, validator
+  statistics, dispatch queues, and out-message queue proofs.
+- `runSmcMethod` supports only the plain execution/result response path. Proof,
+  `init_c7`, and library-extra response modes are rejected.
+- Block transaction listing supports `count`, `after`, and block-root proof mode.
+  Reverse order and metadata proof expansion are not implemented.
+- `getConfigParams` returns the local config payload without applying
+  `param_list` filtering.
+- Full `liteServer.getState` export is not available, even though generated
+  blocks contain state hashes in `state_update`.
+
+## Proof Policy
+
+Several common tonlib paths validate successfully against localnet proofs:
+account state, get-method execution, block headers, block lookup, config lookup,
+and block transaction listing. These proofs are anchored in localnet's own
+stored masterchain and basechain blocks.
+
+Use no-proof or unsafe proof mode for methods still marked "Limited" because of
+missing proof validation, and for any workflow that expects validator-grade
+trust guarantees.

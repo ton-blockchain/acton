@@ -112,6 +112,10 @@ impl FlowContext {
         self.unreachable
     }
 
+    pub(crate) fn equivalent_to(&self, other: &Self) -> bool {
+        self.unreachable == other.unreachable && self.known_facts == other.known_facts
+    }
+
     /// invalidate knowledge about sub-fields of a variable or its field
     /// example: `tensorVar = 2`, invalidate facts about `tensorVar`, `tensorVar.0`, `tensorVar.1.2`, and all others
     /// example: `user.id = rhs`, invalidate facts about `user.id` (sign, etc.) and `user.id.*` if exist
@@ -370,7 +374,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn set_top_level_type(&mut self, symbol_id: SymbolId, ty: TyId) {
-        self.type_db.top_level_types.insert(symbol_id, ty);
+        self.type_db.top_level_types.to_mut().insert(symbol_id, ty);
     }
 
     pub fn get_top_level_type(&mut self, symbol_id: SymbolId) -> Option<TyId> {
@@ -438,6 +442,49 @@ impl InferenceResult {
     #[must_use]
     pub fn type_of(&self, span: Span) -> Option<TyId> {
         self.expression_types.get(&span).copied()
+    }
+
+    /// Relocates all source positions after an unchanged declaration moves in its file.
+    #[must_use]
+    pub fn shifted(&self, file_id: FileId, delta: i64) -> Option<Self> {
+        let expression_types = self
+            .expression_types
+            .iter()
+            .map(|(&span, &ty)| Some((span.shifted(delta)?, ty)))
+            .collect::<Option<FxHashMap<_, _>>>()?;
+        let resolved_refs = self
+            .resolved_refs
+            .iter()
+            .map(|reference| {
+                let mut reference = reference.clone();
+                reference.decl = Span {
+                    start: reference.decl,
+                    end: reference.decl,
+                }
+                .shifted(delta)?
+                .start;
+                reference.span = reference.span.shifted(delta)?;
+
+                if let Resolved::Local(local) = &mut reference.resolved
+                    && local.file_id == file_id
+                {
+                    local.local = Span {
+                        start: local.local,
+                        end: local.local,
+                    }
+                    .shifted(delta)?
+                    .start;
+                }
+
+                Some(reference)
+            })
+            .collect::<Option<Vec<_>>>()?;
+
+        Some(Self {
+            expression_types,
+            resolved_refs,
+            inferred_return_type: self.inferred_return_type,
+        })
     }
 
     /// Resolves a reference at the given span.

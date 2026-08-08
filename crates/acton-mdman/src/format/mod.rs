@@ -12,7 +12,14 @@ pub(crate) trait Formatter {
     /// Renders the end of a block of options (triggered by `{{/options}}`).
     fn render_options_end(&self) -> &'static str;
     /// Renders an option (triggered by `{{#option}}`).
-    fn render_option(&self, params: &[&str], block: &str, man_name: &str) -> Result<String, Error>;
+    fn render_option(
+        &self,
+        params: &[&str],
+        block: &str,
+        man_name: &str,
+        command_path: &str,
+        arg_id: Option<&str>,
+    ) -> Result<String, Error>;
     /// Converts a man page reference into markdown that is appropriate for this format.
     ///
     /// Triggered by `{{man name section}}`.

@@ -1,0 +1,11 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/precompiled.test.tolk (1 test)
+  ✓ basic flow [TIME]
+
+ ✓ 1 passed in 1 file

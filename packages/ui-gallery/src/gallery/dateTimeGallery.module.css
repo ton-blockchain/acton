@@ -1,0 +1,25 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--acton-space-3);
+}
+
+.item {
+  min-width: 0;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-2);
+}
+
+.item > span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.item > strong {
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-medium);
+}

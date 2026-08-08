@@ -1,0 +1,186 @@
+.selector {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--acton-space-1);
+  padding: 2px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-subtle);
+  vertical-align: middle;
+}
+
+.quickLink,
+.trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  color: inherit;
+  transition:
+    color var(--acton-duration-fast) var(--acton-ease-standard),
+    background-color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.quickLink {
+  width: 2rem;
+  border-radius: calc(var(--acton-radius-control-sm) - 2px);
+  text-decoration: none;
+}
+
+.trigger {
+  width: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--acton-color-border-control);
+  border-radius: 0 calc(var(--acton-radius-control-sm) - 2px)
+    calc(var(--acton-radius-control-sm) - 2px) 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.quickLink:hover,
+.trigger:hover,
+.trigger[data-popup-open] {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.quickLink:focus-visible,
+.trigger:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 1px;
+}
+
+.quickLink > svg,
+.itemIcon > svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+.trigger > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  transition: transform var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.trigger[data-popup-open] > svg {
+  transform: rotate(180deg);
+}
+
+.compact {
+  padding: 1px;
+  border-radius: var(--acton-radius-control-xs);
+}
+
+.compact .quickLink,
+.compact .trigger {
+  height: 1.375rem;
+}
+
+.compact .quickLink {
+  width: 1.625rem;
+  border-radius: calc(var(--acton-radius-control-xs) - 1px);
+}
+
+.compact .trigger {
+  width: 1.125rem;
+  border-radius: 0 calc(var(--acton-radius-control-xs) - 1px)
+    calc(var(--acton-radius-control-xs) - 1px) 0;
+}
+
+.compact .quickLink > svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+}
+
+.compact .trigger > svg {
+  width: 0.6875rem;
+  height: 0.6875rem;
+}
+
+.positioner {
+  z-index: 1000;
+  outline: 0;
+}
+
+.popup {
+  box-sizing: border-box;
+  min-width: 10.75rem;
+  padding: var(--acton-space-micro);
+  border: 1px solid var(--acton-color-popover-border);
+  border-radius: var(--acton-radius-control-sm);
+  outline: 0;
+  background: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-popover);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  transform-origin: var(--transform-origin);
+}
+
+.popup[data-starting-style],
+.popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) 0.875rem;
+  align-items: center;
+  min-height: 2rem;
+  gap: var(--acton-space-2);
+  padding: 0 var(--acton-space-2);
+  border-radius: var(--acton-radius-control-xs);
+  outline: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+}
+
+.item[data-highlighted] {
+  background: var(--acton-color-surface-hover);
+}
+
+.item[data-checked] {
+  background: var(--acton-color-surface-hover);
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--acton-color-text-muted);
+}
+
+.item[data-checked] .itemIcon {
+  color: var(--acton-color-text);
+}
+
+.check {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  color: var(--acton-color-text-muted);
+  opacity: 0;
+}
+
+.item[data-checked] .check {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .popup {
+    transition:
+      opacity var(--acton-duration-fast) var(--acton-ease-standard),
+      transform var(--acton-duration-fast) var(--acton-ease-standard);
+  }
+}

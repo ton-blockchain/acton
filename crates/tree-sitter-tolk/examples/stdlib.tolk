@@ -118,14 +118,14 @@ fun now(): int
 fun getMyAddress(): slice
     asm "MYADDR"
 
-/// Returns the balance (in nanotoncoins) of the smart contract at the start of Computation Phase.
+/// Returns the balance (in nanograms) of the smart contract at the start of Computation Phase.
 /// Note that RAW primitives such as [sendMessage] do not update this field.
 @pure
 fun getMyStartBalance(): int
     asm "BALANCE" "FIRST"
 
 /// Same as [getMyStartBalance], but returns a tuple:
-/// `int` — balance in nanotoncoins;
+/// `int` — balance in nanograms;
 /// `cell` — a dictionary with 32-bit keys representing the balance of "extra currencies".
 @pure
 fun getMyStartBalanceWithExtraCurrencies(): [int, cell]
@@ -372,7 +372,7 @@ fun preloadUint(self: slice, len: int): int
 fun preloadBits(self: slice, len: int): slice
     builtin
 
-/// Loads serialized amount of Toncoins (any unsigned integer up to `2^120 - 1`).
+/// Loads serialized amount of GRAM (any unsigned integer up to `2^120 - 1`).
 @pure
 fun loadCoins(mutate self: slice): int
     asm( -> 1 0) "LDGRAMS"
@@ -470,7 +470,7 @@ fun storeUint(mutate self: builder, x: int, len: int): self
 fun storeSlice(mutate self: builder, s: slice): self
     asm "STSLICER"
 
-/// Stores amount of Toncoins into a builder.
+/// Stores amount of GRAM into a builder.
 @pure
 fun storeCoins(mutate self: builder, x: int): self
     asm "STGRAMS"

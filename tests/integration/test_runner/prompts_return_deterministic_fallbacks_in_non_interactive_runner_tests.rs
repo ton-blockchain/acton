@@ -14,7 +14,7 @@ fn prompts_return_deterministic_fallbacks_in_non_interactive_runner() {
             get fun `test prompt select confirm fallbacks`() {
                 expect(prompt("Enter your name:", "Guest")).toEqual("");
                 expect(prompt("Enter your name:", "type your name", "John")).toEqual("John");
-                expect(select("Choose network:", ["Mainnet", "Testnet", "Local"])).toEqual("");
+                expect(select("Choose network:", ["Mainnet", "Testnet", "Local"])).toEqual("Mainnet");
                 expect(confirm("Proceed with deployment?", false, "Safe default should be false.")).toEqual(false);
                 expect(promptInt("Enter retry count:", "42")).toEqual(42);
 
@@ -87,17 +87,17 @@ fn prompt_int_and_address_validate_interactive_input_until_corrected() {
 }
 
 #[test]
-fn confirm_default_true_is_ignored_in_non_interactive_mode_bug() {
-    ProjectBuilder::new("u-stdlib-confirm-default-true-bug")
+fn confirm_default_true_is_used_in_non_interactive_mode() {
+    ProjectBuilder::new("u-stdlib-confirm-default-true")
         .test_file(
-            "prompt_wrappers_bug",
+            "prompt_wrappers_default_true",
             r#"
             import "../../lib/prompts"
             import "../../lib/testing/expect"
 
             get fun `test confirm default true in non interactive mode`() {
                 val answer = confirm("Proceed with deployment?", true, "Press enter to accept default.");
-                expect(answer).toEqual(false);
+                expect(answer).toEqual(true);
             }
         "#,
         )
@@ -108,6 +108,6 @@ fn confirm_default_true_is_ignored_in_non_interactive_mode_bug() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/prompts_return_deterministic_fallbacks_in_non_interactive_runner/confirm_default_true_is_ignored_in_non_interactive_mode_bug.stdout.txt",
+            "integration/snapshots/test-runner/prompts_return_deterministic_fallbacks_in_non_interactive_runner/confirm_default_true_is_used_in_non_interactive_mode.stdout.txt",
         );
 }

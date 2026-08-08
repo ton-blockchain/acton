@@ -1,0 +1,53 @@
+{
+  "opcodes": {
+    "ProfilePing": {
+      "all_values": [
+        333,
+        333
+      ],
+      "avg_gas": 333,
+      "max_gas": 333,
+      "min_gas": 333,
+      "samples": 2
+    }
+  },
+  "timestamp": 0,
+  "trace_chains": {
+    "test-profiled-typed-opcode::trace#1": {
+      "test_name": "test-profiled-typed-opcode",
+      "total_fees": 20601,
+      "total_forward_fees": 89157,
+      "total_gas_fees": 20601,
+      "total_gas_used": 309,
+      "trace_name": "Trace 1",
+      "tx_count": 1
+    },
+    "test-profiled-typed-opcode::trace#2": {
+      "test_name": "test-profiled-typed-opcode",
+      "total_fees": 21868,
+      "total_forward_fees": 65246,
+      "total_gas_fees": 21868,
+      "total_gas_used": 328,
+      "trace_name": "Trace 2",
+      "tx_count": 1
+    },
+    "test-profiled-typed-opcode::trace#3": {
+      "test_name": "test-profiled-typed-opcode",
+      "total_fees": 22201,
+      "total_forward_fees": 44446,
+      "total_gas_fees": 22201,
+      "total_gas_used": 333,
+      "trace_name": "Trace 3",
+      "tx_count": 1
+    },
+    "test-profiled-typed-opcode::trace#4": {
+      "test_name": "test-profiled-typed-opcode",
+      "total_fees": 22201,
+      "total_forward_fees": 44446,
+      "total_gas_fees": 22201,
+      "total_gas_used": 333,
+      "trace_name": "Trace 4",
+      "tx_count": 1
+    }
+  }
+}

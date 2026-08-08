@@ -22,7 +22,7 @@ use tolk_ty::{InferenceResult, TyData};
 ///
 /// fun parse(v: int): Op {
 ///     return v as Op;
-///     //     ^^^^^^^ E030: non-literal cast to enum requires safety comment
+///     //     ^^^^^^^ E024: non-literal cast to enum requires safety comment
 /// }
 /// ```
 ///

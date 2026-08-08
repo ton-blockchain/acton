@@ -1,0 +1,12 @@
+Coverage Summary:
+Lines: 1/1 (100.00%)
+Total Hits: 2
+
+File: [ROOT]/contracts/library_ref_target.tolk
+Annotated Code:
+1   |                                                            |
+2 ✓ |             fun onInternalMessage(_: InMessage) {          | hits:2 branches:throw=0 continue=2
+3   |                 return;                                    |
+4   |             }                                              |
+5   |                                                            |
+

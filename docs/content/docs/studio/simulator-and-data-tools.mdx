@@ -1,0 +1,129 @@
+---
+title: "Simulator and Data Tools"
+description: "Build or paste TON messages, emulate them against an environment, and inspect serialized cells and BoC data"
+---
+
+The **Simulator** and **Cell Inspector** work with the selected environment but do not require you to
+submit a transaction. Use them to understand a message or serialized value before changing network
+state.
+
+## Simulator
+
+Simulator emulates an incoming message against the current environment state and presents the
+result using the same transaction details used by Explorer and test traces.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/simulator-light.png"
+    alt="Acton Studio Simulator in light theme with Builder and Raw input modes"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/simulator-dark.png"
+    alt="Acton Studio Simulator in dark theme with Builder and Raw input modes"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+### Builder mode
+
+Use **Builder** when you know the sender and target address and want Studio to construct the message.
+
+1. Choose the incoming message type.
+2. Enter **From**, **To**, and the value to attach.
+3. Let Studio load ABI automatically from the target account, sender address, project artifacts, or
+   catalog.
+4. Select a named ABI message and fill its typed fields, or choose an empty message.
+5. Select **Emulate**.
+
+Open the advanced sections when the scenario needs:
+
+- account balance, code, data, or state-hash overrides
+- a different timestamp or a relative time increase
+- bounce behavior
+- ABI loading from the sender
+- ignored signature checks
+- a specific masterchain block
+
+State overrides affect only this emulation. They do not update the environment.
+
+### Raw mode
+
+Use **Raw** when another tool already produced a complete message BoC. Paste its hex or base64 value,
+then select **Emulate**.
+
+Raw mode is useful for:
+
+- reproducing a message captured from a dApp or backend
+- comparing behavior across Simulated localnet, Full localnet, Testnet, and Mainnet
+- opening a message from Explorer or the Contracts table without rebuilding its fields
+
+### Read the result
+
+The result includes transaction success, phases, messages, fees, state changes, and decoded actions
+when metadata is available. From there, use the transaction detail controls to inspect the same
+execution layers available in tests and Explorer.
+
+Simulator uses the selected environment at the time you run it. A later block, account update, or
+snapshot restore can produce a different result from the same input.
+
+<Callout type="warning">
+  Emulation does not prove that a later broadcast will produce the same transaction. Network state,
+  time, fees, and account sequence numbers can change before submission.
+</Callout>
+
+## Cell Inspector
+
+Use **Cell Inspector** to decode and navigate TON cells without first identifying a transaction or
+contract.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/cell-inspector-light.png"
+    alt="Cell Inspector in light theme showing a decoded BoC, root hash, cell statistics, and parsed output"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/cell-inspector-dark.png"
+    alt="Cell Inspector in dark theme showing a decoded BoC, root hash, cell statistics, and parsed output"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+Paste a BoC as base64 beginning with a value such as `te6cc…`, or as hex beginning with
+`b5ee9c72…`. Then configure:
+
+- **Root:** selects a root cell when the BoC contains more than one
+- **Tree depth:** limits recursive rendering for large structures
+- **Strict parsing:** rejects trailing or inconsistent serialized data
+- **Use custom TL-B schema:** decodes the cell with a schema you provide
+
+The output can include:
+
+- **Parsed:** a structured value when Studio recognizes the data
+- **Raw:** bits and references without semantic decoding
+- **Code:** disassembly when the cell is recognized as TVM code
+- **BoC:** normalized base64 and hex representations
+
+Use the summary to copy the root hash and check bit, reference, and depth counts. Use Cell Inspector
+for message bodies, StateInit, contract storage, content cells, and data copied from API responses.
+
+## Common workflows
+
+### Investigate an unfamiliar message
+
+1. Copy the message BoC from [Explorer](/docs/studio/explorer-and-contracts#inspect-a-transaction),
+   [API Calls](/docs/studio/workspace#api-calls), or application logs.
+2. Open it in Cell Inspector to verify roots and serialized structure.
+3. Paste it into Simulator Raw mode.
+4. Emulate against the environment that produced the original state.
+5. Inspect phases and exit codes in the result.
+
+### Test a contract call without broadcasting
+
+1. [Open the target in Contracts](/docs/studio/explorer-and-contracts#track-contracts) and confirm
+   that ABI metadata is available. Registering an address alone does not create an ABI match.
+2. Select **Open in Simulator**.
+3. Choose the ABI message and enter typed arguments.
+4. Emulate and inspect the resulting transaction chain.
+5. Only after the result is correct, send through a wallet or application using the same environment.

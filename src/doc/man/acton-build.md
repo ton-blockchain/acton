@@ -18,12 +18,17 @@ By default, `acton build` compiles every configured contract. If you pass a
 dependencies.
 
 For each successful build, Acton writes a JSON artifact to the build output
-directory and, when the contract config has an `output` path, also writes the
-compiled `.boc` file there. Dependency helper files are emitted into the
-generated-code directory, and optional Fift output can be written separately.
+directory. When compiler ABI is available, Acton also writes a contract ABI JSON
+file to the ABI output directory. When the contract config has an `output` path,
+Acton writes the compiled `.boc` file there. Dependency helper files are emitted
+into the generated-code directory, and optional Fift output can be written
+separately. Source registration artifacts for local explorer source upload can
+also be written when explicitly configured.
 
 Contracts with `.boc` sources are treated as precompiled inputs: Acton loads
-their code, includes them in dependency resolution, and skips recompilation.
+their code, includes them in dependency resolution, and skips code
+recompilation. If such a contract has `types`, Acton compiles that interface
+file only to obtain ABI metadata.
 
 If the project has no `[contracts]` section or the section is empty, the
 command prints guidance and exits without compiling anything.
@@ -46,7 +51,7 @@ command prints guidance and exits without compiling anything.
 
 `acton build` reads contracts from `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Wallet]
 display-name = "Wallet Contract"
 src = "contracts/Wallet.tolk"
@@ -54,13 +59,28 @@ output = "Wallet.boc"
 depends = ["Child"]
 ```
 
+For a precompiled contract, keep `src` pointed at the BoC and add `types` when
+you want Acton to emit ABI:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+```
+
+Do not put dependencies on the BoC contract itself: it is already compiled.
+Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
+BoC code.
+
 Optional default output paths can be configured in `[build]`:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "build"
 gen-dir = "gen"
+output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 ```
 
 CLI flags override config values for the current invocation.
@@ -72,10 +92,14 @@ resolved `gen-dir` for that helper file.
 Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
+- `<output-abi>/<contract-name>.json` with ABI from a `.tolk` contract or from
+  `types` on a precompiled `.boc` contract
 - the configured contract `output` `.boc` file
 - `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
   (or a dependency-specific custom path when `depends[].path` is configured)
 - `<output-fift>/<contract-name>.fif` for compiled `.tolk` contracts
+- `<output-sources>/<contract-name>.source.json` with a source registration
+  artifact for compiled `.tolk` contracts
 - a DOT dependency graph file when `--graph` is passed
 
 Existing output files at those paths are replaced with freshly generated
@@ -105,6 +129,10 @@ contract and its transitive dependencies.
 `acton build` writes artifacts, cache entries, and optional graph output under
 the resolved project root. If one contract fails after earlier contracts were
 built successfully, the successful artifacts remain on disk.
+
+Before compiling, `acton build` normally refreshes the bundled standard library
+under `.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic
+refresh for the current process.
 
 ## Exit Status
 
@@ -141,7 +169,10 @@ built successfully, the successful artifacts remain on disk.
 5. Override output locations for a single run:
 
    ```bash
-   acton build --out-dir artifacts --gen-dir artifacts/gen --output-fift artifacts/fift
+   acton build --out-dir artifacts --gen-dir artifacts/gen \
+                                   --output-abi artifacts/abi \
+                                   --output-fift artifacts/fift \
+                                   --output-sources artifacts/sources
    ```
 
 6. Print compiled code and hashes after the build:

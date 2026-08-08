@@ -4,7 +4,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
 
-const RULE_CODE: &str = "E036";
+const RULE_CODE: &str = "E030";
 
 fn run_simple_test(content: &str, name: &str) {
     run_rule_test(

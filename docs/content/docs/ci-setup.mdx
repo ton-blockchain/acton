@@ -4,129 +4,357 @@ description: "Learn how to set up Acton checks, tests, and reports in CI pipelin
 icon: Workflow
 ---
 
-import {Callout} from "fumadocs-ui/components/callout";
+Set up CI by running the same Acton validation commands locally and in the pipeline: `build`, `test`, `check`, and `fmt` checks. Use the GitHub Actions and GitLab examples below as a starting point for contract-only projects and projects that also include a frontend.
 
-This guide shows how to set up Acton in CI to catch issues before merging.
+The CI setup is ready when:
 
-## GitHub Actions
+- local validation commands pass;
+- GitHub Actions or GitLab pipelines exit successfully on a test commit;
+- lint findings appear as annotations in GitHub or as a Code Quality report in GitLab;
+- coverage uploads succeed when the coverage job is enabled.
 
-Acton offers an easy-to-use GitHub action for configuring Acton:
+## Run the checks locally
+
+Run the same commands locally before wiring them into CI:
+
+```bash
+acton build
+acton test
+acton check
+acton fmt --check
+```
+
+These commands should exit with status `0`.
+
+<Callout>
+  If Acton is not installed on the host machine, run the same checks through the published Docker image:
+
+  ```bash
+  docker run --rm \
+    -v "$PWD":/workspace \
+    -w /workspace \
+    ghcr.io/ton-blockchain/acton:{{ acton_version }} \
+    build
+  ```
+
+  Replace `build` with `test`, `check`, or `fmt --check` as needed.
+</Callout>
+
+## Choose the lint output format
+
+Use the lint output format that matches the CI system:
+
+- Default (or plain) output format prints diagnostics with source locations in the standard terminal output.
+- `github` prints GitHub workflow commands and creates annotations in GitHub Actions.
+- `gitlab` writes a GitLab Code Quality report (Code Climate style) and is the best default for GitLab CI.
+- `sarif` is useful when the pipeline uploads [SARIF](https://sarifweb.azurewebsites.net/) artifacts to GitHub code scanning or another SARIF consumer. In private GitHub repositories, use it only when code scanning is enabled for the repository.
+- `json` is useful for custom automation and editor integrations.
+
+<Callout>
+  `--fix` works only with the default `plain` output format. With `json`, `sarif`, `github`, or
+  `gitlab`, Acton rejects `--fix` instead of rewriting files.
+</Callout>
+
+To specify the format, use the `--output-format` flag. To specify the output file, use the `--output-file` flag.
+
+For example, to write a [SARIF](https://sarifweb.azurewebsites.net/) file in CI, run:
+
+```bash
+acton check --output-format sarif --output-file .acton/reports/lint.sarif
+```
+
+### JSON output
+
+```bash
+acton check --output-format json
+```
+
+This prints the linting report as a JSON object to stdout with:
+
+- `success`: `true` or `false`
+- `diagnostics`: array of diagnostics
+
+Each diagnostic includes:
+
+- `file` as an absolute file path
+- `severity`, `name`, `message`, and optional `code` or `help`
+- `annotations[]` with 0-based `range.start/end.{line,character}`, `is_primary`, optional `message`, and optional `tags`
+- `fixes[]` with `message`, `applicability` (`auto` or `manual`), and structured `edits[]`
+
+To print the exact [JSON Schema](https://json-schema.org/) of the report to stdout, run:
+
+```bash
+acton meta get-schema lint-report
+```
+
+Use JSON mode for editor integrations and custom tooling.
+
+### SARIF report
+
+```bash
+acton check --output-format sarif --output-file .acton/reports/lint.sarif
+```
+
+This creates a [SARIF](https://sarifweb.azurewebsites.net/) report in `.acton/reports/lint.sarif`.
+
+The output includes:
+
+- `SRCROOT`-relative artifact locations when possible;
+- primary location and `relatedLocations`;
+- per-rule metadata such as docs `helpUri`, lifecycle status, and fixability;
+- structured SARIF fixes with Acton-specific applicability metadata.
+
+<Callout type="warn" title="Private GitHub repositories">
+  GitHub shows uploaded SARIF files through [code scanning](https://docs.github.com/en/code-security/concepts/code-scanning/code-scanning). For private and internal repositories, [SARIF upload](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/integrate-with-existing-tools/upload-sarif-file) works only when GitHub Code Security or GitHub Advanced Security is enabled for the repository. If it is not enabled, `upload-sarif` fails and the SARIF file will not create pull request annotations.
+
+In that setup, keep SARIF only when another CI step or external tool consumes it. For GitHub pull request feedback without code scanning, use `acton check --output-format github` or an annotation layer such as [reviewdog](https://github.com/reviewdog/reviewdog).
+
+</Callout>
+
+## Set up GitHub Actions
+
+Acton offers a GitHub action to set itself up. [`setup-acton`](https://github.com/ton-blockchain/setup-acton) downloads a release binary, restores and saves it with the GitHub Actions cache, adds `acton` to `PATH`, and exposes install details as outputs:
 
 ```yaml
 - name: Setup Acton
-  uses: ton-blockchain/setup-acton@master
+  uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
+  id: setup-acton
+  with:
+    # (optional) Acton version to install.
+    # Supported values include 'latest', a release tag such as 'v{{ acton_version }}',
+    # a bare semantic version such as '{{ acton_version }}', or 'trunk'.
+    # Defaults to [toolchain].acton in Acton.toml, then 'latest'.
+    version: '{{ acton_version }}'
+
+    # (optional) Target architecture.
+    # Supported values: x86_64, aarch64.
+    # Auto-detected from the runner if not specified.
+    architecture: 'x86_64'
+
+    # (optional) Target platform.
+    # Supported values: linux, apple, windows.
+    # Auto-detected from the runner if not specified.
+    platform: 'linux'
+
+    # (optional) Working directory for the Acton project.
+    # Used when reading Acton.toml. Defaults to the GitHub workspace.
+    working-directory: ${{ github.workspace }}
+
+    # (optional) Restore and save the resolved Acton binary with the
+    # GitHub Actions cache. Defaults to true.
+    save-cache: true
+
+    # (optional) GitHub token.
+    # Used for authenticated release metadata and asset downloads.
+    # Defaults to the current github.token value.
+    github-token: ${{ github.token }}
+
+# The setup action produces the following outputs: acton-path, acton-version, and cache-hit.
+- run: |
+    # acton-path contains full path to the installed Acton binary.
+    echo "Path: ${{ steps.setup-acton.outputs.acton-path }}"
+
+    # acton-version contains installed Acton version parsed from `acton --version`.
+    # If the version cannot be detected, acton-version returns 'unknown'.
+    echo "Version: ${{ steps.setup-acton.outputs.acton-version }}"
+
+    # cache-hit is true when the binary was restored from the Actions cache.
+    echo "Cache hit: ${{ steps.setup-acton.outputs.cache-hit }}"
 ```
 
-`setup-acton` downloads a release binary, adds it to `PATH`, and exposes `acton-path` output.
+If `version` is omitted, `setup-acton` reads `[toolchain].acton` from `Acton.toml` in `working-directory`; if no project version is configured, it installs the latest release:
 
-Learn more in `setup-acton` [repository](https://github.com/ton-blockchain/setup-acton).
+```acton-toml title="Acton.toml"
+[toolchain]
+acton = "{{ acton_version }}"
+```
 
-## Full workflow example
+The action accepts versioned releases, `latest`, `trunk`, and custom release tags. Pin a versioned release in `Acton.toml` or in the `version` input for reproducible workflows. Use `trunk` only for preview workflows.
 
-```yaml title=".github/workflows/ci.yml"
-name: CI
+Caching is enabled by default. The cache key includes the binary name, resolved version, platform target, and architecture, and the post-step saves the cache only after a successful job. When `version: 'trunk'` is used, the action skips saving the cache because `trunk` is a moving target.
+
+For a contract-only repository, create `.github/workflows/contracts.yml`:
+
+```yaml title=".github/workflows/contracts.yml"
+name: Contracts
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    # Keep the primary protected branch:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
 
 jobs:
-  validate:
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@master
-
-      - name: Verify version
-        run: acton --version
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
 
       - name: Build
         run: acton build
 
-      - name: Tests
-        run: acton test
+      - name: Formatter
+        run: acton fmt --check
 
-      - name: Lint
+      - name: Linter
         run: acton check --output-format github
 
-      - name: Format check
-        run: acton fmt --check
+      - name: Test
+        run: acton test
 ```
 
-## Wallets and Secrets in CI
+- The `acton check --output-format github` command emits workflow annotations directly in the GitHub Actions log and pull request checks.
+- The `acton check` command exits with a non-zero status when it reports at least one error, or when warning count exceeds `max-warnings`. To fail CI on any warning, set:
 
-For non-interactive deployment/verification jobs, store mnemonics in CI secrets and use `mnemonic-env`.
+  ```acton-toml title="Acton.toml"
+  [lint]
+  max-warnings = 0
+  ```
 
-```toml title="wallets.toml"
-[wallets.deployer]
-kind = "v5r1"
-keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
-```
+### Add coverage reporting
 
-Then inject the secret in your CI environment:
+Acton can generate `lcov` output directly from the test runner. Add this to a GitHub Actions job that uploads coverage to Codecov:
 
-```yaml
-env:
-  DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
-```
-
-See [Setup wallets](/docs/tutorial/setup-wallets) for all secure storage options.
-
-<Callout type="warn">
-  Never commit mnemonic phrases or wallet files with plaintext secrets.
-</Callout>
-
-## Coverage reports
-
-Generate and upload coverage reports:
-
-```yaml title=".github/workflows/ci.yml"
+```yaml title=".github/workflows/coverage.yml"
 name: Coverage
 
 on:
   pull_request:
-  push:
-    branches: [main]
+    branches:
+      # Keep the primary protected branch:
+      - main
+      - master
+
+permissions: {}
 
 jobs:
-  validate:
+  coverage:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@master
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
 
-      - name: Verify version
-        run: acton --version
+      - name: Run tests with coverage
+        run: acton test --coverage --coverage-format lcov --coverage-file lcov.info
 
-      - name: Build
-        run: acton build
-
-      - name: Tests
-        run: acton test --coverage --coverage-format lcov
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage
+        uses: codecov/codecov-action@v6
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 ```
 
-## GitLab CI
+To fail the job when coverage drops below a threshold, add `--coverage-minimum-percent <PERCENT>` to the test command, where `<PERCENT>` is a number from `0` to `100`. Alternatively, set the default value in the manifest:
 
-If you run CI on GitLab, you can use the published Acton Docker image.
-This example also uploads a GitLab Code Quality report for merge requests:
+```acton-toml title="Acton.toml"
+[test.coverage]
+minimum-percent = 50
+```
+
+### Add frontend checks
+
+If the repository also contains a frontend created with `acton new --app` or a custom one, create a separate frontend workflow with Node.js setup and validation steps. Keep Acton installed in this job when the frontend build can call `acton build`, as the generated contract-aware app templates do.
+
+```yaml title=".github/workflows/dapp.yml"
+name: dApp
+
+on:
+  push:
+    # Keep the primary protected branch:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Acton
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Formatter
+        run: npm run fmt:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test
+```
+
+## Set up GitLab CI
+
+For GitLab, run Acton from the published Docker image. The example pins the image to `{{ acton_version }}`; use `latest` only if the pipeline should always follow the newest release.
 
 ```yaml title=".gitlab-ci.yml"
-image: ghcr.io/ton-blockchain/acton:<version>
+image:
+  name: ghcr.io/ton-blockchain/acton:{{ acton_version }}
+  entrypoint: [""]
 
 stages:
   - validate
@@ -136,10 +364,36 @@ validate:
   script:
     - acton --version
     - acton build
-    - acton test
-    - acton check --output-format gitlab --output-file gl-code-quality-report.json
     - acton fmt --check
+    - acton check --output-format gitlab --output-file gl-code-quality-report.json
+    - acton test
   artifacts:
+    when: always
     reports:
       codequality: gl-code-quality-report.json
 ```
+
+The `entrypoint: [""]` override is required because the Acton Docker image uses `acton` as its entrypoint, while GitLab Runner expects to run job scripts through a shell. `acton check --output-format gitlab` writes a Code Quality report that GitLab can show directly in merge requests.
+
+## Store secrets and wallet mnemonics
+
+Validation jobs do not need to set up wallets. For noninteractive deployment jobs, use `mnemonic-env` to store and retrieve mnemonics:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+```
+
+Then expose the secret in CI:
+
+```yaml
+env:
+  DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
+```
+
+In GitLab CI, store `DEPLOYER_MNEMONIC` as a masked protected variable with the same name.
+
+<Callout type="warn">
+  Never commit mnemonic phrases, plaintext wallet files, or `.env` files that contain production secrets.
+</Callout>

@@ -1,13 +1,12 @@
 #![cfg(test)]
 
 use crate::common::test_parser::{TestCase, TestParser};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tolk_resolver::file_db::{FileDb, FileInfo};
 use tolk_resolver::project_index::ProjectIndex;
-use tolk_resolver::{Resolved, SymbolId, resolve};
-use tolk_ty::{InferenceResult, TypeDb, TypeInterner, infer};
+use tolk_resolver::{Resolved, resolve};
+use tolk_ty::{FileBodyTypes, TypeDb, TypeInterner, infer};
 
 #[cfg(test)]
 pub mod common;
@@ -42,7 +41,7 @@ fn offset_to_line_col(file_info: &FileInfo, offset: usize) -> (usize, usize) {
 fn resolve_symbol_at_offset(
     file_info: &FileInfo,
     project_index: &ProjectIndex,
-    inferences: &HashMap<SymbolId, InferenceResult>,
+    inferences: &FileBodyTypes,
     offset: usize,
 ) -> Option<Resolved> {
     let file_id = file_info.id();
@@ -155,7 +154,7 @@ fn run_resolve_test(test_case: &TestCase) -> String {
     let mut interner = TypeInterner::new();
     let mut type_db = TypeDb::new(&mut interner, &file_db, &index);
 
-    let mut inferences: HashMap<SymbolId, InferenceResult> = HashMap::new();
+    let mut inferences = FileBodyTypes::default();
     for decl in file_info.source().top_levels() {
         let Some(index_decl) = file_info.find_declaration(&decl) else {
             continue;
@@ -195,9 +194,7 @@ fn run_resolve_tests_from_file(path: &Path) {
     };
 
     let mut updates = Vec::new();
-    let update_snapshots = std::env::var("UPDATE_SNAPSHOTS")
-        .map(|v| !v.is_empty())
-        .unwrap_or(false);
+    let update_snapshots = std::env::var("UPDATE_SNAPSHOTS").is_ok_and(|v| !v.is_empty());
 
     for test in tests_to_run {
         let actual = run_resolve_test(test);

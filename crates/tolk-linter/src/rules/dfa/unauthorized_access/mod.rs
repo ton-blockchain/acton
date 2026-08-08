@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::FileId;
 use tolk_resolver::resolve_index::{FileResolveIndex, LocalDefKind};
@@ -15,12 +15,25 @@ pub mod analysis;
 /// State-changing operations that are not guarded by admin authorization may allow
 /// arbitrary inbound senders to mutate contract storage.
 ///
+/// ### Behavior notes
+/// - This preview rule is disabled (`allow`) by default. Enable it in config:
+///
+/// ```toml
+/// [lint.rules]
+/// unauthorized-access = "warn"
+/// ```
+///
+/// - Or run only this rule with `acton check --enable-only E013`.
+/// - The analysis currently checks `onInternalMessage` and treats an
+///   `assert`-style `in.senderAddress == *.adminAddress` guard as the admin
+///   sender check.
+///
 /// ### Example
 /// ```tolk twoslash
 /// fun onInternalMessage(in: InMessage) {
 ///     val storage = lazy Storage.fromCell(contract.getData());
 ///     storage.save();
-///     //      ^^^^ E017: possible storage write without admin sender check
+///     //      ^^^^ E013: possible storage write without admin sender check
 /// }
 /// ```
 ///
@@ -37,6 +50,8 @@ pub mod analysis;
 pub struct UnauthorizedAccess;
 
 impl Violation for UnauthorizedAccess {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
     fn message(&self) -> String {
         "possible storage write without admin sender check".to_owned()
     }

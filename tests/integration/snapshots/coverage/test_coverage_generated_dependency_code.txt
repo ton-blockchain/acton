@@ -1,0 +1,14 @@
+Coverage Summary:
+Lines: 2/2 (100.00%)
+Total Hits: 4
+
+File: [ROOT]/contracts/Child.tolk
+Annotated Code:
+1   |                                                                   |
+2 ✓ |             fun onInternalMessage(_: InMessage) {                 | hits:2 branches:throw=0 continue=2
+3 ✓ |                 if (contract.getOriginalBalance() > 0) {          | hits:2 branches:true=2 false=0
+4   |                     return;                                       |
+5   |                 }                                                 |
+6   |             }                                                     |
+7   |                                                                   |
+

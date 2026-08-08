@@ -76,12 +76,30 @@ Clear the compilation cache before running.
 
 {{#option "`--fork-net` _network_" }}
 Fork blockchain state from a remote network for local execution.
+Acton also uses the network configuration from the resolved masterchain block.
+With an explicit historical block, it uses that block's Unix time; otherwise,
+it uses the current system Unix time.
 When `--net` is set, omitted `--fork-net` defaults to the selected broadcast
 network.
 {{/option}}
 
 {{#option "`--fork-block-number` _seqno_" }}
 Historical block sequence number to fork from.
+
+When a fork block number is set, Acton caches resolved remote accounts under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
+runs with the same fork network, block number, and address read that file before
+calling the remote API. Fork runs without an explicit block use the same account
+cache after they resolve the latest sequence number. Acton caches the matching
+network configuration and, for explicit historical forks, block time for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`.
+{{/option}}
+
+{{#option "`--no-fork-cache`" }}
+Disable persistent account and library cache. Use this when you want every
+script run to fetch forked accounts and libraries from the remote API. This
+option does not disable the 24-hour masterchain snapshot cache. The regular
+`--clear-cache` flag removes this cache together with the rest of `build/cache`.
 {{/option}}
 
 {{/options}}
@@ -95,10 +113,33 @@ Broadcast to the selected network. If omitted, the script runs in emulation
 mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{/option}}
 
+{{#option "`--tonconnect`" }}
+Use TON Connect wallet approval for broadcast messages.
+
+This opens a local browser page, connects a wallet, and sends `net.send(...)`
+messages through that wallet instead of loading local wallet mnemonics.
+The TON Connect session is saved under `build/sessions/tonconnect/<network>.json` and
+reused by later runs in the same project. Currently supported only with
+`--net mainnet` or `--net testnet`.
+{{/option}}
+
+{{#option "`--tonconnect-port` _port_" }}
+Local TON Connect page port. Defaults to `52258`.
+
+Acton keeps this port stable so injected wallets can recognize the same local
+dApp on later runs. If the default port is busy, pass another port explicitly
+and keep using the same value for that project.
+{{/option}}
+
 {{#option "`--explorer` _name_" }}
 Explorer to use for transaction links.
 
-Possible values: `tonscan`, `toncx`, `dton`, `tonviewer`
+Possible values: `actonscan`, `tonscan`, `toncx`, `dton`, `tonviewer`
+
+Actonscan is the default. For `custom:<name>` networks without an explicit
+`networks.<name>.explorer`, Acton embeds the configured `api.v2` and `api.v3`
+endpoints in an Actonscan shared-network URL. An explicit network explorer
+still takes precedence.
 {{/option}}
 
 {{/options}}
@@ -128,11 +169,17 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - state is not preserved between runs
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
+- fork state and configuration come from the same masterchain block; an explicit historical fork also uses that block's time
 - `--net` sends real transactions using configured wallets
+- `--net ... --tonconnect` sends real transactions through the connected TON Connect wallet
 
 Wallet names referenced by the script are resolved from the merged wallet
 configuration, with local `wallets.toml` entries overriding
-`global.wallets.toml` on name conflicts.
+`global.wallets.toml` on name conflicts. With `--tonconnect`, any
+`scripts.wallet("name")` call resolves to the connected wallet address.
+Acton saves the TON Connect session in `build/sessions/tonconnect/<network>.json`, so
+the next script run can restore the wallet connection without asking the user
+to connect again.
 
 ## Argument Forwarding
 
@@ -154,10 +201,11 @@ Forwarded arguments are parsed against the ABI for `main()`.
 - `bool` accepts `true` and `false`
 - nullable supported types accept `null`
 - `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
 - arrays accept `[item1, item2]`
 
 Unsupported parameter types currently include `structs`, `tuple`, `map`,
-`dict`, `builder`, `any_address` and other complex types.
+`dict`, `builder` and other complex types.
 
 ## Side Effects
 
@@ -209,16 +257,31 @@ When a script can affect on-chain state, the usual safe sequence is:
    TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
    ```
 
-5. Broadcast a deploy flow and print explorer links:
+5. Run against a protected localnet:
+
+   ```bash
+   ACTON_LOCALNET_AUTH_TOKEN=localnet-token acton script scripts/deploy.tolk --net localnet
+   ```
+
+6. Broadcast a deploy flow and print explorer links:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
+   ```
+
+7. Broadcast through TON Connect instead of local wallet keys:
+
+   ```bash
+   acton script scripts/deploy.tolk --net testnet --tonconnect
    ```
 
 ## TonCenter API Keys
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Protected `localnet` requests read `ACTON_LOCALNET_AUTH_TOKEN`. Use the token
+printed by `acton localnet start --require-auth`.
 
 For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
 names are uppercased and non-alphanumeric characters are replaced with `_`, so
@@ -232,4 +295,4 @@ one-off overrides or CI.
 
 - `acton help run`
 - [Scripting guide](https://ton-blockchain.github.io/acton/docs/scripting/overview)
-- [Wallet setup](https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets)
+- [Wallet setup](https://ton-blockchain.github.io/acton/docs/wallets)

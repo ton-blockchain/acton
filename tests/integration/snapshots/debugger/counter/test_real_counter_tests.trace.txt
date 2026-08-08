@@ -1,0 +1,119 @@
+Step 1 (before):
+  Code:
+     81|
+     82| get fun `test should reset counter`() {
+     83|     val (counter, deployer) = setupTest();
+                                       ^^^^^^^^^^^
+     84|
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 2 (step_over):
+  Code:
+     83|     val (counter, deployer) = setupTest();
+     84|
+     85|     val res = counter.sendIncrease(deployer.address, 100);
+                               ^^^^^^^^^^^^
+     86|     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_over):
+  Code:
+     84|
+     85|     val res = counter.sendIncrease(deployer.address, 100);
+     86|     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+             ^^^^^^^^^^^
+     87|     expect(counter.getCounter()).toEqual(100);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    res: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_over):
+  Code:
+     85|     val res = counter.sendIncrease(deployer.address, 100);
+     86|     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+     87|     expect(counter.getCounter()).toEqual(100);
+                            ^^^^^^^^^^
+     88|
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    res: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_over):
+  Code:
+     87|     expect(counter.getCounter()).toEqual(100);
+     88|
+     89|     val resetRes = counter.sendReset(deployer.address);
+                                    ^^^^^^^^^
+     90|     expect(resetRes).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    res: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_over):
+  Code:
+     88|
+     89|     val resetRes = counter.sendReset(deployer.address);
+     90|     expect(resetRes).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+             ^^^^^^^^^^^^^^^^
+     91|     expect(counter.getCounter()).toEqual(0);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    res: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    resetRes: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_over):
+  Code:
+     89|     val resetRes = counter.sendReset(deployer.address);
+     90|     expect(resetRes).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+     91|     expect(counter.getCounter()).toEqual(0);
+                            ^^^^^^^^^^
+     92| }
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    res: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    resetRes: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell

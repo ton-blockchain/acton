@@ -16,7 +16,7 @@ use tolk_syntax::ast::expressions::{Expr, IsType, Unary};
 /// ### Example
 /// ```tolk twoslash
 /// if (!(value is int)) {
-/// //  ^^^^^^^^^^^^^^^ E022: negated `is` type check can use `!is`
+/// //  ^^^^^^^^^^^^^^^ S008: negated `is` type check can use `!is`
 ///     return;
 /// }
 /// ```

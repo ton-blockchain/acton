@@ -25,6 +25,18 @@ hash = "beef"
 code = "te6ccgEBAQEAAgAAAA=="
 "#;
 
+fn expected_stdlib_version() -> String {
+    if acton::build_info::RELEASE_CHANNEL == "trunk" {
+        format!(
+            "{}-trunk+{}",
+            acton::build_info::PACKAGE_VERSION,
+            acton::build_info::GIT_HASH
+        )
+    } else {
+        acton::build_info::PACKAGE_VERSION.to_owned()
+    }
+}
+
 // ========================================
 // Basic Init Tests
 // ========================================
@@ -49,11 +61,63 @@ fn test_init_empty_directory() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_empty_directory.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_empty_directory.toml.gen"),
     );
 
     assert!(project.path().join(".acton").exists());
     assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_warns_when_current_directory_is_empty() {
+    let project = ProjectBuilder::new("init-truly-empty")
+        .without_acton_toml()
+        .build();
+    fs::remove_dir_all(project.path().join("contracts")).unwrap();
+    fs::remove_dir_all(project.path().join("tests")).unwrap();
+    let log_dir = project.path().parent().unwrap().join("init-empty-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .init()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/init/test_init_warns_when_current_directory_is_empty.stdout.txt",
+        );
+
+    assert!(project.path().join("Acton.toml").exists());
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_does_not_warn_for_existing_acton_toml_in_otherwise_empty_directory() {
+    let project = ProjectBuilder::new("init-existing-manifest-empty")
+        .without_acton_toml()
+        .build();
+    fs::remove_dir_all(project.path().join("contracts")).unwrap();
+    fs::remove_dir_all(project.path().join("tests")).unwrap();
+    let original_manifest = "[package]\n";
+    fs::write(project.path().join("Acton.toml"), original_manifest).unwrap();
+    let log_dir = project
+        .path()
+        .parent()
+        .unwrap()
+        .join("init-existing-empty-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .init()
+        .run()
+        .success()
+        .assert_not_contains("For new projects, prefer creating from a template");
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
+    );
 }
 
 #[test]
@@ -71,14 +135,12 @@ fn test_init_already_initialized() {
 }
 
 #[test]
-fn test_init_patches_missing_default_mappings_in_existing_config() {
+fn test_init_leaves_existing_config_with_missing_default_mappings_unchanged() {
     let project = ProjectBuilder::new("init-patch-mappings")
         .without_acton_toml()
         .build();
 
-    fs::write(
-        project.path().join("Acton.toml"),
-        r#"[package]
+    let original_manifest = r#"[package]
 name = "my-acton-project"
 description = "A TON blockchain project"
 version = "0.1.0"
@@ -90,22 +152,19 @@ ignore = []
 
 [import-mappings]
 tests = "custom-tests"
-"#,
-    )
-    .unwrap();
+"#;
+    fs::write(project.path().join("Acton.toml"), original_manifest).unwrap();
 
     let output = project.acton().init().run().success();
 
     output
         .assert_contains("Updated Acton project")
-        .assert_contains("Patched Acton.toml with default mappings");
+        .assert_contains("Skipping Acton.toml project configuration")
+        .assert_not_contains("Patched Acton.toml with default mappings");
 
-    let content = fs::read_to_string(project.path().join("Acton.toml")).unwrap();
-    assertion().eq(
-        normalize_output(content.as_str(), project.path()),
-        snapbox::file!(
-            "snapshots/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
-        ),
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
     );
 }
 
@@ -145,7 +204,7 @@ wrappers = "wrappers"
         .assert_not_contains("Patched Acton.toml with default mappings")
         .assert_file_snapshot_matches(
             "Acton.toml",
-            "integration/snapshots/test_init_existing_complete_mappings_are_left_unchanged.toml.gen",
+            "integration/snapshots/init/test_init_existing_complete_mappings_are_left_unchanged.toml.gen",
         );
 }
 
@@ -167,6 +226,60 @@ fn test_init_updates_stdlib_if_already_initialized() {
     output.assert_contains("Updated Acton project");
 
     assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_stdlib_only_updates_without_touching_acton_toml() {
+    let original_manifest = "\
+# keep this exact file
+this is intentionally not valid toml
+";
+    let project = ProjectBuilder::new("init-stdlib-only-preserve-manifest")
+        .without_acton_toml()
+        .raw_file("Acton.toml", original_manifest)
+        .build();
+
+    let acton_dir = project.path().join(".acton");
+    let stale_stdlib_file = acton_dir.join("testing/assert.tolk");
+    fs::create_dir_all(stale_stdlib_file.parent().unwrap()).unwrap();
+    fs::write(acton_dir.join(".version"), expected_stdlib_version()).unwrap();
+    fs::write(&stale_stdlib_file, "stale stdlib content").unwrap();
+
+    let output = project.acton().init().arg("--stdlib-only").run().success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/init/test_init_stdlib_only_updates_without_touching_acton_toml.stdout.txt",
+    );
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
+    );
+    assert_ne!(
+        fs::read_to_string(&stale_stdlib_file).unwrap(),
+        "stale stdlib content"
+    );
+    assert!(!project.path().join(".gitignore").exists());
+}
+
+#[test]
+fn test_init_stdlib_only_installs_without_acton_toml() {
+    let project = ProjectBuilder::new("init-stdlib-only-no-manifest")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .init()
+        .arg("--stdlib-only")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/init/test_init_stdlib_only_installs_without_acton_toml.stdout.txt",
+        );
+
+    assert!(!project.path().join("Acton.toml").exists());
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+    assert!(!project.path().join(".gitignore").exists());
 }
 
 #[test]
@@ -294,7 +407,7 @@ fn test_init_with_no_contracts() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_with_no_contracts.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_with_no_contracts.toml.gen"),
     );
 }
 
@@ -322,7 +435,7 @@ fn test_init_discovers_single_contract() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_discovers_single_contract.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_discovers_single_contract.toml.gen"),
     );
 }
 
@@ -420,7 +533,7 @@ fn test_init_contract_name_formatting() {
     output.assert_contains("Discovered 2 contracts");
     output.assert_file_snapshot_matches(
         "Acton.toml",
-        "integration/snapshots/test_init_contract_name_formatting.toml.gen",
+        "integration/snapshots/init/test_init_contract_name_formatting.toml.gen",
     );
 }
 
@@ -500,7 +613,7 @@ fn test_init_output_format() {
         .init()
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_init_output_format.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/init/test_init_output_format.stdout.txt");
 }
 
 #[test]
@@ -606,7 +719,7 @@ fn test_init_preserves_existing_local_global_wallets_file() {
     );
     output.assert_file_snapshot_matches(
         "global.wallets.toml",
-        "integration/snapshots/test_init_preserves_existing_local_global_wallets.toml.gen",
+        "integration/snapshots/init/test_init_preserves_existing_local_global_wallets.toml.gen",
     );
 }
 
@@ -645,7 +758,7 @@ fn test_init_preserves_existing_local_global_libraries_file() {
     );
     output.assert_file_snapshot_matches(
         "global.libraries.toml",
-        "integration/snapshots/test_init_preserves_existing_local_global_libraries.toml.gen",
+        "integration/snapshots/init/test_init_preserves_existing_local_global_libraries.toml.gen",
     );
 }
 
@@ -676,7 +789,7 @@ fn test_init_patches_gitignore_no_duplicates() {
 
     output.assert_file_snapshot_matches(
         ".gitignore",
-        "integration/snapshots/test_init_patches_gitignore_no_duplicates.gitignore",
+        "integration/snapshots/init/test_init_patches_gitignore_no_duplicates.gitignore",
     );
 }
 
@@ -693,6 +806,7 @@ fn test_init_creates_gitignore_if_not_exists() {
     let content = fs::read_to_string(&gitignore_path).unwrap();
 
     assert!(content.contains(".acton/"));
+    assert!(content.contains(".studio/"));
     assert!(content.contains("wallets.toml"));
     assert!(content.contains("*.mnemonic"));
     assert!(content.contains("global.wallets.toml"));
@@ -722,6 +836,7 @@ global.wallets.toml
 
     for pattern in [
         ".acton/",
+        ".studio/",
         "gen/",
         "build/",
         "lcov.info",
@@ -753,6 +868,7 @@ fn test_init_does_not_patch_gitignore_when_groups_are_complete() {
     let initial_gitignore = "\
 # Acton related files
 .acton/
+.studio/
 gen/
 build/
 lcov.info

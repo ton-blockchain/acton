@@ -1,0 +1,275 @@
+---
+title: "8. Deploy to testnet"
+description: "Create a funded testnet wallet, deploy the poll, verify source code, and retrace a transaction."
+---
+
+<Callout type="warn" title="Testnet only">
+  All commands on this page target testnet. Testnet GRAM has no real value, but treat the wallet
+  mnemonic with the same care as a mainnet wallet — never commit it to git.
+</Callout>
+
+## Create and fund a testnet wallet
+
+```bash
+acton wallet new --name testnet-deployer --local --airdrop --version v5r1
+```
+
+```acton-cli noCopy title="terminal"
+$ acton wallet new --name testnet-deployer --local --airdrop --version v5r1
+✓ Wallet successfully created and added to wallets.toml
+✓ Wallet address is kQCC94LVUO3dVUBgBKKHhw-i3GyXwEIy4BH3rymKB0iamEo9
+→ Requesting airdrop for wallet testnet-deployer kQCC94LVUO3dVUBgBKKHhw-i3GyXwEIy4BH3rymKB0iamEo9
+→ Fetching PoW challenge...
+→ Solving challenge (difficulty: 24 bits)...
+
+To check wallet balances run acton wallet list --balance.
+```
+
+`--airdrop` requests test GRAM from the configured faucet. If the faucet is rate-limited, fund the wallet manually via the [Testnet Giver Bot](https://t.me/testgiver_ton_bot).
+
+```bash
+acton wallet list --balance
+```
+
+<Callout type="info">
+  `acton wallet list --balance` queries TON Center for live balances. Set
+  `TONCENTER_TESTNET_API_KEY` in the environment for a higher rate limit.
+</Callout>
+
+If you already have a wallet, import it instead of creating a new one:
+
+```bash
+acton wallet import --name testnet-deployer --local --version v5r1 "word1 word2 ... word24"
+```
+
+## Deploy to testnet
+
+Replace `scripts/deploy.tolk` with:
+
+```tolk
+import "@acton/io"
+import "@acton/emulation/network"
+import "@acton/emulation/scripts"
+
+import "@contracts/types"
+import "@wrappers/Poll.gen"
+
+fun main() {
+    val deployer = scripts.wallet("testnet-deployer");
+
+    val poll = Poll.fromStorage(PollStorage {
+        owner: deployer.address,
+        option0: 0,
+        option1: 0,
+        isClosed: false,
+    });
+    val res = poll.deploy(deployer.address, { value: grams("0.05") });
+    println(res.waitForTrace());
+
+    println("Deployed Poll contract to {}", poll.address);
+    println("Owner is {}", poll.owner());
+}
+```
+
+```bash
+acton script scripts/deploy.tolk --net testnet
+```
+
+```acton-cli-trace noCopy title="terminal"
+$ acton script scripts/deploy.tolk --net testnet
+Awaiting trace... [Attempt 1/20]
+Trace settled with 2 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A                                       gas=4939
+    └── empty 0.05 GRAM -> EQBa78..XUMpRe B                                      gas=625
+
+Deployed Poll contract to kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U
+Owner is kQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8c8Y
+```
+
+## Inspect on-chain state
+
+```acton-cli
+acton rpc info <POLL_ADDRESS> --net testnet
+```
+
+`<POLL_ADDRESS>` — the address printed by the deployment script.
+
+```acton-cli noCopy title="terminal"
+$ acton rpc info kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U --net testnet
+
+Remote Account
+  Network:           testnet
+  Address:           kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi/U
+  Raw Address:       0:5aefc1b6a77ce035d25e09d3b7285bfa848ecde7953139e822a654a14865d432
+  Status:            active
+  Balance:           0.049958332 GRAM
+  Last Tx LT:        69241750000003
+  Last Tx Hash:      cfvZg4EhUBUFvNNavnJ6y9Woe0IRPRscrZndA2ShzUw=
+  Code Hash:         0x9e77c11a8c480d325165387def822b80043c61c41144e938a20e9924b1deb486
+  Data Hash:         0x0ed71cf812fb65771b02e9675c0a46aed8bf0b6d81a29082d814c83528935749
+
+Local Match
+  Contract:          Poll (Poll)
+
+Decoded Storage
+  isClosed: false
+  option0: 0
+  option1: 0
+  owner: kQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8c8Y
+```
+
+## Verify the source code
+
+Source verification proves the deployed bytecode was compiled from specific source files, letting users inspect the source in a blockchain explorer.
+
+```acton-cli
+acton verify Poll --address <POLL_ADDRESS> --net testnet
+```
+
+```acton-cli noCopy title="terminal"
+$ acton verify Poll --address EQC9R1p... --net testnet
+✓ Contract verification completed!
+View at: https://verifier.ton.org/EQC9R1p...?testnet
+```
+
+When `--dry-run` is not used, the final verification transaction sends `0.1 GRAM` unless the verifier backend reports that the same code hash is already verified.
+
+## Send a vote and retrace the transaction
+
+Create `scripts/vote.tolk`:
+
+```tolk title="scripts/vote.tolk"
+import "@acton/io"
+import "@acton/prompts"
+import "@acton/emulation/network"
+import "@acton/emulation/scripts"
+
+import "@wrappers/Poll.gen"
+
+fun main(pollAddress: address, option: uint8) {
+    val voter = scripts.wallet(promptWallet("Select voter address"));
+    val poll = Poll.fromAddress(pollAddress);
+
+    val res = poll.sendVote(voter.address, option, { value: grams("0.1") });
+    println(res.waitForTrace());
+
+    val (option0, option1) = poll.results();
+    println("Results: option0={}, option1={}", option0, option1);
+}
+```
+
+The two command-line arguments become `pollAddress` and `option`:
+
+```acton-cli
+acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
+```
+
+```acton-cli-trace noCopy title="terminal"
+$ acton script --net testnet scripts/vote.tolk kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U 0
+Awaiting trace... [Attempt 1/20]
+Trace settled with 3 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A             gas=4939
+    └── 0x694d6f6e 0.1 GRAM -> EQBa78..XUMpRe B        gas=4111
+        └── 0x694d6f6e 0.05 GRAM -> EQAHvY..Kbp9gT C   gas=1406
+            └── account created
+
+Results: option0=1, option1=0
+```
+
+Use `acton retrace` with the matching local contract to replay the exact testnet transaction locally:
+
+To inspect the raw on-chain trace first, use `acton rpc trace`:
+
+```acton-cli
+acton rpc trace <TX_HASH> --net testnet
+```
+
+```acton-cli-trace noCopy title="terminal"
+$ acton rpc trace 9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8 --net testnet
+Trace Summary
+  Query Hash:        9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8
+  Trace ID:          XBqC0K8oPX19R7rykhyFQwTwiLyhUulopbdEVMqzFOE=
+  Root Tx Hash:      XBqC0K8oPX19R7rykhyFQwTwiLyhUulopbdEVMqzFOE=
+  Trace Complete:    true
+  Total Txs:         3
+  Total Messages:    3
+
+Trace Tree
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A   gas=4939
+    └── Vote 0.1 GRAM -> Poll B              gas=4111
+        └── Vote 0.05 GRAM -> Voter C        gas=1406
+            └── account created
+```
+
+Then use `acton retrace` with the matching local contract to replay the same transaction locally:
+
+```acton-cli
+acton retrace <TX_HASH> --net testnet --contract Poll
+```
+
+`<TX_HASH>` — the transaction hash printed by the vote script.
+
+```acton-cli-trace noCopy title="terminal"
+$ acton retrace 9e2fd109fc5f7eb7340d4b108e861b71052...7ec8 --net testnet --contract Poll
+Network:             testnet
+State Hash OK:       Yes
+
+Transaction Details:
+  Status:         Success (exit code: 0)
+  Account:        UQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMsmb
+  Sender:         UQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8SlX
+  LT:             69241811000003
+  Time:           13.05.2026, 00:23:03
+  Amount In:      0.100000000 GRAM
+
+Fees & Balance:
+  Balance Before: 0.049958332 GRAM
+  Amount Sent:    0.050000000 GRAM
+  Total Fee:      0.000326935 GRAM
+  Gas Fee:        0.000274068 GRAM
+  Balance After:  0.099525662 GRAM
+
+Compute Phase:
+  Success:        Yes
+  Exit Code:      0
+  VM Steps:       78
+  Gas Used:       4111
+  Gas Fees:       0.000274068 GRAM
+
+Action Phase:
+  Success:        Yes
+  Total Actions:  1
+
+Out Actions:
+  1. Send Message
+     Mode:           PAY_FEES_SEPARATELY
+     Destination:    UQAHvYVFogKzuNpQLwqimwGqKM_Ceg757jxn9cPTYSKbp4XW
+     Value:          0.050000000 GRAM
+     Bounce:         Yes
+     Body Hash:      0xa1234d20a2eb8fca273a9d8aba3c438a253c3984ea880b0fcb9d6f38db55260f
+
+Help: Some fields are shown as hashes. Use --verbose to see full cell content.
+
+Message Data:
+  Opcode:         0x694d6f6e
+
+Help: Use --logs-dir <DIR> to save full VM and executor logs to files.
+```
+
+Add `--debug` when you want source-level replay in the editor with the retrace DAP server.
+
+## Checkpoint
+
+The poll is live and verified on the testnet:
+
+- Deploy with `acton script scripts/deploy.tolk --net testnet`
+- Inspect state with `acton rpc info --net testnet`
+- Debug transactions with `acton retrace --contract Poll`
+- Source visible at verifier.ton.org
+
+The next page builds the React frontend.
+
+**Commands introduced:** `acton wallet`, `acton script --net testnet`, `acton rpc info --net testnet`, `acton verify`, `acton retrace`

@@ -1,5 +1,8 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::{
+    append_custom_network, spawn_toncenter_v2_mock, toncenter_v2_latest_fork_snapshot_responses,
+};
 use tycho_types::cell::CellBuilder;
 
 const IMPORTS: &str = r#"
@@ -26,6 +29,8 @@ fn registered_library_hash_hex() -> String {
 
 #[test]
 fn load_library_prefers_world_state_library_before_network() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let library_hash = registered_library_hash_hex();
     let source = format!(
         r#"
@@ -45,14 +50,22 @@ get fun `test load library prefers world state library before network`() {{
 "#
     );
 
-    ProjectBuilder::new("stdlib-load-library-prefers-world-state-before-network")
+    let project = ProjectBuilder::new("stdlib-load-library-prefers-world-state-before-network")
         .contract("dummy", DUMMY_CONTRACT)
         .test_file("load_library_prefers_world_state", &source)
-        .build()
+        .build();
+    append_custom_network(
+        project.path(),
+        "bm-missing-net",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
         .acton()
         .test()
         .fork_net("custom:bm-missing-net")
         .run()
         .success()
         .assert_passed(1);
+    mock_handle.join().expect("mock toncenter must finish");
 }

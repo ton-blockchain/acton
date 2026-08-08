@@ -1,12 +1,17 @@
 pub mod build_info;
 pub mod commands;
 pub mod context;
+mod contract_interface;
 pub mod crash;
 pub mod external_send;
 pub mod ffi;
 pub mod file_build_cache;
 pub mod formatter;
+pub mod http;
 pub mod paths;
 pub mod retrace;
 pub mod stdlib;
+pub mod studio_discovery;
+mod studio_wallets;
+pub mod tonconnect;
 pub mod wallets;

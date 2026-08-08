@@ -3,8 +3,8 @@
 
 use crate::DebugExecutorHandle;
 use std::sync::Arc;
-use tolk_compiler::TolkSourceMap;
-use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceMap;
+use tolk_source_map::abi::ContractABI;
 
 #[derive(Clone)]
 pub struct ChildDebugContextSpec {
@@ -16,9 +16,9 @@ pub struct ChildDebugContextSpec {
     /// Live executor already prepared for stepping.
     pub executor: DebugExecutorHandle,
     /// Debug info for the code being entered. Without it we cannot create a replayer.
-    pub source_map: Option<Arc<TolkSourceMap>>,
+    pub source_map: Option<Arc<SourceMap>>,
     /// Optional ABI used to render runtime storage / messages in "Registers".
-    pub compiler_abi: Option<Arc<ContractABI>>,
+    pub abi: Option<Arc<ContractABI>>,
     /// True when parent Step Into should land on the first user-visible child location.
     pub stop_on_entry: bool,
 }

@@ -22,7 +22,7 @@ DICTPUSHCONST 19 [
         // .. | ... 13 lines omitted ...
         // 22 |     }
         //    |     ^
-        SDBEGINSQ x{7e8764efa_}
+        SDBEGINSQ x{7E8764EF}
         PUSHCONT {
             // contracts/counter[LINE]
             //  9 |         IncreaseCounter => {
@@ -75,7 +75,7 @@ DICTPUSHCONST 19 [
         // .. | ... 13 lines omitted ...
         // 22 |     }
         //    |     ^
-        SDBEGINSQ x{3a752f06a_}
+        SDBEGINSQ x{3A752F06}
         NIP
         PUSHCONT {
             // contracts/counter[LINE]
@@ -100,7 +100,7 @@ DICTPUSHCONST 19 [
             //    |                      ^^^^^^^^^^^^^
             NEWC
             STSLICE
-            STSLICECONST x{}
+            STSLICECONST x{00000000}
             ENDC
             // contracts/types[LINE]
             // 11 |     contract.setData(self.toCell());

@@ -1,3 +1,0 @@
-  Installing standard library [ACTON_VERSION]
-coins: 1.5 TON
-coins_default: 0.75 TON

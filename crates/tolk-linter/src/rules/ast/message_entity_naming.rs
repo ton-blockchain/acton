@@ -10,16 +10,18 @@ use tolk_syntax::{AstNode, HasTreeSitterKind, TryFromNode, match_parents};
 use tolk_ty::InferenceResult;
 
 /// ### What it does
-/// Checks for messages created with `createMessage(...)` but named as generic `msg`.
+/// Checks for messages created with `createMessage(...)` but named as generic
+/// `msg` or `message`.
 ///
 /// ### Why is this bad?
 /// Messages are first-class entities in Tolk and should have meaningful names.
-/// Generic names like `msg` make code harder to read and reason about.
+/// Generic names like `msg` and `message` make code harder to read and reason
+/// about.
 ///
 /// ### Example
 /// ```tolk twoslash
 /// val msg = createMessage({ ... });
-/// //  ^^^ E011: message should be properly named
+/// //  ^^^ S005: message should be properly named
 /// msg.send(SEND_MODE_REGULAR);
 /// ```
 ///
@@ -28,6 +30,10 @@ use tolk_ty::InferenceResult;
 /// val deployMessage = createMessage({ ... });
 /// deployMessage.send(SEND_MODE_REGULAR);
 /// ```
+///
+/// ### Behavior notes
+/// The rule checks local variables named exactly `msg` or `message` whose
+/// initializer resolves to `createMessage(...)`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct MessageShouldBeNamed;
@@ -50,7 +56,7 @@ impl Violation for MessageShouldBeNamed {
 /// ### Example
 /// ```tolk twoslash
 /// createMessage({ ... }).send(SEND_MODE_REGULAR);
-/// //                    ^^^^^ E012: create named message before send
+/// //                    ^^^^^ S006: create named message before send
 /// ```
 ///
 /// Use instead:

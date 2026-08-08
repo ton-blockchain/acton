@@ -1,0 +1,12 @@
+N/A -> system
+└── system -> kQAiIi..IiIiZI                                                    gas=123
+
+  Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Time:              2023-11-14 22:13:20 UTC — 2023-11-14 22:13:20 UTC
+  Block:             10000 — 10000
+  Trace Complete:    true
+  Total Txs:         1
+  Total Messages:    0
+
+Hint: pass --show-bodies to include decoded message bodies when an ABI matches

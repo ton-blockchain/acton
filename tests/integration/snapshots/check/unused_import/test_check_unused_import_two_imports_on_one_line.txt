@@ -1,4 +1,4 @@
-warning[E006]: unused import
+warning[E005]: unused import
   --> [ROOT]/contracts/main[LINE]
   |
 2 |             import "./unused.tolk"; import "./functions.tolk";
@@ -6,4 +6,4 @@ warning[E006]: unused import
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E006
+For example: acton check --explain E005

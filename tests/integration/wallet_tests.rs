@@ -579,6 +579,39 @@ fn test_wallet_list() {
 }
 
 #[test]
+fn test_wallet_list_global_outside_project_without_acton_toml() {
+    let project = ProjectBuilder::new("wallet-list-global-outside-project").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+    let outside_dir = tempfile::TempDir::new().unwrap();
+
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
+    fs::create_dir_all(&global_wallets_dir).unwrap();
+    fs::write(
+        global_wallets_dir.join("global.wallets.toml"),
+        format!(
+            r#"[wallets.global-only]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
+"#
+        ),
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_list()
+        .current_dir(outside_dir.path())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wallet/test_wallet_list_global_outside_project_without_acton_toml.stdout.txt",
+        );
+}
+
+#[test]
 fn test_wallet_import_local() {
     let project = ProjectBuilder::new("wallet-import-local").build();
     let mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
@@ -1174,6 +1207,42 @@ fn test_wallet_sign_rejects_invalid_payload() {
 }
 
 #[test]
+fn test_wallet_sign_requires_explicit_wallet_in_non_interactive_mode() {
+    let project = ProjectBuilder::new("wallet-sign-multiple-non-interactive").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let (body_hex, _, _) = wallet_sign_fixture();
+
+    fs::write(
+        project.path().join("wallets.toml"),
+        format!(
+            r#"[wallets.first]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
+
+[wallets.second]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic = "{SECOND_TEST_MNEMONIC}" }}
+"#,
+        ),
+    )
+    .expect("failed to write wallets.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .wallet_sign()
+        .arg("--body")
+        .arg(&body_hex)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/wallet/test_wallet_sign_requires_explicit_wallet_in_non_interactive_mode.stderr.txt",
+        );
+}
+
+#[test]
 fn test_wallet_remove_local() {
     let project = ProjectBuilder::new("wallet-remove-local").build();
 
@@ -1705,6 +1774,7 @@ fn test_wallet_list_balance_plain_uses_mocked_toncenter() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "2445700000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1730,7 +1800,7 @@ fn test_wallet_list_balance_plain_uses_mocked_toncenter() {
 
     output.assert_contains("Available wallets:");
     output.assert_contains("balance-wallet");
-    output.assert_contains("2.4457 TON");
+    output.assert_contains("2.4457 GRAM");
 
     let captured = captured
         .lock()
@@ -1765,6 +1835,7 @@ fn test_wallet_list_balance_json_uses_env_api_key() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "500000000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1832,6 +1903,7 @@ fn test_wallet_list_balance_uses_testnet_env_over_mainnet_env() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "1000000000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1901,7 +1973,7 @@ fn test_wallet_list_balance_handles_toncenter_failure() {
     toncenter_handle.join().expect("mock toncenter must finish");
 
     output.assert_contains("balance-wallet");
-    output.assert_contains("0 TON");
+    output.assert_contains("0 GRAM");
 }
 
 #[test]
@@ -2115,7 +2187,7 @@ fn test_wallet_new_all_fields_interactive() {
     session.expect("Wallet type:");
     session.send_line("", "failed to select default wallet type");
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("", "failed to keep default no-airdrop option");
 
     session.expect("Wallet successfully created and added to");

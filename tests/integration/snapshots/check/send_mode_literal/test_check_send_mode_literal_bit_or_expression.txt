@@ -1,0 +1,19 @@
+warning[E012]: send mode should use SEND_MODE_* constants
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |                 deployMessage.send(1 | 2);
+  |                                    ^^^^^ numeric send mode literal is used here
+  |
+  = use named `SEND_MODE_*` constants instead of numeric mode literals
+
+help: replace with SEND_MODE_* constants
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |                 deployMessage.send(1 | 2);
+  |                                    ^^^^^ SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E012

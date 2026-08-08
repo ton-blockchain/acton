@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::FileId;
 
@@ -17,7 +17,7 @@ pub mod analysis;
 /// ```tolk twoslash
 /// fun main(a: int, b: int, c: int): int {
 ///     return a / b * c;
-///     //     ^^^^^^^^^ E025: division before multiplication may cause precision loss
+///     //     ^^^^^^^^^ E019: division before multiplication may cause precision loss
 /// }
 /// ```
 ///
@@ -38,6 +38,8 @@ pub mod analysis;
 pub struct DivideBeforeMultiply;
 
 impl Violation for DivideBeforeMultiply {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
     fn message(&self) -> String {
         "division before multiplication may cause precision loss".to_owned()
     }

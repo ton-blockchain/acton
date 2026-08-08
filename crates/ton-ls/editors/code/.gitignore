@@ -1,7 +1,0 @@
-# Node artifacts
-node_modules/
-out/
-
-# Yarn artifacts
-yarn-error.log
-.yarn/

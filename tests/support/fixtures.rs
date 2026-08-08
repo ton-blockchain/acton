@@ -11,6 +11,7 @@ use tempfile::TempDir;
 pub(crate) struct FixtureProject {
     _tmp_dir: TempDir,
     project_path: PathBuf,
+    isolated_home: PathBuf,
     enabled_slots: HashMap<String, Vec<usize>>,
 }
 
@@ -22,9 +23,13 @@ impl FixtureProject {
         let project_path = tmp_dir.path().join(name);
         Self::patch_imports(&project_path);
 
+        let isolated_home = tmp_dir.path().join(".acton-test-home");
+        fs::create_dir_all(&isolated_home).expect("Failed to create isolated home dir");
+
         Self {
             _tmp_dir: tmp_dir,
             project_path,
+            isolated_home,
             enabled_slots: HashMap::new(),
         }
     }
@@ -102,19 +107,22 @@ impl FixtureProject {
     /// Get `ActonCommand` builder for this project
     pub(crate) fn acton(&self) -> ActonCommand {
         let cmd = ProcessCommandBuilder::new(acton_exe())
+            .env("HOME", &self.isolated_home)
+            .env("USERPROFILE", &self.isolated_home)
             .env("ACTON_LOG_DIR", self.project_path.join(".acton-test-logs"));
         ActonCommand {
             cmd,
             project: Arc::new(crate::support::project::ProjectRef {
                 path: self.project_path.clone(),
             }),
-            test_path: None,
+            test_paths: Vec::new(),
             filter: None,
             build_clear_cache: false,
             build_contract: None,
             build_graph: None,
             build_out_dir: None,
             build_gen_dir: None,
+            build_output_abi: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
@@ -138,7 +146,9 @@ impl FixtureProject {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
+            verify_new: false,
             test_fail_fast: false,
+            test_no_capture: false,
             script_fork_net: None,
             build_info: false,
             force_no_color_env: true,
@@ -168,6 +178,12 @@ impl FixtureProject {
         opts.copy_inside = true;
 
         copy(&fixture_dir, tmp.path(), &opts).expect("Failed to copy fixture project");
+        let copied_project_path = tmp.path().join(name);
+        let copied_acton_dir = copied_project_path.join(".acton");
+        if copied_acton_dir.exists() {
+            fs::remove_dir_all(&copied_acton_dir)
+                .expect("Failed to remove copied fixture .acton directory");
+        }
 
         tmp
     }

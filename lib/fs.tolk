@@ -28,8 +28,10 @@ struct fs
 /// - On any read failure, returns `null` (missing file, non-UTF-8 content,
 ///   permission error, or other host I/O error).
 /// - Failure reasons are intentionally collapsed to `null`; no error reason is exposed.
-/// - Relative paths are resolved by the host process working directory. Path forms such as
-///   `./a.txt` and `dir/../a.txt` are accepted and follow host path normalization rules.
+/// - Relative paths are resolved under the Acton project root. Path forms such as
+///   `./a.txt` and `dir/../a.txt` are accepted when they stay inside the project.
+/// - Absolute paths, parent-directory escapes, and symlinks that resolve outside the project
+///   are rejected and return `null`.
 /// - Newline bytes are preserved as-is after UTF-8 decoding (for example, CRLF is not
 ///   normalized to LF).
 ///
@@ -50,6 +52,7 @@ fun fs.readFile(path: string): string?
 /// Returns:
 /// - `slice` with file bytes on success.
 /// - `null` on read failure (missing file, permission error, etc).
+/// - `null` when the path is absolute or escapes the project root.
 fun fs.readBytes(path: string): slice?
     asm "4 EXTCALL"
 
@@ -58,6 +61,7 @@ fun fs.readBytes(path: string): slice?
 /// Returns:
 /// - `true` if the file was written successfully.
 /// - `false` on any host I/O error.
+/// - `false` when the path is absolute or escapes the project root.
 fun fs.writeString(path: string, data: string): bool
     asm "5 EXTCALL"
 
@@ -66,6 +70,7 @@ fun fs.writeString(path: string, data: string): bool
 /// Returns:
 /// - `true` if the file was written successfully.
 /// - `false` on invalid byte slice input or host I/O error.
+/// - `false` when the path is absolute or escapes the project root.
 fun fs.writeBytes(path: string, data: slice): bool
     asm "7 EXTCALL"
 
@@ -74,5 +79,6 @@ fun fs.writeBytes(path: string, data: slice): bool
 /// Returns:
 /// - `true` when the path exists.
 /// - `false` when missing or if existence check fails.
+/// - `false` when the path is absolute or escapes the project root.
 fun fs.exists(path: string): bool
     asm "22 EXTCALL"

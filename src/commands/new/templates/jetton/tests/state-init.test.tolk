@@ -4,12 +4,14 @@ import "@acton/testing/expect"
 import "@acton/tlb/either"
 import "@acton/tlb/maybe"
 import "@acton/types/transaction"
+
 import "@contracts/fees-management"
 import "@contracts/messages"
 import "@contracts/storage"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
 
 const MAX_JETTON_VALUE = 0xffffffffffffffffffffffffffffff
@@ -22,8 +24,8 @@ get fun `test state: should mint max jetton value`() {
         deployer.address,
         deployer.address,
         MAX_JETTON_VALUE,
-        ton("0.05"),
-        ton("0.3"),
+        grams("0.05"),
+        grams("0.3"),
     );
     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
         from: deployer.address,
@@ -43,7 +45,13 @@ get fun `test state: wallet storage and init-state bounds should match fee const
     val recipient = randomAddress();
     val recipientWallet = userWallet(minter, recipient);
 
-    val mintResult = minter.sendMint(deployer.address, recipient, TEST_JETTON_UNIT, 0, ton("0.3"));
+    val mintResult = minter.sendMint(
+        deployer.address,
+        recipient,
+        TEST_JETTON_UNIT,
+        0,
+        grams("0.3"),
+    );
     expect(mintResult).toHaveSuccessfulTx<InternalTransferStep>({
         from: minter.address,
         to: recipientWallet.address,
@@ -54,7 +62,7 @@ get fun `test state: wallet storage and init-state bounds should match fee const
     if (state == null) {
         return;
     }
-    val (accountCells, accountBits, _) = state!.toCell().calculateSizeStrict(4096);
+    val (accountCells, accountBits, _) = state.toCell().calculateSizeStrict(4096);
     expect(accountBits).toBeGreater(0);
     expect(accountCells).toBeGreater(0);
 

@@ -1,13 +1,15 @@
 # Acton
 
-<img align="right" src="docs/public/logo.png" height="150px" alt="Acton logo" />
+<img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
 Acton is an all-in-one TON smart contract development toolkit written in Rust.
 It combines project scaffolding, build, testing, scripting, wallet and network
 operations, verification, linting, formatting, debugging, and low-level VM
 tooling in one CLI.
 
-Documentation: https://ton-blockchain.github.io/acton/docs/welcome
+Built for **humans**. Perfect for **AI**.
+
+### [Read the docs →](https://ton-blockchain.github.io/acton/docs/welcome)
 
 <br clear="right" />
 
@@ -17,26 +19,26 @@ Documentation: https://ton-blockchain.github.io/acton/docs/welcome
   deploy, verify.
 - Native speed (Rust-based toolchain and test runtime).
 - Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
-- Fast test runner with fork mode, gas snapshots, coverage, mutation and fuzzing testing and nice UI.
+- Ready for dApp development with project templates and automatically generated TypeScript wrappers.
+- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzz testing, and the browser Test UI.
 - Browser test UI for failed tests, traces, logs, and coverage inspection.
-- Local development node with faucet, forking, snapshots, and persistence.
 
 ## Install
 
 The recommended way to get Acton today is to run the latest public installer:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
+curl -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh
 ```
 
 If you prefer a manual download, use the latest public release:
 
-| Platform | Architecture | Download                                                                                                                                       |
-|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-apple-darwin.tar.gz)           |
-| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-apple-darwin.tar.gz)             |
-| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz)   |
-| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz) |
+| Platform | Architecture | Download                                                                                                                                          |
+|----------|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/ton-blockchain/acton/releases/latest/download/acton-aarch64-apple-darwin.tar.gz)           |
+| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/ton-blockchain/acton/releases/latest/download/acton-x86_64-apple-darwin.tar.gz)             |
+| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/ton-blockchain/acton/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz)   |
+| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/ton-blockchain/acton/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz) |
 
 After extracting the archive, make sure `acton` is on your `PATH` and verify
 the installation:
@@ -66,15 +68,14 @@ For more installation details, see the
 
 ## Support policy
 
-Acton is currently distributed as a public beta. The stable release channel is
-the latest numbered GitHub release, and the first-class platform matrix is
-macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
+Acton is stable on the latest numbered GitHub release. The first-class platform
+matrix is macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
 documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
 today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
 follow the Linux installation path there. `trunk` builds installed via
 `acton up --trunk`, WSL installs, and other source-built targets are beta /
 best-effort surfaces for now. The full policy is documented at
-[Support policy](https://ton-blockchain.github.io/acton/docs/miscellaneous/support-policy).
+[Support policy](https://ton-blockchain.github.io/acton/docs/installation#support-policy).
 
 ## From zero to testnet
 
@@ -87,7 +88,7 @@ cd first_counter
 acton build
 acton test
 
-# Create and fund a local testnet wallet
+# Create and fund a locally stored testnet wallet
 acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
@@ -107,7 +108,7 @@ acton build
 acton test
 ```
 
-For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/tutorial/project-init) article.
+For more details, see the [Project management guide](https://ton-blockchain.github.io/acton/docs/projects).
 
 ## Building from source
 

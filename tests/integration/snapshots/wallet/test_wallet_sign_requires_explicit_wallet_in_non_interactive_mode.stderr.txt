@@ -1,0 +1,3 @@
+Error: Cannot prompt for wallet selection in a non-interactive environment.
+
+Pass the wallet name explicitly. Available wallets: first, second

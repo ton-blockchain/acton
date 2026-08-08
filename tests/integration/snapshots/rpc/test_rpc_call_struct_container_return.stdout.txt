@@ -1,0 +1,7 @@
+ContainerReply {
+    numbers: [4, 5],
+    balances: map<int32, int32> {
+        7: 70,
+        8: 80,
+    },
+}

@@ -1,0 +1,33 @@
+[package]
+name = "git-init-failure-project"
+description = "git init failure description"
+version = "0.1.0"
+license = "MIT"
+
+[toolchain]
+acton = "[ACTON_VERSION]"
+
+[contracts.Empty]
+display-name = "Empty"
+src = "contracts/Empty.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+deploy-emulation = "acton script scripts/deploy.tolk"
+deploy-testnet = "acton script scripts/deploy.tolk --net testnet"
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# [ACTON_DOCS_URL]/acton-toml

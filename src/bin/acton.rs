@@ -1,17 +1,16 @@
 use acton::commands;
-use acton::commands::build::build_cmd;
+use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
-use acton::commands::create_app::DEFAULT_APP_DIR;
 use acton::commands::disasm::disasm_cmd;
-use acton::commands::doc::doc_tvm_cmd;
+use acton::commands::doc::{doc_abi_cmd, doc_tvm_cmd};
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
 use acton::commands::help::print_command_manual;
 use acton::commands::hooks::{HooksCommand, hooks_cmd};
-use acton::commands::init::init_cmd;
+use acton::commands::init::{DEFAULT_APP_DIR, init_cmd};
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
@@ -31,12 +30,16 @@ use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
-    WalletsFile, global_wallets_path, init_manifest_path_with_source,
-    init_project_root_with_source, project_root as configured_project_root,
+    TestSettings, WalletsFile, global_wallets_path, init_manifest_path_with_source,
+    init_project_root_with_source, manifest_path as configured_manifest_path,
+    project_root as configured_project_root,
 };
 use acton_config::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
+use acton_studio::DEFAULT_STUDIO_PORT;
+use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
@@ -46,14 +49,16 @@ use clap_complete::engine::{
     ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
 };
 use commands::common::error_fmt;
-use dotenvy::dotenv;
+use dotenvy::{dotenv, from_path};
 use human_panic::{Metadata, setup_panic};
+use std::fmt::Write as _;
 use std::fs::OpenOptions;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -93,22 +98,28 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     #[command(
-        about = "Initialize Acton support in the current directory",
-        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-app, Acton skips project initialization and only scaffolds a TypeScript app.",
+        about = "Add Acton support to current directory",
+        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-dapp, Acton skips project initialization and only scaffolds a TypeScript app. With --stdlib-only, Acton only refreshes the bundled standard library.",
         after_help = detailed_help_pointer("init")
     )]
     Init {
         #[arg(
-            long,
+            long = "create-dapp",
             value_name = "PATH",
             num_args = 0..=1,
             default_missing_value = DEFAULT_APP_DIR,
+            conflicts_with = "stdlib_only",
             help = "Create a TypeScript app scaffold in PATH (default: app)"
         )]
-        create_app: Option<PathBuf>,
+        create_dapp: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Update the bundled standard library without touching Acton.toml"
+        )]
+        stdlib_only: bool,
     },
     #[command(
-        about = "Create a new project in a specified directory",
+        about = "Create a new project from a template",
         long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template.",
         after_help = detailed_help_pointer("new")
     )]
@@ -137,6 +148,11 @@ enum Commands {
         agents: bool,
         #[arg(
             long,
+            help = "Overwrite existing files whose paths collide with the template"
+        )]
+        overwrite: bool,
+        #[arg(
+            long,
             hide = true,
             help = "Print machine-readable template metadata as JSON",
             conflicts_with_all = [
@@ -147,13 +163,14 @@ enum Commands {
                 "license",
                 "app",
                 "hooks",
-                "agents"
+                "agents",
+                "overwrite"
             ]
         )]
         templates: bool,
     },
     #[command(
-        about = "Print this message or the help of a given top-level command",
+        about = "Show top-level or command-specific help",
         after_help = detailed_help_pointer("help")
     )]
     Help {
@@ -161,7 +178,7 @@ enum Commands {
         command: Option<String>,
     },
     #[command(
-        about = "Manage wallets",
+        about = "Manage project and global wallets",
         after_help = detailed_help_pointer("wallet")
     )]
     Wallet {
@@ -169,7 +186,7 @@ enum Commands {
         command: WalletCommand,
     },
     #[command(
-        about = "Manage git hooks for the current project",
+        about = "Install and manage project Git hooks",
         after_help = detailed_help_pointer("hooks")
     )]
     Hooks {
@@ -177,7 +194,7 @@ enum Commands {
         command: HooksCommand,
     },
     #[command(
-        about = "Inspect remote account and contract state",
+        about = "Inspect remote accounts and contracts",
         after_help = detailed_help_pointer("rpc")
     )]
     Rpc {
@@ -185,12 +202,17 @@ enum Commands {
         command: RpcCommand,
     },
     #[command(
-        about = "Execute tests in file or directory",
+        about = "Run tests from files or directories",
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
-        path: Option<String>,
+        #[arg(
+            help = "Test files or directories containing test files (default: project root)",
+            value_name = "PATH",
+            num_args = 0..,
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
+        paths: Vec<String>,
         // Filtering
         #[arg(
             short,
@@ -215,10 +237,13 @@ enum Commands {
         // Execution
         #[arg(
             long,
-            help = "Stop executing tests after the first failure",
-            help_heading = "Execution"
+            help = "Stop executing tests after the first failure (default: [test].fail-fast or false)",
+            help_heading = "Execution",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        fail_fast: bool,
+        fail_fast: Option<bool>,
         #[arg(
             long,
             value_name = "SEED",
@@ -228,7 +253,7 @@ enum Commands {
         fuzz_seed: Option<u64>,
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Execution"
         )]
@@ -241,6 +266,13 @@ enum Commands {
         debug_port: Option<u16>,
         #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
         backtrace: Option<BacktraceMode>,
+        #[arg(
+            long,
+            help = "Print test stdout/stderr immediately while still capturing it for reporters",
+            help_heading = "Debugging",
+            conflicts_with = "mutate"
+        )]
+        no_capture: bool,
 
         // Coverage
         #[arg(long, help = "Generate a coverage profile", help_heading = "Coverage")]
@@ -273,7 +305,7 @@ enum Commands {
         coverage_include_wrappers: bool,
         #[arg(
             long,
-            help = "Include .test.tolk files in coverage reports",
+            help = "Include files under tests/ and .test.tolk files in coverage reports",
             help_heading = "Coverage"
         )]
         coverage_include_tests: bool,
@@ -298,6 +330,25 @@ enum Commands {
             requires = "baseline_snapshot"
         )]
         fail_on_diff: bool,
+        #[arg(
+            long,
+            help = "Write a gas-weighted execution profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Output gas profile in specified format",
+            help_heading = "Profiling"
+        )]
+        gas_profile_format: Option<GasProfileFormat>,
+        #[arg(
+            long,
+            help = "Include .test.tolk unit-test execution in the gas profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile_include_tests: bool,
 
         // Reporting
         #[arg(
@@ -315,8 +366,7 @@ enum Commands {
         show_bodies: bool,
         #[arg(
             long,
-            default_value = "test-results",
-            help = "JUnit XML output directory",
+            help = "JUnit XML output directory (default: [test].junit-path or test-results)",
             help_heading = "Reporting"
         )]
         junit_path: Option<String>,
@@ -326,14 +376,23 @@ enum Commands {
             help_heading = "Reporting"
         )]
         junit_merge: bool,
+        #[arg(
+            long,
+            help = "Do not send test run data to Acton Studio",
+            help_heading = "Reporting"
+        )]
+        no_studio_reporting: bool,
 
         // Cache
         #[arg(
             long,
-            help = "Clear compilation cache before running",
-            help_heading = "Cache"
+            help = "Clear compilation cache before running (default: false)",
+            help_heading = "Cache",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        clear_cache: bool,
+        clear_cache: Option<bool>,
 
         // Remote
         #[arg(
@@ -349,6 +408,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Tracing
         #[arg(
@@ -460,20 +525,31 @@ enum Commands {
         ui: bool,
         #[arg(
             long,
-            help = "UI server port",
-            default_value = "12344",
+            help = "UI server port (default: [test].ui-port or 12344)",
             help_heading = "Reporting",
             value_name = "PORT"
         )]
-        ui_port: u16,
+        ui_port: Option<u16>,
     },
     #[command(
-        about = "Generate wrappers and optionally a stub test file for a contract",
+        about = "Generate contract wrappers and test stubs",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
-        contract_id: String,
+        #[arg(
+            help = "Contract name to generate wrappers for",
+            value_name = "CONTRACT_NAME",
+            required_unless_present = "all",
+            conflicts_with = "all",
+            add = ArgValueCompleter::new(complete_contracts)
+        )]
+        contract_id: Option<String>,
+        #[arg(
+            long,
+            help = "Generate wrappers for every contract defined in Acton.toml",
+            conflicts_with_all = ["output", "test_output"],
+        )]
+        all: bool,
         #[arg(
             long,
             short,
@@ -522,19 +598,23 @@ enum Commands {
         ts: bool,
     },
     #[command(
-        about = "Execute a Tolk script file",
+        about = "Run a standalone Tolk script file",
         after_help = detailed_help_pointer("script")
     )]
     Script {
         #[arg(help = "Script file to execute", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
 
-        #[arg(help = "Arguments to pass to the script")]
+        #[arg(
+            help = "Arguments to pass to the script",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
         args: Vec<String>,
 
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Script"
         )]
@@ -575,6 +655,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Broadcasting
         #[arg(
@@ -583,10 +669,24 @@ enum Commands {
             help_heading = "Broadcasting"
         )]
         net: Option<String>,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for broadcast messages",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
 
         #[arg(
             value_enum,
             long,
+            default_value = "actonscan",
             help = "Explorer to use for transaction links",
             help_heading = "Broadcasting",
             value_name = "NAME"
@@ -600,7 +700,7 @@ enum Commands {
         show_bodies: bool,
     },
     #[command(
-        about = "Build the specified contract or all contracts",
+        about = "Build one contract or every contract",
         after_help = detailed_help_pointer("build")
     )]
     Build {
@@ -625,18 +725,30 @@ enum Commands {
         #[arg(
             long,
             value_name = "DIR",
+            help = "Directory to save contract ABI JSON files (default: build/abi/)"
+        )]
+        output_abi: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
             help = "Directory to save compiled Fift files"
         )]
         output_fift: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save source registration artifacts"
+        )]
+        output_sources: Option<String>,
         #[arg(long, help = "Show compiled contract info")]
         info: bool,
     },
     #[command(
-        about = "Run a script defined in Acton.toml",
+        about = "Run a named script from Acton.toml",
         after_help = detailed_help_pointer("run")
     )]
     Run {
-        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
+        #[arg(help = "Name of the command script to run", add = ArgValueCompleter::new(complete_scripts))]
         script: String,
         #[arg(
             help = "Arguments to pass to the script",
@@ -646,15 +758,15 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Compile a Tolk file",
+        about = "Compile one Tolk source into TVM code",
         after_help = detailed_help_pointer("compile")
     )]
     Compile {
         #[arg(help = "Tolk file to compile", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
-        #[arg(long, help = "Output result as JSON")]
+        #[arg(long, help = "Output result as JSON", conflicts_with = "base64_only")]
         json: bool,
-        #[arg(long, help = "Output only base64 code")]
+        #[arg(long, help = "Output only base64 code", conflicts_with = "json")]
         base64_only: bool,
         #[arg(long, help = "Output code to binary BoC file")]
         boc: Option<String>,
@@ -673,15 +785,21 @@ enum Commands {
         clear_cache: bool,
     },
     #[command(
-        about = "Disassemble TVM bitcode to human-readable TASM",
+        about = "Disassemble TVM code into TASM",
         after_help = detailed_help_pointer("disasm")
     )]
     Disasm {
         #[arg(
-            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)"
+            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)",
+            conflicts_with_all = ["string", "address"]
         )]
         boc_file: Option<String>,
-        #[arg(short, long, help = "BoC string in hex or base64 format")]
+        #[arg(
+            short,
+            long,
+            help = "BoC string in hex or base64 format",
+            conflicts_with_all = ["boc_file", "address"]
+        )]
         string: Option<String>,
         #[arg(
             short,
@@ -699,7 +817,8 @@ enum Commands {
         source_map: Option<String>,
         #[arg(
             long,
-            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
+            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)",
+            conflicts_with_all = ["boc_file", "string"]
         )]
         address: Option<String>,
         #[arg(long, help = "Network for `--address` and library lookups")]
@@ -711,7 +830,7 @@ enum Commands {
         follow_libraries: bool,
     },
     #[command(
-        about = "Verify contract source code on verifier.ton.org",
+        about = "Verify contract source on TON Verifier",
         after_help = detailed_help_pointer("verify")
     )]
     Verify {
@@ -731,9 +850,25 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
+        #[arg(long = "new", hide = true, help = "Use the new Acton verifier service")]
+        new_verifier: bool,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the verification transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
     },
     #[command(
-        about = "Check Tolk files in the project for errors",
+        about = "Check project Tolk sources for errors",
         after_help = detailed_help_pointer("check")
     )]
     Check {
@@ -758,7 +893,7 @@ enum Commands {
             long = "enable-only",
             value_delimiter = ',',
             value_name = "CODE[,CODE...]",
-            help = "Enable only selected lint rules by code (e.g. E001,S001)"
+            help = "Enable only selected lint rules by code (e.g. S003,S001)"
         )]
         enable_only: Option<Vec<String>>,
         #[arg(long, help = "Explain a rule")]
@@ -776,7 +911,7 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Retrace a transaction by its hash",
+        about = "Replay a transaction trace by hash",
         after_help = detailed_help_pointer("retrace")
     )]
     Retrace {
@@ -804,7 +939,7 @@ enum Commands {
         debug_port: Option<u16>,
     },
     #[command(
-        about = "Manage TON libraries",
+        about = "Publish and manage on-chain libraries",
         after_help = detailed_help_pointer("library")
     )]
     Library {
@@ -819,18 +954,44 @@ enum Commands {
         #[command(subcommand)]
         command: LocalnetCommand,
     },
+    #[command(about = "Manage Acton Studio")]
+    Studio {
+        #[command(subcommand)]
+        command: StudioCommand,
+    },
     #[command(
-        about = "Format Tolk source files",
+        about = "Format project Tolk source files",
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
-        #[arg(help = "Files or directories to format (defaults to project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
+        #[arg(
+            help = "Files or directories to format (defaults to project root)",
+            conflicts_with = "stdin",
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
+        #[arg(
+            long,
+            help = "Read Tolk source from stdin and write formatted source to stdout"
+        )]
+        stdin: bool,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Virtual file path to show in stdin diagnostics"
+        )]
+        stdin_filepath: Option<String>,
+        #[arg(
+            long,
+            value_name = "startLine:startChar-endLine:endChar",
+            help = "Format only the specified zero-based source range using UTF-8 byte columns"
+        )]
+        range: Option<String>,
     },
     #[command(
-        about = "Lookup reference documentation",
+        about = "Look up reference documentation and contract ABIs",
         after_help = detailed_help_pointer("doc")
     )]
     Doc {
@@ -848,11 +1009,25 @@ enum Commands {
         stdio: bool,
         #[arg(long, help = "Path to log file")]
         log_file: Option<String>,
+        #[arg(
+            long,
+            default_value = "info",
+            help = "Language server log level: off, error, warn, info, debug, or trace"
+        )]
+        log_level: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Path to physical Tolk standard library root"
+        )]
+        stdlib_path: Option<PathBuf>,
         #[arg(long, help = "Disable logging")]
         no_log: bool,
+        #[arg(long, help = "Collect language server performance profiles")]
+        profile: bool,
     },
     #[command(
-        about = "Manage Acton versions",
+        about = "Install or update Acton CLI releases",
         after_help = detailed_help_pointer("up")
     )]
     Up {
@@ -883,10 +1058,12 @@ enum Commands {
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
+        #[arg(long, hide = true)]
+        yes: bool,
     },
     #[command(
         name = "func2tolk",
-        about = "Convert FunC files to Tolk via @ton/convert-func-to-tolk",
+        about = "Convert FunC sources into Tolk code",
         after_help = detailed_help_pointer("func2tolk")
     )]
     Func2Tolk {
@@ -909,12 +1086,12 @@ enum Commands {
         version: String,
     },
     #[command(
-        about = "Inspect resolved project environment",
+        about = "Inspect the resolved project setup",
         after_help = detailed_help_pointer("doctor")
     )]
     Doctor,
     #[command(
-        about = "Generate shell completions for selected shell",
+        about = "Generate shell completion scripts",
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
@@ -972,7 +1149,10 @@ pub enum LocalnetCommand {
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
-        #[arg(long, help = "Path to SQLite database for persistent storage")]
+        #[arg(
+            long,
+            help = "Path to SQLite database for persistent storage (default: [localnet].db-path)"
+        )]
         db_path: Option<String>,
         #[arg(
             long,
@@ -981,6 +1161,30 @@ pub enum LocalnetCommand {
             help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
+        #[arg(
+            long,
+            value_name = "MS",
+            value_parser = clap::value_parser!(u64).range(1..),
+            help = "Delay TonCenter v2/v3 and Emulate API responses, in milliseconds (default: [localnet].response-delay-ms)"
+        )]
+        response_delay_ms: Option<u64>,
+        #[arg(
+            long,
+            value_name = "MS",
+            value_parser = clap::value_parser!(u64).range(1..),
+            help = "Localnet block production interval, in milliseconds (default: [localnet].block-interval-ms or 500)"
+        )]
+        block_interval_ms: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable automatic block production; mine blocks manually with `acton localnet mine` (default: [localnet].no-mining)"
+        )]
+        no_mining: bool,
+        #[arg(
+            long,
+            help = "Mine blocks even when no messages are pending (default: [localnet].mine-empty-blocks or false)"
+        )]
+        mine_empty_blocks: bool,
         #[arg(
             long,
             help = "Load Localnet state from JSON snapshot before startup",
@@ -994,12 +1198,36 @@ pub enum LocalnetCommand {
             value_name = "PATH"
         )]
         dump_state: Option<String>,
+        #[arg(
+            long,
+            help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
+        )]
+        require_auth: bool,
+        #[arg(
+            long,
+            help = "Start the LiteAPI server (default port: Localnet HTTP port + 1)"
+        )]
+        liteapi: bool,
+        #[arg(
+            long,
+            requires = "liteapi",
+            value_name = "PORT",
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "LiteAPI server port (default: Localnet HTTP port + 1)"
+        )]
+        liteapi_port: Option<u16>,
     },
-    #[command(about = "Request TON from faucet")]
+    #[command(about = "Request GRAM from faucet")]
     Airdrop {
-        #[arg(help = "Address to receive TON")]
+        #[arg(help = "Address to receive funds")]
         address: String,
-        #[arg(long, short, help = "Amount of TON to request", default_value = "100")]
+        #[arg(
+            long,
+            short,
+            help = "Amount of GRAM to request",
+            default_value = "100",
+            value_parser = parse_positive_gram_amount
+        )]
         amount: f64,
         #[arg(
             long,
@@ -1007,6 +1235,256 @@ pub enum LocalnetCommand {
             help = "Localnet server port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Mine localnet blocks manually")]
+    Mine {
+        #[arg(
+            help = "Number of blocks to mine",
+            default_value_t = 1,
+            value_name = "N",
+            value_parser = clap::value_parser!(u32).range(1..)
+        )]
+        blocks: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Increase localnet virtual time")]
+    IncreaseTime {
+        #[arg(
+            help = "Seconds to add to localnet virtual time",
+            value_name = "SECONDS",
+            value_parser = clap::value_parser!(u64).range(1..)
+        )]
+        seconds: u64,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Set localnet virtual unix time")]
+    SetTime {
+        #[arg(help = "Unix timestamp in seconds", value_name = "TIMESTAMP")]
+        timestamp: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Set timestamp for the next localnet block")]
+    SetNextBlockTimestamp {
+        #[arg(
+            help = "Unix timestamp in seconds for the next mined block",
+            value_name = "TIMESTAMP"
+        )]
+        timestamp: u32,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Inspect localnet status")]
+    Status {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Print machine-readable JSON")]
+        json: bool,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Dump or load the current localnet state")]
+    State {
+        #[command(subcommand)]
+        command: LocalnetStateCommand,
+    },
+    #[command(about = "Manage named in-memory localnet checkpoints")]
+    Checkpoint {
+        #[command(subcommand)]
+        command: LocalnetCheckpointCommand,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum StudioCommand {
+    #[command(about = "Start Acton Studio")]
+    Start {
+        #[arg(
+            long,
+            value_name = "IP",
+            default_value = "127.0.0.1",
+            help = "Address for the Studio server to listen on"
+        )]
+        host: IpAddr,
+        #[arg(
+            long,
+            value_name = "PORT",
+            default_value_t = DEFAULT_STUDIO_PORT,
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "Studio server port"
+        )]
+        port: u16,
+        #[arg(long, help = "Do not open Studio in the default browser")]
+        no_open: bool,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LocalnetStateCommand {
+    #[command(about = "Dump the current localnet state to a JSON file")]
+    Dump {
+        #[arg(help = "Output JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(long, help = "Overwrite the output file if it already exists")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Replace the current localnet state from a JSON file")]
+    Load {
+        #[arg(help = "State JSON file", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LocalnetCheckpointCommand {
+    #[command(about = "Create a named in-memory checkpoint")]
+    Create {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "List in-memory checkpoints")]
+    List {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Restore localnet state from a checkpoint")]
+    Restore {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Delete an in-memory checkpoint")]
+    Delete {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Delete all in-memory checkpoints")]
+    Clear {
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Export a checkpoint to a JSON file")]
+    Export {
+        #[arg(help = "Checkpoint name", value_name = "NAME")]
+        name: String,
+        #[arg(long, help = "Output JSON file", value_name = "PATH")]
+        out: PathBuf,
+        #[arg(long, help = "Overwrite the output file if it already exists")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Import a JSON file as an in-memory checkpoint")]
+    Import {
+        #[arg(help = "Checkpoint JSON file to import", value_name = "PATH")]
+        path: PathBuf,
+        #[arg(
+            long,
+            help = "Checkpoint name (defaults to the file stem)",
+            value_name = "NAME"
+        )]
+        name: Option<String>,
+        #[arg(long, help = "Overwrite an existing checkpoint with the same name")]
+        force: bool,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
     },
 }
 
@@ -1027,13 +1505,35 @@ pub enum LibraryCommand {
         wallet: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
         net: String,
-        #[arg(long, help = "Amount of TON to send for publication")]
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the publication transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
+        #[arg(long, help = "Amount of GRAM to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
-        #[arg(long, help = "Save library info to local libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to local libraries.toml",
+            conflicts_with = "global"
+        )]
         local: bool,
-        #[arg(long, help = "Save library info to global.libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to global.libraries.toml",
+            conflicts_with = "local"
+        )]
         global: bool,
     },
     #[command(about = "Fetch a library from the blockchain")]
@@ -1071,7 +1571,21 @@ pub enum LibraryCommand {
         wallet: Option<String>,
         #[arg(
             long,
-            help = "Amount of TON to send (overrides duration-based calculation)"
+            help = "Use TON Connect wallet approval for the top-up transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
+        #[arg(
+            long,
+            help = "Amount of GRAM to send (overrides duration-based calculation)"
         )]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -1081,6 +1595,15 @@ pub enum LibraryCommand {
 
 #[derive(Subcommand, Clone)]
 pub enum DocCommand {
+    #[command(about = "Print compiler ABI for a contract name or verifier code hash")]
+    Abi {
+        #[arg(
+            value_name = "CONTRACT_OR_CODE_HASH",
+            help = "Local or bundled contract name, local contract id, or verifier code hash",
+            add = ArgValueCompleter::new(complete_contracts)
+        )]
+        contract: String,
+    },
     #[command(about = "Lookup an instruction in the TVM specification")]
     Tvm {
         #[arg(
@@ -1212,13 +1735,30 @@ fn detailed_help_pointer(command: &str) -> StyledStr {
     use std::fmt::Write as _;
 
     let mut writer = StyledStr::new();
-    let styles = Styles::styled();
+    let styles = acton_help_styles();
     let literal = styles.get_literal();
     let _ = write!(
         writer,
         "Run '{literal}acton help {command}{literal:#}' for more detailed information."
     );
     writer
+}
+
+const fn acton_help_styles() -> Styles {
+    let header = Style::new().bold();
+    let usage = Style::new().bold();
+    let literal = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        .bold();
+    let placeholder = Style::new().dimmed();
+
+    Styles::styled()
+        .header(header)
+        .usage(usage)
+        .literal(literal)
+        .placeholder(placeholder)
+        .context(placeholder)
+        .context_value(placeholder)
 }
 
 fn root_help(show_global_options: bool) -> StyledStr {
@@ -1258,7 +1798,8 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("localnet", "<COMMAND>"),
+        // ("localnet", "<COMMAND>"),
+        // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -1266,10 +1807,10 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("compile", "<PATH>"),
         ("wrapper", "<CONTRACT_NAME>"),
         ("disasm", "[BOC_FILE]"),
-        ("doc", "tvm <QUERY...>"),
+        ("doc", "<COMMAND>"),
     ];
     let support_commands = vec![
-        ("ls", ""),
+        // ("ls", ""),
         ("up", ""),
         ("help", "[COMMAND]"),
         ("hooks", "<COMMAND>"),
@@ -1419,14 +1960,17 @@ fn root_help(show_global_options: bool) -> StyledStr {
 }
 
 fn base_cli_command() -> clap::Command {
-    Cli::command().disable_version_flag(true).arg(
-        clap::Arg::new("version")
-            .short('v')
-            .short_alias('V')
-            .long("version")
-            .action(clap::ArgAction::Version)
-            .help("Print version"),
-    )
+    Cli::command()
+        .styles(acton_help_styles())
+        .disable_version_flag(true)
+        .arg(
+            clap::Arg::new("version")
+                .short('v')
+                .short_alias('V')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print version"),
+        )
 }
 
 fn cli_command(show_global_options: bool) -> clap::Command {
@@ -1472,9 +2016,10 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
                 .filter(|(_, score)| *score >= 0.80)
                 .max_by(|left, right| left.1.total_cmp(&right.1))
             {
-                message.push_str(&format!(
+                let _ = write!(
+                    message,
                     "\n\nhelp: a command with a similar name exists: `{suggestion}`"
-                ));
+                );
             }
             message.push_str("\n\nhelp: view all commands with `acton --help`");
 
@@ -1566,6 +2111,13 @@ fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<Resolve
                 resolved_project_root.display()
             );
         }
+        let resolved_project_root =
+            dunce::canonicalize(&resolved_project_root).map_err(|error| {
+                anyhow::anyhow!(
+                    "Failed to resolve project root {}: {error}",
+                    resolved_project_root.display()
+                )
+            })?;
 
         return Ok(ResolvedProjectRoot {
             path: resolved_project_root,
@@ -1601,6 +2153,34 @@ fn configure_project_roots(
     Ok(())
 }
 
+fn load_project_dotenv(project_roots_configured: bool) {
+    if project_roots_configured {
+        let project_dotenv = configured_project_root().join(".env");
+        if configured_manifest_path().is_file() && project_dotenv.is_file() {
+            from_path(project_dotenv).ok();
+            return;
+        }
+    }
+
+    dotenv().ok();
+}
+
+fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
+    if !project_roots_configured
+        || matches!(command, Commands::Studio { .. })
+        || !configured_manifest_path().is_file()
+    {
+        return;
+    }
+    let Ok(config) = ActonConfig::load_manifest() else {
+        return;
+    };
+    let _ = acton::studio_discovery::activate_studio_public_network_gateways(
+        configured_project_root(),
+        &config.package.name,
+    );
+}
+
 fn main() {
     CompleteEnv::with_factory(completion_command).complete();
 
@@ -1616,7 +2196,6 @@ fn main() {
         err
     }).ok();
 
-    dotenv().ok();
     let Cli {
         color,
         manifest_path,
@@ -1628,45 +2207,43 @@ fn main() {
     };
     init_color_mode(color);
 
-    if !matches!(
-        command,
-        Commands::Init { .. }
-            | Commands::New { .. }
-            | Commands::Help { .. }
-            | Commands::Rpc { .. }
-            | Commands::Meta { .. }
-            | Commands::Lint { .. }
-    ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
-    {
+    let rpc_project_override = matches!(command, Commands::Rpc { .. })
+        && (manifest_path.is_some() || project_root.is_some());
+    let configure_roots = command_configures_project_roots(&command) || rpc_project_override;
+    if configure_roots && let Err(err) = configure_project_roots(manifest_path, project_root) {
         eprintln!("{} {}", "Error:".red(), err);
+        process::exit(1);
+    }
+
+    load_project_dotenv(configure_roots);
+
+    if configure_roots
+        && (command_checks_toolchain_version(&command) || rpc_project_override)
+        && let Err(err) = validate_project_toolchain_version()
+    {
+        print_error(&err);
         process::exit(1);
     }
 
     if !matches!(
         command,
         Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
-    ) && let Err(err) = setup_logging()
+    ) && let Err(_) = setup_logging()
     {
-        eprintln!(
-            "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
-            "Warning:".yellow()
-        );
+        // previously we print error here, but it is too annoying for LLM agents
+        // we need some better way
     }
 
+    configure_studio_public_network_routing(&command, configure_roots);
+
     let result = match command {
-        Commands::Init { create_app } => init_cmd(create_app.as_deref()),
+        Commands::Init {
+            create_dapp,
+            stdlib_only,
+        } => init_cmd(create_dapp.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
-        Commands::Rpc { command } => {
-            if manifest_path.is_some() || project_root.is_some() {
-                match configure_project_roots(manifest_path, project_root) {
-                    Ok(()) => rpc_cmd(command),
-                    Err(err) => Err(err),
-                }
-            } else {
-                rpc_cmd(command)
-            }
-        }
+        Commands::Rpc { command } => rpc_cmd(command),
         Commands::New {
             path,
             name,
@@ -1676,6 +2253,7 @@ fn main() {
             app,
             hooks,
             agents,
+            overwrite,
             templates,
         } => new_cmd(
             path.as_deref(),
@@ -1686,10 +2264,11 @@ fn main() {
             app,
             hooks,
             agents,
+            overwrite,
             templates,
         ),
         Commands::Test {
-            path,
+            paths,
             filter,
             reporter,
             show_bodies,
@@ -1697,6 +2276,7 @@ fn main() {
             debug,
             debug_port,
             backtrace,
+            no_capture,
             coverage,
             coverage_format,
             coverage_file,
@@ -1708,9 +2288,13 @@ fn main() {
             clear_cache,
             junit_path,
             junit_merge,
+            no_studio_reporting,
             snapshot,
             baseline_snapshot,
             fail_on_diff,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             save_test_trace,
             mutate,
@@ -1728,6 +2312,7 @@ fn main() {
             fail_fast,
             fuzz_seed,
             fork_block_number,
+            no_fork_cache,
             ui,
             ui_port,
         } => match (
@@ -1735,13 +2320,14 @@ fn main() {
             commands::common::validate_cli_verbosity(verbose),
         ) {
             (Ok(fork_net), Ok(verbose)) => {
-                let config = create_test_config(
+                match create_test_config(
                     filter,
                     show_bodies,
                     verbose,
                     debug,
                     debug_port,
                     backtrace,
+                    no_capture,
                     coverage,
                     coverage_format,
                     coverage_file,
@@ -1756,16 +2342,18 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    gas_profile,
+                    gas_profile_format,
+                    if gas_profile_include_tests {
+                        Some(true)
+                    } else {
+                        None
+                    },
                     fail_on_diff,
                     fork_net,
                     fork_block_number,
-                    save_test_trace.or_else(|| {
-                        if ui {
-                            Some(paths::DEFAULT_BUILD_TRACES_DIR.to_owned())
-                        } else {
-                            None
-                        }
-                    }),
+                    !no_fork_cache,
+                    save_test_trace,
                     mutate,
                     mutate_overrides,
                     mutate_contract,
@@ -1779,15 +2367,19 @@ fn main() {
                     mutation_minimum_percent,
                     mutation_disable_rules,
                     fuzz_seed,
-                    Some(fail_fast),
+                    fail_fast,
+                    no_studio_reporting,
                     ui,
                     ui_port,
-                );
-
-                if mutate {
-                    mutation::test_mutate_cmd(&path, &config)
-                } else {
-                    test_cmd(path, &config)
+                ) {
+                    Ok(config) => {
+                        if mutate {
+                            mutation::test_mutate_cmd(&paths, &config)
+                        } else {
+                            test_cmd(paths, &config)
+                        }
+                    }
+                    Err(err) => Err(err),
                 }
             }
             (Err(err), _) | (_, Err(err)) => Err(err),
@@ -1804,6 +2396,7 @@ fn main() {
         } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
         Commands::Wrapper {
             contract_id,
+            all,
             output: wrapper_output,
             output_dir: wrapper_output_dir,
             test_output,
@@ -1811,7 +2404,8 @@ fn main() {
             test,
             ts,
         } => wrapper_cmd(
-            &contract_id,
+            contract_id.as_deref(),
+            all,
             wrapper_output,
             wrapper_output_dir,
             test_output,
@@ -1829,7 +2423,10 @@ fn main() {
             clear_cache,
             fork_net,
             fork_block_number,
+            no_fork_cache,
             net,
+            tonconnect,
+            tonconnect_port,
             explorer,
             show_bodies,
         } => match commands::common::validate_cli_verbosity(verbose) {
@@ -1843,9 +2440,12 @@ fn main() {
                 clear_cache,
                 fork_net,
                 fork_block_number,
+                !no_fork_cache,
                 net,
                 explorer,
                 show_bodies,
+                tonconnect,
+                tonconnect_port,
             ),
             Err(err) => Err(err),
         },
@@ -1855,17 +2455,22 @@ fn main() {
             graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
+            output_sources,
             info,
-        } => build_cmd(
+        } => build_cmd(BuildCommandOptions {
             contract_id,
             clear_cache,
-            graph,
+            graph_output: graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
-            info,
-        ),
+            output_sources,
+            show_info: info,
+            quiet_no_contracts: false,
+        }),
         Commands::Compile {
             path,
             json,
@@ -1898,6 +2503,7 @@ fn main() {
                         }))
                         .expect("JSON serialization should not fail")
                     );
+                    process::exit(1);
                 }
                 return;
             }
@@ -1945,7 +2551,20 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
-        } => verify_cmd(contract_id, address, net, wallet, compiler_version, dry_run),
+            tonconnect,
+            tonconnect_port,
+            new_verifier,
+        } => verify_cmd(
+            contract_id,
+            address,
+            net,
+            wallet,
+            compiler_version,
+            dry_run,
+            new_verifier,
+            tonconnect,
+            tonconnect_port,
+        ),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
                 contract_id,
@@ -1953,6 +2572,8 @@ fn main() {
                 duration,
                 wallet,
                 net,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -1963,6 +2584,8 @@ fn main() {
                 duration,
                 wallet,
                 net,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -1987,9 +2610,19 @@ fn main() {
                 name,
                 duration,
                 wallet,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
-            } => commands::library::topup_cmd(name, duration, wallet, amount, yes),
+            } => commands::library::topup_cmd(
+                name,
+                duration,
+                wallet,
+                tonconnect,
+                tonconnect_port,
+                amount,
+                yes,
+            ),
         },
         Commands::Check {
             fix,
@@ -2016,6 +2649,7 @@ fn main() {
             force,
             list,
             check,
+            yes: _,
         } => {
             let result = up_cmd(version, trunk, stable, force, list, check);
             if check {
@@ -2024,8 +2658,15 @@ fn main() {
             }
             result
         }
-        Commands::Fmt { paths, check } => fmt_cmd(paths, check),
+        Commands::Fmt {
+            paths,
+            check,
+            stdin,
+            stdin_filepath,
+            range,
+        } => fmt_cmd(paths, check, stdin, stdin_filepath, range),
         Commands::Doc { command } => match command {
+            DocCommand::Abi { contract } => doc_abi_cmd(&contract),
             DocCommand::Tvm {
                 instruction,
                 find,
@@ -2065,20 +2706,48 @@ fn main() {
         Commands::Meta { command } => match command {
             MetaCommand::GetSchema { schema } => print_schema_cmd(schema),
         },
-        Commands::Docgen { output, check } => docgen_cmd(output, check),
+        Commands::Docgen { output, check } => {
+            let mut cli_command = base_cli_command();
+            cli_command.build();
+            docgen_cmd(output, check, &cli_command)
+        }
         Commands::Ls {
             port,
             stdio,
             log_file,
+            log_level,
+            stdlib_path,
             no_log,
+            profile,
         } => {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("Failed to initialize tokio runtime for language server");
-            rt.block_on(ls_cmd(port, stdio, log_file, no_log))
+            rt.block_on(ls_cmd(
+                port,
+                stdio,
+                log_file,
+                no_log,
+                log_level,
+                stdlib_path,
+                profile,
+            ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Studio { command } => match command {
+            StudioCommand::Start {
+                host,
+                port,
+                no_open,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to initialize tokio runtime for Studio");
+                rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
+            }
+        },
         Commands::Localnet { command } => match command {
             LocalnetCommand::Start {
                 port,
@@ -2087,15 +2756,27 @@ fn main() {
                 accounts,
                 db_path,
                 rate_limit,
+                response_delay_ms,
+                block_interval_ms,
+                no_mining,
+                mine_empty_blocks,
                 load_state,
                 dump_state,
+                require_auth,
+                liteapi,
+                liteapi_port,
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
+                    db_path,
                     fork_net,
                     fork_block_number,
                     accounts,
                     rate_limit,
+                    response_delay_ms,
+                    block_interval_ms,
+                    no_mining,
+                    mine_empty_blocks,
                 );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -2104,13 +2785,20 @@ fn main() {
                 rt.block_on(async {
                     commands::localnet::localnet_start_cmd(
                         resolved_localnet.port,
-                        db_path,
+                        resolved_localnet.db_path,
                         resolved_localnet.fork_net,
                         resolved_localnet.fork_block_number,
                         resolved_localnet.accounts,
                         resolved_localnet.rate_limit,
+                        resolved_localnet.response_delay_ms,
+                        resolved_localnet.block_interval_ms,
+                        resolved_localnet.no_mining,
+                        resolved_localnet.mine_empty_blocks,
                         load_state,
                         dump_state,
+                        require_auth,
+                        liteapi,
+                        liteapi_port,
                     )
                     .await
                 })
@@ -2119,6 +2807,7 @@ fn main() {
                 address,
                 amount,
                 port,
+                auth_token,
             } => {
                 let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
@@ -2126,8 +2815,206 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::localnet::localnet_airdrop_cmd(&address, amount, port).await
+                    commands::localnet::localnet_airdrop_cmd(&address, amount, port, auth_token)
+                        .await
                 })
+            }
+            LocalnetCommand::Mine {
+                blocks,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_mine_cmd(blocks, port, auth_token).await
+                })
+            }
+            LocalnetCommand::IncreaseTime {
+                seconds,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_increase_time_cmd(seconds, port, auth_token).await
+                })
+            }
+            LocalnetCommand::SetTime {
+                timestamp,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_set_time_cmd(timestamp, port, auth_token).await
+                })
+            }
+            LocalnetCommand::SetNextBlockTimestamp {
+                timestamp,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_set_next_block_timestamp_cmd(
+                        timestamp, port, auth_token,
+                    )
+                    .await
+                })
+            }
+            LocalnetCommand::Status {
+                port,
+                json,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_status_cmd(port, json, auth_token).await
+                })
+            }
+            LocalnetCommand::State { command } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                match command {
+                    LocalnetStateCommand::Dump {
+                        path,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_dump_cmd(
+                                path, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetStateCommand::Load {
+                        path,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_state_load_cmd(path, port, auth_token)
+                                .await
+                        })
+                    }
+                }
+            }
+            LocalnetCommand::Checkpoint { command } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                match command {
+                    LocalnetCheckpointCommand::Create {
+                        name,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_create_cmd(
+                                &name, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::List { port, auth_token } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_list_cmd(port, auth_token).await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Restore {
+                        name,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_restore_cmd(
+                                &name, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Delete {
+                        name,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_delete_cmd(
+                                &name, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Clear { port, auth_token } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_clear_cmd(port, auth_token)
+                                .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Export {
+                        name,
+                        out,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_export_cmd(
+                                &name, out, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                    LocalnetCheckpointCommand::Import {
+                        path,
+                        name,
+                        force,
+                        port,
+                        auth_token,
+                    } => {
+                        let port = resolve_localnet_port(port);
+                        rt.block_on(async {
+                            commands::localnet::localnet_checkpoint_import_cmd(
+                                path, name, force, port, auth_token,
+                            )
+                            .await
+                        })
+                    }
+                }
             }
         },
     };
@@ -2136,6 +3023,76 @@ fn main() {
         print_error(&err);
         process::exit(1)
     }
+}
+
+const fn command_configures_project_roots(command: &Commands) -> bool {
+    !matches!(
+        command,
+        Commands::Init { .. }
+            | Commands::New { .. }
+            | Commands::Help { .. }
+            | Commands::Rpc { .. }
+            | Commands::Meta { .. }
+            | Commands::Lint { .. }
+    )
+}
+
+const fn command_checks_toolchain_version(command: &Commands) -> bool {
+    command_configures_project_roots(command)
+        && !matches!(
+            command,
+            Commands::Up { .. }
+                | Commands::Completions { .. }
+                | Commands::Doctor
+                | Commands::Studio { .. }
+        )
+}
+
+fn validate_project_toolchain_version() -> anyhow::Result<()> {
+    if !configured_manifest_path().exists() {
+        return Ok(());
+    }
+
+    let config = ActonConfig::load_manifest()?;
+    let Some(expected) = config
+        .toolchain
+        .as_ref()
+        .and_then(|toolchain| toolchain.acton.as_deref())
+    else {
+        return Ok(());
+    };
+
+    let expected = expected.trim();
+    if expected.is_empty() {
+        anyhow::bail!(
+            "Acton.toml has empty [toolchain].acton.\n\nSet it to the required Acton CLI version, for example:\n\n[toolchain]\nacton = \"{}\"",
+            acton::build_info::PACKAGE_VERSION
+        );
+    }
+
+    let installed = acton::build_info::SHORT_VERSION;
+    if toolchain_acton_version_matches(expected, installed) {
+        return Ok(());
+    }
+
+    let suggested_config_acton = if acton::build_info::is_trunk_build() {
+        "trunk"
+    } else {
+        installed
+    };
+
+    anyhow::bail!(
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update Acton.toml if this project supports the installed Acton CLI:\n\n[toolchain]\nacton = \"{suggested_config_acton}\""
+    );
+}
+
+fn toolchain_acton_version_matches(expected: &str, installed: &str) -> bool {
+    if expected == installed {
+        return true;
+    }
+
+    acton::build_info::is_trunk_build()
+        && (expected == acton::build_info::PACKAGE_VERSION || expected == "trunk")
 }
 
 fn print_error(err: &anyhow::Error) {
@@ -2161,31 +3118,72 @@ fn lint_command_error(args: &[String]) -> anyhow::Error {
 
 struct ResolvedLocalnetSettings {
     port: u16,
+    db_path: Option<String>,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
     rate_limit: Option<u32>,
+    response_delay_ms: Option<u64>,
+    block_interval_ms: u64,
+    no_mining: bool,
+    mine_empty_blocks: bool,
 }
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
-    resolve_localnet_settings(cli_port, None, None, None, None).port
+    resolve_localnet_settings(
+        cli_port, None, None, None, None, None, None, None, false, false,
+    )
+    .port
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_localnet_settings(
     cli_port: Option<u16>,
+    cli_db_path: Option<String>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
+    cli_response_delay_ms: Option<u64>,
+    cli_block_interval_ms: Option<u64>,
+    cli_no_mining: bool,
+    cli_mine_empty_blocks: bool,
 ) -> ResolvedLocalnetSettings {
     let config = load_localnet_settings_from_config();
     ResolvedLocalnetSettings {
         port: cli_port.or(config.port).unwrap_or(5411),
+        db_path: resolve_localnet_db_path(cli_db_path, config.db_path),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
         rate_limit: cli_rate_limit.or(config.rate_limit),
+        response_delay_ms: cli_response_delay_ms.or(config.response_delay_ms),
+        block_interval_ms: cli_block_interval_ms
+            .or(config.block_interval_ms)
+            .unwrap_or(ton_localnet::DEFAULT_BLOCK_INTERVAL_MS),
+        no_mining: cli_no_mining || config.no_mining.unwrap_or(false),
+        mine_empty_blocks: cli_mine_empty_blocks || config.mine_empty_blocks.unwrap_or(false),
     }
+}
+
+fn resolve_localnet_db_path(
+    cli_db_path: Option<String>,
+    config_db_path: Option<String>,
+) -> Option<String> {
+    if cli_db_path.is_some() {
+        return cli_db_path;
+    }
+
+    config_db_path
+        .map(|path| {
+            let path = PathBuf::from(path);
+            if path.is_absolute() {
+                path
+            } else {
+                configured_project_root().join(path)
+            }
+        })
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn load_localnet_settings_from_config() -> LocalnetSettings {
@@ -2207,7 +3205,23 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
+fn parse_positive_gram_amount(value: &str) -> Result<f64, String> {
+    let amount = value
+        .parse::<f64>()
+        .map_err(|err| format!("invalid GRAM amount '{value}': {err}"))?;
+
+    if !amount.is_finite() {
+        return Err(format!("GRAM amount must be finite, got '{value}'"));
+    }
+
+    if amount <= 0.0 {
+        return Err(format!("GRAM amount must be greater than 0, got '{value}'"));
+    }
+
+    Ok(amount)
+}
+
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -2220,7 +3234,7 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
 
         let content = fs::read_to_string(&path)
             .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+        let result = serde_json::from_str::<SourceMap>(content.as_str()).map_err(|err| {
             anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
         })?;
         Some(Box::new(result))
@@ -2306,6 +3320,7 @@ fn create_test_config(
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
+    no_capture: bool,
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
@@ -2314,15 +3329,19 @@ fn create_test_config(
     coverage_include_tests: bool,
     exclude: Vec<String>,
     include: Vec<String>,
-    clear_cache: bool,
+    clear_cache: Option<bool>,
     report_formats: Vec<ReportFormat>,
     junit_path: Option<String>,
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    gas_profile: Option<String>,
+    gas_profile_format: Option<GasProfileFormat>,
+    gas_profile_include_tests: Option<bool>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     save_test_trace: Option<String>,
     mutate: bool,
     mutate_overrides: Option<String>,
@@ -2338,14 +3357,17 @@ fn create_test_config(
     disable_rules: Vec<String>,
     fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
+    no_studio_reporting: bool,
     ui: bool,
-    ui_port: u16,
-) -> TestConfig {
+    ui_port: Option<u16>,
+) -> anyhow::Result<TestConfig> {
     let acton_config = ActonConfig::load();
 
-    if let Ok(acton_config) = acton_config
+    if let Ok(acton_config) = &acton_config
         && let Some(test_settings) = &acton_config.test
     {
+        validate_test_settings(test_settings)?;
+
         let mut config = test_settings.to_test_config(
             filter,
             report_formats,
@@ -2377,13 +3399,17 @@ fn create_test_config(
             } else {
                 Some(include)
             },
-            None,
+            clear_cache,
             junit_path,
             junit_merge,
             snapshot,
             baseline_snapshot,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             fork_block_number,
+            fork_cache_enabled,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -2397,24 +3423,31 @@ fn create_test_config(
             if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
-            Some(ui_port),
+            ui_port,
         );
         config.verbosity = verbosity;
+        config.no_capture = no_capture;
         config.mutation_ids = mutation_ids;
         if mutation_rules_file.is_some() {
             config.mutation_rules_file = mutation_rules_file;
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
-        return config;
+        if no_studio_reporting {
+            config.studio_reporting = false;
+        }
+        apply_ui_trace_default(&mut config);
+        validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
+        return Ok(config);
     }
 
-    TestConfig {
+    let mut config = TestConfig {
         show_bodies,
         verbosity,
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
+        no_capture,
         coverage,
         coverage_minimum_percent,
         coverage_include_wrappers,
@@ -2424,14 +3457,18 @@ fn create_test_config(
         coverage_file,
         exclude_patterns: exclude,
         include_patterns: include,
-        clear_cache,
+        clear_cache: clear_cache.unwrap_or(false),
         report_formats,
         junit_path,
         junit_merge,
         snapshot,
         baseline_snapshot,
+        gas_profile,
+        gas_profile_format: gas_profile_format.unwrap_or_default(),
+        gas_profile_include_tests: gas_profile_include_tests.unwrap_or(false),
         fail_on_diff,
         fork_block_number,
+        fork_cache_enabled,
         save_test_trace,
         mutate,
         mutate_overrides,
@@ -2449,10 +3486,96 @@ fn create_test_config(
         fuzz_max_test_rejects: None,
         fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
+        studio_reporting: !no_studio_reporting,
         ui,
-        ui_port,
+        ui_port: ui_port.unwrap_or(12344),
         fork_net,
+    };
+    apply_ui_trace_default(&mut config);
+
+    validate_merged_test_fork_network(acton_config.as_ref().ok(), config.fork_net.as_ref())?;
+
+    Ok(config)
+}
+
+fn apply_ui_trace_default(config: &mut TestConfig) {
+    if config.ui && config.save_test_trace.is_none() {
+        config.save_test_trace = Some(paths::DEFAULT_BUILD_TRACES_DIR.to_owned());
     }
+}
+
+fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
+    if let Some(fork_net) = test_settings.fork_net.as_deref() {
+        Network::from_str(fork_net)
+            .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
+    }
+
+    if let Some(format) = test_settings.gas_profile_format.as_deref()
+        && !matches!(format.to_lowercase().as_str(), "cpuprofile" | "collapsed")
+    {
+        anyhow::bail!(
+            "Invalid [test].gas-profile-format '{format}': expected 'cpuprofile' or 'collapsed'"
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_merged_test_fork_network(
+    acton_config: Option<&ActonConfig>,
+    fork_net: Option<&Network>,
+) -> anyhow::Result<()> {
+    let Some(fork_net) = fork_net else {
+        return Ok(());
+    };
+
+    let Some(acton_config) = acton_config else {
+        if let Network::Custom(name) = fork_net {
+            anyhow::bail!(
+                "Custom test fork network 'custom:{name}' requires Acton.toml with [networks.{name}.api].v2"
+            );
+        }
+        return Ok(());
+    };
+
+    if let Network::Custom(name) = fork_net {
+        validate_custom_test_network(acton_config, name)?;
+    }
+
+    let custom_networks = acton_config.custom_networks();
+    let v2_url = fork_net
+        .toncenter_v2_url(&custom_networks)
+        .map_err(|err| anyhow::anyhow!("Invalid test fork network '{fork_net}': {err}"))?;
+    reqwest::Url::parse(&v2_url).map_err(|err| {
+        anyhow::anyhow!("Invalid TonCenter v2 URL for test fork network '{fork_net}': {err}")
+    })?;
+
+    Ok(())
+}
+
+fn validate_custom_test_network(acton_config: &ActonConfig, name: &str) -> anyhow::Result<()> {
+    let network = acton_config
+        .networks
+        .as_ref()
+        .and_then(|networks| networks.get(name))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unknown custom test fork network 'custom:{name}'. Define [networks.{name}.api].v2 in Acton.toml."
+            )
+        })?;
+
+    let has_v2 = network
+        .api
+        .as_ref()
+        .and_then(|api| api.v2.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if !has_v2 {
+        anyhow::bail!(
+            "Custom test fork network 'custom:{name}' must define [networks.{name}.api].v2 in Acton.toml."
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_coverage_percent(raw: &str) -> Result<f64, String> {
@@ -2497,4 +3620,110 @@ fn parse_minimum_percent(raw: &str, kind: &str, flag: &str) -> Result<f64, Strin
     }
 
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_settings_to_config_with_ui_trace_default(
+        settings: &TestSettings,
+        save_test_trace_override: Option<&str>,
+        ui_override: bool,
+    ) -> TestConfig {
+        let mut config = settings.to_test_config(
+            None,
+            Vec::new(),
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            true,
+            save_test_trace_override.map(str::to_owned),
+            false,
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            None,
+            Vec::new(),
+            None,
+            None,
+            None,
+            ui_override,
+            None,
+        );
+        apply_ui_trace_default(&mut config);
+        config
+    }
+
+    #[test]
+    fn ui_from_test_settings_enables_default_trace_dir() {
+        let settings = TestSettings {
+            ui: Some(true),
+            ..TestSettings::default()
+        };
+
+        let config = test_settings_to_config_with_ui_trace_default(&settings, None, false);
+
+        assert!(config.ui);
+        assert_eq!(
+            config.save_test_trace.as_deref(),
+            Some(paths::DEFAULT_BUILD_TRACES_DIR)
+        );
+    }
+
+    #[test]
+    fn cli_ui_flag_enables_default_trace_dir_without_config_ui() {
+        let config =
+            test_settings_to_config_with_ui_trace_default(&TestSettings::default(), None, true);
+
+        assert!(config.ui);
+        assert_eq!(
+            config.save_test_trace.as_deref(),
+            Some(paths::DEFAULT_BUILD_TRACES_DIR)
+        );
+    }
+
+    #[test]
+    fn explicit_trace_dir_is_preserved_when_ui_is_enabled() {
+        let settings = TestSettings {
+            ui: Some(true),
+            ..TestSettings::default()
+        };
+
+        let config =
+            test_settings_to_config_with_ui_trace_default(&settings, Some("custom-traces"), false);
+
+        assert!(config.ui);
+        assert_eq!(config.save_test_trace.as_deref(), Some("custom-traces"));
+    }
+
+    #[test]
+    fn trace_dir_is_not_enabled_without_ui() {
+        let config =
+            test_settings_to_config_with_ui_trace_default(&TestSettings::default(), None, false);
+
+        assert!(!config.ui);
+        assert_eq!(config.save_test_trace, None);
+    }
 }

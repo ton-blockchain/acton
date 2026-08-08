@@ -2,10 +2,10 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 #[test]
-fn confirm_default_true_with_help_message_ignores_empty_input_bug() {
-    let project = ProjectBuilder::new("aq-stdlib-confirm-empty-input-default-bug")
+fn confirm_default_true_with_help_message_uses_default_in_non_interactive_mode() {
+    let project = ProjectBuilder::new("aq-stdlib-confirm-empty-input-default")
         .test_file(
-            "confirm_empty_input_bug",
+            "confirm_empty_input_default",
             r#"
             import "../../lib/prompts"
             import "../../lib/testing/expect"
@@ -14,7 +14,7 @@ fn confirm_default_true_with_help_message_ignores_empty_input_bug() {
                 expect(confirm("Abort deployment?", false, "Press enter to keep false.")).toEqual(false);
 
                 val accepted = confirm("Proceed with deployment?", true, "Press enter to accept default.");
-                expect(accepted).toEqual(false);
+                expect(accepted).toEqual(true);
             }
         "#,
         ).build();
@@ -27,6 +27,6 @@ fn confirm_default_true_with_help_message_ignores_empty_input_bug() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/confirm_default_true_with_help_message_ignores_empty_input_bug/confirm_default_true_with_help_message_ignores_empty_input_bug.stdout.txt",
+            "integration/snapshots/test-runner/confirm_default_true_with_help_message_ignores_empty_input_bug/confirm_default_true_with_help_message_uses_default_in_non_interactive_mode.stdout.txt",
         );
 }

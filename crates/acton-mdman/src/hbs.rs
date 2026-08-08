@@ -59,6 +59,22 @@ impl HelperDef for OptionsHelper<'_> {
         }
         // Prevent nested {{#options}}.
         set_in_context(rc, "__MDMAN_IN_OPTIONS", serde_json::Value::Bool(true));
+        let man_name = man_name_from_context(ctx);
+        let command_path = h
+            .hash_get("command")
+            .map(|value| {
+                value.value().as_str().ok_or_else(|| {
+                    RenderErrorReason::Other("options command hash must be a string".to_string())
+                })
+            })
+            .transpose()?
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| default_command_path(man_name));
+        set_in_context(
+            rc,
+            "__MDMAN_COMMAND_PATH",
+            serde_json::Value::String(command_path),
+        );
         let s = self.formatter.render_options_start();
         out.write(&s)?;
         let t = match h.template() {
@@ -75,6 +91,7 @@ impl HelperDef for OptionsHelper<'_> {
 
         let s = self.formatter.render_options_end();
         out.write(&s)?;
+        remove_from_context(rc, "__MDMAN_COMMAND_PATH");
         remove_from_context(rc, "__MDMAN_IN_OPTIONS");
         Ok(())
     }
@@ -146,11 +163,28 @@ impl HelperDef for OptionHelper<'_> {
             .expect("expected man_name in context")
             .as_str()
             .expect("expect man_name str");
+        let command_path = rc
+            .context()
+            .and_then(|ctx| {
+                ctx.data()
+                    .get("__MDMAN_COMMAND_PATH")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned)
+            })
+            .unwrap_or_else(|| default_command_path(man_name));
+        let arg_id = h
+            .hash_get("id")
+            .map(|value| {
+                value.value().as_str().ok_or_else(|| {
+                    RenderErrorReason::Other("option id hash must be a string".to_string())
+                })
+            })
+            .transpose()?;
 
         // Ask the formatter to convert this option to its format.
         let option = self
             .formatter
-            .render_option(&params, &block, man_name)
+            .render_option(&params, &block, man_name, &command_path, arg_id)
             .map_err(|e| RenderErrorReason::Other(format!("option render failed: {}", e)))?;
         out.write(&option)?;
         Ok(())
@@ -192,6 +226,19 @@ impl HelperDef for ManLinkHelper<'_> {
         out.write(&link)?;
         Ok(())
     }
+}
+
+fn man_name_from_context(ctx: &Context) -> &str {
+    ctx.data()
+        .get("man_name")
+        .expect("expected man_name in context")
+        .as_str()
+        .expect("expect man_name str")
+}
+
+fn default_command_path(man_name: &str) -> String {
+    let command = man_name.strip_prefix("acton-").unwrap_or(man_name);
+    format!("acton {}", command.replace('-', " "))
 }
 
 /// `{{*set var=value}}` decorator.

@@ -1,0 +1,1 @@
+Error: Failed to look up the latest release on GitHub. GitHub release API returned invalid JSON

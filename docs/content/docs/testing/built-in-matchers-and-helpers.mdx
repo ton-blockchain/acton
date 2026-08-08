@@ -1,13 +1,13 @@
 ---
-title: "Built-in Matchers and Helpers"
+title: "Built-in matchers and helpers"
 description: "Reference map for transaction predicates, map expectations, and out-action helpers in Acton tests"
 ---
 
 Before writing custom matchers, check the built-in ones first. Acton already ships a useful set of helpers for transaction search, map assertions, and out-action inspection.
 
-## Transaction Search Matchers
+## Transaction search matchers
 
-Use these when you want to find or assert on transactions produced by `net.send(...)`:
+Use these functions to find or assert on transactions from `net.send(...)`:
 
 - `findTransaction()`
 - `toHaveSuccessfulDeploy()`
@@ -25,7 +25,7 @@ expect(res).toHaveTx({
         return addr == deployer.address;
     },
     to: harness.address,
-    value: ton("0.5"),
+    value: grams("0.5"),
     opcode: 0x0000_0001,
 });
 ```
@@ -33,7 +33,7 @@ expect(res).toHaveTx({
 Important matcher semantics:
 
 - `SearchParams` fields accept either exact values or predicate functions.
-- `toHaveSuccessfulTx()` forces `success = true` and defaults `exitCode = 0` unless you override it explicitly.
+- `toHaveSuccessfulTx()` forces `success = true` and defaults `exitCode = 0` unless overridden explicitly.
 - `toHaveFailedTx()` requires a non-zero `exitCode`.
 - Bounced-message opcode matching should be done with `toHaveBouncedTx()` or an explicit `bounced: true` filter.
 - Predicate functions can be useful for custom diagnostics, but runtime errors inside those predicates surface back to the test output.
@@ -44,7 +44,69 @@ Go deeper in:
 - [Transaction matchers](/docs/standard_library/emulation/network#expectationsendresultlisttohavesuccessfultx)
 - [Reading Transaction Chains](/docs/testing/reading-transaction-chains)
 
-## Map Expectations
+## External message matchers
+
+`net.sendExternal(...)` returns an `ExternalSendResult`. When the external-in
+message is accepted, `result.transactions` contains the produced transaction
+trace. When the contract rejects the message before acceptance, the trace is
+`null` and `result.error` contains emulator metadata such as
+`externalNotAccepted`, `message` and `vmExitCode`.
+
+```tolk
+val result = net.sendExternal(msg);
+
+expect(result).toBeAccepted();
+
+val txs = result.unwrap();
+expect(txs).toHaveAllSuccessfulTxs();
+
+val tx = result.at(0);
+result.giveName("external vote");
+```
+
+Available helpers:
+
+- `isAccepted()` returns whether the external-in message produced a trace.
+- `unwrap()` returns the produced `SendResultList` or fails with the same
+  external diagnostics as `toBeAccepted()`.
+- `at(index)` unwraps the trace and returns one `SendResult`.
+- `giveName(name)` names the external trace for the Test UI and gas/fee reports.
+- `waitForFirstTransaction()` waits for the root on-chain transaction, or
+  returns `null` when the external message was not accepted.
+- `waitForTrace()` waits for the full on-chain trace, or returns `null` when the
+  external message was not accepted.
+- `findExternalOutMessage<T>()` searches external-out messages in the accepted
+  trace, or returns `null` for rejected external-in messages.
+
+Available matchers:
+
+- `toBeAccepted()` expects an accepted external-in message and a produced trace.
+- `toBeNotAccepted()` expects rejection before acceptance.
+- `toHaveExternalVmExitCode(exitCode)` checks the VM exit code reported for a
+  rejected external-in message. For accepted messages, use transaction matchers
+  on `result.unwrap()`.
+
+Failed `toBeAccepted()` checks include the external status, emulator reason, VM
+exit code when available, known exit-code description or ABI error name, source
+location, and full backtrace when the test is run with `--backtrace full`.
+
+```tolk
+val result = net.sendExternal(invalidMsg);
+
+expect(result).toBeNotAccepted();
+expect(result).toHaveExternalVmExitCode(10);
+```
+
+Rejected external-in diagnostics include the matcher location and, with
+`--backtrace full`, the contract-side `onExternalMessage` backtrace.
+
+Go deeper in:
+
+- [ExternalSendResult](/docs/standard_library/emulation/network#externalsendresult)
+- [net.sendExternal](/docs/standard_library/emulation/network#netsendexternal)
+- [External message matchers](/docs/standard_library/emulation/network#expectationexternalsendresulttobeaccepted)
+
+## Map expectations
 
 Map helpers are useful for get-method results and in-memory fixtures:
 
@@ -77,9 +139,9 @@ Go deeper in:
 
 - [Map expectations](/docs/standard_library/testing/expect#expectationmapk-vtocontainkey)
 
-## Out-action Helpers
+## Out-action helpers
 
-Use out-action helpers when you need to inspect C5 output, planned sends, or action kinds:
+Use action helpers to inspect C5 output, planned sends, or action kinds:
 
 ```tolk
 val outActions = testing.outActions();
@@ -113,8 +175,6 @@ Go deeper in:
 - [SendResult.allOutActions()](/docs/standard_library/emulation/network#sendresultalloutactions)
 - [out_actions helpers](/docs/standard_library/types/out_actions)
 
-## When To Write Custom Matchers
+## When to write custom matchers
 
-If the built-in helpers still do not match your domain language, extend `Expectation<T>` with a custom matcher.
-
-See [Custom Matchers](/docs/testing/writing-your-own-matchers).
+If the built-in helpers still do not match a domain-specific vocabulary, extend `Expectation<T>` with a [custom matcher](/docs/testing/writing-your-own-matchers).

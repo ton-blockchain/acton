@@ -1,0 +1,12 @@
+*
+
+!apps/
+apps/*
+!apps/faucet/
+apps/faucet/*
+!apps/faucet/Cargo.toml
+!apps/faucet/Cargo.lock
+!apps/faucet/rust-toolchain.toml
+!apps/faucet/build.rs
+!apps/faucet/src/
+!apps/faucet/crates/

@@ -18,7 +18,7 @@ get fun `test out actions`() {
     val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
-        value: ton("1.9999"),
+        value: grams("1.9999"),
         dest,
         body: IncreaseCounter {
             queryId: 0,
@@ -30,8 +30,8 @@ get fun `test out actions`() {
     val new_code = beginCell().storeUint(0xFF, 8).endCell();
     contract.setCodePostponed(new_code);
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(
-        ton("0.005"),
+    reserveGramsOnBalance(
+        grams("0.005"),
         RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
     );
     changeLib(createEmptyCell(), 2);
@@ -50,7 +50,7 @@ get fun `test out actions`() {
         expect(second_action.mode).toEqual(
             RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
         );
-        expect(second_action.currency.grams).toEqual(ton("0.005"));
+        expect(second_action.currency.grams).toEqual(grams("0.005"));
     }
 
     val third_action = out_actions.at(2);
@@ -61,7 +61,7 @@ get fun `test out actions`() {
 
         val message = third_action.loadMessage<IncreaseCounter>();
         if (message.info is TlbIntMsgInfoRelaxed) {
-            expect(message.info.value.grams).toEqual(ton("1.9999"));
+            expect(message.info.value.grams).toEqual(grams("1.9999"));
             expect(message.info.dest).toEqual(dest);
         }
     }
@@ -77,7 +77,7 @@ get fun `test out message out actions helper`() {
     val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest,
         body: IncreaseCounter {
             queryId: 0,
@@ -112,7 +112,7 @@ get fun `test get send message helpers return null for non send action`() {
     val dest = randomAddress("counter");
     val msg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: IncreaseCounter {
             queryId: 0,
@@ -122,8 +122,8 @@ get fun `test get send message helpers return null for non send action`() {
 
     contract.setCodePostponed(beginCell().storeUint(0xEE, 8).endCell());
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(
-        ton("0.005"),
+    reserveGramsOnBalance(
+        grams("0.005"),
         RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL,
     );
     changeLib(createEmptyCell(), 2);

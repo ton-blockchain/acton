@@ -11,7 +11,7 @@
   ✓ ah stdlib register code cell output name [TIME]
     └─ Test output:
        N/A -> ah_register_code_deployer A
-       └── empty 1 TON -> ah_registered_simple_code B                                  gas=253
+       └── empty 1 GRAM -> ah_registered_simple_code B                                 gas=253
            └── account created
 
  ✓ 1 passed in 1 file

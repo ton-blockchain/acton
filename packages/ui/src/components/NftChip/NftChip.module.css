@@ -1,0 +1,45 @@
+.nftChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px var(--acton-space-2) 2px 3px;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-status-passed-surface);
+  color: var(--acton-color-status-passed);
+  font: inherit;
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1.35;
+  text-align: inherit;
+  white-space: nowrap;
+}
+
+.withoutImage {
+  padding-left: var(--acton-space-2);
+}
+
+.clickable {
+  appearance: none;
+  cursor: pointer;
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.image {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: calc(var(--acton-radius-control-sm) - 2px);
+  object-fit: cover;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

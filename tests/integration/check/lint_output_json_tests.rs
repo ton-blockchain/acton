@@ -244,7 +244,7 @@ fn check_lint_json_writes_report_to_output_file_even_when_exit_code_is_non_zero(
 
 #[test]
 #[named]
-fn check_lint_json_fix_does_not_apply_with_non_plain_output() {
+fn check_lint_json_rejects_fix_with_non_plain_output() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("main", UNUSED_VARIABLE_CONTRACT)
         .with_lint_level("unused-variable", "warn")
@@ -262,8 +262,20 @@ fn check_lint_json_fix_does_not_apply_with_non_plain_output() {
         .arg("--output-file")
         .arg(".acton/reports/fixed.json")
         .run()
-        .success()
-        .assert_file_contains(".acton/reports/fixed.json", "\"name\": \"unused-variable\"")
-        .assert_file_contains(".acton/reports/fixed.json", "\"applicability\": \"auto\"")
-        .assert_file_contains("contracts/main.tolk", "val x = 1;");
+        .failure()
+        .assert_stderr_snapshot_matches(&format!(
+            "integration/snapshots/check/lint_output_json_format/{}.stderr.txt",
+            function_name!()
+        ));
+
+    assert!(
+        !project.path().join(".acton/reports/fixed.json").exists(),
+        "report file should not be created when --fix is rejected"
+    );
+    assert!(
+        std::fs::read_to_string(project.path().join("contracts/main.tolk"))
+            .expect("contract source should be readable")
+            .contains("val x = 1;"),
+        "contract source should not be fixed when --fix is rejected"
+    );
 }

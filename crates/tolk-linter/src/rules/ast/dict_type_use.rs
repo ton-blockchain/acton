@@ -17,7 +17,7 @@ use tree_sitter::Node;
 /// ```tolk twoslash
 /// struct State {
 ///     data: dict
-///     //    ^^^^ E033: low-level `dict` type should be replaced with typed `map<K, V>`
+///     //    ^^^^ E027: low-level `dict` type should be replaced with typed `map<K, V>`
 /// }
 /// ```
 ///

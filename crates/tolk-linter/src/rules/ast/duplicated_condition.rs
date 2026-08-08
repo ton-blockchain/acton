@@ -20,7 +20,7 @@ use tolk_syntax::{Expr, If, IfAlt, NodeTraversalExt};
 /// } else if (a > 4) {
 ///     return 2;
 /// } else if (a > 4) {
-/// //         ^^^^^ E026: duplicated condition in conditional chain
+/// //         ^^^^^ E020: duplicated condition in conditional chain
 ///     return 3;
 /// }
 /// ```

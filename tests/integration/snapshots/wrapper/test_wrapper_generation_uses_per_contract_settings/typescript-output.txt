@@ -1,0 +1,3 @@
+   Generated generated-ts/first/First.gen.ts
+   Generated global-wrappers-ts/Inherited.gen.ts
+   Generated generated-ts/second/Second.gen.ts

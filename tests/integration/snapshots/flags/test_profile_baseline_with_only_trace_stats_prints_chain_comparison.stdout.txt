@@ -1,0 +1,39 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/profile.test.tolk (1 test)
+  ✓ profiled-typed-opcode [TIME]
+
+ ✓ 1 passed in 1 file
+
+ GAS USAGE
+
+───────────────────────────────────────────
+ Opcode        Min Gas   Max Gas   Avg Gas 
+───────────────────────────────────────────
+ ProfilePing       333       333       333 
+
+
+ CHAIN GAS & FEES SUMMARY COMPARISON
+
+Baseline: profile-baseline.json (4 traces, captured 1970-01-01 00:00:00 UTC)
+
+───────────────────────────────────────────────────────────────────────────────────────────
+ Test                         Traces   Tx   Gas Used   Gas Fee            Total Fee        
+───────────────────────────────────────────────────────────────────────────────────────────
+ test-profiled-typed-opcode        4    4       1303   0.000086871 GRAM   0.000086871 GRAM 
+
+
+ CHAIN GAS & FEES · test-profiled-typed-opcode
+
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace     Tx Count   Gas Used   Gas Fee            Fwd Fee            Total Fee        
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace 1          1        309   0.000020601 GRAM   0.000089157 GRAM   0.000020601 GRAM 
+ Trace 2          1        328   0.000021868 GRAM   0.000065246 GRAM   0.000021868 GRAM 
+ Trace 3          1        333   0.000022201 GRAM   0.000044446 GRAM   0.000022201 GRAM 
+ Trace 4          1        333   0.000022201 GRAM   0.000044446 GRAM   0.000022201 GRAM 
+

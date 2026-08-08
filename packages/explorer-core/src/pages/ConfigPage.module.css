@@ -1,0 +1,578 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 48px;
+  box-sizing: border-box;
+  gap: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0;
+}
+
+.header nav {
+  margin: 0;
+}
+
+.indexLink:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.filter {
+  flex: 0 0 480px;
+  min-width: 0;
+  width: 480px;
+}
+
+.configLayout {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.indexPanel {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 10px;
+}
+
+.indexPanel::-webkit-scrollbar {
+  display: none;
+}
+
+.indexList {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+
+.indexLink {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding: 7px 8px;
+  color: var(--acton-color-text-muted);
+  border-radius: 6px;
+  font-size: var(--acton-font-size-xs);
+  line-height: 16px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.indexLink:hover {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.parameterList {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+}
+
+.parameterCard {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 10px;
+  scroll-margin-top: 16px;
+}
+
+.parameterHeader {
+  display: grid;
+  grid-template-columns: minmax(42px, max-content) minmax(0, 1fr);
+  gap: 12px;
+  padding: 17px 18px 14px;
+  padding-inline-start: 24px;
+}
+
+.parameterId {
+  align-self: start;
+  justify-self: start;
+}
+
+.parameterAnchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-hover);
+  border-radius: 7px;
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.parameterAnchor:hover,
+.parameterAnchor:focus-visible {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
+}
+
+.parameterAnchor:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.parameterAnchorNumber,
+.parameterAnchorIcon {
+  transition: opacity var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.parameterAnchorIcon {
+  position: absolute;
+  opacity: 0;
+}
+
+.parameterAnchor:hover .parameterAnchorNumber,
+.parameterAnchor:focus-visible .parameterAnchorNumber {
+  opacity: 0;
+}
+
+.parameterAnchor:hover .parameterAnchorIcon,
+.parameterAnchor:focus-visible .parameterAnchorIcon {
+  opacity: 1;
+}
+
+.parameterHeading {
+  min-width: 0;
+}
+
+.parameterTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.parameterTitle {
+  min-width: 0;
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 17px;
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 24px;
+}
+
+.parameterDescription {
+  max-width: 72ch;
+  margin: 5px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.infoContent {
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.infoContent p {
+  margin: 0;
+}
+
+.infoContent a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  text-decoration: none;
+}
+
+.infoContent a:hover {
+  text-decoration: underline;
+}
+
+.parameterTabs {
+  margin: 0 18px 18px;
+}
+
+.parameterTabPanel {
+  min-height: 5rem;
+}
+
+.compactParameterTabPanel {
+  min-height: 0;
+}
+
+.parsedValue {
+  padding: 13px 14px;
+  background: var(--acton-color-surface);
+}
+
+.globalIdValue {
+  font-size: var(--acton-font-size-2xl);
+  line-height: 28px;
+}
+
+.configValueGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  padding: 15px 14px;
+  background: var(--acton-color-surface);
+}
+
+.validatorSetValue {
+  background: var(--acton-color-surface);
+}
+
+.validatorList {
+  position: relative;
+  margin: 0 14px 14px;
+}
+
+.validatorIndex {
+  font-variant-numeric: tabular-nums;
+}
+
+.validatorHash {
+  min-width: 0;
+}
+
+.validatorWeight {
+  white-space: nowrap;
+}
+
+.validatorListFade {
+  position: absolute;
+  z-index: 1;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  height: 64px;
+  border-radius: 0 0 7px 7px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--acton-color-surface-raised) 0%, transparent),
+    var(--acton-color-surface-raised) 78%
+  );
+  pointer-events: none;
+}
+
+.validatorShowMore {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  color: var(--acton-color-accent);
+  border: 0;
+  background: transparent;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 20px;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.validatorShowMore:hover {
+  color: var(--acton-color-text);
+}
+
+.validatorShowMore:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.validatorShowMoreExpanded {
+  transform: rotate(180deg);
+}
+
+.tableInset {
+  width: calc(100% - 28px);
+  max-width: calc(100% - 28px);
+  margin: 0 14px 14px;
+}
+
+.configValueGridNested {
+  margin-top: 2px;
+  padding: 0 0 0 12px;
+  background: transparent;
+  border-left: 1px solid var(--acton-color-border);
+}
+
+.configValueGrid > .configValueGridGroup:only-child,
+.configValueGridNested > .configValueGridGroup {
+  grid-column: 1 / -1;
+}
+
+.configValueGridItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 34px;
+  gap: 2px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.configValueGridItemWide {
+  grid-column: 1 / -1;
+}
+
+.configValueGridGroup {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+}
+
+.configValueGridGroupLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 16px;
+}
+
+.extraCurrencyLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.configValueGridLabel {
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
+  line-height: 16px;
+}
+
+.configValueGridValue {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+  word-break: break-word;
+}
+
+.configParameterIdList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 14px;
+  background: var(--acton-color-surface);
+  list-style: none;
+}
+
+.configParameterIdItem {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 4.5rem;
+  line-height: 20px;
+}
+
+.configParameterIdAnchor {
+  min-width: 26px;
+  height: 26px;
+  padding-inline: 5px;
+  border-radius: 6px;
+  font-size: var(--acton-font-size-xs);
+}
+
+.configParameterIdAnchor .parameterAnchorIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.configParameterIdEmpty {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.fundamentalValue {
+  background: var(--acton-color-surface);
+}
+
+.parseNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.parameterBoc {
+  margin: 0;
+}
+
+.empty,
+.error {
+  padding: 24px;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 10px;
+}
+
+.empty h2,
+.error h2 {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  line-height: 24px;
+}
+
+.empty p,
+.error p {
+  margin: 6px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.loading {
+  padding-top: 2px;
+}
+
+.loadingLayout {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.loadingIndex {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 14px;
+  padding: 14px;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 10px;
+}
+
+.loadingIndexRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.loadingParameterList {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+}
+
+.loadingParameterCard {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 10px;
+}
+
+.loadingParameterHeader {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 17px 18px 14px;
+}
+
+.loadingParameterHeading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+}
+
+.loadingParameterBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 18px;
+  margin: 0 18px 18px;
+  padding: 14px;
+  overflow: hidden;
+  background: var(--acton-color-surface);
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+}
+
+@media (max-width: 860px) {
+  .configLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .indexPanel {
+    position: static;
+    max-height: 230px;
+  }
+
+  .indexList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .container {
+    padding: 20px 16px 32px;
+  }
+
+  .filter {
+    flex: 1 1 auto;
+    width: min(100%, 480px);
+  }
+
+  .parameterHeader {
+    grid-template-columns: minmax(34px, max-content) minmax(0, 1fr);
+    gap: 9px;
+    padding-inline: 14px;
+    padding-inline-start: 20px;
+  }
+
+  .parameterTabs {
+    margin-inline: 14px;
+  }
+
+  .loadingLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .configValueGrid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .configValueGridItemWide {
+    grid-column: auto;
+  }
+}

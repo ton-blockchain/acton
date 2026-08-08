@@ -1,1 +1,1 @@
-Error: No TVM instructions found for query 'outcomng' in the built-in specification
+Error: No TVM instructions found for query 'outcomng' in the built-in specification. Pass --description to search instruction descriptions as well.

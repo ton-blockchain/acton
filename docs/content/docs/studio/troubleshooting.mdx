@@ -1,0 +1,159 @@
+---
+title: "Troubleshooting"
+description: "Resolve Studio startup, test reporting, environment, Docker, indexer, endpoint, and authentication problems"
+---
+
+Start diagnosis by identifying the failing layer: Studio server, test reporter, managed runtime,
+Docker services, public network provider, or the application using an endpoint.
+
+## Studio does not start
+
+### Port 3015 is occupied
+
+Studio reports the address it could not bind and suggests selecting another port:
+
+```bash
+acton studio start --port 3020
+```
+
+Use the new origin for browser access and generated integration endpoints. Only one Studio daemon
+can register for a project at a time.
+
+### Studio opened the wrong project
+
+Stop Studio, change to the directory containing the intended `Acton.toml`, and start it again:
+
+```bash
+cd /path/to/project
+acton studio start
+```
+
+The Overview status strip shows the resolved project name and path. Test reporting and project
+wallet discovery use this workspace identity.
+
+### Browser did not open
+
+Read the URL printed by `acton studio start` and open it manually. `--no-open` disables automatic
+browser opening intentionally.
+
+## Tests do not appear
+
+Check the following:
+
+1. Studio and `acton test` were started from the same project root.
+2. Studio was already running when the CLI reporter performed discovery.
+3. The command does not include `--no-studio-reporting`.
+4. `[test] studio-reporting` is not set to `false` in `Acton.toml`.
+5. The Studio server is still reachable at the URL shown by its terminal process.
+
+A run started without a matching Studio daemon is intentionally terminal-only and is not imported
+retroactively.
+
+If a run appears without test reports, open **Runner output**. Compilation or process startup may
+have failed before the runner emitted individual results.
+
+## A managed environment does not start
+
+Open the environment row. The state page distinguishes loading, starting, stopping, stopped, and
+failed states.
+
+For a Simulated localnet, common causes are:
+
+- requested runtime port is already occupied
+- fork provider or API key is unavailable
+- invalid project wallet or startup configuration
+
+For a Full localnet, confirm that Docker is running and has enough memory and disk space. The startup
+panel reports four readiness stages:
+
+- **Docker Compose:** containers are being created and started
+- **TON node:** validator network is producing blocks
+- **API:** V2 and V3 services are reachable
+- **Indexer:** indexed data is ready for Explorer and application reads
+
+Initial image download and database initialization make the first Full localnet start slower than
+later starts. Additional validators also increase startup time.
+
+When startup fails, Studio shows copyable **Docker output** on the environment page. Read the final
+container error first, fix the host or image problem, then select **Restart environment**. Settings
+remain available, so an unrecoverable environment can be deleted without starting it.
+
+## Explorer data is missing or stale
+
+For Full localnet, wait for both API and Indexer readiness. The TON node can be ready before actions,
+tokens, NFTs, and imported accounts are indexed.
+
+Then:
+
+1. refresh the page
+2. confirm the latest block advances on Home
+3. open [API Calls](/docs/studio/workspace#api-calls), enable **Studio requests**, and check whether
+   the Explorer request succeeded
+4. verify that the address belongs to the selected environment
+
+An imported Full localnet account is registered in Contracts immediately. Source-network history is
+not imported; indexed activity begins with messages processed by the Full localnet.
+
+## A contract is absent from Contracts
+
+Studio automatically observes successful write submissions only when they pass through its proxied
+RPC endpoint. A deployment sent directly to a container port or public provider bypasses this
+observation.
+
+Follow [Track contracts](/docs/studio/explorer-and-contracts#track-contracts) to add the address
+manually. If Studio shows **Source unavailable**, build the project artifact that matches the active
+code hash.
+
+## An API call is absent from API Calls
+
+Confirm the application uses the endpoint copied from **Home**, **Integrate**, or **Copy RPC**. Direct
+runtime and provider URLs bypass the Studio proxy.
+
+The call log is bounded and in memory. Older calls can be evicted, and restarting Studio clears the
+current diagnostic queue.
+
+Enable **Studio requests** in the filters when you also want to see requests made by Explorer,
+Wallets, and other Studio pages.
+
+## API Reference returns unauthorized
+
+Select the key icon at the bottom of the environment sidebar, enter the environment API token, and
+retry the request. Clear or replace the token from the same control.
+
+Do not paste wallet mnemonics into the API token field. The control token protects runtime management
+methods and is separate from wallet signing.
+
+## A page is missing from navigation
+
+Studio hides tools unsupported by the selected environment. Examples:
+
+- Full snapshots appear only for Full localnet.
+- Mining controls appear only for Simulated localnet.
+- Faucets do not appear for Testnet or Mainnet.
+- Admin and Config API reference pages appear only for Full localnet.
+- Environment settings appear only for managed local environments.
+
+Return to Studio navigation and select an environment with the capability required by the task.
+
+## Recover or remove local state
+
+Prefer lifecycle and deletion controls in Studio over editing `.studio/` manually. The directory
+contains environment metadata, test history, contract registry data, traces, and managed runtime
+descriptors that must remain consistent.
+
+Deleting a Full localnet also deletes its snapshots. Keep the environment when its state or snapshots
+may still be needed. Deleting an environment or an individual snapshot is permanent.
+
+## Collect information for a bug report
+
+Include:
+
+- Acton version
+- operating system and architecture
+- Studio start command and URL
+- selected environment type and status
+- copied error or Docker output
+- relevant API Calls request and response
+- whether the problem reproduces in Simulated localnet, Full localnet, Testnet, or Mainnet
+
+Do not include wallet mnemonics, API keys, environment API tokens, or other secrets.

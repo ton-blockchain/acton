@@ -1,0 +1,33 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/profile.test.tolk (1 test)
+  ✓ profiled-transaction [TIME]
+
+ ✓ 1 passed in 1 file
+
+ CHAIN GAS & FEES SUMMARY COMPARISON
+
+Baseline: profile-baseline.json (3 traces, captured 1970-01-01 00:00:00 UTC)
+
+────────────────────────────────────────────────────────────────────────────────────────────
+ Test                        Traces   Tx   Gas Used   Gas Fee             Total Fee         
+────────────────────────────────────────────────────────────────────────────────────────────
+ test-profiled-transaction        3    3        815    0.000054337 GRAM    0.000054337 GRAM 
+                                  4    4       1068    0.000071205 GRAM    0.000071205 GRAM 
+                                 +1   +1       +253   +0.000016868 GRAM   +0.000016868 GRAM 
+
+
+ CHAIN GAS & FEES · test-profiled-transaction
+
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace     Tx Count   Gas Used   Gas Fee            Fwd Fee            Total Fee        
+────────────────────────────────────────────────────────────────────────────────────────
+ Trace 1          1        309   0.000020601 GRAM   0.000089869 GRAM   0.000020601 GRAM 
+ Trace 2          1        253   0.000016868 GRAM   0.000063113 GRAM   0.000016868 GRAM 
+ Trace 3          1        253   0.000016868 GRAM   0.000044446 GRAM   0.000016868 GRAM 
+ Trace 4          1        253   0.000016868 GRAM   0.000044446 GRAM   0.000016868 GRAM 
+

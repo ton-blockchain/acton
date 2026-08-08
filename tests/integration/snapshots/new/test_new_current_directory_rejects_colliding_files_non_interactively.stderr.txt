@@ -1,0 +1,4 @@
+Error: Refusing to overwrite existing files in non-interactive mode:
+  README.md
+
+Move or remove these files, or pass --overwrite to replace them.

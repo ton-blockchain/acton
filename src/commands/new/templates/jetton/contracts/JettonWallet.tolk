@@ -7,18 +7,18 @@ import "sharding"
 import "storage"
 
 contract JettonWallet {
-    author: "Your Name"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard Jetton Wallet. TEP-74 and TEP-89 compliant"
-    incomingMessages: AllowedMessageToWallet
     storage: WalletStorage
+    incomingMessages: AllowedMessageToWallet
 }
 
 type AllowedMessageToWallet =
     | AskToTransfer
     | AskToBurn
     | InternalTransferStep
-    | TopUpTons
+    | TopUpGrams
 
 type BounceOpToHandle = InternalTransferStep | BurnNotificationForMinter
 
@@ -75,7 +75,7 @@ fun onInternalMessage(in: InMessage) {
             if (msg.sendExcessesTo != null) {
                 val toLeaveOnBalance = contract.getOriginalBalance() - in.valueCoins +
                 contract.getStorageDuePayment();
-                reserveToncoinsOnBalance(
+                reserveGramsOnBalance(
                     max(toLeaveOnBalance, calculateJettonWalletMinStorageFee()),
                     RESERVE_MODE_AT_MOST,
                 );
@@ -86,7 +86,7 @@ fun onInternalMessage(in: InMessage) {
                     value: 0,
                     body: ReturnExcessesBack { queryId: msg.queryId },
                 });
-                // SAFETY: It is safe because of reserveToncoinsOnBalance() called earlier
+                // SAFETY: It is safe because of reserveGramsOnBalance() called earlier
                 excessesMsg.send(SEND_MODE_CARRY_ALL_BALANCE | SEND_MODE_IGNORE_ERRORS);
             }
         }
@@ -155,8 +155,8 @@ fun onInternalMessage(in: InMessage) {
             );
         }
 
-        TopUpTons => {
-            // just accept tons
+        TopUpGrams => {
+            // just accept grams
         }
 
         else => throw 0xFFFF,

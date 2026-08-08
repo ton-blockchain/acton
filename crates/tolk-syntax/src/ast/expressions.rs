@@ -371,7 +371,8 @@ impl<'tree> Bin<'tree> {
     }
 
     pub fn right(&self) -> Option<Expr<'tree>> {
-        self.0.child(self.0.child_count() - 1).map(Into::into)
+        let child_index = u32::try_from(self.0.child_count().checked_sub(1)?).ok()?;
+        self.0.child(child_index).map(Into::into)
     }
 }
 
@@ -564,10 +565,14 @@ impl<'tree> Call<'tree> {
 
     #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, CallArgument<'tree>> {
-        self.0
-            .field::<ArgumentList<'_>>("arguments")
+        self.argument_list()
             .map(|args| args.arguments())
             .unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn argument_list(&self) -> Option<ArgumentList<'tree>> {
+        self.0.field("arguments")
     }
 
     #[must_use]
@@ -649,10 +654,12 @@ impl<'tree> ObjectLit<'tree> {
 
     #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, InstanceArg<'tree>> {
-        self.0
-            .field::<ObjectLiteralBody<'_>>("arguments")
-            .map(|body| body.arguments())
-            .unwrap_or_default()
+        self.body().map(|body| body.arguments()).unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn body(&self) -> Option<ObjectLiteralBody<'tree>> {
+        self.0.field("arguments")
     }
 }
 
@@ -818,6 +825,16 @@ impl<'tree> VarDeclLhs<'tree> {
             })
             .map(Into::into)
     }
+
+    #[must_use]
+    pub fn assignment(&self) -> Option<Assign<'tree>> {
+        Assign::try_from_node(self.0.parent()?).ok()
+    }
+
+    #[must_use]
+    pub fn assigned_value(&self) -> Option<Expr<'tree>> {
+        self.assignment()?.right()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -903,6 +920,19 @@ impl<'tree> VarDecl<'tree> {
     pub fn is_redefinition(&self) -> bool {
         self.0.field::<Ident<'_>>("redef").is_some()
     }
+
+    #[must_use]
+    pub fn declaration(&self) -> Option<VarDeclLhs<'tree>> {
+        let mut node = self.0.parent()?;
+
+        loop {
+            if let Ok(declaration) = VarDeclLhs::try_from_node(node) {
+                return Some(declaration);
+            }
+
+            node = node.parent()?;
+        }
+    }
 }
 
 impl<'tree> HasName<'tree> for VarDecl<'tree> {
@@ -932,6 +962,22 @@ impl<'tree> ArgumentList<'tree> {
     #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, CallArgument<'tree>> {
         AstChildren::new(self.0)
+    }
+
+    /// Returns whether the byte offset is inside the call's parentheses.
+    #[must_use]
+    pub fn contains_offset(&self, offset: usize) -> bool {
+        self.0.start_byte() <= offset && offset < self.0.end_byte()
+    }
+
+    /// Returns the zero-based argument index at the byte offset.
+    #[must_use]
+    pub fn active_parameter(&self, offset: usize) -> usize {
+        let mut cursor = self.0.walk();
+        self.0
+            .children(&mut cursor)
+            .filter(|child| child.kind() == "," && child.end_byte() <= offset)
+            .count()
     }
 }
 
@@ -1047,6 +1093,18 @@ impl<'tree> ObjectLiteralBody<'tree> {
     pub fn arguments(&self) -> AstChildren<'tree, InstanceArg<'tree>> {
         AstChildren::new(self.0)
     }
+
+    #[must_use]
+    pub fn open_brace(&self) -> Option<Node<'tree>> {
+        self.0.child(0).filter(|child| child.kind() == "{")
+    }
+
+    #[must_use]
+    pub fn close_brace(&self) -> Option<Node<'tree>> {
+        self.0
+            .child(self.0.child_count().checked_sub(1)?.try_into().ok()?)
+            .filter(|child| child.kind() == "}")
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1079,7 +1137,31 @@ impl<'tree> HasName<'tree> for InstanceArg<'tree> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_tolk_int_literal;
+    use super::{Call, parse_tolk_int_literal};
+    use crate::{TryFromNode, parse};
+
+    #[test]
+    fn argument_list_range_excludes_the_offset_after_the_closing_parenthesis() {
+        let source = "fun main() { target(1, 2); }";
+        let parsed = parse(source).expect("source must parse");
+        let target_offset = source.find("target").expect("call must exist");
+        let mut node = parsed
+            .tree
+            .root_node()
+            .descendant_for_byte_range(target_offset, target_offset + 1)
+            .expect("call identifier must exist");
+        let call = loop {
+            if let Ok(call) = Call::try_from_node(node) {
+                break call;
+            }
+            node = node.parent().expect("identifier must be inside a call");
+        };
+        let arguments = call.argument_list().expect("call must have arguments");
+
+        assert!(arguments.contains_offset(arguments.0.start_byte()));
+        assert!(arguments.contains_offset(arguments.0.end_byte() - 1));
+        assert!(!arguments.contains_offset(arguments.0.end_byte()));
+    }
 
     #[test]
     fn parse_decimal_literal_with_separators() {

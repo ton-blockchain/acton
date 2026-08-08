@@ -16,7 +16,7 @@ use tolk_resolver::file_index::FileId;
 /// fun main() {
 ///     val _value = 10;
 ///     _value;
-/// //  ^^^^^^ E010: identifier marked as unused is used
+/// //  ^^^^^^ E008: identifier marked as unused is used
 /// }
 /// ```
 ///

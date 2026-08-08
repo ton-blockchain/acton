@@ -21,6 +21,6 @@ fun main() {
     ) {
         return;
     }
-    val promptedOwner = promptJettonAddressRequired("JETTON_OWNER_ADDRESS", "Enter owner address");
+    val promptedOwner = promptJettonAddress("JETTON_OWNER_ADDRESS", "Enter owner address");
     printJettonWalletInfo(minter, promptedOwner, "JETTON_OWNER");
 }

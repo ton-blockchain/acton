@@ -17,6 +17,18 @@ use tree_sitter::Node;
 /// note on the enum value, callers and tests can see the name but not the exact
 /// failure condition it represents.
 ///
+/// ### Behavior notes
+/// - This preview rule is disabled (`allow`) by default. Enable it in config:
+///
+/// ```toml
+/// [lint.rules]
+/// throw-requires-documented-error-value = "warn"
+/// ```
+///
+/// - Or run only this rule with `acton check --enable-only E030`.
+/// - The documentation must be a non-empty `///` doc comment immediately above
+///   the enum value.
+///
 /// ### Example
 /// ```tolk
 /// enum Errors {

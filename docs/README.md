@@ -19,10 +19,10 @@ highlighting for Acton and TON-related languages.
 
 ## Local development
 
-This workspace uses Bun.
+This workspace uses Bun. The required Bun version is pinned in `package.json`.
 
 ```bash
-bun install
+bun ci
 bun run dev
 ```
 
@@ -32,10 +32,16 @@ Open `http://localhost:3000` for the landing page and
 ## Available scripts
 
 - `bun run dev`: start the local development server.
-- `bun run build`: produce the static production build.
-- `bun run start`: serve the production build locally.
+- `bun run build`: run `next build` and export the static site to `out/`.
+- `bun run start`: run Next's standard production server script; GitHub Pages
+  and Netlify use the static `out/` export from `bun run build`.
 - `bun run lint`: run ESLint for the docs app.
-- `bun run lint:links`: validate MDX links with `next-validate-link`.
+- `bun run generated-source`: refresh Fumadocs generated source files.
+- `bun run docs-lint`: validate links, docs navigation, and code-block line length.
+- `bun run lint:links`: validate internal and external MDX links.
+- `bun run lint:links:internal`: validate internal MDX links without network requests.
+- `bun run lint:links:external`: validate external MDX links and fail on redirects.
+- `bun run lint:navigation`: validate that every MDX page is reachable from Fumadocs navigation.
 
 Production deployment is handled by CI via `.github/workflows/deploy-docs.yml`.
 

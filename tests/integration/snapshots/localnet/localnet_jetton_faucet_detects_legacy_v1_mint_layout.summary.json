@@ -1,0 +1,14 @@
+{
+  "faucet": {
+    "message_hash_present": true,
+    "ok": true
+  },
+  "master_total_supply": "7000000950",
+  "mint_transaction": {
+    "in_opcode": 21,
+    "out_opcodes": [
+      395134233
+    ]
+  },
+  "recipient_wallet_balance": "7000000100"
+}

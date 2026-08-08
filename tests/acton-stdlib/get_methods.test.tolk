@@ -98,8 +98,8 @@ get fun `test run get method with nullable struct with two int return type`() {
     val res = counter.sendIncrease(deployer.address, 100);
     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
 
-    val result: tuple = net.runGetMethod(counter.address, "currentStorageOrNull");
-    expect(result).toEqual([null, null, 0]);
+    val result: Storage? = net.runGetMethod(counter.address, "currentStorageOrNull");
+    expect(result).toEqual(null);
 
     val res2 = counter.sendIncrease(deployer.address, 100);
     expect(res2).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
@@ -156,6 +156,6 @@ get fun `test run get method with int return type by id`() {
     val res = counter.sendIncrease(deployer.address, 100);
     expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
 
-    val result: tuple = net.runGetMethod(counter.address, 0x1cad0);
+    val result: int = net.runGetMethod(counter.address, 0x1cad0);
     expect(result).toEqual(100);
 }

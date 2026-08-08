@@ -33,6 +33,7 @@ tree-sitter-language = { workspace = true }
 
 [build-dependencies]
 cc = { workspace = true }
+tree-sitter-language = { workspace = true }
 
 [dev-dependencies]
 tree-sitter = { workspace = true }

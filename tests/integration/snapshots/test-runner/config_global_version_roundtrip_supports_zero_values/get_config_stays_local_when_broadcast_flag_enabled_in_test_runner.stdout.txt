@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/do_config_global_version.test.tolk (1 test)
+  ✓ do stdlib get config stays local with broadcast flag [TIME]
+
+ ✓ 1 passed in 1 file

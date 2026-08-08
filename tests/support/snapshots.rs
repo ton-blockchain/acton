@@ -53,12 +53,30 @@ fn normalize_output_internal(
     let content = content.render().expect("came in as a String");
 
     let redactions = build_redactions(project_path);
+    let content = normalize_dynamic_mutation_output(content);
 
     normalize_dynamic_output(redactions.redact(&content))
 }
 
 fn normalize_dynamic_output(content: String) -> String {
-    normalize_dynamic_mutation_output(normalize_up_snapshot_text(content))
+    normalize_dynamic_slice_output(normalize_awaiting_progress_output(
+        normalize_up_snapshot_text(content),
+    ))
+}
+
+fn normalize_awaiting_progress_output(content: String) -> String {
+    let content = regex!(r"(?m)^(Awaiting transaction\.\.\. \[Attempt \d+/\d+\]\n)+")
+        .replace_all(&content, "Awaiting transaction... [Attempt 1/20]\n")
+        .into_owned();
+    regex!(r"(?m)^(Awaiting trace\.\.\. \[Attempt \d+/\d+\]\n)+")
+        .replace_all(&content, "Awaiting trace... [Attempt 1/20]\n")
+        .into_owned()
+}
+
+fn normalize_dynamic_slice_output(content: String) -> String {
+    regex!(r"slice\{[0-9a-fA-F]{64,}_?\}")
+        .replace_all(&content, "slice{[HEX]}")
+        .into_owned()
 }
 
 fn normalize_dynamic_mutation_output(content: String) -> String {
@@ -109,6 +127,7 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     let tmp_dir_unix_escaped = tmp_dir_unix.replace('\\', "\\\\");
 
     let current_version = env!("CARGO_PKG_VERSION");
+    let current_short_version = build_info::SHORT_VERSION;
 
     redactions.insert("[ROOT]", tmp_dir_raw.clone()).unwrap();
     redactions.insert("[ROOT]", tmp_dir_unix.clone()).unwrap();
@@ -205,6 +224,17 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[ACTON_VERSION]", format!("v{current_version}"))
         .unwrap();
     redactions
+        .insert("[ACTON_VERSION]", current_version.to_owned())
+        .unwrap();
+    if current_short_version != current_version {
+        redactions
+            .insert("[ACTON_VERSION]", format!("v{current_short_version}"))
+            .unwrap();
+        redactions
+            .insert("[ACTON_VERSION]", current_short_version.to_owned())
+            .unwrap();
+    }
+    redactions
         .insert(
             "[ACTON_DOCS_URL]",
             "https://ton-blockchain.github.io/acton/docs",
@@ -237,5 +267,22 @@ fn redact_json_value(value: &mut serde_json::Value, redactions: &snapbox::Redact
             }
         }
         serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_output;
+    use expect_test::expect;
+    use std::path::Path;
+
+    #[test]
+    fn mutation_session_is_normalized_before_boc_hex() {
+        let output = normalize_output("Session:  69ef0b8b5ee9abcd\n", Path::new("/tmp/project"));
+
+        expect![[r"
+            Session:  [MUTATION_SESSION_ID]
+        "]]
+        .assert_eq(&output);
     }
 }
