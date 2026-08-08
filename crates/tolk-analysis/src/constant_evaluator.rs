@@ -464,21 +464,24 @@ fn parse_nanograms(value: &str) -> ConstantValue {
     {
         return ConstantValue::Unknown;
     }
-    if integer.len() > 9 {
-        return ConstantValue::Overflow;
-    }
-
-    let Ok(integer) = integer.parse::<i64>() else {
+    let Some(integer) = BigInt::parse_bytes(integer.as_bytes(), 10) else {
         return ConstantValue::Unknown;
     };
     let fractional = if fractional.is_empty() {
-        0
+        BigInt::ZERO
     } else {
-        let Ok(parsed_fractional) = fractional.parse::<i64>() else {
+        let Some(parsed_fractional) = BigInt::parse_bytes(fractional.as_bytes(), 10) else {
             return ConstantValue::Unknown;
         };
-        parsed_fractional * 10_i64.pow(9 - fractional.len() as u32)
+        parsed_fractional * BigInt::from(10u8).pow(9 - fractional.len() as u32)
     };
-    let nanograms = BigInt::from(integer * 1_000_000_000 + fractional);
-    ConstantValue::Int(if negative { -nanograms } else { nanograms })
+    let nanograms = integer * 1_000_000_000u64 + fractional;
+    let nanograms = if negative { -nanograms } else { nanograms };
+    let limit = (BigInt::from(1u8) << 120) - 1;
+
+    if nanograms < -&limit || nanograms > limit {
+        ConstantValue::Overflow
+    } else {
+        ConstantValue::Int(nanograms)
+    }
 }
