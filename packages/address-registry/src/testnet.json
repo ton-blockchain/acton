@@ -20,6 +20,10 @@
     "name": "Root DNS"
   },
   {
+    "address": "0:0000000000000000000000000000000000000000000000000000000000000000",
+    "name": "Zero Address"
+  },
+  {
     "address": "0:0f65ab9654f51c9b6854253f67dfaa71ce7121978eab127d5bcc15cdd1163fca",
     "name": "Notcoin Voucher Swap 0"
   },
@@ -78,10 +82,6 @@
   {
     "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
     "name": "STON.fi DEX"
-  },
-  {
-    "address": "0:97f8538da3c8c02f136abd463f628d7db3f23f958cc3857027c3b283b801cc6c",
-    "name": "OKX Wallet Bot"
   },
   {
     "address": "0:9c25fd8a1651fdc48c77773b72b71c51164dca419284601afe7f49c520ed61dd",

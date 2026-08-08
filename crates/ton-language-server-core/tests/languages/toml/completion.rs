@@ -224,7 +224,8 @@ fn completes_dynamic_contract_and_network_objects() {
             depends Some(Field) array
             display-name Some(Field) string
             output Some(Field) string
-            types Some(Field) string"]],
+            types Some(Field) string
+            wrappers Some(Field) object"]],
     );
 
     // A known property behind a dynamic network name is still completed from its schema.

@@ -118,6 +118,57 @@ interface ConfigParameterMetadata {
 }
 
 const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata>> = {
+  // https://github.com/ton-blockchain/config-with-ownable-params/blob/4d942616389a7327f8ee40b3664b1b08a457a340/config-code.fc#L9-L10
+  [-1025]: {
+    title: "Custom config slot 2",
+    description: "Second owner-controlled custom configuration slot",
+  },
+  [-1024]: {
+    title: "Custom config slot 1",
+    description: "First owner-controlled custom configuration slot",
+  },
+  // https://github.com/ton-blockchain/governance-contract/blob/a9e0d23eab49f08b3fdbb9b6fe5c2847d05b4d12/constants.fc#L62-L66
+  [-1003]: {
+    title: "Config multikey",
+    description: "Additional public keys used to authorize configuration contract actions",
+  },
+  [-1002]: {
+    title: "Signed votes disabled",
+    description: "Disables signed external votes for configuration proposals when present",
+  },
+  [-1001]: {
+    title: "Update elector code",
+    description: "Contains code used to upgrade the Elector smart contract",
+  },
+  [-1000]: {
+    title: "Update config code",
+    description: "Contains code used to upgrade the configuration smart contract",
+  },
+  [-999]: {
+    title: "Set config key",
+    description: "Sets the master public key used to authorize configuration contract actions",
+  },
+  // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/func/auto-tests/legacy_tests/dns-collection/dns-utils.fc#L7
+  [-80]: {
+    title: "DNS blacklist",
+    description: "Testnet configuration slot containing the TON DNS domain blacklist",
+  },
+  // https://github.com/ton-blockchain/token-bridge-func/blob/4e7ec44a651e6b455ce5a09ed1383535fae3a637/src/func/jetton-bridge/config.fc#L7-L10
+  // https://github.com/ton-blockchain/token-bridge-func/blob/4e7ec44a651e6b455ce5a09ed1383535fae3a637/src/func/jetton-bridge/params.fc#L1
+  [-79]: {
+    title: "Legacy Ethereum jetton bridge",
+    description: "Legacy configuration slot used as a fallback by Ethereum jetton bridge contracts",
+  },
+  // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/func/auto-tests/legacy_tests/eth-bridge-multisig/multisig-code.fc#L5-L10
+  [-71]: {
+    title: "Legacy Ethereum bridge",
+    description: "Legacy configuration slot used as a fallback by Ethereum bridge contracts",
+  },
+  // https://github.com/ton-blockchain/ton/blob/011e97f53c1610ead70e59f662f14d4a7be268d6/crypto/block/block.tlb#L737-L739
+  [-41]: {
+    title: "Legacy collator configuration",
+    description: "Legacy full-collated-data flag and list of configured collator nodes",
+  },
   0: {
     title: "Config address",
     description:
@@ -316,6 +367,12 @@ const UNKNOWN_PARAMETER_METADATA: ConfigParameterMetadata = {
     "No public description or typed parser is available for this parameter; inspect its raw cell",
 }
 
+const EXTENSION_PARAMETER_METADATA: ConfigParameterMetadata = {
+  title: "Extension parameter",
+  description:
+    "Negative configuration identifiers are reserved for implementation-specific extension data",
+}
+
 export function parseNetworkConfig(rawBoc: string): NetworkConfig {
   const rootCell = Cell.fromBase64(rawBoc)
   const {config, configAddress} = readConfigState(rootCell)
@@ -384,14 +441,13 @@ function loadConfigDictionary(rootCell: Cell): Dictionary<number, Cell> {
 }
 
 function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
-  const metadata = CONFIG_PARAMETER_METADATA[id] ?? UNKNOWN_PARAMETER_METADATA
+  const metadata =
+    CONFIG_PARAMETER_METADATA[id] ??
+    (id < 0 ? EXTENSION_PARAMETER_METADATA : UNKNOWN_PARAMETER_METADATA)
   const parameter: NetworkConfigParameter = {
     id,
-    title: id < 0 ? "Extension parameter" : metadata.title,
-    description:
-      id < 0
-        ? "Negative configuration identifiers are reserved for implementation-specific extension data"
-        : metadata.description,
+    title: metadata.title,
+    description: metadata.description,
     rawHex: cell.toBoc().toString("hex"),
   }
 

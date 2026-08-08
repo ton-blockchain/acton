@@ -169,7 +169,7 @@ impl ProfileReport {
         for event in &summary.events {
             let entry = aggregated.entry(event.name).or_default();
             entry.0 += 1;
-            entry.1 += event.elapsed.as_secs_f64() * 1000.0;
+            entry.1 = event.elapsed.as_secs_f64().mul_add(1000.0, entry.1);
         }
         let spans = aggregated
             .into_iter()
