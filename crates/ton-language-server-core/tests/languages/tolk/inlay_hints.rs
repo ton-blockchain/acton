@@ -292,6 +292,26 @@ fn suppresses_redundant_parameter_hints() {
 }
 
 #[test]
+fn skips_self_parameter_for_generic_method_calls() {
+    case_tolk_inlay_hints(
+        r"
+            fun int.genericMethod<T>(self, params: int): void {}
+
+            fun main(): void {
+                1.genericMethod<int>(2);
+            }
+        ",
+        full_document_range(),
+        expect![[r#"
+            fun int.genericMethod<T>(self, params: int): void {}
+
+            fun main(): void {
+                1.genericMethod<int>(/* params: */2);
+            }"#]],
+    );
+}
+
+#[test]
 fn evaluates_compile_time_functions_and_skips_cycles() {
     case_tolk_inlay_hints(
         r#"
