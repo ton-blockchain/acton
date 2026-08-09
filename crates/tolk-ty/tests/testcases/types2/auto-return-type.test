@@ -108,10 +108,10 @@ fun main() {
 ok
 
 ========================================================================
-Auto return type: cyclic reference TODO
+Auto return type: cyclic reference
 ========================================================================
 fun test<T>(arg: T) {
-//! ^ (T) -> int | auto
+//! ^ (T) -> int
     if (arg) {
         return 10;
     }
@@ -120,9 +120,9 @@ fun test<T>(arg: T) {
 
 fun main() {
     val res =
-//!     ^ int | auto
+//!     ^ int
           test<slice>("hello");
-//!       ^ (T) -> int | auto
+//!       ^ (T) -> int
 }
 ------------------------------------------------------------------------
 ok

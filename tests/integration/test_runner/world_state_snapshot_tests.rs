@@ -43,7 +43,7 @@ get fun `test load world state snapshot from disk`() {{
     val target = randomAddress("snapshot-target");
 
     expect(testing.getAccountBalance(target)).toEqual(0);
-    expect(testing.getNow()).toEqual(0);
+    expect(testing.getNow() > 0).toBeTrue();
 
     expect(testing.loadSnapshot("world-state.json")).toBeTrue();
 
@@ -86,6 +86,7 @@ get fun `test load world state snapshot invalid inputs`() {{
     expect(testing.loadSnapshot("invalid-address-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("invalid-library-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("invalid-random-seed-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
 }}
 "#
@@ -96,7 +97,7 @@ get fun `test load world state snapshot invalid inputs`() {{
 {NETWORK_IMPORTS}
 
 get fun `test save empty world state snapshot`() {{
-    expect(testing.getNow()).toEqual(0);
+    testing.setNow(1700023002);
     expect(testing.saveSnapshot("empty-world-state.json")).toBeTrue();
 }}
 "#
@@ -114,7 +115,7 @@ get fun `test load empty world state snapshot`() {{
 
     expect(testing.loadSnapshot("empty-world-state.json")).toBeTrue();
 
-    expect(testing.getNow()).toEqual(0);
+    expect(testing.getNow()).toEqual(1700023002);
     expect(testing.getAccountBalance(target)).toEqual(0);
 }}
 "#
@@ -424,6 +425,14 @@ fn world_state_snapshot_load_replaces_current_runner_state_and_rejects_invalid_i
         &invalid_library_snapshot,
     );
 
+    let mut invalid_random_seed_snapshot =
+        read_world_state_snapshot(&project.path().join("world-state.json"));
+    invalid_random_seed_snapshot.random_seed = Some("42".to_owned());
+    write_world_state_snapshot(
+        &project.path().join("invalid-random-seed-world-state.json"),
+        &invalid_random_seed_snapshot,
+    );
+
     let mut duplicate_accounts_snapshot =
         read_world_state_snapshot(&project.path().join("world-state.json"));
     let duplicate_entry = duplicate_accounts_snapshot.accounts[0].clone();
@@ -458,7 +467,7 @@ fn world_state_snapshot_empty_state_can_be_saved_and_loaded() {
 
     let empty_snapshot = read_world_state_snapshot(&project.path().join("empty-world-state.json"));
     assert_eq!(empty_snapshot.current_lt, 0);
-    assert_eq!(empty_snapshot.current_now, 0);
+    assert_eq!(empty_snapshot.current_now, 1_700_023_002);
     assert!(empty_snapshot.accounts.is_empty());
     assert!(empty_snapshot.libraries_boc64.is_empty());
 
@@ -661,6 +670,8 @@ fn world_state_snapshot_helpers_reject_absolute_and_parent_escape_paths() {
         version: 1,
         current_lt: 0,
         current_now: 123,
+        random_seed: None,
+        ignore_chksig: false,
         config_boc64: DEFAULT_CONFIG.to_owned(),
         libraries_boc64: Vec::new(),
         accounts: Vec::new(),

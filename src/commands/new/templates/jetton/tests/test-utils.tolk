@@ -19,13 +19,13 @@ fun buildTestMetadata(uri: string): cell {
     return metadata.toCell();
 }
 
-// Common values used across tests (nanotons for TON amounts)
+// Common values used across tests (nanograms for GRAM amounts)
 const TEST_JETTON_UNIT = 1
-const DEFAULT_MINTED_JETTONS = ton("5") // 5 TON in jetton units
-const DEFAULT_TRANSFER_MSG_VALUE = 300000000 // 0.3 TON
-const LOW_TRANSFER_MSG_VALUE = 200000000 // 0.2 TON
-const DEFAULT_BURN_MSG_VALUE = 200000000 // 0.2 TON
-const DEFAULT_FORWARD_TON_AMOUNT = 50000000 // 0.05 TON
+const DEFAULT_MINTED_JETTONS = grams("5") // 5 whole jetton units
+const DEFAULT_TRANSFER_MSG_VALUE = 300000000 // 0.3 GRAM
+const LOW_TRANSFER_MSG_VALUE = 200000000 // 0.2 GRAM
+const DEFAULT_BURN_MSG_VALUE = 200000000 // 0.2 GRAM
+const DEFAULT_FORWARD_TON_AMOUNT = 50000000 // 0.05 GRAM
 const MIN_EDGE_DELTA = 1
 const CONFIG_SCALE_X10 = 10
 const GAS_SCALE_X3 = 3
@@ -74,7 +74,7 @@ fun estimateMessageForwardFee<T>(body: T, dest: address, bounce: bool, value: co
 }
 
 fun estimateBodyForwardFee<T>(body: T): coins {
-    return estimateMessageForwardFee(body, randomAddress(), true, ton("1"));
+    return estimateMessageForwardFee(body, randomAddress(), true, grams("1"));
 }
 
 fun sendRawTransferPayload(
@@ -107,7 +107,7 @@ fun walletStateInit(storage: WalletStorage): ContractState {
 fun deployWalletFromStorage(
     storage: WalletStorage,
     from: address,
-    value: coins = ton("10"),
+    value: coins = grams("10"),
 ): JettonWallet {
     val init = storage.jettonBalance == 0
         ? calcDeployedJettonWallet(
@@ -124,7 +124,7 @@ fun deployWalletFromStorage(
             bounce: false,
             value,
             dest: init,
-            body: TopUpTons {},
+            body: TopUpGrams {},
         }),
     );
     expect(deployResult).toHaveSuccessfulDeploy({
@@ -152,7 +152,7 @@ fun setupDirectWallet(initialBalance: coins = 0): (JettonWallet, Treasury, Treas
             minter.address,
             createMessage({
                 bounce: true,
-                value: ton("0.3"),
+                value: grams("0.3"),
                 dest: wallet.address,
                 body: InternalTransferStep {
                     queryId: 0,
@@ -215,7 +215,7 @@ fun setupTest(initialSupply: int = 0): (JettonMinter, Treasury, Treasury) {
         nextAdminAddress: null,
     });
 
-    val transactions = minter.sendDeploy(deployer.address, { value: ton("10") });
+    val transactions = minter.sendDeploy(deployer.address, { value: grams("10") });
     expect(transactions).toHaveSuccessfulDeploy({
         to: minter.address,
     });
@@ -227,7 +227,7 @@ fun mintTo(minter: JettonMinter, admin: Treasury, recipient: address, amount: co
     val supplyBefore = minter.getTotalSupply();
     val wallet = userWallet(minter, recipient);
 
-    val mintResult = minter.sendMint(admin.address, recipient, amount, ton("0.05"), ton("0.3"));
+    val mintResult = minter.sendMint(admin.address, recipient, amount, grams("0.05"), grams("0.3"));
     expect(mintResult).toHaveSuccessfulTx<MintNewJettons>({
         from: admin.address,
         to: minter.address,

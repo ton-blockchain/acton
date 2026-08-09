@@ -1,0 +1,29 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`ABI storage builder describes storage and round-trips edited JSON through BoC 1`] = `
+{
+  "boc": "b5ee9c7241010101000b000011000001f9a2540be4044d184652",
+  "decoded": {
+    "$": "Storage",
+    "balance": "1250000000",
+    "enabled": true,
+    "seqno": "505",
+  },
+  "info": {
+    "sample": {
+      "balance": "0",
+      "enabled": false,
+      "seqno": "0",
+    },
+    "tyIdx": 12,
+    "typeLabel": "Storage",
+  },
+}
+`;
+
+exports[`ABI storage builder returns no builder info and rejects builds when storage is absent 1`] = `
+{
+  "missingAbi": undefined,
+  "missingStorage": undefined,
+}
+`;

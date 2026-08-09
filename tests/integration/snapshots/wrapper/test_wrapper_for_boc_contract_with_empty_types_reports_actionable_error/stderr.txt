@@ -1,0 +1,1 @@
+Error: Contract precompiled uses a precompiled BoC source, so wrapper generation requires `types = "path/to/types.tolk"` in Acton.toml

@@ -1,0 +1,9 @@
+requests:
+GET /api/v2/getMasterchainInfo
+GET /api/v2/getConfigAll?seqno=333333
+GET /api/v2/getShardAccountCell?address=0%3A6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707&seqno=333333
+GET /api/v2/getAddressInformation?address=0%3A6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707&seqno=333333
+GET /api/v2/getMasterchainInfo
+cache_tree:
+333333/
+333333/0_6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707.json

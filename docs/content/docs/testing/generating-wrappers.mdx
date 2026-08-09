@@ -1,9 +1,11 @@
 ---
 title: "Generating wrappers"
-description: "Learn how to automatically generate wrappers for Tolk contracts"
+description: "Learn how to automatically generate wrappers for contracts"
 ---
 
-Integration tests often need utility wrapper files to interact with smart contracts: send messages and call get-methods. The [`acton wrapper`](/docs/commands/wrapper) command generates those wrappers from Tolk contracts.
+Integration tests often need utility wrapper files to interact with smart contracts: send messages and call get-methods. The [`acton wrapper`](/docs/commands/wrapper) command generates those wrappers from contract ABI.
+
+For precompiled `.boc` contracts, add a `types` interface file first. See [Precompiled BoC contracts](/docs/building/precompiled-boc).
 
 ## Generate a wrapper
 
@@ -44,7 +46,7 @@ fun setupTest(): (Counter, Treasury, Treasury) {
         owner: deployer.address,
         counter: 0,
     });
-    val res = contract.deploy(deployer.address, { value: ton("1") });
+    val res = contract.deploy(deployer.address, { value: grams("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
     return (contract, deployer, notDeployer);
@@ -160,7 +162,7 @@ get fun `test example`() {
 
     // 2. Deploy it
     val deployer = testing.treasury("deployer");
-    contract.deploy(deployer.address, { value: ton("1") });
+    contract.deploy(deployer.address, { value: grams("1") });
 }
 ```
 
@@ -183,7 +185,7 @@ contract.sendIncrease(deployer.address, 10);
 
 // With custom value and bounce flag
 contract.sendIncrease(deployer.address, 10, {
-    value: ton("0.5"),
+    value: grams("0.5"),
     bounce: true
 });
 ```
@@ -225,11 +227,22 @@ test-output-dir = "tests/generated-tests"
 
 [wrappers.typescript]
 output-dir = "./wrappers-ts"
+
+[contracts.Counter.wrappers.tolk]
+output-dir = "tests/counter-wrappers"
+generate-test = false
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
 ```
 
 With this configuration:
 
-- `acton wrapper Counter` would write `tests/generated-wrappers/Counter.gen.tolk` and `tests/generated-tests/Counter.test.tolk`
-- `acton wrapper Counter --ts` would write to `wrappers-ts/Counter.gen.ts` (by default)
+- `acton wrapper Counter` writes `tests/counter-wrappers/Counter.gen.tolk` without a test stub because the contract overrides those two Tolk fields
+- `acton wrapper Counter --ts` writes `app/src/wrappers/counter/Counter.gen.ts`
+- contracts without nested wrapper settings continue to use `tests/generated-wrappers`, `tests/generated-tests`, and `wrappers-ts`
+
+Per-contract settings use the same fields as the project defaults and inherit
+any fields they omit. CLI path and test flags override both levels.
 
 See the [`acton wrapper` command reference](/docs/commands/wrapper) for more details on CLI options.

@@ -1,0 +1,17 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`suspended accounts config decodes basechain and masterchain addresses from ConfigParam 44 1`] = `
+{
+  "config": {
+    "rawAddresses": [
+      "0:0000000000000000000000000000000000000000000000000000000000000000",
+      "-1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    ],
+    "suspendedUntil": 1803189600,
+  },
+  "expiredAddressSuspended": false,
+  "invalidAddressSuspended": false,
+  "ordinaryAddressSuspended": false,
+  "zeroAddressSuspended": true,
+}
+`;

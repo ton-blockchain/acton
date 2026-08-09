@@ -244,7 +244,7 @@ fun onExternalMessage(inMsg: slice) {
     if (!canUseRestricted) {
         effectivelyLocked += totalRestrictedValue;
     }
-    reserveToncoinsOnBalance(effectivelyLocked, 2);
+    reserveGramsOnBalance(effectivelyLocked, 2);
 
     cs.stackMoveToTop();
     while (cs.getRemainingRefsCount()) {
@@ -303,9 +303,9 @@ get fun get_balances_at(time: int): (int, int, int) {
     ) = unpackData();
     (restricted, totalRestrictedValue) = unlockGrams(restricted, totalRestrictedValue, time);
     (locked, totalLockedValue) = unlockGrams(locked, totalLockedValue, time);
-    var tonBalance: int = getMyStartBalance();
+    var gramBalance: int = getMyStartBalance();
     try {} catch {}
-    return (tonBalance, totalRestrictedValue, totalLockedValue);
+    return (gramBalance, totalRestrictedValue, totalLockedValue);
 }
 
 @method_id(123)

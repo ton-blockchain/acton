@@ -11,7 +11,7 @@ Code coverage only shows execution and lines of code executed, whereas mutation 
 
 Additionally, coverage can be misleading and overlook weak tests. For example, a test that only calls `add(1, 2)` can reach every line yet never exercise the `a > 0` guard in the following code:
 
-```tolk
+```tolk {2}
 fun add(a: int, b: int): int {
     assert (a > 0) throw 5; // Validation
     return a + b;

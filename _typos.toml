@@ -17,6 +17,13 @@ extend-exclude = [
   "src/commands/new/templates/*/app/**",
   "src/commands/new/templates/*/wrappers-ts/**",
   "src/commands/new/templates/*/package-lock.json",
+  "crates/acton-abi-catalog/data/data-abis.json",
+  "*.csv",
+  "crates/ton-liteapi/src/tl/schemas/**",
+  "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json",
+  "packages/explorer-core/src/cell-inspector/block.tlb.generated.ts",
+  "packages/address-registry/src/mainnet.json",
+  "packages/address-registry/src/testnet.json",
 ]
 
 [default]
@@ -27,5 +34,12 @@ extend-ignore-re = [
   "\\balse\\b",
   "\\b(?:test-)?ba-stdlib-[A-Za-z0-9-]+\\b",
   "[dD]arcula",
-  "Ba"
+  "Ba",
+  "Inferrable",
+  "readed",
+  "authentificate",
+  "authentification",
+  "ba",
+  "lazer",
+  "\\b(?:vart|fo|FO|Fo|tou|overfl|bui|tru|TNam)\\b", # completion prefixes
 ]

@@ -1,26 +1,37 @@
+use crate::LocalnetError;
 use crate::executor::TvmEmulatorAdapter;
-use crate::node::{Node, StateSource};
+use crate::jetton_faucet;
+use crate::node::{Node, NodeClockInfo, StateSource};
+use crate::node_snapshot::{NodeStateSnapshot, snapshot_from_json, snapshot_to_json};
+use crate::remote::{
+    RemoteProvider, fetch_remote_block_header_v2, fetch_remote_block_transactions_ext_v2,
+    fetch_remote_block_transactions_v2, fetch_remote_blocks_v3, fetch_remote_lookup_block_v2,
+    fetch_remote_shards_v2, fetch_remote_transactions_v3,
+};
 use crate::storage;
-use crate::storage::{AccountStatus, BlockMeta, EMPTY_CELL_BASE64, MsgMeta, TransactionInfo};
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
+use crate::streaming::StreamingCommitEvent;
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use anyhow::Context;
-use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::{mpsc, oneshot};
+use std::time::{Duration, SystemTime};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::time::Instant;
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use tvm_ffi::json_stack::json_to_legacy_item;
-use tvm_ffi::stack::Tuple;
+use ton_executor::message::PrevBlockId;
+use tvm_ffi::json_stack::{TvmStackEntry, json_to_legacy_stack, std_stack_into_tuple};
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo, StdAddr, StdAddrFormat};
+use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
 use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
@@ -34,14 +45,82 @@ pub struct LocalnetBlockId {
     pub file_hash: Hash256,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetBlock {
+    pub workchain: i32,
+    pub shard: i64,
+    pub seqno: Seqno,
+    pub root_hash: Hash256,
+    pub file_hash: Hash256,
+    pub gen_utime: u32,
+    pub start_lt: Lt,
+    pub end_lt: Lt,
+    pub tx_count: usize,
+    pub prev_blocks: Vec<LocalnetBlockId>,
+    pub masterchain_block_ref: Option<LocalnetBlockId>,
+}
+
 impl LocalnetBlockId {
     pub const fn first() -> Self {
+        Self::basechain_anchor(0)
+    }
+
+    pub const fn basechain_anchor(seqno: Seqno) -> Self {
         Self {
             workchain: 0,
             shard: -9223372036854775808,
-            seqno: 0,
+            seqno,
             root_hash: Hash256([0; 32]),
             file_hash: Hash256([0; 32]),
+        }
+    }
+
+    pub const fn first_masterchain() -> Self {
+        Self::masterchain_anchor(0)
+    }
+
+    pub const fn masterchain_anchor(seqno: Seqno) -> Self {
+        Self {
+            workchain: -1,
+            shard: -9223372036854775808,
+            seqno,
+            root_hash: Hash256([0; 32]),
+            file_hash: Hash256([0; 32]),
+        }
+    }
+}
+
+fn localnet_block_id_from_v2(
+    block: &ton_api::toncenter::v2::TonBlockIdExt,
+) -> anyhow::Result<LocalnetBlockId> {
+    let shard = block.shard.trim();
+    let shard = if shard.starts_with('-') {
+        shard.parse::<i64>()?
+    } else {
+        let hex = shard
+            .strip_prefix("0x")
+            .or_else(|| shard.strip_prefix("0X"))
+            .unwrap_or(shard);
+        u64::from_str_radix(hex, 16)? as i64
+    };
+    Ok(LocalnetBlockId {
+        workchain: block.workchain,
+        shard,
+        seqno: Seqno::try_from(block.seqno)
+            .context("Remote block seqno does not fit localnet block numbering")?,
+        root_hash: block.root_hash.parse()?,
+        file_hash: block.file_hash.parse()?,
+    })
+}
+
+impl From<LocalnetBlockId> for PrevBlockId {
+    fn from(block_id: LocalnetBlockId) -> Self {
+        Self {
+            workchain: block_id.workchain,
+            shard: block_id.shard,
+            seqno: block_id.seqno,
+            root_hash: block_id.root_hash.0,
+            file_hash: block_id.file_hash.0,
         }
     }
 }
@@ -51,6 +130,7 @@ pub struct LocalnetAccountState {
     pub address: Addr,
     pub account_state_hash: Hash256,
     pub balance: u128,
+    pub extra_currencies: Vec<ExtraCurrency>,
     pub code: Option<BocBytes>,
     pub code_hash: Option<Hash256>,
     pub data: Option<BocBytes>,
@@ -62,12 +142,110 @@ pub struct LocalnetAccountState {
     pub frozen_hash: Option<Hash256>,
 }
 
+#[derive(Debug, Clone)]
+pub struct LocalnetAddressInfo {
+    pub address: Addr,
+    pub code_hash: Option<Hash256>,
+    pub dns: Option<storage::DnsRecordMeta>,
+    pub jetton_wallet: Option<storage::JettonWalletMeta>,
+    pub jetton_master: Option<storage::JettonMasterMeta>,
+    pub nft_item: Option<storage::NftItemMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+}
+
+impl LocalnetAddressInfo {
+    #[must_use]
+    pub fn jetton_wallet_code_hash(&self) -> Option<Hash256> {
+        self.jetton_master
+            .as_ref()
+            .map(|master| master.jetton_wallet_code_hash)
+            .or_else(|| {
+                self.jetton_wallet
+                    .as_ref()
+                    .map(|wallet| wallet.jetton_wallet_code_hash)
+            })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetAccountStateWithInfo {
+    pub state: LocalnetAccountState,
+    pub info: LocalnetAddressInfo,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetJettonWalletsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub jetton_addresses: Vec<String>,
+    pub exclude_zero_balance: Option<bool>,
+    pub sort: Option<LocalnetSortOrder>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetNftItemsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub collection_addresses: Vec<String>,
+    pub indexes: Vec<String>,
+    pub order: LocalnetNftItemsOrder,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetNftItemsOrder {
+    Insertion,
+    OwnerCollectionIndex,
+    CollectionIndex,
+    LastTransactionLtDesc,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetSortOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedJettonWalletsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    jetton_addresses: HashSet<Addr>,
+    exclude_zero_balance: bool,
+    sort: Option<LocalnetSortOrder>,
+    limit: usize,
+    offset: usize,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedNftItemsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    collection_addresses: HashSet<Addr>,
+    indexes: HashSet<BigInt>,
+    order: LocalnetNftItemsOrder,
+    limit: usize,
+    offset: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum LocalnetAccountStateChange {
+    Nonexist,
+    Uninit { balance: u128 },
+    FrozenFromCurrent,
+    Frozen { frozen_hash: Hash256, balance: u128 },
+}
+
 impl LocalnetAccountState {
     pub fn empty(address: Addr, block_id: LocalnetBlockId, sync_utime: u64) -> Self {
         Self {
             address,
             account_state_hash: Hash256([0; 32]),
             balance: 0,
+            extra_currencies: Vec::new(),
             code: None,
             code_hash: None,
             data: None,
@@ -78,6 +256,11 @@ impl LocalnetAccountState {
             sync_utime,
             frozen_hash: None,
         }
+    }
+
+    #[must_use]
+    pub(crate) fn is_missing(&self) -> bool {
+        self.account_state_hash == Hash256([0; 32])
     }
 }
 
@@ -94,7 +277,7 @@ pub struct LocalnetTransaction {
     pub mc_block_seqno: u32,
     pub utime: u32,
     pub data: BocBytes,
-    pub success: bool,
+    pub aborted: bool,
     pub exit_code: i32,
     pub transaction_id: LocalnetTransactionId,
     pub in_msg: LocalnetMessage,
@@ -105,12 +288,50 @@ pub struct LocalnetTransaction {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetTransactionsPage {
+    pub transactions: Vec<LocalnetTransaction>,
+    pub previous_transaction_id: LocalnetTransactionId,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetAccountBalance {
+    pub account: Addr,
+    pub balance: u128,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LocalnetEstimatedFee {
+    pub in_fwd_fee: u64,
+    pub storage_fee: u64,
+    pub gas_fee: u64,
+    pub fwd_fee: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetEstimateFeeResult {
+    pub source_fees: LocalnetEstimatedFee,
+    pub destination_fees: Vec<LocalnetEstimatedFee>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LocalnetContractData {
+    pub dns: Option<storage::DnsRecordMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+    pub nft_sale: Option<storage::NftSaleMeta>,
+    pub multisig: Option<storage::MultisigMeta>,
+    pub multisig_order: Option<storage::MultisigOrderMeta>,
+    pub vesting: Option<storage::VestingMeta>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
     #[serde(default)]
     pub hash_norm: Option<Hash256>,
     pub source: Option<Addr>,
     pub destination: Option<Addr>,
+    pub bounce: bool,
+    pub bounced: bool,
     pub value: u128,
     pub body_hash: Hash256,
     pub body: BocBytes,
@@ -119,6 +340,8 @@ pub struct LocalnetMessage {
     pub fwd_fee: u128,
     pub ihr_fee: u128,
     pub created_lt: u64,
+    #[serde(default)]
+    pub extra_currencies: Vec<ExtraCurrency>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -136,6 +359,8 @@ pub struct LocalnetMasterchainInfo {
     pub last: LocalnetBlockId,
     pub state_root_hash: Hash256,
     pub init: LocalnetBlockId,
+    pub config: BocBytes,
+    pub prev_blocks: Vec<LocalnetBlockId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -145,21 +370,83 @@ pub struct LocalnetConsensusBlock {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetMineResult {
+    pub blocks_mined: u32,
+    pub skipped_empty_blocks: u32,
+    pub last_block_seqno: Seqno,
+    pub blocks: Vec<LocalnetBlockId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct LocalnetMiningMode {
+    pub skip_empty_blocks: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum TransactionLookupKind {
+    Source,
+    Result,
+}
+
+impl Default for LocalnetMiningMode {
+    fn default() -> Self {
+        Self {
+            skip_empty_blocks: true,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetCheckpointResult {
+    pub name: String,
+    pub block_seqno: Seqno,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
+    pub global_id: i32,
+    pub version: i32,
+    pub after_merge: bool,
+    pub after_split: bool,
+    pub before_split: bool,
+    pub want_merge: bool,
+    pub want_split: bool,
+    pub validator_list_hash_short: i32,
+    pub catchain_seqno: i32,
+    pub min_ref_mc_seqno: i32,
+    pub is_key_block: bool,
+    pub prev_key_block_seqno: i32,
     pub gen_utime: u32,
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub prev_seqno: Option<Seqno>,
+    pub prev_blocks: Vec<LocalnetBlockId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockTransactions {
     pub id: LocalnetBlockId,
     pub transactions: Vec<LocalnetTransaction>,
+    pub requested_count: usize,
+    pub incomplete: bool,
     pub msg_hash: Option<Hash256>,
     #[serde(default)]
     pub msg_hash_norm: Option<Hash256>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetAcceptedExternalMessage {
+    /// Hash of the exact external-in message BOC accepted into the localnet queue.
+    pub msg_hash: Hash256,
+    /// TEP-467 normalized hash used by TonCenter-compatible lookups for external-in messages.
+    pub msg_hash_norm: Hash256,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetAcceptedInternalMessage {
+    /// Hash of the exact internal message BOC accepted into the localnet queue.
+    pub msg_hash: Hash256,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -175,17 +462,46 @@ pub struct LocalnetLibrary {
 pub(crate) enum Request {
     SendBoc {
         boc: BocBytes,
-        resp: oneshot::Sender<anyhow::Result<LocalnetBlockTransactions>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedExternalMessage>>,
+    },
+    SendInternalBoc {
+        boc: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
     GetAddressInformation {
         address: Addr,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LocalnetAccountState>>,
     },
+    GetAccountStates {
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAccountStateWithInfo>>>,
+    },
+    GetAddressInfos {
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAddressInfo>>>,
+    },
+    GetCellBoc {
+        hash: Hash256,
+        resp: oneshot::Sender<anyhow::Result<Option<BocBytes>>>,
+    },
     GetShardAccountCell {
         address: Addr,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    SetShardAccount {
+        address: Addr,
+        shard_account: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    ChangeAccountState {
+        address: Addr,
+        change: LocalnetAccountStateChange,
+        mine: bool,
+        resp: oneshot::Sender<anyhow::Result<()>>,
     },
     GetTransactions {
         address: Addr,
@@ -193,30 +509,38 @@ pub(crate) enum Request {
         lt: Option<u64>,
         hash: Option<Hash256>,
         to_lt: Option<u64>,
-        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetTransactionsPage>>,
     },
     GetAllTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
     },
+    GetAllTransactionsPage {
+        limit: usize,
+        offset: usize,
+        descending: bool,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
+    },
+    GetBlockTransactionsPage {
+        seqno: u32,
+        limit: usize,
+        offset: usize,
+        descending: bool,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
+    },
+    GetBlocks {
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetBlock>>>,
+    },
+    GetStateSource {
+        resp: oneshot::Sender<StateSource>,
+    },
     GetPendingTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
     },
-    TryLocateTx {
+    LocateTransaction {
         source: Addr,
         destination: Addr,
         created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateResultTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateSourceTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
+        kind: TransactionLookupKind,
         resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
     },
     RunGetMethod {
@@ -229,6 +553,26 @@ pub(crate) enum Request {
     GetBlockHeader {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<LocalnetBlockHeader>>,
+    },
+    GetBlockData {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    GetShardStateCell {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Cell>>,
+    },
+    GetMasterchainBlockHeader {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<LocalnetBlockHeader>>,
+    },
+    GetMasterchainBlockData {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    GetMasterchainStateCell {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Cell>>,
     },
     GetBlockTransactions {
         seqno: u32,
@@ -270,7 +614,13 @@ pub(crate) enum Request {
     Faucet {
         address: Addr,
         amount: u128,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
+    },
+    JettonFaucet {
+        recipient: Addr,
+        jetton_master: Addr,
+        amount: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
     GetTraces {
         tx_hash: Hash256,
@@ -286,97 +636,338 @@ pub(crate) enum Request {
         mc_block_seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<storage::EmulateTraceResult>>,
     },
+    EstimateFees {
+        boc: BocBytes,
+        ignore_chksig: bool,
+        resp: oneshot::Sender<anyhow::Result<LocalnetEstimateFeeResult>>,
+    },
+    GetTopAccountBalances {
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAccountBalance>>>,
+    },
     GetJettonMasters {
-        address: Option<Addr>,
-        admin_address: Option<Addr>,
+        addresses: HashSet<Addr>,
+        admin_addresses: HashSet<Addr>,
         limit: usize,
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonMasterMeta>>>,
     },
     GetJettonWallets {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        jetton_address: Option<Addr>,
-        exclude_zero_balance: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedJettonWalletsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
     GetNftItems {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        collection_address: Option<Addr>,
-        index: Option<String>,
-        sort_by_last_transaction_lt: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedNftItemsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
     },
-    SetAddressName {
+    DetectContractData {
         address: Addr,
-        name: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetContractData>>,
+    },
+    DumpStateToPath {
+        path: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    GetAddressName {
-        address: Addr,
-        resp: oneshot::Sender<anyhow::Result<Option<String>>>,
-    },
-    SetStateSource {
-        source: StateSource,
+    LoadStateFromPath {
+        path: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    GetStateSource {
-        resp: oneshot::Sender<anyhow::Result<StateSource>>,
-    },
-    RegisterCompilerAbis {
-        entries: Vec<(Hash256, Value)>,
-        resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    GetCompilerAbi {
-        code_hash: Hash256,
-        resp: oneshot::Sender<anyhow::Result<Option<Value>>>,
     },
     DumpState {
-        path: String,
-        resp: oneshot::Sender<anyhow::Result<()>>,
+        resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
     },
     LoadState {
-        path: String,
+        json: Vec<u8>,
         resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    CreateCheckpoint {
+        name: String,
+        force: bool,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
+    },
+    ListCheckpoints {
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetCheckpointResult>>>,
+    },
+    RestoreCheckpoint {
+        name: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
+    },
+    DeleteCheckpoint {
+        name: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
+    },
+    ClearCheckpoints {
+        resp: oneshot::Sender<anyhow::Result<usize>>,
+    },
+    ExportCheckpoint {
+        name: String,
+        resp: oneshot::Sender<anyhow::Result<Vec<u8>>>,
+    },
+    ImportCheckpoint {
+        name: String,
+        json: Vec<u8>,
+        force: bool,
+        resp: oneshot::Sender<anyhow::Result<LocalnetCheckpointResult>>,
+    },
+    MineBlocks {
+        count: u32,
+        resp: oneshot::Sender<anyhow::Result<LocalnetMineResult>>,
+    },
+    GetMiningMode {
+        resp: oneshot::Sender<anyhow::Result<LocalnetMiningMode>>,
+    },
+    SetMiningMode {
+        mode: LocalnetMiningMode,
+        resp: oneshot::Sender<anyhow::Result<LocalnetMiningMode>>,
+    },
+    GetClockInfo {
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    IncreaseTime {
+        seconds: u64,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    SetTime {
+        timestamp: u32,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    SetNextBlockTimestamp {
+        timestamp: u32,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
     },
 }
 
 pub struct Localnet {
     tx: mpsc::Sender<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
+    started_at: SystemTime,
+    block_interval_ms: u64,
+    auto_mining: bool,
 }
 
-impl Default for Localnet {
-    fn default() -> Self {
-        Self::new(StateSource::Local, None)
+#[derive(Default)]
+struct Checkpoints {
+    points: Vec<Checkpoint>,
+}
+
+struct Checkpoint {
+    name: String,
+    snapshot: NodeStateSnapshot,
+}
+
+impl Checkpoints {
+    fn create(
+        &mut self,
+        node: &Node,
+        name: String,
+        force: bool,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let name = normalize_checkpoint_name(name)?;
+        let replacement_index = self.replacement_index(&name, force)?;
+        let snapshot = node.build_snapshot()?;
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
+    }
+
+    fn import(
+        &mut self,
+        json: &[u8],
+        name: String,
+        force: bool,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let name = normalize_checkpoint_name(name)?;
+        let replacement_index = self.replacement_index(&name, force)?;
+        let snapshot = snapshot_from_json(json)?;
+        Node::validate_snapshot(&snapshot)?;
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
+    }
+
+    fn store_snapshot(
+        &mut self,
+        snapshot: NodeStateSnapshot,
+        name: String,
+        replacement_index: Option<usize>,
+    ) -> LocalnetCheckpointResult {
+        let block_seqno = snapshot.globals.head_seqno;
+        let point = Checkpoint {
+            name: name.clone(),
+            snapshot,
+        };
+        if let Some(index) = replacement_index {
+            self.points[index] = point;
+        } else {
+            self.points.push(point);
+        }
+        LocalnetCheckpointResult { name, block_seqno }
+    }
+
+    fn list(&self) -> Vec<LocalnetCheckpointResult> {
+        self.points
+            .iter()
+            .map(|point| LocalnetCheckpointResult {
+                name: point.name.clone(),
+                block_seqno: point.snapshot.globals.head_seqno,
+            })
+            .collect()
+    }
+
+    fn restore(&self, node: &mut Node, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
+        let index = self.find_index(&name)?;
+        let snapshot = self.points[index].snapshot.clone();
+        let result = self.result_at(index);
+        node.apply_snapshot(snapshot)?;
+        Ok(result)
+    }
+
+    fn delete(&mut self, name: String) -> anyhow::Result<LocalnetCheckpointResult> {
+        let index = self.find_index(&name)?;
+        let result = self.result_at(index);
+        self.points.remove(index);
+        Ok(result)
+    }
+
+    fn export(&self, name: String) -> anyhow::Result<Vec<u8>> {
+        let index = self.find_index(&name)?;
+        snapshot_to_json(&self.points[index].snapshot)
+    }
+
+    fn clear(&mut self) -> usize {
+        let count = self.points.len();
+        self.points.clear();
+        count
+    }
+
+    fn replacement_index(&self, name: &str, force: bool) -> anyhow::Result<Option<usize>> {
+        let index = self.points.iter().position(|point| point.name == name);
+        if index.is_some() && !force {
+            anyhow::bail!("Checkpoint name {name} already exists");
+        }
+        Ok(index)
+    }
+
+    fn find_index(&self, name: &str) -> anyhow::Result<usize> {
+        let name = normalize_checkpoint_name(name.to_owned())?;
+        self.points
+            .iter()
+            .position(|point| point.name == name)
+            .with_context(|| format!("Checkpoint name {name} not found"))
+    }
+
+    fn result_at(&self, index: usize) -> LocalnetCheckpointResult {
+        let point = &self.points[index];
+        LocalnetCheckpointResult {
+            name: point.name.clone(),
+            block_seqno: point.snapshot.globals.head_seqno,
+        }
     }
 }
 
+fn normalize_checkpoint_name(name: String) -> anyhow::Result<String> {
+    let name = name.trim();
+    if name.is_empty() {
+        anyhow::bail!("Checkpoint name cannot be empty");
+    }
+    Ok(name.to_owned())
+}
+
+pub const DEFAULT_BLOCK_INTERVAL_MS: u64 = 500;
+
 impl Localnet {
     #[must_use]
-    pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
+    pub fn new(
+        state_source: StateSource,
+        db_path: Option<String>,
+        block_interval: Duration,
+        auto_mining: bool,
+        mining_mode: LocalnetMiningMode,
+    ) -> Self {
         let (tx, rx) = mpsc::channel(100);
+        let (events_tx, _) = broadcast::channel(1024);
+        let started_at = SystemTime::now();
+        let node_events_tx = events_tx.clone();
+        let block_interval_ms = u64::try_from(block_interval.as_millis()).unwrap_or(u64::MAX);
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, state_source, db_path) {
+            if let Err(e) = run_node_loop(
+                rx,
+                node_events_tx,
+                state_source,
+                db_path,
+                block_interval,
+                auto_mining,
+                mining_mode,
+            ) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
 
-        Self { tx }
+        Self {
+            tx,
+            events_tx,
+            started_at,
+            block_interval_ms,
+            auto_mining,
+        }
     }
 
-    pub async fn send_boc(&self, boc_str: String) -> anyhow::Result<LocalnetBlockTransactions> {
-        let boc = base64::engine::general_purpose::STANDARD
-            .decode(&boc_str)
-            .context("Invalid BOC base64")?
-            .into();
+    #[must_use]
+    pub fn uptime_seconds(&self) -> u64 {
+        self.started_at
+            .elapsed()
+            .map_or(0, |duration| duration.as_secs())
+    }
+
+    #[must_use]
+    pub const fn block_interval_ms(&self) -> u64 {
+        self.block_interval_ms
+    }
+
+    #[must_use]
+    pub const fn auto_mining(&self) -> bool {
+        self.auto_mining
+    }
+
+    #[must_use]
+    pub fn subscribe_streaming_events(&self) -> broadcast::Receiver<StreamingCommitEvent> {
+        self.events_tx.subscribe()
+    }
+
+    pub async fn send_boc(
+        &self,
+        boc_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedExternalMessage> {
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        self.send_boc_bytes(boc).await
+    }
+
+    /// Sends an already decoded external-in message `BoC` into the localnet queue.
+    ///
+    /// Toncenter-compatible HTTP accepts a base64 string, while `LiteAPI` carries the
+    /// raw `bytes` field from `liteServer.sendMessage`. Both paths end up in the
+    /// same actor request so localnet keeps one validation/enqueueing behavior for
+    /// external-in messages.
+    pub async fn send_boc_bytes(
+        &self,
+        boc: BocBytes,
+    ) -> anyhow::Result<LocalnetAcceptedExternalMessage> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendBoc { boc, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn send_internal_boc(
+        &self,
+        boc_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        self.enqueue_internal_boc(boc).await
+    }
+
+    async fn enqueue_internal_boc(
+        &self,
+        boc: BocBytes,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
     }
 
@@ -385,7 +976,7 @@ impl Localnet {
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetAccountState> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressInformation {
@@ -397,17 +988,93 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_account_states(
+        &self,
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Vec<LocalnetAccountStateWithInfo>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAccountStates {
+                addresses,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_address_infos(
+        &self,
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressInfos {
+                addresses,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_cell_boc(&self, hash: Hash256) -> anyhow::Result<Option<BocBytes>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetCellBoc { hash, resp }).await?;
+        rx.await?
+    }
+
     pub async fn get_shard_account_cell(
         &self,
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<BocBytes> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetShardAccountCell {
                 address,
                 seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn set_shard_account(
+        &self,
+        address_str: String,
+        shard_account: String,
+    ) -> anyhow::Result<()> {
+        let address = Addr::parse(&address_str)?;
+        let shard_account =
+            BocBytes::from_base64(&shard_account).context("Invalid shard_account base64")?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetShardAccount {
+                address,
+                shard_account,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn change_account_state(
+        &self,
+        address_str: String,
+        change: LocalnetAccountStateChange,
+        mine: bool,
+    ) -> anyhow::Result<()> {
+        let address = Addr::parse(&address_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::ChangeAccountState {
+                address,
+                change,
+                mine,
                 resp,
             })
             .await?;
@@ -422,13 +1089,42 @@ impl Localnet {
         hash_str: Option<String>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let hash = if let Some(h) = hash_str {
-            Some(Hash256::from_base64(&h)?)
+            Some(h.parse()?)
         } else {
             None
         };
+        self.get_transactions_by_address(address, limit, lt, hash, to_lt)
+            .await
+    }
 
+    /// Returns transactions for a parsed account address.
+    ///
+    /// This typed API is shared by `LiteAPI` and `TonCenter` adapters so both
+    /// transports use the same actor request and pagination semantics.
+    pub async fn get_transactions_by_address(
+        &self,
+        address: Addr,
+        limit: usize,
+        lt: Option<u64>,
+        hash: Option<Hash256>,
+        to_lt: Option<u64>,
+    ) -> anyhow::Result<Vec<LocalnetTransaction>> {
+        Ok(self
+            .get_transactions_page_by_address(address, limit, lt, hash, to_lt)
+            .await?
+            .transactions)
+    }
+
+    pub async fn get_transactions_page_by_address(
+        &self,
+        address: Addr,
+        limit: usize,
+        lt: Option<u64>,
+        hash: Option<Hash256>,
+        to_lt: Option<u64>,
+    ) -> anyhow::Result<LocalnetTransactionsPage> {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetTransactions {
@@ -449,6 +1145,121 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_all_transactions_page(
+        &self,
+        limit: usize,
+        offset: usize,
+        descending: bool,
+    ) -> anyhow::Result<Vec<LocalnetTransaction>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAllTransactionsPage {
+                limit,
+                offset,
+                descending,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_block_transactions_page(
+        &self,
+        seqno: u32,
+        limit: usize,
+        offset: usize,
+        descending: bool,
+    ) -> anyhow::Result<Vec<LocalnetTransaction>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetBlockTransactionsPage {
+                seqno,
+                limit,
+                offset,
+                descending,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_blocks(&self) -> anyhow::Result<Vec<LocalnetBlock>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetBlocks { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn state_source(&self) -> anyhow::Result<StateSource> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetStateSource { resp }).await?;
+        Ok(rx.await?)
+    }
+
+    pub async fn get_historical_blocks_v3(
+        &self,
+        requested_seqno: Option<i32>,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::BlocksResponse>> {
+        let Some(provider) = self.historical_provider(requested_seqno).await? else {
+            return Ok(None);
+        };
+        fetch_remote_blocks_v3(&provider, raw_query).await.map(Some)
+    }
+
+    pub async fn get_historical_transactions_v3(
+        &self,
+        requested_seqno: Option<i32>,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::TransactionsResponse>> {
+        let Some(provider) = self.historical_provider(requested_seqno).await? else {
+            return Ok(None);
+        };
+        fetch_remote_transactions_v3(&provider, raw_query)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_unpinned_historical_transactions_v3(
+        &self,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::TransactionsResponse>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        if provider.fork_block_number.is_none() {
+            return Ok(None);
+        }
+        fetch_remote_transactions_v3(&provider, raw_query)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_fork_masterchain_block_v2(
+        &self,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockHeader>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        let Some(seqno) = provider
+            .fork_block_number
+            .map(u32::try_from)
+            .transpose()
+            .context("Fork block seqno does not fit TonCenter v2 request")?
+        else {
+            return Ok(None);
+        };
+        let request = ton_api::toncenter::v2::BlockHeaderRequest {
+            workchain: (-1).into(),
+            shard: ton_api::toncenter::v2::StringOrNumber::String(i64::MIN.to_string()),
+            seqno: seqno.into(),
+            root_hash: None,
+            file_hash: None,
+        };
+        fetch_remote_block_header_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
     pub async fn get_pending_transactions(&self) -> anyhow::Result<Vec<LocalnetTransaction>> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -457,60 +1268,20 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn try_locate_tx(
+    pub(crate) async fn locate_transaction(
         &self,
-        source_str: String,
-        destination_str: String,
+        source: Addr,
+        destination: Addr,
         created_lt: u64,
+        kind: TransactionLookupKind,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::TryLocateTx {
+            .send(Request::LocateTransaction {
                 source,
                 destination,
                 created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_result_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateResultTx {
-                source,
-                destination,
-                created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_source_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateSourceTx {
-                source,
-                destination,
-                created_lt,
+                kind,
                 resp,
             })
             .await?;
@@ -524,7 +1295,30 @@ impl Localnet {
         stack_json: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-        let address = Self::parse_addr(&address_str)?;
+        let stack = json_to_legacy_stack(stack_json)?;
+        self.run_get_method_with_stack(address_str, method, stack, seqno)
+            .await
+    }
+
+    pub async fn run_get_method_std(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Vec<TvmStackEntry>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        self.run_get_method_with_stack(address_str, method, std_stack_into_tuple(stack)?, seqno)
+            .await
+    }
+
+    async fn run_get_method_with_stack(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Tuple,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        let address = Addr::parse(&address_str)?;
         let method_id = if let Ok(id) = method.parse::<i32>() {
             id
         } else {
@@ -532,13 +1326,24 @@ impl Localnet {
             (i32::from(crc) & 0xffff) | 0x10000
         };
 
-        let stack = Tuple(
-            stack_json
-                .into_iter()
-                .map(json_to_legacy_item)
-                .collect::<anyhow::Result<Vec<_>>>()?,
-        );
+        self.run_get_method_by_id(address, method_id, stack, seqno)
+            .await
+    }
 
+    /// Runs a smart-contract get-method using a numeric method id and a typed TVM stack.
+    ///
+    /// This is the shared execution path for binary protocols such as `LiteAPI`
+    /// that already carry `method_id` and serialized stack values. The method
+    /// avoids the toncenter JSON stack conversion used by [`Self::run_get_method`]
+    /// and sends the typed request directly to the localnet actor, which executes
+    /// it against the requested block state.
+    pub async fn run_get_method_by_id(
+        &self,
+        address: Addr,
+        method_id: i32,
+        stack: Tuple,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::RunGetMethod {
@@ -578,6 +1383,47 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_block_data(&self, seqno: u32) -> anyhow::Result<BocBytes> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetBlockData { seqno, resp }).await?;
+        rx.await?
+    }
+
+    pub(crate) async fn get_shard_state_cell(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetShardStateCell { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_masterchain_block_header(
+        &self,
+        seqno: u32,
+    ) -> anyhow::Result<LocalnetBlockHeader> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetMasterchainBlockHeader { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_masterchain_block_data(&self, seqno: u32) -> anyhow::Result<BocBytes> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetMasterchainBlockData { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub(crate) async fn get_masterchain_state_cell(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetMasterchainStateCell { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_block_transactions(
         &self,
         seqno: u32,
@@ -592,7 +1438,16 @@ impl Localnet {
     pub async fn get_masterchain_info(&self) -> anyhow::Result<LocalnetMasterchainInfo> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetMasterchainInfo { resp }).await?;
-        rx.await?
+        let mut info = rx.await??;
+        if info.last.root_hash == Hash256::default()
+            && info.last.file_hash == Hash256::default()
+            && let Some(header) = self.get_fork_masterchain_block_v2().await?
+        {
+            let block_id = localnet_block_id_from_v2(&header.id)?;
+            info.last = block_id.clone();
+            info.init = block_id;
+        }
+        Ok(info)
     }
 
     pub async fn get_consensus_block(&self) -> anyhow::Result<LocalnetConsensusBlock> {
@@ -634,15 +1489,142 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_historical_block_header_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockHeaderRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockHeader>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_header_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_historical_block_transactions_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockTransactions>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_transactions_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_historical_block_transactions_ext_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: u32,
+        request: ton_api::toncenter::v2::BlockTransactionsRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockTransactionsExt>> {
+        let Some(provider) = self
+            .historical_block_provider(workchain, shard, seqno)
+            .await?
+        else {
+            return Ok(None);
+        };
+        fetch_remote_block_transactions_ext_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_historical_shards_v2(
+        &self,
+        seqno: u32,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::Shards>> {
+        let Some(provider) = self.historical_provider(i32::try_from(seqno).ok()).await? else {
+            return Ok(None);
+        };
+        fetch_remote_shards_v2(&provider, seqno).await.map(Some)
+    }
+
+    async fn historical_provider(
+        &self,
+        requested_seqno: Option<i32>,
+    ) -> anyhow::Result<Option<RemoteProvider>> {
+        let Some(requested_seqno) = requested_seqno.and_then(|seqno| u64::try_from(seqno).ok())
+        else {
+            return Ok(None);
+        };
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        // The fork block is the remote parent of the first locally mined block.
+        Ok(provider
+            .fork_block_number
+            .is_some_and(|fork_seqno| requested_seqno <= fork_seqno)
+            .then_some(provider))
+    }
+
+    async fn historical_block_provider(
+        &self,
+        workchain: i32,
+        shard: i64,
+        requested_seqno: u32,
+    ) -> anyhow::Result<Option<RemoteProvider>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        let is_historical = provider
+            .contains_historical_block(workchain, shard, u64::from(requested_seqno))
+            .await?;
+        Ok(is_historical.then_some(provider))
+    }
+
+    pub async fn get_historical_lookup_block_v2(
+        &self,
+        workchain: i32,
+        shard: i64,
+        requested_seqno: Option<u32>,
+        request: ton_api::toncenter::v2::LookupBlockRequest,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::TonBlockIdExt>> {
+        let provider = if let Some(seqno) = requested_seqno {
+            let Some(provider) = self
+                .historical_block_provider(workchain, shard, seqno)
+                .await?
+            else {
+                return Ok(None);
+            };
+            provider
+        } else {
+            let StateSource::Remote(provider) = self.state_source().await? else {
+                return Ok(None);
+            };
+            if provider.fork_block_number.is_none() {
+                return Ok(None);
+            }
+            provider
+        };
+        let block = fetch_remote_lookup_block_v2(&provider, request).await?;
+        Ok(provider
+            .contains_historical_block_id(&block)
+            .await?
+            .then_some(block))
+    }
+
     pub async fn lookup_block(
         &self,
         workchain: i32,
-        shard: String,
+        shard: i64,
         seqno: Option<u32>,
         lt: Option<u64>,
         unixtime: Option<u32>,
     ) -> anyhow::Result<LocalnetBlockId> {
-        let shard = shard.parse::<i64>().context("invalid shard number")?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::LookupBlock {
@@ -657,13 +1639,39 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn faucet(&self, address_str: String, amount: u128) -> anyhow::Result<Value> {
-        let address = Self::parse_addr(&address_str)?;
+    pub async fn faucet(
+        &self,
+        address_str: String,
+        amount: u128,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::Faucet {
                 address,
                 amount,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn jetton_faucet(
+        &self,
+        address_str: String,
+        jetton_master_str: String,
+        amount_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let recipient = Addr::parse(&address_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid recipient address"))?;
+        let jetton_master = Addr::parse(&jetton_master_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid jetton master address"))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::JettonFaucet {
+                recipient,
+                jetton_master,
+                amount: amount_str,
                 resp,
             })
             .await?;
@@ -693,10 +1701,7 @@ impl Localnet {
         ignore_chksig: Option<bool>,
         mc_block_seqno: Option<u32>,
     ) -> anyhow::Result<storage::EmulateTraceResult> {
-        let boc = base64::engine::general_purpose::STANDARD
-            .decode(&boc_str)
-            .context("Invalid BOC base64")?
-            .into();
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::EmulateTrace {
@@ -709,21 +1714,53 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn estimate_fees(
+        &self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::EstimateFees {
+                boc,
+                ignore_chksig,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_top_account_balances(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<LocalnetAccountBalance>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetTopAccountBalances {
+                limit,
+                offset,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_jetton_masters(
         &self,
-        address: Option<String>,
-        admin_address: Option<String>,
+        addresses: Vec<String>,
+        admin_addresses: Vec<String>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let admin_address = admin_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let addresses = Self::parse_addresses(addresses)?;
+        let admin_addresses = Self::parse_addresses(admin_addresses)?;
 
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetJettonMasters {
-                address,
-                admin_address,
+                addresses,
+                admin_addresses,
                 limit: limit.unwrap_or(10),
                 offset: offset.unwrap_or(0),
                 resp,
@@ -734,189 +1771,366 @@ impl Localnet {
 
     pub async fn get_jetton_wallets(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        jetton_address: Option<String>,
-        exclude_zero_balance: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetJettonWalletsQuery,
     ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let jetton_address = jetton_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let query = ParsedJettonWalletsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            jetton_addresses: Self::parse_addresses(query.jetton_addresses)?,
+            exclude_zero_balance: query.exclude_zero_balance.unwrap_or(false),
+            sort: query.sort,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetJettonWallets {
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance: exclude_zero_balance.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
+            .send(Request::GetJettonWallets { query, resp })
             .await?;
         rx.await?
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn get_nft_items(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        collection_address: Option<String>,
-        index: Option<String>,
-        sort_by_last_transaction_lt: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetNftItemsQuery,
     ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let collection_address = collection_address
-            .map(|s| Self::parse_addr(&s))
-            .transpose()?;
+        let query = ParsedNftItemsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            collection_addresses: Self::parse_addresses(query.collection_addresses)?,
+            indexes: query
+                .indexes
+                .into_iter()
+                .filter(|index| !index.is_empty())
+                .map(|index| {
+                    index
+                        .parse()
+                        .with_context(|| format!("Invalid NFT index `{index}`"))
+                })
+                .collect::<anyhow::Result<_>>()?,
+            order: query.order,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetNftItems {
-                address,
-                owner_address,
-                collection_address,
-                index,
-                sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
-            .await?;
+        self.tx.send(Request::GetNftItems { query, resp }).await?;
         rx.await?
     }
 
-    pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::SetAddressName {
-                address,
-                name,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn get_address_name(&self, address_str: String) -> anyhow::Result<Option<String>> {
-        let address = Self::parse_addr(&address_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressName { address, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::SetStateSource { source, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn get_state_source(&self) -> anyhow::Result<StateSource> {
-        let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::GetStateSource { resp }).await?;
-        rx.await?
-    }
-
-    pub async fn register_compiler_abis(
+    pub async fn detect_contract_data(
         &self,
-        entries: Vec<(Hash256, Value)>,
-    ) -> anyhow::Result<()> {
-        if entries.is_empty() {
-            return Ok(());
-        }
-
+        address: String,
+    ) -> anyhow::Result<LocalnetContractData> {
+        let address = Addr::parse(&address)?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::RegisterCompilerAbis { entries, resp })
+            .send(Request::DetectContractData { address, resp })
             .await?;
         rx.await?
     }
 
-    pub async fn get_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<Option<Value>> {
+    pub async fn dump_state_to_path(&self, path: String) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetCompilerAbi { code_hash, resp })
+            .send(Request::DumpStateToPath { path, resp })
             .await?;
         rx.await?
     }
 
-    pub async fn dump_state(&self, path: String) -> anyhow::Result<()> {
+    pub async fn load_state_from_path(&self, path: String) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::DumpState { path, resp }).await?;
+        self.tx
+            .send(Request::LoadStateFromPath { path, resp })
+            .await?;
         rx.await?
     }
 
-    pub async fn load_state(&self, path: String) -> anyhow::Result<()> {
+    pub async fn dump_state(&self) -> anyhow::Result<Vec<u8>> {
         let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::LoadState { path, resp }).await?;
+        self.tx.send(Request::DumpState { resp }).await?;
         rx.await?
     }
 
-    fn parse_addr(s: &str) -> anyhow::Result<Addr> {
-        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
-            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
-        })?;
-        Ok(Addr {
-            workchain: i32::from(int_addr.workchain),
-            addr: int_addr.address.0,
-        })
+    pub async fn load_state(&self, json: Vec<u8>) -> anyhow::Result<()> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::LoadState { json, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn create_checkpoint(
+        &self,
+        name: String,
+        force: bool,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::CreateCheckpoint { name, force, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn list_checkpoints(&self) -> anyhow::Result<Vec<LocalnetCheckpointResult>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ListCheckpoints { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn restore_checkpoint(
+        &self,
+        name: String,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::RestoreCheckpoint { name, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn delete_checkpoint(
+        &self,
+        name: String,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::DeleteCheckpoint { name, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn clear_checkpoints(&self) -> anyhow::Result<usize> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ClearCheckpoints { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn export_checkpoint(&self, name: String) -> anyhow::Result<Vec<u8>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::ExportCheckpoint { name, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn import_checkpoint(
+        &self,
+        name: String,
+        json: Vec<u8>,
+        force: bool,
+    ) -> anyhow::Result<LocalnetCheckpointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::ImportCheckpoint {
+                name,
+                json,
+                force,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn mine_blocks(&self, count: u32) -> anyhow::Result<LocalnetMineResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::MineBlocks { count, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn get_mining_mode(&self) -> anyhow::Result<LocalnetMiningMode> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetMiningMode { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn set_mining_mode(
+        &self,
+        mode: LocalnetMiningMode,
+    ) -> anyhow::Result<LocalnetMiningMode> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SetMiningMode { mode, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn clock_info(&self) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetClockInfo { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn increase_time(&self, seconds: u64) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::IncreaseTime { seconds, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn set_time(&self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SetTime { timestamp, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn set_next_block_timestamp(&self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetNextBlockTimestamp { timestamp, resp })
+            .await?;
+        rx.await?
+    }
+
+    fn parse_addresses(values: Vec<String>) -> anyhow::Result<HashSet<Addr>> {
+        values
+            .into_iter()
+            .map(|value| Addr::parse(&value))
+            .collect()
     }
 }
 
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
     state_source: StateSource,
     db_path: Option<String>,
+    block_interval: Duration,
+    auto_mining: bool,
+    mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
-    let executor = Box::new(TvmEmulatorAdapter::new()?);
-    let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
-    let mut node = Node::with_db_path(executor, config_bytes.into(), state_source, db_path)?;
+    let mut node = create_node(events_tx, state_source, db_path)?;
+    let mut checkpoints = Checkpoints::default();
+    tracing::info!(
+        "TON localnet started, block interval: {}ms, auto mining: {}, skip empty blocks: {}",
+        block_interval.as_millis(),
+        auto_mining,
+        mining_mode.skip_empty_blocks
+    );
 
-    tracing::info!("TON localnet started");
+    if !auto_mining {
+        while let Some(req) = rx.blocking_recv() {
+            process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
+        }
+        return Ok(());
+    }
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .context("Failed to create localnet node runtime")?;
+    runtime.block_on(run_node_loop_async(rx, node, block_interval, mining_mode))
+}
+
+fn create_node(
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
+    state_source: StateSource,
+    db_path: Option<String>,
+) -> anyhow::Result<Node> {
+    let executor = Box::new(TvmEmulatorAdapter::new()?);
+    let config_boc = BocBytes::from_base64(DEFAULT_CONFIG)?;
+    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path)?;
+    node.streaming_events = Some(events_tx);
+    Ok(node)
+}
+
+// The node loop runs on a dedicated current-thread Tokio runtime, so the
+// non-Send executor stored in Node never crosses thread boundaries.
+#[allow(clippy::future_not_send)]
+async fn run_node_loop_async(
+    mut rx: mpsc::Receiver<Request>,
+    mut node: Node,
+    block_interval: Duration,
+    mut mining_mode: LocalnetMiningMode,
+) -> anyhow::Result<()> {
+    let mut next_block_at = Instant::now() + block_interval;
+    let mut checkpoints = Checkpoints::default();
 
     loop {
-        // 1. Process all currently pending requests
-        while let Ok(req) = rx.try_recv() {
-            process_loop_request(&mut node, req);
-        }
-
-        // 2. If there are pending messages in the pool, mine one
-        if node.has_pending_messages() {
-            tracing::info!("Auto-mining message from pool");
-            if let Err(e) = node.mine_one() {
-                tracing::error!("Auto-mining failed: {:?}", e);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+        if Instant::now() >= next_block_at {
+            next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
             continue;
         }
 
-        // 3. If pool is empty, block until next request
-        if let Some(req) = rx.blocking_recv() {
-            process_loop_request(&mut node, req);
-        } else {
-            break; // Channel closed
+        tokio::select! {
+            biased;
+            () = tokio::time::sleep_until(next_block_at) => {
+                next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
+            }
+            req = rx.recv() => {
+                let Some(req) = req else {
+                    return Ok(());
+                };
+                process_loop_request(&mut node, &mut checkpoints, &mut mining_mode, req);
+            }
         }
     }
-    Ok(())
 }
 
-fn process_loop_request(node: &mut Node, req: Request) {
+fn mine_scheduled_block(
+    node: &mut Node,
+    block_interval: Duration,
+    mining_mode: LocalnetMiningMode,
+) -> Instant {
+    if let Err(e) = mine_block_with_mode(node, mining_mode) {
+        tracing::error!("Block mining failed: {:?}", e);
+    }
+    Instant::now() + block_interval
+}
+
+fn mine_block_with_mode(
+    node: &mut Node,
+    mining_mode: LocalnetMiningMode,
+) -> anyhow::Result<Option<BlockMeta>> {
+    if mining_mode.skip_empty_blocks {
+        node.mine_block_if_pending()
+    } else {
+        node.mine_block().map(Some)
+    }
+}
+
+fn handle_mine_blocks(
+    node: &mut Node,
+    count: u32,
+    mining_mode: LocalnetMiningMode,
+) -> anyhow::Result<LocalnetMineResult> {
+    anyhow::ensure!(count > 0, "blocks must be greater than 0");
+
+    let mut blocks = Vec::with_capacity(count as usize);
+    let mut skipped_empty_blocks = 0;
+    for _ in 0..count {
+        match mine_block_with_mode(node, mining_mode)? {
+            Some(block) => blocks.push(block.block_id()),
+            None => skipped_empty_blocks += 1,
+        }
+    }
+
+    let last_block_seqno = blocks
+        .last()
+        .map_or(node.globals.head_seqno, |block| block.seqno);
+    let blocks_mined = blocks
+        .len()
+        .try_into()
+        .context("mined blocks count exceeds u32")?;
+    Ok(LocalnetMineResult {
+        blocks_mined,
+        skipped_empty_blocks,
+        last_block_seqno,
+        blocks,
+    })
+}
+
+fn process_loop_request(
+    node: &mut Node,
+    checkpoints: &mut Checkpoints,
+    mining_mode: &mut LocalnetMiningMode,
+    req: Request,
+) {
     tracing::debug!("Node loop processing request: {:?}", req);
     match req {
         Request::SendBoc { boc, resp } => {
             let res = handle_send_boc(node, boc);
+            let _ = resp.send(res);
+        }
+        Request::SendInternalBoc { boc, resp } => {
+            let res = handle_send_internal_boc(node, boc);
             let _ = resp.send(res);
         }
         Request::GetAddressInformation {
@@ -927,12 +2141,48 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_address_info(node, address, seqno);
             let _ = resp.send(res);
         }
+        Request::GetAccountStates {
+            addresses,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_account_states(node, addresses, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetAddressInfos {
+            addresses,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_infos(node, addresses, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetCellBoc { hash, resp } => {
+            let _ = resp.send(Ok(node.get_cell(&hash)));
+        }
         Request::GetShardAccountCell {
             address,
             seqno,
             resp,
         } => {
             let res = node.get_shard_account_at_block(&address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::SetShardAccount {
+            address,
+            shard_account,
+            resp,
+        } => {
+            let res = node.set_shard_account(&address, shard_account);
+            let _ = resp.send(res);
+        }
+        Request::ChangeAccountState {
+            address,
+            change,
+            mine,
+            resp,
+        } => {
+            let res = node.change_account_state(&address, change, mine);
             let _ = resp.send(res);
         }
         Request::GetTransactions {
@@ -950,35 +2200,44 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_all_transactions(node);
             let _ = resp.send(res);
         }
+        Request::GetAllTransactionsPage {
+            limit,
+            offset,
+            descending,
+            resp,
+        } => {
+            let res = handle_get_all_transactions_page(node, limit, offset, descending);
+            let _ = resp.send(res);
+        }
+        Request::GetBlockTransactionsPage {
+            seqno,
+            limit,
+            offset,
+            descending,
+            resp,
+        } => {
+            let res = handle_get_block_transactions_page(node, seqno, limit, offset, descending);
+            let _ = resp.send(res);
+        }
+        Request::GetBlocks { resp } => {
+            let res = handle_get_blocks(node);
+            let _ = resp.send(res);
+        }
+        Request::GetStateSource { resp } => {
+            let _ = resp.send(node.state_source.clone());
+        }
         Request::GetPendingTransactions { resp } => {
             let res = handle_get_pending_transactions(node);
             let _ = resp.send(res);
         }
-        Request::TryLocateTx {
+        Request::LocateTransaction {
             source,
             destination,
             created_lt,
+            kind,
             resp,
         } => {
-            let res = handle_try_locate_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateResultTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_result_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateSourceTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_source_tx(node, source, destination, created_lt);
+            let res = handle_locate_transaction(node, source, destination, created_lt, kind);
             let _ = resp.send(res);
         }
         Request::RunGetMethod {
@@ -993,6 +2252,26 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::GetBlockHeader { seqno, resp } => {
             let res = handle_get_block_header(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetBlockData { seqno, resp } => {
+            let res = node.get_block_data(seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetShardStateCell { seqno, resp } => {
+            let res = node.get_shard_state_cell(seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetMasterchainBlockHeader { seqno, resp } => {
+            let res = handle_get_masterchain_block_header(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetMasterchainBlockData { seqno, resp } => {
+            let res = node.get_masterchain_block_data(seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetMasterchainStateCell { seqno, resp } => {
+            let res = node.get_masterchain_state_cell(seqno);
             let _ = resp.send(res);
         }
         Request::GetBlockTransactions { seqno, resp } => {
@@ -1024,14 +2303,14 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let _ = resp.send(res);
         }
         Request::LookupBlock {
-            workchain: _, // unused since localnet have only one workchain
-            shard: _,     // unused since localnet have only one shard
+            workchain,
+            shard,
             seqno,
             lt,
             unixtime,
             resp,
         } => {
-            let res = handle_lookup_block(node, seqno, lt, unixtime);
+            let res = handle_lookup_block(node, workchain, shard, seqno, lt, unixtime);
             let _ = resp.send(res);
         }
         Request::Faucet {
@@ -1039,7 +2318,19 @@ fn process_loop_request(node: &mut Node, req: Request) {
             amount,
             resp,
         } => {
-            let res = node.faucet(&address, amount);
+            let res = node
+                .faucet(&address, amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
+            let _ = resp.send(res);
+        }
+        Request::JettonFaucet {
+            recipient,
+            jetton_master,
+            amount,
+            resp,
+        } => {
+            let res = jetton_faucet::mint(node, &jetton_master, &recipient, &amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
             let _ = resp.send(res);
         }
         Request::GetTraces { tx_hash, resp } => {
@@ -1059,118 +2350,152 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = node.emulate_trace_by_external_message(boc, ignore_chksig, mc_block_seqno);
             let _ = resp.send(res);
         }
+        Request::EstimateFees {
+            boc,
+            ignore_chksig,
+            resp,
+        } => {
+            let res = node.estimate_fees_by_external_message(boc, ignore_chksig);
+            let _ = resp.send(res);
+        }
+        Request::GetTopAccountBalances {
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = Ok(node.top_account_balances(limit, offset));
+            let _ = resp.send(res);
+        }
         Request::GetJettonMasters {
-            address,
-            admin_address,
+            addresses,
+            admin_addresses,
             limit,
             offset,
             resp,
         } => {
-            let res = node.get_jetton_masters(address, admin_address, limit, offset);
+            let res = handle_get_jetton_masters(node, addresses, admin_addresses, limit, offset);
             let _ = resp.send(res);
         }
-        Request::GetJettonWallets {
-            address,
-            owner_address,
-            jetton_address,
-            exclude_zero_balance,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = node.get_jetton_wallets(
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance,
-                limit,
-                offset,
-            );
+        Request::GetJettonWallets { query, resp } => {
+            let res = handle_get_jetton_wallets(node, query);
             let _ = resp.send(res);
         }
-        Request::GetNftItems {
-            address,
-            owner_address,
-            collection_address,
-            index,
-            sort_by_last_transaction_lt,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = node.get_nft_items(
-                address,
-                owner_address,
-                collection_address,
-                index,
-                sort_by_last_transaction_lt,
-                limit,
-                offset,
-            );
+        Request::GetNftItems { query, resp } => {
+            let res = handle_get_nft_items(node, query);
             let _ = resp.send(res);
         }
-        Request::SetAddressName {
-            address,
-            name,
-            resp,
-        } => {
-            node.history.address_names.insert(address, name);
-            let _ = resp.send(Ok(()));
-        }
-        Request::GetAddressName { address, resp } => {
-            let res = node.history.address_names.get(&address).cloned();
-            let _ = resp.send(Ok(res));
-        }
-        Request::SetStateSource { source, resp } => {
-            node.state_source = source;
-            let _ = resp.send(Ok(()));
-        }
-        Request::GetStateSource { resp } => {
-            let _ = resp.send(Ok(node.state_source.clone()));
-        }
-        Request::RegisterCompilerAbis { entries, resp } => {
-            let res = entries
-                .into_iter()
-                .try_for_each(|(code_hash, compiler_abi)| {
-                    node.history.set_compiler_abi(code_hash, compiler_abi)
-                });
+        Request::DetectContractData { address, resp } => {
+            let res = node.detect_contract_data(&address);
             let _ = resp.send(res);
         }
-        Request::GetCompilerAbi { code_hash, resp } => {
-            let _ = resp.send(Ok(node.history.get_compiler_abi(&code_hash)));
-        }
-        Request::DumpState { path, resp } => {
+        Request::DumpStateToPath { path, resp } => {
             let res = node.dump_state_to_path(path);
             let _ = resp.send(res);
         }
-        Request::LoadState { path, resp } => {
+        Request::LoadStateFromPath { path, resp } => {
             let res = node.load_state_from_path(path);
+            if res.is_ok() {
+                checkpoints.clear();
+            }
+            let _ = resp.send(res);
+        }
+        Request::DumpState { resp } => {
+            let res = node.dump_state_to_json();
+            let _ = resp.send(res);
+        }
+        Request::LoadState { json, resp } => {
+            let res = node.load_state_from_json(&json);
+            if res.is_ok() {
+                checkpoints.clear();
+            }
+            let _ = resp.send(res);
+        }
+        Request::CreateCheckpoint { name, force, resp } => {
+            let res = checkpoints.create(node, name, force);
+            let _ = resp.send(res);
+        }
+        Request::ListCheckpoints { resp } => {
+            let res = Ok(checkpoints.list());
+            let _ = resp.send(res);
+        }
+        Request::RestoreCheckpoint { name, resp } => {
+            let res = checkpoints.restore(node, name);
+            let _ = resp.send(res);
+        }
+        Request::DeleteCheckpoint { name, resp } => {
+            let res = checkpoints.delete(name);
+            let _ = resp.send(res);
+        }
+        Request::ClearCheckpoints { resp } => {
+            let res = Ok(checkpoints.clear());
+            let _ = resp.send(res);
+        }
+        Request::ExportCheckpoint { name, resp } => {
+            let res = checkpoints.export(name);
+            let _ = resp.send(res);
+        }
+        Request::ImportCheckpoint {
+            name,
+            json,
+            force,
+            resp,
+        } => {
+            let res = checkpoints.import(&json, name, force);
+            let _ = resp.send(res);
+        }
+        Request::MineBlocks { count, resp } => {
+            let res = handle_mine_blocks(node, count, *mining_mode);
+            let _ = resp.send(res);
+        }
+        Request::GetMiningMode { resp } => {
+            let _ = resp.send(Ok(*mining_mode));
+        }
+        Request::SetMiningMode { mode, resp } => {
+            *mining_mode = mode;
+            tracing::info!(
+                "Localnet mining mode changed, skip empty blocks: {}",
+                mining_mode.skip_empty_blocks
+            );
+            let _ = resp.send(Ok(*mining_mode));
+        }
+        Request::GetClockInfo { resp } => {
+            let res = node.clock_info();
+            let _ = resp.send(res);
+        }
+        Request::IncreaseTime { seconds, resp } => {
+            let res = node.increase_time(seconds);
+            let _ = resp.send(res);
+        }
+        Request::SetTime { timestamp, resp } => {
+            let res = node.set_time(timestamp);
+            let _ = resp.send(res);
+        }
+        Request::SetNextBlockTimestamp { timestamp, resp } => {
+            let res = node.set_next_block_timestamp(timestamp);
             let _ = resp.send(res);
         }
     }
 }
 
-fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {
-    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?;
-    let (msg_hash, tx_hash, seqno, _) = node.send_boc(boc)?;
-
-    let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
-        anyhow::bail!("Transaction not found after mining")
-    };
-
-    let tx_boc = node.get_cell(&tx_hash).unwrap_or_default();
-    let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc)?;
-
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} with transaction not found after mining")
-    };
-
-    Ok(LocalnetBlockTransactions {
-        id: block_header.block_id(),
-        transactions: vec![tx_struct],
-        msg_hash: Some(msg_hash),
+fn handle_send_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetAcceptedExternalMessage> {
+    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?
+        .context("sendBoc accepts only external-in messages")?;
+    let msg_hash = node.send_boc(boc)?;
+    Ok(LocalnetAcceptedExternalMessage {
+        msg_hash,
         msg_hash_norm,
     })
+}
+
+fn handle_send_internal_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+    let msg_hash = node.send_internal_boc(boc)?;
+    Ok(LocalnetAcceptedInternalMessage { msg_hash })
 }
 
 fn handle_get_address_info(
@@ -1178,15 +2503,17 @@ fn handle_get_address_info(
     address: Addr,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetAccountState> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
+    let block_id = block_id_for_query_seqno(node, seqno)?;
+    let sync_utime = if seqno == node.globals.origin_seqno {
+        u64::from(node.now_unix()?)
+    } else {
+        let block = node
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        u64::from(block.gen_utime)
     };
-
-    let block_id = block_header.block_id();
-    let sync_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
     let Some(meta) = meta else {
         return Ok(LocalnetAccountState::empty(address, block_id, sync_utime));
@@ -1199,7 +2526,8 @@ fn handle_get_address_info(
     Ok(LocalnetAccountState {
         address,
         account_state_hash: meta.account_hash,
-        balance: meta.cached_balance.unwrap_or(0),
+        balance: meta.balance,
+        extra_currencies: meta.extra_currencies,
         code,
         code_hash: meta.code_hash,
         data,
@@ -1212,6 +2540,304 @@ fn handle_get_address_info(
     })
 }
 
+fn handle_get_account_states(
+    node: &mut Node,
+    addresses: Vec<Addr>,
+    seqno: Option<u32>,
+) -> anyhow::Result<Vec<LocalnetAccountStateWithInfo>> {
+    addresses
+        .into_iter()
+        .map(|address| {
+            let state = handle_get_address_info(node, address, seqno)?;
+            let info = handle_get_address_context(node, address, seqno)?;
+            Ok(LocalnetAccountStateWithInfo { state, info })
+        })
+        .collect()
+}
+
+fn handle_get_address_infos(
+    node: &mut Node,
+    addresses: Vec<Addr>,
+    seqno: Option<u32>,
+) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
+    addresses
+        .into_iter()
+        .map(|address| handle_get_address_context(node, address, seqno))
+        .collect()
+}
+
+fn handle_get_address_context(
+    node: &mut Node,
+    address: Addr,
+    seqno: Option<u32>,
+) -> anyhow::Result<LocalnetAddressInfo> {
+    let seqno = account_query_seqno(node, seqno);
+    let _ = block_id_for_query_seqno(node, seqno)?;
+    let meta = node.get_address_information_at_block(&address, seqno);
+    node.detect_assets_for_account(&address, meta.as_ref())
+}
+
+const fn account_query_seqno(node: &Node, seqno: Option<Seqno>) -> Seqno {
+    match seqno {
+        Some(0) | None => node.globals.head_seqno,
+        Some(seqno) => seqno,
+    }
+}
+
+fn block_id_for_query_seqno(node: &Node, seqno: Seqno) -> anyhow::Result<LocalnetBlockId> {
+    if seqno == node.globals.origin_seqno {
+        return Ok(LocalnetBlockId::basechain_anchor(seqno));
+    }
+
+    node.get_block_header(seqno)
+        .map(|block| block.block_id())
+        .ok_or_else(|| LocalnetError::BlockNotFound { seqno }.into())
+}
+
+fn handle_get_jetton_masters(
+    node: &mut Node,
+    addresses: HashSet<Addr>,
+    admin_addresses: HashSet<Addr>,
+    limit: usize,
+    offset: usize,
+) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
+    for addr in &addresses {
+        node.ensure_detected_assets_for_address(addr)?;
+    }
+
+    Ok(node
+        .iter_jetton_masters()
+        .filter(|master| {
+            if !addresses.is_empty() && !addresses.contains(&master.address) {
+                return false;
+            }
+            if !admin_addresses.is_empty()
+                && !master
+                    .admin_address
+                    .is_some_and(|address| admin_addresses.contains(&address))
+            {
+                return false;
+            }
+            true
+        })
+        .skip(offset)
+        .take(limit)
+        .cloned()
+        .collect())
+}
+
+fn handle_get_jetton_wallets(
+    node: &mut Node,
+    query: ParsedJettonWalletsQuery,
+) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
+    for addr in &query.addresses {
+        node.ensure_detected_assets_for_address(addr)?;
+    }
+
+    let mut wallets = node
+        .iter_jetton_wallets()
+        .enumerate()
+        .filter(|wallet| {
+            let wallet = wallet.1;
+            if !query.addresses.is_empty() && !query.addresses.contains(&wallet.address) {
+                return false;
+            }
+            if !query.owner_addresses.is_empty()
+                && !query.owner_addresses.contains(&wallet.owner_address)
+            {
+                return false;
+            }
+            if !query.jetton_addresses.is_empty()
+                && !query.jetton_addresses.contains(&wallet.jetton_address)
+            {
+                return false;
+            }
+            if query.exclude_zero_balance && wallet.balance == 0 {
+                return false;
+            }
+            true
+        })
+        .map(|(id, wallet)| (id, wallet.clone()))
+        .collect::<Vec<_>>();
+    match query.sort {
+        Some(LocalnetSortOrder::Asc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                left.balance.cmp(&right.balance)
+            });
+        }
+        Some(LocalnetSortOrder::Desc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                right.balance.cmp(&left.balance)
+            });
+        }
+        None => {
+            sort_jetton_wallets(&mut wallets, &query, |(left_id, _), (right_id, _)| {
+                left_id.cmp(right_id)
+            });
+        }
+    }
+    Ok(wallets
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .map(|(_, wallet)| wallet)
+        .collect())
+}
+
+fn sort_jetton_wallets(
+    wallets: &mut [(usize, storage::JettonWalletMeta)],
+    query: &ParsedJettonWalletsQuery,
+    compare_sort_column: impl Fn(
+        &(usize, storage::JettonWalletMeta),
+        &(usize, storage::JettonWalletMeta),
+    ) -> std::cmp::Ordering,
+) {
+    if query.jetton_addresses.len() == 1 {
+        wallets.sort_by(|left, right| {
+            left.1
+                .jetton_address
+                .cmp(&right.1.jetton_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.owner_addresses.is_empty() {
+        wallets.sort_by(|left, right| {
+            left.1
+                .owner_address
+                .cmp(&right.1.owner_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.addresses.is_empty() {
+        wallets.sort_by_key(|(_, wallet)| wallet.address);
+    } else {
+        wallets.sort_by(compare_sort_column);
+    }
+}
+
+fn handle_get_nft_items(
+    node: &mut Node,
+    query: ParsedNftItemsQuery,
+) -> anyhow::Result<Vec<storage::NftItemMeta>> {
+    for addr in &query.addresses {
+        node.ensure_detected_assets_for_address(addr)?;
+    }
+
+    let matches_query = |item: &storage::NftItemMeta| -> anyhow::Result<bool> {
+        if !query.addresses.is_empty() && !query.addresses.contains(&item.address) {
+            return Ok(false);
+        }
+        if !query.owner_addresses.is_empty()
+            && !item
+                .owner_address
+                .is_some_and(|address| query.owner_addresses.contains(&address))
+        {
+            return Ok(false);
+        }
+        if !query.collection_addresses.is_empty()
+            && !item
+                .collection_address
+                .is_some_and(|address| query.collection_addresses.contains(&address))
+        {
+            return Ok(false);
+        }
+        if !query.indexes.is_empty() {
+            let index = parse_stored_nft_index(item)?;
+            if !query.indexes.contains(&index) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    };
+
+    if query.limit == 0 {
+        return Ok(Vec::new());
+    }
+    if query.order == LocalnetNftItemsOrder::Insertion {
+        let mut result = Vec::new();
+        let mut skipped = 0;
+        for item in node.iter_nft_items() {
+            if !matches_query(item)? {
+                continue;
+            }
+            if skipped < query.offset {
+                skipped += 1;
+                continue;
+            }
+            result.push(item.clone());
+            if result.len() == query.limit {
+                break;
+            }
+        }
+        return Ok(result);
+    }
+
+    let mut items = Vec::new();
+    for item in node.iter_nft_items() {
+        if matches_query(item)? {
+            items.push(item.clone());
+        }
+    }
+    match query.order {
+        LocalnetNftItemsOrder::Insertion => unreachable!(),
+        LocalnetNftItemsOrder::LastTransactionLtDesc => {
+            items.sort_by(|left, right| {
+                right
+                    .last_transaction_lt
+                    .cmp(&left.last_transaction_lt)
+                    .then_with(|| left.address.cmp(&right.address))
+            });
+        }
+        LocalnetNftItemsOrder::OwnerCollectionIndex | LocalnetNftItemsOrder::CollectionIndex => {
+            let mut indexed_items = items
+                .into_iter()
+                .map(|item| {
+                    let index = parse_stored_nft_index(&item)?;
+                    Ok((item, index))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if query.order == LocalnetNftItemsOrder::OwnerCollectionIndex {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left.owner_address
+                        .is_none()
+                        .cmp(&right.owner_address.is_none())
+                        .then_with(|| left.owner_address.cmp(&right.owner_address))
+                        .then_with(|| {
+                            left.collection_address
+                                .is_none()
+                                .cmp(&right.collection_address.is_none())
+                        })
+                        .then_with(|| left.collection_address.cmp(&right.collection_address))
+                        .then_with(|| left_index.cmp(right_index))
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            } else {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left_index
+                        .cmp(right_index)
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            }
+            return Ok(indexed_items
+                .into_iter()
+                .skip(query.offset)
+                .take(query.limit)
+                .map(|(item, _)| item)
+                .collect());
+        }
+    }
+
+    Ok(items
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .collect())
+}
+
+fn parse_stored_nft_index(item: &storage::NftItemMeta) -> anyhow::Result<BigInt> {
+    item.index
+        .parse()
+        .with_context(|| format!("Invalid stored NFT index `{}`", item.index))
+}
+
 fn handle_get_transactions(
     node: &Node,
     address: Addr,
@@ -1219,11 +2845,29 @@ fn handle_get_transactions(
     lt: Option<u64>,
     hash: Option<Hash256>,
     to_lt: Option<u64>,
-) -> anyhow::Result<Vec<LocalnetTransaction>> {
-    let mut raw_txs = node.get_transactions(&address, limit, lt, hash);
+) -> anyhow::Result<LocalnetTransactionsPage> {
+    let mut raw_txs = node.get_transactions(&address, limit.saturating_add(1), lt, hash);
+
+    if let (Some(lt), Some(hash)) = (lt, hash)
+        && lt != 0
+        && !raw_txs
+            .first()
+            .is_some_and(|tx| tx.meta.lt == lt && tx.meta.tx_hash == hash)
+    {
+        anyhow::bail!("LITE_SERVER_UNKNOWN: transaction hash mismatch");
+    }
+
+    let previous_transaction_id =
+        raw_txs
+            .get(limit)
+            .map_or_else(LocalnetTransactionId::default, |tx| LocalnetTransactionId {
+                lt: tx.meta.lt,
+                hash: tx.meta.tx_hash,
+            });
+    raw_txs.truncate(limit);
 
     if let Some(min_lt) = to_lt {
-        raw_txs.retain(|tx| tx.meta.lt >= min_lt);
+        raw_txs.retain(|tx| tx.meta.lt > min_lt);
     }
 
     let full_txs = raw_txs
@@ -1233,7 +2877,10 @@ fn handle_get_transactions(
             convert_to_tx_struct(tx, tx_boc)
         })
         .collect();
-    Ok(full_txs)
+    Ok(LocalnetTransactionsPage {
+        transactions: full_txs,
+        previous_transaction_id,
+    })
 }
 
 fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransaction>> {
@@ -1243,7 +2890,11 @@ fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransa
         .values()
         .cloned()
         .collect::<Vec<_>>();
-    metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+    metas.sort_by(|a, b| {
+        b.lt.cmp(&a.lt)
+            .then_with(|| a.account.cmp(&b.account))
+            .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+    });
 
     let mut result = Vec::with_capacity(metas.len());
     for meta in metas {
@@ -1252,6 +2903,178 @@ fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransa
         }
     }
     Ok(result)
+}
+
+fn handle_get_all_transactions_page(
+    node: &Node,
+    limit: usize,
+    offset: usize,
+    descending: bool,
+) -> anyhow::Result<Vec<LocalnetTransaction>> {
+    let mut metas = node
+        .history
+        .tx_by_hash
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    if descending {
+        metas.sort_by(|a, b| {
+            b.lt.cmp(&a.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
+    } else {
+        metas.sort_by(|a, b| {
+            a.lt.cmp(&b.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
+    }
+
+    let mut result = Vec::with_capacity(limit.min(metas.len().saturating_sub(offset)));
+    for meta in metas.into_iter().skip(offset).take(limit) {
+        if let Some(tx) = node.get_transaction_by_hash(&meta.tx_hash) {
+            result.push(convert_to_tx_struct(&tx, tx.tx_boc.clone())?);
+        }
+    }
+    Ok(result)
+}
+
+fn handle_get_block_transactions_page(
+    node: &Node,
+    seqno: u32,
+    limit: usize,
+    offset: usize,
+    descending: bool,
+) -> anyhow::Result<Vec<LocalnetTransaction>> {
+    let Some(block_header) = node.get_block_header(seqno) else {
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
+    };
+
+    let hashes = if descending {
+        block_header
+            .tx_hashes
+            .iter()
+            .rev()
+            .skip(offset)
+            .take(limit)
+            .copied()
+            .collect::<Vec<_>>()
+    } else {
+        block_header
+            .tx_hashes
+            .iter()
+            .skip(offset)
+            .take(limit)
+            .copied()
+            .collect::<Vec<_>>()
+    };
+
+    let mut result = Vec::with_capacity(hashes.len());
+    for tx_hash in hashes {
+        if let Some(tx) = node.get_transaction_by_hash(&tx_hash) {
+            result.push(convert_to_tx_struct(&tx, tx.tx_boc.clone())?);
+        }
+    }
+    Ok(result)
+}
+
+fn handle_get_blocks(node: &Node) -> anyhow::Result<Vec<LocalnetBlock>> {
+    let masterchain_by_seqno = node
+        .history
+        .masterchain_blocks
+        .iter()
+        .map(|block| (block.seqno, block))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    let mut blocks =
+        Vec::with_capacity(node.history.blocks.len() + node.history.masterchain_blocks.len());
+    blocks.extend(node.history.masterchain_blocks.iter().map(|block| {
+        localnet_block_from_masterchain_meta(
+            block,
+            &node.history.masterchain_blocks,
+            node.globals.origin_seqno,
+        )
+    }));
+    blocks.extend(node.history.blocks.iter().map(|block| {
+        localnet_block_from_block_meta(
+            block,
+            &node.history.blocks,
+            masterchain_by_seqno.get(&block.seqno).copied(),
+            node.globals.origin_seqno,
+        )
+    }));
+
+    Ok(blocks)
+}
+
+fn localnet_block_from_block_meta(
+    block: &BlockMeta,
+    blocks: &[BlockMeta],
+    masterchain_block: Option<&MasterchainBlockMeta>,
+    origin_seqno: Seqno,
+) -> LocalnetBlock {
+    let id = block.block_id();
+    LocalnetBlock {
+        workchain: id.workchain,
+        shard: id.shard,
+        seqno: id.seqno,
+        root_hash: id.root_hash,
+        file_hash: id.file_hash,
+        gen_utime: block.gen_utime,
+        start_lt: block.start_lt,
+        end_lt: block.end_lt,
+        tx_count: block.tx_hashes.len(),
+        prev_blocks: block
+            .prev_seqno
+            .and_then(|seqno| {
+                blocks
+                    .iter()
+                    .find(|candidate| candidate.seqno == seqno)
+                    .map(BlockMeta::block_id)
+                    .or_else(|| {
+                        (seqno == origin_seqno)
+                            .then(|| LocalnetBlockId::basechain_anchor(origin_seqno))
+                    })
+            })
+            .into_iter()
+            .collect(),
+        masterchain_block_ref: masterchain_block.map(MasterchainBlockMeta::block_id),
+    }
+}
+
+fn localnet_block_from_masterchain_meta(
+    block: &MasterchainBlockMeta,
+    masterchain_blocks: &[MasterchainBlockMeta],
+    origin_seqno: Seqno,
+) -> LocalnetBlock {
+    let id = block.block_id();
+    LocalnetBlock {
+        workchain: id.workchain,
+        shard: id.shard,
+        seqno: id.seqno,
+        root_hash: id.root_hash,
+        file_hash: id.file_hash,
+        gen_utime: block.gen_utime,
+        start_lt: block.start_lt,
+        end_lt: block.end_lt,
+        tx_count: 0,
+        prev_blocks: block
+            .prev_seqno
+            .and_then(|seqno| {
+                masterchain_blocks
+                    .iter()
+                    .find(|candidate| candidate.seqno == seqno)
+                    .map(MasterchainBlockMeta::block_id)
+                    .or_else(|| {
+                        (seqno == origin_seqno)
+                            .then(|| LocalnetBlockId::masterchain_anchor(origin_seqno))
+                    })
+            })
+            .into_iter()
+            .collect(),
+        masterchain_block_ref: None,
+    }
 }
 
 fn handle_get_pending_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransaction>> {
@@ -1280,76 +3103,41 @@ fn handle_get_pending_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTr
     Ok(result)
 }
 
-fn handle_try_locate_tx(
+fn handle_locate_transaction(
     node: &Node,
     source: Addr,
     destination: Addr,
     created_lt: u64,
+    kind: TransactionLookupKind,
 ) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
+    let expected_account = match kind {
+        TransactionLookupKind::Source => source,
+        TransactionLookupKind::Result => destination,
+    };
     let tx_hash = node
         .history
-        .msg_to_tx
-        .get(&msg_hash)
-        .copied()
-        .context("Destination transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located destination transaction is missing")?;
-
-    if tx.meta.account != destination {
-        anyhow::bail!("Located transaction does not belong to destination account")
-    }
-
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn handle_try_locate_result_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    handle_try_locate_tx(node, source, destination, created_lt)
-}
-
-fn handle_try_locate_source_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
-    let tx_hash = node
-        .history
-        .tx_by_hash
-        .iter()
-        .find_map(|(hash, tx)| {
-            (tx.account == source && tx.out_msg_hashes.contains(&msg_hash)).then_some(*hash)
-        })
-        .context("Source transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located source transaction is missing")?;
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn find_message_hash(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<Hash256> {
-    node.history
         .msg_by_hash
         .iter()
-        .find_map(|(hash, msg)| {
-            (msg.src == Some(source)
+        .filter(|(_, msg)| {
+            msg.src == Some(source)
                 && msg.dst == Some(destination)
-                && msg.created_lt == Some(created_lt))
-            .then_some(*hash)
+                && msg.created_lt == Some(created_lt)
         })
-        .context("Message not found by source, destination and created_lt")
+        .filter_map(|(msg_hash, _)| {
+            let tx_hash = match kind {
+                TransactionLookupKind::Source => node.indexes.tx_by_out_msg.get(msg_hash),
+                TransactionLookupKind::Result => node.history.msg_to_tx.get(msg_hash),
+            }?;
+            let tx = node.history.tx_by_hash.get(tx_hash)?;
+            (tx.account == expected_account).then_some((tx.lt, *tx_hash))
+        })
+        .max()
+        .map(|(_, tx_hash)| tx_hash)
+        .ok_or(LocalnetError::TransactionNotFound)?;
+    let tx = node
+        .get_transaction_by_hash(&tx_hash)
+        .context("Located transaction is missing")?;
+    convert_to_tx_struct(&tx, tx.tx_boc.clone())
 }
 
 fn handle_run_get_method(
@@ -1359,43 +3147,46 @@ fn handle_run_get_method(
     stack: Tuple,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-    let meta = meta.ok_or_else(|| anyhow::anyhow!("Account {address} not found"))?;
+    let block_id = block_id_for_query_seqno(node, seqno)?;
 
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
+    let Some(meta) = meta else {
+        return no_code_run_get_method_result(
+            method_id,
+            block_id,
+            LocalnetTransactionId::default(),
+        );
     };
 
-    let block_id = block_header.block_id();
     let last_transaction_id = meta.last_tx_id();
+    let Some(code_hash) = meta.code_hash else {
+        return no_code_run_get_method_result(method_id, block_id, last_transaction_id);
+    };
 
-    let code_boc = meta.code_hash.and_then(|h| node.get_cell(&h)).map_or_else(
-        || EMPTY_CELL_BASE64.to_owned(),
-        |b| base64::engine::general_purpose::STANDARD.encode(b),
-    );
-
-    let data_boc = meta.data_hash.and_then(|h| node.get_cell(&h)).map_or_else(
-        || EMPTY_CELL_BASE64.to_owned(),
-        |b| base64::engine::general_purpose::STANDARD.encode(b),
-    );
-
-    let balance_tokens = meta.cached_balance.unwrap_or(0);
+    let code_boc = node.get_cell_or_empty(Some(code_hash)).to_base64();
+    let data_boc = node.get_cell_or_empty(meta.data_hash).to_base64();
+    let libs = node
+        .build_vm_global_libs_boc()?
+        .map_or_else(String::new, |boc| boc.to_base64());
 
     let args = RunGetMethodArgs {
         code: code_boc,
         data: data_boc,
         method_id,
         address: address.to_string(),
-        unixtime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
-        balance: balance_tokens.to_string(),
+        unixtime: i64::from(node.now_unix()?),
+        balance: meta.balance.to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
         gas_limit: "10000000".to_owned(),
         debug_enabled: false,
         verbosity: ExecutorVerbosity::Short,
-        libs: String::new(),
+        libs,
         extra_currencies: Default::default(),
-        prev_blocks_info: None,
+        prev_blocks_info: Some(
+            node.prev_blocks_info_at(seqno)
+                .to_stack_entry_boc_base64()?,
+        ),
     };
 
     let stack_cell = stack
@@ -1410,28 +3201,41 @@ fn handle_run_get_method(
         .context("Execution failed")?;
 
     match res {
-        GetMethodResult::Success(s) => {
-            let stack_bytes = base64::engine::general_purpose::STANDARD
-                .decode(s.stack.as_ref())
-                .unwrap_or_default();
-            Ok(LocalnetRunGetMethodResult {
-                gas_used: s.gas_used.parse().unwrap_or(0),
-                stack: stack_bytes.into(),
-                exit_code: s.vm_exit_code,
-                vm_log: s.vm_log,
-                block_id,
-                last_transaction_id,
-            })
-        }
+        GetMethodResult::Success(s) => Ok(LocalnetRunGetMethodResult {
+            gas_used: s.gas_used.parse().unwrap_or(0),
+            stack: BocBytes::from_base64(s.stack.as_ref()).unwrap_or_default(),
+            exit_code: s.vm_exit_code,
+            vm_log: s.vm_log,
+            block_id,
+            last_transaction_id,
+        }),
         GetMethodResult::Error(e) => anyhow::bail!("Get method error: {e:?}"),
     }
+}
+
+fn no_code_run_get_method_result(
+    method_id: i32,
+    block_id: LocalnetBlockId,
+    last_transaction_id: LocalnetTransactionId,
+) -> anyhow::Result<LocalnetRunGetMethodResult> {
+    let stack = Tuple(vec![TupleItem::Int(method_id.into())])
+        .serialize()
+        .context("Failed to serialize no-code get-method stack to BoC")?;
+    Ok(LocalnetRunGetMethodResult {
+        gas_used: 0,
+        stack: BocBytes::from(Boc::encode(stack)),
+        exit_code: -13,
+        vm_log: Arc::from(""),
+        block_id,
+        last_transaction_id,
+    })
 }
 
 pub(crate) fn convert_to_tx_struct(
     tx: &TransactionInfo,
     tx_boc: BocBytes,
 ) -> anyhow::Result<LocalnetTransaction> {
-    let in_msg_struct = if let Some(in_msg) = &tx.in_msg {
+    let in_msg = if let Some(in_msg) = &tx.in_msg {
         convert_to_message_struct(&in_msg.meta, &in_msg.boc)?
     } else {
         LocalnetMessage {
@@ -1439,6 +3243,8 @@ pub(crate) fn convert_to_tx_struct(
             hash_norm: None,
             source: None,
             destination: None,
+            bounce: false,
+            bounced: false,
             value: 0,
             body_hash: Hash256([0; 32]),
             body: Vec::new().into(),
@@ -1447,13 +3253,15 @@ pub(crate) fn convert_to_tx_struct(
             fwd_fee: 0,
             ihr_fee: 0,
             created_lt: 0,
+            extra_currencies: Vec::new(),
         }
     };
 
-    let mut out_msgs_struct = Vec::new();
-    for out_msg in &tx.out_msgs {
-        out_msgs_struct.push(convert_to_message_struct(&out_msg.meta, &out_msg.boc)?);
-    }
+    let out_msgs = tx
+        .out_msgs
+        .iter()
+        .map(|out_msg| convert_to_message_struct(&out_msg.meta, &out_msg.boc))
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     Ok(LocalnetTransaction {
         hash: tx.meta.tx_hash,
@@ -1461,17 +3269,17 @@ pub(crate) fn convert_to_tx_struct(
         mc_block_seqno: tx.meta.block_seqno,
         utime: tx.meta.now,
         data: tx_boc,
-        success: tx.meta.success,
+        aborted: tx.meta.aborted,
         exit_code: tx.meta.compute_exit_code.unwrap_or(0),
         transaction_id: LocalnetTransactionId {
             lt: tx.meta.lt,
             hash: tx.meta.tx_hash,
         },
-        in_msg: in_msg_struct,
-        out_msgs: out_msgs_struct,
-        total_fees: tx.meta.total_fees.unwrap_or(0),
-        storage_fees: tx.meta.storage_fees.unwrap_or(0),
-        other_fees: tx.meta.other_fees.unwrap_or(0),
+        in_msg,
+        out_msgs,
+        total_fees: tx.meta.total_fees,
+        storage_fees: tx.meta.storage_fees,
+        other_fees: tx.meta.other_fees,
     })
 }
 
@@ -1497,7 +3305,7 @@ pub(crate) fn compute_normalized_ext_in_hash(msg: &Message<'_>) -> anyhow::Resul
     builder.store_bit_zero()?;
     builder.store_bit_one()?;
     builder.store_reference(body_cell)?;
-    Ok(Hash256(*builder.build()?.repr_hash().as_array()))
+    Ok(Hash256::from(builder.build()?.repr_hash()))
 }
 
 fn normalized_ext_in_hash_from_boc(boc: &[u8]) -> anyhow::Result<Option<Hash256>> {
@@ -1524,17 +3332,29 @@ pub(crate) fn convert_to_message_struct(
     let mut builder = CellBuilder::new();
     builder.store_slice(msg.body)?;
     let body_cell = builder.build()?;
-    let body_hash = Hash256(*body_cell.repr_hash().as_array());
+    let body_hash = Hash256::from(body_cell.repr_hash());
     let body_bytes = Boc::encode(body_cell);
 
-    let (fwd_fee, ihr_fee) = match &msg.info {
-        MsgInfo::Int(info) => (info.fwd_fee.into(), info.ihr_fee.into()),
-        _ => (0, 0),
+    let (fwd_fee, ihr_fee, bounce, bounced, extra_currencies) = match &msg.info {
+        MsgInfo::Int(info) => {
+            let extra_currencies = ExtraCurrency::from_collection(&info.value.other)?;
+            (
+                info.fwd_fee.into(),
+                info.ihr_fee.into(),
+                info.bounce,
+                info.bounced,
+                extra_currencies,
+            )
+        }
+        _ => (0, 0, false, false, Vec::new()),
     };
 
-    // Extract opcode (first 32 bits)
+    // Extract opcode, skipping the bounce prefix for bounced internal messages.
     let mut opcode = None;
     let mut body_slice = msg.body;
+    if bounced {
+        let _ = body_slice.load_uint(32);
+    }
     if body_slice.size_bits() >= 32
         && let Ok(op) = body_slice.load_uint(32)
     {
@@ -1555,6 +3375,8 @@ pub(crate) fn convert_to_message_struct(
         hash_norm,
         source: meta.src,
         destination: meta.dst,
+        bounce,
+        bounced,
         value: meta.value.unwrap_or(0),
         body_hash,
         body: body_bytes.into(),
@@ -1563,20 +3385,82 @@ pub(crate) fn convert_to_message_struct(
         fwd_fee,
         ihr_fee,
         created_lt: meta.created_lt.unwrap_or(0),
+        extra_currencies,
     })
 }
 
 fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LocalnetBlockHeader> {
     let Some(header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
+    let block_boc = node.get_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| {
+            node.get_block_header(prev_seqno)
+                .map(|prev| prev.block_id())
+                .or_else(|| {
+                    (prev_seqno == node.globals.origin_seqno)
+                        .then(|| LocalnetBlockId::basechain_anchor(prev_seqno))
+                })
+        })
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
+}
 
+fn handle_get_masterchain_block_header(
+    node: &Node,
+    seqno: u32,
+) -> anyhow::Result<LocalnetBlockHeader> {
+    let Some(header) = node.get_masterchain_block_header(seqno) else {
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
+    };
+    let block_boc = node.get_masterchain_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| {
+            node.get_masterchain_block_header(prev_seqno)
+                .map(|prev| prev.block_id())
+                .or_else(|| {
+                    (prev_seqno == node.globals.origin_seqno)
+                        .then(|| LocalnetBlockId::masterchain_anchor(prev_seqno))
+                })
+        })
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
+}
+
+fn parse_block_header(
+    id: LocalnetBlockId,
+    prev_blocks: Vec<LocalnetBlockId>,
+    block_boc: &BocBytes,
+) -> anyhow::Result<LocalnetBlockHeader> {
+    let cell = Boc::decode(block_boc).context("Failed to decode block BOC")?;
+    let block = cell.parse::<Block>().context("Failed to parse block")?;
+    let info = block.load_info().context("Failed to load block info")?;
+
+    let prev_seqno = prev_blocks.first().map(|block| block.seqno);
     Ok(LocalnetBlockHeader {
-        id: header.block_id(),
-        gen_utime: header.gen_utime,
-        start_lt: header.start_lt,
-        end_lt: header.end_lt,
-        prev_seqno: header.prev_seqno,
+        id,
+        global_id: block.global_id,
+        version: info.version as i32,
+        after_merge: info.after_merge,
+        after_split: info.after_split,
+        before_split: info.before_split,
+        want_merge: info.want_merge,
+        want_split: info.want_split,
+        validator_list_hash_short: info.gen_validator_list_hash_short as i32,
+        catchain_seqno: info.gen_catchain_seqno as i32,
+        min_ref_mc_seqno: info.min_ref_mc_seqno as i32,
+        is_key_block: info.key_block,
+        prev_key_block_seqno: info.prev_key_block_seqno as i32,
+        gen_utime: info.gen_utime,
+        start_lt: info.start_lt,
+        end_lt: info.end_lt,
+        prev_seqno,
+        prev_blocks,
     })
 }
 
@@ -1585,26 +3469,26 @@ fn handle_get_block_transactions(
     seqno: u32,
 ) -> anyhow::Result<LocalnetBlockTransactions> {
     let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
     let Some(txs) = node.get_block_transactions(&block_header) else {
         anyhow::bail!("Transaction in block {seqno} not found")
     };
 
-    let mut result = Vec::new();
-    for tx in txs {
-        let Some(ext_tx) = node.get_transaction_by_hash(&tx.tx_hash) else {
-            continue;
-        };
-
-        let tx_boc = node.get_cell(&ext_tx.meta.tx_hash).unwrap_or_default();
-        result.push(convert_to_tx_struct(&ext_tx, tx_boc)?);
-    }
+    let result = txs
+        .into_iter()
+        .filter_map(|tx| {
+            node.get_transaction_by_hash(&tx.tx_hash)
+                .map(|ext_tx| convert_to_tx_struct(&ext_tx, ext_tx.tx_boc.clone()))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     let block_id = block_header.block_id();
 
     Ok(LocalnetBlockTransactions {
         id: block_id,
+        requested_count: result.len(),
+        incomplete: false,
         transactions: result,
         msg_hash: None,
         msg_hash_norm: None,
@@ -1612,22 +3496,45 @@ fn handle_get_block_transactions(
 }
 
 fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<LocalnetMasterchainInfo> {
-    let head_block = node.get_block_header(node.globals.head_seqno);
-    let block_id = head_block
-        .as_ref()
-        .map_or_else(LocalnetBlockId::first, BlockMeta::block_id);
+    if node.history.masterchain_blocks.is_empty() {
+        let block_id = LocalnetBlockId::masterchain_anchor(node.globals.origin_seqno);
+        return Ok(LocalnetMasterchainInfo {
+            state_root_hash: block_id.root_hash,
+            last: block_id.clone(),
+            init: block_id,
+            config: handle_get_config_all(node, Some(node.globals.head_seqno))?,
+            prev_blocks: Vec::new(),
+        });
+    }
+
+    let Some(masterchain_block) = node.get_masterchain_block_header(node.globals.head_seqno) else {
+        return Err(LocalnetError::BlockNotFound {
+            seqno: node.globals.head_seqno,
+        }
+        .into());
+    };
+    let block_id = masterchain_block.block_id();
+    let prev_blocks = node
+        .history
+        .masterchain_blocks
+        .iter()
+        .filter(|block| block.seqno < node.globals.head_seqno)
+        .map(MasterchainBlockMeta::block_id)
+        .collect();
 
     Ok(LocalnetMasterchainInfo {
-        state_root_hash: block_id.root_hash,
+        state_root_hash: masterchain_block.state_root_hash,
         last: block_id,
-        init: LocalnetBlockId::first(),
+        init: LocalnetBlockId::first_masterchain(),
+        config: handle_get_config_all(node, Some(node.globals.head_seqno))?,
+        prev_blocks,
     })
 }
 
 fn handle_get_consensus_block(node: &Node) -> anyhow::Result<LocalnetConsensusBlock> {
     let consensus_block = node.globals.head_seqno;
     let timestamp = node
-        .get_block_header(consensus_block)
+        .get_masterchain_block_header(consensus_block)
         .map(|block| block.gen_utime)
         .unwrap_or_default();
 
@@ -1640,10 +3547,10 @@ fn handle_get_consensus_block(node: &Node) -> anyhow::Result<LocalnetConsensusBl
 fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<LocalnetLibrary>> {
     let entries = node.get_libraries(hashes);
     let mut result = Vec::with_capacity(entries.len());
-    for lookup in entries {
-        if let Some(entry) = lookup.entry {
+    for (hash, entry) in hashes.iter().copied().zip(entries) {
+        if let Some(entry) = entry {
             result.push(LocalnetLibrary {
-                hash: lookup.hash,
+                hash: entry.hash,
                 found: true,
                 data: Some(entry.lib_boc),
                 publishers_count: entry.publishers.len(),
@@ -1651,7 +3558,7 @@ fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<L
             });
         } else {
             result.push(LocalnetLibrary {
-                hash: lookup.hash,
+                hash,
                 found: false,
                 data: None,
                 publishers_count: 0,
@@ -1685,13 +3592,24 @@ fn handle_get_config_param(
 fn handle_get_config_all(node: &Node, seqno: Option<u32>) -> anyhow::Result<BocBytes> {
     ensure_seqno_exists(node, seqno)?;
 
-    node.get_cell(&node.globals.config_boc_hash)
+    let config_boc_hash = match seqno {
+        Some(seqno) if seqno > 0 && seqno != node.globals.origin_seqno => {
+            node.get_masterchain_block_header(seqno)
+                .ok_or(LocalnetError::BlockNotFound { seqno })?
+                .config_boc_hash
+        }
+        _ => node.globals.config_boc_hash,
+    };
+    node.get_cell(&config_boc_hash)
         .context("Blockchain config cell not found")
 }
 
 fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Vec<LocalnetBlockId>> {
+    if seqno == node.globals.origin_seqno {
+        return Ok(vec![LocalnetBlockId::basechain_anchor(seqno)]);
+    }
     let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block not found for seqno={seqno}")
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
     Ok(vec![block_header.block_id()])
 }
@@ -1699,19 +3617,71 @@ fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Vec<LocalnetBloc
 fn ensure_seqno_exists(node: &Node, seqno: Option<u32>) -> anyhow::Result<()> {
     if let Some(seqno) = seqno
         && seqno > 0
+        && seqno != node.globals.origin_seqno
         && node.get_block_header(seqno).is_none()
     {
-        anyhow::bail!("Block {seqno} not found");
+        return Err(LocalnetError::BlockNotFound { seqno }.into());
     }
     Ok(())
 }
 
 fn handle_lookup_block(
     node: &Node,
+    workchain: i32,
+    shard: i64,
     seqno: Option<u32>,
     lt: Option<u64>,
     unixtime: Option<u32>,
 ) -> anyhow::Result<LocalnetBlockId> {
+    if workchain == -1 {
+        let masterchain_shard = LocalnetBlockId::first_masterchain().shard;
+        if shard != masterchain_shard {
+            return Err(LocalnetError::protocol_violation(format!(
+                "Shard {workchain}:{shard} is not available in localnet masterchain lookup"
+            ))
+            .into());
+        }
+
+        if seqno == Some(node.globals.origin_seqno) {
+            return Ok(LocalnetBlockId::masterchain_anchor(
+                node.globals.origin_seqno,
+            ));
+        }
+
+        let found_block = if let Some(s) = seqno {
+            node.get_masterchain_block_header(s)
+        } else if let Some(l) = lt {
+            node.find_masterchain_block_by_lt(l)
+        } else if let Some(u) = unixtime {
+            node.find_masterchain_block_by_unixtime(u)
+        } else {
+            None
+        };
+
+        let Some(block) = found_block else {
+            return Err(LocalnetError::BlockLookupNotFound {
+                seqno,
+                lt,
+                unixtime,
+            }
+            .into());
+        };
+
+        return Ok(block.block_id());
+    }
+
+    let basechain_shard = LocalnetBlockId::first().shard;
+    if workchain != 0 || shard != basechain_shard {
+        return Err(LocalnetError::protocol_violation(format!(
+            "Shard {workchain}:{shard} is not available in localnet lookup"
+        ))
+        .into());
+    }
+
+    if seqno == Some(node.globals.origin_seqno) {
+        return Ok(LocalnetBlockId::basechain_anchor(node.globals.origin_seqno));
+    }
+
     let found_block = if let Some(s) = seqno {
         node.get_block_header(s)
     } else if let Some(l) = lt {
@@ -1723,8 +3693,505 @@ fn handle_lookup_block(
     };
 
     let Some(block) = found_block else {
-        anyhow::bail!("Block not found for seqno={seqno:?}, lt={lt:?}, unixtime={unixtime:?}")
+        return Err(LocalnetError::BlockLookupNotFound {
+            seqno,
+            lt,
+            unixtime,
+        }
+        .into());
     };
 
     Ok(block.block_id())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::executor::{ExecContext, ExecResult, TvmExecutor};
+    use crate::remote::RemoteProvider;
+    use ton_networks::Network;
+    use tycho_types::boc::BocRepr;
+    use tycho_types::cell::{CellSliceParts, HashBytes};
+    use tycho_types::models::config::BlockchainConfigParams;
+    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
+
+    const REGULAR_OPCODE: u32 = 0x178d_4519;
+    const BOUNCE_PREFIX: u32 = 0xffff_ffff;
+
+    #[test]
+    fn convert_to_message_struct_extracts_regular_internal_opcode() {
+        let message = internal_message_boc(false, &[REGULAR_OPCODE]);
+        let hash = message.hash().expect("message must hash");
+        let mapped =
+            convert_to_message_struct(&message_meta(hash), &message).expect("message must map");
+
+        assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
+        assert!(!mapped.bounced);
+    }
+
+    #[test]
+    fn convert_to_message_struct_extracts_bounced_opcode_after_prefix() {
+        let message = internal_message_boc(true, &[BOUNCE_PREFIX, REGULAR_OPCODE]);
+        let hash = message.hash().expect("message must hash");
+        let mapped =
+            convert_to_message_struct(&message_meta(hash), &message).expect("message must map");
+
+        assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
+        assert!(mapped.bounced);
+    }
+
+    #[test]
+    fn handle_mine_blocks_skips_empty_blocks_by_default() {
+        let mut node = make_test_node();
+
+        let result = handle_mine_blocks(&mut node, 3, LocalnetMiningMode::default())
+            .expect("manual mining must succeed");
+
+        assert_eq!(result.blocks_mined, 0);
+        assert_eq!(result.skipped_empty_blocks, 3);
+        assert!(result.blocks.is_empty());
+        assert_eq!(result.last_block_seqno, 0);
+        assert_eq!(node.globals.head_seqno, 0);
+    }
+
+    #[test]
+    fn handle_mine_blocks_can_mine_empty_blocks_when_enabled() {
+        let mut node = make_test_node();
+
+        let result = handle_mine_blocks(
+            &mut node,
+            2,
+            LocalnetMiningMode {
+                skip_empty_blocks: false,
+            },
+        )
+        .expect("manual mining must succeed");
+
+        assert_eq!(result.blocks_mined, 2);
+        assert_eq!(result.skipped_empty_blocks, 0);
+        assert_eq!(result.blocks.len(), 2);
+        assert_eq!(result.last_block_seqno, 2);
+        assert_eq!(node.globals.head_seqno, 2);
+    }
+
+    #[test]
+    fn config_queries_use_the_config_committed_with_each_block() {
+        const TEST_PARAM: u32 = 999;
+
+        let mut node = make_test_node();
+        node.mine_block().expect("first block must be mined");
+        let first_config =
+            handle_get_config_all(&node, Some(1)).expect("first block config must be available");
+
+        let mut builder = CellBuilder::new();
+        builder
+            .store_u32(0xfeed_cafe)
+            .expect("test config marker must fit");
+        let test_param = builder.build().expect("test config param must build");
+        let mut second_config_params = BlockchainConfigParams::from_raw(
+            Boc::decode(&first_config).expect("default config must decode"),
+        );
+        second_config_params
+            .set_raw(TEST_PARAM, test_param.clone())
+            .expect("test config param must be inserted");
+        let second_config_cell = second_config_params
+            .as_dict()
+            .root()
+            .as_ref()
+            .expect("config dictionary must remain non-empty")
+            .clone();
+        let second_config_hash = Hash256::from(second_config_cell.repr_hash());
+        let second_config = BocBytes::from(Boc::encode(second_config_cell));
+        node.cas.put(second_config.clone(), second_config_hash);
+        node.globals.config_boc_hash = second_config_hash;
+
+        node.mine_block().expect("second block must be mined");
+
+        assert_eq!(
+            handle_get_config_all(&node, Some(1)).expect("historical config must remain available"),
+            first_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, Some(2)).expect("second block config must be available"),
+            second_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, None).expect("latest config must be available"),
+            second_config
+        );
+        assert!(handle_get_config_param(&node, TEST_PARAM, Some(1)).is_err());
+        assert_eq!(
+            handle_get_config_param(&node, TEST_PARAM, Some(2))
+                .expect("new config param must be available at the second block"),
+            BocBytes::from(Boc::encode(test_param))
+        );
+        node.get_masterchain_state_cell(1)
+            .expect("historical masterchain state must use the historical config");
+    }
+
+    struct NoopExecutor;
+
+    impl TvmExecutor for NoopExecutor {
+        fn execute(
+            &self,
+            _shard_account: &BocBytes,
+            _in_msg: &BocBytes,
+            _ctx: &ExecContext,
+            _config: &BocBytes,
+            _libs: Option<&BocBytes>,
+        ) -> anyhow::Result<ExecResult> {
+            anyhow::bail!("NoopExecutor should not be used in empty block mining tests")
+        }
+    }
+
+    fn make_test_node() -> Node {
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        Node::new(Box::new(NoopExecutor), config_boc, StateSource::Local)
+            .expect("must create test node")
+    }
+
+    #[test]
+    fn address_queries_accept_nonzero_fork_origin_as_default_head() {
+        const ORIGIN_SEQNO: Seqno = 82_400_780;
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::new(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+                fork_snapshot: None,
+            }),
+        )
+        .expect("must create forked test node");
+        let address = test_addr(0x71);
+        node.latest.accounts.insert(
+            address,
+            test_contract_account(Hash256([0x72; 32]), AccountStatus::Active, 1),
+        );
+
+        let information = handle_get_address_info(&mut node, address, None)
+            .expect("default getAddressInformation query must accept fork origin");
+        assert_eq!(information.block_id.seqno, ORIGIN_SEQNO);
+        assert_eq!(information.state, AccountStatus::Active);
+        assert_eq!(
+            handle_get_address_info(&mut node, address, Some(0))
+                .expect("default getAddressState query must accept fork origin")
+                .state,
+            AccountStatus::Active
+        );
+    }
+
+    fn test_contract_account(
+        code_hash: Hash256,
+        status: AccountStatus,
+        last_transaction_lt: u64,
+    ) -> storage::AccountMeta {
+        storage::AccountMeta {
+            account_hash: Hash256([code_hash.0[0].wrapping_add(4); 32]),
+            status,
+            balance: 1000 + u128::from(last_transaction_lt),
+            extra_currencies: Vec::new(),
+            last_trans_lt: Some(last_transaction_lt),
+            last_trans_hash: Some(Hash256([code_hash.0[0].wrapping_add(2); 32])),
+            code_hash: Some(code_hash),
+            data_hash: Some(Hash256([code_hash.0[0].wrapping_add(1); 32])),
+            frozen_hash: None,
+        }
+    }
+
+    #[test]
+    fn jetton_master_pages_preserve_detection_order() {
+        let mut node = make_test_node();
+        let admin_a = test_addr(10);
+        let admin_b = test_addr(11);
+        for master in [
+            test_jetton_master(3, admin_a),
+            test_jetton_master(1, admin_b),
+            test_jetton_master(2, admin_a),
+        ] {
+            node.history.jetton_masters.insert(master.address, master);
+        }
+
+        let default = handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::new(), 2, 1)
+            .expect("default jetton master page must succeed");
+        let by_admin =
+            handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::from([admin_a]), 1, 1)
+                .expect("admin jetton master page must succeed");
+
+        assert_eq!(jetton_master_addresses(&default), [1, 2]);
+        assert_eq!(jetton_master_addresses(&by_admin), [2]);
+    }
+
+    fn test_jetton_master(id: u8, admin_address: Addr) -> storage::JettonMasterMeta {
+        storage::JettonMasterMeta {
+            address: test_addr(id),
+            admin_address: Some(admin_address),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_content: Value::Null,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt: u64::from(id),
+            mintable: true,
+            total_supply: 0,
+        }
+    }
+
+    fn jetton_master_addresses(masters: &[storage::JettonMasterMeta]) -> Vec<u8> {
+        masters
+            .iter()
+            .map(|master| master.address.addr[0])
+            .collect()
+    }
+
+    #[test]
+    fn jetton_wallet_queries_follow_upstream_sort_precedence() {
+        let mut node = make_test_node();
+        let owner_a = test_addr(10);
+        let owner_b = test_addr(11);
+        let master_a = test_addr(20);
+        let master_b = test_addr(21);
+        for wallet in [
+            test_jetton_wallet(1, owner_b, master_a, 300, 10),
+            test_jetton_wallet(2, owner_a, master_a, 100, 30),
+            test_jetton_wallet(3, owner_a, master_b, 200, 20),
+            test_jetton_wallet(4, owner_b, master_b, 0, 40),
+        ] {
+            node.history.jetton_wallets.insert(wallet.address, wallet);
+        }
+
+        let default = handle_get_jetton_wallets(&mut node, test_jetton_wallet_query(None))
+            .expect("default query must succeed");
+        assert_eq!(wallet_addresses(&default), vec![1, 2, 3, 4]);
+
+        let ascending = handle_get_jetton_wallets(
+            &mut node,
+            test_jetton_wallet_query(Some(LocalnetSortOrder::Asc)),
+        )
+        .expect("ascending query must succeed");
+        assert_eq!(wallet_balances(&ascending), vec![0, 100, 200, 300]);
+
+        let mut descending_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        descending_query.offset = 1;
+        descending_query.limit = 2;
+        let descending = handle_get_jetton_wallets(&mut node, descending_query)
+            .expect("descending page must succeed");
+        assert_eq!(wallet_balances(&descending), vec![200, 100]);
+
+        let mut address_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        address_query.addresses = HashSet::from([test_addr(3), test_addr(1)]);
+        let by_address = handle_get_jetton_wallets(&mut node, address_query)
+            .expect("address query must succeed");
+        assert_eq!(wallet_addresses(&by_address), vec![1, 3]);
+
+        let mut owner_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        owner_query.owner_addresses.insert(owner_a);
+        let by_owner =
+            handle_get_jetton_wallets(&mut node, owner_query).expect("owner query must succeed");
+        assert_eq!(wallet_balances(&by_owner), vec![200, 100]);
+
+        let mut combined_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        combined_query.owner_addresses.insert(owner_a);
+        combined_query.jetton_addresses.insert(master_a);
+        let combined = handle_get_jetton_wallets(&mut node, combined_query)
+            .expect("combined owner and jetton query must succeed");
+        assert_eq!(wallet_addresses(&combined), vec![2]);
+
+        let mut nonzero_query = test_jetton_wallet_query(None);
+        nonzero_query.exclude_zero_balance = true;
+        let nonzero = handle_get_jetton_wallets(&mut node, nonzero_query)
+            .expect("nonzero query must succeed");
+        assert_eq!(wallet_addresses(&nonzero), vec![1, 2, 3]);
+    }
+
+    fn test_jetton_wallet_query(sort: Option<LocalnetSortOrder>) -> ParsedJettonWalletsQuery {
+        ParsedJettonWalletsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            jetton_addresses: HashSet::new(),
+            exclude_zero_balance: false,
+            sort,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_jetton_wallet(
+        id: u8,
+        owner_address: Addr,
+        jetton_address: Addr,
+        balance: u128,
+        last_transaction_lt: Lt,
+    ) -> storage::JettonWalletMeta {
+        storage::JettonWalletMeta {
+            address: test_addr(id),
+            balance,
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_address,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt,
+            mintless_is_claimed: None,
+            owner_address,
+        }
+    }
+
+    fn wallet_addresses(wallets: &[storage::JettonWalletMeta]) -> Vec<u8> {
+        wallets
+            .iter()
+            .map(|wallet| wallet.address.addr[0])
+            .collect()
+    }
+
+    fn wallet_balances(wallets: &[storage::JettonWalletMeta]) -> Vec<u128> {
+        wallets.iter().map(|wallet| wallet.balance).collect()
+    }
+
+    #[test]
+    fn nft_item_queries_follow_upstream_order_precedence() {
+        let mut node = make_test_node();
+        let owner = test_addr(10);
+        let collection_a = test_addr(20);
+        let collection_b = test_addr(21);
+        for item in [
+            test_nft_item(1, owner, Some(collection_b), "10", 10),
+            test_nft_item(2, owner, Some(collection_b), "2", 40),
+            test_nft_item(3, owner, Some(collection_a), "7", 20),
+            test_nft_item(4, owner, None, "1", 30),
+        ] {
+            node.history.nft_items.insert(item.address, item);
+        }
+
+        let default = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::Insertion),
+        )
+        .expect("default NFT query must succeed");
+        assert_eq!(nft_item_addresses(&default), vec![1, 2, 3, 4]);
+
+        let mut collection_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        collection_query.collection_addresses.insert(collection_b);
+        let by_collection = handle_get_nft_items(&mut node, collection_query)
+            .expect("collection NFT query must succeed");
+        assert_eq!(nft_item_indexes(&by_collection), vec!["2", "10"]);
+
+        let mut owner_query = test_nft_items_query(LocalnetNftItemsOrder::OwnerCollectionIndex);
+        owner_query.owner_addresses.insert(owner);
+        let by_owner =
+            handle_get_nft_items(&mut node, owner_query).expect("owner NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_owner), vec![3, 2, 1, 4]);
+
+        let by_lt = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::LastTransactionLtDesc),
+        )
+        .expect("LT-sorted NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_lt), vec![2, 4, 3, 1]);
+
+        let mut page_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        page_query.collection_addresses.insert(collection_b);
+        page_query.limit = 1;
+        page_query.offset = 1;
+        let page =
+            handle_get_nft_items(&mut node, page_query).expect("paginated NFT query must succeed");
+        assert_eq!(nft_item_indexes(&page), vec!["10"]);
+    }
+
+    fn test_nft_items_query(order: LocalnetNftItemsOrder) -> ParsedNftItemsQuery {
+        ParsedNftItemsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            collection_addresses: HashSet::new(),
+            indexes: HashSet::new(),
+            order,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_nft_item(
+        id: u8,
+        owner_address: Addr,
+        collection_address: Option<Addr>,
+        index: &str,
+        last_transaction_lt: Lt,
+    ) -> storage::NftItemMeta {
+        storage::NftItemMeta {
+            address: test_addr(id),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            collection_address,
+            owner_address: Some(owner_address),
+            content: Value::Null,
+            index: index.to_owned(),
+            init: true,
+            last_transaction_lt,
+        }
+    }
+
+    fn nft_item_addresses(items: &[storage::NftItemMeta]) -> Vec<u8> {
+        items.iter().map(|item| item.address.addr[0]).collect()
+    }
+
+    fn nft_item_indexes(items: &[storage::NftItemMeta]) -> Vec<&str> {
+        items.iter().map(|item| item.index.as_str()).collect()
+    }
+
+    fn internal_message_boc(bounced: bool, body_words: &[u32]) -> BocBytes {
+        let mut body = CellBuilder::new();
+        for word in body_words {
+            body.store_u32(*word).expect("body word must store");
+        }
+        let body = body.build().expect("body cell must build");
+        let message = OwnedMessage {
+            info: MsgInfo::Int(IntMsgInfo {
+                ihr_disabled: true,
+                bounce: false,
+                bounced,
+                src: IntAddr::Std(test_std_addr(0x11)),
+                dst: IntAddr::Std(test_std_addr(0x22)),
+                value: CurrencyCollection::new(1),
+                ihr_fee: Default::default(),
+                fwd_fee: Default::default(),
+                created_at: 0,
+                created_lt: 0,
+            }),
+            init: None,
+            body: CellSliceParts::from(body),
+            layout: None,
+        };
+
+        BocRepr::encode(message)
+            .expect("internal message must encode")
+            .into()
+    }
+
+    fn message_meta(hash: Hash256) -> MsgMeta {
+        MsgMeta {
+            msg_hash: hash,
+            hash_norm: None,
+            msg_boc_hash: hash,
+            src: Some(test_addr(0x11)),
+            dst: Some(test_addr(0x22)),
+            value: Some(1),
+            bounce: Some(false),
+            created_lt: Some(0),
+            created_at: Some(0),
+        }
+    }
+
+    fn test_addr(byte: u8) -> Addr {
+        Addr {
+            workchain: 0,
+            addr: [byte; 32],
+        }
+    }
+
+    fn test_std_addr(byte: u8) -> StdAddr {
+        StdAddr {
+            anycast: None,
+            address: HashBytes([byte; 32]),
+            workchain: 0,
+        }
+    }
 }

@@ -25,7 +25,7 @@ expect(res).toHaveTx({
         return addr == deployer.address;
     },
     to: harness.address,
-    value: ton("0.5"),
+    value: grams("0.5"),
     opcode: 0x0000_0001,
 });
 ```

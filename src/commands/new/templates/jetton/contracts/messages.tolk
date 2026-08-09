@@ -98,7 +98,7 @@ struct (0xcb862902) ChangeMinterMetadata {
     newMetadata: cell
 }
 
-struct (0xd372158c) TopUpTons {}
+struct (0xd372158c) TopUpGrams {}
 
 fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self) {
     var mutableCopy = self;

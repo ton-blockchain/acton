@@ -1,6 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
-use crate::support::toncenter::{append_custom_network, spawn_toncenter_v2_mock_with_capture};
+use crate::support::toncenter::{
+    append_custom_network, format_captured_requests, spawn_toncenter_v2_mock_with_capture,
+    toncenter_v2_latest_fork_snapshot_responses,
+};
+use std::fs;
 
 const EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -336,9 +340,12 @@ get fun `test send external stays local with broadcast flag in tests`() {
     net.enableBroadcast();
     expect(net.isBroadcasting()).toBeTrue();
 
-    val txs = net.sendExternal(
+    val result = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 9 }),
-    ).unwrap();
+    );
+
+    expect(result.isAccepted()).toBeTrue();
+    val txs = result.unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0).tx.load();
@@ -353,7 +360,8 @@ get fun `test send external stays local with broadcast flag in tests`() {
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn broadcast_wait_helpers_stay_local_in_test_runner() {
-    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock_with_capture(vec![]);
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock_with_capture(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let source = with_prelude(
         r"
 get fun `test broadcast wait helpers stay local in tests`() {
@@ -376,23 +384,30 @@ get fun `test broadcast wait helpers stay local in tests`() {
         .build();
     append_custom_network(project.path(), "mock-wait-unused", &mock_url);
 
-    project
+    let output = project
         .acton()
         .test()
         .arg("--fork-net")
         .arg("custom:mock-wait-unused")
         .run()
-        .success()
-        .assert_passed(1)
-        .assert_snapshot_matches(
-            "integration/snapshots/test-runner/api_external/broadcast_wait_helpers_stay_local_in_test_runner.stdout.txt",
-        );
+        .success();
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/api_external/broadcast_wait_helpers_stay_local_in_test_runner.stdout.txt",
+    );
 
     mock_handle.join().expect("mock toncenter must finish");
     let captured = captured
         .lock()
         .expect("captured toncenter requests mutex poisoned");
-    assert_eq!(captured.len(), 0, "acton test must not poll toncenter");
+    fs::write(
+        project.path().join("broadcast-wait-fork-requests.txt"),
+        format_captured_requests(&captured),
+    )
+    .expect("failed to write captured fork requests");
+    output.assert_file_snapshot_matches(
+        "broadcast-wait-fork-requests.txt",
+        "integration/snapshots/test-runner/api_external/broadcast_wait_helpers_stay_local_in_test_runner.requests.txt",
+    );
 }
 
 #[test]
@@ -885,6 +900,7 @@ get fun `test external send result helpers cover accepted trace`() {
     expect(result.transactions).toBeNotNull();
 
     result.giveName("external-helper-trace");
+    result.hideTraceFromUi();
 
     val txs = result.unwrap();
     expect(txs).toHaveLength(1);

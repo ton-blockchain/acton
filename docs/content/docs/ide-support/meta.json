@@ -3,6 +3,7 @@
   "icon": "FileCode",
   "pages": [
     "vscode",
-    "jetbrains"
+    "jetbrains",
+    "language-server-protocol"
   ]
 }

@@ -143,7 +143,7 @@ function trimFraction(value: string, precision: number): string {
   return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
 }
 
-export function formatTonAmount(
+export function formatGramAmount(
   value: bigint | string | null | undefined,
   precision = 4,
 ): string {
@@ -152,7 +152,7 @@ export function formatTonAmount(
   }
 
   const source = typeof value === 'bigint' ? fromNano(value) : value;
-  return `${trimFraction(source, precision)} TON`;
+  return `${trimFraction(source, precision)} GRAM`;
 }
 
 export function getExplorerUrl(address: Address | string): string {

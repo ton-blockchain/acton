@@ -27,7 +27,7 @@ use xxhash_rust::xxh3::Xxh3;
 
 use crate::paths;
 
-const CACHE_SCHEMA_VERSION: u32 = 12;
+const CACHE_SCHEMA_VERSION: u32 = 13;
 const CACHE_LOCK_WAIT_ATTEMPTS: usize = 60;
 const CACHE_LOCK_RETRY_DELAY: Duration = Duration::from_secs(1);
 const DEBUG_CACHE_SUBDIR: &str = "debug";
@@ -38,6 +38,9 @@ pub struct CacheEntry {
     pub code_hash_hex: String,
     pub fift_code: Option<String>,
     pub source_map: Option<tolk_compiler::SourceMap>,
+    pub debug_marks_base64: Option<String>,
+    pub symbol_types_json: Option<tolk_compiler::source_map::SymbolTypesJson>,
+    pub debug_marks_json: Option<Vec<tolk_compiler::source_map::DebugMark>>,
     pub abi: Option<ContractABI>,
     pub dependency_paths: Vec<String>,
     pub dependencies_hash: String,
@@ -239,6 +242,9 @@ impl FileBuildCache {
             code_hash_hex: result.code_hash_hex.clone(),
             fift_code: with_fift.then(|| result.fift_code.clone()),
             source_map: result.source_map.clone(),
+            debug_marks_base64: result.debug_marks_base64.clone(),
+            symbol_types_json: result.symbol_types_json.clone(),
+            debug_marks_json: result.debug_marks_json.clone(),
             abi: result.abi.clone(),
             dependency_paths: dependencies,
             dependencies_hash,
@@ -617,6 +623,9 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             source_map: Some(source_map_for_paths(&[&main_path, &lib_path])),
+            debug_marks_base64: None,
+            symbol_types_json: None,
+            debug_marks_json: None,
             abi: None,
         };
 
@@ -658,6 +667,9 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             source_map: Some(source_map_for_paths(&[&main_path])),
+            debug_marks_base64: None,
+            symbol_types_json: None,
+            debug_marks_json: None,
             abi: None,
         };
 
@@ -716,6 +728,9 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             source_map: Some(source_map_for_paths(&[&main_path, &lib_path])),
+            debug_marks_base64: None,
+            symbol_types_json: None,
+            debug_marks_json: None,
             abi: None,
         };
 

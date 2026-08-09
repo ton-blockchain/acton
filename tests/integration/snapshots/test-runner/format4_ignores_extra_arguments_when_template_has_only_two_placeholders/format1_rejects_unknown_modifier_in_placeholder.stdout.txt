@@ -6,7 +6,7 @@
 
  > tests/fmt_behavior.test.tolk (1 test)
   ✗ eb stdlib format1 unknown modifier [TIME]
-    └─ Error: Invalid format string at byte 6: unknown format modifier 'hex' in {:hex} (supported: :x, :ton, :cell-tree)
+    └─ Error: Invalid format string at byte 6: unknown format modifier 'decimal' in {:decimal} (supported: :x, :X, :b, :B, :gram, :grams, :ton, :cell-tree)
 
  ✗ 1 failed in 1 file
 

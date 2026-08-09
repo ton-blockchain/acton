@@ -1,0 +1,207 @@
+.samplePanel {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.inlineRow {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--acton-space-3);
+  min-width: 0;
+}
+
+.rowLabel,
+.sampleText,
+.toolbarLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+.triggerWrap {
+  min-width: 0;
+}
+
+.inlineTrigger {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.popoverContent {
+  display: grid;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+.popoverTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.25;
+}
+
+.popoverText {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+.popoverLink {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.popoverLink:hover {
+  color: var(--acton-color-accent-hover);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--acton-space-4);
+  min-width: 0;
+}
+
+.sampleTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.sampleText {
+  margin: var(--acton-space-1) 0 0;
+}
+
+.infoTrigger,
+.placementTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  gap: var(--acton-space-2);
+  padding: 0 var(--acton-space-3);
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.infoTrigger:hover,
+.placementTrigger:hover {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+}
+
+.statusLine,
+.statusHeader {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+}
+
+.statusHeader {
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.statusDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--acton-radius-round);
+  background: var(--acton-color-accent);
+}
+
+.contentActions {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  padding-top: var(--acton-space-1);
+}
+
+.placementGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--acton-space-3);
+  min-width: 0;
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.placementTrigger {
+  width: 100%;
+  text-transform: capitalize;
+}
+
+.toolbarSample {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+@media (max-width: 700px) {
+  .inlineRow,
+  .cardHeader,
+  .toolbarSample {
+    align-items: flex-start;
+  }
+
+  .inlineRow {
+    grid-template-columns: 1fr;
+    gap: var(--acton-space-1);
+  }
+
+  .cardHeader {
+    flex-direction: column;
+  }
+
+  .placementGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbarSample {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}

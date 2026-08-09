@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/language-configuration-schema.json",
+  "comments": {
+    "lineComment": ";;",
+    "blockComment": ["{-", "-}"]
+  },
+  "brackets": [["{", "}"], ["[", "]"], ["(", ")"]],
+  "autoClosingPairs": [
+    {"open": "{", "close": "}", "notIn": ["string", "comment"]},
+    {"open": "[", "close": "]", "notIn": ["string", "comment"]},
+    {"open": "(", "close": ")", "notIn": ["string", "comment"]},
+    {"open": "\"", "close": "\"", "notIn": ["comment"]}
+  ],
+  "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["\"", "\""]],
+  "indentationRules": {
+    "increaseIndentPattern": "^(.*\\{[^}\"']*|.*\\([^\\)\"']*|.*\\[[^\\]\"']*)$",
+    "decreaseIndentPattern": "^\\s*[\\}\\]\\)]"
+  },
+  "wordPattern": "`[^`]+`|[A-Za-z_$:][^\\s+\\-*\\/%,.;(){}\\[\\]=|\\^~]*",
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*;;;.*$",
+      "action": {
+        "indent": "none",
+        "appendText": ";;; "
+      }
+    }
+  ]
+}

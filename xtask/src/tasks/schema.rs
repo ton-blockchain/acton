@@ -6,12 +6,15 @@ use acton_config::lint_output::LintJsonReport;
 use acton_config::mutation_rules::CustomMutationRulesFile;
 use anyhow::{Context, Result, bail};
 use clap::{Args, ValueEnum};
-use schemars::JsonSchema;
 use schemars::r#gen::SchemaSettings;
+use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject};
+use schemars::{JsonSchema, Map};
+use tolk_linter::Linter;
 
 const ACTON_TOML_OUTPUT_PATH: &str = "crates/acton-config/schemas/acton.schema.json";
 const LINT_REPORT_OUTPUT_PATH: &str = "crates/acton-config/schemas/lint-report.schema.json";
 const MUTATION_RULES_OUTPUT_PATH: &str = "crates/acton-config/schemas/mutation-rules.schema.json";
+const LINT_RULE_LEVEL_SCHEMA_NAME: &str = "LintRuleLevel";
 
 #[derive(Args)]
 pub(crate) struct SchemaArgs {
@@ -53,7 +56,7 @@ pub(crate) fn run(args: SchemaArgs) -> Result<()> {
         .output
         .unwrap_or_else(|| PathBuf::from(args.schema.default_output_path()));
     let content = match args.schema {
-        SchemaTarget::ActonToml => schema_content::<ActonConfig>()?,
+        SchemaTarget::ActonToml => acton_toml_schema_content()?,
         SchemaTarget::LintReport => schema_content::<LintJsonReport>()?,
         SchemaTarget::MutationRules => schema_content::<CustomMutationRulesFile>()?,
     };
@@ -81,13 +84,107 @@ pub(crate) fn run(args: SchemaArgs) -> Result<()> {
     Ok(())
 }
 
+fn acton_toml_schema_content() -> Result<String> {
+    let mut schema = root_schema::<ActonConfig>();
+    add_lint_rule_documentation(&mut schema)?;
+    serialize_schema(&schema)
+}
+
 fn schema_content<T: JsonSchema>() -> Result<String> {
+    serialize_schema(&root_schema::<T>())
+}
+
+fn root_schema<T: JsonSchema>() -> RootSchema {
     let generator = SchemaSettings::draft07().with(|settings| {
         settings.option_add_null_type = false;
     });
-    let schema = generator.into_generator().into_root_schema_for::<T>();
+    generator.into_generator().into_root_schema_for::<T>()
+}
+
+fn serialize_schema(schema: &RootSchema) -> Result<String> {
     Ok(format!(
         "{}\n",
-        serde_json::to_string_pretty(&schema).context("failed to serialize JSON schema")?
+        serde_json::to_string_pretty(schema).context("failed to serialize JSON schema")?
     ))
+}
+
+fn add_lint_rule_documentation(schema: &mut RootSchema) -> Result<()> {
+    let lint_level = schema
+        .definitions
+        .get("LintLevel")
+        .cloned()
+        .context("Acton.toml schema is missing the LintLevel definition")?;
+    schema.definitions.insert(
+        LINT_RULE_LEVEL_SCHEMA_NAME.to_owned(),
+        without_documentation(lint_level),
+    );
+    let lint_rules = schema
+        .definitions
+        .get_mut("LintRules")
+        .and_then(|schema| match schema {
+            Schema::Object(schema) => Some(schema),
+            Schema::Bool(_) => None,
+        })
+        .context("Acton.toml schema is missing the LintRules definition")?;
+    lint_rules
+        .object()
+        .properties
+        .extend(lint_rule_properties());
+
+    Ok(())
+}
+
+fn lint_rule_properties() -> Map<String, Schema> {
+    Linter::Tolk
+        .all_rules()
+        // Compiler errors are emitted before configurable lint rules are evaluated.
+        .filter(|rule| rule.name() != "compiler-error")
+        .map(|rule| {
+            let title = Linter::Tolk.code_for_rule(rule).map_or_else(
+                || rule.name().to_owned(),
+                |code| format!("{code}: {}", rule.name()),
+            );
+            let mut schema = SchemaObject::default();
+            schema.metadata().title = Some(title);
+            schema.metadata().description = rule.explanation().map(|it| it.trim().to_owned());
+            let mut contract_overrides = SchemaObject {
+                instance_type: Some(InstanceType::Object.into()),
+                ..SchemaObject::default()
+            };
+            contract_overrides.object().additional_properties = Some(Box::new(Schema::new_ref(
+                format!("#/definitions/{LINT_RULE_LEVEL_SCHEMA_NAME}"),
+            )));
+            schema.subschemas().any_of = Some(vec![
+                Schema::new_ref(format!("#/definitions/{LINT_RULE_LEVEL_SCHEMA_NAME}")),
+                contract_overrides.into(),
+            ]);
+            (rule.name().to_owned(), schema.into())
+        })
+        .collect()
+}
+
+fn without_documentation(mut schema: Schema) -> Schema {
+    remove_documentation(&mut schema);
+    schema
+}
+
+fn remove_documentation(schema: &mut Schema) {
+    let Schema::Object(schema) = schema else {
+        return;
+    };
+    if let Some(metadata) = &mut schema.metadata {
+        metadata.title = None;
+        metadata.description = None;
+    }
+    if let Some(subschemas) = &mut schema.subschemas {
+        for branch in subschemas
+            .all_of
+            .iter_mut()
+            .chain(&mut subschemas.any_of)
+            .chain(&mut subschemas.one_of)
+            .flatten()
+        {
+            remove_documentation(branch);
+        }
+    }
 }

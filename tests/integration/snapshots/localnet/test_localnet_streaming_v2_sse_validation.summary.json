@@ -1,0 +1,10 @@
+{
+  "missing_trace_hash": {
+    "error": "trace_external_hash_norms are required for trace subscription",
+    "status": 400
+  },
+  "missing_types": {
+    "error": "types are required for subscription",
+    "status": 400
+  }
+}

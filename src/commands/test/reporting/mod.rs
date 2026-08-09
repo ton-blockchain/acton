@@ -12,14 +12,15 @@ use std::sync::Arc;
 use std::time::Duration;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceLocation;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::{ShardAccount, StdAddr};
 
 pub(super) mod console;
 pub(super) mod dot;
 pub(super) mod junit;
+pub(super) mod studio;
 pub(super) mod teamcity;
 pub(super) mod ui;
 
@@ -28,6 +29,7 @@ pub struct TestExecutionContext {
     pub gas_used: u64,
     pub stdout: String,
     pub stderr: String,
+    pub debug_output: String,
     pub vm_log: Option<Arc<str>>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
@@ -167,6 +169,10 @@ pub trait TestReporter: Send + Sync {
         Ok(())
     }
 
+    fn on_run_finished(&mut self, _success: bool) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     fn on_suite_started(
         &mut self,
         _file_path: &Path,
@@ -238,6 +244,13 @@ impl ReporterManager {
     pub fn on_testing_finished(&mut self, stats: &TestSuiteStats) -> anyhow::Result<()> {
         for reporter in &mut self.reporters {
             reporter.on_testing_finished(stats)?;
+        }
+        Ok(())
+    }
+
+    pub fn on_run_finished(&mut self, success: bool) -> anyhow::Result<()> {
+        for reporter in &mut self.reporters {
+            reporter.on_run_finished(success)?;
         }
         Ok(())
     }

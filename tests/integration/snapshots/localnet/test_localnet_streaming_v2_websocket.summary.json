@@ -1,0 +1,23 @@
+{
+  "event": {
+    "address_book_len": 0,
+    "event": null,
+    "finality": "finalized",
+    "first_account": "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79",
+    "trace_external_hash_norm_present": true,
+    "transactions_len": 1,
+    "type": "transactions"
+  },
+  "pong": {
+    "id": "ping-1",
+    "status": "pong"
+  },
+  "subscribed": {
+    "id": "subscribe-1",
+    "status": "subscribed"
+  },
+  "unsubscribed": {
+    "id": "unsubscribe-1",
+    "status": "unsubscribed"
+  }
+}

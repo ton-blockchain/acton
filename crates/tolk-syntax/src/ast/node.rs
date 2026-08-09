@@ -19,6 +19,12 @@ pub struct SourceFile {
 ton_syntax::impl_source_file_basics!(SourceFile, ParseError, collect_errors, language);
 
 impl SourceFile {
+    /// Returns documentation declared for the whole file.
+    #[must_use]
+    pub fn documentation(&self) -> Option<String> {
+        file_documentation(&self.tree, self.source.as_ref())
+    }
+
     /// Returns an iterator over all top-level declarations in the file.
     #[must_use]
     pub fn top_levels(&self) -> AstChildren<'_, TopLevel<'_>> {
@@ -69,6 +75,73 @@ impl SourceFile {
             decl_start <= start && start <= decl_end && end <= decl_end
         })
     }
+}
+
+fn file_documentation(tree: &Tree, source: &str) -> Option<String> {
+    let root = tree.root_node();
+    let mut cursor = root.walk();
+    let mut children = root.named_children(&mut cursor);
+    let first = children.next()?;
+    let first_text = first.utf8_text(source.as_bytes()).ok()?;
+    if first.kind() != "comment"
+        || !source.get(..first.start_byte())?.trim().is_empty()
+        || !is_documentation_comment(first_text)
+    {
+        return None;
+    }
+
+    let mut comments = vec![first_text];
+    let mut last_end = first.end_byte();
+    let mut boundary = source.len();
+    for node in children {
+        let gap = source.get(last_end..node.start_byte())?;
+        let text = node.utf8_text(source.as_bytes()).ok()?;
+        if node.kind() == "comment"
+            && gap.matches('\n').count() <= 1
+            && is_documentation_comment(text)
+        {
+            comments.push(text);
+            last_end = node.end_byte();
+            continue;
+        }
+        boundary = node.start_byte();
+        break;
+    }
+
+    if boundary < source.len() && source.get(last_end..boundary)?.matches('\n').count() <= 1 {
+        return None;
+    }
+
+    let documentation = comments
+        .into_iter()
+        .map(clean_comment)
+        .collect::<Vec<_>>()
+        .join("\n");
+    (!documentation.is_empty()).then_some(documentation)
+}
+
+fn is_documentation_comment(comment: &str) -> bool {
+    comment.starts_with("///") || comment.starts_with("/**")
+}
+
+/// Removes Tolk comment delimiters and one optional leading or trailing space.
+#[must_use]
+pub fn clean_comment(comment: &str) -> String {
+    if let Some(comment) = comment
+        .strip_prefix("///")
+        .or_else(|| comment.strip_prefix("//"))
+    {
+        return comment.strip_prefix(' ').unwrap_or(comment).to_owned();
+    }
+
+    let comment = comment
+        .strip_prefix("/**")
+        .or_else(|| comment.strip_prefix("/*"))
+        .and_then(|comment| comment.strip_suffix("*/"))
+        .unwrap_or_default();
+    let comment = comment.strip_prefix(' ').unwrap_or(comment);
+
+    comment.strip_suffix(' ').unwrap_or(comment).to_owned()
 }
 
 pub use ton_syntax::ast::{AstChildren, RawNode, SyntaxNodeChildren};

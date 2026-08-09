@@ -1,0 +1,45 @@
+tolk 1.0
+
+const SIMPLE/* : int */ = 1
+const COMPUTED/* : int */ = 1 + 2/* = 3 (0x3) */
+const REFERENCED/* : int */ = COMPUTED * 4/* = 12 (0xC) */
+const BOOLEAN/* : bool */ = REFERENCED == 12/* = true */
+
+enum Status {
+    None/* = 0 */
+    Ready/* = 1 */
+    Explicit = 7
+    Next/* = 8 */
+    Hex = 0x10/* = 16 */
+    Truthy = true/* = -1 */
+    AfterTruthy/* = 0 */
+}
+
+struct Payload {
+    value: int
+}
+
+fun deliver(destination: int, amount: int)/* : void */ {}
+
+fun Payload.add(self, amount: int): int {
+    return self.value + amount;
+}
+
+get/* (0x1cad0) */ fun currentCounter(): int {
+    return 0;
+}
+
+@method_id(123)
+get fun explicitId(): int {
+    return 0;
+}
+
+get fun `test skipped`(): int {
+    return 0;
+}
+
+fun main()/* : void */ {
+    val payload/* : Payload */ = Payload { value: 1 };
+    deliver(/* destination: */100, /* amount: */25);
+    payload.add(/* amount: */2);
+}

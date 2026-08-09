@@ -1,0 +1,253 @@
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.sidebarSlot {
+  flex: 0 0 auto;
+  width: var(--sidebar-expanded-width);
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  transition: width 250ms ease;
+  will-change: width;
+}
+
+.sidebarSlotCollapsed {
+  overflow: visible;
+}
+
+.sidebarSlotPinning {
+  overflow: visible;
+}
+
+.sidebarSlotClosing {
+  overflow: visible;
+}
+
+.sidebarSlotResizing {
+  transition: none;
+}
+
+.sidebarViewport {
+  position: relative;
+  z-index: 20;
+  width: var(--sidebar-expanded-width);
+  height: 100%;
+  transition: transform 250ms ease;
+  will-change: transform;
+}
+
+.sidebarSlotCollapsed .sidebarViewport {
+  z-index: 120;
+  pointer-events: none;
+  transform: translateX(calc(-1 * var(--sidebar-expanded-width) - 1px));
+}
+
+.sidebarSlotFloating .sidebarViewport {
+  pointer-events: auto;
+  transform: translateX(8px);
+}
+
+.sidebarPeekTarget {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 16px;
+  z-index: 110;
+}
+
+.floatingSidebar {
+  transition:
+    height 250ms ease,
+    margin 250ms ease,
+    border-color 250ms ease,
+    border-radius 250ms ease,
+    box-shadow 250ms ease;
+}
+
+.sidebarSlotCollapsed:not(.sidebarSlotClosing) .floatingSidebar,
+.sidebarSlotFloating .floatingSidebar,
+.sidebarSlotPinning .floatingSidebar {
+  height: calc(100vh - 16px);
+  margin: 8px 0;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
+}
+
+.expandButton {
+  position: absolute;
+  left: var(--acton-space-4);
+  top: var(--acton-space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-xs);
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  z-index: 100;
+  transition:
+    background-color 0.1s,
+    color 0.1s;
+}
+
+.expandButton:hover {
+  color: var(--acton-color-text);
+  background-color: var(--acton-color-surface-hover);
+}
+
+.expandButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-text-subtle) 70%, transparent);
+}
+
+.expandButton svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+}
+
+.resizer {
+  width: 2px;
+  transition: background-color 0.2s;
+  z-index: 10;
+  flex-shrink: 0;
+  outline: none;
+  position: relative;
+  background: transparent;
+}
+
+.resizerActive {
+  cursor: col-resize;
+}
+
+.resizerHovered {
+  background-color: var(--acton-test-color-status-todo);
+}
+
+.mainContent {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--acton-color-surface);
+}
+
+.viewTabs {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-bottom: 1px solid var(--acton-color-border);
+  background-color: var(--acton-color-surface-group);
+}
+
+.viewTab {
+  border: none;
+  background: none;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  padding: var(--acton-space-2) var(--acton-space-4);
+  border-radius: var(--acton-radius-control-xs);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+}
+
+.viewTab:hover {
+  color: var(--acton-color-text);
+}
+
+.viewTabActive {
+  background-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  box-shadow: var(--acton-shadow-surface);
+}
+
+.mainPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.profileView {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.noSelection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+.connectionOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--acton-space-8);
+  background-color: color-mix(in srgb, var(--acton-color-surface) 72%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.connectionDialog {
+  width: min(480px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--acton-space-12);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background-color: var(--acton-color-surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+  text-align: center;
+}
+
+.connectionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--acton-space-6);
+  color: var(--acton-color-text-muted);
+  font-size: 64px;
+  line-height: 1;
+}
+
+.connectionTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-3xl);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 1.2;
+}
+
+.connectionMessage {
+  max-width: 37ch;
+  margin: var(--acton-space-4) 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-lg);
+  line-height: 1.55;
+}

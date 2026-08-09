@@ -1774,6 +1774,7 @@ fn test_wallet_list_balance_plain_uses_mocked_toncenter() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "2445700000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1799,7 +1800,7 @@ fn test_wallet_list_balance_plain_uses_mocked_toncenter() {
 
     output.assert_contains("Available wallets:");
     output.assert_contains("balance-wallet");
-    output.assert_contains("2.4457 TON");
+    output.assert_contains("2.4457 GRAM");
 
     let captured = captured
         .lock()
@@ -1834,6 +1835,7 @@ fn test_wallet_list_balance_json_uses_env_api_key() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "500000000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1901,6 +1903,7 @@ fn test_wallet_list_balance_uses_testnet_env_over_mainnet_env() {
     let response_body = serde_json::json!({
         "accounts": [{
             "address": address,
+            "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "balance": "1000000000",
             "code_boc": Value::Null,
             "status": "active"
@@ -1970,7 +1973,7 @@ fn test_wallet_list_balance_handles_toncenter_failure() {
     toncenter_handle.join().expect("mock toncenter must finish");
 
     output.assert_contains("balance-wallet");
-    output.assert_contains("0 TON");
+    output.assert_contains("0 GRAM");
 }
 
 #[test]
@@ -2184,7 +2187,7 @@ fn test_wallet_new_all_fields_interactive() {
     session.expect("Wallet type:");
     session.send_line("", "failed to select default wallet type");
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("", "failed to keep default no-airdrop option");
 
     session.expect("Wallet successfully created and added to");

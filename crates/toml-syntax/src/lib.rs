@@ -52,7 +52,7 @@ pub fn language() -> Language {
 
 #[cfg(test)]
 mod tests {
-    use crate::{TopLevel, parse};
+    use crate::{AstNode, TopLevel, Value, parse};
 
     #[test]
     fn api_smoke_test() -> anyhow::Result<()> {
@@ -94,6 +94,37 @@ name = "Hammer"
                 assert_eq!(key.text(source), "products");
             }
             _ => panic!("expected table array"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn string_content_range_excludes_delimiters() -> anyhow::Result<()> {
+        let source = r#"basic = "path"
+literal = 'path'
+multiline = """path"""
+literal_multiline = '''path'''
+"#;
+        let file = parse(source)?;
+        let strings = file
+            .top_levels()
+            .filter_map(|item| match item {
+                TopLevel::Pair(pair) => match pair.value()? {
+                    Value::String(string) => Some(string),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(strings.len(), 4);
+        for string in strings {
+            let start = source[string.syntax().start_byte()..]
+                .find("path")
+                .map(|offset| string.syntax().start_byte() + offset)
+                .expect("string content should be present");
+            assert_eq!(string.content_range(source), start..start + "path".len());
         }
 
         Ok(())

@@ -47,7 +47,7 @@ fn format4_ignores_extra_arguments_when_template_has_only_two_placeholders() {
         r#"
 get fun `test eb stdlib format4 extra args ignored`() {
     val rendered = format("{}: {:ton}", "alpha", 2500000000, "unused", 255);
-    expect(rendered).toEqual("alpha: 2.5 TON");
+    expect(rendered).toEqual("alpha: 2.5 GRAM");
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format4_ignores_extra_arguments_when_template_has_only_two_placeholders.stdout.txt",
@@ -74,11 +74,11 @@ fn format1_rejects_unknown_modifier_in_placeholder() {
         "eb-stdlib-format1-unknown-modifier",
         r#"
 get fun `test eb stdlib format1 unknown modifier`() {
-    format("value={:hex}", 255);
+    format("value={:decimal}", 255);
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format1_rejects_unknown_modifier_in_placeholder.stdout.txt",
-        &["Invalid format string", "unknown format modifier 'hex'"],
+        &["Invalid format string", "unknown format modifier 'decimal'"],
     );
 }
 

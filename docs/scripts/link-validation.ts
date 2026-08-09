@@ -9,7 +9,7 @@ export async function getLinkValidationInput(): Promise<{
   const scanned = await scanURLs({
     preset: "next",
     populate: {
-      "docs/[[...slug]]": source.getPages().map(page => {
+      "docs/[...slug]": source.getPages().map(page => {
         return {
           value: {
             slug: page.slugs,

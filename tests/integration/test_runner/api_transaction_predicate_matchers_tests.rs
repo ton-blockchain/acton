@@ -31,14 +31,14 @@ fun onInternalMessage(in: InMessage) {
     }
 
     if (msg.queryId == 20) {
-        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
         return;
     }
 
     if (msg.queryId == 40) {
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: msg.queryId },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -69,14 +69,14 @@ fun onInternalMessage(in: InMessage) {
     }
 
     if (msg.queryId == 20) {
-        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
         return;
     }
 
     if (msg.queryId == 40) {
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: msg.queryId },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -91,14 +91,14 @@ fun onInternalMessage(in: InMessage) {
 
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: 50 },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
 
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: 51 },
         }).send(SEND_MODE_REGULAR);
@@ -108,7 +108,7 @@ fun onInternalMessage(in: InMessage) {
     if (msg.queryId == 60) {
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: contract.getAddress(),
             body: Ping { queryId: 10 },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
@@ -154,7 +154,7 @@ fun deployHarness() {
 
     val deployMsg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: harness.init,
         },
@@ -168,7 +168,7 @@ fun deployHarness() {
 fun sendPingWithBounce(sender: Treasury, harness: Harness, queryId: uint64, bounceable: bool) {
     val msg = createMessage({
         bounce: bounceable,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId },
     });
@@ -182,7 +182,7 @@ fun sendPing(sender: Treasury, harness: Harness, queryId: uint64) {
 fun sendBouncedNotice(sender: Treasury, harness: Harness) {
     val trigger = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId: 40 },
     });
@@ -197,7 +197,7 @@ fun sendBouncedNotice(sender: Treasury, harness: Harness) {
 
     val bouncedMsg = createMessage({
         bounce: false,
-        value: ton("0.3"),
+        value: grams("0.3"),
         dest: harness.address,
         body: bouncedBody,
     }).bounced();
@@ -287,7 +287,7 @@ get fun `test predicate regular transaction fields`() {
         },
         value: fun(value: coins): bool {
             println("value={}", value);
-            return value == ton("0.5");
+            return value == grams("0.5");
         },
         exitCode: fun(code: int32): bool {
             println("exitCode={}", code);
@@ -727,7 +727,7 @@ get fun `test predicate compute phase skipped true`() {
 
     val res = net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: missingAddress,
         body: expectedBody,
     }));
@@ -771,7 +771,7 @@ get fun `test predicate compute skipped success semantics`() {
 
     val res = net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: missingAddress,
         body: beginCell().storeUint(0x21, 32).endCell(),
     }));
@@ -828,7 +828,7 @@ get fun `test predicate mixed scalar and predicate fields`() {
             return addr == sender.address;
         },
         to: harness.address,
-        value: ton("0.5"),
+        value: grams("0.5"),
         bounce: true,
         body: expectedBody,
     });
@@ -849,7 +849,7 @@ get fun `test predicate mixed scalar and predicate fields`() {
             return false;
         },
         to: harness.address,
-        value: ton("0.5"),
+        value: grams("0.5"),
     });
 }
 "#,

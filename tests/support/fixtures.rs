@@ -115,7 +115,7 @@ impl FixtureProject {
             project: Arc::new(crate::support::project::ProjectRef {
                 path: self.project_path.clone(),
             }),
-            test_path: None,
+            test_paths: Vec::new(),
             filter: None,
             build_clear_cache: false,
             build_contract: None,
@@ -146,7 +146,9 @@ impl FixtureProject {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
+            verify_new: false,
             test_fail_fast: false,
+            test_no_capture: false,
             script_fork_net: None,
             build_info: false,
             force_no_color_env: true,
@@ -176,6 +178,12 @@ impl FixtureProject {
         opts.copy_inside = true;
 
         copy(&fixture_dir, tmp.path(), &opts).expect("Failed to copy fixture project");
+        let copied_project_path = tmp.path().join(name);
+        let copied_acton_dir = copied_project_path.join(".acton");
+        if copied_acton_dir.exists() {
+            fs::remove_dir_all(&copied_acton_dir)
+                .expect("Failed to remove copied fixture .acton directory");
+        }
 
         tmp
     }

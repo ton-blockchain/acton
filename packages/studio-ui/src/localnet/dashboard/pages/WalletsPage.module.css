@@ -1,0 +1,534 @@
+.walletLayout {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mainColumn,
+.sideColumn,
+.modalContent,
+.permissionsList,
+.requestMessages {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mainColumn,
+.sideColumn {
+  gap: 18px;
+}
+
+.permissionsList,
+.requestMessages {
+  gap: 10px;
+}
+
+.radio,
+.addressCopyButton,
+.messageIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.walletAddressCell,
+.sessionDappCell {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.walletAddressCell > * {
+  max-width: 100%;
+}
+
+.walletBalanceCell > * {
+  display: flex;
+}
+
+.sessionTitle,
+.pickerTitle,
+.permissionTitle,
+.messageAddress {
+  color: var(--acton-color-text);
+  font-weight: 600;
+}
+
+.unsupportedItem {
+  border-radius: 999px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.sessionDomain,
+.permissionDescription,
+.unsupportedTitle,
+.metaLabel,
+.metaValue,
+.messageValue {
+  color: var(--acton-color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.sessionTitle,
+.sessionDomain,
+.metaValue,
+.sessionWalletCell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionTitle,
+.sessionDomain {
+  display: block;
+}
+
+.sessionDappLine {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.sessionDappLine .sessionTitle,
+.sessionDappLine .sessionDomain {
+  min-width: 0;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionDappLine .sessionTitle {
+  flex: 0 1 auto;
+}
+
+.sessionDappLine .sessionDomain {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+
+.sessionDappSeparator {
+  color: var(--acton-color-text-muted);
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.sessionDomain {
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.sessionWalletCell {
+  color: var(--acton-color-text);
+  font-weight: 600;
+}
+
+.sessionWalletFallback {
+  color: var(--acton-color-text-muted);
+  font-weight: 500;
+}
+
+.connectFooterCell {
+  padding: 0 !important;
+}
+
+.unsupportedBlock {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.unsupportedTitle {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.unsupportedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connectControlForm {
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 11px 18px;
+  box-sizing: border-box;
+  background: var(--acton-color-surface-raised);
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 14px;
+}
+
+.connectInlineLabel {
+  color: var(--acton-color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.connectAction {
+  justify-self: end;
+}
+
+.connectInput {
+  height: 34px;
+  border-radius: 9px;
+  background: var(--acton-color-surface-raised);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.copyableAddress {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyableAddressText {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--acton-color-text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressCopyButton {
+  border: 1px solid var(--acton-color-border);
+  border-radius: 9px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+}
+
+.addressCopyButton {
+  width: 30px;
+  height: 30px;
+}
+
+.addressCopyButton:hover {
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.addressCopyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.addressCopyButtonCopied {
+  color: var(--acton-color-text);
+}
+
+.permissionItem,
+.messageItem,
+.requestSummary {
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  padding: 12px;
+}
+
+.metaRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.metaLabel {
+  font-weight: 600;
+}
+
+.metaValue {
+  color: var(--acton-color-text);
+  text-align: right;
+}
+
+.walletPickerLabel {
+  color: var(--acton-color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.modalDialog {
+  --acton-dialog-description-gap: var(--acton-space-2);
+
+  background: var(--acton-color-surface);
+}
+
+.modalContent {
+  gap: 16px;
+}
+
+.cellSignDialog {
+  height: min(46rem, calc(100dvh - var(--acton-space-6) - var(--acton-space-6)));
+}
+
+.cellSignDialogContent {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.signRequestPreview {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.signRequestPreview > * {
+  max-height: 100%;
+}
+
+.signValuePreview {
+  min-width: 0;
+  display: grid;
+  gap: var(--acton-space-4);
+}
+
+.signValueSummary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.signValueSummary > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+}
+
+.signValueTitle {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.25em;
+  line-height: 1.35;
+}
+
+.signValueType {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.signValueMetadata {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.signTextContent {
+  padding: var(--acton-space-4);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.cellSignDialogContent .modalActions {
+  flex: 0 0 auto;
+}
+
+.permissionItem,
+.messageItem {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.permissionItem svg,
+.messageItem svg {
+  margin-top: 2px;
+  color: var(--acton-color-text-muted);
+  flex: 0 0 auto;
+}
+
+.walletPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.pickerOption {
+  width: 100%;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px;
+  text-align: left;
+}
+
+.pickerOptionContent {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 3px;
+}
+
+.pickerPrimary,
+.pickerMeta {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pickerOption:hover {
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-hover);
+}
+
+.pickerOption:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.pickerOptionActive {
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-active);
+}
+
+.pickerTitle,
+.pickerBalance,
+.pickerAddress,
+.pickerNetwork {
+  display: block;
+}
+
+.pickerTitle,
+.pickerAddress {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickerBalance,
+.pickerNetwork {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pickerBalance {
+  color: var(--acton-color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pickerAddress,
+.pickerNetwork {
+  color: var(--acton-color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.radio {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: 999px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.requestSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.messageIndex {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 9px;
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.messageValue {
+  margin-top: 6px;
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .cellSignDialog {
+    height: calc(100dvh - var(--acton-space-3) - var(--acton-space-3));
+  }
+
+  .modalActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metaRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .metaValue {
+    text-align: left;
+  }
+
+  .pickerOption {
+    align-items: flex-start;
+  }
+
+  .pickerPrimary,
+  .pickerMeta {
+    gap: 8px;
+  }
+}

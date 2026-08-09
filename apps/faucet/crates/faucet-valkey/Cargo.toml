@@ -1,0 +1,20 @@
+[package]
+name = "faucet-valkey"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+faucet-config = { workspace = true }
+redis = { version = "1.2.1", features = ["tokio-rustls-comp"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lib]
+doctest = false

@@ -29,7 +29,7 @@ Examples:
 
 - `[build].out-dir = "artifacts"` writes under `<project-root>/artifacts`.
 - `acton build --out-dir artifacts` writes under `<cwd>/artifacts`.
-- `[wrappers.tolk].output-dir = "wrappers"` resolves from project root, but `acton wrapper Counter --output-dir wrappers` resolves from the current working directory.
+- `[wrappers.tolk].output-dir = "wrappers"` and `[contracts.Counter.wrappers.tolk].output-dir = "counter-wrappers"` resolve from project root, but `acton wrapper Counter --output-dir wrappers` resolves from the current working directory.
 
 ## Root section
 
@@ -88,6 +88,14 @@ Example:
 acton = "{{ acton_version }}"
 ```
 
+For preview-channel builds installed with `acton up --trunk`, set the pin to
+`trunk` instead of the numbered stable release:
+
+```acton-toml title="Acton.toml"
+[toolchain]
+acton = "trunk"
+```
+
 `acton up` remains available when the configured version does not match, so the
 expected version can be installed from the same project directory.
 
@@ -99,8 +107,38 @@ This section is a map where each key is a contract name and the value is a contr
 |:---------------|:---------|:---------|:------------------------------------------------------------------------|
 | `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.     |
 | `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
+| `types`        | `string` | No       | Tolk interface file used to produce ABI for a precompiled `.boc`.       |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
 | `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+| `wrappers`     | `table`  | No       | Per-contract overrides for the project-level `[wrappers]` settings.     |
+
+For precompiled `.boc` contracts, `types` can point to a Tolk file that contains
+the contract header, message/storage types, and getters. Acton still loads code
+from `src`, but uses the `types` file to produce ABI and generate wrappers.
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+display-name = "Precompiled"
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+
+[contracts.Precompiled.wrappers.tolk]
+output-dir = "generated/precompiled"
+generate-test = true
+test-output-dir = "tests/generated/precompiled"
+
+[contracts.Precompiled.wrappers.typescript]
+output-dir = "app/src/wrappers/precompiled"
+```
+
+The nested `wrappers.tolk` and `wrappers.typescript` tables accept the same
+fields as their project-level counterparts. A field set for a contract
+overrides only that field; omitted fields continue to use the project-level
+value.
+
+Do not put dependencies on the BoC contract itself: it is already compiled.
+Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
+BoC code.
 
 ### Contract dependencies
 
@@ -141,6 +179,7 @@ Configures defaults for `acton build`.
 | `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
 | `output-abi`  | `string` | No       | Directory where contract ABI JSON files are written (default: `build/abi`).              |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
+| `output-sources` | `string` | No    | Directory where source registration artifacts are written (`<contract>.source.json` per `.tolk` contract). |
 
 Example:
 
@@ -150,9 +189,10 @@ out-dir = "build"
 gen-dir = "gen"
 output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Arbitrary `.boc` contracts are skipped in ABI and Fift output.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, `acton build --output-fift <DIR>`, and `acton build --output-sources <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Precompiled `.boc` contracts emit ABI only when their contract config sets `types`; they never emit Fift or source registration output.
 
 ## `[wrappers]`
 
@@ -186,10 +226,10 @@ output-dir = "app/src/wrappers-ts"
 
 Override rules:
 
-- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
-- For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
-- For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
-- `[wrappers.tolk].generate-test` affects only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
+- For Tolk wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.tolk].output-dir`, then `[wrappers.tolk].output-dir`, then the `@wrappers` mapping when present, then the wrapper command's built-in `wrappers/` location.
+- For TypeScript wrappers, `--output` has highest priority, then `--output-dir`, then `[contracts.<name>.wrappers.typescript].output-dir`, then `[wrappers.typescript].output-dir`, then the wrapper command's built-in default location.
+- For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[contracts.<name>.wrappers.tolk].test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
+- Per-contract `[contracts.<name>.wrappers.tolk].generate-test` overrides `[wrappers.tolk].generate-test`. Both affect only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
 
 Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
 
@@ -222,26 +262,38 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 Configures defaults for `acton localnet`.
 
-| Field               | Type       | Default | Description                                                                         |
-|:--------------------|:-----------|:--------|:------------------------------------------------------------------------------------|
-| `port`              | `integer`  | `5411`  | Port used by `acton localnet` commands when `--port` is omitted.                    |
-| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                |
-| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.     |
-| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.     |
-| `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow). |
+| Field               | Type       | Default | Description                                                                                                                 |
+|:--------------------|:-----------|:--------|:----------------------------------------------------------------------------------------------------------------------------|
+| `port`              | `integer`  | `5411`  | Port used by `acton localnet` commands when `--port` is omitted.                                                            |
+| `db-path`           | `string`   | -       | SQLite database path for persistent node state. Relative paths resolve from project root; incompatible with `--load-state`. |
+| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                                                        |
+| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.                                             |
+| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.                                             |
+| `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow).                                         |
+| `response-delay-ms` | `integer`  | -       | Response delay for `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints; streaming/control/UI are not delayed.             |
+| `block-interval-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                                 |
+| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton localnet mine` or `/acton_mine`.                       |
+
+The localnet fork uses the network configuration from the resolved masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
 
 Example:
 
 ```acton-toml title="Acton.toml"
 [localnet]
 port = 3010
+db-path = ".acton/localnet.sqlite"
 fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
+response-delay-ms = 300
+block-interval-ms = 500
+no-mining = false
 ```
 
-`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, and `--rate-limit <RPS>` override these values for a single run.
+`acton localnet start --port <PORT>`, `--db-path <PATH>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-interval-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
 
 ## `[test]`
 
@@ -264,9 +316,17 @@ Configures the behavior of `acton test`.
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `studio-reporting`          | `boolean`  | `true`        | Send test run data to Acton Studio when it is available.               |
+| `gas-profile`               | `string`   | -             | Path to write a gas-weighted execution profile.                        |
+| `gas-profile-format`        | `string`   | `cpuprofile`  | Gas profile output format: `cpuprofile` or `collapsed`.                |
+| `gas-profile-include-tests` | `boolean`  | `false`       | Include `.test.tolk` unit-test get-method execution in the profile.    |
 | `ui`                        | `boolean`  | `false`       | Enable the browser test UI server.                                     |
 | `ui-port`                   | `integer`  | `12344`       | Port for the browser test UI server.                                   |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+The test fork uses state and network configuration from the same masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, it uses the current system Unix time.
 
 TON Center API keys are configured through the process environment, not `Acton.toml`: use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` when the built-in fork target needs authentication.
 
@@ -325,6 +385,9 @@ Example:
 reporter = ["console", "junit"]
 fail-fast = true
 fail-on-diff = true
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 
 [test.coverage]
 enabled = true
@@ -348,7 +411,11 @@ rules-file = "mutation-rules.json"
 
 CLI flags such as `--mutation-diff`, `--mutation-diff-ref`, `--mutation-levels`, `--mutation-minimum-percent`, `--mutation-disable-rules`, and `--mutation-rules-file` override these defaults for the current run.
 
-The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
+The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`). Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
+
+Combine them with `ui = true` or `acton test --gas-profile <FILE> --ui` to
+browse flamegraphs in Test UI. Set `gas-profile-include-tests = true` when
+`.test.tolk` unit-test get methods contain the hot path you want to inspect.
 
 ## `[lint]`
 
@@ -427,19 +494,33 @@ Defines network settings used by `--net` and `--fork-net`.
 - `localnet` is a first-class network and is always available.
 - Extra entries under `[networks.<name>]` are used as `custom:<name>`.
 
+Wallet V5 derives its wallet ID from the network's TON `global-id`. Custom
+networks default to `-3`, matching testnet and localnet; set `global-id = -239`
+for a custom endpoint that is an alias or proxy for mainnet. Localnet always
+keeps `-3`, even when `[localnet].fork-net = "mainnet"`: the fork only provides
+remote state and does not turn the local chain into mainnet.
+
 | Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
-| `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
-| `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://localhost:<port>/explorer/tx/<hash>`. |
+| `global-id` | `integer` | No                                    | TON network global ID used to derive Wallet V5 IDs. Defaults to `-3` for custom networks. Use `-239` for a mainnet-compatible endpoint. This field is ignored for built-in `mainnet`, `testnet`, and `localnet`. |
+| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
+| `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://127.0.0.1:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
+| `explorer` | `string` | No                                      | Explicit base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). This network-specific value takes precedence over `--explorer`. For default `localnet`, the derived link is `http://127.0.0.1:<port>/explorer/tx/<hash>`. |
+
+When `explorer` is omitted for `custom:<name>` and both `api.v2` and `api.v3`
+are configured, the default Actonscan link carries the network name and API
+endpoints as shared-network query parameters. If `api.v3` is unavailable,
+Acton keeps the legacy fallback derived from `api.v2`:
+`<scheme>://<host>/explorer/tx/<hash>`.
 
 Example:
 
 ```acton-toml title="Acton.toml"
 [networks.localnet]
-explorer = "http://localhost:3006"
+explorer = "http://127.0.0.1:3006"
 
 [networks.my-custom-net]
+global-id = -3
 api = { v2 = "https://my-custom-net.com/api/v2", v3 = "https://my-custom-net.com/api/v3" }
 explorer = "https://my-custom-net.com/explorer"
 ```

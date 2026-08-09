@@ -1,0 +1,24 @@
+.viewerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: var(--acton-space-4);
+  align-items: start;
+}
+
+.sample {
+  min-width: 0;
+  display: grid;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.sampleLabel {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

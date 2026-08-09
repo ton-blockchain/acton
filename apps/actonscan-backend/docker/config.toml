@@ -1,0 +1,14 @@
+[server]
+bind_addr = "0.0.0.0:3000"
+
+[logging]
+level = "info"
+
+[storage]
+database_path = "/var/lib/actonscan/actonscan.sqlite3"
+
+[indexer]
+global_config_path = "/etc/actonscan/mainnet-global.config.json"
+liteserver_parallelism = 4
+tps_backfill_batches = 1024
+poll_interval_ms = 100

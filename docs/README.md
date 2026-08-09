@@ -19,10 +19,10 @@ highlighting for Acton and TON-related languages.
 
 ## Local development
 
-This workspace uses Bun.
+This workspace uses Bun. The required Bun version is pinned in `package.json`.
 
 ```bash
-bun install
+bun ci
 bun run dev
 ```
 

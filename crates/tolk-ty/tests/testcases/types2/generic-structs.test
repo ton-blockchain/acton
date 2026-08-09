@@ -41,7 +41,7 @@ type IntFoo = Foo<int>;
 
 fun main() {
     val foo =
-//!     ^ IntFoo
+//!     ^ Foo<int>
         IntFoo { field: 10 };
 //!              ^ int
 
@@ -116,4 +116,4 @@ fun main() {
 //!                                                    ^ Ok<int>
 }
 ------------------------------------------------------------------------
-type inference error at offset 503: expected OkAlias<int>, got Ok<int>
+ok

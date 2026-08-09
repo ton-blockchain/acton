@@ -5,6 +5,10 @@ description: "Run local node with testnet/mainnet state, including historical bl
 
 Fork mode lets the local node resolve account state from a remote network while keeping execution local.
 
+Acton pins one masterchain block and uses its state and network configuration as
+the local chain origin. An explicit historical fork also uses the selected
+block's Unix time.
+
 ## Basic Forking
 
 ```bash
@@ -22,6 +26,18 @@ acton localnet start --fork-net testnet --fork-block-number 55000000
 ```
 
 This is useful for deterministic debugging of historical behavior.
+
+If you omit `--fork-block-number`, Acton resolves the latest masterchain block
+once during startup and starts the virtual clock from the current system Unix
+time without requesting the block header. If you provide it, account reads, the
+network configuration, and the virtual clock all use that exact block. New local
+blocks start from the selected block's Unix time.
+
+Acton stores masterchain snapshots for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`. An explicit block
+can start from a fresh cache entry without another network request. A latest
+fork still queries the network for the latest sequence number before it checks
+the matching cache entry. Use `--clear-cache` to remove these entries.
 
 ## API Key
 

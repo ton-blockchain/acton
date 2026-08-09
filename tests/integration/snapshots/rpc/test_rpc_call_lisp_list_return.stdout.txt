@@ -1,0 +1,10 @@
+[
+    PluginListEntry {
+        workchain: 0,
+        address: 4369,
+    },
+    PluginListEntry {
+        workchain: -1,
+        address: 8738,
+    },
+]

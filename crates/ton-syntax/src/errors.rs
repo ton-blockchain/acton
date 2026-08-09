@@ -34,7 +34,10 @@ pub fn collect_errors(source: &Arc<str>, tree: &Tree, language: &Language) -> Ve
 
     while let Some(node) = stack.pop() {
         for i in (0..node.child_count()).rev() {
-            if let Some(child) = node.child(i) {
+            let Ok(child_index) = u32::try_from(i) else {
+                continue;
+            };
+            if let Some(child) = node.child(child_index) {
                 stack.push(child);
             }
         }

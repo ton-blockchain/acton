@@ -133,6 +133,7 @@ pub struct ReplayerDebugSession {
     /// Last visible frame snapshot captured while stepping the parent. Reused when a
     /// child context starts so it can keep showing where the nested call came from.
     cached_visible_frames: RefCell<Vec<CollectedFrame>>,
+    capture_outer_frame_locals: bool,
     frame_to_depth: HashMap<i64, FrameLocator>,
     vars_debug_values: HashMap<i64, RenderedValue>,
     runtime_register_scope_requests: HashMap<i64, usize>,
@@ -204,6 +205,7 @@ impl ReplayerDebugSession {
             exception_mode: replayer::ExceptionBreakMode::Uncaught,
             performing_step: None,
             cached_visible_frames: RefCell::new(Vec::new()),
+            capture_outer_frame_locals: true,
             frame_to_depth: HashMap::new(),
             vars_debug_values: HashMap::new(),
             runtime_register_scope_requests: HashMap::new(),
@@ -212,6 +214,12 @@ impl ReplayerDebugSession {
             active_step_start: None,
             skip_active_step_start_once: false,
         }
+    }
+
+    #[must_use]
+    pub const fn with_outer_frame_local_snapshots(mut self, enabled: bool) -> Self {
+        self.capture_outer_frame_locals = enabled;
+        self
     }
 
     fn active_context(&self) -> Option<Rc<RefCell<ReplayerContext>>> {
@@ -416,7 +424,7 @@ impl ReplayerDebugSession {
                 label.as_ref(),
                 &outer_frames,
                 replayer,
-                true,
+                self.capture_outer_frame_locals,
             );
         });
         ctx.replayer.is_finished()

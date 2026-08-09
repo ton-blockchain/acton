@@ -1,9 +1,12 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{
-    append_custom_network, format_captured_requests, spawn_toncenter_v2_mock,
+    append_custom_network, format_captured_requests, mocked_config_boc64, spawn_toncenter_v2_mock,
     spawn_toncenter_v2_mock_with_capture, toncenter_v2_account_info_ok_response,
-    toncenter_v2_error_response,
+    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
+    toncenter_v2_error_response, toncenter_v2_fork_snapshot_responses,
+    toncenter_v2_latest_fork_snapshot_responses, toncenter_v2_masterchain_info_ok_response,
+    write_fork_account_cache_summary, write_fork_account_cache_tree_summary,
 };
 use base64::Engine;
 use std::fmt::Write as _;
@@ -20,6 +23,8 @@ const RAW_ADDRESS_TESTNET: &str = "kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB
 
 #[test]
 fn fork_net_mainnet_formats_addresses_as_mainnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("i-fork-mainnet-address")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -36,6 +41,10 @@ fn fork_net_mainnet_formats_addresses_as_mainnet() {
 
     project
         .acton()
+        .env(
+            "ACTON_TEST_TONCENTER_MAINNET_V2_URL",
+            &format!("{mock_url}/api/v2"),
+        )
         .test()
         .fork_net("mainnet")
         .run()
@@ -46,10 +55,13 @@ fn fork_net_mainnet_formats_addresses_as_mainnet() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_fork_network/fork_net_mainnet_formats_addresses_as_mainnet.stdout.txt",
         );
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
 fn fork_net_testnet_formats_addresses_as_testnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("i-fork-testnet-address")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -66,6 +78,10 @@ fn fork_net_testnet_formats_addresses_as_testnet() {
 
     project
         .acton()
+        .env(
+            "ACTON_TEST_TONCENTER_TESTNET_V2_URL",
+            &format!("{mock_url}/api/v2"),
+        )
         .test()
         .fork_net("testnet")
         .run()
@@ -76,10 +92,13 @@ fn fork_net_testnet_formats_addresses_as_testnet() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_fork_network/fork_net_testnet_formats_addresses_as_testnet.stdout.txt",
         );
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]
 fn fork_net_mainnet_formats_failure_addresses_as_mainnet() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("i-fork-mainnet-failure-address")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(
@@ -98,6 +117,10 @@ fn fork_net_mainnet_formats_failure_addresses_as_mainnet() {
 
     project
         .acton()
+        .env(
+            "ACTON_TEST_TONCENTER_MAINNET_V2_URL",
+            &format!("{mock_url}/api/v2"),
+        )
         .test()
         .fork_net("mainnet")
         .run()
@@ -107,6 +130,123 @@ fn fork_net_mainnet_formats_failure_addresses_as_mainnet() {
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_fork_network/fork_net_mainnet_formats_failure_addresses_as_mainnet.stdout.txt",
         );
+    mock_handle.join().expect("mock toncenter must finish");
+}
+
+#[test]
+fn historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    const GLOBAL_VERSION: u32 = 777;
+    const GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+    let config_boc64 = mocked_config_boc64(GLOBAL_VERSION, GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+    ]);
+    let project = ProjectBuilder::new("i-historical-fork-snapshot")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "fork_snapshot",
+            r#"
+import "../../lib/emulation/config"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+get fun `test historical fork snapshot`() {
+    val version = testing.getConfig().getGlobalVersion();
+    println("version={}, capabilities={}", version.version, version.capabilities);
+    println("testing-now={}, blockchain-now={}", testing.getNow(), blockchain.now());
+}
+"#,
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "historical-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:historical-snapshot")
+        .arg("--fork-block-number")
+        .arg(&FORK_SEQNO.to_string())
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/historical_fork_uses_block_config_and_time.stdout.txt",
+    );
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("historical-fork-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write historical fork request log");
+    output.assert_file_snapshot_matches(
+        "historical-fork-requests.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/historical_fork_uses_block_config_and_time.requests.txt",
+    );
+}
+
+#[test]
+fn fork_snapshot_is_loaded_once_per_test_suite() {
+    const FORK_SEQNO: u64 = 654_321;
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(
+        toncenter_v2_fork_snapshot_responses(FORK_SEQNO, 1_700_000_321),
+    );
+    let project = ProjectBuilder::new("i-fork-snapshot-once-per-suite")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "snapshot_once",
+            r#"
+import "../../lib/testing/expect"
+
+get fun `test fork snapshot first`() {
+    expect(blockchain.now()).toEqual(1700000321);
+}
+
+get fun `test fork snapshot second`() {
+    expect(blockchain.now()).toEqual(1700000321);
+}
+"#,
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "snapshot-once",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:snapshot-once")
+        .arg("--fork-block-number")
+        .arg(&FORK_SEQNO.to_string())
+        .run()
+        .success();
+
+    output.assert_passed(2);
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("fork-snapshot-once-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write fork snapshot request log");
+    output.assert_file_snapshot_matches(
+        "fork-snapshot-once-requests.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_snapshot_is_loaded_once_per_test_suite.requests.txt",
+    );
 }
 
 #[test]
@@ -115,10 +255,12 @@ fn forked_remote_account_preserves_last_transaction_metadata() {
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
     let last_hash_hex = hex::encode(last_hash_bytes);
     let last_lt = 424_242_u64;
-    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+    let mut responses = toncenter_v2_latest_fork_snapshot_responses(123_456);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", last_lt, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(responses);
 
     let source = format!(
         r#"
@@ -161,10 +303,13 @@ fn forked_remote_account_preserves_last_transaction_metadata() {
 fn fork_block_number_is_forwarded_to_remote_account_requests() {
     let last_hash_bytes = [0x22_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
-    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+    let mut responses = toncenter_v2_fork_snapshot_responses(123_456, 1_700_000_000);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 101, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
 
     let project = ProjectBuilder::new("i-fork-block-number-forwarded")
         .contract("simple", SIMPLE_CONTRACT)
@@ -218,13 +363,299 @@ fn fork_block_number_is_forwarded_to_remote_account_requests() {
 }
 
 #[test]
+fn fork_block_number_reuses_persistent_account_cache_between_cli_runs() {
+    let last_hash_bytes = [0x66_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 777777_u64;
+    let mut responses = toncenter_v2_fork_snapshot_responses(fork_block_number, 1_700_000_100);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 505, &last_hash_b64),
+    ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("i-fork-block-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_cache_block",
+            &remote_shard_account_last_lt_test_source("persistent fork block cache", 505),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.first.stdout.txt",
+        );
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success();
+
+    output.assert_passed(1).assert_snapshot_matches(
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.second.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "remote-cache",
+        fork_block_number,
+        "fork-block-cache-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "fork-block-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_block_number_reuses_persistent_account_cache_between_cli_runs.summary.txt",
+    );
+}
+
+#[test]
+fn fork_net_without_block_number_pins_latest_and_reuses_account_cache_between_cli_runs() {
+    let last_hash_bytes = [0x99_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 333_333_u64;
+    let mut responses = toncenter_v2_latest_fork_snapshot_responses(fork_block_number);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 808, &last_hash_b64),
+    ]);
+    responses.push(toncenter_v2_masterchain_info_ok_response(fork_block_number));
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("i-fork-live-no-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_live_cache",
+            &remote_shard_account_last_lt_test_source("latest fork reuses pinned cache", 808),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-live-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let mut last_output = None;
+    for _ in 0..2 {
+        let output = project
+            .acton()
+            .test()
+            .fork_net("custom:remote-live-cache")
+            .run()
+            .success();
+        output.assert_passed(1);
+        last_output = Some(output);
+    }
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_tree_summary(
+        project.path(),
+        "remote-live-cache",
+        "fork-latest-cache-summary.txt",
+        &captured_requests,
+    );
+    let last_output = last_output.expect("at least one latest fork test run must execute");
+    last_output.assert_file_snapshot_matches(
+        "fork-latest-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_net_without_block_number_pins_latest_and_reuses_account_cache_between_cli_runs.summary.txt",
+    );
+}
+
+#[test]
+fn fork_account_cache_isolated_by_block_number() {
+    let first_hash_b64 = base64::engine::general_purpose::STANDARD.encode([0xaa_u8; 32]);
+    let second_hash_b64 = base64::engine::general_purpose::STANDARD.encode([0xbb_u8; 32]);
+    let first_block_number = 111111_u64;
+    let second_block_number = 222222_u64;
+    let mut responses = toncenter_v2_fork_snapshot_responses(first_block_number, 1_700_000_300);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 909, &first_hash_b64),
+    ]);
+    responses.extend(toncenter_v2_fork_snapshot_responses(
+        second_block_number,
+        1_700_000_400,
+    ));
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 1001, &second_hash_b64),
+    ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("i-fork-block-cache-isolated")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_isolated_block",
+            &remote_shard_account_last_lt_test_source("fork block cache isolation", 909),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-block-isolated",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&first_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1);
+
+    fs::write(
+        project.path().join("tests/remote_isolated_block.test.tolk"),
+        remote_shard_account_last_lt_test_source("fork block cache isolation", 1001),
+    )
+    .expect("failed to update fork block isolation test source");
+
+    project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&second_block_number.to_string())
+        .run()
+        .success()
+        .assert_passed(1);
+
+    fs::write(
+        project.path().join("tests/remote_isolated_block.test.tolk"),
+        remote_shard_account_last_lt_test_source("fork block cache isolation", 909),
+    )
+    .expect("failed to restore fork block isolation test source");
+
+    let output = project
+        .acton()
+        .test()
+        .fork_net("custom:remote-block-isolated")
+        .arg("--fork-block-number")
+        .arg(&first_block_number.to_string())
+        .run()
+        .success();
+    output.assert_passed(1);
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_tree_summary(
+        project.path(),
+        "remote-block-isolated",
+        "fork-block-cache-isolated-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "fork-block-cache-isolated-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/fork_account_cache_isolated_by_block_number.summary.txt",
+    );
+}
+
+#[test]
+fn no_fork_cache_keeps_remote_account_fetches_between_cli_runs() {
+    let last_hash_bytes = [0x77_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 888888_u64;
+    let mut responses = toncenter_v2_fork_snapshot_responses(fork_block_number, 1_700_000_500);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 606, &last_hash_b64),
+    ]);
+    responses.extend([
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 606, &last_hash_b64),
+    ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
+
+    let project = ProjectBuilder::new("i-fork-block-no-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "remote_no_cache_block",
+            &remote_shard_account_test_source("skip persistent fork block cache"),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "remote-no-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let mut last_output = None;
+    for _ in 0..2 {
+        let output = project
+            .acton()
+            .test()
+            .fork_net("custom:remote-no-cache")
+            .arg("--fork-block-number")
+            .arg(&fork_block_number.to_string())
+            .arg("--no-fork-cache")
+            .run()
+            .success();
+        output.assert_passed(1);
+        last_output = Some(output);
+    }
+
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "remote-no-cache",
+        fork_block_number,
+        "fork-block-no-cache-summary.txt",
+        &captured_requests,
+    );
+    let last_output = last_output.expect("at least one no-cache test run must execute");
+    last_output.assert_file_snapshot_matches(
+        "fork-block-no-cache-summary.txt",
+        "integration/snapshots/test-runner/test_runner_fork_network/no_fork_cache_keeps_remote_account_fetches_between_cli_runs.summary.txt",
+    );
+}
+
+#[test]
 fn configured_fork_block_number_is_forwarded_to_remote_account_requests() {
     let last_hash_bytes = [0x44_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
-    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+    let mut responses = toncenter_v2_fork_snapshot_responses(111_111, 1_700_000_600);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 303, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
 
     let project = ProjectBuilder::new("i-fork-block-number-config")
         .contract("simple", SIMPLE_CONTRACT)
@@ -265,10 +696,13 @@ fn configured_fork_block_number_is_forwarded_to_remote_account_requests() {
 fn cli_fork_block_number_overrides_configured_fork_block_number() {
     let last_hash_bytes = [0x55_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
-    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+    let mut responses = toncenter_v2_fork_snapshot_responses(222_222, 1_700_000_700);
+    responses.extend([
         toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 404, &last_hash_b64),
     ]);
+    let (mock_url, mock_handle, captured_requests) =
+        spawn_toncenter_v2_mock_with_capture(responses);
 
     let project = ProjectBuilder::new("i-fork-block-number-cli-override")
         .contract("simple", SIMPLE_CONTRACT)
@@ -475,6 +909,25 @@ fn remote_shard_account_test_source(test_name: &str) -> String {
         "#
     .replace("__TEST_NAME__", test_name)
     .replace("__REMOTE_ADDRESS__", RAW_ADDRESS_MAINNET)
+}
+
+fn remote_shard_account_last_lt_test_source(test_name: &str, last_lt: u64) -> String {
+    r#"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test __TEST_NAME__`() {
+                val shard = testing.getShardAccount(address("__REMOTE_ADDRESS__"));
+                expect(shard).toBeNotNull();
+
+                if (shard != null) {
+                    expect(shard!.lastTransLt).toEqual(__LAST_LT__);
+                }
+            }
+        "#
+    .replace("__TEST_NAME__", test_name)
+    .replace("__REMOTE_ADDRESS__", RAW_ADDRESS_MAINNET)
+    .replace("__LAST_LT__", &last_lt.to_string())
 }
 
 fn append_test_fork_settings(project_path: &Path, fork_net: &str, fork_block_number: u64) {

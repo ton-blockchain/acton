@@ -23,6 +23,21 @@ acton wrapper --all
 
 When generating all wrappers, use `--output-dir` to choose a directory. `--output` is only for a single contract because it names one file.
 
+Precompiled `.boc` contracts can also have wrappers when their contract section
+points `types` to a Tolk interface file:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+```
+
+Acton reads deployable code from the BoC and reads the ABI from
+`Precompiled.types.tolk`. A BoC contract without `types` is skipped by
+`acton wrapper --all`, and `acton wrapper Precompiled` reports that `types` is
+required. See [Precompiled BoC contracts](/docs/building/precompiled-boc) for
+the build and wrapper workflow.
+
 Pass `--test` to also emit a runnable test stub alongside the wrapper:
 
 ```bash
@@ -42,6 +57,11 @@ The generated file provides:
 - `counter.sendExternal{MessageName}(...)` — one method per external incoming message type declared in `contract { incomingExternal: ... }`; these methods return `ExternalSendResult`.
 - `counter.sendAnyExternal(body)` — sends a custom external-in body when the contract declares external incoming messages.
 - `counter.{getMethodName}()` — one method per declared get method.
+
+In local emulation, `ExternalSendResult.isAccepted()` reports whether the
+contract accepted the external-in message. After a network broadcast, use
+`waitForFirstTransaction()` or `waitForTrace()` instead: successful submission
+does not prove contract acceptance, so `isAccepted()` exits with an error.
 
 Fine tune wrapper generation with the `contract { ... }` header in the contract entrypoint file:
 
@@ -63,7 +83,7 @@ get fun `test increase`() {
     val deployer = testing.treasury("deployer");
 
     val contract = Counter.fromStorage({ id: 0, counter: 0 });
-    val deployResult = contract.deploy(deployer.address, { value: ton("0.05") });
+    val deployResult = contract.deploy(deployer.address, { value: grams("0.05") });
     expect(deployResult).toHaveSuccessfulDeploy({ to: contract.address });
 
     val sendResult = contract.sendIncreaseCounter(deployer.address, 5);
@@ -89,7 +109,7 @@ fun main() {
     val deployer = scripts.wallet("deployer");
 
     val contract = Counter.fromStorage({ id: 0, counter: 0 });
-    val result = contract.deploy(deployer.address, { value: ton("0.05") });
+    val result = contract.deploy(deployer.address, { value: grams("0.05") });
     result.waitForFirstTransaction();
 
     println("Deployed to {}", contract.address);
@@ -143,10 +163,28 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
+Override any of these fields for one contract by nesting the same tables under
+its contract entry:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Acton resolves each field independently, so omitted per-contract fields inherit
+the project defaults. CLI output and test options still have the highest
+priority. `acton wrapper --all` applies the resulting settings separately to
+each contract.
+
 See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
 
 ## See also
 
+- [Precompiled BoC contracts](/docs/building/precompiled-boc)
 - [Testing guides](/docs/testing/overview)
 - [Scripting guides](/docs/scripting/overview)
 - [Deployment](/docs/deploy)

@@ -10,8 +10,8 @@ use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions;
 use tasm_core::types::{ArgValue, Code, Instruction};
 use tolk_compiler::SourceMap;
+use tolk_source_map::SourceLocation;
 use ton_api::{Network, TonApiClient};
-use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 

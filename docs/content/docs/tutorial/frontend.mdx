@@ -47,7 +47,7 @@ The directory layout matters for the next steps:
         <File name="..." />
       </Folder>
     </Folder>
-    <Folder name="wrappers-ts" description="placeholder, will be replaced" />
+    <Folder name="wrappers-ts" description="Folder with TypeScript wrappers" />
   </Folder>
 </Files>
 
@@ -58,10 +58,17 @@ npm ci
 
 ## Generate the TypeScript wrapper
 
-From the Acton project root, generate a typed TypeScript wrapper for `Poll` and write it directly into the dApp:
+The output directory for TypeScript wrappers defaults to `wrappers-ts/` in the project root. To override it, either pass `--output-dir app/wrappers-ts` for each `acton wrapper` call or change the `output-dir` value in `Acton.toml`:
+
+```toml title="Acton.toml"
+[wrappers.typescript]
+output-dir = "app/wrappers-ts"
+```
+
+Generate a TypeScript wrapper for the Poll contract from the Acton project root:
 
 ```bash
-acton wrapper Poll --ts --output-dir app/wrappers-ts
+acton wrapper Poll --ts
 ```
 
 The generated `app/wrappers-ts/Poll.gen.ts` exposes typed helpers built from the contract ABI:
@@ -71,16 +78,10 @@ The generated `app/wrappers-ts/Poll.gen.ts` exposes typed helpers built from the
 - `Poll.createCellOfClosePoll({})` — build a `ClosePoll` message body
 - `getResults()`, `getOwner()`, `getIsClosed()` — typed getter calls
 
-The placeholder wrapper from the scaffold is no longer needed:
+Rerun `acton wrapper Poll --ts` whenever messages or getters change.
 
-```bash
-rm app/wrappers-ts/Empty.gen.ts
-```
-
-<Callout type="info">
-  Re-run `acton wrapper Poll --ts --output-dir app/wrappers-ts` whenever messages
-  or getters change. The file is regenerated from scratch every time — do not
-  edit it manually.
+<Callout type="caution">
+  The wrapper file is regenerated from scratch every time — do not edit it manually.
 </Callout>
 
 ## Check the path aliases
@@ -320,9 +321,9 @@ The `Button` primitive, Tailwind theme tokens (`bg-secondary`, `bg-primary`,
 the scaffold. `App.tsx` only contains poll-specific logic.
 
 <Callout type="info">
-  The scaffold ships a default TON Connect manifest URL pointing at a generic
-  Acton-hosted manifest. For a production app, host your own at a stable URL
-  and update `manifestUrl` in `app/app/src/providers/AppProviders.tsx`.
+  The scaffold ships a default TON Connect manifest URL pointing at a generic Acton-hosted manifest.
+  For a production app, host your own at a stable URL and update `manifestUrl` in
+  `app/app/src/providers/AppProviders.tsx`.
 </Callout>
 
 ## Run the app

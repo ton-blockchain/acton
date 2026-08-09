@@ -1,5 +1,5 @@
 N/A -> deployer A
-└── empty 0.005 TON -> Counter B                                                gas=692
+└── empty 0.005 GRAM -> Counter B                                               gas=692
     └── account created
 
 Deployed counter to [WALLET_ADDRESS_BASE] (Counter)

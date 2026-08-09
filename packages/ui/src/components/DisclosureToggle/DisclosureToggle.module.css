@@ -1,0 +1,80 @@
+.disclosureToggle {
+  position: relative;
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.disclosureToggle:hover:not(:disabled),
+.disclosureToggle:focus-visible {
+  color: var(--acton-color-text);
+}
+
+.disclosureToggle:focus-visible {
+  outline: none;
+}
+
+.disclosureToggle:focus-visible::after {
+  position: absolute;
+  inset-block: calc(-1 * var(--acton-space-1));
+  inset-inline-start: calc(-1 * var(--acton-space-1));
+  inset-inline-end: calc(-1 * var(--acton-space-2));
+  border: 1px solid var(--acton-color-focus-ring);
+  border-radius: var(--acton-radius-round);
+  content: "";
+  pointer-events: none;
+}
+
+.disclosureToggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.disclosureToggle[data-loading="true"] {
+  cursor: wait;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--acton-space-1);
+}
+
+.icon svg {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 2;
+}
+
+.label {
+  flex: 0 0 auto;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+}

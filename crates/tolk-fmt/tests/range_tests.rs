@@ -1,8 +1,23 @@
 use expect_test::{Expect, expect};
-use tolk_fmt::{FormatOptions, FormatPosition, FormatRange, format_source};
+use tolk_fmt::{FormatError, FormatOptions, FormatPosition, FormatRange, format_source};
 
 const SELECTION_START: &str = "<selection>";
 const SELECTION_END: &str = "</selection>";
+
+#[test]
+fn reports_syntax_errors_as_typed_format_errors() {
+    let error = format_source("fun main( {\n", FormatOptions::default())
+        .expect_err("malformed Tolk should not be formatted");
+    let kind = match error {
+        FormatError::SyntaxErrors => "syntax-errors",
+        FormatError::Parse(_) => "parse",
+        FormatError::Source => "source",
+        FormatError::Render(_) => "render",
+        FormatError::InvalidUtf8(_) => "invalid-utf8",
+    };
+
+    expect!["syntax-errors"].assert_eq(kind);
+}
 
 fn check_selection(marked_code: &str, width: usize, expect: Expect) {
     let (code, range) = parse_selection(marked_code);

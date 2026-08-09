@@ -79,6 +79,24 @@ mod tests {
         ast, match_parents, parse,
     };
 
+    #[test]
+    fn attaches_standalone_leading_documentation_to_the_file() {
+        let source = parse("/// Module documentation.\n///\n/// More details.\n\nfun main() {}")
+            .expect("source should parse");
+
+        assert_eq!(
+            source.documentation().as_deref(),
+            Some("Module documentation.\n\nMore details.")
+        );
+    }
+
+    #[test]
+    fn leaves_documentation_on_the_first_declaration() {
+        let source = parse("/// Main documentation.\nfun main() {}").expect("source should parse");
+
+        assert_eq!(source.documentation(), None);
+    }
+
     /// This test does not assert much and instead just shows off the crate's API.
     #[test]
     fn api_walkthrough() -> anyhow::Result<()> {

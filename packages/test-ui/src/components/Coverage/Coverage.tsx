@@ -1,0 +1,415 @@
+import type React from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
+import {FiSearch} from "react-icons/fi"
+
+import {
+  formatSourcePath,
+  highlightCodeToTokens,
+  Percentage,
+  SourceLocationValue,
+  type HighlightedCodeToken,
+  useTheme,
+} from "@acton/ui"
+
+import {useCoverageReport} from "../../hooks/useCoverageReport"
+import {useFileContent} from "../../hooks/useFileContent"
+import {parseLcov, type CoverageFile} from "../../utils/lcov"
+
+import styles from "./Coverage.module.css"
+
+interface CoverageProps {
+  readonly projectRoot?: string
+}
+
+interface CoverageContentProps extends CoverageProps {
+  readonly lcov: string
+}
+
+const formatBranchCoverage = (file: CoverageFile) => {
+  if (file.branchesFound === 0) {
+    return "No branches"
+  }
+
+  return `${file.branchesHit}/${file.branchesFound} branches`
+}
+
+const getScoreTone = (score: number) => {
+  if (score >= 85) {
+    return styles.scoreOk
+  }
+
+  if (score >= 60) {
+    return styles.scoreWarn
+  }
+
+  return styles.scoreCritical
+}
+
+const ITALIC_FONT_STYLE = 1
+const BOLD_FONT_STYLE = 2
+const UNDERLINE_FONT_STYLE = 4
+const STRIKETHROUGH_FONT_STYLE = 8
+
+const tokenStyle = (token: HighlightedCodeToken): React.CSSProperties | undefined => {
+  const style: React.CSSProperties = {}
+
+  if (token.htmlStyle) {
+    return token.htmlStyle as React.CSSProperties
+  }
+
+  if (token.color) {
+    style.color = token.color
+  }
+
+  const fontStyle = token.fontStyle ?? 0
+  if ((fontStyle & ITALIC_FONT_STYLE) !== 0) {
+    style.fontStyle = "italic"
+  }
+  if ((fontStyle & BOLD_FONT_STYLE) !== 0) {
+    style.fontWeight = "bold"
+  }
+
+  const textDecorations: string[] = []
+  if ((fontStyle & UNDERLINE_FONT_STYLE) !== 0) {
+    textDecorations.push("underline")
+  }
+  if ((fontStyle & STRIKETHROUGH_FONT_STYLE) !== 0) {
+    textDecorations.push("line-through")
+  }
+  if (textDecorations.length > 0) {
+    style.textDecoration = textDecorations.join(" ")
+  }
+
+  return Object.keys(style).length > 0 ? style : undefined
+}
+
+export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
+  const {lcov, error, loading} = useCoverageReport()
+
+  if (loading) return <div className={styles.emptyState}>Loading coverage report...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load coverage: {error}</div>
+  if (lcov === undefined) return <div className={styles.emptyState}>Coverage is not available</div>
+
+  return <CoverageContent lcov={lcov} projectRoot={projectRoot} />
+}
+
+const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) => {
+  const {theme} = useTheme()
+  const coverage = useMemo(() => parseLcov(lcov), [lcov])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
+    return coverage.files[0]?.filePath
+  })
+  const [highlightedLines, setHighlightedLines] = useState<
+    readonly (readonly HighlightedCodeToken[])[] | undefined
+  >()
+  const codePaneRef = useRef<HTMLDivElement | null>(null)
+
+  const filteredFiles = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return coverage.files.filter(file => {
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        file.filePath.toLowerCase().includes(normalizedQuery) ||
+        formatSourcePath(file.filePath, {projectRoot}).toLowerCase().includes(normalizedQuery)
+
+      return matchesQuery
+    })
+  }, [coverage.files, projectRoot, searchQuery])
+
+  useEffect(() => {
+    if (filteredFiles.some(file => file.filePath === selectedFilePath)) {
+      return
+    }
+
+    setSelectedFilePath(filteredFiles[0]?.filePath ?? coverage.files[0]?.filePath)
+  }, [coverage.files, filteredFiles, selectedFilePath])
+
+  const selectedFile = useMemo(() => {
+    if (selectedFilePath === undefined) {
+      return filteredFiles[0] ?? coverage.files[0]
+    }
+
+    return coverage.files.find(file => file.filePath === selectedFilePath) ?? filteredFiles[0]
+  }, [coverage.files, filteredFiles, selectedFilePath])
+  const {
+    content: loadedSourceContent,
+    error: sourceError,
+    loading: isLoadingSource,
+  } = useFileContent(selectedFile?.filePath)
+  const sourceContent = loadedSourceContent ?? ""
+
+  useEffect(() => {
+    if (!sourceContent) {
+      setHighlightedLines(undefined)
+      return
+    }
+
+    let isDisposed = false
+
+    const renderHighlightedLines = async () => {
+      try {
+        const tokens = await highlightCodeToTokens(sourceContent, "tolk", theme)
+        if (!isDisposed) {
+          setHighlightedLines(tokens)
+        }
+      } catch (error) {
+        console.error("Failed to highlight coverage source file", error)
+        if (!isDisposed) {
+          setHighlightedLines(undefined)
+        }
+      }
+    }
+
+    void renderHighlightedLines()
+
+    return () => {
+      isDisposed = true
+    }
+  }, [sourceContent, theme])
+
+  const focusLine = selectedFile?.firstUncoveredLine ?? selectedFile?.firstPartialLine
+
+  useEffect(() => {
+    if (focusLine === undefined || !sourceContent) {
+      return
+    }
+
+    const targetLine = codePaneRef.current?.querySelector<HTMLElement>(
+      `[data-line-number="${focusLine}"]`,
+    )
+    targetLine?.scrollIntoView({block: "center"})
+  }, [focusLine, sourceContent])
+
+  const sourceLines = useMemo(() => {
+    if (!sourceContent) {
+      return []
+    }
+
+    return sourceContent.split("\n")
+  }, [sourceContent])
+
+  if (coverage.files.length === 0) {
+    return <div className={styles.emptyState}>No coverage records found in the LCOV report</div>
+  }
+
+  return (
+    <div className={styles.coverage}>
+      <div className={styles.summaryGrid}>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryLabel}>Overall Score</div>
+          <div className={`${styles.summaryValue} ${getScoreTone(coverage.combinedScore)}`}>
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.combinedScore}
+            />
+          </div>
+          <div className={styles.summaryMeta}>Weighted across lines and branches</div>
+        </div>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryLabel}>Line Coverage</div>
+          <div className={styles.summaryValue}>
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.linePercentage}
+            />
+          </div>
+          <div className={styles.summaryMeta}>
+            {coverage.totalLinesHit}/{coverage.totalLinesFound} executable lines
+          </div>
+        </div>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryLabel}>Branch Coverage</div>
+          <div className={styles.summaryValue}>
+            <Percentage
+              fallback="n/a"
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              value={coverage.branchPercentage}
+            />
+          </div>
+          <div className={styles.summaryMeta}>
+            {coverage.totalBranchesFound > 0
+              ? `${coverage.totalBranchesHit}/${coverage.totalBranchesFound} branches`
+              : "No branches recorded"}
+          </div>
+        </div>
+        <div className={styles.summaryCard}>
+          <div className={styles.summaryLabel}>Files</div>
+          <div className={styles.summaryValue}>{coverage.totalFiles}</div>
+          <div className={styles.summaryMeta}>Sorted by lowest score first</div>
+        </div>
+      </div>
+
+      <div className={styles.workspace}>
+        <aside className={styles.sidebar}>
+          <div className={styles.sidebarHeader}>
+            <div className={styles.sidebarTitle}>Coverage Files</div>
+            <div className={styles.sidebarMeta}>Sorted by score</div>
+          </div>
+
+          <div className={styles.searchContainer}>
+            <FiSearch className={styles.searchIcon} />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              placeholder="Filter files..."
+              className={styles.searchInput}
+            />
+          </div>
+
+          <div className={styles.fileList}>
+            {filteredFiles.map(file => {
+              const isSelected = file.filePath === selectedFile?.filePath
+              return (
+                <button
+                  key={file.filePath}
+                  type="button"
+                  className={`${styles.fileButton} ${isSelected ? styles.fileButtonSelected : ""}`}
+                  onClick={() => setSelectedFilePath(file.filePath)}
+                >
+                  <div className={styles.fileRow}>
+                    <SourceLocationValue
+                      className={styles.filePath}
+                      projectRoot={projectRoot}
+                      value={{file: file.filePath}}
+                    />
+                    <span
+                      className={`${styles.filePercentage} ${getScoreTone(file.combinedScore)}`}
+                    >
+                      <Percentage
+                        fallback="n/a"
+                        maximumFractionDigits={1}
+                        minimumFractionDigits={1}
+                        value={file.combinedScore}
+                      />
+                    </span>
+                  </div>
+                  <div className={styles.fileMeta}>
+                    <span>
+                      {file.linesHit}/{file.linesFound} lines
+                    </span>
+                    <span>{formatBranchCoverage(file)}</span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div
+                      className={`${styles.progressFill} ${getScoreTone(file.combinedScore)}`}
+                      style={{width: `${Math.max(2, file.combinedScore)}%`}}
+                    />
+                  </div>
+                </button>
+              )
+            })}
+
+            {filteredFiles.length === 0 && (
+              <div className={styles.emptyList}>No files matched the current filter</div>
+            )}
+          </div>
+        </aside>
+
+        <section className={styles.viewer} aria-label="Coverage source">
+          {selectedFile === undefined ? (
+            <div className={styles.emptyState}>Select a file to inspect its coverage</div>
+          ) : (
+            <>
+              <div className={styles.viewerHeader}>
+                <div>
+                  <SourceLocationValue
+                    className={styles.viewerPath}
+                    projectRoot={projectRoot}
+                    value={{file: selectedFile.filePath}}
+                  />
+                  <div className={styles.viewerMeta}>
+                    <span
+                      className={`${styles.viewerScore} ${getScoreTone(selectedFile.combinedScore)}`}
+                    >
+                      Score{" "}
+                      <Percentage
+                        fallback="n/a"
+                        maximumFractionDigits={1}
+                        minimumFractionDigits={1}
+                        value={selectedFile.combinedScore}
+                      />
+                    </span>
+                    <span>
+                      {selectedFile.linesHit}/{selectedFile.linesFound} executable lines
+                    </span>
+                    <span>{formatBranchCoverage(selectedFile)}</span>
+                    {focusLine !== undefined && <span>First gap at line {focusLine}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.legend}>
+                <span className={`${styles.legendItem} ${styles.legendCovered}`}>Covered</span>
+                <span className={`${styles.legendItem} ${styles.legendPartial}`}>
+                  Partial branch
+                </span>
+                <span className={`${styles.legendItem} ${styles.legendUncovered}`}>Uncovered</span>
+              </div>
+
+              {isLoadingSource && <div className={styles.viewerState}>Loading source file...</div>}
+              {!isLoadingSource && sourceError !== undefined && (
+                <div className={styles.viewerState}>Unable to load source: {sourceError}</div>
+              )}
+              {!isLoadingSource && sourceError === undefined && (
+                <div className={styles.codePane} ref={codePaneRef}>
+                  {sourceLines.map((sourceLine, index) => {
+                    const lineNumber = index + 1
+                    const lineCoverage = selectedFile.lines.get(lineNumber)
+                    const lineTokens = highlightedLines?.[index]
+                    const lineClassName =
+                      lineCoverage?.status === "covered"
+                        ? styles.codeLineCovered
+                        : lineCoverage?.status === "partial"
+                          ? styles.codeLinePartial
+                          : lineCoverage?.status === "uncovered"
+                            ? styles.codeLineUncovered
+                            : ""
+
+                    return (
+                      <div
+                        key={lineNumber}
+                        data-line-number={lineNumber}
+                        className={`${styles.codeLine} ${lineClassName}`}
+                      >
+                        <div className={styles.lineNumber}>{lineNumber}</div>
+                        <div className={styles.hitCount}>
+                          {lineCoverage ? `${lineCoverage.hits}x` : ""}
+                        </div>
+                        <div className={styles.codeText}>
+                          {lineTokens && lineTokens.length > 0
+                            ? lineTokens.map((token, tokenIndex) => (
+                                <span
+                                  key={`${lineNumber}-${tokenIndex}`}
+                                  style={tokenStyle(token)}
+                                  className={styles.codeToken}
+                                >
+                                  {token.content}
+                                </span>
+                              ))
+                            : sourceLine || " "}
+                        </div>
+                        <div className={styles.branchInfo}>
+                          {lineCoverage && lineCoverage.branchesFound > 0
+                            ? `${lineCoverage.branchesHit}/${lineCoverage.branchesFound}`
+                            : ""}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,383 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`decodeMessageBody decodes a single prefixless Wallet V4 external message before a text comment 1`] = `
+{
+  "decodedOpcode": undefined,
+  "parsedBody": {
+    "name": "WalletV4ExternalMessage",
+    "value": {
+      "entries": [
+        {
+          "key": "signature",
+          "value": {
+            "kind": "scalar",
+            "typeName": "bits512",
+            "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          },
+        },
+        {
+          "key": "subwalletId",
+          "value": {
+            "kind": "scalar",
+            "typeName": "uint32",
+            "value": "698983191",
+          },
+        },
+        {
+          "key": "validUntil",
+          "value": {
+            "kind": "scalar",
+            "typeName": "uint32",
+            "value": "1900000000",
+          },
+        },
+        {
+          "key": "seqno",
+          "value": {
+            "kind": "scalar",
+            "typeName": "uint32",
+            "value": "42",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "WalletV4SignedExternal",
+    },
+  },
+  "rawFirst32Bits": 0,
+}
+`;
+
+exports[`decodeMessageBody prefers receiver incoming over sender outgoing for an internal message 1`] = `
+{
+  "name": "ReceiverIncoming",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "ReceiverIncoming",
+  },
+}
+`;
+
+exports[`decodeMessageBody falls back to sender outgoing when receiver incoming does not match 1`] = `
+{
+  "name": "SenderOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "SenderOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody prefers the message source over the caller-provided source fallback 1`] = `
+{
+  "name": "ActualSenderOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "ActualSenderOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody decodes external-out using the sender outgoing ABI 1`] = `
+{
+  "name": "SenderExternalOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "SenderExternalOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody uses the caller-provided source for a relaxed message without src 1`] = `
+{
+  "name": "RelaxedSenderOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "RelaxedSenderOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody selects the matching opcode when the receiver ABI has multiple messages 1`] = `
+{
+  "name": "SetFeatureMode",
+  "opcode": 2,
+  "value": {
+    "entries": [
+      {
+        "key": "mode",
+        "value": {
+          "kind": "scalar",
+          "rawValue": "1",
+          "typeName": "FeatureMode",
+          "value": "FeatureMode.Enabled (1)",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "SetFeatureMode",
+  },
+}
+`;
+
+exports[`decodeMessageBody does not guess between multiple prefixless messages without an opcode 1`] = `
+{
+  "name": "Text Comment",
+  "opcode": 0,
+  "value": {
+    "entries": [
+      {
+        "key": "text",
+        "value": {
+          "kind": "scalar",
+          "value": "",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "Text Comment",
+  },
+}
+`;
+
+exports[`decodeMessageBody decodes a single prefixless bounced message without an opcode 1`] = `
+{
+  "name": "OriginalOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "OriginalOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody decodes a short prefixless bounced message with fewer than 32 bits 1`] = `
+{
+  "name": "ShortOriginalOutgoing",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint8",
+          "value": "7",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "ShortOriginalOutgoing",
+  },
+}
+`;
+
+exports[`decodeMessageBody tries fallback contract ABIs after both endpoint ABIs 1`] = `
+{
+  "name": "FallbackIncoming",
+  "value": {
+    "entries": [
+      {
+        "key": "value",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint32",
+          "value": "0",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "FallbackIncoming",
+  },
+}
+`;
+
+exports[`decodeMessageBody decodes a text comment only after receiver and sender ABIs fail 1`] = `
+{
+  "name": "Text Comment",
+  "opcode": 0,
+  "value": {
+    "entries": [
+      {
+        "key": "text",
+        "value": {
+          "kind": "scalar",
+          "value": "hello",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "Text Comment",
+  },
+}
+`;
+
+exports[`decodeMessageBody returns undefined when no ABI or built-in parser matches 1`] = `undefined`;
+
+exports[`decodeCellWithAbi decodes storage maps with bits keys through the compatibility fallback 1`] = `
+{
+  "category": "storage",
+  "consumption": {
+    "complete": true,
+    "initialBits": 1,
+    "initialRefs": 1,
+    "remainingBits": 0,
+    "remainingRefs": 0,
+  },
+  "name": "map<bits8, void>",
+  "provenance": {
+    "codeHashes": [
+      "bits-dictionary-code-hash",
+    ],
+    "displayName": "BitsDictionary",
+    "source": "compiler-abi",
+  },
+  "value": {
+    "entries": [
+      {
+        "key": {
+          "kind": "scalar",
+          "typeName": "bits8",
+          "value": "AB",
+        },
+        "value": {
+          "kind": "void",
+        },
+      },
+    ],
+    "kind": "map",
+    "typeName": "map<bits8, void>",
+  },
+}
+`;
+
+exports[`decodeCellWithAbi preserves enum member names and unknown encoded values 1`] = `
+{
+  "known": {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 64,
+      "initialRefs": 0,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "SetFeatureMode",
+    "provenance": {
+      "codeHashes": [
+        "enum-example-code-hash",
+      ],
+      "displayName": "EnumExample",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "mode",
+          "value": {
+            "kind": "scalar",
+            "rawValue": "1",
+            "typeName": "FeatureMode",
+            "value": "FeatureMode.Enabled (1)",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "SetFeatureMode",
+    },
+  },
+  "unknown": {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 64,
+      "initialRefs": 0,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "SetFeatureMode",
+    "provenance": {
+      "codeHashes": [
+        "enum-example-code-hash",
+      ],
+      "displayName": "EnumExample",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "mode",
+          "value": {
+            "kind": "scalar",
+            "rawValue": "7",
+            "typeName": "FeatureMode",
+            "value": "FeatureMode(7)",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "SetFeatureMode",
+    },
+  },
+}
+`;

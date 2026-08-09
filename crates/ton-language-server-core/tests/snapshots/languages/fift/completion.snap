@@ -1,0 +1,17 @@
+helper kind=Some(Function) edit=3:2-3:4:helper
+IF:<{ kind=Some(Snippet) detail=if block edit=3:2-3:4:IF:<{\n\t$0\n}>
+IFJMP:<{ kind=Some(Snippet) detail=if-jump block edit=3:2-3:4:IFJMP:<{\n\t$0\n}>
+<{ kind=Some(Snippet) detail=instruction block edit=3:2-3:4:<{\n\t$0\n}>
+DECLMETHOD kind=Some(Snippet) detail=method declaration edit=3:2-3:4:DECLMETHOD ${1:id} ${2:name}$0
+DECLPROC kind=Some(Snippet) detail=procedure declaration edit=3:2-3:4:DECLPROC ${1:name}$0
+GLOBAL kind=Some(Snippet) detail=global variable edit=3:2-3:4:GLOBAL ${1:name}$0
+METHOD:<{ kind=Some(Snippet) detail=method edit=3:2-3:4:${1:id} ${2:name} METHOD:<{\n\t$0\n}>
+PROC:<{ kind=Some(Snippet) detail=procedure edit=3:2-3:4:${1:name} PROC:<{\n\t$0\n}>
+PROCINLINE:<{ kind=Some(Snippet) detail=inline procedure edit=3:2-3:4:${1:name} PROCINLINE:<{\n\t$0\n}>
+PROCREF:<{ kind=Some(Snippet) detail=procedure reference edit=3:2-3:4:${1:name} PROCREF:<{\n\t$0\n}>
+PROGRAM{ kind=Some(Snippet) detail=program edit=3:2-3:4:PROGRAM{\n\t$0\nEND>c
+REPEAT:<{ kind=Some(Snippet) detail=repeat loop edit=3:2-3:4:REPEAT:<{\n\t$0\n}>
+UNTIL:<{ kind=Some(Snippet) detail=until loop edit=3:2-3:4:UNTIL:<{\n\t$0\n}>
+WHILE:<{ kind=Some(Snippet) detail=while loop edit=3:2-3:4:WHILE:<{\n\t$1\n}>DO<{\n\t$0\n}>
+}>DO<{ kind=Some(Snippet) detail=while body edit=3:2-3:4:}>DO<{\n\t$0\n}>
+}>ELSE<{ kind=Some(Snippet) detail=else block edit=3:2-3:4:}>ELSE<{\n\t$0\n}>

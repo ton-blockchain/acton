@@ -83,7 +83,7 @@ pub(crate) trait TestOutputExt {
 fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+        .is_some_and(|ext| matches!(ext, "json" | "sarif" | "cpuprofile"))
 }
 
 #[allow(dead_code)]

@@ -1,0 +1,14 @@
+[server]
+bind_addr = "127.0.0.1:3008"
+
+[logging]
+level = "info"
+
+[storage]
+database_path = "apps/actonscan-backend/data/actonscan.sqlite3"
+
+[indexer]
+global_config_path = "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json"
+liteserver_parallelism = 4
+tps_backfill_batches = 1024
+poll_interval_ms = 100

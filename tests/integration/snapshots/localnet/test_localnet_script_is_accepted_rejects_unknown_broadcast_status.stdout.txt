@@ -1,0 +1,3 @@
+  Installing standard library [ACTON_VERSION]
+ExternalSendResult.isAccepted() is unavailable after broadcasting because submission does not report contract acceptance; use waitForFirstTransaction() to check whether the message appears on-chain
+at scripts/external_is_accepted[LINE]

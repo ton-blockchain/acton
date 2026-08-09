@@ -1,0 +1,21 @@
+diff --git a/ton-index-worker/index-engine/src/IndexScheduler.cpp b/ton-index-worker/index-engine/src/IndexScheduler.cpp
+--- a/ton-index-worker/index-engine/src/IndexScheduler.cpp
++++ b/ton-index-worker/index-engine/src/IndexScheduler.cpp
+@@ -57,7 +57,7 @@ std::string get_time_string(double seconds) {
+ }
+ 
+ void IndexScheduler::alarm() {
+-    alarm_timestamp() = td::Timestamp::in(is_in_sync_ ? 0.1 : 1.0);
++    alarm_timestamp() = td::Timestamp::in(is_in_sync_ ? 0.2 : 1.0);
+ 
+     td::Timestamp now = td::Timestamp::now();
+     double dt = 0.0;
+@@ -231,7 +231,7 @@ void IndexScheduler::got_newest_mc_seqno(std::uint32_t newest_mc_seqno) {
+     if (!is_in_sync_ && (last_known_seqno_ - last_indexed_seqno_ <= IS_IN_SYNC_THRESHOLD)) {
+         LOG(INFO) << "Indexer is in sync with TON node";
+         is_in_sync_ = true;
+-        td::actor::send_closure(db_scanner_, &DbScanner::set_catch_up_interval, 0.1);
++        td::actor::send_closure(db_scanner_, &DbScanner::set_catch_up_interval, 0.2);
+     } else if (is_in_sync_ && (last_known_seqno_ - last_indexed_seqno_ > IS_IN_SYNC_THRESHOLD)) {
+         LOG(WARNING) << "Indexing is out of sync with TON node";
+         is_in_sync_ = false;

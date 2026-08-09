@@ -1,0 +1,147 @@
+---
+title: "Precompiled BoC contracts"
+description: "Use a precompiled .boc file as a contract source while keeping wrappers and ABI available"
+---
+
+Most contracts in an Acton project start from `.tolk` files. Sometimes you only
+have the compiled contract code: a `.boc` artifact from another repository, a
+release bundle, or a contract whose source is generated elsewhere.
+
+In that case, you can still make the contract feel like a normal Acton contract.
+Start by teaching Acton where the BoC is. If you later want typed wrappers or
+ABI JSON, add a small Tolk file that describes the contract interface.
+
+## Configure the contract
+
+Put the BoC file in your project and point `src` to it:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+```
+
+Run the build:
+
+```bash
+acton build Precompiled
+```
+
+This already gives you a regular build artifact in `build/Precompiled.json`.
+The artifact contains the BoC code as `code_boc64` and the code hash. You can
+also use this contract from dependencies and from `build("Precompiled")`.
+
+This is enough when you only need the code cell. For example, a parent contract
+can depend on the BoC contract and use the generated helper from `gen/`.
+
+```acton-toml title="Acton.toml"
+[contracts.Parent]
+src = "contracts/Parent.tolk"
+depends = ["Precompiled"]
+
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+```
+
+Do not put `depends` on the BoC contract itself. The BoC is already compiled,
+so Acton cannot rebuild it with generated dependency helpers. Put `depends` on
+the `.tolk` contract that needs the BoC code, like `Parent` above.
+
+## Add typed tooling
+
+<AvailabilityBadge since="Acton 1.1" />
+
+The BoC alone has no ABI. Acton can read and embed the code, but it cannot know
+which storage type, messages, or get methods belong to it.
+
+Create a small Tolk file next to the BoC when you want typed wrappers or ABI
+JSON:
+
+```tolk title="contracts/Precompiled.types.tolk"
+struct Storage {
+    id: uint32
+    owner: address
+    counter: uint32
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+
+contract Precompiled {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+```
+
+Then connect it from `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+```
+
+The `types` file does not need `onInternalMessage()` or `onBouncedMessage()`.
+It is compiled in interface-only mode, and the produced code is ignored.
+
+At this point the contract has two files with different jobs:
+
+- `src` is the real deployable code.
+- `types` describes the interface for tooling.
+
+The `types` file is not a source replacement. It only gives Acton enough shape
+information to generate ABI-backed tooling.
+
+<Callout>
+  Get methods still need valid Tolk bodies because the file must compile. Stub
+  bodies are fine; Acton uses the signatures for ABI metadata.
+</Callout>
+
+Keep this file honest. If a message opcode, field type, storage layout, or get
+method signature does not match the BoC, generated helpers will be typed but
+wrong.
+
+## Inspect a deployed contract with the interface
+
+Pass the interface directly when the deployed code is not available in the
+current project or does not have verifier ABI metadata:
+
+```bash
+acton rpc info <ADDRESS> --abi contracts/Precompiled.types.tolk --net mainnet
+acton rpc call <ADDRESS> currentCounter --abi contracts/Precompiled.types.tolk --net mainnet
+```
+
+`--abi` also accepts compiler ABI JSON, for example
+`build/abi/precompiled.json`. Explicit ABI files take priority over automatic
+local, catalog, and verifier matching.
+
+## Generate wrappers
+
+After adding `types`, generate a Tolk wrapper the same way you would for a
+source contract:
+
+```bash
+acton wrapper Precompiled --test
+```
+
+TypeScript wrappers work the same way:
+
+```bash
+acton wrapper Precompiled --ts
+```
+
+`acton wrapper --all` includes BoC contracts with `types` and skips BoC
+contracts without it. If you ask for one BoC contract directly and `types` is
+missing, Acton tells you to add it.
+
+## See also
+
+- [Build system overview](/docs/building/overview)
+- [Tolk wrappers](/docs/building/wrappers)
+- [Build reference](/docs/building/reference#using-precompiled-contracts)
+- [`acton build` command reference](/docs/commands/build)
+- [`acton wrapper` command reference](/docs/commands/wrapper)

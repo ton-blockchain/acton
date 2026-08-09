@@ -1,0 +1,8 @@
+trace_contracts: child,parent
+contract_files: child.json,parent.json
+tx_dest_contracts: <unknown> -> parent -> parent -> child
+parent_json_name: parent
+child_json_name: child
+child_abi_contract_name: child
+child_storage_ty_idx: 13
+child_incoming_messages: 1

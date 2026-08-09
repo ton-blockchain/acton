@@ -1,4 +1,11 @@
 import {defineConfig, defineDocs} from "fumadocs-mdx/config"
+import {
+  transformerMetaHighlight,
+  transformerNotationDiff,
+  transformerNotationFocus,
+  transformerNotationHighlight,
+  transformerNotationWordHighlight,
+} from "@shikijs/transformers"
 import {transformerTwoslash} from "fumadocs-twoslash"
 import {createFileSystemTypesCache} from "fumadocs-twoslash/cache-fs"
 import {readFileSync} from "node:fs"
@@ -185,6 +192,11 @@ export default defineConfig({
       langs: [...builtinLangs, ...customLangs],
       transformers: [
         transformerNoCopy,
+        transformerMetaHighlight(),
+        transformerNotationHighlight({matchAlgorithm: "v3"}),
+        transformerNotationWordHighlight({matchAlgorithm: "v3"}),
+        transformerNotationDiff({matchAlgorithm: "v3"}),
+        transformerNotationFocus({matchAlgorithm: "v3"}),
         transformerTwoslash({
           typesCache: createFileSystemTypesCache(),
           langs: ["tolk"],

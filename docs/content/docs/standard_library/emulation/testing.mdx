@@ -156,7 +156,7 @@ Example:
 ```tolk
 val bouncedMsg = createMessage({
     bounce: false,
-    value: ton("0.95"),
+    value: grams("0.95"),
     dest: deployer.address,
     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 }).bounced();
@@ -239,7 +239,7 @@ Example:
 ```tolk
 val state = testing.getAccountState(contract.address);
 if (state != null) {
-    println("Balance: {:ton}", state.storage.balance.grams);
+    println("Balance: {:gram}", state.storage.balance.grams);
 } else {
     println("Account not found");
 }
@@ -261,7 +261,7 @@ Example:
 ```tolk
 val storageFee = testing.getAccountStorageFee(contract.address, 86400); // 1 day
 if (storageFee != null) {
-    println("Daily storage fee: {:ton}", storageFee);
+    println("Daily storage fee: {:gram}", storageFee);
 }
 ```
 
@@ -301,11 +301,9 @@ fun testing.getNow(): uint32
 
 Get the current Unix timestamp used in emulation.
 
-Returns the current time in the emulated blockchain.
-
-Get-method execution prefers this mocked time once you have called
-[testing.setNow](#testingsetnow). If the emulated time is still `0` (the default before any
-override), Acton falls back to the real wall clock for get-method runs.
+Test and script runs initialize this value from the current wall clock. A
+forked run uses the pinned block timestamp instead. Call [testing.setNow](#testingsetnow) to
+override it for time-dependent scenarios.
 
 Example:
 ```tolk
@@ -313,7 +311,71 @@ val currentTime = testing.getNow();
 println("Current emulation time: {}", currentTime);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L262" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L260" />
+
+## `testing.setRandomSeed`
+
+```tolk
+fun testing.setRandomSeed(seed: uint256? = null): uint256
+```
+
+Set the VM random seed used by the current test/script and future emulated execution.
+
+Pass a `uint256` seed for fully reproducible randomness. If [seed](#testingsetrandomseed) is omitted,
+Acton generates a host-random 256-bit seed and returns it so you can print it
+and reuse it later.
+
+`testing.setRandomSeed()` synchronizes randomness in two places:
+- the current VM context, so [random.getSeed](/docs/tolk_standard_library/common#randomgetseed), [random.uint256](/docs/tolk_standard_library/common#randomuint256), and
+  [random.range](/docs/tolk_standard_library/common#randomrange) immediately use the new seed
+- the emulated world state, so future `net.send`, `testing.runTickTock`,
+  and `net.runGetMethod` calls use the same deterministic seed source
+
+This function does not affect [crypto.getSecureRandomBytes](/docs/standard_library/crypto#cryptogetsecurerandombytes), which uses
+host-side secure randomness.
+
+Example:
+```tolk
+// Reproducible seed
+testing.setRandomSeed(42);
+val a = random.uint256();
+testing.setRandomSeed(42);
+val b = random.uint256(); // same as `a`
+
+// Host-random seed, returned for logging/reproduction
+val seed = testing.setRandomSeed();
+println("random seed: {:X}", seed);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L291" />
+
+## `testing.setChecksigIgnore`
+
+```tolk
+fun testing.setChecksigIgnore(ignore: bool): void
+```
+
+Controls whether future emulated transactions bypass VM signature checks.
+
+When enabled, the emulator treats TVM signature-checking instructions such as
+`CHKSIGNU` and `CHKSIGNS` as successful. This is useful for tests that need to
+exercise wallet or external-message flows without constructing a valid
+signature.
+
+The setting is scoped to the current emulated world state and affects
+subsequent transaction execution paths such as [net.send](/docs/standard_library/emulation/network#netsend),
+[net.sendExternal](/docs/standard_library/emulation/network#netsendexternal), [testing.processSingleTraceStep](#testingprocesssingletracestep),
+[testing.createTraceIterationCursor](#testingcreatetraceiterationcursor), and [testing.runTickTock](#testingrunticktock). It does not
+affect get-method calls or broadcast sends to a real network.
+
+Example:
+```tolk
+testing.setChecksigIgnore(true);
+val result = net.sendExternal(message);
+testing.setChecksigIgnore(false);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L321" />
 
 ## `testing.topUp`
 
@@ -321,17 +383,17 @@ println("Current emulation time: {}", currentTime);
 fun testing.topUp(to: address, amount: coins): void
 ```
 
-Topup an address with a specified amount of TON.
+Topup an address with a specified amount of GRAM.
 
 Example:
 ```tolk
-testing.topUp(address, ton("10"));
+testing.topUp(address, grams("10"));
 ```
 
 Note: This function for tests only!
-For testnet TON airdrop onto your wallet, use `acton wallet airdrop` command.
+For testnet GRAM airdrop onto your wallet, use `acton wallet airdrop` command.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L275" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L334" />
 
 ## `testing.getAccountBalance`
 
@@ -346,10 +408,10 @@ Returns 0 if the address is not deployed.
 Example:
 ```tolk
 val balance = testing.getAccountBalance(address);
-println("{:ton}", balance);
+println("{:gram}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L294" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L353" />
 
 ## `testing.getShardAccount`
 
@@ -369,7 +431,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L309" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L368" />
 
 ## `testing.setShardAccount`
 
@@ -389,7 +451,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L324" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L383" />
 
 ## `testing.loadAndRegisterLibrary`
 
@@ -402,7 +464,7 @@ in the current emulated blockchain.
 
 Returns false if library is not found.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L336" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L395" />
 
 ## `testing.registerLibrary`
 
@@ -412,7 +474,7 @@ fun testing.registerLibrary(libCell: cell): void
 
 Register a library in the emulated blockchain.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L346" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L405" />
 
 ## `testing.saveSnapshot`
 
@@ -426,12 +488,12 @@ Returns `true` on successful write and `false` on serialization or host I/O fail
 
 Example:
 ```tolk
-testing.topUp(addr, ton("3"));
+testing.topUp(addr, grams("3"));
 val saved = testing.saveSnapshot("world-state.json");
 expect(saved).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L360" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L419" />
 
 ## `testing.loadSnapshot`
 
@@ -450,7 +512,7 @@ val loaded = testing.loadSnapshot("world-state.json");
 expect(loaded).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L374" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L433" />
 
 ## `testing.setConfig`
 
@@ -506,7 +568,7 @@ if (success) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L425" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L484" />
 
 ## `testing.getConfig`
 
@@ -539,7 +601,7 @@ val globalVersion = config.getGlobalVersion();
 println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L484" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L543" />
 
 ## `testing.isDeployed`
 
@@ -564,7 +626,7 @@ fun JettonWallet.getJettonBalance(self): coins {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L504" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L563" />
 
 ## `testing.outActions`
 
@@ -580,5 +642,5 @@ val outActions = testing.outActions();
 println(outActions.size());
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L515" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/testing.tolk#L574" />
 

@@ -1,0 +1,35 @@
+{
+  "name": "@acton/verifier-ui",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite --host 127.0.0.1 --port 3007",
+    "doctor": "CI=1 react-doctor",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "preview": "vite preview --host 127.0.0.1 --port 3007"
+  },
+  "dependencies": {
+    "@acton/ui": "file:../ui",
+    "lucide-react": "^0.474.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  }
+}

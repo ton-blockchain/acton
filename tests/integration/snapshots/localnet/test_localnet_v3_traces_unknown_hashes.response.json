@@ -1,0 +1,18 @@
+{
+  "msg_hash": {
+    "response": {
+      "address_book": {},
+      "metadata": {},
+      "traces": []
+    },
+    "status": 200
+  },
+  "tx_hash": {
+    "response": {
+      "address_book": {},
+      "metadata": {},
+      "traces": []
+    },
+    "status": 200
+  }
+}

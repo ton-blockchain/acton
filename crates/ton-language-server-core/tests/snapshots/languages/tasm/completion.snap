@@ -1,0 +1,2 @@
+PUSHINT kind=Some(Function) detail=PUSHINT value edit=0:0-0:4:PUSHINT ${1:value}$0
+ADD kind=Some(Function) detail=x:Int y:Int -> sum:Int edit=0:0-0:4:ADD

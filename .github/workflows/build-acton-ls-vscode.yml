@@ -1,0 +1,122 @@
+name: Build Acton VS Code Extension
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-acton-ls-vscode.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "biome.jsonc"
+      - "bun.lock"
+      - "package.json"
+      - "src/bin/acton.rs"
+      - "src/commands/ls/**"
+      - "crates/ton-language-server-core/**"
+      - "crates/ton-language-server-native/Cargo.toml"
+      - "crates/ton-language-server-native/src/**"
+      - "packages/vscode-ton/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-acton-ls-vscode.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "biome.jsonc"
+      - "bun.lock"
+      - "package.json"
+      - "src/bin/acton.rs"
+      - "src/commands/ls/**"
+      - "crates/ton-language-server-core/**"
+      - "crates/ton-language-server-native/Cargo.toml"
+      - "crates/ton-language-server-native/src/**"
+      - "packages/vscode-ton/**"
+  workflow_dispatch:
+
+concurrency:
+  group: build-vscode-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build:
+    name: Build VS Code Extension
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    env:
+      TARGET_NAME: x86_64-unknown-linux-gnu
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit dependencies
+        working-directory: packages/vscode-ton
+        run: bun audit --audit-level=moderate
+
+      - name: Check formatting and linting
+        working-directory: packages/vscode-ton
+        run: bun run check
+
+      - name: Check types
+        working-directory: packages/vscode-ton
+        run: bun run typecheck
+
+      - name: Run tests
+        working-directory: packages/vscode-ton
+        run: bun run test
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          mkdir -p objs
+          gh release download release-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
+
+      - name: Build Acton language server
+        run: cargo build --bin acton
+
+      - name: Run Extension Host smoke tests
+        working-directory: packages/vscode-ton
+        run: xvfb-run -a bun run test:e2e
+
+      - name: Build extension
+        working-directory: packages/vscode-ton
+        run: bun run build
+
+      - name: Build VSIX
+        working-directory: packages/vscode-ton
+        run: bunx vsce package --no-dependencies --out acton-language-server.vsix
+
+#      - name: Upload VSIX
+#        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+#        with:
+#          name: acton-language-server-vsix
+#          path: packages/vscode-ton/acton-language-server.vsix
+#          if-no-files-found: error

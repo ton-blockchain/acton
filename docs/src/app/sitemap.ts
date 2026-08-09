@@ -1,10 +1,14 @@
 import type {MetadataRoute} from "next"
 import {getVisiblePages} from "@/lib/source"
-import {baseUrl} from "@/lib/metadata"
+import {baseUrl, docsEnvironment} from "@/lib/metadata"
 
 export const revalidate = false
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if (docsEnvironment !== "production") {
+    return []
+  }
+
   const url = (path: string): string => `${baseUrl}${path}`
   const excludedUrls = new Set(["/docs"])
 

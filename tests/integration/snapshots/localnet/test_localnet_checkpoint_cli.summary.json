@@ -1,0 +1,10 @@
+{
+  "clear": "Deleted 1 localnet checkpoint",
+  "create": "Created localnet checkpoint stable",
+  "delete": "Deleted localnet checkpoint stable",
+  "export": "Exported localnet checkpoint stable to [ROOT]/stable.json",
+  "import": "Imported localnet checkpoint restored from [ROOT]/stable.json",
+  "list": "Localnet checkpoints:/n  stable (block 0)",
+  "list_after_clear": "No localnet checkpoints found",
+  "restore": "Restored localnet checkpoint restored"
+}

@@ -2,7 +2,7 @@ import "types"
 
 contract Empty {
     author: "Acton User"
-    version: "[ACTON_VERSION]"
+    version: "1.0.0"
     description: "Minimal starter contract with owner management"
     storage: Storage
     incomingMessages: AllowedMessage

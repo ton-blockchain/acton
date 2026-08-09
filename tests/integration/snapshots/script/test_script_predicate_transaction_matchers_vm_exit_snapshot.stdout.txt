@@ -2,7 +2,7 @@
 script.vm-exit.to=[WALLET_ADDRESS_BASE] (counter)
 expect(actual).toHaveTx(expected)
 N/A -> deployer A
-└── IncreaseCounter 0.1 TON -> counter B                                        gas=1324
+└── IncreaseCounter 0.1 GRAM -> counter B                                       gas=1324
 
 Cannot find transaction from <any> to <function>
 with:

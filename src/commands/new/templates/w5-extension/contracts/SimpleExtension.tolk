@@ -21,7 +21,7 @@ type AllowedExternalMessages =
     | CollectPaymentFromWallet
     | WithdrawExtensionBalance
 
-const MIN_PLUGIN_AMOUNT = ton("0.5")
+const MIN_PLUGIN_AMOUNT = grams("0.5")
 
 fun onExternalMessage(inMsg: slice) {
     val msg = lazy AllowedExternalMessages.fromSlice(inMsg);
@@ -56,7 +56,7 @@ fun onExternalMessage(inMsg: slice) {
                 },
                 bounce: false,
                 dest: storage.walletAddress,
-                value: ton("0.05"),
+                value: grams("0.05"),
             });
             collectPaymentMsg.send(SEND_MODE_REGULAR);
         }

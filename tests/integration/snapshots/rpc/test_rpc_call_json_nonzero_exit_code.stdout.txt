@@ -1,0 +1,20 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "contract": "counter",
+  "error": {
+    "message": "Get method listVoters failed: Errors.VoteProposalMissing ([EXIT_STATUS] 133)",
+    "name": "Errors.VoteProposalMissing"
+  },
+  "exitCode": 133,
+  "method": "listVoters",
+  "network": "mock",
+  "rawAddress": "0:2222222222222222222222222222222222222222222222222222222222222222",
+  "rawStack": [
+    [
+      "num",
+      "0x0"
+    ]
+  ],
+  "result": null,
+  "signature": "listVoters(proposalHash: uint256): int"
+}

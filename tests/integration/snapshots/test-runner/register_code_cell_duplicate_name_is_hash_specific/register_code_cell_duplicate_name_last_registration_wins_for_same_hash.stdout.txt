@@ -11,7 +11,7 @@
   ✓ cr register code cell duplicate name precedence [TIME]
     └─ Test output:
        N/A -> cr_precedence_deployer A
-       └── empty 1 TON -> cr_duplicate_name_after B                                    gas=635
+       └── empty 1 GRAM -> cr_duplicate_name_after B                                   gas=635
            └── account created
 
  ✓ 1 passed in 1 file

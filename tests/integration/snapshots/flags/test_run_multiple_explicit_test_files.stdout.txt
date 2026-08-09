@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test1.test.tolk (1 test)
+  ✓ in selected file 1 [TIME]
+    └─ Test output:
+       selected file 1
+ > tests/test2.test.tolk (1 test)
+  ✓ in selected file 2 [TIME]
+    └─ Test output:
+       selected file 2
+
+ ✓ 2 passed in 2 files

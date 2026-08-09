@@ -1,0 +1,36 @@
+{
+  "fund": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "@type": "ok",
+      "hash": "[HASH]"
+    }
+  },
+  "invalid": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "Invalid shard_account base64",
+    "ok": false
+  },
+  "set": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "source_balance": "1000000000",
+  "target_after_set": {
+    "address_matches": null,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": false,
+    "data_present": false,
+    "frozen_hash_present": false,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "uninitialized"
+  },
+  "target_balance_after_set": "1000000000",
+  "target_cell_matches_source": true
+}

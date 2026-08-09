@@ -8,9 +8,11 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast};
+use tolk_syntax::{
+    AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast, clean_comment,
+};
 use tree_sitter::Node;
 
 /// Represents a byte range in the source code.
@@ -113,6 +115,18 @@ impl Span {
     pub const fn is_empty(&self) -> bool {
         self.start == self.end
     }
+
+    /// Relocates this span by a signed byte offset.
+    #[must_use]
+    pub fn shifted(self, delta: i64) -> Option<Self> {
+        let start = i64::from(self.start).checked_add(delta)?;
+        let end = i64::from(self.end).checked_add(delta)?;
+
+        Some(Self {
+            start: u32::try_from(start).ok()?,
+            end: u32::try_from(end).ok()?,
+        })
+    }
 }
 
 /// Extension trait to easily get a `Span` from an AST node.
@@ -170,22 +184,26 @@ pub struct Symbol {
     pub name_span: Span,
     /// Span of the entire declaration body (useful for "document symbols").
     pub body_span: Span,
-    /// Span of the associated documentation comment (if any).
-    pub doc_span: Option<Span>,
+    /// Documentation associated with this symbol.
+    pub doc: Arc<str>,
     /// If this symbol is deprecated.
     pub is_deprecated: bool,
     /// If this symbol is marked as `@pure`.
     pub is_pure: bool,
+    /// If this symbol is a private struct field.
+    pub is_private: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Parameter {
+    pub name: Arc<str>,
     pub is_mutate: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct TypeParameter {
     pub name: Arc<str>,
+    pub span: Span,
 }
 
 /// Distinguishes between different kinds of top-level declarations.
@@ -244,6 +262,26 @@ pub enum SymbolKind {
     },
 }
 
+/// A contract header indexed separately from ordinary Tolk symbols.
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct IndexedContract {
+    pub name: Arc<str>,
+    pub name_span: Span,
+    pub body_span: Span,
+    pub doc: Arc<str>,
+    pub fields: Vec<IndexedContractField>,
+}
+
+/// A field declared in an indexed contract header.
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct IndexedContractField {
+    pub name: Arc<str>,
+    pub value: Arc<str>,
+    pub name_span: Span,
+    pub body_span: Span,
+    pub doc: Arc<str>,
+}
+
 impl Symbol {
     /// Returns `true` if this declaration defines a type (struct, enum, or alias).
     #[must_use]
@@ -262,6 +300,14 @@ impl Symbol {
             SymbolKind::Function { .. } | SymbolKind::Method { .. } | SymbolKind::GetMethod { .. }
         )
     }
+
+    fn nested_symbols(&self) -> &[Self] {
+        match &self.kind {
+            SymbolKind::Struct { fields, .. } => fields,
+            SymbolKind::Enum { members } => members,
+            _ => &[],
+        }
+    }
 }
 
 /// Represents an import statement.
@@ -269,6 +315,8 @@ impl Symbol {
 pub struct Import {
     /// Path string as it appears in the source code.
     pub path: Arc<str>,
+    /// Span of the path string literal, including its quotes.
+    pub path_span: Span,
     /// Span of the entire import declaration.
     pub span: Span,
 }
@@ -296,6 +344,8 @@ pub struct FileIndex {
     pub imports: Vec<Import>,
     /// List of top-level declarations in this file.
     pub decls: Vec<Symbol>,
+    /// Contract header, which is indexed but does not participate in name resolution.
+    pub contract: Option<IndexedContract>,
     /// Mapping from `local_id` of the [`SymbolId`] to index in tree root children.
     pub symbol_id_to_decl_index: BTreeMap<u32, usize>, // SymbolId.local_id to idx in top levels
     /// Sorted list of spans for top-level declarations, used for efficient lookup.
@@ -303,6 +353,73 @@ pub struct FileIndex {
 }
 
 impl FileIndex {
+    #[must_use]
+    pub fn find_contract_at(&self, offset: usize) -> Option<&IndexedContract> {
+        self.contract
+            .as_ref()
+            .filter(|contract| contract.name_span.contains(offset))
+    }
+
+    #[must_use]
+    pub fn find_contract_field_at(
+        &self,
+        offset: usize,
+    ) -> Option<(&IndexedContract, &IndexedContractField)> {
+        let contract = self.contract.as_ref()?;
+        contract
+            .fields
+            .iter()
+            .find(|field| field.name_span.contains(offset))
+            .map(|field| (contract, field))
+    }
+
+    /// Returns whether replacing this file leaves project-wide lookup tables valid.
+    ///
+    /// Declaration spans and semantic metadata may change. Import paths and every
+    /// global `(SymbolId, fqn)` entry must remain stable so the project index can
+    /// reuse its file graph and global symbol map.
+    #[must_use]
+    pub(crate) fn has_same_project_index_shape(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.path == other.path
+            && self.source_kind == other.source_kind
+            && self
+                .imports
+                .iter()
+                .map(|import| import.path.as_ref())
+                .eq(other.imports.iter().map(|import| import.path.as_ref()))
+            && symbols_have_same_global_identity(&self.decls, &other.decls)
+    }
+
+    /// Returns whether this file exposes the same names to importing files.
+    ///
+    /// Source spans, bodies, signatures, and method declarations do not affect
+    /// name resolution in another file. Symbol IDs do: a declaration inserted
+    /// earlier in the file can renumber every declaration after it.
+    #[must_use]
+    pub fn has_same_name_resolution_exports(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.path == other.path
+            && self.source_kind == other.source_kind
+            && self
+                .name_resolution_exports()
+                .eq(other.name_resolution_exports())
+    }
+
+    fn name_resolution_exports(&self) -> impl Iterator<Item = (SymbolId, &str, bool, bool)> {
+        self.decls
+            .iter()
+            .filter(|symbol| symbol.is_name_resolution_export())
+            .map(|symbol| {
+                (
+                    symbol.id,
+                    symbol.name.as_ref(),
+                    symbol.is_type(),
+                    symbol.is_func(),
+                )
+            })
+    }
+
     #[must_use]
     pub fn find_symbol_index_at_offset(&self, offset: usize) -> Option<usize> {
         let idx = self
@@ -326,6 +443,16 @@ impl FileIndex {
         self.source_kind == FileSource::Stdlib
     }
 
+    /// Returns whether this is the stdlib prelude implicitly visible from every file.
+    #[must_use]
+    pub fn is_stdlib_prelude(&self) -> bool {
+        self.is_stdlib_file()
+            && self
+                .path
+                .file_name()
+                .is_some_and(|name| matches!(name.to_str(), Some("common.tolk" | "builtin.tolk")))
+    }
+
     /// Checks if passed file resides in Acton standard library.
     #[must_use]
     pub fn is_acton_file(&self) -> bool {
@@ -342,7 +469,7 @@ impl FileIndex {
     ///
     /// # Panics
     ///
-    /// Panics in debug builds if the path is not absolute.
+    /// Panics in debug builds if the path is not a stable absolute path.
     #[must_use]
     pub fn build(
         content: &str,
@@ -351,20 +478,28 @@ impl FileIndex {
         file: &ast::SourceFile,
         source_kind: FileSource,
     ) -> FileIndex {
-        debug_assert!(path.is_absolute()); // for stable ID
+        debug_assert!(
+            is_stable_absolute_path(&path),
+            "FileIndex path must be absolute or slash-rooted: {}",
+            path.display()
+        );
 
         let mut decls = vec![];
         let mut imports = vec![];
+        let mut contract = None;
 
         let mut local_id: u32 = 0;
 
         let mut symbol_id_to_decl_index = BTreeMap::new();
 
         for (idx, decl) in file.top_levels().enumerate() {
+            if let tolk_syntax::TopLevel::Contract(contract_ast) = decl {
+                contract = Self::extract_contract(file, contract_ast);
+                continue;
+            }
             if matches!(
                 decl,
                 tolk_syntax::TopLevel::TolkRequiredVersion(_)
-                    | tolk_syntax::TopLevel::Contract(_)
                     | tolk_syntax::TopLevel::EmptyStmt(_)
                     | tolk_syntax::TopLevel::Unmapped(_)
             ) {
@@ -378,7 +513,7 @@ impl FileIndex {
             let fqn = name.clone();
             let id = SymbolId { file_id, local_id };
             let body_span = decl.span();
-            let doc_span = None; // TODO: future work
+            let doc = extract_preceding_documentation(decl.syntax(), content);
             let is_deprecated = Self::is_deprecated(content, decl);
             let is_pure = Self::is_pure(content, decl);
 
@@ -390,9 +525,10 @@ impl FileIndex {
                     kind: SymbolKind::GlobalVariable,
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::Constant(_) => decls.push(Symbol {
                     id,
@@ -401,9 +537,10 @@ impl FileIndex {
                     kind: SymbolKind::Constant,
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::TypeAlias(decl) => decls.push(Symbol {
                     id,
@@ -418,9 +555,10 @@ impl FileIndex {
                     },
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::Struct(decl) => {
                     let struct_name = name.clone();
@@ -428,12 +566,13 @@ impl FileIndex {
                     let fields = fields
                         .filter_map(|f| {
                             let name_ident = f.name()?;
-                            let name = Arc::from(name_ident.text(&file.source));
+                            let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
+                            let body_span = f.span();
                             let fqn = Arc::from(format!("{struct_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
-                            let doc_span = None;
+                            let doc = extract_field_documentation(f.syntax(), content);
                             Some(Symbol {
                                 id,
                                 name,
@@ -441,9 +580,10 @@ impl FileIndex {
                                 kind: SymbolKind::StructField,
                                 name_span,
                                 body_span,
-                                doc_span,
+                                doc,
                                 is_deprecated: false,
                                 is_pure: false,
+                                is_private: f.has_private(),
                             })
                         })
                         .collect();
@@ -458,9 +598,10 @@ impl FileIndex {
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Enum(decl) => {
@@ -469,12 +610,13 @@ impl FileIndex {
                     let members = members
                         .filter_map(|f| {
                             let name_ident = f.name()?;
-                            let name = Arc::from(name_ident.text(&file.source));
+                            let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
+                            let body_span = f.span();
                             let fqn = Arc::from(format!("{enum_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
-                            let doc_span = None;
+                            let doc = extract_field_documentation(f.syntax(), content);
                             Some(Symbol {
                                 id,
                                 name,
@@ -482,9 +624,10 @@ impl FileIndex {
                                 kind: SymbolKind::EnumMember,
                                 name_span,
                                 body_span,
-                                doc_span,
+                                doc,
                                 is_deprecated: false,
                                 is_pure: false,
+                                is_private: false,
                             })
                         })
                         .collect();
@@ -495,9 +638,10 @@ impl FileIndex {
                         kind: SymbolKind::Enum { members },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Func(func) => {
@@ -508,19 +652,15 @@ impl FileIndex {
                         fqn,
                         kind: SymbolKind::Function {
                             has_return_type,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Method(func) => {
@@ -555,19 +695,15 @@ impl FileIndex {
                             has_return_type,
                             is_mutable,
                             is_instance,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::GetMethod(func) => {
@@ -578,28 +714,25 @@ impl FileIndex {
                         fqn,
                         kind: SymbolKind::GetMethod {
                             has_return_type,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Import(import) => {
                     let Some(path) = import.path() else {
                         continue;
                     };
-                    let path = path.content(&file.source);
+                    let content = path.content(&file.source);
                     imports.push(Import {
-                        path: Arc::from(path),
+                        path: Arc::from(content),
+                        path_span: path.span(),
                         span: import.span(),
                     });
                 }
@@ -625,9 +758,41 @@ impl FileIndex {
             source_kind,
             imports,
             decls,
+            contract,
             symbol_id_to_decl_index,
             body_spans,
         }
+    }
+
+    fn extract_contract(
+        file: &ast::SourceFile,
+        contract: ast::Contract<'_>,
+    ) -> Option<IndexedContract> {
+        let source = file.source.as_ref();
+        let name = contract.name()?;
+        let fields = contract
+            .body()
+            .into_iter()
+            .flat_map(|body| body.fields())
+            .filter_map(|field| {
+                let name = field.name()?;
+                Some(IndexedContractField {
+                    name: Arc::from(name.text(source)),
+                    value: Arc::from(field.value().map_or("", |value| value.text(source))),
+                    name_span: name.span(),
+                    body_span: field.span(),
+                    doc: extract_field_documentation(field.syntax(), source),
+                })
+            })
+            .collect();
+
+        Some(IndexedContract {
+            name: Arc::from(name.text(source)),
+            name_span: name.span(),
+            body_span: contract.span(),
+            doc: extract_preceding_documentation(contract.syntax(), source),
+            fields,
+        })
     }
 
     fn extract_type_parameters<'a, Node: HasGenericParams<'a>>(
@@ -641,12 +806,28 @@ impl FileIndex {
                         let name_ident = p.name()?;
                         Some(TypeParameter {
                             name: Arc::from(name_ident.text(&file.source)),
+                            span: name_ident.span(),
                         })
                     })
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default()
             .into_iter()
+            .collect()
+    }
+
+    fn extract_parameters<'a, Node: FunctionLike<'a>>(
+        file: &ast::SourceFile,
+        decl: Node,
+    ) -> Vec<Parameter> {
+        decl.parameters()
+            .filter_map(|parameter| {
+                let name = parameter.name()?;
+                Some(Parameter {
+                    name: Arc::from(name.text(&file.source)),
+                    is_mutate: parameter.mutate(),
+                })
+            })
             .collect()
     }
 
@@ -667,4 +848,73 @@ impl FileIndex {
             })
         })
     }
+}
+
+fn extract_preceding_documentation(node: Node<'_>, source: &str) -> Arc<str> {
+    let mut comments = Vec::new();
+    let mut sibling = node.prev_named_sibling();
+    let mut boundary = node.start_byte();
+    while let Some(comment) = sibling {
+        if comment.kind() != "comment" {
+            break;
+        }
+        if comment.prev_named_sibling().is_some_and(|previous| {
+            previous.kind() != "comment"
+                && previous.end_position().row == comment.start_position().row
+        }) {
+            break;
+        }
+        let Some(gap) = source.get(comment.end_byte()..boundary) else {
+            break;
+        };
+        if gap.matches('\n').count() > 1 {
+            break;
+        }
+        comments.push(clean_comment(comment.text(source)));
+        boundary = comment.start_byte();
+        sibling = comment.prev_named_sibling();
+    }
+    comments.reverse();
+    Arc::from(comments.join("\n"))
+}
+
+fn extract_field_documentation(node: Node<'_>, source: &str) -> Arc<str> {
+    let preceding = extract_preceding_documentation(node, source);
+    if !preceding.is_empty() {
+        return preceding;
+    }
+
+    let Some(comment) = node.next_named_sibling() else {
+        return preceding;
+    };
+    if comment.kind() != "comment" || comment.start_position().row != node.end_position().row {
+        return preceding;
+    }
+
+    Arc::from(clean_comment(comment.text(source)))
+}
+
+fn symbols_have_same_global_identity(left: &[Symbol], right: &[Symbol]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.id == right.id
+                && left.name == right.name
+                && left.fqn == right.fqn
+                && matches!(left.kind, SymbolKind::Method { .. })
+                    == matches!(right.kind, SymbolKind::Method { .. })
+                && symbols_have_same_global_identity(left.nested_symbols(), right.nested_symbols())
+        })
+}
+
+impl Symbol {
+    const fn is_name_resolution_export(&self) -> bool {
+        !matches!(
+            self.kind,
+            SymbolKind::Method { .. } | SymbolKind::StructField | SymbolKind::EnumMember
+        )
+    }
+}
+
+fn is_stable_absolute_path(path: &Path) -> bool {
+    path.is_absolute() || path.to_string_lossy().starts_with('/')
 }

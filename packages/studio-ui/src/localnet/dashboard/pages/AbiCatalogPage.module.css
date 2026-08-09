@@ -1,0 +1,27 @@
+.page {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hero {
+  display: flex;
+  padding: 4px 0 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 40px;
+}
+
+@media (max-width: 720px) {
+  .title {
+    font-size: var(--acton-font-size-2xl);
+    line-height: 1.2;
+  }
+}

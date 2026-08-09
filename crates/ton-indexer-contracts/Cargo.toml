@@ -1,0 +1,33 @@
+[package]
+name = "ton-indexer-contracts"
+description = "TON smart-contract detection and data decoding"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ton-executor = { workspace = true }
+tvm-ffi = { workspace = true, features = ["derive"] }
+tycho-types = { workspace = true }
+base64 = { workspace = true }
+anyhow = { workspace = true }
+crc = { workspace = true }
+num-bigint = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
+
+[lints]
+workspace = true
+
+[lib]
+test = false
+doctest = false

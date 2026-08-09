@@ -83,7 +83,7 @@ Use a secure native store for mnemonic storage when available.
 {{/option}}
 
 {{#option "`--airdrop`" }}
-Request testnet TON after wallet creation.
+Request testnet GRAM after wallet creation.
 {{/option}}
 
 {{#option "`--faucet-url` _url_" }}
@@ -330,7 +330,8 @@ For `wallet airdrop`, the selected backend depends on `--net`.
 
 - `testnet` requests a PoW challenge from the faucet, solves it locally, and
   submits a claim
-- `localnet` sends a fixed faucet transfer through Localnet
+- `localnet` sends a fixed faucet transfer through Localnet and waits until the
+  wallet balance includes the credited amount
 
 After a successful interactive testnet `wallet airdrop`, Acton briefly waits
 for the balance to appear and lets you skip that wait by pressing `Enter`,

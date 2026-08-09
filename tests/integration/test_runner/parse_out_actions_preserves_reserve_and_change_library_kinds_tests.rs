@@ -30,8 +30,8 @@ fn parse_out_actions_preserves_reserve_and_change_library_kinds() {
         "cj-stdlib-parse-out-actions-preserves-kinds",
         r#"
 get fun `test cj parse out actions preserves kinds`() {
-    reserveToncoinsOnBalance(
-        ton("0.05"),
+    reserveGramsOnBalance(
+        grams("0.05"),
         RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL
     );
     changeLib(beginCell().storeUint(0xAB, 8).endCell(), 2);
@@ -53,12 +53,12 @@ get fun `test cj parse out actions preserves kinds`() {
 }
 
 #[test]
-fn parse_out_actions_reserve_nanoton_is_misparsed_as_change_library_bug() {
+fn parse_out_actions_reserve_nanogram_is_misparsed_as_change_library_bug() {
     run_success(
-        "cj-stdlib-parse-out-actions-reserve-one-nanoton-kind-bug",
+        "cj-stdlib-parse-out-actions-reserve-one-nanogram-kind-bug",
         r#"
-get fun `test cj parse out actions reserve one nanoton kind bug`() {
-    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+get fun `test cj parse out actions reserve one nanogram kind bug`() {
+    reserveGramsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = testing.outActions();
     expect(parsed.size()).toEqual(1);
@@ -66,24 +66,24 @@ get fun `test cj parse out actions reserve one nanoton kind bug`() {
     expect(parsed.at(0).kind()).toEqual("reserve-currency");
 }
 "#,
-        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_nanoton_is_misparsed_as_change_library_bug.stdout.txt",
+        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_nanogram_is_misparsed_as_change_library_bug.stdout.txt",
     );
 }
 
 #[test]
-fn parse_out_actions_reserve_zero_nanoton_stays_reserve_currency() {
+fn parse_out_actions_reserve_zero_nanogram_stays_reserve_currency() {
     run_success(
-        "cj-stdlib-parse-out-actions-reserve-zero-nanoton-kind",
+        "cj-stdlib-parse-out-actions-reserve-zero-nanogram-kind",
         r#"
-get fun `test cj parse out actions reserve zero nanoton kind`() {
-    reserveToncoinsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+get fun `test cj parse out actions reserve zero nanogram kind`() {
+    reserveGramsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = testing.outActions();
     expect(parsed.size()).toEqual(1);
     expect(parsed.at(0).kind()).toEqual("reserve-currency");
 }
 "#,
-        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_zero_nanoton_stays_reserve_currency.stdout.txt",
+        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_zero_nanogram_stays_reserve_currency.stdout.txt",
     );
 }
 
@@ -113,7 +113,7 @@ get fun `test cj parse out actions single send message`() {
     val dest = randomAddress("cj_single_send_dest");
     createMessage({
         bounce: false,
-        value: ton("0.2"),
+        value: grams("0.2"),
         dest,
         body: beginCell().storeUint(0xC7000011, 32).endCell().beginParse(),
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -136,8 +136,8 @@ fn parse_out_actions_reserve_zero_and_one_preserve_kind_and_amount() {
         "cj-stdlib-parse-out-actions-reserve-zero-and-one",
         r#"
 get fun `test cj parse out actions reserve zero and one`() {
-    reserveToncoinsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = testing.outActions();
     expect(parsed.size()).toEqual(2);
@@ -168,11 +168,11 @@ fn parse_out_actions_mixed_action_chain_preserves_order_and_types() {
 get fun `test cj parse out actions mixed chain`() {
     val dest = randomAddress("cj_mixed_chain_dest");
 
-    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
     contract.setCodePostponed(beginCell().storeUint(0xB2, 8).endCell());
     createMessage({
         bounce: false,
-        value: ton("0.3"),
+        value: grams("0.3"),
         dest,
         body: beginCell().storeUint(0xC7000022, 32).endCell().beginParse(),
     }).send(SEND_MODE_REGULAR);

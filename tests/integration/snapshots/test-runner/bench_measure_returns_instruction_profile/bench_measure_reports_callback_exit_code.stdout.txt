@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/bench_measure_exit_code.test.tolk (1 test)
+  ✗ bench measure reports callback [EXIT_STATUS] [TIME]
+    └─ Error: bench.measure at [ROOT]/tests/bench_measure_exit_code.test[LINE]: measured callback exited with [EXIT_STATUS] 123
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

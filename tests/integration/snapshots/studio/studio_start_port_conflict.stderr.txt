@@ -1,0 +1,6 @@
+Error: Failed to start Acton Studio on [LOCALHOST_ADDR]
+Set another port with --port
+Or stop the process currently listening on that port
+
+Caused by:
+  Address already in use ([OS_ERROR])

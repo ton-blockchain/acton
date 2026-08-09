@@ -1,4 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
+use crate::context::is_treasury_code;
 use crate::context::{
     BuildCache, CompilationResult, Emulations, FailedSendMessageResult, KnownAddresses, to_cell,
 };
@@ -10,16 +11,19 @@ use std::path::Path;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceLocation;
+use ton_emulator::SendMessageResultSuccess;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
-use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
-use xxhash_rust::xxh3::xxh3_64;
+use tycho_types::models::AccountStatus;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TestTrace {
     pub name: Arc<str>,
     pub pos: Pos,
     pub traces: Vec<TransactionList>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub skipped_traces_count: usize,
     pub contracts: Vec<String>,
     pub wallets: BTreeMap<String, String>, // Address -> Name
 }
@@ -27,6 +31,8 @@ pub(super) struct TestTrace {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TransactionList {
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_treasury_deploy: bool,
     pub transactions: Vec<TransactionInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failed_messages: Vec<FailedMessageInfo>,
@@ -75,6 +81,28 @@ pub(super) fn trace_file_name(test_name: &str) -> String {
     format!("{stem}_trace.json")
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn is_treasury_deploy_trace(trace_transactions: &[SendMessageResultSuccess]) -> bool {
+    let Some(root) = trace_transactions.first() else {
+        return false;
+    };
+
+    matches!(
+        root.transaction.orig_status,
+        AccountStatus::NotExists | AccountStatus::Uninit
+    ) && root.transaction.end_status == AccountStatus::Active
+        && root.code.as_ref().is_some_and(is_treasury_code)
+}
+
 fn safe_file_stem(name: &str, fallback: &str) -> String {
     let mut stem = String::with_capacity(name.len());
     for ch in name.chars() {
@@ -94,23 +122,17 @@ fn safe_file_stem(name: &str, fallback: &str) -> String {
 }
 
 pub(super) fn contract_file_name(contract_name: &str) -> String {
-    let stem = safe_file_stem(contract_name, "contract");
-    if stem == contract_name {
-        return format!("{stem}.json");
-    }
-
-    let suffix = xxh3_64(contract_name.as_bytes());
-    format!("{stem}-{suffix:016x}.json")
+    acton_studio::test_contract_artifact_file_name(contract_name)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExecutorActionFailureReasonInfo {
-    NotEnoughToncoinToSend {
+    NotEnoughGramsToSend {
         remaining_balance: String,
         required: String,
     },
-    CannotReserveToncoin {
+    CannotReserveGrams {
         requested: String,
         available: String,
     },
@@ -235,17 +257,17 @@ fn executor_action_info(
 #[must_use]
 fn convert_failure_reason(reason: ExecutedActionFailureReason) -> ExecutorActionFailureReasonInfo {
     match reason {
-        ExecutedActionFailureReason::NotEnoughToncoinToSend {
+        ExecutedActionFailureReason::NotEnoughGramsToSend {
             remaining_balance,
             required,
-        } => ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend {
+        } => ExecutorActionFailureReasonInfo::NotEnoughGramsToSend {
             remaining_balance: remaining_balance.to_string(),
             required: required.to_string(),
         },
-        ExecutedActionFailureReason::CannotReserveToncoin {
+        ExecutedActionFailureReason::CannotReserveGrams {
             requested,
             available,
-        } => ExecutorActionFailureReasonInfo::CannotReserveToncoin {
+        } => ExecutorActionFailureReasonInfo::CannotReserveGrams {
             requested: requested.to_string(),
             available: available.to_string(),
         },
@@ -270,11 +292,19 @@ pub(super) fn dump_test_transactions(
     output_dir: &str,
 ) -> anyhow::Result<()> {
     let mut known_contracts = BTreeMap::new();
+    let skipped_traces_count = txs
+        .messages
+        .iter()
+        .filter(|trace_transactions| txs.is_trace_hidden_from_ui(trace_transactions))
+        .count();
+
     let traces = txs
         .messages
         .iter()
         .enumerate()
-        .map(|(trace_index, trace_transactions)| {
+        .filter(|(_, trace_transactions)| !txs.is_trace_hidden_from_ui(trace_transactions))
+        .enumerate()
+        .map(|(visible_trace_index, (trace_index, trace_transactions))| {
             let transactions = trace_transactions
                 .iter()
                 .map(|tx| {
@@ -315,12 +345,15 @@ pub(super) fn dump_test_transactions(
                 },
             );
 
-            let name = txs
-                .trace_name(trace_transactions)
-                .map_or_else(|| format!("Trace {}", trace_index + 1), ToString::to_string);
+            let name = txs.trace_name(trace_transactions).map_or_else(
+                || format!("Trace {}", visible_trace_index + 1),
+                ToString::to_string,
+            );
+            let is_treasury_deploy = is_treasury_deploy_trace(trace_transactions);
 
             TransactionList {
                 name,
+                is_treasury_deploy,
                 transactions,
                 failed_messages,
             }
@@ -343,6 +376,7 @@ pub(super) fn dump_test_transactions(
         name: test.name.clone(),
         pos: test.pos.clone(),
         traces,
+        skipped_traces_count,
         contracts: known_contracts.keys().cloned().collect(),
         wallets,
     };
@@ -424,9 +458,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::SendMessage {
                 failure_code: Some(37),
-                failure_reason: Some(
-                    ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend { .. }
-                ),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::NotEnoughGramsToSend { .. }),
                 location: None,
                 ..
             }
@@ -460,7 +492,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::ReserveCurrency {
                 failure_code: Some(37),
-                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveToncoin { .. }),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveGrams { .. }),
                 location: None,
                 ..
             }

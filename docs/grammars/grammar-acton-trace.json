@@ -88,7 +88,7 @@
           "name": "keyword.control.acton-trace"
         },
         {
-          "match": "(?:empty|0x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9_]*)(?=\\s+\\d+(?:\\.\\d+)?\\s+TON\\s+->)",
+          "match": "(?:empty|0x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9_]*)(?=\\s+\\d+(?:\\.\\d+)?\\s+GRAM\\s+->)",
           "name": "keyword.control.acton-trace"
         }
       ]
@@ -96,7 +96,7 @@
     "amounts": {
       "patterns": [
         {
-          "match": "\\b\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "match": "\\b\\d+(?:\\.\\d+)?\\s+GRAM\\b",
           "name": "string.unquoted.acton-trace"
         }
       ]
@@ -160,7 +160,7 @@
     "actions": {
       "patterns": [
         {
-          "match": "\\bbalance:\\s+\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "match": "\\bbalance:\\s+\\d+(?:\\.\\d+)?\\s+GRAM\\b",
           "name": "string.unquoted.acton-trace"
         },
         {

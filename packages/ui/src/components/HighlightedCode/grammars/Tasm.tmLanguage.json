@@ -1,0 +1,200 @@
+{
+  "name": "tasm",
+  "displayName": "TASM",
+  "scopeName": "source.tasm",
+  "fileTypes": ["tasm"],
+  "foldingStartMarker": "\\{\\s*$",
+  "foldingStopMarker": "^\\s*\\}",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#keyword"
+    },
+    {
+      "include": "#instruction"
+    },
+    {
+      "include": "#literal"
+    },
+    {
+      "include": "#register"
+    },
+    {
+      "include": "#code_block"
+    },
+    {
+      "include": "#dictionary"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.tasm",
+          "begin": "//",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.tasm"
+            }
+          },
+          "end": "$"
+        }
+      ]
+    },
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.other.ref.tasm",
+          "match": "\\b(ref)(?!\\w)"
+        },
+        {
+          "name": "keyword.other.embed.tasm",
+          "match": "\\b(embed)(?!\\w)"
+        },
+        {
+          "name": "keyword.other.exotic.tasm",
+          "match": "\\b(exotic)(?!\\w)"
+        },
+        {
+          "name": "keyword.other.library.tasm",
+          "match": "\\b(library)(?!\\w)"
+        }
+      ]
+    },
+    "instruction": {
+      "patterns": [
+        {
+          "match": "\\b([A-Z_][A-Z0-9_]*)\\b",
+          "name": "keyword.control.instruction.tasm"
+        }
+      ]
+    },
+    "literal": {
+      "patterns": [
+        {
+          "comment": "Hexadecimal integer literal (0x...)",
+          "match": "\\b(0[xX][a-fA-F0-9](?:_?[a-fA-F0-9])*)\\b",
+          "name": "constant.numeric.hex.tasm"
+        },
+        {
+          "comment": "Binary integer literal (0b...)",
+          "match": "\\b(0[bB][01](?:_?[01])*)\\b",
+          "name": "constant.numeric.binary.tasm"
+        },
+        {
+          "comment": "Octal integer literal (0o...)",
+          "match": "\\b(0[oO][0-7](?:_?[0-7])*)\\b",
+          "name": "constant.numeric.octal.tasm"
+        },
+        {
+          "comment": "Decimal integer literal",
+          "match": "\\b(-?(?:[0-9](?:_?[0-9])*))\\b",
+          "name": "constant.numeric.decimal.tasm"
+        },
+        {
+          "comment": "Hex data literal (x{...})",
+          "match": "x\\{[a-fA-F0-9_]*\\}",
+          "name": "constant.other.hex.tasm"
+        },
+        {
+          "comment": "Binary data literal (b{...})",
+          "match": "b\\{[01_]*\\}",
+          "name": "constant.other.binary.tasm"
+        },
+        {
+          "comment": "BOC data literal (boc{...})",
+          "match": "boc\\{[a-fA-F0-9_]*\\}",
+          "name": "constant.other.boc.tasm"
+        },
+        {
+          "comment": "String literal",
+          "begin": "\"",
+          "beginCaptures": {
+            "0": {"name": "punctuation.definition.string.begin.tasm"}
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {"name": "punctuation.definition.string.end.tasm"}
+          },
+          "name": "string.quoted.double.tasm",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.tasm"
+            }
+          ]
+        }
+      ]
+    },
+    "register": {
+      "patterns": [
+        {
+          "comment": "Stack registers (s0, s-1, etc.)",
+          "match": "\\b(s-?[0-9]+)\\b",
+          "name": "variable.parameter.register.stack.tasm"
+        },
+        {
+          "comment": "Control registers (c0, c4, etc.)",
+          "match": "\\b(c[0-9]+)\\b",
+          "name": "variable.parameter.register.control.tasm"
+        }
+      ]
+    },
+    "code_block": {
+      "comment": "Code blocks { ... }",
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {"name": "punctuation.section.code.begin.tasm"}
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {"name": "punctuation.section.code.end.tasm"}
+      },
+      "name": "meta.code-block.tasm",
+      "patterns": [{"include": "$self"}]
+    },
+    "dictionary": {
+      "comment": "Dictionaries [ ... ]",
+      "begin": "\\[",
+      "beginCaptures": {
+        "0": {"name": "punctuation.section.dictionary.begin.tasm"}
+      },
+      "end": "\\]",
+      "endCaptures": {
+        "0": {"name": "punctuation.section.dictionary.end.tasm"}
+      },
+      "name": "meta.dictionary.tasm",
+      "patterns": [
+        {
+          "comment": "Dictionary key-value separator =>",
+          "match": "=>",
+          "name": "keyword.operator.mapsto.tasm"
+        },
+        {"include": "#literal"},
+        {"include": "#code_block"},
+        {"include": "#punctuation"}
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": ",",
+          "name": "punctuation.comma.tasm"
+        },
+        {
+          "match": ";",
+          "name": "punctuation.semi.tasm"
+        },
+        {
+          "match": ":",
+          "name": "punctuation.colon.tasm"
+        }
+      ]
+    }
+  }
+}

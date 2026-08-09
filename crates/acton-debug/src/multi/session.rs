@@ -3,8 +3,8 @@
 
 use crate::DebugExecutorHandle;
 use std::sync::Arc;
-use tolk_compiler::SourceMap;
-use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceMap;
+use tolk_source_map::abi::ContractABI;
 
 #[derive(Clone)]
 pub struct ChildDebugContextSpec {

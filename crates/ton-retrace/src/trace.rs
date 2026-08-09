@@ -183,7 +183,7 @@ impl InstalledSendMessageAction {
 pub struct InstalledReserveAction {
     /// Reservation mode.
     pub mode: i32,
-    /// Amount of nanoton to reserve.
+    /// Amount of nanograms to reserve.
     pub amount: BigInt,
     /// Hash of the code cell where the instruction was executed.
     pub loc_hash: String,
@@ -228,15 +228,15 @@ pub struct InstalledChangeLibraryAction {
 /// These are extracted from the executor logs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecutedActionFailureReason {
-    /// Send message failed because there were not enough funds to cover transfer + forwarding fees.
-    NotEnoughToncoinToSend {
+    /// Send message failed because there was not enough GRAM to cover transfer + forwarding fees.
+    NotEnoughGramsToSend {
         /// Remaining account balance when processing the action.
         remaining_balance: BigInt,
         /// Required amount including forwarding fees.
         required: BigInt,
     },
     /// Reserve action failed because requested amount exceeds available balance.
-    CannotReserveToncoin {
+    CannotReserveGrams {
         /// Requested reserve amount.
         requested: BigInt,
         /// Available balance at reservation time.
@@ -423,6 +423,8 @@ impl Trace {
         start_gas: Option<usize>,
     ) -> Trace {
         let start_gas = start_gas.unwrap_or(1_000_000);
+        let mut gas_base = start_gas;
+        let mut gas_consumed = 0usize;
         let mut gas_remaining = start_gas;
 
         let mut steps = Vec::<TraceStep>::new();
@@ -451,7 +453,9 @@ impl Trace {
                 }
                 VmLine::VmGasRemaining { gas } => {
                     let new_gas = gas.parse::<usize>().unwrap_or(gas_remaining);
-                    let gas_cost = gas_remaining.saturating_sub(new_gas);
+                    let new_gas_consumed = gas_base.saturating_sub(new_gas);
+                    let gas_cost = new_gas_consumed.saturating_sub(gas_consumed);
+                    gas_consumed = new_gas_consumed;
                     gas_remaining = new_gas;
 
                     let instr = current_instr.take().unwrap_or_default();
@@ -499,7 +503,10 @@ impl Trace {
                     steps.push(TraceStep::FinalC5 { cell });
                 }
                 VmLine::VmLimitChanged { limit } => {
-                    gas_remaining = limit.parse().unwrap_or(gas_remaining);
+                    if let Ok(new_limit) = limit.parse::<usize>() {
+                        gas_base = new_limit;
+                        gas_remaining = gas_base.saturating_sub(gas_consumed);
+                    }
                 }
                 VmLine::VmUnknown { .. } => {}
             }
@@ -856,7 +863,7 @@ impl ExecutedActions {
                         && matches!(action, ExecutedAction::SendMessage { .. })
                     {
                         action.set_failure_reason(
-                            ExecutedActionFailureReason::NotEnoughToncoinToSend {
+                            ExecutedActionFailureReason::NotEnoughGramsToSend {
                                 remaining_balance: remaining_balance
                                     .parse::<BigInt>()
                                     .unwrap_or(BigInt::ZERO),
@@ -873,7 +880,7 @@ impl ExecutedActions {
                         && matches!(action, ExecutedAction::ReserveCurrency { .. })
                     {
                         action.set_failure_reason(
-                            ExecutedActionFailureReason::CannotReserveToncoin {
+                            ExecutedActionFailureReason::CannotReserveGrams {
                                 requested: requested.parse::<BigInt>().unwrap_or(BigInt::ZERO),
                                 available: available.parse::<BigInt>().unwrap_or(BigInt::ZERO),
                             },
@@ -1043,6 +1050,33 @@ gas remaining: 997
         let mismatched = ExecutedActions::from(&mismatched_executor_logs);
         assert!(!actions.actions[1].matches_executed_action(&mismatched.actions[0]));
     }
+
+    #[test]
+    fn gas_cost_preserves_consumed_gas_when_limit_changes() {
+        let logs = r"
+stack: [ ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 0
+execute DROP
+gas remaining: 90
+stack: [ ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 1
+execute ACCEPT
+changing gas limit to 1000
+gas remaining: 980
+        ";
+
+        let trace = Trace::new(logs, Some(100));
+        let gas_costs = trace
+            .steps
+            .iter()
+            .filter_map(|step| match step {
+                TraceStep::Execute { gas, .. } => Some(*gas),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(gas_costs, vec![10, 10]);
+    }
 }
 
 #[cfg(all(test, feature = "only_ci"))]
@@ -1209,7 +1243,7 @@ execute FOO
             assert_eq!(failure_code, &Some(37));
             assert_eq!(
                 failure_reason.as_ref(),
-                Some(&ExecutedActionFailureReason::NotEnoughToncoinToSend {
+                Some(&ExecutedActionFailureReason::NotEnoughGramsToSend {
                     remaining_balance: BigInt::from(997_209_600u64),
                     required: BigInt::from(1_000_000_400_000u64),
                 })
@@ -1284,7 +1318,7 @@ execute FOO
             assert_eq!(failure_code, &Some(37));
             assert_eq!(
                 failure_reason.as_ref(),
-                Some(&ExecutedActionFailureReason::CannotReserveToncoin {
+                Some(&ExecutedActionFailureReason::CannotReserveGrams {
                     requested: BigInt::from(1_000_000_000_000u64),
                     available: BigInt::from(1_088_500_000u64),
                 })

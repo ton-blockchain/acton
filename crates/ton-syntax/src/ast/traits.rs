@@ -40,6 +40,20 @@ pub trait AstNode<'tree>: TryFromNode<'tree> + Clone {
     /// Returns the underlying tree-sitter node.
     fn syntax(&self) -> tree_sitter::Node<'tree>;
 
+    /// Returns this node or its nearest ancestor that can be converted to `N`.
+    fn ancestor_as<N>(&self) -> Option<N>
+    where
+        N: TryFromNode<'tree>,
+    {
+        let mut node = self.syntax();
+        loop {
+            if let Ok(typed) = N::try_from_node(node) {
+                return Some(typed);
+            }
+            node = node.parent()?;
+        }
+    }
+
     /// Returns the source text associated with this AST node.
     fn text<'a>(&self, source: &'a str) -> &'a str {
         self.syntax()

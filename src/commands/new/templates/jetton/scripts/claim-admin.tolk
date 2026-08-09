@@ -11,7 +11,7 @@ fun main() {
     val res = minter.sendClaimMinterAdmin(
         claimer.address,
         0,
-        { bounce: false, value: ton("0.05") },
+        { bounce: false, value: grams("0.05") },
     );
     println(res.waitForTrace());
 

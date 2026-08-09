@@ -1,0 +1,206 @@
+.container {
+  --trace-line-height: 20px;
+  --trace-line-number-width: 47px;
+  --trace-scrollbar-thumb: rgb(100 100 100 / 24%);
+  --trace-scrollbar-thumb-active: rgb(100 100 100 / 40%);
+  --trace-scrollbar-thumb-hover: rgb(100 100 100 / 50%);
+
+  flex: 1;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  background-color: var(--trace-editor-background);
+  scrollbar-color: var(--trace-scrollbar-thumb) transparent;
+  scrollbar-width: auto;
+}
+
+.container::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.container::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--trace-scrollbar-thumb);
+  transition: background-color 160ms ease;
+}
+
+.container:hover::-webkit-scrollbar-thumb,
+.container:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--trace-scrollbar-thumb-active);
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--trace-scrollbar-thumb-hover);
+}
+
+.container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.stepItem {
+  position: relative;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  min-height: var(--trace-line-height);
+  display: grid;
+  grid-template-columns: var(--trace-line-number-width) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0;
+  text-align: left;
+  color: var(--trace-editor-text);
+  font-family: "JetBrains Mono", var(--acton-font-mono), monospace;
+  font-size: 13.5px;
+  line-height: var(--trace-line-height);
+  cursor: pointer;
+  transition: background-color var(--acton-duration-fast) ease;
+}
+
+.stepItem:hover {
+  background-color: transparent;
+}
+
+.stepItem:hover::before {
+  position: absolute;
+  inset: 0 0 0 var(--trace-line-number-width);
+  content: "";
+  background-color: var(--editor-clickable-line-bg);
+  pointer-events: none;
+}
+
+.stepItem:focus-visible {
+  outline: 2px solid var(--acton-color-accent);
+  outline-offset: 2px;
+}
+
+.stepItemActive {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.stepItemActive::before,
+.stepItemActive:hover::before {
+  position: absolute;
+  inset: 0 0 0 var(--trace-line-number-width);
+  content: "";
+  background-color: var(--color-highlight-bg);
+  pointer-events: none;
+}
+
+.stepItem > * {
+  position: relative;
+  z-index: 1;
+}
+
+.stepIndex {
+  min-width: 0;
+  padding: 0 22px 0 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--trace-editor-line-number);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--trace-line-height);
+  text-align: right;
+}
+
+.stepItemActive .stepIndex {
+  color: var(--trace-editor-active-line-number);
+}
+
+.stepName {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--syntax-keyword);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stepNameImplicitRet {
+  color: var(--color-warning-text);
+}
+
+.stepInstruction {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 8px;
+  overflow: hidden;
+  line-height: var(--trace-line-height);
+}
+
+.stepArgs {
+  display: block;
+  font-family: inherit;
+  font-size: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepArgText {
+  color: var(--trace-editor-text);
+}
+
+.stepArgSeparator {
+  color: var(--trace-editor-text);
+}
+
+.stepArgStackRegister {
+  color: var(--syntax-number);
+}
+
+.stepArgControlRegister {
+  color: var(--syntax-number);
+}
+
+.stepArgHexBlob {
+  color: var(--syntax-number);
+  font-style: italic;
+}
+
+.stepArgNumber {
+  color: var(--syntax-number);
+}
+
+.stepArgImplicitRet {
+  color: var(--color-warning-text);
+}
+
+.stepGas {
+  color: var(--trace-editor-line-number);
+  padding-right: 10px;
+  padding-left: 16px;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: var(--trace-line-height);
+  white-space: nowrap;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--acton-color-text-muted);
+  padding: var(--acton-space-4);
+  background-color: var(--acton-color-surface-raised);
+}

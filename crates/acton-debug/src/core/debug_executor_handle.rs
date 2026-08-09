@@ -3,6 +3,7 @@
 //! runtime registers are visible", regardless of whether the boundary came from
 //! `send_message` or `run_get_method`.
 
+use super::replayer::RuntimeDebugSnapshot;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::message::step::StepExecutor;
 use tvm_ffi::serde::parse_tuple_item;
@@ -21,15 +22,6 @@ pub struct DebugExecutorSnapshot {
     /// Raw code position + stack snapshot used to synthesize replayer events.
     pub code_position: Option<DebugCodePosition>,
     pub stack_values: Option<Vec<VmStackValue>>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct RuntimeDebugSnapshot {
-    /// Values exposed under the DAP "Registers" scope for live runtimes.
-    pub stack_values: Vec<VmStackValue>,
-    pub c4: Option<VmStackValue>,
-    pub c5: Option<VmStackValue>,
-    pub c7: Option<VmStackValue>,
 }
 
 /// Small sum-type wrapper over the live step executors we can debug through the replayer.

@@ -1,5 +1,6 @@
 use crate::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use anyhow::{Result, anyhow};
 use path_absolutize::Absolutize;
@@ -11,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 pub use ton_networks::{CustomNetworkUrls, Network};
+
+pub const MAINNET_GLOBAL_ID: i32 = -239;
+pub const TESTNET_GLOBAL_ID: i32 = -3;
 
 static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
 static PROJECT_ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -52,8 +56,10 @@ pub struct ResolvedPathsDiagnostics {
     pub manifest_path_source: ResolutionSource,
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, Default, Eq, PartialEq)]
 pub enum Explorer {
+    #[default]
+    Actonscan,
     Tonscan,
     Toncx,
     Dton,
@@ -116,10 +122,10 @@ pub enum ContractDependency {
 #[serde(deny_unknown_fields)]
 pub struct CustomNetworkApiConfig {
     /// The URL for the `TonCenter` API v2. For localnet this defaults to
-    /// `http://localhost:<localnet.port>/api/v2` with `5411` as the fallback port
+    /// `http://127.0.0.1:<localnet.port>/api/v2` with `5411` as the fallback port
     pub v2: Option<String>,
     /// The URL for the `TonCenter` API v3. For localnet this defaults to
-    /// `http://localhost:<localnet.port>/api/v3` with `5411` as the fallback port
+    /// `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port
     pub v3: Option<String>,
 }
 
@@ -127,6 +133,11 @@ pub struct CustomNetworkApiConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CustomNetworkConfig {
+    /// TON network global ID used to derive Wallet V5 IDs. Custom networks
+    /// default to the testnet value (`-3`)
+    #[serde(rename = "global-id")]
+    #[schemars(rename = "global-id")]
+    pub global_id: Option<i32>,
     /// Base URL used to build transaction links for this network. Acton appends
     /// `/tx/<hash>` automatically and derives links from `api.v2` when omitted
     pub explorer: Option<String>,
@@ -294,6 +305,13 @@ pub struct TestSettings {
     pub coverage: Option<TestCoverageSettings>,
     /// Default fuzz settings for parameterized tests
     pub fuzz: Option<TestFuzzSettings>,
+    /// Output path for gas-weighted execution profiling
+    pub gas_profile: Option<String>,
+    /// Export format for gas-weighted execution profiling
+    #[schemars(with = "Option<GasProfileFormat>")]
+    pub gas_profile_format: Option<String>,
+    /// Include `.test.tolk` unit-test execution in the generated gas profile
+    pub gas_profile_include_tests: Option<bool>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
@@ -313,6 +331,8 @@ pub struct TestSettings {
     pub fail_fast: Option<bool>,
     /// Exit with a non-zero code when profiling differs from baseline
     pub fail_on_diff: Option<bool>,
+    /// Send test run data to Acton Studio when it is available
+    pub studio_reporting: Option<bool>,
     /// Enable the test UI server
     pub ui: Option<bool>,
     /// Port for the test UI server
@@ -445,6 +465,8 @@ pub struct BuildSettings {
     pub output_abi: Option<String>,
     /// Directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
+    /// Directory where per-contract source registration artifacts are saved
+    pub output_sources: Option<String>,
 }
 
 /// Default settings for wrapper generation
@@ -483,6 +505,8 @@ pub struct LocalnetSettings {
     /// Localnet port used by `acton localnet` commands
     #[schemars(default = "default_localnet_port", range(max = 65535))]
     pub port: Option<u16>,
+    /// Path to an `SQLite` database used by `acton localnet start` for persistent node state
+    pub db_path: Option<String>,
     /// Network to fork from used by `acton localnet start`
     #[schemars(with = "Option<Network>")]
     pub fork_net: Option<String>,
@@ -493,6 +517,15 @@ pub struct LocalnetSettings {
     pub accounts: Option<Vec<String>>,
     /// Maximum number of API requests per second served by `Localnet` `/api` endpoints
     pub rate_limit: Option<u32>,
+    /// Response delay in milliseconds for `Localnet` `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints
+    pub response_delay_ms: Option<u64>,
+    /// Block production interval in milliseconds for `acton localnet start`
+    #[schemars(range(min = 1))]
+    pub block_interval_ms: Option<u64>,
+    /// Disable automatic block production for `acton localnet start`
+    pub no_mining: Option<bool>,
+    /// Mine blocks even when there are no pending messages
+    pub mine_empty_blocks: Option<bool>,
 }
 
 const fn default_localnet_port() -> Option<u16> {
@@ -603,10 +636,14 @@ pub struct ContractConfig {
     pub name: Option<String>,
     /// Path to the contract source (`.tolk`) or precompiled (`.boc`) file
     pub src: String,
+    /// Optional Tolk interface file used to produce ABI for precompiled `.boc` contracts
+    pub types: Option<String>,
     /// Dependencies of this contract
     pub depends: Option<Vec<ContractDependency>>,
     /// Path where the compiled `.boc` should be saved
     pub output: Option<String>,
+    /// Wrapper settings that override the project-level `[wrappers]` defaults for this contract
+    pub wrappers: Option<WrappersConfig>,
 }
 
 impl Default for ActonConfig {
@@ -713,6 +750,20 @@ impl ContractConfig {
             Ok(path) => path.into_owned(),
             Err(_) => Path::new(self.src.as_str()).to_path_buf(),
         }
+    }
+
+    /// Returns the optional contract interface file resolved relative to the project root.
+    /// If `types` is already absolute, it is returned as-is.
+    #[must_use]
+    pub fn absolute_types_path(&self, project_root: &Path) -> Option<PathBuf> {
+        let types = self
+            .types
+            .as_deref()
+            .filter(|types| !types.trim().is_empty())?;
+        Some(match Path::new(types).absolutize_from(project_root) {
+            Ok(path) => path.into_owned(),
+            Err(_) => Path::new(types).to_path_buf(),
+        })
     }
 }
 
@@ -885,8 +936,8 @@ impl ActonConfig {
             .as_ref()
             .and_then(|cfg| cfg.port)
             .unwrap_or(5411);
-        let default_localnet_v2 = format!("http://localhost:{localnet_port}/api/v2");
-        let default_localnet_v3 = format!("http://localhost:{localnet_port}/api/v3");
+        let default_localnet_v2 = format!("http://127.0.0.1:{localnet_port}/api/v2");
+        let default_localnet_v3 = format!("http://127.0.0.1:{localnet_port}/api/v3");
 
         let localnet_config = self
             .networks
@@ -945,6 +996,20 @@ impl ActonConfig {
             }
         }
         result
+    }
+
+    #[must_use]
+    pub fn network_global_id(&self, network: &Network) -> i32 {
+        match network {
+            Network::Mainnet => MAINNET_GLOBAL_ID,
+            Network::Testnet | Network::Localnet => TESTNET_GLOBAL_ID,
+            Network::Custom(name) => self
+                .networks
+                .as_ref()
+                .and_then(|networks| networks.get(name.as_ref()))
+                .and_then(|network| network.global_id)
+                .unwrap_or(TESTNET_GLOBAL_ID),
+        }
     }
 
     #[must_use]
@@ -1243,8 +1308,12 @@ impl TestSettings {
         junit_merge_override: bool,
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
+        gas_profile_override: Option<String>,
+        gas_profile_format_override: Option<GasProfileFormat>,
+        gas_profile_include_tests_override: Option<bool>,
         fork_net_override: Option<Network>,
         fork_block_number_override: Option<u64>,
+        fork_cache_enabled: bool,
         save_test_trace_override: Option<String>,
         mutate_override: bool,
         mutate_overrides_override: Option<String>,
@@ -1294,6 +1363,7 @@ impl TestSettings {
                         _ => None,
                     })
             }),
+            no_capture: false,
             coverage: coverage_override.unwrap_or_else(|| self.coverage_enabled().unwrap_or(false)),
             coverage_format: coverage_format_override.or_else(|| {
                 self.coverage_format_value()
@@ -1319,12 +1389,26 @@ impl TestSettings {
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
+            gas_profile: gas_profile_override.or_else(|| self.gas_profile.clone()),
+            gas_profile_format: gas_profile_format_override.unwrap_or_else(|| {
+                self.gas_profile_format
+                    .as_deref()
+                    .and_then(|format| match format.to_lowercase().as_str() {
+                        "cpuprofile" => Some(GasProfileFormat::Cpuprofile),
+                        "collapsed" => Some(GasProfileFormat::Collapsed),
+                        _ => None,
+                    })
+                    .unwrap_or_default()
+            }),
+            gas_profile_include_tests: gas_profile_include_tests_override
+                .unwrap_or_else(|| self.gas_profile_include_tests.unwrap_or(false)),
             fork_net: fork_net_override.or_else(|| {
                 self.fork_net
                     .as_deref()
                     .and_then(|n| Network::from_str(n).ok())
             }),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
+            fork_cache_enabled,
             save_test_trace: save_test_trace_override,
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
@@ -1367,6 +1451,7 @@ impl TestSettings {
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
+            studio_reporting: self.studio_reporting.unwrap_or(true),
             ui: ui_override || self.ui.unwrap_or(false),
             ui_port: ui_port_override.unwrap_or_else(|| self.ui_port.unwrap_or(12344)),
         }
@@ -1376,6 +1461,11 @@ impl TestSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actonscan_is_the_default_explorer() {
+        assert_eq!(Explorer::default(), Explorer::Actonscan);
+    }
 
     fn test_settings_to_config(
         settings: &TestSettings,
@@ -1406,8 +1496,12 @@ mod tests {
             false,
             None,
             None,
+            None,
+            None,
+            None,
             fork_net_override,
             fork_block_number_override,
+            true,
             None,
             false,
             None,
@@ -1431,6 +1525,7 @@ mod tests {
             junit_path: Some("configured-reports".to_owned()),
             fork_net: Some("custom:devnet".to_owned()),
             fail_fast: Some(true),
+            studio_reporting: Some(false),
             ui_port: Some(23_456),
             fork_block_number: Some(111_111),
             ..TestSettings::default()
@@ -1442,6 +1537,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
         assert_eq!(config.fork_block_number, Some(111_111));
         assert!(config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 23_456);
 
         let config = test_settings_to_config(
@@ -1458,6 +1554,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Testnet));
         assert_eq!(config.fork_block_number, Some(222_222));
         assert!(!config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 34_567);
     }
 
@@ -1471,6 +1568,7 @@ mod tests {
         assert_eq!(config.fork_net, None);
         assert_eq!(config.fork_block_number, None);
         assert!(!config.fail_fast);
+        assert!(config.studio_reporting);
         assert_eq!(config.ui_port, 12_344);
     }
 
@@ -1649,8 +1747,10 @@ rules-file = "mutation-rules.json"
                     ContractConfig {
                         name: Some("Counter Contract".to_string()),
                         src: "counter.tolk".to_string(),
+                        types: None,
                         depends: Some(vec![]),
                         output: None,
+                        wrappers: None,
                     },
                 )]),
             }),
@@ -1712,11 +1812,15 @@ name = "test-project"
 description = "Test project"
 version = "0.1.0"
 
+[localnet]
+fork-net = "mainnet"
+
 [networks.localnet]
-api = { v2 = "http://localhost:3010/api/v2/", v3 = "http://localhost:3010/api/v3/" }
-explorer = "http://localhost:3010/explorer/"
+api = { v2 = "http://127.0.0.1:3010/api/v2/", v3 = "http://127.0.0.1:3010/api/v3/" }
+explorer = "http://127.0.0.1:3010/explorer/"
 
 [networks.my-custom]
+global-id = -239
 api = { v2 = "https://example.com/api/v2/" }
 "#;
 
@@ -1726,14 +1830,14 @@ api = { v2 = "https://example.com/api/v2/" }
         let localnet = networks
             .get("localnet")
             .expect("localnet config should be present");
-        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:3010/api/v2");
+        assert_eq!(localnet.v2_url.as_ref(), "http://127.0.0.1:3010/api/v2");
         assert_eq!(
             localnet.v3_url.as_deref(),
-            Some("http://localhost:3010/api/v3")
+            Some("http://127.0.0.1:3010/api/v3")
         );
         assert_eq!(
             localnet.explorer_url.as_deref(),
-            Some("http://localhost:3010/explorer")
+            Some("http://127.0.0.1:3010/explorer")
         );
 
         let custom = networks
@@ -1742,6 +1846,18 @@ api = { v2 = "https://example.com/api/v2/" }
         assert_eq!(custom.v2_url.as_ref(), "https://example.com/api/v2");
         assert_eq!(custom.v3_url, None);
         assert_eq!(custom.explorer_url, None);
+        assert_eq!(
+            config.network_global_id(&Network::Custom(Arc::from("my-custom"))),
+            MAINNET_GLOBAL_ID
+        );
+        assert_eq!(
+            config.network_global_id(&Network::Custom(Arc::from("development"))),
+            TESTNET_GLOBAL_ID
+        );
+        assert_eq!(
+            config.network_global_id(&Network::Localnet),
+            TESTNET_GLOBAL_ID
+        );
     }
 
     #[test]
@@ -1756,7 +1872,7 @@ version = "0.1.0"
 port = 3015
 
 [networks.localnet]
-explorer = "http://localhost:3015/explorer"
+explorer = "http://127.0.0.1:3015/explorer"
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1765,14 +1881,14 @@ explorer = "http://localhost:3015/explorer"
             .get("localnet")
             .expect("localnet config should always be present");
 
-        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:3015/api/v2");
+        assert_eq!(localnet.v2_url.as_ref(), "http://127.0.0.1:3015/api/v2");
         assert_eq!(
             localnet.v3_url.as_deref(),
-            Some("http://localhost:3015/api/v3")
+            Some("http://127.0.0.1:3015/api/v3")
         );
         assert_eq!(
             localnet.explorer_url.as_deref(),
-            Some("http://localhost:3015/explorer")
+            Some("http://127.0.0.1:3015/explorer")
         );
     }
 
@@ -1791,10 +1907,10 @@ version = "0.1.0"
             .get("localnet")
             .expect("localnet config should always be present");
 
-        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:5411/api/v2");
+        assert_eq!(localnet.v2_url.as_ref(), "http://127.0.0.1:5411/api/v2");
         assert_eq!(
             localnet.v3_url.as_deref(),
-            Some("http://localhost:5411/api/v3")
+            Some("http://127.0.0.1:5411/api/v3")
         );
         assert_eq!(localnet.explorer_url, None);
     }
@@ -1808,7 +1924,7 @@ description = "Test project"
 version = "0.1.0"
 
 [networks.localnet]
-v2-url = "http://localhost:3010/api/v2"
+v2-url = "http://127.0.0.1:3010/api/v2"
 "#;
 
         let err = toml::from_str::<ActonConfig>(toml_content).expect_err("legacy key must fail");
@@ -1924,6 +2040,7 @@ exclude = ["**/integration/**"]
 include = ["**/unit/**"]
 junit-path = "custom-reports"
 junit-merge = true
+studio-reporting = false
 
 [test.coverage]
 enabled = true
@@ -1974,6 +2091,7 @@ seed = 42
         assert_eq!(test_settings.include, Some(vec!["**/unit/**".to_string()]));
         assert_eq!(test_settings.junit_path, Some("custom-reports".to_string()));
         assert_eq!(test_settings.junit_merge, Some(true));
+        assert_eq!(test_settings.studio_reporting, Some(false));
     }
 
     #[test]
@@ -2099,6 +2217,7 @@ out-dir = "artifacts/build"
 gen-dir = "artifacts/gen"
 output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -2107,6 +2226,7 @@ output-fift = "build/fift"
         assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
         assert_eq!(build.output_abi.as_deref(), Some("build/abi"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
+        assert_eq!(build.output_sources.as_deref(), Some("build/sources"));
     }
 
     #[test]
@@ -2143,6 +2263,58 @@ output-dir = "./wrappers-ts"
     }
 
     #[test]
+    fn test_per_contract_wrapper_settings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[contracts.counter]
+src = "contracts/Counter.tolk"
+
+[contracts.counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+test-output-dir = "generated-tests/counter"
+
+[contracts.counter.wrappers.typescript]
+output-dir = "generated-ts/counter"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let wrappers = config
+            .get_contract("counter")
+            .and_then(|contract| contract.wrappers.as_ref())
+            .expect("counter wrapper settings");
+        let tolk = wrappers.tolk.as_ref().expect("Tolk wrapper settings");
+        assert_eq!(tolk.output_dir.as_deref(), Some("generated/counter"));
+        assert_eq!(tolk.generate_test, Some(false));
+        assert_eq!(
+            tolk.test_output_dir.as_deref(),
+            Some("generated-tests/counter")
+        );
+        assert_eq!(
+            wrappers
+                .typescript
+                .as_ref()
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated-ts/counter")
+        );
+
+        let serialized = toml::to_string(&config).expect("serialize Acton config");
+        let reparsed: ActonConfig = toml::from_str(&serialized).expect("reparse Acton config");
+        assert_eq!(
+            reparsed
+                .get_contract("counter")
+                .and_then(|contract| contract.wrappers.as_ref())
+                .and_then(|wrappers| wrappers.tolk.as_ref())
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated/counter")
+        );
+    }
+
+    #[test]
     fn test_localnet_settings_parsing() {
         let toml_content = r#"
 [package]
@@ -2152,15 +2324,21 @@ version = "0.1.0"
 
 [localnet]
 port = 3015
+db-path = "state/localnet.sqlite"
 fork-net = "testnet"
 fork-block-number = 1234567
 accounts = ["deployer", "user"]
 rate-limit = 3
+response-delay-ms = 300
+block-interval-ms = 250
+no-mining = true
+mine-empty-blocks = true
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
         let localnet = config.localnet.as_ref().unwrap();
         assert_eq!(localnet.port, Some(3015));
+        assert_eq!(localnet.db_path.as_deref(), Some("state/localnet.sqlite"));
         assert_eq!(localnet.fork_net.as_deref(), Some("testnet"));
         assert_eq!(localnet.fork_block_number, Some(1234567));
         assert_eq!(
@@ -2168,5 +2346,9 @@ rate-limit = 3
             Some(vec!["deployer".to_string(), "user".to_string()])
         );
         assert_eq!(localnet.rate_limit, Some(3));
+        assert_eq!(localnet.response_delay_ms, Some(300));
+        assert_eq!(localnet.block_interval_ms, Some(250));
+        assert_eq!(localnet.no_mining, Some(true));
+        assert_eq!(localnet.mine_empty_blocks, Some(true));
     }
 }

@@ -1,0 +1,12 @@
+diff --git a/ton-index-worker/ton-smc-scanner/src/SmcScanner.h b/ton-index-worker/ton-smc-scanner/src/SmcScanner.h
+index c39e817..11c1f40 100644
+--- a/ton-index-worker/ton-smc-scanner/src/SmcScanner.h
++++ b/ton-index-worker/ton-smc-scanner/src/SmcScanner.h
+@@ -29,6 +29,6 @@ struct Options {
+   std::uint32_t seqno_{0};
+   td::actor::ActorId<PostgreSQLInsertManager> insert_manager_;
+-  std::uint64_t basechain_batch_step_ = 0x0001'0000'0000'0000ULL;
++  std::uint64_t basechain_batch_step_ = 0x1000'0000'0000'0000ULL;
+   std::uint64_t masterchain_batch_step_ = 0x1000'0000'0000'0000ULL;
+   std::uint32_t batch_size_{1000};
+   int max_parallel_batches_{8};

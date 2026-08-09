@@ -138,7 +138,7 @@ get fun `test cr register code cell duplicate name precedence`() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("1 TON -> cr_duplicate_name_after")
+        .assert_contains("1 GRAM -> cr_duplicate_name_after")
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/register_code_cell_duplicate_name_is_hash_specific/register_code_cell_duplicate_name_last_registration_wins_for_same_hash.stdout.txt",
         );

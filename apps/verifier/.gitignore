@@ -1,0 +1,21 @@
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
+/compiler-worker/node_modules/
+# Acton generated/local state
+/.acton/
+/build/
+/dist/
+/gen/
+/lcov.info
+/wallets.toml
+/libraries.toml
+/.env
+/config.toml
+/verifier-index.sqlite3
+/verifier-index.sqlite3-*
+.playwright-mcp/
+/.codegraph/

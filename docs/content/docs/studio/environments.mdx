@@ -1,0 +1,145 @@
+---
+title: "Environments"
+description: "Choose, create, start, stop, and connect Simulated localnet, Full localnet, Testnet, and Mainnet environments"
+---
+
+An environment is the network context behind Studio tools. Its state and capabilities determine
+what the explorer sees, where wallets send messages, what the simulator reads, and which endpoints
+are available to applications.
+
+Open **Virtual Environments** to manage local runtimes. Testnet and Mainnet appear separately under
+**Networks** because Studio does not own their lifecycle.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/environments-light.png"
+    alt="Virtual environments table in light theme with running and stopped Full localnet environments"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/environments-dark.png"
+    alt="Virtual environments table in dark theme with running and stopped Full localnet environments"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+## Choose an environment type
+
+### Simulated localnet
+
+Use a Simulated localnet for the normal edit, build, test, deploy, and frontend loop. It starts an
+Acton emulator process, consumes little disk space, and exposes TON-compatible V2 and V3 APIs.
+
+It supports:
+
+- a clean state or a fork of Testnet or Mainnet
+- an optional historical fork block
+- project wallets created as startup accounts
+- automatic or manual mining
+- optional empty blocks
+- request rate limits and artificial response delay
+- a configurable automatic block interval
+- GRAM and Jetton faucets
+
+Choose this type unless you need behavior that depends on validator nodes or the full indexer stack.
+
+### Full localnet
+
+Use a Full localnet to run local TON validators, Localton services, Postgres, Redis, and V2/V3
+indexers through Docker. It is closer to a full TON network but starts more slowly and consumes more
+CPU, memory, and disk space.
+
+Full localnet supports one to seven validators. Each additional validator increases startup time.
+The startup screen reports Docker Compose, TON node, API, and indexer readiness separately.
+
+Choose this type when you need:
+
+- full-node and indexer behavior
+- the behavior of the full V2 and V3 indexer stack for actions, tokens, and NFT data
+- Admin and Config APIs
+- cold snapshots with archive and state sizes
+- startup accounts imported into zerostate
+
+Docker must be installed and running before you create or restart a Full localnet.
+See [A managed environment does not start](/docs/studio/troubleshooting#a-managed-environment-does-not-start)
+when Docker or one of the network services fails during startup.
+
+### Testnet and Mainnet
+
+Testnet and Mainnet are external environments. They are always listed under **Networks**, cannot be
+stopped or deleted, and do not expose local mining, faucets, snapshots, or runtime settings.
+
+Use them to inspect public network data, simulate against current network state, connect wallets,
+and route application requests through Studio. Requests sent through Studio can appear in **API
+Calls** and can contribute successful deployments to the contract registry.
+
+## Which type should I use?
+
+| Need | Recommended type |
+| --- | --- |
+| Fast contract and frontend iteration | Simulated localnet |
+| Reproduce state from a public network | Simulated localnet with a fork |
+| Test full validator and indexer behavior | Full localnet |
+| Bootstrap selected existing accounts into a new chain | Full localnet with account imports |
+| Inspect or interact with public Testnet | Testnet |
+| Inspect production state or prepare a real transaction | Mainnet |
+
+Use separate environments for scenarios that require different state, mining behavior, or fidelity.
+This keeps debugging reproducible and prevents one experiment from changing another.
+
+## Create a Simulated localnet
+
+1. Open **Virtual Environments** and select **Create environment**.
+2. Select **Simulated localnet**.
+3. Enter a name used in navigation and history.
+4. Leave **Local port** empty for automatic selection or reserve a specific port.
+5. Choose **Clean network**, **Fork mainnet**, or **Fork testnet**.
+6. For a fork, optionally enter a masterchain block number; empty uses the latest available state.
+7. Select project wallets under **Startup accounts**.
+8. Expand **Network and mining** only when you need rate, latency, interval, or mining overrides.
+9. Select **Create environment**.
+
+The selected initial state and startup accounts are fixed when the environment is created. Use a new
+environment when a scenario needs a different fork point or bootstrap set.
+
+## Create a Full localnet
+
+1. Select **Full localnet** in the create dialog.
+2. Enter a name and choose the validator count from 1 to 7.
+3. Add accounts that must exist in zerostate.
+4. Select **Create environment** and wait for all startup services to become ready.
+
+Each import row contains:
+
+- **Source:** an existing Studio environment used to load the account state
+- **Contract name:** an optional name for the contract registry
+- **Account address:** a friendly or raw TON address
+
+Address completion lists active contracts known in the selected source environment. Selecting a
+completion fills the address and, when available, the contract name. You can also enter any active
+TON address manually. When the name is empty, Studio registers it as `Account 1`, `Account 2`, and
+so on.
+
+The imported balance, code, and data become part of the new zerostate. The imported state is a copy:
+later source-network changes do not update the Full localnet account.
+
+Source-network blocks, transactions, and actions are not imported. New history begins with activity
+on the Full localnet.
+
+<Callout type="warning">
+  Full localnet account import is a state bootstrap mechanism, not a live fork. Import every account
+  whose initial code or data is required by the scenario.
+</Callout>
+
+## Manage lifecycle
+
+The environments table shows status, type, network source, proxied endpoint, and available actions.
+
+- **Open:** select a row to enter the environment workspace.
+- **Copy endpoint:** copy the stable Studio proxy URL instead of a container port.
+- **Stop:** stop a running managed environment while keeping its saved metadata and state.
+- **Restart:** start a stopped or failed environment again.
+- **Delete:** open environment settings and confirm deletion in the danger zone.
+
+Deleting an environment removes its Studio metadata and stored state. It is not the same as stopping
+the runtime.

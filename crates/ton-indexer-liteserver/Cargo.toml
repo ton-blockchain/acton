@@ -1,0 +1,31 @@
+[package]
+name = "ton-indexer-liteserver"
+description = "Direct TON LiteAPI block source for ton-indexer-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+async-trait.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+ton-indexer-core = { path = "../ton-indexer-core" }
+tonutils = { version = "=1.1.0", default-features = false, features = [
+  "liteclient",
+  "network-config",
+  "std",
+] }
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false

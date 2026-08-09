@@ -82,7 +82,7 @@ fun deployNftCollection(deployer: ActonWallet, info: NftCollectionInfo): NftColl
     val collection = NftCollection.fromStorage(
         makeNftCollectionStorage(deployer.address, info),
     );
-    val res = collection.deploy(deployer.address, { value: ton("0.05"), bounce: false });
+    val res = collection.deploy(deployer.address, { value: grams("0.05"), bounce: false });
     res.waitForFirstTransaction();
     return collection;
 }
@@ -98,9 +98,9 @@ fun deployNftItem(
         deployer.address,
         0,
         itemIndex,
-        ton("0.03"),
+        grams("0.03"),
         { ownerAddress: owner, content: itemContent },
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
     res.waitForFirstTransaction();
     return NftItem.fromAddress(collection.getNftAddressByIndex(itemIndex));
@@ -115,7 +115,7 @@ fun deployNftBatch(
     var deployList: map<uint64, BatchDeployDictItem> = [];
     var i = 0;
     val nextItemIndex = collection.getCollectionData().nextItemIndex;
-    val perItemAmount = ton("0.03");
+    val perItemAmount = grams("0.03");
 
     while (i < count) {
         val index = (nextItemIndex + i);
@@ -139,7 +139,7 @@ fun deployNftBatch(
         i += 1;
     }
 
-    val messageValue = perItemAmount * count + ton("0.1");
+    val messageValue = perItemAmount * count + grams("0.1");
     return collection.sendBatchDeployNfts(
         deployer.address,
         0,

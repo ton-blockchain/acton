@@ -1,6 +1,6 @@
 # Acton
 
-<img align="right" src="docs/public/logo.png" height="150px" alt="Acton logo" />
+<img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
 Acton is an all-in-one TON smart contract development toolkit written in Rust.
 It combines project scaffolding, build, testing, scripting, wallet and network

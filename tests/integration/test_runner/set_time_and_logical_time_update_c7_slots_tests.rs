@@ -76,6 +76,26 @@ get fun `test aj stdlib vm set time and logical slots 3 4 5`() {
 }
 
 #[test]
+fn initial_world_state_time_matches_vm_time_for_new_accounts() {
+    run_success_case(
+        "aj-stdlib-vm-initial-world-state-time",
+        r#"
+get fun `test initial world state time matches vm time for new accounts`() {
+    val initialNow = testing.getNow();
+
+    expect(initialNow > 0).toBeTrue();
+    expect(initialNow).toEqual(blockchain.now());
+
+    val account = testing.treasury("initial-time-account");
+    val accountState = testing.getAccountState(account.address)!;
+    expect(accountState.storageStat.lastPaid).toEqual(initialNow);
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/initial_world_state_time_matches_vm_time_for_new_accounts.stdout.txt",
+    );
+}
+
+#[test]
 fn set_original_balance_updates_balance_tuple_with_and_without_extra_dict() {
     run_success_case(
         "aj-stdlib-vm-set-original-balance-slot-7",
@@ -352,5 +372,47 @@ get fun `test aj stdlib vm cell from hex invalid`() {
 "#,
         "Failed to decode cell hex deadbeef",
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_hex_reports_invalid_hex.stdout.txt",
+    );
+}
+
+#[test]
+fn cell_from_base64_decodes_valid_boc_base64() {
+    run_success_case(
+        "aj-stdlib-vm-cell-from-base64-valid",
+        r#"
+get fun `test aj stdlib vm cell from base64 valid`() {
+    val decoded = parseCellFromBase64("te6ccgEBAQEAAgAAAA==");
+    expect(decoded).toEqual(createEmptyCell());
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_decodes_valid_boc_base64.stdout.txt",
+    );
+}
+
+#[test]
+fn cell_from_base64_trims_surrounding_whitespace() {
+    run_success_case(
+        "aj-stdlib-vm-cell-from-base64-trims-whitespace",
+        r#"
+get fun `test aj stdlib vm cell from base64 trims whitespace`() {
+    val decoded = parseCellFromBase64("  te6ccgEBAQEAAgAAAA==  ");
+    expect(decoded).toEqual(createEmptyCell());
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_trims_surrounding_whitespace.stdout.txt",
+    );
+}
+
+#[test]
+fn cell_from_base64_reports_invalid_base64() {
+    run_failure_case(
+        "aj-stdlib-vm-cell-from-base64-invalid",
+        r#"
+get fun `test aj stdlib vm cell from base64 invalid`() {
+    val _ = parseCellFromBase64("not-base64");
+}
+"#,
+        "Failed to decode cell base64 not-base64",
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/cell_from_base64_reports_invalid_base64.stdout.txt",
     );
 }

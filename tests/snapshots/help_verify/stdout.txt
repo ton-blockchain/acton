@@ -48,7 +48,7 @@ OPTIONS
        --compiler-version version
            Tolk compiler version to request on the verifier side.
 
-           Currently defaults to 1.4.0.
+           Currently defaults to 1.4.1.
 
        --dry-run
            Run verification without submitting the final blockchain
@@ -147,7 +147,7 @@ REQUIREMENTS AND LIMITATIONS
 
 COST AND BACKEND NOTES
        o  when --dry-run is not used, the final verification transaction sends
-          0.1 TON
+          0.1 GRAM
 
        o  if the verifier backend reports that the contract is already
           verified, Acton exits successfully without sending another

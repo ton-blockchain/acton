@@ -21,6 +21,20 @@ pub(crate) struct CapturedVerifierRequest {
     pub(crate) body: Vec<u8>,
 }
 
+pub(crate) fn abi_response(code_hash: &str, abi: &serde_json::Value) -> VerifierMockResponse {
+    VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "items": [{
+                "code_hash": code_hash,
+                "abi": abi,
+            }]
+        })
+        .to_string(),
+        headers: vec![],
+    }
+}
+
 pub(crate) fn spawn_verifier_mock(
     responses: Vec<VerifierMockResponse>,
 ) -> (

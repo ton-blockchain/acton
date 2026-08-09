@@ -1,0 +1,34 @@
+/target/
+/.localton/
+/.idea/
+.DS_Store
+*.log
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+*.xz
+*.bz2
+
+# Runtime-generated private keys, including custom --state-dir paths.
+*.pem
+*.key
+*.p12
+*.pfx
+*.seed
+*.mnemonic
+**/genesis/db/keyring/
+**/genesis/certs/
+**/genesis/zerostate/*.pk
+**/dht/keyring/
+**/nodes/*/db/keyring/
+**/nodes/*/certs/
+**/wallets/*/*.pk
+**/wallets/*/*.private
+**/services/ton-http-api-*/keystore/
+
+# Pinned TON releases extracted under a custom state directory.
+**/cache/v*/
+**/tools/ton-http-api-*/

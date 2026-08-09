@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling signature
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/signature.test.tolk (1 test)
+  ✓ checksig ignore controls transaction signature checks [TIME]
+
+ ✓ 1 passed in 1 file

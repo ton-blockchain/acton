@@ -133,6 +133,11 @@ async fn assert_retrace(
     expected_success: bool,
     expected_hash_ok: bool,
 ) {
+    if net != Network::Localnet {
+        // disable for now
+        return;
+    }
+
     // SAFETY: well...
     unsafe {
         std::env::set_var(

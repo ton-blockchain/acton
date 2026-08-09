@@ -1,8 +1,8 @@
 use super::{
-    format_nanotons, format_std_address, load_local_contract_candidates, load_rpc_config, print_kv,
-    print_section, resolve_rpc_network,
+    find_fallback_contract_match, format_nanograms, format_std_address,
+    load_local_contract_candidates, load_rpc_config, print_kv, resolve_rpc_network,
 };
-use crate::context::{BuildCache, KnownAddresses};
+use crate::context::{BuildCache, KnownAddresses, code_lookup_hash};
 use crate::ffi::emulation::{
     V3TraceTransaction, V3TraceTransactions, build_v3_trace_transactions, v3_message_hash,
 };
@@ -10,18 +10,17 @@ use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
+use chrono::{TimeZone, Utc};
 use log::warn;
 use num_bigint::BigInt;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
-use ton_api::{
-    AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
-    V3TransactionSummary,
-};
+use ton_api::{Network, TonApiClient, toncenter::v3};
 use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{HashBytes, Lazy};
@@ -59,20 +58,30 @@ pub(super) fn rpc_trace_cmd(
             anyhow::bail!("Trace references missing transaction {tx_hash}");
         }
     };
-    print_rpc_trace_summary(hash, &trace);
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
-    print_section("Trace Tree");
     let send_result_list: Vec<TupleItem> = trace_txs
         .iter()
         .map(V3TraceTransaction::to_send_result_tuple)
         .collect();
     let formatted_tree = formatter.format_transaction_list(&send_result_list);
     println!("{}", formatted_tree.trim_end());
+    println!();
+
+    print_rpc_trace_summary(hash, &trace);
 
     if verbose {
-        print_section("Trace Details");
+        println!();
         print_rpc_trace_details(&trace_txs, Some(&formatter), &network);
+    }
+
+    if !show_bodies {
+        println!();
+        println!(
+            "{}",
+            "Hint: pass --show-bodies to include decoded message bodies when an ABI matches"
+                .dimmed()
+        );
     }
 
     Ok(())
@@ -85,10 +94,8 @@ fn rpc_trace_formatter(
     config: &ActonConfig,
     show_bodies: bool,
 ) -> anyhow::Result<FormatterContext<'static>> {
-    let build_cache = load_local_build_cache(config)?;
-    let accounts = if build_cache.built.is_empty() {
-        FxHashMap::default()
-    } else {
+    let mut build_cache = load_local_build_cache(config)?;
+    let accounts = if show_bodies || !build_cache.built.is_empty() {
         match fetch_trace_accounts(trace_txs, client) {
             Ok(accounts) => accounts,
             Err(err) => {
@@ -96,7 +103,12 @@ fn rpc_trace_formatter(
                 FxHashMap::default()
             }
         }
+    } else {
+        FxHashMap::default()
     };
+    if show_bodies {
+        add_fallback_abi_matches(&mut build_cache, &accounts);
+    }
 
     let mut formatter = FormatterContext::empty();
     formatter.accounts = Cow::Owned(accounts);
@@ -107,23 +119,23 @@ fn rpc_trace_formatter(
     Ok(formatter)
 }
 
-fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
-    println!("{}", "Trace Summary".bold().cyan());
-    print_kv("Query Hash", query_hash);
-    print_kv("Trace ID", trace.trace_id.as_str());
+fn print_rpc_trace_summary(query_hash: &str, trace: &v3::Trace) {
+    print_kv("Query Hash", format_trace_hash(query_hash));
+    print_kv("Trace ID", format_trace_hash(&trace.trace_id));
+    print_kv("Time", format_trace_time_range(trace));
+    print_kv("Block", format_trace_block_range(trace));
+    print_kv("Trace Complete", format_trace_bool(!trace.is_incomplete));
     print_kv(
-        "Root Tx Hash",
-        trace
-            .transactions_order
-            .first()
-            .map_or("<none>", String::as_str),
+        "Total Txs",
+        format_trace_count(trace.transactions_order.len()),
     );
-    print_kv("Trace Complete", (!trace.is_incomplete).to_string());
-    print_kv("Total Txs", trace.transactions_order.len().to_string());
-    print_kv("Total Messages", trace_message_count(trace).to_string());
+    print_kv(
+        "Total Messages",
+        format_trace_count(trace_message_count(trace)),
+    );
 }
 
-fn trace_message_count(trace: &V3Trace) -> usize {
+fn trace_message_count(trace: &v3::Trace) -> usize {
     let mut unique = BTreeSet::new();
 
     for tx_hash in &trace.transactions_order {
@@ -157,8 +169,8 @@ fn print_rpc_trace_details(
     for (idx, tx) in trace_txs.iter().enumerate() {
         let prefix = format!("tx[{}]", idx + 1);
         println!("  {prefix}:");
-        println!("    hash: {}", tx.hash);
-        println!("    lt: {}", tx.transaction.lt);
+        println!("    hash: {}", format_trace_hash(&tx.hash));
+        println!("    lt: {}", format_trace_u64(tx.transaction.lt));
         println!(
             "    account: {}",
             format_trace_address(&tx.summary.account, network)
@@ -182,21 +194,27 @@ fn print_rpc_trace_details(
                 "    opcode: {}",
                 format_message_opcode(message, message_name.as_deref())
             );
-            println!("    bounced: {}", message.bounced.unwrap_or(false));
+            println!(
+                "    bounced: {}",
+                format_trace_bool(message.bounced.unwrap_or(false))
+            );
             println!(
                 "    branch: {}",
-                trace_branch_kind(&tx.summary, message, message_name.as_deref())
+                trace_branch_kind(&tx.summary, message, message_name.as_deref()).cyan()
             );
         } else {
-            println!("    from: <none>");
-            println!("    to: <none>");
-            println!("    value: <none>");
-            println!("    opcode: <none>");
-            println!("    bounced: false");
-            println!("    branch: system");
+            println!("    from: {}", format_trace_none());
+            println!("    to: {}", format_trace_none());
+            println!("    value: {}", format_trace_none());
+            println!("    opcode: {}", format_trace_none());
+            println!("    bounced: {}", format_trace_bool(false));
+            println!("    branch: {}", "system".cyan());
         }
 
-        println!("    success: {}", trace_tx_success(&tx.summary));
+        println!(
+            "    success: {}",
+            format_trace_bool(trace_tx_success(&tx.summary))
+        );
         println!("    exit_code: {}", format_compute_exit_code(&tx.summary));
         println!(
             "    action_result_code: {}",
@@ -206,27 +224,25 @@ fn print_rpc_trace_details(
 }
 
 fn format_optional_u64(value: Option<u64>) -> String {
-    value.map_or_else(|| "null".to_owned(), |value| value.to_string())
+    value.map_or_else(format_trace_null, format_trace_u64)
 }
 
 fn format_child_lts(child_lts: &[u64]) -> String {
     if child_lts.is_empty() {
-        return "[]".to_owned();
+        return "[]".dimmed().to_string();
     }
     format!(
         "[{}]",
         child_lts
             .iter()
-            .map(ToString::to_string)
+            .map(|value| format_trace_u64(*value))
             .collect::<Vec<_>>()
             .join(", ")
     )
 }
 
-fn trace_tx_success(tx: &V3TransactionSummary) -> bool {
-    let Some(description) = &tx.description else {
-        return false;
-    };
+fn trace_tx_success(tx: &v3::Transaction) -> bool {
+    let description = &tx.description;
     if description.aborted.unwrap_or(false) {
         return false;
     }
@@ -243,34 +259,34 @@ fn trace_tx_success(tx: &V3TransactionSummary) -> bool {
     true
 }
 
-fn format_compute_exit_code(tx: &V3TransactionSummary) -> String {
+fn format_compute_exit_code(tx: &v3::Transaction) -> String {
     tx.description
+        .compute_ph
         .as_ref()
-        .and_then(|description| description.compute_ph.as_ref())
         .and_then(|compute| compute.exit_code)
-        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+        .map_or_else(format_trace_null, format_trace_code)
 }
 
-fn format_action_result_code(tx: &V3TransactionSummary) -> String {
+fn format_action_result_code(tx: &v3::Transaction) -> String {
     tx.description
+        .action
         .as_ref()
-        .and_then(|description| description.action.as_ref())
         .and_then(|action| action.result_code)
-        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+        .map_or_else(format_trace_null, format_trace_code)
 }
 
 fn trace_branch_kind(
-    tx: &V3TransactionSummary,
-    message: &V3MessageSummary,
+    tx: &v3::Transaction,
+    message: &v3::Message,
     message_name: Option<&str>,
 ) -> &'static str {
     if message.bounced.unwrap_or(false) {
         return "bounce";
     }
     if matches!(
-        tx.orig_status.as_deref(),
-        Some("nonexist" | "uninit" | "uninitialized")
-    ) && tx.end_status.as_deref() == Some("active")
+        tx.orig_status.as_str(),
+        "nonexist" | "uninit" | "uninitialized"
+    ) && tx.end_status == "active"
     {
         return "deploy";
     }
@@ -280,7 +296,7 @@ fn trace_branch_kind(
     "message"
 }
 
-fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>) -> String {
+fn format_message_opcode(message: &v3::Message, message_name: Option<&str>) -> String {
     let opcode = extract_message_opcode(message);
     let opcode_text = if opcode == 0 {
         "0x00000000".to_owned()
@@ -289,12 +305,12 @@ fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>)
     };
     let name = message_name.or_else(|| (opcode == 0).then_some("empty"));
     match name {
-        Some(name) => format!("{opcode_text} ({name})"),
-        None => opcode_text,
+        Some(name) => format!("{} ({})", opcode_text.yellow(), name.cyan()),
+        None => opcode_text.yellow().to_string(),
     }
 }
 
-fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
+fn extract_message_opcode(message: &v3::Message) -> u32 {
     let Some(body_boc64) = message
         .message_content
         .as_ref()
@@ -313,28 +329,115 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
     parser.load_u32().unwrap_or(0)
 }
 
-fn format_message_value(message: &V3MessageSummary) -> String {
+fn format_message_value(message: &v3::Message) -> String {
     let Some(value) = message.value.as_deref() else {
-        return "<none>".to_owned();
+        return format_trace_none();
     };
     match BigInt::from_str(value) {
-        Ok(value) => format_nanotons(&value),
-        Err(_) => value.to_owned(),
+        Ok(value) => format_nanograms(&value).white().to_string(),
+        Err(_) => value.yellow().to_string(),
     }
 }
 
 fn format_optional_address(address: Option<&str>, network: &Network) -> String {
-    address.map_or_else(
-        || "<none>".to_owned(),
-        |address| format_trace_address(address, network),
-    )
+    address.map_or_else(format_trace_none, |address| {
+        format_trace_address(address, network)
+    })
 }
 
 fn format_trace_address(address: &str, network: &Network) -> String {
     StdAddr::from_str_ext(address, StdAddrFormat::any()).map_or_else(
-        |_| address.to_owned(),
-        |(address, _)| format_std_address(&address, network),
+        |_| address.yellow().to_string(),
+        |(address, _)| format_std_address(&address, network).cyan().to_string(),
     )
+}
+
+fn format_trace_hash(hash: &str) -> String {
+    hash.yellow().to_string()
+}
+
+fn format_trace_time_range(trace: &v3::Trace) -> String {
+    let timestamps = trace
+        .transactions_order
+        .iter()
+        .filter_map(|tx_hash| trace.transactions.get(tx_hash))
+        .filter_map(|tx| (tx.now != 0).then_some(u64::from(tx.now)));
+    let range = trace_u64_range(timestamps);
+
+    match range {
+        Some((start, end)) => format_trace_range(format_trace_time(start), format_trace_time(end)),
+        None => format_trace_range(format_trace_null(), format_trace_null()),
+    }
+}
+
+fn format_trace_time(timestamp: u64) -> String {
+    Utc.timestamp_opt(timestamp as i64, 0)
+        .single()
+        .map_or_else(
+            || timestamp.to_string(),
+            |datetime| datetime.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        )
+        .white()
+        .to_string()
+}
+
+fn format_trace_block_range(trace: &v3::Trace) -> String {
+    let blocks = trace
+        .transactions_order
+        .iter()
+        .filter_map(|tx_hash| trace.transactions.get(tx_hash))
+        .map(|tx| u64::from(tx.mc_block_seqno));
+    let range = trace_u64_range(blocks);
+
+    match range {
+        Some((start, end)) => format_trace_range(format_trace_u64(start), format_trace_u64(end)),
+        None => format_trace_range(format_trace_null(), format_trace_null()),
+    }
+}
+
+fn trace_u64_range(values: impl IntoIterator<Item = u64>) -> Option<(u64, u64)> {
+    values.into_iter().fold(None, |range, value| {
+        Some(match range {
+            Some((start, end)) => (start.min(value), end.max(value)),
+            None => (value, value),
+        })
+    })
+}
+
+fn format_trace_range(start: String, end: String) -> String {
+    format!("{start} {} {end}", "—".dimmed())
+}
+
+fn format_trace_bool(value: bool) -> String {
+    if value {
+        "true".green().to_string()
+    } else {
+        "false".red().to_string()
+    }
+}
+
+fn format_trace_count(value: usize) -> String {
+    value.to_string().white().to_string()
+}
+
+fn format_trace_u64(value: u64) -> String {
+    value.to_string().white().to_string()
+}
+
+fn format_trace_code(value: i32) -> String {
+    if value == 0 {
+        value.to_string().green().to_string()
+    } else {
+        value.to_string().red().to_string()
+    }
+}
+
+fn format_trace_null() -> String {
+    "null".dimmed().to_string()
+}
+
+fn format_trace_none() -> String {
+    "<none>".dimmed().to_string()
 }
 
 fn fetch_trace_accounts(
@@ -385,7 +488,7 @@ fn collect_trace_address(address: &str, addresses: &mut BTreeSet<String>) {
 }
 
 fn shard_account_from_ton_api_state(
-    state: &TonApiAccountState,
+    state: &v3::AccountStateFull,
 ) -> anyhow::Result<Option<(StdAddr, ShardAccount)>> {
     let (address, _) =
         StdAddr::from_str_ext(&state.address, StdAddrFormat::any()).map_err(|_| {
@@ -445,4 +548,60 @@ fn load_local_build_cache(config: &ActonConfig) -> anyhow::Result<BuildCache> {
         );
     }
     Ok(build_cache)
+}
+
+fn add_fallback_abi_matches(
+    build_cache: &mut BuildCache,
+    accounts: &FxHashMap<StdAddr, ShardAccount>,
+) {
+    let mut checked_hashes = FxHashSet::default();
+    for account in accounts.values() {
+        let Some(code) = trace_account_code(account) else {
+            continue;
+        };
+        let code_hash = code_lookup_hash(&code);
+        if !checked_hashes.insert(code_hash) {
+            continue;
+        }
+        let existing_path = build_cache.built.iter().find_map(|(path, result)| {
+            (result.code_hash == code_hash).then(|| (path.clone(), result.abi.is_some()))
+        });
+        if existing_path.as_ref().is_some_and(|(_, has_abi)| *has_abi) {
+            continue;
+        }
+
+        let Some(contract) = find_fallback_contract_match(&code_hash) else {
+            continue;
+        };
+        let Some(abi) = contract.abi else {
+            continue;
+        };
+
+        if let Some((path, _)) = existing_path {
+            if let Some(result) = build_cache.built.get_mut(&path) {
+                result.abi = Some(abi);
+            }
+            continue;
+        }
+
+        let cache_name = format!("rpc:{code_hash}");
+        let cache_path = PathBuf::from(format!("<rpc:{code_hash}>"));
+        build_cache.memoize(
+            &cache_name,
+            &contract.contract_name,
+            &cache_path,
+            &Boc::encode_base64(&code),
+            code_hash,
+            Arc::new(SourceMap::without_debug_info()),
+            Some(abi),
+        );
+    }
+}
+
+fn trace_account_code(account: &ShardAccount) -> Option<tycho_types::cell::Cell> {
+    let state = account.account.load().ok()?.0.map(|account| account.state);
+    let Some(TychoAccountState::Active(state)) = state else {
+        return None;
+    };
+    state.code
 }

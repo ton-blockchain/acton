@@ -3,7 +3,7 @@ title: "Reference"
 description: "Complete reference for all Test UI features and interface sections"
 ---
 
-Test UI is a browser interface for reviewing completed `acton test` runs with traces, transaction trees, logs, source links, and coverage data when the run includes `--coverage`.
+Test UI is a browser interface for reviewing completed `acton test` runs with traces, transaction trees, logs, source links, coverage data when the run includes `--coverage`, and gas profiles when the run includes `--gas-profile`.
 
 ## 1. Start Test UI
 
@@ -23,6 +23,9 @@ acton test tests/counter.test.tolk --ui --filter "test deploy"
 
 # Open Test UI with coverage viewer enabled
 acton test --coverage --ui
+
+# Open Test UI with gas profile flamegraphs enabled
+acton test --gas-profile build/gas.cpuprofile --ui
 ```
 
 ![Test UI overview with test list sidebar, summary cards, and details pane](../imgs/test-ui-first-screen.png)
@@ -35,6 +38,12 @@ acton test --coverage --ui
 <Callout type="idea">
   The `Coverage` tab is available only when the test run is started with both
   `--coverage` and `--ui`.
+</Callout>
+
+<Callout type="idea">
+  The `Profile` tab is available only when the test run is started with both
+  `--gas-profile <FILE>` and `--ui`. Add `--gas-profile-include-tests` when
+  the expensive work happens inside `.test.tolk` unit-test get methods.
 </Callout>
 
 ## 2. Sidebar features
@@ -113,7 +122,7 @@ If traces are available, Info tab also shows `Fee Summary` table per trace:
 
 Clicking a trace row opens that trace in `Transactions` tab.
 
-For baseline and regression-oriented fee analysis, see the [gas profiling with snapshots](/docs/testing/gas-profiling-with-snapshots) page.
+For baseline and regression-oriented fee analysis, see the [gas profiling and snapshots](/docs/testing/gas-profiling-with-snapshots) page.
 
 <Callout type="idea">
   Name trace chains in tests with [`txs.giveName(...)`](/docs/standard_library/emulation/network#sendresultlistgivename) to make trace tabs and fee summaries easier to read.
@@ -164,7 +173,29 @@ Logs tab shows `Executor Log` and `VM Log` grouped by transaction for the select
 
 ![Logs tab with Executor Log and VM Log grouped by transaction](../imgs/test-ui-logs.png)
 
-## 7. Coverage tab
+## 7. Profile tab
+
+When the run includes `acton test --gas-profile build/gas.cpuprofile --ui`, Test UI adds a dedicated `Profile` tab with:
+
+- contract tabs for profiled contracts
+- gas-weighted flamegraph for the selected contract
+- selected frame details: source location, total gas, self gas, and contract share
+
+The global profile view is grouped by contract. Function names inside each
+contract do not repeat the contract prefix, so frames such as
+`Elector:onInternalMessage` are shown as `onInternalMessage` inside the
+`Elector` contract tab.
+
+When the run also includes `--gas-profile-include-tests`, individual tests with
+recorded unit execution get a `Profile` tab next to `Info`, `Transactions`, and
+`Logs`. The per-test profile hides Acton runtime frames from `@acton`/`.acton`
+paths to keep user-code hot paths visible. The exported `cpuprofile` or
+`collapsed` file remains complete.
+
+For command examples and snapshot comparison workflows, see the
+[gas profiling and snapshots](/docs/testing/gas-profiling-with-snapshots) page.
+
+## 8. Coverage tab
 
 When the run includes `acton test --coverage --ui`, Test UI adds a dedicated
 `Coverage` tab with:

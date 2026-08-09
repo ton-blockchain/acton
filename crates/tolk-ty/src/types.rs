@@ -1,6 +1,7 @@
 use crate::type_interner::TyId;
 use std::sync::Arc;
 use tolk_resolver::file_index::SymbolId;
+use tolk_resolver::resolve_index::LocalDefId;
 
 /// Represents the data of a type. This is the main enum that holds all possible types in the language.
 ///
@@ -39,6 +40,7 @@ pub enum TyData {
     },
     /// A generic type parameter (e.g. `T`).
     TypeParameter {
+        id: Option<LocalDefId>,
         name: String,
         /// The default type if provided (as `T = int`).
         default_type: Option<TyId>,

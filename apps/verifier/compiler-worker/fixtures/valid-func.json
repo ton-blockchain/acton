@@ -1,0 +1,13 @@
+{
+  "language": "func",
+  "compiler_version": "0.4.6-wasmfix.0",
+  "entrypoint": "main.fc",
+  "sources": [
+    {
+      "path": "main.fc",
+      "content": "() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {\n}\n",
+      "is_entrypoint": true,
+      "include_in_command": true
+    }
+  ]
+}

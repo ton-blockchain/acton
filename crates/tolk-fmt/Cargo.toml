@@ -14,6 +14,7 @@ license = { workspace = true }
 tolk-syntax = { workspace = true }
 tree-sitter = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 arrayvec = "0.7.6"
 typed-arena = "2.0.2"
 unicode-width = "0.2.0"

@@ -1,0 +1,362 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MasterchainInfoQuery {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterchainBlockShardStateQuery {
+    pub seqno: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterchainBlockShardsQuery {
+    pub seqno: i32,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddressInformationQuery {
+    pub address: String,
+    pub use_v2: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AddressesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletInformationQuery {
+    pub address: String,
+    pub use_v2: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AccountStatesQuery {
+    pub address: Vec<String>,
+    pub include_boc: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TracesQuery {
+    pub account: Option<String>,
+    #[serde(default)]
+    pub trace_id: Vec<String>,
+    #[serde(default)]
+    pub tx_hash: Vec<String>,
+    #[serde(default)]
+    pub msg_hash: Vec<String>,
+    pub mc_seqno: Option<i32>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub include_actions: Option<bool>,
+    #[serde(default)]
+    pub supported_action_types: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingActionsQuery {
+    pub account: Option<String>,
+    #[serde(default)]
+    pub ext_msg_hash: Vec<String>,
+    #[serde(default)]
+    pub supported_action_types: Vec<String>,
+    pub include_transactions: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingTracesQuery {
+    pub account: Option<String>,
+    #[serde(default)]
+    pub ext_msg_hash: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsRecordsQuery {
+    pub wallet: Option<String>,
+    pub domain: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonBurnsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub jetton_wallet: Vec<String>,
+    pub jetton_master: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonTransfersQuery {
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub jetton_wallet: Vec<String>,
+    pub jetton_master: Option<String>,
+    pub direction: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftCollectionsQuery {
+    #[serde(default)]
+    pub collection_address: Vec<String>,
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftSalesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftTransfersQuery {
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub item_address: Vec<String>,
+    pub collection_address: Option<String>,
+    pub direction: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MultisigOrdersQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub multisig_address: Vec<String>,
+    pub parse_actions: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MultisigWalletsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub wallet_address: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+    pub include_orders: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VestingQuery {
+    #[serde(default)]
+    pub contract_address: Vec<String>,
+    #[serde(default)]
+    pub wallet_address: Vec<String>,
+    pub check_whitelist: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransactionsQuery {
+    pub workchain: Option<i32>,
+    pub shard: Option<String>,
+    pub seqno: Option<i32>,
+    pub mc_seqno: Option<i32>,
+    #[serde(default)]
+    pub account: Vec<String>,
+    #[serde(default)]
+    pub exclude_account: Vec<String>,
+    #[serde(default)]
+    pub hash: Vec<String>,
+    pub lt: Option<u64>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BlocksQuery {
+    pub workchain: Option<i32>,
+    pub shard: Option<String>,
+    pub seqno: Option<i32>,
+    pub root_hash: Option<String>,
+    pub file_hash: Option<String>,
+    pub mc_seqno: Option<i32>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TransactionsByMessageQuery {
+    #[serde(default)]
+    pub msg_hash: Vec<String>,
+    pub body_hash: Option<String>,
+    pub opcode: Option<String>,
+    pub direction: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionsByMasterchainBlockQuery {
+    pub seqno: i32,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MessagesQuery {
+    #[serde(default)]
+    pub msg_hash: Vec<String>,
+    pub body_hash: Option<String>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub opcode: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub direction: Option<String>,
+    pub exclude_externals: Option<bool>,
+    pub only_externals: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdjacentTransactionsQuery {
+    pub hash: String,
+    pub direction: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WalletStatesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TopAccountsByBalanceQuery {
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstimateFeeRequest {
+    pub address: String,
+    pub body: String,
+    pub init_code: Option<String>,
+    pub init_data: Option<String>,
+    pub ignore_chksig: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingTransactionsQuery {
+    /// `TonCenter` currently requires at least one account even though its Swagger marks it optional.
+    #[serde(default)]
+    pub account: Vec<String>,
+    #[serde(default)]
+    pub trace_id: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonMastersQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub admin_address: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonWalletsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub jetton_address: Vec<String>,
+    pub exclude_zero_balance: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftItemsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub collection_address: Vec<String>,
+    #[serde(default)]
+    pub index: Vec<String>,
+    pub include_on_sale: Option<bool>,
+    pub sort_by_last_transaction_lt: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendMessageRequest {
+    pub boc: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunGetMethodRequest {
+    pub address: String,
+    pub method: String,
+    pub stack: Vec<StackEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackEntry {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub value: Value,
+}

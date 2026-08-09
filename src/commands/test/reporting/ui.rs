@@ -1,4 +1,5 @@
 use crate::commands::common::error_fmt;
+use crate::commands::test::profiling::UiGasProfileReport;
 use crate::commands::test::reporting::{FuzzExecutionContext, TestReport, TestReporter};
 use crate::commands::test::trace;
 use crate::formatter::FormatterContext;
@@ -22,7 +23,7 @@ use tower_http::services::ServeDir;
 
 // Static directory containing UI assets, embedded into the binary during release builds.
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/crates/acton-test-ui/dist");
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/packages/test-ui/dist");
 
 #[cfg(target_os = "macos")]
 static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
@@ -36,6 +37,7 @@ pub(crate) struct UiServerState {
     pub project_root: String,
     pub project_root_path: PathBuf,
     pub coverage_lcov: Option<Arc<str>>,
+    pub gas_profile: Option<Arc<UiGasProfileReport>>,
 }
 
 pub(crate) struct UiReporter {
@@ -68,7 +70,7 @@ struct UiTestReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     details: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    location: Option<ton_source_map::SourceLocation>,
+    location: Option<tolk_source_map::SourceLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     execution: Option<UiExecutionSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -140,6 +142,7 @@ pub(crate) async fn start_ui_server(
     trace_dir: Option<String>,
     project_root: String,
     coverage_lcov: Option<String>,
+    gas_profile: Option<UiGasProfileReport>,
     listener: std::net::TcpListener,
 ) -> anyhow::Result<()> {
     let project_root_path =
@@ -153,6 +156,7 @@ pub(crate) async fn start_ui_server(
         project_root,
         project_root_path,
         coverage_lcov: coverage_lcov.map(Arc::<str>::from),
+        gas_profile: gas_profile.map(Arc::new),
     });
 
     let app = build_ui_api_router(state);
@@ -162,7 +166,7 @@ pub(crate) async fn start_ui_server(
     let app = {
         let dist_path = PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/crates/acton-test-ui/dist"
+            "/packages/test-ui/dist"
         ));
         app.fallback_service(
             ServeDir::new(&dist_path).fallback(ServeDir::new(dist_path.join("index.html"))),
@@ -198,6 +202,7 @@ fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
         .route("/api/contract/{name}", get(handle_api_contract))
         .route("/api/file", get(handle_api_file))
         .route("/api/coverage.lcov", get(handle_api_coverage_lcov))
+        .route("/api/gas-profile", get(handle_api_gas_profile))
         .route("/api/config", get(handle_api_config))
         .route("/api/health", get(handle_api_health))
         .with_state(state)
@@ -379,11 +384,15 @@ async fn handle_api_file(
 #[derive(Serialize)]
 struct ConfigResponse {
     project_root: String,
+    coverage_available: bool,
+    gas_profile_available: bool,
 }
 
 async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     Json(ConfigResponse {
         project_root: state.project_root.clone(),
+        coverage_available: state.coverage_lcov.is_some(),
+        gas_profile_available: state.gas_profile.is_some(),
     })
 }
 
@@ -397,6 +406,14 @@ async fn handle_api_coverage_lcov(State(state): State<Arc<UiServerState>>) -> im
         coverage_lcov.to_string(),
     )
         .into_response()
+}
+
+async fn handle_api_gas_profile(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
+    let Some(gas_profile) = &state.gas_profile else {
+        return StatusCode::NO_CONTENT.into_response();
+    };
+
+    Json(gas_profile.as_ref()).into_response()
 }
 
 async fn handle_api_trace(

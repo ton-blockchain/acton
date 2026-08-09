@@ -333,13 +333,13 @@ fun test() {
 
     <caret>address2;
 
-    val foo: <caret>address2; // TODO
+    val foo: <caret>address2;
 }
 ------------------------------------------------------------------------
 2:16 -> 0:5 resolved
 5:29 -> 2:4 resolved
 7:4 -> 5:8 resolved
-9:13 -> 5:8 resolved
+9:13 -> 0:5 resolved
 
 ========================================================================
 Resolve keyword

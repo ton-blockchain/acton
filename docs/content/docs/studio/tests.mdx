@@ -1,0 +1,141 @@
+---
+title: "Tests"
+description: "Run Acton tests from Studio, collect CLI test history, and inspect failures, traces, logs, and output"
+---
+
+The **Tests** area keeps a project-wide history of test runs. Runs started from Studio and runs
+reported by `acton test` use the same result format, so you can move between the browser and terminal
+without maintaining separate test workflows.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/tests-light.png"
+    alt="Studio test history in light theme with CLI and Studio runs, status, result, duration, and start time"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/tests-dark.png"
+    alt="Studio test history in dark theme with CLI and Studio runs, status, result, duration, and start time"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+## Start tests from Studio
+
+Select **Run tests** and configure the runner:
+
+| Field | Effect |
+| --- | --- |
+| Test paths | Limits discovery to comma- or newline-separated files and directories; empty means the whole project |
+| Test name filter | Runs tests whose names match the filter |
+| Include patterns | Adds comma-separated glob patterns such as `**/integration/**` |
+| Exclude patterns | Removes comma-separated glob patterns such as `**/slow/**` |
+| Fail fast | Stops after the first failed test |
+| Save traces | Keeps transaction traces so the details view can reconstruct execution |
+
+Studio starts the same Acton test command used by the CLI. A Studio-owned run can be stopped from
+its details page while it is running. Stopping the run updates its status to **Cancelled** and keeps
+the output collected before cancellation.
+
+## Report terminal runs to Studio
+
+With Studio running in the same project, use the CLI as usual:
+
+```bash
+acton test
+acton test tests/counter.test.tolk --filter "test deploy"
+```
+
+Studio discovers its local daemon before adding the reporter. If no matching Studio daemon is
+available, `acton test` keeps its normal terminal-only behavior.
+
+If a run does not appear, follow [Tests do not appear](/docs/studio/troubleshooting#tests-do-not-appear).
+
+The **Source** column distinguishes runs started by **Studio** from runs started by the **CLI**.
+Manual CLI runs keep their normal terminal output; Studio stores their structured reports and
+per-test artifacts rather than redirecting the terminal stream.
+
+### Disable reporting
+
+Disable reporting for one command when a run should not appear in Studio:
+
+```bash
+acton test --no-studio-reporting
+```
+
+Disable it for the project in `Acton.toml`:
+
+```toml
+[test]
+studio-reporting = false
+```
+
+The CLI flag also applies to mutation runs and is forwarded to their child test processes.
+
+## Read the run table
+
+Each row shows:
+
+- total number of test reports
+- final or current status
+- CLI or Studio source
+- passed, failed, skipped, and todo counts
+- execution duration
+- start time
+
+Queued and running rows update while Studio receives events. Completed runs remain available after
+Studio restarts.
+
+## Investigate a run
+
+Open a row to view its test-run details. Studio selects the first failing test when the run contains
+failures; otherwise it selects the first report.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/test-details-light.png"
+    alt="Failed test details in Acton Studio light theme with error context, source code, and test navigation"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/test-details-dark.png"
+    alt="Failed test details in Acton Studio dark theme with error context, source code, and test navigation"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+Use the tabs for different questions:
+
+- **Info:** What failed? Read the matcher message, source location, highlighted source, fee summary,
+  and test metadata.
+- **Transactions:** Where did execution diverge? Follow the transaction tree, open a node, and read
+  compute, action, storage, bounce, messages, exit codes, and fees.
+- **Logs:** What did the executor or VM do? Open executor and VM logs for low-level diagnosis.
+
+Select another test from the suite list without leaving the run. The URL stores the selected test,
+so a browser refresh returns to the same report.
+
+In **Transactions**, start with the exit code and compute phase, then inspect the action phase and
+outgoing messages. Storage and bounce phases matter when the failure involves rent, account state,
+or a rejected message.
+
+Use **Runner output** for build errors, panics, and process-level failures that happened before a
+test report was produced. Studio-started runs capture stdout and stderr. A manual CLI run leaves
+those streams in its terminal.
+
+The embedded details view uses the same trace and result model as [Test UI](/docs/testing/test-ui/overview).
+See the [Test UI reference](/docs/testing/test-ui/reference) for a deeper description of transaction
+panels and trace controls.
+
+## Recommended workflow
+
+1. Keep Studio open while iterating on a failing test.
+2. Run a focused path or name filter from Studio or the CLI.
+3. Open the first failed test and read **Info** before opening VM logs.
+4. Use **Transactions** to identify the first unexpected state change or exit code.
+5. Rerun after the fix and compare the latest run with the previous result.
+
+<Callout type="tip">
+  Keep **Save traces** enabled for debugging. Disable it for short performance measurements when you
+  only need pass or fail results.
+</Callout>

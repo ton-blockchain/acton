@@ -1,5 +1,6 @@
 # Acton project directories
 .acton/
+.studio/
 /objs
 /build
 .test/
@@ -22,14 +23,16 @@ docs/out
 **/dist
 **/node_modules
 **/target
+**/.wrangler
 **/.eslintcache
+test-results/
 
 # OS files
 .DS_Store
 Thumbs.db
 
 .env
-
+.worktree/
 gen/
 *.mnemonic
 wallets.toml
@@ -38,4 +41,9 @@ toncenter-*.json
 libraries.toml
 AGENTS.md
 block.tlb
+!packages/localnet-ui/src/explorer/cell-inspector/block.tlb
 debug.entitlements
+.codegraph/
+.playwright-mcp/
+.mcp.json
+crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/

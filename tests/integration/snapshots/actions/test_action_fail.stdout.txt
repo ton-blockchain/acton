@@ -13,12 +13,12 @@
   ✓ action fail [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── empty 0.2 TON -> simple B                                                   gas=2347 aborted action_result_code=37
+       └── empty 0.2 GRAM -> simple B                                                  gas=2347 aborted action_result_code=37
            ├── account created
            ├── Action phase failed
-           ├── Description: Not enough Toncoin
+           ├── Description: Not enough GRAM
            └── Executed actions:
-               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL  balance: 0.099843532 TON  at contracts/simple[LINE]
-               └── empty 0.5 TON -> new-child             balance: 0 TON            at contracts/simple[LINE]
+               ├── reserve 0.1 GRAM BOUNCE_ON_ACTION_FAIL  balance: 0.099843532 GRAM  at contracts/simple[LINE]
+               └── empty 0.5 GRAM -> new-child             balance: 0 GRAM            at contracts/simple[LINE]
 
  ✓ 1 passed in 1 file

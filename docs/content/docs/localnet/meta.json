@@ -7,6 +7,8 @@
     "forking-from-network",
     "startup-accounts",
     "persistence-and-snapshots",
-    "api-compatibility"
+    "control-api",
+    "api-compatibility",
+    "liteapi-support"
   ]
 }

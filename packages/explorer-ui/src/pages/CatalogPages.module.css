@@ -1,0 +1,39 @@
+.container {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  flex-direction: column;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 24px 32px 48px;
+}
+
+.hero {
+  display: flex;
+  padding: 4px 0 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 40px;
+}
+
+.container.toolHeader {
+  padding-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .container {
+    padding: 16px 16px 32px;
+  }
+
+  .title {
+    font-size: var(--acton-font-size-2xl);
+    line-height: 1.2;
+  }
+}

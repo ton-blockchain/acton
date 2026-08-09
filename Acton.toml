@@ -1,7 +1,7 @@
 [package]
 name = "Acton"
 description = "All-in-one toolkit for TON Blockchain smartcontract development"
-version = "1.0.0"
+version = "1.1.0"
 license = "MIT"
 
 [test]
@@ -11,10 +11,10 @@ fail-on-diff = false
 [test.mutation]
 
 [lint]
-exclude = ["tests/**", "**/templates/**"]
+exclude = ["tests/**", "**/templates/**", "packages/test-ui/e2e/**", "crates/ton-language-server-core/tests/fixtures/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**"]
 
 [fmt]
-ignore = ["crates/tolk-compiler/**"]
+ignore = ["crates/tolk-compiler/**", "crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/**", "tests/integration/snapshots/check/**"]
 
 [localnet]
 port = 3010

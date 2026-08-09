@@ -1,0 +1,17 @@
+{
+  "crc": {
+    "decoded_hash_matches": true,
+    "flag_set": true,
+    "four_bytes_longer": true,
+    "hex": "b5ee9c724101020100080001041234010002ab21632415"
+  },
+  "plain": {
+    "decoded_hash_matches": true,
+    "hex": "b5ee9c720101020100080001041234010002ab",
+    "matches_tycho_encode": true
+  },
+  "slice_remainder": {
+    "decoded_hash_matches": true,
+    "hex": "b5ee9c72010102010008000104beef01000222"
+  }
+}

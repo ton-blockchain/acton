@@ -1,0 +1,193 @@
+.dialogContent {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.form {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.form input[type="number"] {
+  appearance: textfield;
+}
+
+.form input[type="number"]::-webkit-inner-spin-button,
+.form input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.formBody {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: var(--acton-space-5);
+  padding: 0 var(--acton-space-5) var(--acton-space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.advancedContent {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.checkboxGroup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.fullTonFields {
+  display: grid;
+  gap: var(--acton-space-5);
+}
+
+.importPicker {
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+}
+
+.importHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-4);
+}
+
+.importHeader > div {
+  display: grid;
+  gap: var(--acton-space-1);
+  min-width: 0;
+}
+
+.importHeader strong {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.importHeader > div > span,
+.importHint {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
+.importList {
+  max-height: 19rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.importColumns,
+.importRow {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.42fr) minmax(10rem, 0.4fr) minmax(16rem, 1fr) 2rem;
+  gap: var(--acton-space-3);
+}
+
+.importColumns {
+  align-items: center;
+  padding: var(--acton-space-2) var(--acton-space-4);
+  background: var(--acton-color-surface-group);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.importColumns::after {
+  content: "";
+}
+
+.importRow {
+  align-items: center;
+  padding: var(--acton-space-3) var(--acton-space-4);
+}
+
+.importRow + .importRow {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.importAddressInput {
+  width: 100%;
+}
+
+.importMessage {
+  min-height: 4.5rem;
+  padding: var(--acton-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--acton-space-3);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  text-align: center;
+}
+
+.importHint {
+  margin: 0;
+  padding: var(--acton-space-3) var(--acton-space-4);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.formActions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-4) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+}
+
+@media (max-width: 680px) {
+  .formGrid,
+  .checkboxGroup {
+    grid-template-columns: 1fr;
+  }
+
+  .formBody {
+    padding: 0 var(--acton-space-4) var(--acton-space-4);
+  }
+
+  .formActions {
+    padding: var(--acton-space-3) var(--acton-space-4);
+  }
+
+  .importHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .importColumns {
+    display: none;
+  }
+
+  .importRow {
+    grid-template-columns: minmax(0, 1fr) 2rem;
+  }
+
+  .importRow > :not(:last-child) {
+    grid-column: 1;
+  }
+
+  .importRow > :last-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

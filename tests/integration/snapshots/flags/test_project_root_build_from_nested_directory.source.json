@@ -1,0 +1,348 @@
+{
+  "bundle": {
+    "compiler": {
+      "language": "tolk",
+      "params": {
+        "compiler_version": "1.4.2"
+      },
+      "version": "1.4.2"
+    },
+    "compiler_abi": {
+      "abi_schema_version": "1.0",
+      "alias_instantiations": [],
+      "compiler_name": "tolk",
+      "compiler_version": "1.4.2",
+      "contract_name": "",
+      "declarations": [],
+      "emitted_events": [],
+      "get_methods": [],
+      "incoming_external": [],
+      "incoming_messages": [],
+      "outgoing_messages": [],
+      "storage": {},
+      "struct_instantiations": [],
+      "thrown_errors": [],
+      "unique_types": [
+        {
+          "kind": "void"
+        },
+        {
+          "kind": "int"
+        },
+        {
+          "kind": "slice"
+        },
+        {
+          "kind": "cell"
+        },
+        {
+          "kind": "builder"
+        },
+        {
+          "kind": "bool"
+        },
+        {
+          "kind": "coins"
+        },
+        {
+          "kind": "address"
+        },
+        {
+          "kind": "intN",
+          "n": 32
+        },
+        {
+          "kind": "uintN",
+          "n": 32
+        },
+        {
+          "kind": "intN",
+          "n": 64
+        },
+        {
+          "kind": "uintN",
+          "n": 64
+        }
+      ]
+    },
+    "entrypoint": "contracts/simple.tolk",
+    "files": [
+      {
+        "content": "\nfun onInternalMessage(in: InMessage) {}\nfun onBouncedMessage(_: InMessageBounced) {}\n",
+        "content_hash": "df7f9c45c17354ec4b3474bc0423cbfb293ad8707ccb2d70b06306b5259829ad",
+        "has_include_directives": true,
+        "include_in_command": true,
+        "is_stdlib": false,
+        "path": "contracts/simple.tolk"
+      },
+      {
+        "content": "{\"abi_schema_version\":\"1.0\",\"contract_name\":\"\",\"unique_types\":[{\"kind\":\"void\"},{\"kind\":\"int\"},{\"kind\":\"slice\"},{\"kind\":\"cell\"},{\"kind\":\"builder\"},{\"kind\":\"bool\"},{\"kind\":\"coins\"},{\"kind\":\"address\"},{\"kind\":\"intN\",\"n\":32},{\"kind\":\"uintN\",\"n\":32},{\"kind\":\"intN\",\"n\":64},{\"kind\":\"uintN\",\"n\":64}],\"struct_instantiations\":[],\"alias_instantiations\":[],\"declarations\":[],\"incoming_messages\":[],\"incoming_external\":[],\"outgoing_messages\":[],\"emitted_events\":[],\"storage\":{},\"get_methods\":[],\"thrown_errors\":[],\"compiler_name\":\"tolk\",\"compiler_version\":\"1.4.2\"}\n",
+        "content_hash": "e5c984dceabf492c794b993ce4a9f1f74948891e6eff569d4b5c2a7d05ade124",
+        "has_include_directives": null,
+        "include_in_command": null,
+        "is_stdlib": null,
+        "path": "output/simple.abi.json"
+      }
+    ],
+    "source_bundle_hash": "f2f64f07b291e34027854b171c8924ee0166e76068b91c9ea1691b487cbe1424",
+    "source_map": {
+      "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
+      "debug_marks_base64": "te6ccgEBFwEAqgACASABAgFDv9DqPnecvp53Ip1be9RbjsFl8qyckXeCPUJds3mi5hRAsAMBQ7/LUUtpEnlC4z33SeGHxRhIq/htUa7i3D8ghbwxhQTn4/ARAgPOQAQFAgEgBgcCAWoPDwIBIBQIAgEgCQoCASAVCwIBIAsMAQFIDgEBIA0BASAOAASoCAAEqBgBASAQAASoIAIDzkASEwEB/BYCAUgUFAIBIBUVAQEgFgAB1Q==",
+      "debug_marks_json": [
+        {
+          "f_idx": 0,
+          "ir_import": [
+            0
+          ],
+          "is_builtin": false,
+          "is_inlined": false,
+          "kind": "enter_fun",
+          "mark_id": 0,
+          "range": [
+            1,
+            2,
+            5,
+            2,
+            22
+          ]
+        },
+        {
+          "kind": "stack",
+          "mark_id": 1,
+          "stack": [
+            0
+          ]
+        },
+        {
+          "ir_lazy_slice": null,
+          "ir_slots": [
+            0
+          ],
+          "is_parameter": true,
+          "kind": "var",
+          "mark_id": 2,
+          "ty_idx": 2,
+          "var_name": "in.body"
+        },
+        {
+          "kind": "stack",
+          "mark_id": 3,
+          "stack": []
+        },
+        {
+          "kind": "loc",
+          "mark_id": 4,
+          "range": [
+            1,
+            2,
+            5,
+            2,
+            22
+          ]
+        },
+        {
+          "kind": "stack",
+          "mark_id": 5,
+          "stack": [
+            1
+          ]
+        },
+        {
+          "kind": "loc",
+          "mark_id": 6,
+          "range": [
+            1,
+            2,
+            5,
+            2,
+            22
+          ]
+        },
+        {
+          "kind": "stack",
+          "mark_id": 7,
+          "stack": []
+        },
+        {
+          "f_idx": 1,
+          "ir_import": [
+            0
+          ],
+          "is_builtin": false,
+          "is_inlined": true,
+          "kind": "enter_fun",
+          "mark_id": 8,
+          "range": [
+            1,
+            2,
+            5,
+            2,
+            22
+          ]
+        },
+        {
+          "ir_lazy_slice": null,
+          "ir_slots": [
+            0
+          ],
+          "is_parameter": true,
+          "kind": "var",
+          "mark_id": 9,
+          "ty_idx": 2,
+          "var_name": "in.body"
+        },
+        {
+          "f_idx": 1,
+          "ir_return": [],
+          "kind": "leave_fun",
+          "mark_id": 10,
+          "range": [
+            1,
+            3,
+            44,
+            3,
+            45
+          ]
+        },
+        {
+          "f_idx": 0,
+          "ir_return": [],
+          "kind": "leave_fun",
+          "mark_id": 11,
+          "range": [
+            1,
+            2,
+            39,
+            2,
+            40
+          ]
+        },
+        {
+          "kind": "stack",
+          "mark_id": 12,
+          "stack": []
+        },
+        {
+          "f_idx": 0,
+          "ir_return": [],
+          "kind": "leave_fun",
+          "mark_id": 13,
+          "range": [
+            1,
+            2,
+            39,
+            2,
+            40
+          ]
+        }
+      ],
+      "symbol_types_json": {
+        "alias_instantiations": [],
+        "declarations": [],
+        "files": [
+          {
+            "file_id": 0,
+            "file_name": "@stdlib/common.tolk",
+            "imports": [],
+            "size_chars": 75314
+          },
+          {
+            "file_id": 1,
+            "file_name": "contracts/simple.tolk",
+            "imports": [],
+            "size_chars": 86
+          }
+        ],
+        "functions": [
+          {
+            "end_loc": [
+              1,
+              2,
+              39,
+              2,
+              40
+            ],
+            "f_idx": 0,
+            "ident_loc": [
+              1,
+              2,
+              5,
+              2,
+              22
+            ],
+            "name": "onInternalMessage",
+            "num_params": 1,
+            "return_ty_idx": 0
+          },
+          {
+            "end_loc": [
+              1,
+              3,
+              44,
+              3,
+              45
+            ],
+            "f_idx": 1,
+            "ident_loc": [
+              1,
+              3,
+              5,
+              3,
+              21
+            ],
+            "name": "onBouncedMessage",
+            "num_params": 1,
+            "return_ty_idx": 0
+          }
+        ],
+        "struct_instantiations": [],
+        "unique_types": [
+          {
+            "kind": "void"
+          },
+          {
+            "kind": "int"
+          },
+          {
+            "kind": "slice"
+          },
+          {
+            "kind": "cell"
+          },
+          {
+            "kind": "builder"
+          },
+          {
+            "kind": "bool"
+          },
+          {
+            "kind": "coins"
+          },
+          {
+            "kind": "address"
+          },
+          {
+            "kind": "intN",
+            "n": 32
+          },
+          {
+            "kind": "uintN",
+            "n": 32
+          },
+          {
+            "kind": "intN",
+            "n": 64
+          },
+          {
+            "kind": "uintN",
+            "n": 64
+          }
+        ]
+      }
+    },
+    "storage_revision": "local",
+    "verified_at": 0
+  },
+  "code_hash": "E67EEC3BD481C7910C87A061E60CA509E82EDD687A0E1C8BF1B437E6DE3E6973",
+  "verified": true
+}

@@ -1,0 +1,855 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`network configuration parser parses a direct getConfigAll dictionary and keeps signed extension IDs 1`] = `
+{
+  "address": "-1:5555555555555555555555555555555555555555555555555555555555555555",
+  "blockCreateFees": [
+    {
+      "format": "gram",
+      "label": "Masterchain block fee",
+      "value": 1700000000n,
+    },
+    {
+      "format": "gram",
+      "label": "Basechain block fee",
+      "value": 1000000000n,
+    },
+  ],
+  "blockLimits": [
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Underload",
+          "value": 15,
+        },
+        {
+          "format": "bytes",
+          "label": "Soft limit",
+          "value": 16,
+        },
+        {
+          "format": "bytes",
+          "label": "Hard limit",
+          "value": 17,
+        },
+      ],
+      "label": "Bytes",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 18,
+        },
+        {
+          "label": "Soft limit",
+          "value": 19,
+        },
+        {
+          "label": "Hard limit",
+          "value": 20,
+        },
+      ],
+      "label": "Gas",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 21,
+        },
+        {
+          "label": "Soft limit",
+          "value": 22,
+        },
+        {
+          "label": "Hard limit",
+          "value": 23,
+        },
+      ],
+      "label": "LT delta",
+    },
+  ],
+  "burning": {
+    "blackholeAddress": "-1:6666666666666666666666666666666666666666666666666666666666666666",
+    "feeBurnDenom": 2,
+    "feeBurnNum": 1,
+  },
+  "catchain": [
+    {
+      "label": "Shuffle MC validators",
+      "value": true,
+    },
+    {
+      "label": "MC catchain lifetime",
+      "value": 36,
+    },
+    {
+      "label": "Shard catchain lifetime",
+      "value": 37,
+    },
+    {
+      "label": "Shard validators lifetime",
+      "value": 38,
+    },
+    {
+      "label": "Shard validators num",
+      "value": 39,
+    },
+  ],
+  "complaintPricing": [
+    {
+      "format": "gram",
+      "label": "Deposit",
+      "value": 1000000000n,
+    },
+    {
+      "format": "gram",
+      "label": "Bit price",
+      "value": 1n,
+    },
+    {
+      "format": "gram",
+      "label": "Cell price",
+      "value": 500n,
+    },
+  ],
+  "configAddressParameter": "-1:5555555555555555555555555555555555555555555555555555555555555555",
+  "configVoting": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "label": "Min total rounds",
+              "value": 2,
+            },
+            {
+              "label": "Max total rounds",
+              "value": 6,
+            },
+            {
+              "label": "Min wins",
+              "value": 2,
+            },
+            {
+              "label": "Max losses",
+              "value": 5,
+            },
+            {
+              "format": "duration",
+              "label": "Min store sec",
+              "value": 1000000,
+            },
+            {
+              "format": "duration",
+              "label": "Max store sec",
+              "value": 10000000,
+            },
+            {
+              "format": "gram",
+              "label": "Bit price",
+              "value": 1,
+            },
+            {
+              "format": "gram",
+              "label": "Cell price",
+              "value": 500,
+            },
+          ],
+          "label": "Config proposal setup",
+        },
+      ],
+      "label": "Normal params",
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "label": "Min total rounds",
+              "value": 4,
+            },
+            {
+              "label": "Max total rounds",
+              "value": 7,
+            },
+            {
+              "label": "Min wins",
+              "value": 3,
+            },
+            {
+              "label": "Max losses",
+              "value": 5,
+            },
+            {
+              "format": "duration",
+              "label": "Min store sec",
+              "value": 5000000,
+            },
+            {
+              "format": "duration",
+              "label": "Max store sec",
+              "value": 20000000,
+            },
+            {
+              "format": "gram",
+              "label": "Bit price",
+              "value": 2,
+            },
+            {
+              "format": "gram",
+              "label": "Cell price",
+              "value": 1000,
+            },
+          ],
+          "label": "Config proposal setup",
+        },
+      ],
+      "label": "Critical params",
+    },
+  ],
+  "consensus": [
+    {
+      "label": "Use quic",
+      "value": false,
+    },
+    {
+      "label": "New catchain ids",
+      "value": true,
+    },
+    {
+      "label": "Round candidates",
+      "value": 4,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Next candidate delay ms",
+      "value": 5,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Consensus timeout ms",
+      "value": 6,
+    },
+    {
+      "label": "Fast attempts",
+      "value": 7,
+    },
+    {
+      "label": "Attempt duration",
+      "value": 8,
+    },
+    {
+      "label": "Catchain max deps",
+      "value": 9,
+    },
+    {
+      "format": "bytes",
+      "label": "Max block bytes",
+      "value": 10,
+    },
+    {
+      "format": "bytes",
+      "label": "Max collated bytes",
+      "value": 11,
+    },
+    {
+      "label": "Proto version",
+      "value": 12,
+    },
+    {
+      "label": "Catchain max blocks coeff",
+      "value": 13,
+    },
+  ],
+  "critical": [
+    8,
+    31,
+    -1,
+  ],
+  "currentValidatorSet": {
+    "main": 1,
+    "total": 1,
+    "utimeSince": 1786072840,
+    "utimeUntil": 1786138376,
+    "validators": [
+      {
+        "index": 0,
+        "publicKey": "9191919191919191919191919191919191919191919191919191919191919191",
+        "weight": 400n,
+      },
+    ],
+  },
+  "electionTiming": [
+    {
+      "format": "duration",
+      "label": "Validators elected for",
+      "value": 65536,
+    },
+    {
+      "format": "duration",
+      "label": "Elections start before",
+      "value": 32768,
+    },
+    {
+      "format": "duration",
+      "label": "Elections end before",
+      "value": 8192,
+    },
+    {
+      "format": "duration",
+      "label": "Stake held for",
+      "value": 32768,
+    },
+  ],
+  "extension": {
+    "description": "Address of the testnet NFT collection representing ownership of configuration slots",
+    "hasRawHex": true,
+    "title": "Config ownership collection",
+  },
+  "extraCurrencies": [
+    {
+      "amount": 1000000000000n,
+      "id": -17,
+    },
+    {
+      "amount": 666666666666n,
+      "id": 239,
+    },
+  ],
+  "forwardPrices": [
+    {
+      "format": "gram",
+      "label": "Lump price",
+      "value": 30n,
+    },
+    {
+      "format": "gram-per-65536",
+      "label": "Bit price",
+      "value": 31n,
+    },
+    {
+      "format": "gram-per-65536",
+      "label": "Cell price",
+      "value": 32n,
+    },
+    {
+      "label": "Ihr price factor",
+      "value": 33,
+    },
+    {
+      "label": "First frac",
+      "value": 34,
+    },
+    {
+      "label": "Next frac",
+      "value": 35,
+    },
+  ],
+  "fundamental": [
+    {
+      "address": "-1:0000000000000000000000000000000000000000000000000000000000001234",
+      "codeHash": "0x0000000000000000000000000000000000000000000000000000000000001234",
+    },
+  ],
+  "globalId": -239,
+  "globalVersion": {
+    "capabilities": 1006n,
+    "version": 15,
+  },
+  "hasRootRawHex": true,
+  "ids": [
+    0,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    28,
+    29,
+    31,
+    32,
+    34,
+    43,
+    44,
+    45,
+    71,
+    79,
+    -1,
+  ],
+  "jettonBridge": {
+    "bridgeAddress": "-1:b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+    "externalChainAddress": "0xb3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+    "kind": "jetton",
+    "oracleAddress": "-1:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "oracles": [
+      {
+        "index": 0,
+        "key": "0x0000000000000000000000000000000000000000000000000000000000000033",
+        "value": "0x0000000000000000000000000000000000000000000000000000000000000044",
+      },
+    ],
+    "prices": [
+      {
+        "format": "gram",
+        "label": "Bridge burn fee",
+        "value": 1n,
+      },
+      {
+        "format": "gram",
+        "label": "Bridge mint fee",
+        "value": 2n,
+      },
+      {
+        "format": "gram",
+        "label": "Wallet min GRAM for storage",
+        "value": 3n,
+      },
+      {
+        "format": "gram",
+        "label": "Wallet gas consumption",
+        "value": 4n,
+      },
+      {
+        "format": "gram",
+        "label": "Minter min GRAM for storage",
+        "value": 5n,
+      },
+      {
+        "format": "gram",
+        "label": "Discover gas consumption",
+        "value": 6n,
+      },
+    ],
+    "stateFlags": 1,
+  },
+  "mandatory": [
+    0,
+    5,
+  ],
+  "masterchainBlockLimits": [
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Underload",
+          "value": 1,
+        },
+        {
+          "format": "bytes",
+          "label": "Soft limit",
+          "value": 2,
+        },
+        {
+          "format": "bytes",
+          "label": "Hard limit",
+          "value": 3,
+        },
+      ],
+      "label": "Bytes",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 4,
+        },
+        {
+          "label": "Soft limit",
+          "value": 5,
+        },
+        {
+          "label": "Hard limit",
+          "value": 6,
+        },
+      ],
+      "label": "Gas",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 7,
+        },
+        {
+          "label": "Soft limit",
+          "value": 8,
+        },
+        {
+          "label": "Hard limit",
+          "value": 9,
+        },
+      ],
+      "label": "LT delta",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 10,
+        },
+        {
+          "label": "Soft limit",
+          "value": 11,
+        },
+        {
+          "label": "Hard limit",
+          "value": 12,
+        },
+      ],
+      "label": "Collated data",
+    },
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Max bytes",
+          "value": 13,
+        },
+        {
+          "label": "Max msgs",
+          "value": 14,
+        },
+      ],
+      "label": "Imported msg queue",
+    },
+  ],
+  "masterchainForwardPrices": [
+    {
+      "format": "gram",
+      "label": "Lump price",
+      "value": 24n,
+    },
+    {
+      "format": "gram-per-65536",
+      "label": "Bit price",
+      "value": 25n,
+    },
+    {
+      "format": "gram-per-65536",
+      "label": "Cell price",
+      "value": 26n,
+    },
+    {
+      "label": "Ihr price factor",
+      "value": 27,
+    },
+    {
+      "label": "First frac",
+      "value": 28,
+    },
+    {
+      "label": "Next frac",
+      "value": 29,
+    },
+  ],
+  "masterchainGasPrices": [
+    {
+      "format": "gram",
+      "label": "Gas price",
+      "value": 1n,
+    },
+    {
+      "label": "Gas limit",
+      "value": 2n,
+    },
+    {
+      "label": "Gas credit",
+      "value": 3n,
+    },
+    {
+      "label": "Block gas limit",
+      "value": 4n,
+    },
+    {
+      "format": "gram",
+      "label": "Freeze due limit",
+      "value": 5n,
+    },
+    {
+      "format": "gram",
+      "label": "Delete due limit",
+      "value": 6n,
+    },
+  ],
+  "oracleBridge": {
+    "bridgeAddress": "-1:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "externalChainAddress": "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+    "kind": "oracle",
+    "oracleAddress": "-1:a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+    "oracles": [
+      {
+        "index": 0,
+        "key": "0x0000000000000000000000000000000000000000000000000000000000000011",
+        "value": "0x0000000000000000000000000000000000000000000000000000000000000022",
+      },
+    ],
+  },
+  "precompiledContracts": [
+    {
+      "codeHash": "0x0000000000000000000000000000000000000000000000000000000000000011",
+      "gasUsage": 1000n,
+      "index": 0,
+    },
+    {
+      "codeHash": "0x0000000000000000000000000000000000000000000000000000000000000022",
+      "gasUsage": 2000n,
+      "index": 1,
+    },
+  ],
+  "previousValidatorSet": {
+    "main": 1,
+    "total": 2,
+    "totalWeight": 300n,
+    "utimeSince": 1786007304,
+    "utimeUntil": 1786072840,
+    "validators": [
+      {
+        "adnlAddress": "0101010101010101010101010101010101010101010101010101010101010101",
+        "index": 0,
+        "publicKey": "8181818181818181818181818181818181818181818181818181818181818181",
+        "weight": 100n,
+      },
+      {
+        "adnlAddress": "0202020202020202020202020202020202020202020202020202020202020202",
+        "index": 1,
+        "publicKey": "8282828282828282828282828282828282828282828282828282828282828282",
+        "weight": 200n,
+      },
+    ],
+  },
+  "sizeLimits": [
+    {
+      "label": "Max msg bits",
+      "value": 2097152,
+    },
+    {
+      "label": "Max msg cells",
+      "value": 8192,
+    },
+    {
+      "label": "Max library cells",
+      "value": 200,
+    },
+    {
+      "label": "Max VM data depth",
+      "value": 512,
+    },
+    {
+      "label": "Max ext msg size",
+      "value": 65535,
+    },
+    {
+      "label": "Max ext msg depth",
+      "value": 512,
+    },
+    {
+      "label": "Max acc state cells",
+      "value": 65536,
+    },
+    {
+      "label": "Max MC acc state cells",
+      "value": 2048,
+    },
+    {
+      "label": "Max acc public libraries",
+      "value": 256,
+    },
+    {
+      "label": "Defer out queue size limit",
+      "value": 256,
+    },
+    {
+      "label": "Max msg extra currencies",
+      "value": 0,
+    },
+    {
+      "label": "Max acc fixed prefix length",
+      "value": 8,
+    },
+    {
+      "label": "Acc state cells for storage dict",
+      "value": 26,
+    },
+    {
+      "label": "Max transaction library loads",
+      "value": 3,
+    },
+  ],
+  "stakeLimits": [
+    {
+      "format": "gram",
+      "label": "Min stake",
+      "value": 300000000000000n,
+    },
+    {
+      "format": "gram",
+      "label": "Max stake",
+      "value": 10000000000000000n,
+    },
+    {
+      "format": "gram",
+      "label": "Min total stake",
+      "value": 75000000000000n,
+    },
+    {
+      "label": "Max stake factor",
+      "value": 294912,
+    },
+  ],
+  "storagePrices": [
+    {
+      "children": [
+        {
+          "format": "date",
+          "label": "Utime since",
+          "value": 0,
+        },
+        {
+          "format": "gram",
+          "label": "Bit price ps",
+          "value": 1n,
+        },
+        {
+          "format": "gram",
+          "label": "Cell price ps",
+          "value": 500n,
+        },
+        {
+          "format": "gram",
+          "label": "MC bit price ps",
+          "value": 1000n,
+        },
+        {
+          "format": "gram",
+          "label": "MC cell price ps",
+          "value": 500000n,
+        },
+      ],
+      "label": "Initial storage prices",
+    },
+    {
+      "children": [
+        {
+          "format": "date",
+          "label": "Utime since",
+          "value": 1777500000,
+        },
+        {
+          "format": "gram",
+          "label": "Bit price ps",
+          "value": 0n,
+        },
+        {
+          "format": "gram",
+          "label": "Cell price ps",
+          "value": 135n,
+        },
+        {
+          "format": "gram",
+          "label": "MC bit price ps",
+          "value": 1000n,
+        },
+        {
+          "format": "gram",
+          "label": "MC cell price ps",
+          "value": 500000n,
+        },
+      ],
+      "label": "Storage prices from Apr 29, 2026",
+    },
+  ],
+  "suspendedAddresses": {
+    "addresses": [
+      "-1:5555555555555555555555555555555555555555555555555555555555555555",
+      "0:4444444444444444444444444444444444444444444444444444444444444444",
+    ],
+    "suspendedUntil": 1803189600,
+  },
+  "validatorLimits": [
+    {
+      "label": "Max validators",
+      "value": 400,
+    },
+    {
+      "label": "Max main validators",
+      "value": 100,
+    },
+    {
+      "label": "Min validators",
+      "value": 75,
+    },
+  ],
+  "version": {
+    "entries": [
+      {
+        "key": "Version",
+        "value": {
+          "kind": "scalar",
+          "typeName": undefined,
+          "value": "15",
+        },
+      },
+      {
+        "key": "Capabilities",
+        "value": {
+          "kind": "scalar",
+          "typeName": "uint",
+          "value": "1006",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "Global version",
+  },
+  "workchainGasPrices": [
+    {
+      "format": "gram",
+      "label": "Gas price",
+      "value": 7n,
+    },
+    {
+      "label": "Gas limit",
+      "value": 8n,
+    },
+    {
+      "label": "Special gas limit",
+      "value": 9n,
+    },
+    {
+      "label": "Gas credit",
+      "value": 10n,
+    },
+    {
+      "label": "Block gas limit",
+      "value": 11n,
+    },
+    {
+      "format": "gram",
+      "label": "Freeze due limit",
+      "value": 12n,
+    },
+    {
+      "format": "gram",
+      "label": "Delete due limit",
+      "value": 13n,
+    },
+  ],
+}
+`;

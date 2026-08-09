@@ -1,0 +1,32 @@
+.stack {
+  display: grid;
+  max-width: 46rem;
+  gap: var(--acton-space-5);
+}
+
+.content {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--acton-space-2) var(--acton-space-4);
+  margin: 0;
+  font-size: var(--acton-font-size-sm);
+}
+
+.values dt {
+  color: var(--acton-color-text-muted);
+}
+
+.values dd {
+  margin: 0;
+  color: var(--acton-color-text);
+}
+
+.narrow {
+  max-width: 22rem;
+}

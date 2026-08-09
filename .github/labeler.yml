@@ -17,14 +17,16 @@
 "test-runner":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-test-ui/**"
+          - "packages/test-ui/**"
           - "src/commands/test/**"
 
 "IDE Support":
   - changed-files:
       - any-glob-to-any-file:
           - "crates/dap-client/**"
-          - "crates/ton-ls/**"
+          - "crates/ton-language-server-core/**"
+          - "crates/ton-language-server-native/**"
+          - "crates/ton-language-server-wasm/**"
           - "crates/tree-sitter-tolk/**"
           - "crates/tree-sitter-fift/**"
           - "crates/tree-sitter-tlb/**"
@@ -78,10 +80,15 @@
 "localnet":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-localnet-ui/**"
           - "crates/ton-indexer/**"
           - "crates/ton-localnet/**"
           - "src/commands/localnet/**"
+
+"explorer":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/explorer-core/**"
+          - "packages/explorer-ui/**"
 
 "wallets":
   - changed-files:
@@ -112,3 +119,28 @@
   - changed-files:
       - any-glob-to-any-file:
           - "src/commands/hooks/**"
+
+"UI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/**"
+
+"actonscan":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/actonscan-backend/**"
+
+"faucet":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/faucet/**"
+
+"localton":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/localton/**"
+
+"verifier":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/verifier/**"

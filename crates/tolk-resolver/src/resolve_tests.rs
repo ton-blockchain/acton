@@ -268,7 +268,7 @@ mod tests {
                 }
             ",
             expect![[r"
-                int -> Global(int at common.tolk:350-353)
+                int -> Global(int at common.tolk:352-355)
                 x -> Local(x at 63-64)
             "]],
         );
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_match_ambiguous_arm() {
+    fn test_match_type_pattern_wins_over_local_value() {
         check_definition(
             r#"
                 type ctring = slice;
@@ -399,7 +399,7 @@ mod tests {
                 }
             "#,
             expect![[r"
-                ctring -> Local(ctring at 92-98)
+                ctring -> Global(ctring at test.tolk:22-28)
             "]],
         );
     }
@@ -1076,7 +1076,7 @@ mod tests {
                 }
             ",
             expect![[r"
-                int -> Global(int at common.tolk:350-353)
+                int -> Global(int at test.tolk:22-25)
                 Status -> Global(Status at test.tolk:59-65)
                 Status -> Global(Status at test.tolk:59-65)
             "]],
@@ -1114,10 +1114,10 @@ mod tests {
                 }
             ",
             expect![[r"
-                uint128 -> Global(uintN at common.tolk:3511-3516)
-                int32 -> Global(intN at common.tolk:3235-3239)
-                bits256 -> Global(bitsN at common.tolk:5113-5118)
-                bytes32 -> Global(bytesN at common.tolk:5203-5209)
+                uint128 -> Global(uintN at common.tolk:3513-3518)
+                int32 -> Global(intN at common.tolk:3237-3241)
+                bits256 -> Global(bitsN at common.tolk:5114-5119)
+                bytes32 -> Global(bytesN at common.tolk:5204-5210)
             "]],
         );
     }
@@ -1453,7 +1453,7 @@ mod tests {
                 "#,
             )
             .check_definition(expect![[r"
-                getGasConsumedAtTheMoment -> Global(getGasConsumedAtTheMoment at gas-payments.tolk:180-205)
+                getGasConsumedAtTheMoment -> Global(getGasConsumedAtTheMoment at gas-payments.tolk:182-207)
             "]]);
     }
 

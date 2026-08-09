@@ -1,64 +1,47 @@
 {
   "name": "acton",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
   "workspaces": [
-    "crates/acton-localnet-ui",
-    "crates/acton-shared-ui",
-    "crates/acton-test-ui"
+    "packages/*"
   ],
   "scripts": {
     "build": "bun --filter '*' build",
-    "dev:localnet": "bun --filter acton-localnet-ui dev",
-    "dev:test": "bun --filter acton-test-ui dev",
+    "dev:studio": "bun --filter @acton/studio-ui dev",
+    "dev:test": "bun --filter @acton/test-ui dev",
+    "dev:ui": "bun --filter @acton/ui-gallery dev",
+    "doctor": "CI=1 react-doctor",
     "fmt": "bun --filter '*' fmt",
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
-    "lint:fix": "bun --filter '*' lint:fix"
+    "lint:fix": "bun --filter '*' lint:fix",
+    "test:e2e:test-ui": "playwright test --config packages/test-ui/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config packages/ui-e2e/playwright.config.ts",
+    "test:unit": "bun --filter '*' test"
   },
   "overrides": {
-    "postcss": "8.5.10",
-    "uuid": "14.0.0"
+    "@ton/core": "^0.63.1",
+    "brace-expansion": "5.0.9",
+    "fast-uri": "^3.1.5",
+    "js-yaml": "4.3.1",
+    "nanoid": "3.3.18",
+    "postcss": "^8.5.23",
+    "qs": "^6.15.2",
+    "sharp": "^0.35.3",
+    "undici": "^7.29.0",
+    "uuid": "^14.0.0",
+    "ws": "^8.21.0"
   },
-  "prettier": {
-    "arrowParens": "avoid",
-    "bracketSpacing": false,
-    "printWidth": 100,
-    "semi": false,
-    "singleQuote": false,
-    "tabWidth": 2,
-    "trailingComma": "all",
-    "useTabs": false,
-    "overrides": [
-      {
-        "files": [
-          "*.yaml",
-          "*.yml"
-        ],
-        "options": {
-          "tabWidth": 2
-        }
-      }
-    ]
+  "dependencies": {
+    "bun-types": "^1.3.14"
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.0",
-    "eslint": "^9.25.0",
-    "eslint-config-prettier": "^10.1.5",
-    "eslint-import-resolver-typescript": "^4.3.4",
-    "eslint-plugin-functional": "^9.0.1",
-    "eslint-plugin-import-x": "^4.16.1",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "eslint-plugin-unicorn": "^56.0.1",
-    "eslint-plugin-unused-imports": "^4.1.4",
-    "globals": "^16.0.0",
-    "prettier": "3.4.2",
-    "typescript-eslint": "^8.30.1"
-  }
+    "@biomejs/biome": "^2.5.0",
+    "@playwright/test": "1.59.0",
+    "react-doctor": "^0.9.3"
+  },
+  "packageManager": "bun@1.3.14"
 }

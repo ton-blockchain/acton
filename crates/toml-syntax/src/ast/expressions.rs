@@ -184,6 +184,32 @@ impl_ast_node!(QuotedKey, "quoted_key");
 pub struct StringLit<'tree>(pub Node<'tree>);
 impl_ast_node!(StringLit, "string");
 
+impl StringLit<'_> {
+    /// Returns the byte range occupied by the string content.
+    ///
+    /// The returned range excludes the string delimiters. Basic strings and
+    /// literal strings lose one byte at each end (`"` or `'`), while multiline
+    /// strings lose three bytes at each end (`"""` or `'''`). The offsets are
+    /// byte offsets into `source`, which must be the same source text that was
+    /// used to produce this node.
+    ///
+    /// This method does not unescape the string. It only identifies the source
+    /// range that contains the string content, making it suitable for editor
+    /// selection ranges and diagnostics.
+    #[must_use]
+    pub fn content_range(&self, source: &str) -> std::ops::Range<usize> {
+        let text = source.get(self.0.byte_range()).unwrap_or_default();
+        let delimiter_len = if text.starts_with("\"\"\"") || text.starts_with("'''") {
+            3
+        } else {
+            1
+        };
+        let start = self.0.start_byte().saturating_add(delimiter_len);
+        let end = self.0.end_byte().saturating_sub(delimiter_len);
+        start.min(end)..end
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct IntegerLit<'tree>(pub Node<'tree>);
 impl_ast_node!(IntegerLit, "integer");

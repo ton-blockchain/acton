@@ -1,1 +1,1 @@
-Error: Invalid TON format: multiple dots
+Error: Invalid GRAM format: multiple dots

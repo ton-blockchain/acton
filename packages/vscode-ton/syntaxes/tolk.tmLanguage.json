@@ -1,0 +1,121 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Tolk",
+  "scopeName": "source.tolk",
+  "foldingStartMarker": "\\{\\s*$",
+  "foldingStopMarker": "^\\s*\\}",
+  "fileTypes": ["tolk"],
+  "patterns": [
+    {
+      "name": "comment.line.double-slash",
+      "match": "//(.*)"
+    },
+    {
+      "name": "comment.block",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    {
+      "name": "string.quoted.triple.tolk",
+      "begin": "\"\"\"",
+      "end": "\"\"\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.tolk",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.double.tolk",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.tolk",
+          "match": "\\\\([nrt\\\\'\"])"
+        }
+      ]
+    },
+    {
+      "name": "constant.numeric",
+      "match": "\\b(-?(0x[0-9a-fA-F_]*|0b[01_]*|[0-9][0-9_]*))\\b"
+    },
+    {
+      "name": "keyword.control",
+      "match": "\\b(do|if|try|else|while|for|break|throw|catch|return|assert|repeat|continue|asm|builtin|match|lazy)\\b"
+    },
+    {
+      "name": "keyword.operator",
+      "match": "\\+|-|\\*|/|%|\\?|:|,|;|\\(|\\)|\\[|\\]|{|}|=|<|>|!|&|\\||\\^|==|!=|<=|>=|<<|>>|&&|\\|\\||~/|\\^/|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|->|<=>|~>>|\\^>>|<<=|>>=|=>|\\?\\?"
+    },
+    {
+      "name": "keyword.other",
+      "match": "\\b(import|export|namespace|true|false|null|mutate|tolk|as|is|private|readonly)\\b"
+    },
+    {
+      "name": "keyword.other",
+      "match": "\\bself\\b"
+    },
+    {
+      "name": "entity.name.type.parameter",
+      "match": "(?<!\\.)\\b[TUKV]\\b"
+    },
+    {
+      "match": "\\b(val|var)\\s+(?:type|enum|int|map|array|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|unknown|coins|address|varint16|varint32|varuint16|varuint32|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b",
+      "captures": {
+        "1": {"name": "storage.modifier"}
+      }
+    },
+    {
+      "name": "constant.other",
+      "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
+    },
+    {
+      "name": "storage.type",
+      "match": "(?<!\\.)\\b(type|enum|int|map|array|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|unknown|coins|varint16|varint32|varuint16|varuint32|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b"
+    },
+    {
+      "name": "storage.type",
+      "match": "(?<!\\.)\\baddress\\b(?!\\s*:)"
+    },
+    {
+      "name": "storage.modifier",
+      "match": "\\b(global|const|var|val|fun|get|struct|contract)\\b"
+    },
+    {
+      "begin": "(@)(?=[A-Za-z0-9_])",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.function.decorator"
+        }
+      },
+      "end": "(?![A-Za-z0-9_.])",
+      "patterns": [
+        {
+          "name": "entity.name.function.decorator",
+          "match": "[A-Za-z0-9_]+"
+        }
+      ]
+    },
+    {
+      "match": "(\\.)?(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*(?:<[^()\\n]*>)?\\s*\\()",
+      "captures": {
+        "1": {"name": "keyword.operator.accessor"},
+        "2": {"name": "entity.name.function"}
+      }
+    },
+    {
+      "match": "(\\.)(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)",
+      "captures": {
+        "1": {"name": "keyword.operator.accessor"},
+        "2": {"name": "variable.other.property"}
+      }
+    },
+    {
+      "name": "entity.name.type",
+      "match": "(?<!\\.)\\b[A-Z][a-zA-Z0-9]*\\b"
+    }
+  ],
+  "repository": {}
+}

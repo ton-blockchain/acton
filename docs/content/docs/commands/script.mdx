@@ -174,6 +174,9 @@ Clear the compilation cache before running.
 </CommandOptionTitle>
 
 Fork blockchain state from a remote network for local execution.
+Acton also uses the network configuration from the resolved masterchain block.
+With an explicit historical block, it uses that block's Unix time; otherwise,
+it uses the current system Unix time.
 When `--net` is set, omitted `--fork-net` defaults to the selected broadcast
 network.
 
@@ -188,6 +191,29 @@ network.
 </CommandOptionTitle>
 
 Historical block sequence number to fork from.
+
+When a fork block number is set, Acton caches resolved remote accounts under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
+runs with the same fork network, block number, and address read that file before
+calling the remote API. Fork runs without an explicit block use the same account
+cache after they resolve the latest sequence number. Acton caches the matching
+network configuration and, for explicit historical forks, block time for 24 hours under
+`build/cache/masterchain-snapshots/<network>/<seqno>.json`.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--no-fork-cache`
+
+</CommandOptionTitle>
+
+Disable persistent account and library cache. Use this when you want every
+script run to fetch forked accounts and libraries from the remote API. This
+option does not disable the 24-hour masterchain snapshot cache. The regular
+`--clear-cache` flag removes this cache together with the rest of `build/cache`.
 
 </CommandOption>
 
@@ -263,7 +289,18 @@ Explorer to use for transaction links.
 
 <CommandOptionMeta label="Possible values">
 
-`tonscan`, `toncx`, `dton`, `tonviewer`
+`actonscan`, `tonscan`, `toncx`, `dton`, `tonviewer`
+
+</CommandOptionMeta>
+
+Actonscan is the default. For `custom:<name>` networks without an explicit
+`networks.<name>.explorer`, Acton embeds the configured `api.v2` and `api.v3`
+endpoints in an Actonscan shared-network URL. An explicit network explorer
+still takes precedence.
+
+<CommandOptionMeta label="Default">
+
+`actonscan`
 
 </CommandOptionMeta>
 
@@ -376,6 +413,7 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - state is not preserved between runs
 - local execution uses emulator wallets and balances
 - `--fork-net` keeps execution local but resolves remote state
+- fork state and configuration come from the same masterchain block; an explicit historical fork also uses that block's time
 - `--net` sends real transactions using configured wallets
 - `--net ... --tonconnect` sends real transactions through the connected TON Connect wallet
 
@@ -407,10 +445,11 @@ Forwarded arguments are parsed against the ABI for `main()`.
 - `bool` accepts `true` and `false`
 - nullable supported types accept `null`
 - `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
 - arrays accept `[item1, item2]`
 
 Unsupported parameter types currently include `structs`, `tuple`, `map`,
-`dict`, `builder`, `any_address` and other complex types.
+`dict`, `builder` and other complex types.
 
 ## Side Effects
 
@@ -462,13 +501,19 @@ When a script can affect on-chain state, the usual safe sequence is:
    TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
    ```
 
-5. Broadcast a deploy flow and print explorer links:
+5. Run against a protected localnet:
+
+   ```bash
+   ACTON_LOCALNET_AUTH_TOKEN=localnet-token acton script scripts/deploy.tolk --net localnet
+   ```
+
+6. Broadcast a deploy flow and print explorer links:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
 
-6. Broadcast through TON Connect instead of local wallet keys:
+7. Broadcast through TON Connect instead of local wallet keys:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --tonconnect
@@ -478,6 +523,9 @@ When a script can affect on-chain state, the usual safe sequence is:
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Protected `localnet` requests read `ACTON_LOCALNET_AUTH_TOKEN`. Use the token
+printed by `acton localnet start --require-auth`.
 
 For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
 names are uppercased and non-alphanumeric characters are replaced with `_`, so

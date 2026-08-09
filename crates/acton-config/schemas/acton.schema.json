@@ -133,6 +133,10 @@
         "output-fift": {
           "description": "Directory where per-contract compiled Fift files are saved",
           "type": "string"
+        },
+        "output-sources": {
+          "description": "Directory where per-contract source registration artifacts are saved",
+          "type": "string"
         }
       }
     },
@@ -201,6 +205,18 @@
         "src": {
           "description": "Path to the contract source (`.tolk`) or precompiled (`.boc`) file",
           "type": "string"
+        },
+        "types": {
+          "description": "Optional Tolk interface file used to produce ABI for precompiled `.boc` contracts",
+          "type": "string"
+        },
+        "wrappers": {
+          "description": "Wrapper settings that override the project-level `[wrappers]` defaults for this contract",
+          "allOf": [
+            {
+              "$ref": "#/definitions/WrappersConfig"
+            }
+          ]
         }
       }
     },
@@ -273,11 +289,11 @@
       "type": "object",
       "properties": {
         "v2": {
-          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://localhost:<localnet.port>/api/v2` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v2. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v2` with `5411` as the fallback port",
           "type": "string"
         },
         "v3": {
-          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://localhost:<localnet.port>/api/v3` with `5411` as the fallback port",
+          "description": "The URL for the `TonCenter` API v3. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port",
           "type": "string"
         }
       },
@@ -298,6 +314,11 @@
         "explorer": {
           "description": "Base URL used to build transaction links for this network. Acton appends `/tx/<hash>` automatically and derives links from `api.v2` when omitted",
           "type": "string"
+        },
+        "global-id": {
+          "description": "TON network global ID used to derive Wallet V5 IDs. Custom networks default to the testnet value (`-3`)",
+          "type": "integer",
+          "format": "int32"
         }
       },
       "additionalProperties": false
@@ -345,6 +366,25 @@
           "minimum": 0.0
         }
       }
+    },
+    "GasProfileFormat": {
+      "description": "Gas profile output formats supported by `acton test`",
+      "oneOf": [
+        {
+          "description": "Chrome `DevTools` `.cpuprofile` output",
+          "type": "string",
+          "enum": [
+            "cpuprofile"
+          ]
+        },
+        {
+          "description": "Folded stack output for flamegraph-style tooling",
+          "type": "string",
+          "enum": [
+            "collapsed"
+          ]
+        }
+      ]
     },
     "LintConfig": {
       "description": "Linter configuration for the project",
@@ -428,8 +468,602 @@
         }
       ]
     },
+    "LintRuleLevel": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "allow"
+          ]
+        },
+        {
+          "type": "string",
+          "enum": [
+            "warn"
+          ]
+        },
+        {
+          "type": "string",
+          "enum": [
+            "deny"
+          ]
+        }
+      ]
+    },
     "LintRules": {
       "type": "object",
+      "properties": {
+        "acton-import-in-contract": {
+          "title": "E010: acton-import-in-contract",
+          "description": "### What it does\nForbids importing files from `.acton` in contract dependency trees.\n\n### Why is this bad?\nContract sources should not depend on Acton internals from `.acton`.\nSuch imports are environment-dependent and make contracts less portable.\n\n### Behavior notes\nThis rule's default diagnostic severity is error, unlike most linter rules.\n`[lint.rules]` can still lower or allow it. When `acton check` is run on a\nsingle `.tolk` file, command settings currently allow this rule for\ntest-file workflows.\n\n### Example\n```tolk twoslash\nimport \"@acton/tlb/maybe\";\n//      ^^^^^^^^^^^^^^^^ E010: contracts cannot import files from Acton standard library\n```\n\nUse instead:\n```tolk\nimport \"@stdlib/gas-payments\";\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "asm-function-missing-safety-comment": {
+          "title": "E011: asm-function-missing-safety-comment",
+          "description": "### What it does\nRequires documenting safety requirements for every declaration with an `asm` body.\n\n### Why is this bad?\n`asm` bypasses high-level safety guarantees. Without an explicit safety note,\nit is hard to review assumptions and soundness constraints.\n\n### Example\n```tolk twoslash\nfun lowLevelLoad(x: slice): int asm \"32 LDI\";\n//                              ^^^ E011: asm function requires safety comment\n```\n\nUse instead:\n```tolk\n// SAFETY: `x` always contains at least 32 bits.\nfun lowLevelLoad(x: slice): int asm \"32 LDI\";\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "bless-call-missing-safety-comment": {
+          "title": "E017: bless-call-missing-safety-comment",
+          "description": "### What it does\nRequires a `SAFETY` comment for calls to `transformSliceToContinuation`\nand for calls to any `asm` function that uses `BLESS`.\n\n### Why is this bad?\n`BLESS` creates continuations from raw code slices and can bypass\nhigh-level control-flow assumptions. Call sites should document\nwhy inputs are trusted and which invariants are required.\n\n### Example\n```tolk twoslash\nfun convert(code: slice): continuation {\n    return transformSliceToContinuation(code);\n    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E017: converting slice to continuation requires safety comment\n}\n```\n\nUse instead:\n```tolk\nfun convert(code: slice): continuation {\n    // SAFETY: `code` is verified bytecode from trusted state.\n    return transformSliceToContinuation(code);\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "create-message-body-to-cell": {
+          "title": "E029: create-message-body-to-cell",
+          "description": "### What it does\nWarns about `MyMessage { ... }.toCell()` inside `createMessage({ body: ... })` initializer.\n\n### Why is this bad?\n`createMessage` already accepts a serializable object as `body` and decides whether to inline it\nor wrap it into a reference cell automatically. Calling `.toCell()` manually is usually\nunnecessary and can be worse for performance because it forces an extra cell creation even\nwhen the compiler could inline a small body directly.\n\n### Example\n```tolk twoslash\nstruct Transfer {\n    amount: int32\n}\n\nfun send(dest: address) {\n    val msg = createMessage({\n        bounce: false,\n        value: grams(\"0.1\"),\n        dest,\n        body: Transfer { amount: 1 }.toCell(),\n        //                          ^^^^^^^^^ E029: explicit `.toCell()` on `createMessage` body is usually unnecessary and can hurt performance\n    });\n}\n```\n\nUse instead:\n```tolk\nstruct Transfer {\n    amount: int32\n}\n\nfun send(dest: address) {\n    val msg = createMessage({\n        bounce: false,\n        value: grams(\"0.1\"),\n        dest,\n        body: Transfer { amount: 1 },\n    });\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "create-message-inline-send": {
+          "title": "S006: create-message-inline-send",
+          "description": "### What it does\nChecks for inline sending of newly created messages: `createMessage(...).send(...)`.\n\n### Why is this bad?\nCreating and sending message in one expression hides message intent.\nPrefer giving message a name before sending.\n\n### Example\n```tolk twoslash\ncreateMessage({ ... }).send(SEND_MODE_REGULAR);\n//                    ^^^^^ S006: create named message before send\n```\n\nUse instead:\n```tolk\nval deployMessage = createMessage({ ... });\ndeployMessage.send(SEND_MODE_REGULAR);\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "dangerous-send-mode-missing-safety-comment": {
+          "title": "E016: dangerous-send-mode-missing-safety-comment",
+          "description": "### What it does\nRequires a `SAFETY` comment for `msg.send(...)` calls that use dangerous send-mode flags.\n\n### Why is this bad?\nFlags like `SEND_MODE_CARRY_ALL_BALANCE` or `SEND_MODE_DESTROY` can drain balance\nor destroy the contract. These calls should always document their assumptions.\n\n### Example\n```tolk twoslash\noutMsg.send(SEND_MODE_CARRY_ALL_BALANCE);\n//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E016: send with dangerous mode requires safety comment\n```\n\nUse instead:\n```tolk\n// SAFETY: this path intentionally drains balance during controlled migration.\noutMsg.send(SEND_MODE_CARRY_ALL_BALANCE);\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "deprecated-symbol-use": {
+          "title": "E003: deprecated-symbol-use",
+          "description": "### What it does\nChecks for usage of deprecated symbols in code.\n\n### Why is this bad?\nUsing deprecated symbols can lead to compatibility issues,\nunexpected behavior, or reliance on outdated APIs. Such symbols\nmay be removed in future versions.\n\n### Example\n```tolk twoslash\n@deprecated\nfun oldFunction() {\n    // some deprecated logic\n}\n\nfun main() {\n    oldFunction();\n//  ^^^^^^^^^^^ E003: usage of deprecated symbol\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "dict-type-use": {
+          "title": "E027: dict-type-use",
+          "description": "### What it does\nWarns when code uses the low-level `dict` type.\n\n### Why is this bad?\n`dict` erases key and value types, which makes code less type-safe and harder to understand.\nIn most cases, `map<K, V>` communicates intent better and gives stronger type checking.\n\n### Example\n```tolk twoslash\nstruct State {\n    data: dict\n    //    ^^^^ E027: low-level `dict` type should be replaced with typed `map<K, V>`\n}\n```\n\nUse instead:\n```tolk\nstruct State {\n    data: map<uint32, cell>\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "divide-before-multiply": {
+          "title": "E019: divide-before-multiply",
+          "description": "### What it does\nDetects cases where division is evaluated before multiplication.\n\n### Why is this bad?\nDivision done too early may lose precision (especially for integer arithmetic)\nand can produce unintended results in subsequent multiplication.\n\n### Example\n```tolk twoslash\nfun main(a: int, b: int, c: int): int {\n    return a / b * c;\n    //     ^^^^^^^^^ E019: division before multiplication may cause precision loss\n}\n```\n\nUse instead:\n```tolk\nfun main(a: int, b: int, c: int): int {\n    return a * c / b;\n}\n```\n\n### Behavior notes\nThe check uses CFG + dataflow:\n- reports direct patterns like `(x / y) * z` and `x * (y / z)`;\n- tracks locals tainted by division through assignments and warns when\n  such values are later used in multiplication.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "duplicated-condition": {
+          "title": "E020: duplicated-condition",
+          "description": "### What it does\nDetects duplicated conditions in `if / else if` chains.\n\n### Why is this bad?\nRepeating the same condition in one conditional chain usually means a\ncopy-paste bug and can make branches unreachable.\n\n### Example\n```tolk twoslash\nif (a < 1) {\n    return 1;\n} else if (a > 4) {\n    return 2;\n} else if (a > 4) {\n//         ^^^^^ E020: duplicated condition in conditional chain\n    return 3;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "enum-cast-missing-safety-comment": {
+          "title": "E024: enum-cast-missing-safety-comment",
+          "description": "### What it does\nRequires a `SAFETY` comment for non-literal `as` casts to enum types.\n\n### Why is this bad?\nCasting arbitrary values to enums can construct invalid enum values.\nCompiler optimizations may rely on enum invariants, so invalid values\ncan lead to subtle and hard-to-debug behavior.\n\n### Example\n```tolk twoslash\nenum Op { Add = 0, Sub = 1 }\n\nfun parse(v: int): Op {\n    return v as Op;\n    //     ^^^^^^^ E024: non-literal cast to enum requires safety comment\n}\n```\n\nUse instead:\n```tolk\nenum Op { Add = 0, Sub = 1 }\n\nfun parse(v: int): Op {\n    if (v != 0 && v != 1) {\n        throw 7\n    }\n    // SAFETY: input is validated and guaranteed to be either 0 or 1.\n    return v as Op;\n}\n\n// or even better, use match\n\nfun parse(v: int): Op {\n    return match (v) {\n        0 => Op.Add,\n        1 => Op.Sub,\n        else => throw 7,\n    }\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "explicit-return-type": {
+          "title": "S002: explicit-return-type",
+          "description": "### What it does\nRequires explicit return types for function declarations.\n\n### Why is this bad?\nOmitting return types makes APIs less clear and can hide accidental signature changes.\n\n### Example\n```tolk twoslash\nfun buildSlice() {\n//  ^^^^^^^^^^ S002: function return type should be explicit\n    return beginCell().toSlice();\n}\n```\n\nUse instead:\n```tolk\nfun buildSlice(): slice {\n    return beginCell().toSlice();\n}\n```\n\n### Behavior notes\n- Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.\n- Functions whose inferred return type is `void` are ignored by this rule.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "field-init-can-be-folded": {
+          "title": "S003: field-init-can-be-folded",
+          "description": "### What it does\nChecks for struct initialization where the field name and the variable used to initialize it are the same.\n\n### Why is this bad?\nIt's redundant and can be simplified using the shorthand syntax.\n\n### Example\n```tolk twoslash\nstruct Foo { bar: int }\n\nfun main() {\n    val bar = 1;\n    val foo = Foo { bar: bar };\n    //              ^^^^^^^^ S003: field initialization can be folded\n}\n```\n\nUse instead:\n```tolk\nstruct Foo { bar: int }\n\nfun main() {\n    val bar = 1;\n    val foo = Foo { bar };\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "identical-conditional-branches": {
+          "title": "E021: identical-conditional-branches",
+          "description": "### What it does\nDetects conditionals where both branches are structurally identical.\n\n### Why is this bad?\nSuch condition has no effect on behavior and usually indicates a bug or a\ncopy-paste mistake.\n\n### Example\n```tolk twoslash\nif (flag) {\n    checkAccess();\n} else {\n    checkAccess();\n//  ^^^^^^^^^^^^^ E021: conditional branches are identical\n}\n\nval result = flag ? value + 1 : value + 1;\n//                              ^^^^^^^^^ E021: conditional branches are identical\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "import-path-can-use-mappings": {
+          "title": "S007: import-path-can-use-mappings",
+          "description": "### What it does\nWarns when a relative import path can be replaced with a configured `@mapping/...` path.\n\n### Why is this bad?\nRelative imports are harder to maintain in larger projects and become fragile when files move.\n\n### Example\n```tolk twoslash\nimport \"../libs/math.tolk\";\n//      ^^^^^^^^^^^^^^^^^ S007: import path can use mappings\n```\n\nUse instead:\n```tolk\nimport \"@libs/math\";\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "message-should-be-named": {
+          "title": "S005: message-should-be-named",
+          "description": "### What it does\nChecks for messages created with `createMessage(...)` but named as generic\n`msg` or `message`.\n\n### Why is this bad?\nMessages are first-class entities in Tolk and should have meaningful names.\nGeneric names like `msg` and `message` make code harder to read and reason\nabout.\n\n### Example\n```tolk twoslash\nval msg = createMessage({ ... });\n//  ^^^ S005: message should be properly named\nmsg.send(SEND_MODE_REGULAR);\n```\n\nUse instead:\n```tolk\nval deployMessage = createMessage({ ... });\ndeployMessage.send(SEND_MODE_REGULAR);\n```\n\n### Behavior notes\nThe rule checks local variables named exactly `msg` or `message` whose\ninitializer resolves to `createMessage(...)`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "method-can-be-static": {
+          "title": "S004: method-can-be-static",
+          "description": "### What it does\nChecks for instance methods where `self` is unnecessary.\n\n### Why is this bad?\nIf `self` is never used, the method can be static which makes the API clearer.\n\n### Example\n```tolk twoslash\nstruct Foo {}\n\nfun Foo.bar(self, a: int): int {\n//          ^^^^ S004: method can be static\n    return a + 1;\n}\n```\n\nUse instead:\n```tolk\nstruct Foo {}\n\nfun Foo.bar(a: int): int {\n    return a + 1;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "missing-contract-header": {
+          "title": "E025: missing-contract-header",
+          "description": "### What it does\nWarns when a contract source defines standard contract entrypoints but omits the `contract` header.\n\n### Why is this bad?\nThe contract header is the ABI source of truth for metadata like `storage` and `incomingMessages`.\nWithout it, wrapper generation and other tooling cannot recover the contract shape reliably.\n\n### Example\n```tolk twoslash\nfun onInternalMessage(in: InMessage) {\n//  ^^^^^^^^^^^^^^^^^ E025: contract defines entrypoints but is missing a `contract` header\n    // ...\n}\n```\n\nUse instead:\n```tolk\ncontract Wallet {\n    storage: Storage\n    incomingMessages: AllowedMessage\n}\n\nfun onInternalMessage(in: InMessage) {\n    // ...\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "mutable-parameter-can-be-immutable": {
+          "title": "E009: mutable-parameter-can-be-immutable",
+          "description": "### What it does\nChecks for parameters that are declared as mutable (`mutate`) but are never mutated.\n\n### Why is this bad?\nUsing immutable parameters makes the function contract clearer and reduces accidental mutations.\n\n### Example\n```tolk twoslash\nfun increment(mutate value: int): int {\n//            ^^^^^^ E009: parameter can be immutable\n    return value + 1;\n}\n```\n\nUse instead:\n```tolk\nfun increment(value: int): int {\n    return value + 1;\n}\n```\n\n### Behavior notes\n- Parameters with zero usages are not reported by this rule.\n- Passing a parameter as `mutate a` counts as write usage and suppresses this diagnostic.\n- Autofix removes the `mutate` keyword (and one trailing whitespace if present).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "mutable-variable-can-be-immutable": {
+          "title": "E002: mutable-variable-can-be-immutable",
+          "description": "### What it does\nChecks for variables that are declared as mutable (`var`) but are never mutated.\n\n### Why is this bad?\nUsing `val` instead of `var` makes the code clearer by signaling that the variable's value will not change.\n\n### Example\n```tolk twoslash\nfun main() {\n    var x = 1;\n//  ^^^ E002: variable can be immutable\n    println(x);\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val x = 1;\n    println(x);\n}\n```\n\n### Behavior notes\n- Variables with zero usages are handled by `unused-variable` and are not reported here.\n- A variable is considered mutated when write usage is detected\n  (for example `=`, `+=`, `mutate arg`, field/index writes, mutable method calls).\n- Autofix is available for simple `var x = ...` declarations.\n  Destructuring declarations still warn but may not have a fix.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "name-case-checker": {
+          "title": "S001: name-case-checker",
+          "description": "### What it does\nChecks identifier naming style and suggests consistent casing.\n\n### Why is this bad?\nInconsistent naming makes code harder to read and maintain.\nThis rule enforces:\n- `camelCase` for variables, functions, methods, and struct fields\n- `PascalCase` for structs, enums, enum members, type aliases, and type\n  parameters\n- `SCREAMING_SNAKE_CASE` for constants\n\n### Example\n```tolk twoslash\nstruct low_struct {\n//     ^^^^^^^^^^ S001: name should be in the expected case\n    TheBad: int\n//  ^^^^^^ S001: name should be in the expected case\n}\n\nconst iAmConst_variable = 1\n//    ^^^^^^^^^^^^^^^^^ S001: name should be in the expected case\n\nfun BadFunctionName() {}\n//  ^^^^^^^^^^^^^^^ S001: name should be in the expected case\n```\n\nUse instead:\n```tolk\nstruct LowStruct {\n    theBad: int\n}\n\nconst I_AM_CONST_VARIABLE = 1\n\nfun badFunctionName() {}\n```\n\n### Behavior notes\n- Names that start with `_` are ignored.\n- Get method names are ignored because external standards commonly require\n  `snake_case` names such as `get_wallet_info`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "negated-is-type-can-use-not-is": {
+          "title": "S008: negated-is-type-can-use-not-is",
+          "description": "### What it does\nDetects negated type checks written as `!(a is T)`.\n\n### Why is this bad?\nTolk has a dedicated `!is` operator, which is clearer than negating `is`.\n\n### Example\n```tolk twoslash\nif (!(value is int)) {\n//  ^^^^^^^^^^^^^^^ S008: negated `is` type check can use `!is`\n    return;\n}\n```\n\nUse instead:\n```tolk\nif (value !is int) {\n    return;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "no-bounce-handler": {
+          "title": "E007: no-bounce-handler",
+          "description": "### What it does\nReports `createMessage({ bounce: BounceMode.<...> })` calls reachable from\n`onInternalMessage` when the contract file does not declare\n`onBouncedMessage`.\n\n### Why is this bad?\nIf an outgoing internal message can bounce, the bounced transaction returns\nto `onBouncedMessage`. Without that handler, the contract cannot restore\nstate, refund accounting, or observe the failure.\n\n### Example\n```tolk\nfun onInternalMessage(in: InMessage) {\n    sendRefund(in.senderAddress);\n}\n\nfun sendRefund(dest: address) {\n    val refundMessage = createMessage({\n        bounce: BounceMode.Only256BitsOfBody,\n        //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E007: contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist\n        value: grams(\"0.1\"),\n        dest,\n    });\n    refundMessage.send(SEND_MODE_REGULAR);\n}\n```\n\nUse instead:\n```tolk\nfun onBouncedMessage(in: InMessageBounced) {\n    // handle bounced refund message\n}\n```\n\nOr send explicitly without bounce handling:\n```tolk\nval refundMessage = createMessage({\n    bounce: BounceMode.NoBounce,\n    value: grams(\"0.1\"),\n    dest,\n    body: beginCell().endCell(),\n});\n```\n\n### Behavior notes\n- `BounceMode.NoBounce` is ignored by this rule.\n- Legacy boolean `bounce` values are not currently matched; the check looks\n  for `BounceMode` field access.\n- The handler must be declared as `onBouncedMessage` in the same file as the\n  `onInternalMessage` entrypoint.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "no-global-variables": {
+          "title": "E022: no-global-variables",
+          "description": "### What it does\nDisallows top-level `global` variable declarations.\n\n### Why is this bad?\nGlobal mutable state makes contracts harder to reason about and audit.\nKeeping state in explicit storage structures and passing values through function scope is\nclearer and less error-prone.\n\n### Example\n```tolk twoslash\nglobal counter: int\n//     ^^^^^^^ E022: global variable declarations are not allowed\n```\n\nUse instead:\n```tolk\nstruct State {\n    counter: int\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "pure-function-call-unused": {
+          "title": "E006: pure-function-call-unused",
+          "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why is this bad?\n`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.\n\n### Example\n```tolk twoslash\n@pure\nfun add(a: int, b: int): int { return a + b; }\n\nfun main() {\n    add(1, 2);\n//  ^^^^^^^^^ E006: result of pure function is not used\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "random-requires-initialization": {
+          "title": "E018: random-requires-initialization",
+          "description": "### What it does\nRequires random generator initialization before random value generation calls.\n\n### Why is this bad?\nCalling `random.uint256(...)` or `random.range(...)` before\n`random.initialize(...)` / `random.initializeBy(...)` can lead to predictable\nor invalid randomness behavior.\n\n### Example\n```tolk twoslash\nfun main() {\n    val x = random.uint256();\n    //      ^^^^^^^^^^^^^^^^ E018: random generator must be initialized before `random.uint256`/`random.range` call\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    random.initializeBy(123);\n    val x = random.uint256();\n}\n```\n\n### Behavior notes\n\nThis check is control-flow aware. It does not just scan text for \"init before use\".\nIt builds a control-flow graph (CFG) and verifies that for each\n`random.uint256(...)` / `random.range(...)` call, initialization is guaranteed\non all reachable execution paths before that call.\n\nIt also follows function calls, so helper functions that initialize random\nare taken into account.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "reserve-mode-literal": {
+          "title": "E015: reserve-mode-literal",
+          "description": "### What it does\nWarns when `reserve` mode is passed as numeric literal instead of `RESERVE_MODE_*` constants.\n\n### Why is this bad?\nNumeric reserve modes are hard to read and easy to misuse.\nNamed constants make intent explicit and reduce mistakes.\n\n### Example\n```tolk twoslash\nreserveGramsOnBalance(grams(\"0.1\"), 3);\n//                                  ^ E015: reserve mode should use RESERVE_MODE_* constants\n```\n\nUse instead:\n```tolk\nreserveGramsOnBalance(grams(\"0.1\"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST);\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "send-mode-literal": {
+          "title": "E012: send-mode-literal",
+          "description": "### What it does\nWarns when `send` mode is passed as numeric literal instead of `SEND_MODE_*` constants.\n\n### Why is this bad?\nNumeric send modes are hard to read and easy to misuse.\nNamed constants make intent explicit and reduce mistakes.\n\n### Example\n```tolk twoslash\noutMsg.send(3);\n//          ^ E012: send mode should use SEND_MODE_* constants\n```\n\nUse instead:\n```tolk\noutMsg.send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "several-not-null-assertions": {
+          "title": "E014: several-not-null-assertions",
+          "description": "### What it does\nDetects repeated not-null assertions like `foo!!`.\n\n### Why is this bad?\nRepeating `!` is redundant: after the first not-null assertion the value is already non-null.\n\n### Example\n```tolk twoslash\nval x = foo!!;\n//         ^^ E014: several not-null assertions in a row\n```\n\nUse instead:\n```tolk\nval x = foo!;\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "throw-requires-documented-error-value": {
+          "title": "E030: throw-requires-documented-error-value",
+          "description": "### What it does\nRequires documentation for enum values used as `throw` codes.\n\n### Why is this bad?\nSymbolic exit codes become part of the contract interface. Without a short\nnote on the enum value, callers and tests can see the name but not the exact\nfailure condition it represents.\n\n### Behavior notes\n- This preview rule is disabled (`allow`) by default. Enable it in config:\n\n```toml\n[lint.rules]\nthrow-requires-documented-error-value = \"warn\"\n```\n\n- Or run only this rule with `acton check --enable-only E030`.\n- The documentation must be a non-empty `///` doc comment immediately above\n  the enum value.\n\n### Example\n```tolk\nenum Errors {\n    NotOwner = 401\n}\n\nfun onInternalMessage(in: InMessage) {\n    // ...\n    assert (in.senderAddress == storage.ownerAddress) throw Errors.NotOwner;\n}\n```\n\nUse instead:\n```tolk\nenum Errors {\n    /// Sender is not the current owner.\n    NotOwner = 401\n}\n\nfun onInternalMessage(in: InMessage) {\n    // ...\n    assert (in.senderAddress == storage.ownerAddress) throw Errors.NotOwner;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "throw-requires-errors-enum": {
+          "title": "E028: throw-requires-errors-enum",
+          "description": "### What it does\nWarns when symbolic throw codes are referenced as bare constants.\n\n### Why is this bad?\nUsing `Errors.SomeName` keeps custom exit codes consistent across contracts, tests, and compiler ABI output.\nBare constants such as `ERR_NOT_OWNER` are harder to discover and produce inconsistent symbolic names.\n\n### Example\n```tolk twoslash\nstruct Storage {\n    ownerAddress: address\n}\n\nconst ERR_NOT_OWNER = 401\n\nfun onInternalMessage(in: InMessage) {\n    val storage = lazy Storage.load();\n    val isOwner = in.senderAddress == storage.ownerAddress;\n    assert (isOwner) throw ERR_NOT_OWNER;\n    //                     ^^^^^^^^^^^^^ E028: throw code should use `Errors.<Name>`\n}\n```\n\nUse instead:\n```tolk\nenum Errors {\n    NotOwner = 401\n}\n\nstruct Storage {\n    ownerAddress: address\n}\n\nfun onInternalMessage(in: InMessage) {\n    val storage = lazy Storage.load();\n    val isOwner = in.senderAddress == storage.ownerAddress;\n    assert (isOwner) throw Errors.NotOwner;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "unauthorized-access": {
+          "title": "E013: unauthorized-access",
+          "description": "### What it does\nDetects storage mutations (`contract.setData(...)`, `*.save()`) that are reachable\nwithout a preceding admin sender check.\n\n### Why is this bad?\nState-changing operations that are not guarded by admin authorization may allow\narbitrary inbound senders to mutate contract storage.\n\n### Behavior notes\n- This preview rule is disabled (`allow`) by default. Enable it in config:\n\n```toml\n[lint.rules]\nunauthorized-access = \"warn\"\n```\n\n- Or run only this rule with `acton check --enable-only E013`.\n- The analysis currently checks `onInternalMessage` and treats an\n  `assert`-style `in.senderAddress == *.adminAddress` guard as the admin\n  sender check.\n\n### Example\n```tolk twoslash\nfun onInternalMessage(in: InMessage) {\n    val storage = lazy Storage.fromCell(contract.getData());\n    storage.save();\n    //      ^^^^ E013: possible storage write without admin sender check\n}\n```\n\nUse instead:\n```tolk\nfun onInternalMessage(in: InMessage) {\n    val storage = lazy Storage.fromCell(contract.getData());\n    assert (in.senderAddress == storage.adminAddress) throw ERR_UNAUTHORIZED;\n    storage.save();\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "unnecessary-not-null-assertion": {
+          "title": "E031: unnecessary-not-null-assertion",
+          "description": "### What it does\nDetects a not-null assertion when the expression's inferred type cannot be `null`.\n\n### Why is this bad?\nThe `!` operator only removes `null` from a nullable type. Applying it to an expression\nthat is already non-null has no effect and can mislead readers into expecting a nullable value.\n\n### Behavior notes\nFor a direct chain such as `value!!`, E031 reports only the outermost unnecessary `!`.\nWhen E014 is also enabled, E014 owns the chain's auto-fix to avoid overlapping edits.\n\n### Example\n```tolk twoslash\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value! + 1;\n        //          ^ E031: unnecessary not-null assertion\n    }\n    return 0;\n}\n```\n\nUse instead:\n```tolk\nfun addOne(value: int?): int {\n    if (value != null) {\n        return value + 1;\n    }\n    return 0;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "unused-expression": {
+          "title": "E026: unused-expression",
+          "description": "### What it does\nWarns when an expression statement computes a value that is immediately discarded.\n\n### Why is this bad?\nSuch expressions usually have no effect and often indicate a typo, such as using `!=`\ninstead of `=` or `+=`.\n\n### Example\n```tolk twoslash\nfun main(a: int, b: int) {\n    a != b;\n//  ^^^^^^^ E026: unused expression has no effect\n}\n```\n\nUse instead:\n```tolk\nfun main(mutate a: int, b: int) {\n    a -= b;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "unused-import": {
+          "title": "E005: unused-import",
+          "description": "### What it does\nChecks for imports that are never used in the file.\n\n### Why is this bad?\nUnused imports clutter the code and increase compilation time.\n\n### Example\n```tolk twoslash\nimport \"other.tolk\";\n//      ^^^^^^^^^^ E005: unused import\n\nfun main() {\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\n\n### Behavior notes\n- Autofix is available only when the unused import can be removed as a whole-line edit.\n- If multiple imports share one line, warning is emitted but autofix is skipped.\n- Whole-line autofix also removes inline comments attached to that import line.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "unused-variable": {
+          "title": "E001: unused-variable",
+          "description": "### What it does\nChecks for variables and parameters that are declared but never used.\n\n### Why is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\n### Example\n```tolk twoslash\nfun main() {\n    val x = 1;\n    //  ^ E001: variable is unused\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\nOr prefix with an underscore if the variable is intentionally unused:\n```tolk\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n```\n\n### Behavior notes\n- Locals prefixed with `_` are intentionally ignored.\n- The rule also skips type parameters, implicit asm/builtin parameters, and `self`.\n- Autofix prefixes the declaration identifier with `_`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "used-ignored-identifier": {
+          "title": "E008: used-ignored-identifier",
+          "description": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk twoslash\nfun main() {\n    val _value = 10;\n    _value;\n//  ^^^^^^ E008: identifier marked as unused is used\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        },
+        "write-only-variable": {
+          "title": "E004: write-only-variable",
+          "description": "### What it does\nChecks for variables that are written to but never read.\n\n### Why is this bad?\nA variable that is only written to but never read is likely a bug or redundant code.\n\n### Example\n```tolk twoslash\nfun main() {\n    var x = 1;\n    //  ^ E004: variable is only written to but never read\n    x = 2;\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\n\n### Behavior notes\n- Locals prefixed with `_` are ignored.\n- Mutable parameters (`mutate`) are ignored.\n- Variables with zero usages are handled by `unused-variable`.\n- This rule only reports variables with writes and no reads.\n  Operations that imply reads (for example `+=`) do not match this rule.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LintRuleLevel"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/LintRuleLevel"
+              }
+            }
+          ]
+        }
+      },
       "additionalProperties": {
         "$ref": "#/definitions/LintEntry"
       }
@@ -445,6 +1079,16 @@
             "type": "string"
           }
         },
+        "block-interval-ms": {
+          "description": "Block production interval in milliseconds for `acton localnet start`",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 1.0
+        },
+        "db-path": {
+          "description": "Path to an `SQLite` database used by `acton localnet start` for persistent node state",
+          "type": "string"
+        },
         "fork-block-number": {
           "description": "Block sequence number used by `acton localnet start` when forking from historical state",
           "type": "integer",
@@ -459,6 +1103,14 @@
             }
           ]
         },
+        "mine-empty-blocks": {
+          "description": "Mine blocks even when there are no pending messages",
+          "type": "boolean"
+        },
+        "no-mining": {
+          "description": "Disable automatic block production for `acton localnet start`",
+          "type": "boolean"
+        },
         "port": {
           "description": "Localnet port used by `acton localnet` commands",
           "default": 3000,
@@ -471,6 +1123,12 @@
           "description": "Maximum number of API requests per second served by `Localnet` `/api` endpoints",
           "type": "integer",
           "format": "uint32",
+          "minimum": 0.0
+        },
+        "response-delay-ms": {
+          "description": "Response delay in milliseconds for `Localnet` `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints",
+          "type": "integer",
+          "format": "uint64",
           "minimum": 0.0
         }
       }
@@ -789,6 +1447,22 @@
             }
           ]
         },
+        "gas-profile": {
+          "description": "Output path for gas-weighted execution profiling",
+          "type": "string"
+        },
+        "gas-profile-format": {
+          "description": "Export format for gas-weighted execution profiling",
+          "allOf": [
+            {
+              "$ref": "#/definitions/GasProfileFormat"
+            }
+          ]
+        },
+        "gas-profile-include-tests": {
+          "description": "Include `.test.tolk` unit-test execution in the generated gas profile",
+          "type": "boolean"
+        },
         "include": {
           "description": "Glob patterns to include in testing",
           "type": "array",
@@ -818,6 +1492,10 @@
           "items": {
             "$ref": "#/definitions/ReportFormat"
           }
+        },
+        "studio-reporting": {
+          "description": "Send test run data to Acton Studio when it is available",
+          "type": "boolean"
         },
         "ui": {
           "description": "Enable the test UI server",

@@ -24,12 +24,12 @@ fn test_action_fail() {
                     },
                 }.calculateAddress();
 
-                reserveToncoinsOnBalance(ton("0.1"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+                reserveGramsOnBalance(grams("0.1"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
                 val outMsg = createMessage({
                     dest: addr,
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                 });
                 outMsg.send(SEND_MODE_REGULAR);
             }
@@ -71,7 +71,7 @@ fn test_action_fail() {
                 // Trigger internal message that will cause action fail
                 val triggerMsg = createMessage({
                     bounce: false,
-                    value: ton("0.2"),
+                    value: grams("0.2"),
                     dest: addr,
                 });
 
@@ -226,7 +226,7 @@ fn code_and_library_action_failure_project(project_name: &str) -> ProjectBuilder
                 fun onInternalMessage(in: InMessage) {
                     contract.setCodePostponed(beginCell().storeUint(0xCA, 8).endCell());
                     contract.setLibraryCode(beginCell().storeUint(0xFE, 8).endCell(), 2);
-                    reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+                    reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
                 }
 
                 fun onBouncedMessage(_: InMessageBounced) {}
@@ -253,7 +253,7 @@ fn code_and_library_action_failure_project(project_name: &str) -> ProjectBuilder
 
                 val triggerMsg = createMessage({
                     bounce: false,
-                    value: ton("0.2"),
+                    value: grams("0.2"),
                     dest: addr,
                 });
 
@@ -296,7 +296,7 @@ fn invalid_action_fail_project(project_name: &str) -> ProjectBuilder {
                 // Trigger internal message that will cause action fail
                 val triggerMsg = createMessage({
                     bounce: false,
-                    value: ton("0.2"),
+                    value: grams("0.2"),
                     dest: addr,
                 });
 

@@ -1,6 +1,6 @@
 ---
 title: "Overview"
-description: "Run a TON-compatible local node with faucet, fork mode, startup wallets, and snapshot workflows"
+description: "Run a TON-compatible local node with faucet, fork mode, startup wallets, state files, and checkpoints"
 ---
 
 Acton includes a built-in local development node available through `acton localnet`.
@@ -11,14 +11,16 @@ It is designed for fast local iteration with a familiar TonCenter API and reprod
 - Fast local feedback loop for deploys, transactions, and get-method calls.
 - Optional fork mode for querying real blockchain state from testnet or mainnet.
 - Built-in faucet and startup wallet bootstrap for zero-friction local testing.
-- Reproducible environments with SQLite persistence or JSON snapshots.
+- Reproducible environments with SQLite persistence, JSON state files, or checkpoints.
+- Runtime network-condition controls for simulating slower API responses.
 
 ## Built-in Explorer UI
 
 The local node serves a bundled explorer UI from the same HTTP server as the API.
 
 - The root path serves the explorer UI, and client-side routes such as `/explorer`, `/tokens`, `/nfts`, `/explorer/address/<ADDR>`, and `/explorer/tx/<HASH>` all resolve through the same single-page app shell.
-- The UI reads blockchain data from `/api/v2` and `/api/v3`, and uses `/admin/address-name` plus `/admin/compiler-abi` for local alias and ABI lookups.
+- The UI reads blockchain data from `/api/v2` and `/api/v3`, and uses `/acton_getAddressName` plus `/acton_getCompilerAbi` for local alias and ABI lookups.
+- Account pages subscribe to `/api/streaming/v2/sse` so new transactions and account state changes appear without waiting for a polling interval.
 
 ## Learn more
 
@@ -32,10 +34,13 @@ The local node serves a bundled explorer UI from the same HTTP server as the API
   <Card href="/docs/localnet/startup-accounts" title="Startup Accounts">
     Auto-fund and auto-deploy configured wallets on node startup.
   </Card>
-  <Card href="/docs/localnet/persistence-and-snapshots" title="Persistence and Snapshots">
-    Persist state to SQLite or export/import JSON snapshots for repeatable runs.
+  <Card href="/docs/localnet/persistence-and-snapshots" title="Persistence and State">
+    Persist state to SQLite, transfer JSON state files, or use in-memory checkpoints.
   </Card>
   <Card href="/docs/localnet/api-compatibility" title="API Compatibility">
-    Use TonCenter-compatible v2/v3 routes and admin endpoints.
+    Use TonCenter-compatible v2/v3, Streaming API, and control endpoints.
+  </Card>
+  <Card href="/docs/localnet/liteapi-support" title="LiteAPI Support">
+    Connect LiteServer-compatible tools and check supported binary API methods.
   </Card>
 </Cards>

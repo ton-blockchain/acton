@@ -1,4 +1,4 @@
-use crate::common::strip_ansi;
+use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use serde_json::Value;
@@ -183,7 +183,14 @@ fn spawn_http_mock(
                 });
 
             assert_eq!(method, response.method, "unexpected HTTP method");
-            assert_eq!(path, response.path, "unexpected HTTP path");
+            if let Some(prefix) = response.path.strip_suffix('*') {
+                assert!(
+                    path.starts_with(prefix),
+                    "unexpected HTTP path: expected prefix {prefix:?}, got {path:?}"
+                );
+            } else {
+                assert_eq!(path, response.path, "unexpected HTTP path");
+            }
 
             let body = response.body;
             let raw_response = format!(
@@ -436,6 +443,84 @@ fn test_wallet_airdrop_rejects_difficulty_above_256() {
     output.assert_stderr_snapshot_matches(
         "integration/snapshots/wallet_airdrop/test_wallet_airdrop_rejects_difficulty_above_256.stderr.txt",
     );
+}
+
+#[test]
+fn test_wallet_airdrop_honors_challenge_nonce_limit() {
+    let project = ProjectBuilder::new("wallet-airdrop-challenge-nonce-limit").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/faucet/challenge",
+        status: 200,
+        body: r#"{"version":1,"challenge":"mock-challenge","difficulty":1,"max_solve_ttl_seconds":300,"max_nonce_attempts":0}"#,
+    }]);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    output.assert_stderr_contains("PoW solve exceeded nonce limit of 0");
+}
+
+#[test]
+fn test_wallet_airdrop_honors_challenge_solve_ttl() {
+    let project = ProjectBuilder::new("wallet-airdrop-challenge-solve-ttl").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/faucet/challenge",
+        status: 200,
+        body: r#"{"version":1,"challenge":"mock-challenge","difficulty":1,"max_solve_ttl_seconds":0,"max_nonce_attempts":1000000000}"#,
+    }]);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    output.assert_stderr_contains("PoW solve exceeded time limit of 0s");
 }
 
 #[test]
@@ -761,6 +846,97 @@ fn test_wallet_airdrop_localnet_success_uses_configured_port_and_fixed_amount() 
 }
 
 #[test]
+fn test_wallet_airdrop_localnet_waits_for_top_up_balance() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-top-up").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (port, faucet_handle, captured_requests) = spawn_localnet_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/acton_fundAccount",
+            status: 200,
+            body: r#"{"ok":true,"result":{"hash":"accepted"}}"#,
+        },
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"100000000000"}}"#,
+        },
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"200000000000"}}"#,
+        },
+    ]);
+    append_localnet_port(project.path(), port);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .success();
+
+    faucet_handle
+        .join()
+        .expect("mock localnet faucet thread must finish without panic");
+    let (request_sequence, post_body) = {
+        let requests = captured_requests
+            .lock()
+            .expect("captured requests mutex poisoned");
+        let request_sequence = requests
+            .iter()
+            .map(|request| {
+                let path = request.path.split('?').next().unwrap_or(&request.path);
+                format!("{} {path}", request.method)
+            })
+            .collect::<Vec<_>>();
+        let post_body: Value =
+            serde_json::from_str(&requests[1].body).expect("localnet faucet body must be JSON");
+        drop(requests);
+        (request_sequence, post_body)
+    };
+    let summary = serde_json::json!({
+        "success_message": strip_ansi(&output.get_stdout()).contains("Successfully airdropped 100 GRAM on localnet"),
+        "request_sequence": request_sequence,
+        "post_amount": post_body["amount"],
+        "post_address_present": post_body["address"].as_str().is_some_and(|address| !address.is_empty()),
+    });
+    let summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&summary).expect("Failed to serialize JSON snapshot")
+    );
+
+    assertion().eq(
+        summary_json,
+        snapbox::file!(
+            "snapshots/wallet_airdrop/test_wallet_airdrop_localnet_waits_for_top_up_balance.summary.json"
+        ),
+    );
+}
+
+#[test]
 fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
     let project = ProjectBuilder::new("wallet-airdrop-localnet-transport-error").build();
 
@@ -808,12 +984,20 @@ fn test_wallet_airdrop_localnet_http_error_preserves_response_body() {
         .run()
         .success();
 
-    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![FaucetMockResponse {
-        method: "POST",
-        path: "/admin/faucet",
-        status: 500,
-        body: r#"{"error":"backend unavailable"}"#,
-    }]);
+    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/acton_fundAccount",
+            status: 500,
+            body: r#"{"error":"backend unavailable"}"#,
+        },
+    ]);
     append_localnet_port(project.path(), port);
 
     let output = project
@@ -850,12 +1034,20 @@ fn test_wallet_airdrop_localnet_invalid_json_response_reports_parse_error() {
         .run()
         .success();
 
-    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![FaucetMockResponse {
-        method: "POST",
-        path: "/admin/faucet",
-        status: 200,
-        body: "not json",
-    }]);
+    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/api/v2/getAddressInformation*",
+            status: 200,
+            body: r#"{"ok":true,"result":{"balance":"0"}}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/acton_fundAccount",
+            status: 200,
+            body: "not json",
+        },
+    ]);
     append_localnet_port(project.path(), port);
 
     let output = project
@@ -912,7 +1104,7 @@ fn test_wallet_airdrop_localnet_json_success_omits_pow_fields() {
     assert_eq!(json["success"], true);
     assert_eq!(
         json["message"],
-        "Successfully airdropped 100 TON on localnet"
+        "Successfully airdropped 100 GRAM on localnet"
     );
     assert!(
         json["address"]
@@ -1132,6 +1324,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "0",
                     "code_boc": Value::Null,
                     "status": "uninit",
@@ -1144,6 +1337,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1165,7 +1359,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
 
     session.expect("interactive airdrop wait success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 2.2000 TON");
+    session.expect("Testnet funds are available: 2.2000 GRAM");
     session.expect(Eof);
 
     faucet_handle
@@ -1238,6 +1432,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1250,6 +1445,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1262,6 +1458,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "3400000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1283,7 +1480,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
 
     session.expect("existing balance airdrop wait success");
     session.expect("Waiting for testnet balance to increase... Press Enter to skip waiting.");
-    session.expect("Testnet balance increased: 3.4000 TON (+1.2000 TON)");
+    session.expect("Testnet balance increased: 3.4000 GRAM (+1.2000 GRAM)");
     session.expect(Eof);
 
     faucet_handle
@@ -2422,7 +2619,7 @@ fn test_wallet_new_prompted_airdrop_yes_uses_cli_faucet_url() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("y", "failed to confirm prompted airdrop");
     session.expect("Requesting airdrop for wallet prompted-cli-wallet");
     session.expect("prompted cli faucet success");
@@ -2476,6 +2673,7 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2500000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2498,11 +2696,11 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("y", "failed to confirm prompted airdrop wait");
     session.expect("prompted wait success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 2.5000 TON");
+    session.expect("Testnet funds are available: 2.5000 GRAM");
     session.expect(Eof);
 
     faucet_handle
@@ -2573,6 +2771,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "1500000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2598,7 +2797,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
 
     session.expect("interactive airdrop success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 1.5000 TON");
+    session.expect("Testnet funds are available: 1.5000 GRAM");
     session.expect(Eof);
 
     faucet_handle

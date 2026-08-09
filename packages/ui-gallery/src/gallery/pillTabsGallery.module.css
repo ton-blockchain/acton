@@ -1,0 +1,24 @@
+.frame {
+  min-width: 0;
+  padding: var(--acton-space-3) var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.stack {
+  display: grid;
+  gap: var(--acton-space-3);
+  min-width: 0;
+}
+
+.hint {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+}
+
+.narrowFrame {
+  max-width: 28rem;
+}

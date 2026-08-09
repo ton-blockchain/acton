@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/bench_measure_empty_callback.test.tolk (1 test)
+  ✓ bench measure empty callback returns empty profile [TIME]
+    └─ Test output:
+       BENCH_EMPTY_GAS=0
+       BENCH_EMPTY_INSTRUCTIONS=0
+       BENCH_EMPTY_CALL_OVERHEAD_REMOVED=true
+       BENCH_EMPTY_GAS_MATCHES_INSTRUCTION_TOTAL=true
+       Bench profile: "empty callback"
+       Total gas: 0
+       
+       No instructions captured.
+       
+       BENCH_EMPTY_ASM_CODE_START
+       BENCH_EMPTY_ASM_CODE_END
+
+ ✓ 1 passed in 1 file

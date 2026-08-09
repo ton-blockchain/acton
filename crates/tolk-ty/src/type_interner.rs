@@ -4,6 +4,7 @@ use crate::types::{AddressKind, IntTy, TyData};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use tolk_resolver::file_index::SymbolId;
+use tolk_resolver::resolve_index::LocalDefId;
 
 /// A lightweight identifier for an interned type.
 ///
@@ -34,6 +35,7 @@ impl std::fmt::Display for TyDisplay<'_> {
 pub struct TypeInterner {
     arena: Vec<TyData>,           // TyId -> TyData
     map: FxHashMap<TyData, TyId>, // TyData -> TyId
+    scoped_type_parameters: FxHashMap<LocalDefId, TyId>,
 
     pub ty_undefined: TyId,
     pub ty_unknown: TyId,
@@ -67,6 +69,7 @@ impl TypeInterner {
         let mut this = Self {
             arena: Vec::new(),
             map: FxHashMap::default(),
+            scoped_type_parameters: FxHashMap::default(),
             ty_undefined: TyId(0),
             ty_unknown: TyId(0),
             ty_int: TyId(0),
@@ -299,7 +302,47 @@ impl TypeInterner {
 
     /// Creates a type parameter type.
     pub fn type_parameter(&mut self, name: String, default_type: Option<TyId>) -> TyId {
-        self.intern(TyData::TypeParameter { name, default_type })
+        self.intern(TyData::TypeParameter {
+            id: None,
+            name,
+            default_type,
+        })
+    }
+
+    /// Returns the current type parameter for a scoped declaration identity.
+    pub fn scoped_type_parameter(
+        &mut self,
+        id: LocalDefId,
+        name: String,
+        default_type: Option<TyId>,
+    ) -> TyId {
+        if let Some(&ty) = self.scoped_type_parameters.get(&id) {
+            return ty;
+        }
+
+        let ty = self.intern(TyData::TypeParameter {
+            id: Some(id),
+            name,
+            default_type,
+        });
+        self.scoped_type_parameters.insert(id, ty);
+        ty
+    }
+
+    /// Interns the current declaration data and updates identity-based lookups.
+    pub fn declare_scoped_type_parameter(
+        &mut self,
+        id: LocalDefId,
+        name: String,
+        default_type: Option<TyId>,
+    ) -> TyId {
+        let ty = self.intern(TyData::TypeParameter {
+            id: Some(id),
+            name,
+            default_type,
+        });
+        self.scoped_type_parameters.insert(id, ty);
+        ty
     }
 
     /// when `var v = rhs`, `v` is `undefined` before assignment (before rhs->inferred_type is assigned to it);
@@ -374,10 +417,11 @@ impl TypeInterner {
             if a_args.len() != b_args.len() {
                 return true;
             }
-            return !a_args
-                .iter()
-                .zip(b_args.iter())
-                .all(|(&at, &bt)| self.equals(at, bt));
+            return a_def != b_def
+                || !a_args
+                    .iter()
+                    .zip(b_args.iter())
+                    .all(|(&at, &bt)| self.equals(at, bt));
         }
 
         // handle `type MInt2 = MInt1`, as well as `type BalanceList = dict`, then they are equal
@@ -1203,8 +1247,8 @@ impl TypeInterner {
                 {
                     let mut mapping = FxHashMap::default();
                     for (&formal, &actual) in formal_args.iter().zip(types.iter()) {
-                        if let TyData::TypeParameter { name, .. } = self.data(formal) {
-                            mapping.insert(name.clone(), actual);
+                        if let TyData::TypeParameter { .. } = self.data(formal) {
+                            mapping.insert(formal, actual);
                         }
                     }
 
@@ -1261,6 +1305,33 @@ mod tests {
         assert!(matches!(
             interner.data(interner.ty_unknown),
             TyData::Unknown
+        ));
+    }
+
+    #[test]
+    fn scoped_type_parameters_include_current_declaration_data() {
+        let mut interner = TypeInterner::new();
+        let id = LocalDefId::new(1, 10);
+
+        let original =
+            interner.declare_scoped_type_parameter(id, "T".to_owned(), Some(interner.ty_int));
+        let original_lookup = interner.scoped_type_parameter(id, "T".to_owned(), None);
+        let changed_default =
+            interner.declare_scoped_type_parameter(id, "T".to_owned(), Some(interner.ty_slice));
+        let changed_lookup = interner.scoped_type_parameter(id, "T".to_owned(), None);
+        let removed_default = interner.declare_scoped_type_parameter(id, "T".to_owned(), None);
+
+        assert_eq!(original_lookup, original);
+        assert_ne!(changed_default, original);
+        assert_eq!(changed_lookup, changed_default);
+        assert_ne!(removed_default, changed_default);
+        assert!(matches!(
+            interner.data(changed_default),
+            TyData::TypeParameter {
+                id: Some(existing),
+                name,
+                default_type: Some(default_type),
+            } if *existing == id && name == "T" && *default_type == interner.ty_slice
         ));
     }
 
@@ -1362,7 +1433,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generic_alias_equality() {
+    fn generic_aliases_with_different_bases_are_nominal() {
         let mut interner = TypeInterner::new();
 
         let def_w1 = SymbolId {
@@ -1382,7 +1453,9 @@ mod tests {
         let t_w2_int =
             interner.type_alias_instantiation(def_w2, "Wrapper2".into(), t_int, vec![t_int]);
 
-        assert!(interner.equals(t_w1_int, t_w2_int));
+        assert!(!interner.equals(t_w1_int, t_w2_int));
+        assert!(!interner.can_rhs_be_assigned(t_w1_int, t_w2_int));
+        assert!(!interner.can_rhs_be_assigned(t_w2_int, t_w1_int));
     }
 
     #[test]

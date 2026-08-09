@@ -1,0 +1,4 @@
+field1: int   = -1
+field2: cell  = te6ccgEBAQEABwAACmhlbGxv
+field3: slice = [WALLET_ADDRESS_BASE]
+field4: null  = null

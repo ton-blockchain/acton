@@ -16,8 +16,19 @@ By default, the node listens on port `5411` (or `[localnet].port` from `Acton.to
 You can verify that the server is running:
 
 ```bash
-curl -s "http://localhost:5411/api/v2/getMasterchainInfo"
+curl -s "http://127.0.0.1:5411/api/v2/getMasterchainInfo"
 ```
+
+## Explore Blocks
+
+Open `http://127.0.0.1:5411/explorer/blocks` to inspect the latest
+transactions, masterchain blocks, workchain blocks, and block details in the
+local dashboard.
+
+The same block metadata is available through the TonCenter v3-compatible
+`GET /api/v3/blocks` endpoint. It supports filtering by `workchain`, `shard`,
+`seqno`, `root_hash`, `file_hash`, `mc_seqno`, generated time, logical time,
+`limit`, `offset`, and `sort`.
 
 ## Fund an Address
 
@@ -45,16 +56,95 @@ Then target the same port for CLI helpers:
 acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
+## Mine Blocks Manually
+
+Use `--no-mining` when you want full control over block production:
+
+```bash
+acton localnet start --no-mining
+```
+
+Accepted messages stay queued until you mine blocks:
+
+```bash
+acton localnet mine
+acton localnet mine 5
+```
+
+You can also store the mode in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+no-mining = true
+```
+
+## Control Time
+
+Localnet uses a virtual clock for block and transaction timestamps. Move it
+forward without waiting for wall-clock time:
+
+```bash
+acton localnet increase-time 3600
+acton localnet mine
+```
+
+Set the current virtual Unix time:
+
+```bash
+acton localnet set-time 1710000000
+```
+
+Set a one-shot timestamp for only the next mined block:
+
+```bash
+acton localnet set-next-block-timestamp 1710000600
+acton localnet mine
+```
+
+The requested timestamp cannot be lower than the latest mined block time.
+`acton localnet status` reports the current virtual time, offset, and any
+pending next-block timestamp.
+
+## Simulate API Latency
+
+Use `--response-delay-ms` when you need local API requests to behave more like
+a slower remote provider:
+
+```bash
+acton localnet start --response-delay-ms 300
+```
+
+This delays `/api/v2`, `/api/v3`, and `/api/emulate/v1` responses. Streaming
+subscriptions, control endpoints, and the explorer UI are not delayed.
+
+You can change the delay while the node is running:
+
+```bash
+curl -s -X POST "http://127.0.0.1:5411/acton_setNetworkConditions" \
+  -H "content-type: application/json" \
+  -d '{"response_delay_ms":300}'
+```
+
+Use `{"response_delay_ms":0}` to disable the delay. The current value is
+included in `/acton_nodeInfo`.
+
+You can also store the same default in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+response-delay-ms = 300
+```
+
 ## Stop the Node
 
 Press `Ctrl+C` in the terminal where the node is running.
 
 <Callout type="info">
-If you use `--dump-state`, the snapshot is saved during graceful shutdown.
+If you use `--dump-state`, the state file is saved during graceful shutdown.
 </Callout>
 
 ## Next Steps
 
 - Learn how to [fork from testnet/mainnet](/docs/localnet/forking-from-network).
 - Configure [startup accounts](/docs/localnet/startup-accounts).
-- Add [persistence or snapshots](/docs/localnet/persistence-and-snapshots).
+- Add [persistence, state files, or checkpoints](/docs/localnet/persistence-and-snapshots).

@@ -11,10 +11,10 @@
   ✗ should increase counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1513 exit_code=10 aborted
             └── Compute phase failed: Dictionary error
         
-        Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+        Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
         with:
           success=true
           exit_code=0
@@ -22,10 +22,10 @@
   ✗ should reset counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1513 exit_code=10 aborted
             └── Compute phase failed: Dictionary error
         
-        Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+        Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
         with:
           success=true
           exit_code=0

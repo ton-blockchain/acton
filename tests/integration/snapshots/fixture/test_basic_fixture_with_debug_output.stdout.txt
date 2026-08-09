@@ -11,7 +11,7 @@
   ✓ should increase counter [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1508
+       └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1508
            └── Debug logs:
                Hello World
   ✓ should reset counter [TIME]

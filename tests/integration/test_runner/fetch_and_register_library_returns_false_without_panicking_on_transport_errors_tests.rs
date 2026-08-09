@@ -1,6 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::fixtures::FixtureProject;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::{
+    spawn_toncenter_v2_mock, toncenter_v2_latest_fork_snapshot_responses,
+};
 use std::fs;
 
 const MISSING_LIBRARY_HASH: &str =
@@ -9,6 +12,8 @@ const KNOWN_LIBRARY_HASH: &str = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a
 
 #[test]
 fn fetch_and_register_library_returns_false_without_panicking_on_transport_errors() {
+    let (mock_url, mock_handle) =
+        spawn_toncenter_v2_mock(toncenter_v2_latest_fork_snapshot_responses(123_456));
     let project = ProjectBuilder::new("bl-stdlib-fetch-register-library-false")
         .test_file(
             "fetch_register_library_false",
@@ -39,7 +44,7 @@ get fun `test bl stdlib fetch register library false`() {{
         r#"{base_config}
 
 [networks.bl-unreachable]
-api = {{ v2 = "http://127.0.0.1:1/api/v2" }}
+api = {{ v2 = "{mock_url}/api/v2" }}
 "#
     );
     fs::write(&acton_toml_path, patched_config).expect("failed to patch Acton.toml for BL test");
@@ -51,6 +56,8 @@ api = {{ v2 = "http://127.0.0.1:1/api/v2" }}
         .run()
         .success()
         .assert_passed(1);
+
+    mock_handle.join().expect("mock toncenter must finish");
 }
 
 #[test]

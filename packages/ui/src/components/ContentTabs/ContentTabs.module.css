@@ -1,0 +1,116 @@
+.contentTabs {
+  display: grid;
+  min-width: 0;
+  color: var(--acton-color-text);
+}
+
+.tabList {
+  display: flex;
+  align-items: stretch;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 0 calc(-1 * 1px);
+  padding: 0;
+  overflow-x: auto;
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.tabList::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  position: relative;
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.125rem;
+  padding: var(--acton-space-2) var(--acton-space-5);
+  border: 1px solid var(--acton-color-border);
+  border-inline-start-width: 0;
+  border-radius: 0;
+  background: var(--acton-color-surface-group);
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    border-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.tab:first-child {
+  border-inline-start-width: 1px;
+  border-start-start-radius: var(--acton-radius-control-sm);
+}
+
+.tab:last-child {
+  border-start-end-radius: var(--acton-radius-control-sm);
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--acton-color-text);
+}
+
+.tab:focus-visible {
+  z-index: 2;
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -3px;
+}
+
+.tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.tabActive {
+  z-index: 1;
+  background: var(--acton-color-surface);
+  border-bottom-color: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.panel {
+  position: relative;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 0 0 var(--acton-radius-panel) var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+}
+
+.panel:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.loadingStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.loadingSkeleton {
+  min-height: 14rem;
+  padding: var(--acton-space-4);
+}
+
+@media (max-width: 640px) {
+  .tab {
+    padding-inline: var(--acton-space-4);
+  }
+}

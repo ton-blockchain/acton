@@ -17,6 +17,7 @@ const GITIGNORE_GROUPS: &[(&str, &[&str])] = &[
         "# Acton related files",
         &[
             ".acton/",
+            ".studio/",
             "gen/",
             "build/",
             "lcov.info",
@@ -244,8 +245,10 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
         let contract_config = ContractConfig {
             name: Some(contract_name),
             src: relative_path,
+            types: None,
             depends: Some(vec![]),
             output: None,
+            wrappers: None,
         };
 
         contracts.insert(contract_key, contract_config);

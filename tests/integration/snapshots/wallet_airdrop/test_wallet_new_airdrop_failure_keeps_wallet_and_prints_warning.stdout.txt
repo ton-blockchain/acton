@@ -6,7 +6,7 @@
 ✓ Challenge solved in [TIME]
 Warning: Wallet was created, but automatic airdrop failed: Faucet returned error 400 Bad Request: faucet down
 
-NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
+NOTE: This is a testnet wallet. Testnet GRAM has NO VALUE.
 
 To check wallet balances run acton wallet list --balance.
 

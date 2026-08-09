@@ -61,6 +61,9 @@ use std::slice;
 use std::str;
 use std::sync::Arc;
 
+/// Gas limit used by native get-method execution.
+pub const DEFAULT_GET_METHOD_GAS_LIMIT: i64 = i64::MAX - 1000;
+
 // Opaque native emulator handle guarded by `GetExecutor::inner`.
 struct RawGetExecutorHandle(NonNull<c_void>);
 
@@ -118,7 +121,7 @@ impl GetExecutor {
             // We set a very high gas limit by default for get-methods,
             // as they are typically executed off-chain and for some reason,
             // Tolk compilation consumes gas :D
-            tvm_emulator_set_gas_limit(inner.0.as_ptr(), i64::MAX - 1000);
+            tvm_emulator_set_gas_limit(inner.0.as_ptr(), DEFAULT_GET_METHOD_GAS_LIMIT);
 
             run_get_method_struct(
                 inner.0.as_ptr(),
@@ -251,7 +254,7 @@ impl GetExecutor {
 
         // SAFETY: `tvm_emulator_set_gas_limit` and `tvm_emulator_run_continuation` are safe C API functions.
         let result_ptr = unsafe {
-            tvm_emulator_set_gas_limit(inner.0.as_ptr(), i64::MAX - 1000);
+            tvm_emulator_set_gas_limit(inner.0.as_ptr(), DEFAULT_GET_METHOD_GAS_LIMIT);
 
             tvm_emulator_run_continuation(inner.0.as_ptr(), cont_cstr.as_ptr(), stack_cstr.as_ptr())
         };

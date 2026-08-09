@@ -1,0 +1,42 @@
+[package]
+name = "ton-liteapi"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = "MIT"
+
+[features]
+default = ["liteclient"]
+liteclient = []
+
+[dependencies]
+aes = { workspace = true }
+ctr = { workspace = true }
+curve25519-dalek = { workspace = true }
+derivative = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+log = { workspace = true }
+pin-project = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tl-proto = { workspace = true }
+tokio = { workspace = true, features = ["net", "io-util", "time"] }
+tokio-tower = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+tower = { workspace = true, features = ["make", "util"] }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tl-scheme = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[lib]
+doctest = false

@@ -1,0 +1,15 @@
+{
+  "title": "Studio",
+  "icon": "LayoutDashboard",
+  "pages": [
+    "overview",
+    "getting-started",
+    "tests",
+    "environments",
+    "workspace",
+    "explorer-and-contracts",
+    "simulator-and-data-tools",
+    "snapshots-and-settings",
+    "troubleshooting"
+  ]
+}

@@ -56,7 +56,7 @@ fun setupTest() {
     val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
-        value: ton("1.0"),
+        value: grams("1.0"),
         dest: {
             stateInit: counter.init,
         },
@@ -914,7 +914,7 @@ fn test_send_message_to_not_deployed_contract() {
                     dest: address,
                     body: createEmptyCell(),
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                 });
                 val res = net.send(sender.address, msg);
                 println(res);
@@ -954,7 +954,7 @@ fn test_send_message_to_not_deployed_contract_with_register() {
                     dest: address,
                     body: createEmptyCell(),
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                 });
                 val res = net.send(sender.address, msg);
                 println(res);
@@ -999,7 +999,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code() {
 
                 val outMsg = createMessage({
                     bounce: BounceMode.NoBounce,
-                    value: ton("0.1"),
+                    value: grams("0.1"),
                     dest: address,
                 });
                 net.send(deployer.address, outMsg);
@@ -1047,7 +1047,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full()
 
                 val outMsg = createMessage({
                     bounce: BounceMode.NoBounce,
-                    value: ton("0.1"),
+                    value: grams("0.1"),
                     dest: address,
                 });
                 net.send(deployer.address, outMsg);
@@ -1092,7 +1092,7 @@ fn test_send_invalid_message() {
 
                 val outMsg = createMessage({
                     bounce: BounceMode.NoBounce,
-                    value: ton("0.1"),
+                    value: grams("0.1"),
                     dest: address,
                 });
                 net.send(deployer.address, outMsg);
@@ -1142,7 +1142,7 @@ fn test_debug_logs_in_contract() {
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1231,7 +1231,7 @@ fn test_auto_register_refs_if_any() {
 
                 val outMsg = createMessage({
                     bounce: BounceMode.NoBounce,
-                    value: ton("0.1"),
+                    value: grams("0.1"),
                     dest: address,
                 });
                 outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -1260,7 +1260,7 @@ fn test_auto_register_refs_if_any() {
                 // Trigger internal message that will cause action fail
                 val triggerMsg = createMessage({
                     bounce: false,
-                    value: ton("0.2"),
+                    value: grams("0.2"),
                     dest: address,
                 });
 
@@ -1317,7 +1317,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
 
                 val outMsg = createMessage({
                     bounce: false,
-                    value: ton("0.2"),
+                    value: grams("0.2"),
                     dest: {
                         stateInit: childInit,
                     },
@@ -1350,7 +1350,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
                     deployer.address,
                     createMessage({
                         bounce: false,
-                        value: ton("1"),
+                        value: grams("1"),
                         dest: {
                             stateInit: mainStateInit,
                         },
@@ -1362,7 +1362,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
                     deployer.address,
                     createMessage({
                         bounce: false,
-                        value: ton("1"),
+                        value: grams("1"),
                         dest: mainAddress,
                         body: beginCell().storeUint(1, 32).endCell(),
                     }),
@@ -1444,7 +1444,7 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1498,7 +1498,7 @@ fn test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1548,7 +1548,7 @@ fn action_exit_code_37_project(project_name: &str) -> ProjectBuilder {
             "simple",
             r#"
             fun onInternalMessage(in: InMessage) {
-                reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+                reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
             }
             "#,
         )
@@ -1573,7 +1573,7 @@ fn action_exit_code_37_project(project_name: &str) -> ProjectBuilder {
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1591,7 +1591,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
             "simple",
             r#"
             fun onInternalMessage(in: InMessage) {
-                reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+                reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
                 throw 10
             }
             "#,
@@ -1617,7 +1617,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1668,7 +1668,7 @@ fn test_test_all_successful_tx_matcher_with_fail() {
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
@@ -1721,7 +1721,7 @@ fn test_test_all_successful_tx_matcher_without_fail() {
                 val sender = testing.treasury("sender");
                 val msg = createMessage({
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });

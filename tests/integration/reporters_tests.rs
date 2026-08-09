@@ -319,6 +319,103 @@ fn test_junit_reporter_includes_captured_stdout_and_stderr() {
 }
 
 #[test]
+fn test_junit_reporter_keeps_captured_output_with_no_capture() {
+    ProjectBuilder::new("junit_no_capture_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test junit no capture output`() {
+                println("junit no capture stdout");
+                debug.dumpStack();
+                eprintln("junit no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .verbose()
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            "test-results/TEST-output.test.tolk.xml",
+            "integration/snapshots/reporters/test_junit_reporter_keeps_captured_output_with_no_capture.xml.gen",
+        );
+}
+
+#[test]
+fn test_dot_reporter_no_capture_prints_live_output_once() {
+    ProjectBuilder::new("dot_no_capture_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test dot no capture output`() {
+                println("dot no capture stdout");
+                eprintln("dot no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("dot")
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_dot_reporter_no_capture_prints_live_output_once.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_dot_reporter_no_capture_prints_live_output_once.stderr.txt",
+        );
+}
+
+#[test]
+fn test_console_reporter_no_capture_keeps_verbose_debug_output_after_test() {
+    ProjectBuilder::new("console_no_capture_verbose_output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "output",
+            r#"
+            import "../../lib/io"
+
+            get fun `test console no capture verbose output`() {
+                println("console no capture stdout");
+                debug.dumpStack();
+                eprintln("console no capture stderr");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .verbose()
+        .no_capture()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/reporters/test_console_reporter_no_capture_keeps_verbose_debug_output_after_test.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/reporters/test_console_reporter_no_capture_keeps_verbose_debug_output_after_test.stderr.txt",
+        );
+}
+
+#[test]
 fn test_multiple_reporters_console_and_teamcity() {
     FixtureProject::load("basic")
         .acton()

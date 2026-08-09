@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
+@import "../../node_modules/fumadocs-openapi/css/preset.css";
 @import "fumadocs-twoslash/twoslash.css";
 
 .twoslash .twoslash-error.twoslash-error-level-warning {
@@ -63,6 +64,19 @@ pre {
   font-family: var(--font-geist-mono), "Courier New", monospace;
 }
 
+.prose h2:has(+ .availability-badge) {
+  margin-bottom: 0.5rem;
+}
+
+.prose .availability-badge {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose .availability-badge + figure {
+  margin-top: 1rem;
+}
+
 figure.shiki > div[role="region"] {
   max-height: 44rem;
 }
@@ -88,6 +102,22 @@ figure.shiki > div[role="region"] {
   fill: rgba(34, 34, 34, 0.8) !important;
   stroke: none;
   opacity: 1 !important;
+}
+
+.theme-image-light {
+  display: block;
+}
+
+.theme-image-dark {
+  display: none;
+}
+
+html.dark .theme-image-light {
+  display: none;
+}
+
+html.dark .theme-image-dark {
+  display: block;
 }
 
 .home-shell {

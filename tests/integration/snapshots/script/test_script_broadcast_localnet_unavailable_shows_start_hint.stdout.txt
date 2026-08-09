@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 100
+  Re-run with --backtrace full to get more information
+Failed to send message to real network: could not reach network localnet while sending external message from wallet deployer; likely causes:
+- network API endpoint is not running or is unreachable
+- configured api.v2 URL points to the wrong host or port
+- a firewall, proxy, or temporary service outage blocked the request
+
+Possible fix:
+- start localnet with acton localnet start
+- if localnet uses a custom port, check [localnet].port and [networks.localnet].api.v2 in Acton.toml
+
+Details:
+Failed to send BOC: error sending request for url ([LOCALHOST_URL]/api/v2/sendBoc): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])

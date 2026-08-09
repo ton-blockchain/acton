@@ -224,3 +224,42 @@ fn test_println_typed_cell_includes_decoded_value() {
             "integration/snapshots/println/test_println_typed_cell_includes_decoded_value.stdout.txt",
         );
 }
+
+#[test]
+fn test_println_generic_type_coloring_keeps_punctuation_plain() {
+    let project = ProjectBuilder::new("println-generic-type-colors")
+        .script_file(
+            "main",
+            r#"
+            import "../../lib/io"
+
+            struct Leaf {
+                value: uint8
+            }
+
+            struct GenericBox {
+                typedCell: Cell<Leaf>
+                boxedItems: map<uint8, Cell<Leaf>>
+            }
+
+            fun main() {
+                val leafCell = Leaf { value: 7 }.toCell() as Cell<Leaf>;
+                var boxedItems = createEmptyMap<uint8, Cell<Leaf>>();
+                boxedItems.set(1 as uint8, leafCell);
+                println(GenericBox { typedCell: leafCell, boxedItems });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/main.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .run()
+        .success()
+        .assert_stdout_svg_snapshot_matches(
+            "integration/snapshots/println/test_println_generic_type_coloring_keeps_punctuation_plain.stdout.svg",
+        );
+}

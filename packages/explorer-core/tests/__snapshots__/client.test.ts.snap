@@ -1,0 +1,46 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`account history streaming subscribes to and dispatches transactions and actions 1`] = `
+{
+  "receivedEvents": [
+    {
+      "finality": "confirmed",
+      "transactions": [
+        {
+          "hash": "transaction-hash",
+        },
+      ],
+      "type": "transactions",
+    },
+    {
+      "actions": [
+        {
+          "action_id": "action-id",
+        },
+      ],
+      "address_book": {
+        "0:account": {
+          "user_friendly": "EQAccount",
+        },
+      },
+      "finality": "confirmed",
+      "metadata": {
+        "0:account": {
+          "token_info": [],
+        },
+      },
+      "type": "actions",
+    },
+  ],
+  "subscription": {
+    "addresses": [
+      "EQAddress",
+    ],
+    "min_finality": "confirmed",
+    "types": [
+      "transactions",
+      "actions",
+    ],
+  },
+}
+`;

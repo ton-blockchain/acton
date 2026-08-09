@@ -8,9 +8,9 @@ use acton_debug::{RenderedValue, render_tuple_as_tolk_type};
 use anyhow::{Context as ErrorContext, anyhow};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use tolk_source_map::SourceLocation;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use ton_source_map::SourceLocation;
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::models::{IntAddr, StdAddr, Transaction};
@@ -71,8 +71,8 @@ fn assert_bin_impl(
         .ok_or_else(|| anyhow!("ty_idx=`{right_ty_idx}` does not fit into usize"))?;
 
     if operator == "==" || operator == "!=" {
-        let left_rendered = render_tuple_as_tolk_type(&source_map, &left, left_ty_idx);
-        let right_rendered = render_tuple_as_tolk_type(&source_map, &right, right_ty_idx);
+        let left_rendered = render_tuple_as_tolk_type(source_map.as_ref(), &left, left_ty_idx);
+        let right_rendered = render_tuple_as_tolk_type(source_map.as_ref(), &right, right_ty_idx);
         let values_equal = rendered_values_equal(&left_rendered, &right_rendered);
 
         if operator == "==" && values_equal {

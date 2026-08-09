@@ -1,0 +1,58 @@
+<svg width="740px" height="308px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .fg-green { fill: #00AA00 }
+    .fg-magenta { fill: #AA00AA }
+    .fg-yellow { fill: #AA5500 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    .bold { font-weight: bold; }
+    .dimmed { opacity: 0.7; }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library [ACTON_VERSION]</tspan>
+</tspan>
+    <tspan x="10px" y="46px"><tspan class="fg-magenta">GenericBox</tspan><tspan> </tspan><tspan class="dimmed">{</tspan>
+</tspan>
+    <tspan x="10px" y="64px"><tspan>    typedCell: </tspan><tspan class="fg-magenta">Cell</tspan><tspan>&lt;</tspan><tspan class="fg-magenta">Leaf</tspan><tspan>&gt; </tspan><tspan class="dimmed">8 bits, 0 refs, hash: 0xe82efc66...</tspan><tspan> </tspan><tspan class="dimmed">{</tspan>
+</tspan>
+    <tspan x="10px" y="82px"><tspan>        decoded: </tspan><tspan class="fg-magenta">Leaf</tspan><tspan> </tspan><tspan class="dimmed">{</tspan>
+</tspan>
+    <tspan x="10px" y="100px"><tspan>            value: </tspan><tspan class="fg-yellow">7</tspan><tspan>,</tspan>
+</tspan>
+    <tspan x="10px" y="118px"><tspan>        </tspan><tspan class="dimmed">}</tspan><tspan>,</tspan>
+</tspan>
+    <tspan x="10px" y="136px"><tspan>        bits: 8,</tspan>
+</tspan>
+    <tspan x="10px" y="154px"><tspan>        refs: 0,</tspan>
+</tspan>
+    <tspan x="10px" y="172px"><tspan>        hash: 0xe82efc6669e40dea4f74fa751236431a39d6c58b455a34b6d34988ba66ad257e,</tspan>
+</tspan>
+    <tspan x="10px" y="190px"><tspan>        raw: cell{[BOC_HEX]},</tspan>
+</tspan>
+    <tspan x="10px" y="208px"><tspan>    </tspan><tspan class="dimmed">}</tspan><tspan>,</tspan>
+</tspan>
+    <tspan x="10px" y="226px"><tspan>    boxedItems: </tspan><tspan class="fg-magenta">map</tspan><tspan>&lt;</tspan><tspan class="fg-magenta">uint8</tspan><tspan>, </tspan><tspan class="fg-magenta">Cell</tspan><tspan>&lt;</tspan><tspan class="fg-magenta">Leaf</tspan><tspan>&gt;&gt; </tspan><tspan class="dimmed">{</tspan>
+</tspan>
+    <tspan x="10px" y="244px"><tspan>        </tspan><tspan class="fg-yellow">1</tspan><tspan>: </tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>,</tspan>
+</tspan>
+    <tspan x="10px" y="262px"><tspan>    </tspan><tspan class="dimmed">}</tspan><tspan>,</tspan>
+</tspan>
+    <tspan x="10px" y="280px"><tspan class="dimmed">}</tspan>
+</tspan>
+    <tspan x="10px" y="298px">
+</tspan>
+  </text>
+
+</svg>

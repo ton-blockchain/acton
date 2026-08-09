@@ -28,30 +28,27 @@ pub struct GlobalEnv {
 
 impl GlobalEnv {
     /// Creates a new `GlobalEnv` for the given file, including its own symbols,
-    /// directly imported symbols, and symbols from `common.tolk`.
+    /// directly imported symbols, and implicit stdlib preludes.
     #[must_use]
     pub fn new(index: &ProjectIndex, file_id: FileId) -> Self {
-        let common_tolk = index
+        let mut preludes = index
             .files()
             .values()
-            .find(|f| f.path.ends_with("common.tolk"))
-            .cloned();
+            .filter(|file| file.is_stdlib_prelude())
+            .cloned()
+            .collect::<Vec<_>>();
+        preludes.sort_by(|left, right| left.path.cmp(&right.path));
 
         let file = index.get_file_index(file_id);
 
-        // Since common.tolk is quite big, preallocate memory for the map to avoid reallocations
-        let capacity = common_tolk.as_ref().map_or(0, |f| f.decls.len())
+        // Since common.tolk is quite big, preallocate memory for the map to avoid reallocations.
+        let capacity = preludes.iter().map(|file| file.decls.len()).sum::<usize>()
             + file.as_ref().map_or(0, |f| f.decls.len())
             + 50;
 
         let mut visible: HashMap<Arc<str>, Vec<SymbolId>> = HashMap::with_capacity(capacity);
 
-        // common.tolk is available in any file
-        if let Some(common_tolk) = common_tolk {
-            Self::add_file_declaration(&mut visible, &common_tolk);
-        }
-
-        // add symbols from current file
+        // Declarations in the current file shadow common.tolk and imported declarations.
         if let Some(file) = file {
             Self::add_file_declaration(&mut visible, file);
         }
@@ -68,6 +65,11 @@ impl GlobalEnv {
 
                 Self::add_file_declaration(&mut visible, index);
             }
+        }
+
+        // Prelude declarations have the lowest priority.
+        for prelude in preludes {
+            Self::add_file_declaration(&mut visible, &prelude);
         }
 
         GlobalEnv { visible }
@@ -184,7 +186,7 @@ impl<'a> SymbolResolver<'a> {
     }
 
     fn resolve_symbol(&mut self, ident: &Node, use_kind: NameUseKind) -> Option<()> {
-        let name = norm(self.file.text(ident).ok()?);
+        let name = norm(self.file.text(ident));
 
         let mut current = Some(self.current_scope);
         let decl_start = self.decl_start();
@@ -193,14 +195,31 @@ impl<'a> SymbolResolver<'a> {
         while let Some(scope_idx) = current {
             let scope = &self.scopes[scope_idx];
             if let Some(symbol_id) = scope.symbols.get(&name) {
-                self.uses.push(NameUse {
-                    decl: decl_start,
-                    span: ident.span(),
-                    kind: use_kind,
-                    name,
-                    resolved: Resolved::Local(*symbol_id),
-                });
-                return Some(());
+                let local_kind = self
+                    .locals
+                    .iter()
+                    .find(|local| local.id == *symbol_id)
+                    .map(|local| local.kind);
+                let matches_namespace = match use_kind {
+                    NameUseKind::Type => {
+                        matches!(local_kind, Some(LocalDefKind::TypeParameter))
+                    }
+                    NameUseKind::Value | NameUseKind::LocalValue => {
+                        !matches!(local_kind, Some(LocalDefKind::TypeParameter))
+                    }
+                    NameUseKind::Mixed => true,
+                };
+
+                if matches_namespace {
+                    self.uses.push(NameUse {
+                        decl: decl_start,
+                        span: ident.span(),
+                        kind: use_kind,
+                        name,
+                        resolved: Resolved::Local(*symbol_id),
+                    });
+                    return Some(());
+                }
             }
             current = scope.parent;
         }
@@ -236,7 +255,7 @@ impl<'a> SymbolResolver<'a> {
                 return None;
             }
 
-            if use_kind == NameUseKind::Type
+            if matches!(use_kind, NameUseKind::Type | NameUseKind::Mixed)
                 && let Some(base_name) = parse_builtin_type_base_name(name.as_ref())
                 && let Some(symbol_id) = self.resolve_global_type_symbol(base_name)
             {
@@ -836,6 +855,25 @@ fn parse_numeric_suffix(name: &str, prefix: &str) -> bool {
 /// Resolves all symbols in all files present in the `ProjectIndex`.
 pub fn resolve(db: &FileDb, index: &mut ProjectIndex) {
     let files = index.files().keys().copied().collect::<Vec<_>>();
+    resolve_files(db, index, files);
+}
+
+/// Resolves symbols only in workspace files present in the `ProjectIndex`.
+pub fn resolve_workspace_files(db: &FileDb, index: &mut ProjectIndex) {
+    let files = index
+        .workspace_files()
+        .into_iter()
+        .map(|file| file.id)
+        .collect::<Vec<_>>();
+    resolve_files(db, index, files);
+}
+
+/// Resolves symbols in selected files present in the `ProjectIndex`.
+pub fn resolve_files(
+    db: &FileDb,
+    index: &mut ProjectIndex,
+    files: impl IntoIterator<Item = FileId>,
+) {
     for file_id in files {
         let Some(file_index) = resolve_file(db, index, file_id) else {
             continue;

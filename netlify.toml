@@ -11,5 +11,5 @@ publish = "out"
 ignore = "bash ./scripts/netlify-ignore-build.sh"
 
 [build.environment]
-BUN_VERSION = "1.3.5"
+BUN_VERSION = "1.3.14"
 NEXT_TELEMETRY_DISABLED = "1"

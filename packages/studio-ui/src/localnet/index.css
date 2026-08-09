@@ -1,0 +1,20 @@
+:root {
+  --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  --litenode-workspace-to: #71717a;
+  --litenode-workspace-dot: rgba(255, 255, 255, 0.25);
+}
+
+:root.dark-theme {
+  --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --litenode-workspace-dot: rgba(9, 9, 11, 0.36);
+}
+
+body {
+  margin: 0;
+  font-family: var(--acton-font-sans), sans-serif;
+  background-color: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+  transition:
+    background-color var(--acton-duration-slow),
+    color var(--acton-duration-slow);
+}

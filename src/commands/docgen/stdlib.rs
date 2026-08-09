@@ -210,12 +210,22 @@ fn write_doc_page(
             symbol.start_line + 1
         );
 
+        let (availability, doc_text) = if let Some(doc_text) = symbol.doc.as_ref() {
+            split_availability_statement(doc_text)
+        } else {
+            (None, None)
+        };
+
+        if let Some(since) = availability {
+            let _ = writeln!(mdx_content, "<AvailabilityBadge since={since:?} />\n");
+        }
+
         mdx_content.push_str("```tolk\n");
         mdx_content.push_str(&symbol.signature);
         mdx_content.push_str("\n```\n\n");
 
-        if let Some(doc_text) = symbol.doc.as_ref() {
-            if Some(doc_text) == doc.file_header.as_ref() {
+        if let Some(doc_text) = doc_text.as_ref() {
+            if symbol.doc.as_ref() == doc.file_header.as_ref() {
                 // skip if the symbol doc is exactly the same as the file header
             } else {
                 let processed_doc =
@@ -329,6 +339,41 @@ fn skip_symbol(s: &SymbolInfo) -> bool {
         || s.name.starts_with("never.")
         || s.name.starts_with("unknown.")
         || s.name.contains("__")
+}
+
+fn split_availability_statement(doc_text: &str) -> (Option<String>, Option<String>) {
+    let mut availability = None;
+    let mut lines = Vec::new();
+    let mut in_fenced_code_block = false;
+
+    for line in doc_text.lines() {
+        if line.trim_start().starts_with("```") {
+            in_fenced_code_block = !in_fenced_code_block;
+            lines.push(line.to_owned());
+            continue;
+        }
+
+        if !in_fenced_code_block
+            && availability.is_none()
+            && let Some(since) = parse_availability_statement(line)
+        {
+            availability = Some(since);
+            continue;
+        }
+
+        lines.push(line.to_owned());
+    }
+
+    let doc_text = lines.join("\n");
+    let doc_text = (!doc_text.trim().is_empty()).then_some(doc_text.trim().to_owned());
+
+    (availability, doc_text)
+}
+
+fn parse_availability_statement(line: &str) -> Option<String> {
+    let statement = line.trim().strip_prefix("Available since ")?;
+    let statement = statement.trim_end_matches('.').trim();
+    (!statement.is_empty()).then(|| statement.to_owned())
 }
 
 enum SymbolKind {

@@ -1,6 +1,7 @@
 
 # Acton main directory
 .acton/
+.studio/
 
 # Build directory
 build/

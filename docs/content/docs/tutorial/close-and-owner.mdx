@@ -12,8 +12,8 @@ enum Errors {
     InvalidOption  = 100
     AlreadyVoted   = 101
     NotFromPoll    = 102
-    NotOwner       = 103
-    PollClosed     = 104
+    NotOwner       = 103 // [!code ++]
+    PollClosed     = 104 // [!code ++]
     InvalidMessage = 0xFFFF
 }
 ```
@@ -25,7 +25,7 @@ struct PollStorage {
     owner:    address
     option0:  uint32
     option1:  uint32
-    isClosed: bool
+    isClosed: bool // [!code ++]
 }
 ```
 
@@ -43,7 +43,7 @@ The final `contracts/Poll.tolk` with all changes applied:
 import "@gen/Voter.code"
 import "types"
 
-type AllowedPollMessage = Vote | ClosePoll
+type AllowedPollMessage = Vote | ClosePoll // [!code ++]
 
 contract Poll {
     storage: PollStorage
@@ -76,13 +76,13 @@ fun onInternalMessage(in: InMessage) {
             };
             val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
-                value:  ton("0.05"),
+                value:  grams("0.05"),
                 dest:   { stateInit: voterInit },
                 body:   msg,
             });
             outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
         }
-        ClosePoll => {
+        ClosePoll => { // [!code ++:16]
             var storage = lazy PollStorage.load();
             assert (in.senderAddress == storage.owner) throw Errors.NotOwner;
             storage.isClosed = true;
@@ -139,7 +139,7 @@ get fun owner(): address {
     return storage.owner;
 }
 
-get fun isClosed(): bool {
+get fun isClosed(): bool { // [!code ++:4]
     val storage = lazy PollStorage.load();
     return storage.isClosed;
 }
@@ -152,7 +152,8 @@ acton wrapper Poll
 ```
 
 <Callout type="info">
-  `PollStorage` now has an `isClosed` field. Update `setupTest()` to include `isClosed: false` in the `PollStorage` initializer.
+  `PollStorage` now has an `isClosed` field. Update `setupTest()` to include `isClosed: false` in
+  the `PollStorage` initializer.
 </Callout>
 
 ## Test the close logic
@@ -161,11 +162,11 @@ acton wrapper Poll
 get fun `test non-owner cannot close poll`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res = poll.sendClosePoll(alice.address, { value: ton("0.05") });
+    val res = poll.sendClosePoll(alice.address, { value: grams("0.05") });
     expect(res).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,
-        exitCode: Errors.NotOwner as int,
+        exitCode: Errors.NotOwner,
     });
 
     expect(poll.isClosed()).toEqual(false);
@@ -174,10 +175,10 @@ get fun `test non-owner cannot close poll`() {
 get fun `test owner closes poll`() {
     val (poll, owner, alice, _) = setupTest();
 
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveAllSuccessfulTxs();
 
-    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    val closeRes = poll.sendClosePoll(owner.address, { value: grams("0.05") });
     expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
 
     expect(poll.isClosed()).toEqual(true);
@@ -186,14 +187,14 @@ get fun `test owner closes poll`() {
 get fun `test vote rejected after close`() {
     val (poll, owner, alice, _) = setupTest();
 
-    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    val closeRes = poll.sendClosePoll(owner.address, { value: grams("0.05") });
     expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
 
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,
-        exitCode: Errors.PollClosed as int,
+        exitCode: Errors.PollClosed,
     });
 }
 ```
@@ -215,13 +216,14 @@ acton test --snapshot baseline.json
 Commit `baseline.json`. From now on, detect regressions with:
 
 ```bash
-acton test --baseline-snapshot baseline.json
+acton test --baseline-snapshot baseline.json --fail-on-diff
 ```
 
-If any test uses significantly more gas than the baseline, the command exits with an error.
+If any test uses more gas than the baseline, the command exits with an error.
 
 <Callout type="info">
-  Re-capture the baseline after intentional changes that affect gas — for example, adding a field to storage.
+  Re-capture the baseline after intentional changes that affect gas — for example, adding a field to
+  storage.
 </Callout>
 
 ## Checkpoint

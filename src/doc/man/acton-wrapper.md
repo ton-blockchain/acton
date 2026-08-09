@@ -18,15 +18,17 @@ Generate a wrapper for the contract identified by `_contract-name_` from
 Use `--all` to generate wrappers for every contract defined in `Acton.toml`
 without picking a single one.
 
-Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
-contract header is the source of truth for typed storage accessors, incoming
-message helpers, and generated get-method bindings.
+Wrapper generation uses ABI emitted by the Tolk compiler from the contract source
+or from a configured `types` interface file. In practice, the contract header is
+the source of truth for typed storage accessors, incoming message helpers, and
+generated get-method bindings.
 
 The command can also generate a stub test file or emit a TypeScript wrapper for
 frontend and tooling integrations.
 
-`acton wrapper` compiles the selected contract directly. A prior `acton build`
-run is not required.
+For `.tolk` contracts, `acton wrapper` compiles the selected source directly.
+For precompiled `.boc` contracts, it reads code from the BoC and compiles the
+configured `types` interface file. A prior `acton build` run is not required.
 
 ## Options
 
@@ -141,7 +143,37 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
-CLI flags override config values for the current invocation.
+Each contract can override the same settings without changing the defaults for
+other contracts:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+test-output-dir = "tests/generated/counter"
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Settings are resolved field by field. CLI flags have the highest priority,
+then `[contracts.<name>.wrappers.*]`, then `[wrappers.*]`, and finally the
+wrapper command defaults. An omitted per-contract field inherits the
+project-wide value. An explicit per-contract `generate-test = false` overrides
+a project-wide `true`. With `--all`, Acton resolves these settings separately
+for every contract.
+
+For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
+generation can read ABI from the Tolk interface file:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+```
+
+Do not put dependencies on the BoC contract itself: it is already compiled.
+Instead, put `depends = ["Precompiled"]` on the `.tolk` contract that needs the
+BoC code.
 
 ## Exit Status
 

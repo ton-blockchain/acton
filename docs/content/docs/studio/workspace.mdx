@@ -1,0 +1,178 @@
+---
+title: "Environment Workspace"
+description: "Use an environment dashboard, wallets, faucets, integration setup, API calls, and API reference pages"
+---
+
+Opening an environment switches the left navigation from the Studio workspace to tools scoped to
+that network. Every address, transaction, contract, wallet, simulation, and API call shown in this
+mode belongs to the selected environment.
+
+Select the environment name at the top of the sidebar to return to Studio navigation. Studio
+remembers the last Explorer location for each environment, so selecting **Explorer** returns to the
+account or transaction you were inspecting.
+
+## Home
+
+The **Home** page is the starting point for application integration and network health.
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/environment-dashboard-light.png"
+    alt="Full localnet environment Home page in light theme with integration setup, node information, and recent transactions"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/environment-dashboard-dark.png"
+    alt="Full localnet environment Home page in dark theme with integration setup, node information, and recent transactions"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+### Connect environment
+
+Choose the consumer you want to connect:
+
+- **Acton project:** generates a `[networks.<name>]` configuration and an `acton script` command.
+- **JavaScript app:** generates a `@ton/ton` client setup for the selected endpoint.
+- **RPC endpoints:** lists raw TON-compatible endpoints for another tool, service, or test harness.
+
+Select **Configure** to choose the endpoint or network name used by generated examples. Use **Copy
+integration prompt** when you want to give an agent the complete setup context.
+
+The same setup remains available on the **Integrate** page after you finish the Home checklist.
+
+### Network activity
+
+**Node info** summarizes the latest block, state source, validator count when available, and latest
+block time. **Recent transactions** links to the latest activity in Explorer.
+
+The header **Copy RPC** action copies the preferred endpoint for the environment. Studio proxy URLs
+remain stable when a managed runtime restarts or its internal port changes.
+
+## Available tools
+
+The sidebar is capability-based. Unsupported pages are hidden instead of showing controls that
+cannot work for the selected network.
+
+✅ means the tool is available for the environment. ❌ means Studio does not expose it there.
+
+| Tool | Simulated localnet | Full localnet | Testnet and Mainnet |
+| --- | :---: | :---: | :---: |
+| Explorer, blocks, tokens, NFTs | ✅ | ✅ | ✅ |
+| Contracts, sources, ABI | ✅ | ✅ | ✅ |
+| Simulator and Cell Inspector | ✅ | ✅ | ✅ |
+| Wallets | ✅ | ✅ | ✅ |
+| GRAM faucet | ✅ | ✅ | ❌ |
+| Jetton faucet | ✅ | ❌ | ❌ |
+| Full network snapshots | ❌ | ✅ | ❌ |
+| Integrate and API Calls | ✅ | ✅ | ✅ |
+| V2 and V3 API reference | ✅ | ✅ | ✅ |
+| Control API reference | ✅ | ❌ | ❌ |
+| Admin and Config API reference | ❌ | ✅ | ❌ |
+| Environment settings | ✅ | ✅ | ❌ |
+
+Capabilities also depend on runtime status. Settings remains available for a stopped managed
+environment. Restart the environment before opening network-backed pages.
+
+## Wallets
+
+The **Wallets** page lists project wallets available on the selected network. Wallet operations are
+signed by the Studio server; wallet mnemonics are not sent to the browser.
+
+Use Wallets to:
+
+- inspect the environment-specific wallet address and balance
+- copy an address
+- connect a dApp through TON Connect
+- open the wallet in Explorer
+- send a transaction from the selected wallet
+
+RPC integration and wallet connection solve different tasks. Use **Integrate** to configure the
+application's TON client and RPC endpoints. Use **Connect** on a wallet to establish a TON Connect
+session with a dApp. An application can use both connections.
+
+For a Simulated localnet, add frequently used project wallets as startup accounts when creating the
+environment. They are available as soon as the runtime starts.
+
+## Faucet
+
+Use **Faucet** to fund an address inside a managed local environment. A Simulated localnet can expose
+both GRAM and Jetton funding; a Full localnet exposes the GRAM funding supported by its runtime.
+
+The environment dashboard also provides **Fund** and **Send** shortcuts when the selected network
+supports them. Faucets do not appear for Testnet or Mainnet.
+
+## Integrate
+
+The **Integrate** page generates setup for the currently selected environment. Prefer these generated
+values over copying an internal runtime port: the examples use Studio proxy endpoints that continue
+to identify the same environment.
+
+For Acton, add the generated network entry to `Acton.toml`, then use its name with `--net`:
+
+```toml
+[networks.localnet]
+api.v2 = "http://localhost:3015/api/v1/environments/environment-1/rpc/api/v2"
+api.v3 = "http://localhost:3015/api/v1/environments/environment-1/rpc/api/v3"
+explorer = "http://localhost:3015/virtual-environments/environment-1/explorer"
+```
+
+```bash
+acton script --net localnet scripts/deploy.tolk
+```
+
+## API Calls
+
+**API Calls** records requests that pass through the Studio proxy for this environment. Use it to
+answer questions such as:
+
+- Which endpoint did the application call?
+- Was the call a read or a write?
+- What status code and duration did it produce?
+- What query parameters, request body, and response body were involved?
+- Did Studio itself make the request, or did it come from another client?
+
+<figure className="theme-image my-6">
+  <img
+    src="/docs/studio/api-calls-light.png"
+    alt="API Calls page in light theme showing request filters and captured environment traffic"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="/docs/studio/api-calls-dark.png"
+    alt="API Calls page in dark theme showing request filters and captured environment traffic"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
+
+Filter by endpoint, read or write type, success or failure status, and whether Studio UI requests
+should be included. Expand a row to inspect and copy parameters, request data, and response data.
+
+API call capture uses a bounded in-memory queue per environment. It is intended for current-session
+diagnostics: old entries can be evicted and the queue is not a permanent audit log.
+
+Requests sent directly to an internal runtime or a public provider, bypassing the Studio endpoint,
+do not appear here.
+See [An API call is absent from API Calls](/docs/studio/troubleshooting#an-api-call-is-absent-from-api-calls)
+when expected traffic is missing.
+
+## API Reference
+
+The **API Reference** group contains interactive OpenAPI documentation for endpoints supported by
+the environment:
+
+- **v2 API** and **v3 API** for TON-compatible reads and submissions
+- **Control API** for Simulated localnet network operations
+- **Admin API** for Full localnet service management
+- **Config API** for Full localnet configuration and connection information
+
+Select an operation, enter its parameters, and execute it against the current environment. If an
+endpoint requires authentication, select the key icon at the bottom of the sidebar and enter the
+environment API token. Clear or replace the token from the same control. See
+[API Reference returns unauthorized](/docs/studio/troubleshooting#api-reference-returns-unauthorized)
+when authentication fails.
+
+<Callout type="warning">
+  Testnet and Mainnet operations can read or submit against public networks. Check the selected
+  network and wallet before executing a write request.
+</Callout>

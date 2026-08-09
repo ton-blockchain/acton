@@ -8,6 +8,7 @@ use crate::ast::{
     identical_conditional_branches, missing_contract_header, negated_is_type_can_use_not_is,
     no_bounce_handler, no_global_variables, several_not_null_assertions,
     throw_requires_documented_error_value, throw_requires_errors_enum,
+    unnecessary_not_null_assertion,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -32,8 +33,7 @@ use tolk_syntax::{
     HasGenericParams, HasName, Ident, If, IfAlt, InstanceArg, Method, NotNull, SourceFile, Ternary,
     Throw, TopLevel, TypeIdent, Unary, Walker, walk_ast,
 };
-use tolk_ty::InferenceResult;
-use tolk_ty::TypeDb;
+use tolk_ty::{InferenceResult, TypeDb, WorkspaceBodyTypes};
 use tree_sitter::Node;
 
 #[cfg(feature = "profile_rules")]
@@ -68,7 +68,7 @@ macro_rules! run_rule {
 pub struct Checker<'a> {
     pub file_db: &'a FileDb,
     pub type_db: &'a mut TypeDb<'a>,
-    pub body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    pub body_types: &'a WorkspaceBodyTypes,
     pub analysis_db: AnalysisDb,
     pub diagnostics: Vec<Diagnostic>,
     pub settings: HashMap<Rule, LintLevel>,
@@ -89,7 +89,7 @@ impl<'a> Checker<'a> {
     pub fn new(
         file_db: &'a FileDb,
         type_db: &'a mut TypeDb<'a>,
-        body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+        body_types: &'a WorkspaceBodyTypes,
     ) -> Self {
         Self {
             file_db,
@@ -252,8 +252,12 @@ impl<'a> Checker<'a> {
     }
 
     pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
-        self.analysis_db
-            .use_facts(self.type_db, self.body_types, file_id)
+        self.analysis_db.use_facts(
+            self.type_db.file_db,
+            self.type_db.project_index,
+            self.body_types,
+            file_id,
+        )
     }
 
     pub fn cfg_for_symbol(
@@ -756,6 +760,16 @@ impl<'file> Walker<'file> for CheckerWalker<'_, '_> {
             self.checker,
             Rule::SeveralNotNullAssertions,
             several_not_null_assertions::check_not_null(self.checker, self.file_id, node)
+        );
+        run_rule!(
+            self.checker,
+            Rule::UnnecessaryNotNullAssertion,
+            unnecessary_not_null_assertion::check_not_null(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference,
+            )
         );
 
         if let Some(inner) = node.inner() {

@@ -6,7 +6,7 @@
 
  > tests/fmt_behavior.test.tolk (1 test)
   ✗ eb stdlib format1 unsupported placeholder payload [TIME]
-    └─ Error: Invalid format string at byte 6: unsupported placeholder {name} (supported: {}, {:x}, {:ton}, {:cell-tree})
+    └─ Error: Invalid format string at byte 6: unsupported placeholder {name} (supported: {}, {:x}, {:X}, {:b}, {:B}, {:gram}, {:grams}, {:ton}, {:cell-tree})
 
  ✗ 1 failed in 1 file
 

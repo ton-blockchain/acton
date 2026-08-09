@@ -1,0 +1,118 @@
+[
+  {
+    "address": "-1:0000000000000000000000000000000000000000000000000000000000000000",
+    "name": "System"
+  },
+  {
+    "address": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+    "name": "Elector Contract"
+  },
+  {
+    "address": "-1:5555555555555555555555555555555555555555555555555555555555555555",
+    "name": "Config Contract"
+  },
+  {
+    "address": "-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c",
+    "name": "Root DNS"
+  },
+  {
+    "address": "-1:efe71d13860afaa6aeaeaf636f9168487f80f1031b0bf8d939ae49d3ea7f7da0",
+    "name": "Root DNS"
+  },
+  {
+    "address": "0:0000000000000000000000000000000000000000000000000000000000000000",
+    "name": "Zero Address"
+  },
+  {
+    "address": "0:0f65ab9654f51c9b6854253f67dfaa71ce7121978eab127d5bcc15cdd1163fca",
+    "name": "Notcoin Voucher Swap 0"
+  },
+  {
+    "address": "0:2ecf5e47d591eb67fa6c56b02b6bb1de6a530855e16ad3082eaa59859e8d5fdc",
+    "name": "Telegram Team"
+  },
+  {
+    "address": "0:310569f85cd583d93c98c59de87d28c6965f5412eb43a4d4e80313226f8bd4c7",
+    "name": "Thermos"
+  },
+  {
+    "address": "0:348bcf827469c5fc38541c77fdd91d4e347eac200f6f2d9fd62dc08885f0415f",
+    "name": "Tolya"
+  },
+  {
+    "address": "0:393f1a7f102f694e5c6bbcee7d0f58aa06aa1d6a3a23ba59607f4ec434a6b6da",
+    "name": "TelePay"
+  },
+  {
+    "address": "0:50fd4050bd1f6bc948ca0f08a3b688b2ca06b65a5fb2266e98f2097493e1c387",
+    "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:5257fbb634f34dca6159817d15a91c2edafe9c4c9a3bb329a0a8a170cdc359ee",
+    "name": "Mr. FreeMan"
+  },
+  {
+    "address": "0:53191a57801de242aef8a4735c9cacc553f4b88f85869ee6ce89860b53924538",
+    "name": "Marketapp Deployer"
+  },
+  {
+    "address": "0:5f0564fb5f604783db57031ce1cf668a88d4d4d6da6de4db222b4b920d6fd800",
+    "name": "DeDust Factory"
+  },
+  {
+    "address": "0:63d51e99989113b39025443d53cf6ee2c1e26a2d88655985ffc55d988926e297",
+    "name": "Connecton VPN"
+  },
+  {
+    "address": "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
+    "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:80d78a35f955a14b679faa887ff4cd5bfc0f43b4a4eea2a7e6927f3701b273c2",
+    "name": ".t.me DNS"
+  },
+  {
+    "address": "0:92112d13658a9c56482882e8486fc88c128e1cbda130988ad4e6a6d082737c7e",
+    "name": "Testgiver TON Bot"
+  },
+  {
+    "address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
+    "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
+    "name": "STON.fi DEX"
+  },
+  {
+    "address": "0:9c25fd8a1651fdc48c77773b72b71c51164dca419284601afe7f49c520ed61dd",
+    "name": "Omniston Fee Vault"
+  },
+  {
+    "address": "0:ad040142d36aa07f68ca7fa4ab2cd891c5365a1eeb7ba51a5b5d9a1ab0ec7612",
+    "name": "Tonometr Bot"
+  },
+  {
+    "address": "0:b774d95eb20543f186c06b371ab88ad704f7e256130caf96189368a7d0cb6ccf",
+    "name": ".ton DNS"
+  },
+  {
+    "address": "0:c21fabd3d0cbd5a746c160d8e838da6481be7534c3cd3895c54161b9e17a0802",
+    "name": "CAT Services"
+  },
+  {
+    "address": "0:dae153a74d894bbc32748198cd626e4f5df4a69ad2fa56ce80fc2644b5708d20",
+    "name": "DeDust Vault"
+  },
+  {
+    "address": "0:e8dbb3fe0806a6fc6db19907780b19c562363614a3e698a11cf304c2878737dc",
+    "name": "EVAA Liquidator"
+  },
+  {
+    "address": "0:ed1691307050047117b998b561d8de82d31fbf84910ced6eb5fc92e7485ef8a7",
+    "name": "TON Believers Fund"
+  },
+  {
+    "address": "0:ff3b559e33e89c318f092281b383248443c8afbe84a9812a20954b1ab9ae980c",
+    "name": "Acton Faucet"
+  }
+]

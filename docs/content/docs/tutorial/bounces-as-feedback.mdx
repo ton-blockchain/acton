@@ -13,7 +13,20 @@ When a bounceable message fails on the recipient:
 
 The 256-bit limit matters: the `Vote` struct is 40 bits (32-bit opcode + 8-bit option), so it fits entirely in the bounce payload. That is why `BounceMode.Only256BitsOfBody` is used when Poll forwards a `Vote` to Voter.
 
-## Implement onBouncedMessage in Poll
+```mermaid
+sequenceDiagram
+    participant Alice as Alice wallet
+    participant Poll
+    participant Voter as Alice Voter
+
+    Alice->>Poll: Vote(option=0)
+    Poll->>Poll: increment option0
+    Poll->>Voter: forward Vote
+    Voter--xPoll: bounce AlreadyVoted
+    Poll->>Poll: decrement option0
+```
+
+## Implement `onBouncedMessage` in Poll
 
 In `contracts/Poll.tolk`, replace the empty `onBouncedMessage` with:
 
@@ -50,7 +63,7 @@ $ acton test
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (3 tests)
+ > tests/poll.test.tolk (3 tests)
   ✓ alice votes option 0  19ms
   ✓ alice and bob vote for different options  23ms
   ✓ alice cannot vote twice  21ms
@@ -77,16 +90,20 @@ $ acton test --coverage
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (3 tests)
+ > tests/poll.test.tolk (3 tests)
   ✓ alice votes option 0  19ms
   ✓ alice and bob vote for different options  23ms
   ✓ alice cannot vote twice  21ms
 
  ✓ 3 passed in 1 file
 
-Coverage summary:
-  contracts/Poll.tolk    87.5%  (7/8 lines)
-  contracts/Voter.tolk   75.0%  (6/8 lines)
+──────────────────────────────────────────────────────────────────────────────────────────────
+ File         Covered   Total Lines   % Lines   Covered   Total Branches   % Branches   Score
+──────────────────────────────────────────────────────────────────────────────────────────────
+ All files         40            44     90.9%        17               24        70.8%    83.8%
+ Voter.tolk         8             9     88.9%         5                8        62.5%    76.5%
+ Poll.tolk         30            33     90.9%        12               16        75.0%    85.7%
+ types.tolk         2             2    100.0%         0                0          n/a   100.0%
 ```
 
 <Callout type="info">
@@ -104,10 +121,10 @@ Add two tests to fill those gaps:
 get fun `test bounce on option 1 vote`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res1 = poll.sendVote(alice.address, 1, { value: ton("0.1") });
+    val res1 = poll.sendVote(alice.address, 1, { value: grams("0.1") });
     expect(res1).toHaveAllSuccessfulTxs();
 
-    poll.sendVote(alice.address, 1, { value: ton("0.1") });
+    poll.sendVote(alice.address, 1, { value: grams("0.1") });
     val (_, opt1) = poll.results();
     expect(opt1).toEqual(1);
 }
@@ -117,7 +134,7 @@ get fun `test voter rejects direct vote`() {
     val intruder = testing.treasury("intruder");
 
     // Deploy the Voter by having Alice vote normally first.
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveAllSuccessfulTxs();
 
     val voterAddr = poll.calcVoterAddress(alice.address);
@@ -125,7 +142,7 @@ get fun `test voter rejects direct vote`() {
 
     val directMsg = createMessage({
         bounce: false,
-        value:  ton("0.05"),
+        value:  grams("0.05"),
         dest:   voter.address,
         body:   Vote { option: 0 },
     });
@@ -133,25 +150,15 @@ get fun `test voter rejects direct vote`() {
     expect(res).toHaveFailedTx({
         from:     intruder.address,
         to:       voter.address,
-        exitCode: Errors.NotFromPoll as int,
+        exitCode: Errors.NotFromPoll,
     });
 }
 ```
 
-`poll.calcVoterAddress()` comes from the generated wrapper. If it is missing, add this getter to `Poll.tolk` and regenerate the wrapper with `acton wrapper Poll`:
+And add an import for the Voter contract wrapper on top:
 
-```tolk
-get fun calcVoterAddress(voter: address): address {
-  val init = ContractState {
-      code: voterCompiledCode(),
-      data: VoterStorage {
-          poll: contract.getAddress(),
-          voter,
-          hasVoted: false,
-      }.toCell(),
-  };
-  return AutoDeployAddress { stateInit: init }.calculateAddress();
-}
+```tolk title="tests/poll.test.tolk"
+import "@wrappers/Voter.gen"
 ```
 
 Run coverage again — coverage should be above 90% for both contracts.
