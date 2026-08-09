@@ -4,7 +4,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -15,17 +15,22 @@ use tokio::net::TcpListener;
 use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
 use ton_language_server_core::languages::tlb::TlbLanguage;
-use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::languages::tolk::{
+    FormattingError, LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage,
+};
 use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
-    CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
-    CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
-    DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
-    InlayHintCategory, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
-    LanguageServiceConfig, Location, Position, PrepareRename, ProfileReport, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    SignatureHelp, SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig,
-    WorkspaceEdit, WorkspaceSymbol,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
+    CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
+    CompletionTrigger, CompletionTriggerKind, Diagnostic as CoreDiagnostic,
+    DiagnosticSeverity as CoreDiagnosticSeverity, DiagnosticTag as CoreDiagnosticTag,
+    DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri,
+    FileRename, FindUsagesScope, FoldingRange, Hover, InlayHint, InlayHintKind, InlayHintLabel,
+    InsertTextFormat, LanguageId, LanguageServerSettings, LanguageService, LanguageServiceConfig,
+    Location, Position, PrepareRename, ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
+    SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken, SemanticTokens, SignatureHelp,
+    SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -41,6 +46,9 @@ const TASM_SPEC_JSON: &str = include_str!("../../tasm-core/spec/tvm-specificatio
 pub const TOLK_TYPE_AT_POSITION_REQUEST: &str = "tolk.getTypeAtPosition";
 pub const PROFILE_REQUEST: &str = "ton/profile";
 pub const DISASSEMBLE_REQUEST: &str = "ton/disassemble";
+const WATCHED_FILES_REGISTRATION_ID: &str = "ton-language-server-watched-files";
+const WATCHED_SOURCE_FILES_GLOB: &str = "**/*.{tolk,tasm,fif,fift,tlb}";
+const WATCHED_MANIFEST_FILES_GLOB: &str = "**/Acton.toml";
 
 trait ToCore {
     type Core;
@@ -145,137 +153,6 @@ pub struct NativeLoggingConfig {
     pub level: LogLevel,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct NativeSettings {
-    tolk: TolkSettings,
-    tlb: TlbSettings,
-    fift: FiftSettings,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkSettings {
-    hints: TolkHintSettings,
-    completion: TolkCompletionSettings,
-    find_usages: FindUsagesSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkHintSettings {
-    disable: bool,
-    types: bool,
-    parameters: bool,
-    show_method_id: bool,
-    constant_values: bool,
-}
-
-impl Default for TolkHintSettings {
-    fn default() -> Self {
-        Self {
-            disable: false,
-            types: true,
-            parameters: true,
-            show_method_id: true,
-            constant_values: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkCompletionSettings {
-    type_aware: bool,
-    add_imports: bool,
-}
-
-impl Default for TolkCompletionSettings {
-    fn default() -> Self {
-        Self {
-            type_aware: true,
-            add_imports: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct FindUsagesSettings {
-    scope: FindUsagesScope,
-}
-
-impl Default for FindUsagesSettings {
-    fn default() -> Self {
-        Self {
-            scope: FindUsagesScope::Workspace,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum FindUsagesScope {
-    #[default]
-    Workspace,
-    Everywhere,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default)]
-struct TlbSettings {
-    hints: TlbHintSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TlbHintSettings {
-    disable: bool,
-    show_constructor_tag: bool,
-}
-
-impl Default for TlbHintSettings {
-    fn default() -> Self {
-        Self {
-            disable: false,
-            show_constructor_tag: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct FiftSettings {
-    hints: FiftHintSettings,
-    semantic_highlighting: SemanticHighlightingSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct FiftHintSettings {
-    show_gas_consumption: bool,
-}
-
-impl Default for FiftHintSettings {
-    fn default() -> Self {
-        Self {
-            show_gas_consumption: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct SemanticHighlightingSettings {
-    enabled: bool,
-}
-
-impl Default for SemanticHighlightingSettings {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
-}
-
 impl NativeLoggingConfig {
     #[must_use]
     pub fn new(path: impl Into<PathBuf>, level: LogLevel) -> Self {
@@ -332,7 +209,7 @@ pub struct NativeLanguageServer {
     workspace: Mutex<Option<NativeWorkspace>>,
     startup_warnings: Mutex<Vec<String>>,
     documents: Mutex<HashMap<String, OpenDocument>>,
-    settings: Mutex<NativeSettings>,
+    supports_dynamic_file_watching: AtomicBool,
 }
 
 #[derive(Clone, Debug)]
@@ -382,8 +259,29 @@ impl NativeLanguageServer {
             workspace: Mutex::new(None),
             startup_warnings: Mutex::new(Vec::new()),
             documents: Mutex::new(HashMap::new()),
-            settings: Mutex::new(NativeSettings::default()),
+            supports_dynamic_file_watching: AtomicBool::new(false),
         }
+    }
+
+    async fn register_file_watchers(&self) -> anyhow::Result<()> {
+        let register_options =
+            serde_json::to_value(lsp::DidChangeWatchedFilesRegistrationOptions {
+                watchers: [WATCHED_SOURCE_FILES_GLOB, WATCHED_MANIFEST_FILES_GLOB]
+                    .into_iter()
+                    .map(|pattern| lsp::FileSystemWatcher {
+                        glob_pattern: lsp::GlobPattern::String(pattern.to_owned()),
+                        kind: None,
+                    })
+                    .collect(),
+            })?;
+        self.client
+            .register_capability(vec![lsp::Registration {
+                id: WATCHED_FILES_REGISTRATION_ID.to_owned(),
+                method: "workspace/didChangeWatchedFiles".to_owned(),
+                register_options: Some(register_options),
+            }])
+            .await?;
+        Ok(())
     }
 
     async fn report_error(&self, operation: &'static str, error: impl ToString) {
@@ -397,6 +295,46 @@ impl NativeLanguageServer {
         self.client
             .log_message(lsp::MessageType::ERROR, message)
             .await;
+    }
+
+    async fn publish_diagnostics(&self, uri: &lsp::Url, version: Option<i32>) {
+        let diagnostics = self.with_service(|service| service.diagnostics(&uri.to_core()));
+        match diagnostics {
+            Ok(diagnostics) => {
+                self.client
+                    .publish_diagnostics(
+                        uri.clone(),
+                        diagnostics.into_iter().map(diagnostic_to_lsp).collect(),
+                        version,
+                    )
+                    .await;
+            }
+            Err(error) => self.report_error("document.diagnostics", error).await,
+        }
+    }
+
+    async fn publish_all_tolk_diagnostics(&self) {
+        let uris = self
+            .documents
+            .lock()
+            .map(|documents| {
+                documents
+                    .iter()
+                    .filter(|(_, document)| {
+                        matches!(
+                            &document.kind,
+                            OpenDocumentKind::Language { language_id, .. }
+                                if language_id.as_str() == TOLK_LANGUAGE_ID
+                        )
+                    })
+                    .filter_map(|(uri, _)| lsp::Url::parse(uri).ok())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        for uri in uris {
+            self.publish_diagnostics(&uri, None).await;
+        }
     }
 
     fn with_service<T>(
@@ -479,11 +417,8 @@ impl NativeLanguageServer {
         }
     }
 
-    fn settings(&self) -> anyhow::Result<NativeSettings> {
-        self.settings
-            .lock()
-            .map(|settings| settings.clone())
-            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))
+    fn settings(&self) -> anyhow::Result<LanguageServerSettings> {
+        self.with_service(|service| Ok(service.settings().clone()))
     }
 
     fn document_language_id(&self, uri: &lsp::Url) -> anyhow::Result<Option<LanguageId>> {
@@ -507,14 +442,15 @@ impl NativeLanguageServer {
         Ok(uri.to_core().logical_path() == self.workspace()?.manifest_uri.logical_path())
     }
 
-    fn update_settings(&self, value: Value) -> anyhow::Result<()> {
+    fn update_settings(&self, value: Value) -> anyhow::Result<bool> {
         let value = value.get("ton").cloned().unwrap_or(value);
-        let settings = serde_json::from_value::<NativeSettings>(value)?;
-        *self
-            .settings
-            .lock()
-            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))? = settings;
-        Ok(())
+        let settings = serde_json::from_value::<LanguageServerSettings>(value)?;
+        self.with_service(|service| {
+            let diagnostics_changed =
+                service.settings().tolk.diagnostics != settings.tolk.diagnostics;
+            service.set_settings(settings);
+            Ok(diagnostics_changed)
+        })
     }
 
     async fn type_at_position(
@@ -626,6 +562,20 @@ impl LanguageServer for NativeLanguageServer {
         &self,
         params: lsp::InitializeParams,
     ) -> jsonrpc::Result<lsp::InitializeResult> {
+        let supports_dynamic_file_watching = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files)
+            .and_then(|capabilities| capabilities.dynamic_registration)
+            .unwrap_or(false);
+        self.supports_dynamic_file_watching
+            .store(supports_dynamic_file_watching, Ordering::Relaxed);
+        if let Some(settings) = params.initialization_options.clone()
+            && let Err(error) = self.update_settings(settings)
+        {
+            self.record_startup_warning("workspace.configuration.init", error);
+        }
         self.initialize_workspace(&params).map_err(rpc_error)?;
 
         Ok(lsp::InitializeResult {
@@ -650,6 +600,7 @@ impl LanguageServer for NativeLanguageServer {
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 type_definition_provider: Some(lsp::TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(lsp::OneOf::Left(true)),
+                call_hierarchy_provider: Some(lsp::CallHierarchyServerCapability::Simple(true)),
                 document_highlight_provider: Some(lsp::OneOf::Left(true)),
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: Some(false),
@@ -673,6 +624,7 @@ impl LanguageServer for NativeLanguageServer {
                     resolve_provider: Some(false),
                 }),
                 folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
+                selection_range_provider: Some(lsp::SelectionRangeProviderCapability::Simple(true)),
                 document_symbol_provider: Some(lsp::OneOf::Left(true)),
                 workspace_symbol_provider: Some(lsp::OneOf::Left(true)),
                 code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
@@ -715,6 +667,13 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn initialized(&self, _: lsp::InitializedParams) {
+        if self.supports_dynamic_file_watching.load(Ordering::Relaxed)
+            && let Err(error) = self.register_file_watchers().await
+        {
+            self.report_error("workspace.files.watch.register", error)
+                .await;
+        }
+
         let project_root = self.workspace().map_or_else(
             |_| self.fallback_project_root.clone(),
             |workspace| workspace.project_root,
@@ -742,13 +701,24 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn did_change_configuration(&self, params: lsp::DidChangeConfigurationParams) {
-        if let Err(error) = self.update_settings(params.settings) {
-            self.report_error("workspace.configuration.change", error)
-                .await;
-            return;
+        let diagnostics_changed = match self.update_settings(params.settings) {
+            Ok(changed) => changed,
+            Err(error) => {
+                self.report_error("workspace.configuration.change", error)
+                    .await;
+                return;
+            }
+        };
+
+        if diagnostics_changed {
+            self.publish_all_tolk_diagnostics().await;
         }
 
-        if let Err(error) = self.client.inlay_hint_refresh().await {
+        let (inlay_refresh, semantic_refresh) = tokio::join!(
+            self.client.inlay_hint_refresh(),
+            self.client.semantic_tokens_refresh()
+        );
+        if let Err(error) = inlay_refresh {
             tracing::debug!(
                 target: "ton_language_server_native",
                 operation = "workspace.inlay_hint.refresh",
@@ -756,7 +726,7 @@ impl LanguageServer for NativeLanguageServer {
                 "client did not accept an inlay hint refresh"
             );
         }
-        if let Err(error) = self.client.semantic_tokens_refresh().await {
+        if let Err(error) = semantic_refresh {
             tracing::debug!(
                 target: "ton_language_server_native",
                 operation = "workspace.semantic_tokens.refresh",
@@ -793,6 +763,7 @@ impl LanguageServer for NativeLanguageServer {
                 updates_workspace_config,
             },
         );
+        let is_language_document = matches!(&kind, OpenDocumentKind::Language { .. });
 
         if let OpenDocumentKind::Language { language_id, .. } = &kind {
             let result = self.with_service(|service| {
@@ -817,6 +788,11 @@ impl LanguageServer for NativeLanguageServer {
                 },
             );
         }
+        if updates_workspace_config {
+            self.publish_all_tolk_diagnostics().await;
+        } else if is_language_document {
+            self.publish_diagnostics(&uri, Some(item.version)).await;
+        }
     }
 
     async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
@@ -829,20 +805,25 @@ impl LanguageServer for NativeLanguageServer {
                 return;
             }
         };
+        let is_language_document = matches!(&change.0, OpenDocumentKind::Language { .. });
+        let updates_workspace_config = change.0.updates_workspace_config();
 
-        if change.0.updates_workspace_config()
+        if updates_workspace_config
             && let Err(error) = self.apply_workspace_config_text(change.1.clone())
         {
             self.report_error("workspace.config.change", error).await;
         }
 
-        match change {
+        let changed = match change {
             (OpenDocumentKind::Language { .. }, full_text, AppliedChanges::FullText) => {
                 let result = self.with_service(|service| {
                     service.change_document(&uri.to_core(), version, full_text)
                 });
                 if let Err(error) = result {
                     self.report_error("document.change", error).await;
+                    false
+                } else {
+                    true
                 }
             }
             (OpenDocumentKind::Language { .. }, _, AppliedChanges::Incremental(edits)) => {
@@ -850,9 +831,19 @@ impl LanguageServer for NativeLanguageServer {
                     .with_service(|service| service.edit_document(&uri.to_core(), version, edits));
                 if let Err(error) = result {
                     self.report_error("document.edit", error).await;
+                    false
+                } else {
+                    true
                 }
             }
-            (OpenDocumentKind::Unsupported, _, _) => {}
+            (OpenDocumentKind::Unsupported, _, _) => false,
+        };
+        if changed {
+            if updates_workspace_config {
+                self.publish_all_tolk_diagnostics().await;
+            } else if is_language_document {
+                self.publish_diagnostics(&uri, Some(version)).await;
+            }
         }
     }
 
@@ -908,6 +899,7 @@ impl LanguageServer for NativeLanguageServer {
                 );
             });
         }
+        self.client.publish_diagnostics(uri, Vec::new(), None).await;
     }
 
     async fn goto_definition(
@@ -953,6 +945,58 @@ impl LanguageServer for NativeLanguageServer {
         Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
     }
 
+    async fn prepare_call_hierarchy(
+        &self,
+        params: lsp::CallHierarchyPrepareParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyItem>>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let item = self
+            .with_service(|service| service.prepare_call_hierarchy(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(item.and_then(|item| call_hierarchy_item_to_lsp(item).map(|item| vec![item])))
+    }
+
+    async fn incoming_calls(
+        &self,
+        params: lsp::CallHierarchyIncomingCallsParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyIncomingCall>>> {
+        let uri = params.item.uri;
+        let position = params.item.selection_range.start.to_core();
+        let Some(language_id) = self.document_language_id(&uri).map_err(rpc_error)? else {
+            return Ok(Some(Vec::new()));
+        };
+        let calls = self
+            .with_service(|service| service.incoming_calls(&language_id, &uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            calls
+                .into_iter()
+                .filter_map(call_hierarchy_incoming_call_to_lsp)
+                .collect(),
+        ))
+    }
+
+    async fn outgoing_calls(
+        &self,
+        params: lsp::CallHierarchyOutgoingCallsParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyOutgoingCall>>> {
+        let uri = params.item.uri;
+        let position = params.item.selection_range.start.to_core();
+        let Some(language_id) = self.document_language_id(&uri).map_err(rpc_error)? else {
+            return Ok(Some(Vec::new()));
+        };
+        let calls = self
+            .with_service(|service| service.outgoing_calls(&language_id, &uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            calls
+                .into_iter()
+                .filter_map(call_hierarchy_outgoing_call_to_lsp)
+                .collect(),
+        ))
+    }
+
     async fn formatting(
         &self,
         params: lsp::DocumentFormattingParams,
@@ -960,7 +1004,7 @@ impl LanguageServer for NativeLanguageServer {
         let uri = params.text_document.uri;
         let edits = self
             .with_service(|service| service.formatting(&uri.to_core(), None))
-            .map_err(rpc_error)?;
+            .map_err(formatting_rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
 
@@ -972,7 +1016,7 @@ impl LanguageServer for NativeLanguageServer {
         let range = params.range.to_core();
         let edits = self
             .with_service(|service| service.formatting(&uri.to_core(), Some(range)))
-            .map_err(rpc_error)?;
+            .map_err(formatting_rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
 
@@ -1009,27 +1053,9 @@ impl LanguageServer for NativeLanguageServer {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position.to_core();
         let trigger = completion_trigger_from_lsp(params.context);
-        let mut completion = self
+        let completion = self
             .with_service(|service| service.completion(&uri.to_core(), position, trigger))
             .map_err(rpc_error)?;
-        if self
-            .document_language_id(&uri)
-            .map_err(rpc_error)?
-            .as_ref()
-            .is_some_and(|language_id| language_id.as_str() == "tolk")
-        {
-            let settings = self.settings().map_err(rpc_error)?.tolk.completion;
-            if !settings.add_imports {
-                completion
-                    .items
-                    .retain(|item| item.additional_text_edits.is_empty());
-            }
-            if !settings.type_aware {
-                for item in &mut completion.items {
-                    item.sort_text = None;
-                }
-            }
-        }
         Ok(Some(lsp::CompletionResponse::List(completion_list_to_lsp(
             completion,
         ))))
@@ -1040,22 +1066,6 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::SemanticTokensParams,
     ) -> jsonrpc::Result<Option<lsp::SemanticTokensResult>> {
         let uri = params.text_document.uri;
-        if self
-            .document_language_id(&uri)
-            .map_err(rpc_error)?
-            .as_ref()
-            .is_some_and(|language_id| language_id.as_str() == "fift")
-            && !self
-                .settings()
-                .map_err(rpc_error)?
-                .fift
-                .semantic_highlighting
-                .enabled
-        {
-            return Ok(Some(lsp::SemanticTokensResult::Tokens(
-                semantic_tokens_to_lsp(SemanticTokens::new(Vec::new())),
-            )));
-        }
         let tokens = self
             .with_service(|service| service.semantic_tokens(&uri.to_core()))
             .map_err(rpc_error)?;
@@ -1070,12 +1080,9 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<Vec<lsp::InlayHint>>> {
         let uri = params.text_document.uri;
         let range = params.range.to_core();
-        let mut hints = self
+        let hints = self
             .with_service(|service| service.inlay_hints(&uri.to_core(), range))
             .map_err(rpc_error)?;
-        let settings = self.settings().map_err(rpc_error)?;
-        let language_id = self.document_language_id(&uri).map_err(rpc_error)?;
-        hints.retain(|hint| inlay_hint_enabled(&settings, language_id.as_ref(), hint.category));
         Ok(Some(hints.into_iter().map(inlay_hint_to_lsp).collect()))
     }
 
@@ -1099,6 +1106,24 @@ impl LanguageServer for NativeLanguageServer {
             .with_service(|service| service.folding_ranges(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(ranges.into_iter().map(folding_range_to_lsp).collect()))
+    }
+
+    async fn selection_range(
+        &self,
+        params: lsp::SelectionRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::SelectionRange>>> {
+        let uri = params.text_document.uri;
+        let positions = params
+            .positions
+            .iter()
+            .map(ToCore::to_core)
+            .collect::<Vec<_>>();
+        let ranges = self
+            .with_service(|service| service.selection_ranges(&uri.to_core(), &positions))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            ranges.into_iter().map(selection_range_to_lsp).collect(),
+        ))
     }
 
     async fn document_symbol(
@@ -1774,9 +1799,23 @@ fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> lsp::SemanticTokens {
 }
 
 fn inlay_hint_to_lsp(hint: InlayHint) -> lsp::InlayHint {
+    let label = match hint.label {
+        InlayHintLabel::Parts(parts) => lsp::InlayHintLabel::LabelParts(
+            parts
+                .into_iter()
+                .map(|part| lsp::InlayHintLabelPart {
+                    value: part.value,
+                    tooltip: None,
+                    location: part.location.as_ref().and_then(location_to_lsp),
+                    command: None,
+                })
+                .collect(),
+        ),
+        InlayHintLabel::String(label) => lsp::InlayHintLabel::String(label),
+    };
     lsp::InlayHint {
         position: position_to_lsp(hint.position),
-        label: lsp::InlayHintLabel::String(hint.label),
+        label,
         kind: hint.kind.map(|kind| match kind {
             InlayHintKind::Type => lsp::InlayHintKind::TYPE,
             InlayHintKind::Parameter => lsp::InlayHintKind::PARAMETER,
@@ -1841,6 +1880,33 @@ fn code_action_to_lsp(action: CodeAction) -> anyhow::Result<lsp::CodeActionOrCom
     }))
 }
 
+fn diagnostic_to_lsp(diagnostic: CoreDiagnostic) -> lsp::Diagnostic {
+    let severity = match diagnostic.severity {
+        CoreDiagnosticSeverity::Error => lsp::DiagnosticSeverity::ERROR,
+        CoreDiagnosticSeverity::Warning => lsp::DiagnosticSeverity::WARNING,
+        CoreDiagnosticSeverity::Information => lsp::DiagnosticSeverity::INFORMATION,
+        CoreDiagnosticSeverity::Hint => lsp::DiagnosticSeverity::HINT,
+    };
+    let tags = diagnostic
+        .tags
+        .into_iter()
+        .map(|tag| match tag {
+            CoreDiagnosticTag::Unnecessary => lsp::DiagnosticTag::UNNECESSARY,
+            CoreDiagnosticTag::Deprecated => lsp::DiagnosticTag::DEPRECATED,
+        })
+        .collect::<Vec<_>>();
+
+    lsp::Diagnostic {
+        range: range_to_lsp(diagnostic.range),
+        severity: Some(severity),
+        code: diagnostic.code.map(lsp::NumberOrString::String),
+        source: Some(diagnostic.source),
+        message: diagnostic.message,
+        tags: (!tags.is_empty()).then_some(tags),
+        ..lsp::Diagnostic::default()
+    }
+}
+
 const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
     lsp::FoldingRange {
         start_line: range.start_line,
@@ -1849,6 +1915,15 @@ const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
         end_character: range.end_character,
         kind: None,
         collapsed_text: None,
+    }
+}
+
+fn selection_range_to_lsp(range: SelectionRange) -> lsp::SelectionRange {
+    lsp::SelectionRange {
+        range: range_to_lsp(range.range),
+        parent: range
+            .parent
+            .map(|parent| Box::new(selection_range_to_lsp(*parent))),
     }
 }
 
@@ -1870,6 +1945,37 @@ fn document_symbol_to_lsp(symbol: DocumentSymbol) -> lsp::DocumentSymbol {
                 .collect()
         }),
     }
+}
+
+fn call_hierarchy_item_to_lsp(item: CallHierarchyItem) -> Option<lsp::CallHierarchyItem> {
+    Some(lsp::CallHierarchyItem {
+        name: item.name,
+        kind: document_symbol_kind_to_lsp(item.kind),
+        tags: None,
+        detail: item.detail,
+        uri: lsp::Url::parse(item.uri.as_str()).ok()?,
+        range: range_to_lsp(item.range),
+        selection_range: range_to_lsp(item.selection_range),
+        data: None,
+    })
+}
+
+fn call_hierarchy_incoming_call_to_lsp(
+    call: CallHierarchyIncomingCall,
+) -> Option<lsp::CallHierarchyIncomingCall> {
+    Some(lsp::CallHierarchyIncomingCall {
+        from: call_hierarchy_item_to_lsp(call.from)?,
+        from_ranges: call.from_ranges.into_iter().map(range_to_lsp).collect(),
+    })
+}
+
+fn call_hierarchy_outgoing_call_to_lsp(
+    call: CallHierarchyOutgoingCall,
+) -> Option<lsp::CallHierarchyOutgoingCall> {
+    Some(lsp::CallHierarchyOutgoingCall {
+        to: call_hierarchy_item_to_lsp(call.to)?,
+        from_ranges: call.from_ranges.into_iter().map(range_to_lsp).collect(),
+    })
 }
 
 fn workspace_symbol_to_lsp(symbol: WorkspaceSymbol) -> Option<lsp::SymbolInformation> {
@@ -1999,6 +2105,16 @@ fn rpc_error(error: impl ToString) -> jsonrpc::Error {
     rpc_error
 }
 
+fn formatting_rpc_error(error: anyhow::Error) -> jsonrpc::Error {
+    let Some(error) = error.downcast_ref::<FormattingError>() else {
+        return rpc_error(error);
+    };
+
+    let mut rpc_error = jsonrpc::Error::new(jsonrpc::ErrorCode::ServerError(-32803));
+    rpc_error.message = error.to_string().into();
+    rpc_error
+}
+
 fn is_acton_manifest_uri(uri: &lsp::Url) -> bool {
     uri.to_file_path()
         .ok()
@@ -2021,36 +2137,6 @@ fn location_is_in_root(location: &Location, root: &Path) -> bool {
         .ok()
         .and_then(|uri| uri.to_file_path().ok())
         .is_some_and(|path| path.starts_with(root))
-}
-
-fn inlay_hint_enabled(
-    settings: &NativeSettings,
-    language_id: Option<&LanguageId>,
-    category: InlayHintCategory,
-) -> bool {
-    if language_id.is_some_and(|language_id| language_id.as_str() == "tolk") {
-        let hints = &settings.tolk.hints;
-        return !hints.disable
-            && match category {
-                InlayHintCategory::Type => hints.types,
-                InlayHintCategory::Parameter => hints.parameters,
-                InlayHintCategory::ConstantValue => hints.constant_values,
-                InlayHintCategory::MethodId => hints.show_method_id,
-                InlayHintCategory::ConstructorTag
-                | InlayHintCategory::GasConsumption
-                | InlayHintCategory::Other => true,
-            };
-    }
-    if language_id.is_some_and(|language_id| language_id.as_str() == "tlb") {
-        return !settings.tlb.hints.disable
-            && (category != InlayHintCategory::ConstructorTag
-                || settings.tlb.hints.show_constructor_tag);
-    }
-    if language_id.is_some_and(|language_id| language_id.as_str() == "fift") {
-        return category != InlayHintCategory::GasConsumption
-            || settings.fift.hints.show_gas_consumption;
-    }
-    true
 }
 
 fn is_excluded_workspace_dir(root: &Path, path: &Path) -> bool {
@@ -2323,10 +2409,11 @@ const fn level_rank(level: Level) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ton_language_server_core::InlayHintCategory;
 
     #[test]
     fn parses_and_applies_language_feature_settings() -> anyhow::Result<()> {
-        let settings = serde_json::from_value::<NativeSettings>(serde_json::json!({
+        let settings = serde_json::from_value::<LanguageServerSettings>(serde_json::json!({
             "tolk": {
                 "hints": {
                     "types": false,
@@ -2335,7 +2422,12 @@ mod tests {
                     "constantValues": false
                 },
                 "completion": {"typeAware": false, "addImports": false},
-                "findUsages": {"scope": "everywhere"}
+                "findUsages": {"scope": "everywhere"},
+                "diagnostics": {
+                    "enabled": true,
+                    "linter": {"enabled": false},
+                    "compiler": {"enabled": false}
+                }
             },
             "tlb": {"hints": {"showConstructorTag": false}},
             "fift": {
@@ -2347,39 +2439,18 @@ mod tests {
         let tlb = LanguageId::from("tlb");
         let fift = LanguageId::from("fift");
 
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::Type
-        ));
-        assert!(inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::Parameter
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::MethodId
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::ConstantValue
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tlb),
-            InlayHintCategory::ConstructorTag
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&fift),
-            InlayHintCategory::GasConsumption
-        ));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::Type));
+        assert!(settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::Parameter));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::MethodId));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::ConstantValue));
+        assert!(!settings.inlay_hint_enabled(Some(&tlb), InlayHintCategory::ConstructorTag));
+        assert!(!settings.inlay_hint_enabled(Some(&fift), InlayHintCategory::GasConsumption));
         assert!(!settings.tolk.completion.type_aware);
         assert!(!settings.tolk.completion.add_imports);
         assert_eq!(settings.tolk.find_usages.scope, FindUsagesScope::Everywhere);
+        assert!(settings.tolk.diagnostics.enabled);
+        assert!(!settings.tolk.diagnostics.linter.enabled);
+        assert!(!settings.tolk.diagnostics.compiler.enabled);
         assert!(!settings.fift.semantic_highlighting.enabled);
 
         Ok(())

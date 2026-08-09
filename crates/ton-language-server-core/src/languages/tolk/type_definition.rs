@@ -61,7 +61,7 @@ impl TolkResolveSnapshot {
         inference.type_of(span)
     }
 
-    fn type_symbol(&self, ty: TyId) -> Option<SymbolId> {
+    pub(super) fn type_symbol(&self, ty: TyId) -> Option<SymbolId> {
         match self.type_interner.data(ty) {
             TyData::Struct { def, .. }
             | TyData::Enum { def, .. }

@@ -60,9 +60,7 @@ impl FileInfo {
 
     #[must_use]
     pub fn has_contract_declaration(&self) -> bool {
-        self.source
-            .top_levels()
-            .any(|top_level| matches!(top_level, ast::TopLevel::Contract(_)))
+        self.index.contract.is_some()
     }
 
     #[must_use]

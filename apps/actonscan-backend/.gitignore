@@ -1,0 +1,8 @@
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
+# Runtime data
+data/

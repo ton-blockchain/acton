@@ -33,6 +33,7 @@ indicatif = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
 tolk-linter = { workspace = true }
+ton-language-server-core = { path = "../crates/ton-language-server-core", default-features = false, features = ["schema", "tolk"] }
 tree-sitter = { workspace = true }
 tree-sitter-fift = { workspace = true }
 tree-sitter-tasm = { workspace = true }

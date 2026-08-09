@@ -1,4 +1,5 @@
 use crate::text::TextIndex;
+use std::borrow::Cow;
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -44,7 +45,10 @@ fn file_uri_path(uri: &str) -> Option<PathBuf> {
     let mut uri = url::Url::parse(uri).ok()?;
     let authority = uri.host_str().map(str::to_owned);
     uri.set_host(None).ok()?;
+    #[cfg(not(target_arch = "wasm32"))]
     let path = uri.to_file_path().ok()?;
+    #[cfg(target_arch = "wasm32")]
+    let path = PathBuf::from(urlencoding::decode(uri.path()).ok()?.as_ref());
 
     if let Some(authority) = authority {
         path.strip_prefix("/")
@@ -280,6 +284,74 @@ impl Range {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+    Information,
+    Hint,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub severity: DiagnosticSeverity,
+    pub code: Option<String>,
+    pub source: String,
+    pub message: String,
+    pub tags: Vec<DiagnosticTag>,
+}
+
+impl Diagnostic {
+    #[must_use]
+    pub fn new(
+        range: Range,
+        severity: DiagnosticSeverity,
+        source: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            range,
+            severity,
+            code: None,
+            source: source.into(),
+            message: message.into(),
+            tags: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_tags(mut self, tags: Vec<DiagnosticTag>) -> Self {
+        self.tags = tags;
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SelectionRange {
+    pub range: Range,
+    pub parent: Option<Box<Self>>,
+}
+
+impl SelectionRange {
+    #[must_use]
+    pub const fn new(range: Range, parent: Option<Box<Self>>) -> Self {
+        Self { range, parent }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextEdit {
     pub range: Range,
@@ -479,7 +551,7 @@ pub enum InlayHintCategory {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InlayHint {
     pub position: Position,
-    pub label: String,
+    pub label: InlayHintLabel,
     pub kind: Option<InlayHintKind>,
     pub category: InlayHintCategory,
     pub tooltip: Option<String>,
@@ -493,7 +565,7 @@ impl InlayHint {
     pub fn new(position: Position, label: impl Into<String>, kind: InlayHintKind) -> Self {
         Self {
             position,
-            label: label.into(),
+            label: InlayHintLabel::String(label.into()),
             kind: Some(kind),
             category: match kind {
                 InlayHintKind::Type => InlayHintCategory::Type,
@@ -510,7 +582,7 @@ impl InlayHint {
     pub fn plain(position: Position, label: impl Into<String>) -> Self {
         Self {
             position,
-            label: label.into(),
+            label: InlayHintLabel::String(label.into()),
             kind: None,
             category: InlayHintCategory::Other,
             tooltip: None,
@@ -530,6 +602,62 @@ impl InlayHint {
     pub const fn with_category(mut self, category: InlayHintCategory) -> Self {
         self.category = category;
         self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InlayHintLabel {
+    String(String),
+    Parts(Vec<InlayHintLabelPart>),
+}
+
+impl InlayHintLabel {
+    #[must_use]
+    pub fn text(&self) -> Cow<'_, str> {
+        match self {
+            Self::String(value) => Cow::Borrowed(value),
+            Self::Parts(parts) => {
+                Cow::Owned(parts.iter().map(|part| part.value.as_str()).collect())
+            }
+        }
+    }
+}
+
+impl fmt::Display for InlayHintLabel {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::String(value) => formatter.write_str(value),
+            Self::Parts(parts) => {
+                for part in parts {
+                    formatter.write_str(&part.value)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InlayHintLabelPart {
+    pub value: String,
+    pub location: Option<Location>,
+}
+
+impl InlayHintLabelPart {
+    #[must_use]
+    pub fn plain(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+            location: None,
+        }
+    }
+
+    #[must_use]
+    pub fn linked(value: impl Into<String>, location: Location) -> Self {
+        Self {
+            value: value.into(),
+            location: Some(location),
+        }
     }
 }
 
@@ -600,6 +728,28 @@ pub struct DocumentSymbol {
     pub range: Range,
     pub selection_range: Range,
     pub children: Vec<DocumentSymbol>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyItem {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: DocumentSymbolKind,
+    pub uri: DocumentUri,
+    pub range: Range,
+    pub selection_range: Range,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyIncomingCall {
+    pub from: CallHierarchyItem,
+    pub from_ranges: Vec<Range>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyOutgoingCall {
+    pub to: CallHierarchyItem,
+    pub from_ranges: Vec<Range>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

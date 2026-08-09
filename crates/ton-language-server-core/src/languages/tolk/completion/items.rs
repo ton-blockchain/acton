@@ -138,11 +138,8 @@ pub(super) fn symbol(
         .with_snippet_replacement(context.syntax.replacement_range, insertion);
     item = with_symbol_label_details(item, context, symbol, member);
     item.deprecated = symbol.is_deprecated;
-    if let Some(documentation) = symbol
-        .doc_span
-        .and_then(|span| semantics::raw_text(context.snapshot, symbol.id.file_id, span))
-    {
-        item.documentation = Some(documentation);
+    if !symbol.doc.is_empty() {
+        item.documentation = Some(symbol.doc.to_string());
     }
     Some(RankedCompletionItem {
         item,

@@ -3,7 +3,7 @@
   "root": false,
   "extends": "//",
   "files": {
-    "includes": ["**", "!dist", "!node_modules", "!*.vsix", "!bun.lock"]
+    "includes": ["**", "!.vscode-test", "!*.vsix"]
   },
   "linter": {
     "rules": {

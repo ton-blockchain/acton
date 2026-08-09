@@ -18,9 +18,6 @@ exceptions = []
 unused-allowed-license = "deny"
 unused-license-exception = "deny"
 
-[licenses.private]
-ignore = true
-
 [[licenses.clarify]]
 crate = "everscale-crypto@0.2.1"
 expression = "MIT"

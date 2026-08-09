@@ -1,8 +1,9 @@
 use crate::language::{
-    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
-    DocumentHighlightRequest, DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest,
-    FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
-    ParsedDocument, PluginContext, PrepareRenameRequest, ReferenceRequest, RenameRequest,
+    CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
+    CompletionRequest, DefinitionRequest, DiagnosticRequest, DocumentHighlightRequest,
+    DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    PrepareRenameRequest, ReferenceRequest, RenameRequest, SelectionRangeRequest,
     SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
     WorkspaceSymbolRequest,
 };
@@ -10,11 +11,13 @@ use crate::logging;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
-    CodeAction, CodeLens, DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol,
-    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position,
-    PrepareRename, Range, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
+    Diagnostic, DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
+    FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position, PrepareRename,
+    Range, SelectionRange, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol,
 };
-use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
+use crate::{CompletionList, CompletionTrigger, LanguageServerSettings, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -31,6 +34,7 @@ struct DocumentState {
 pub struct LanguageService {
     plugins: HashMap<LanguageId, Box<dyn LanguagePlugin>>,
     documents: HashMap<DocumentUri, DocumentState>,
+    settings: LanguageServerSettings,
     profiler: Profiler,
 }
 
@@ -45,8 +49,18 @@ impl LanguageService {
         Self {
             plugins: HashMap::new(),
             documents: HashMap::new(),
+            settings: LanguageServerSettings::default(),
             profiler,
         }
+    }
+
+    pub const fn set_settings(&mut self, settings: LanguageServerSettings) {
+        self.settings = settings;
+    }
+
+    #[must_use]
+    pub const fn settings(&self) -> &LanguageServerSettings {
+        &self.settings
     }
 
     pub fn register_language(&mut self, plugin: impl LanguagePlugin + 'static) {
@@ -950,6 +964,80 @@ impl LanguageService {
         result
     }
 
+    pub fn prepare_call_hierarchy(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<CallHierarchyItem>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.prepare_call_hierarchy(CallHierarchyPrepareRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("call_hierarchy.prepare", started_at);
+        result
+    }
+
+    pub fn incoming_calls(
+        &mut self,
+        language_id: &LanguageId,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<CallHierarchyIncomingCall>> {
+        let Some(plugin) = self.plugins.get(language_id) else {
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.incoming_calls(CallHierarchyRequest {
+            uri,
+            position,
+            profiler: &mut self.profiler,
+        });
+        self.profiler.finish("call_hierarchy.incoming", started_at);
+        result
+    }
+
+    pub fn outgoing_calls(
+        &mut self,
+        language_id: &LanguageId,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<CallHierarchyOutgoingCall>> {
+        let Some(plugin) = self.plugins.get(language_id) else {
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.outgoing_calls(CallHierarchyRequest {
+            uri,
+            position,
+            profiler: &mut self.profiler,
+        });
+        self.profiler.finish("call_hierarchy.outgoing", started_at);
+        result
+    }
+
     pub fn document_highlights(
         &mut self,
         uri: &DocumentUri,
@@ -1028,7 +1116,7 @@ impl LanguageService {
         }
 
         let started_at = self.profiler.start();
-        let result = plugin.completion(CompletionRequest {
+        let mut result = plugin.completion(CompletionRequest {
             context: PluginContext {
                 document: &state.document,
                 parsed: state.parsed.as_ref(),
@@ -1038,6 +1126,21 @@ impl LanguageService {
             trigger,
         });
         self.profiler.finish("completion", started_at);
+        if state.document.language_id().as_str() == "tolk"
+            && let Ok(completion) = &mut result
+        {
+            let settings = &self.settings.tolk.completion;
+            if !settings.add_imports {
+                completion
+                    .items
+                    .retain(|item| item.additional_text_edits.is_empty());
+            }
+            if !settings.type_aware {
+                for item in &mut completion.items {
+                    item.sort_text = None;
+                }
+            }
+        }
         match &result {
             Ok(completion) => tracing::debug!(
                 target: logging::SERVICE_TARGET,
@@ -1105,6 +1208,11 @@ impl LanguageService {
                 version = state.document.version(),
                 "semantic tokens unsupported by language"
             );
+            return Ok(SemanticTokens::new(Vec::new()));
+        }
+        if state.document.language_id().as_str() == "fift"
+            && !self.settings.fift.semantic_highlighting.enabled
+        {
             return Ok(SemanticTokens::new(Vec::new()));
         }
 
@@ -1195,7 +1303,7 @@ impl LanguageService {
         }
 
         let started_at = self.profiler.start();
-        let result = plugin.inlay_hints(InlayHintRequest {
+        let mut result = plugin.inlay_hints(InlayHintRequest {
             context: PluginContext {
                 document: &state.document,
                 parsed: state.parsed.as_ref(),
@@ -1204,6 +1312,12 @@ impl LanguageService {
             range,
         });
         self.profiler.finish("inlay_hints", started_at);
+        if let Ok(hints) = &mut result {
+            hints.retain(|hint| {
+                self.settings
+                    .inlay_hint_enabled(Some(state.document.language_id()), hint.category)
+            });
+        }
         match &result {
             Ok(hints) => {
                 tracing::info!(
@@ -1384,6 +1498,58 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn selection_ranges(
+        &mut self,
+        uri: &DocumentUri,
+        positions: &[Position],
+    ) -> anyhow::Result<Vec<SelectionRange>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().selection_ranges {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.selection_ranges(SelectionRangeRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            positions,
+        });
+        self.profiler.finish("selection_ranges", started_at);
+        result
+    }
+
+    pub fn diagnostics(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<Diagnostic>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().diagnostics {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.diagnostics(DiagnosticRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            settings: &self.settings,
+        });
+        self.profiler.finish("diagnostics", started_at);
         result
     }
 

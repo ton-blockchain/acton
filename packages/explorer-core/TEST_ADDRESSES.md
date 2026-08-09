@@ -30,6 +30,49 @@ These addresses are not fixtures and their balances or recent history can change
 | --- | --- | --- |
 | [`0:8000000000000000:86786720`](https://actonscan.com/block/0/8000000000000000/86786720?network=mainnet) | Block with 533 transactions, useful for checking the v2 fallback and uninterrupted incremental transaction loading | 2026-08-06 |
 
+## Mainnet configuration blocks
+
+| Block | What to verify | Last checked |
+| --- | --- | --- |
+| [`-1:8000000000000000:84965023`](https://actonscan.com/block/-1/8000000000000000/84965023?network=mainnet) | Masterchain block whose configuration contains ConfigParam 36 (`Next validator set`), useful for checking historical validator set rendering | 2026-08-10 |
+
+## Mainnet ConfigParam 8 history
+
+`ConfigParam 8` contains the network's global protocol version and a bitmask of enabled capabilities. Closed ranges below are inclusive; an open end means that the value is still active.
+
+| From seqno | To seqno | Version | Capabilities |
+| ---: | ---: | ---: | ---: |
+| [1](https://actonscan.com/block/-1/8000000000000000/1?network=mainnet) | [2,908,198](https://actonscan.com/block/-1/8000000000000000/2908198?network=mainnet) | 0 | `0x002` |
+| [2,908,199](https://actonscan.com/block/-1/8000000000000000/2908199?network=mainnet) | [2,908,414](https://actonscan.com/block/-1/8000000000000000/2908414?network=mainnet) | 1 | `0x00e` |
+| [2,908,415](https://actonscan.com/block/-1/8000000000000000/2908415?network=mainnet) | [2,908,450](https://actonscan.com/block/-1/8000000000000000/2908450?network=mainnet) | 0 | `0x002` |
+| [2,908,451](https://actonscan.com/block/-1/8000000000000000/2908451?network=mainnet) | [3,127,941](https://actonscan.com/block/-1/8000000000000000/3127941?network=mainnet) | 1 | `0x006` |
+| [3,127,942](https://actonscan.com/block/-1/8000000000000000/3127942?network=mainnet) | [34,875,662](https://actonscan.com/block/-1/8000000000000000/34875662?network=mainnet) | 2 | `0x02e` |
+| [34,875,663](https://actonscan.com/block/-1/8000000000000000/34875663?network=mainnet) | [35,865,386](https://actonscan.com/block/-1/8000000000000000/35865386?network=mainnet) | 4 | `0x02e` |
+| [35,865,387](https://actonscan.com/block/-1/8000000000000000/35865387?network=mainnet) | [36,746,857](https://actonscan.com/block/-1/8000000000000000/36746857?network=mainnet) | 5 | `0x02e` |
+| [36,746,858](https://actonscan.com/block/-1/8000000000000000/36746858?network=mainnet) | [37,375,728](https://actonscan.com/block/-1/8000000000000000/37375728?network=mainnet) | 6 | `0x02e` |
+| [37,375,729](https://actonscan.com/block/-1/8000000000000000/37375729?network=mainnet) | [39,939,168](https://actonscan.com/block/-1/8000000000000000/39939168?network=mainnet) | 7 | `0x02e` |
+| [39,939,169](https://actonscan.com/block/-1/8000000000000000/39939169?network=mainnet) | [44,891,368](https://actonscan.com/block/-1/8000000000000000/44891368?network=mainnet) | 8 | `0x1ee` |
+| [44,891,369](https://actonscan.com/block/-1/8000000000000000/44891369?network=mainnet) | [47,557,456](https://actonscan.com/block/-1/8000000000000000/47557456?network=mainnet) | 9 | `0x1ee` |
+| [47,557,457](https://actonscan.com/block/-1/8000000000000000/47557457?network=mainnet) | [49,524,025](https://actonscan.com/block/-1/8000000000000000/49524025?network=mainnet) | 10 | `0x1ee` |
+| [49,524,026](https://actonscan.com/block/-1/8000000000000000/49524026?network=mainnet) | [53,939,516](https://actonscan.com/block/-1/8000000000000000/53939516?network=mainnet) | 11 | `0x1ee` |
+| [53,939,517](https://actonscan.com/block/-1/8000000000000000/53939517?network=mainnet) | [59,015,495](https://actonscan.com/block/-1/8000000000000000/59015495?network=mainnet) | 12 | `0x1ee` |
+| [59,015,496](https://actonscan.com/block/-1/8000000000000000/59015496?network=mainnet) | [71,304,030](https://actonscan.com/block/-1/8000000000000000/71304030?network=mainnet) | 13 | `0x1ee` |
+| [71,304,031](https://actonscan.com/block/-1/8000000000000000/71304031?network=mainnet) | [81,421,435](https://actonscan.com/block/-1/8000000000000000/81421435?network=mainnet) | 14 | `0x3ee` |
+| [81,421,436](https://actonscan.com/block/-1/8000000000000000/81421436?network=mainnet) | — | 15 | `0x3ee` |
+
+Capability masks used in this history:
+
+| Mask | Enabled capabilities |
+| ---: | --- |
+| `0x002` | `capCreateStatsEnabled` |
+| `0x006` | `capCreateStatsEnabled`, `capBounceMsgBody` |
+| `0x00e` | `capCreateStatsEnabled`, `capBounceMsgBody`, `capReportVersion` |
+| `0x02e` | `capCreateStatsEnabled`, `capBounceMsgBody`, `capReportVersion`, `capShortDequeue` |
+| `0x1ee` | `capCreateStatsEnabled`, `capBounceMsgBody`, `capReportVersion`, `capShortDequeue`, `capStoreOutMsgQueueSize`, `capMsgMetadata`, `capDeferMessages` |
+| `0x3ee` | `capCreateStatsEnabled`, `capBounceMsgBody`, `capReportVersion`, `capShortDequeue`, `capStoreOutMsgQueueSize`, `capMsgMetadata`, `capDeferMessages`, `capFullCollatedData` |
+
+The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found safely with a binary search that assumes monotonic values. Version 3 was not observed in mainnet. Equal capability masks across multiple versions do not mean equal protocol behavior.
+
 ## Mainnet transactions
 
 | Transaction | What to verify | Last checked |

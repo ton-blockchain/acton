@@ -14,8 +14,14 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
+check-deps:
+    cargo shear --deny-warnings
+
 clippy:
     cargo clippy --workspace --all-targets --locked -- -D warnings
+
+check-deny:
+    cargo deny check
 
 test:
     cargo test --workspace --all-targets --locked
@@ -23,7 +29,7 @@ test:
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 
-check-ci: fmt-check clippy doc
+check-ci: fmt-check check-deps clippy check-deny doc
 
 check: check-ci test
 

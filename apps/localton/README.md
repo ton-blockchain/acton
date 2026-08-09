@@ -557,4 +557,4 @@ The project does not include an explorer or contract editor. Use API V2, API V3,
 
 ## License
 
-localton uses the GNU General Public License, version 3 or later. See [NOTICE.md](NOTICE.md) for third-party notices.
+Localton is licensed under either the MIT License or the Apache License, Version 2.0, at your option. See [NOTICE.md](NOTICE.md) for third-party notices.

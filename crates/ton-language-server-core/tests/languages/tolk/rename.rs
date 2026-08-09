@@ -1,5 +1,7 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
+#[path = "rename/coverage.rs"]
+mod coverage;
 #[path = "../../support.rs"]
 mod support;
 #[path = "rename/upstream.rs"]

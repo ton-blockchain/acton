@@ -1,37 +1,73 @@
 [package]
 name = "actonscan-backend"
 description = "Actonscan network statistics backend"
-version.workspace = true
+version = { workspace = true }
 publish = false
-authors.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-license.workspace = true
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[workspace]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["TON Core"]
+edition = "2024"
+rust-version = "1.96.1"
+repository = "https://github.com/ton-blockchain/acton"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0.100"
+async-trait = "0.1.89"
+axum = "0.8.1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+tempfile = "3.10.1"
+thiserror = "2.0.18"
+tokio = { version = "1.41", features = ["full"] }
+toml = "0.9.8"
+tower-http = "0.6.2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tycho-types = { version = "0.3.0", features = ["bigint"] }
+utoipa = "5.5"
 
 [dependencies]
-anyhow.workspace = true
-async-trait.workspace = true
-axum.workspace = true
-rusqlite.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+axum = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
 ton-indexer-core = { path = "../../crates/ton-indexer-core" }
 ton-indexer-liteserver = { path = "../../crates/ton-indexer-liteserver" }
 tower-http = { workspace = true, features = ["compression-br", "compression-gzip", "cors"] }
-tracing.workspace = true
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-toml.workspace = true
-tycho-types.workspace = true
-utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
-
-[lints]
-workspace = true
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+toml = { workspace = true }
+tycho-types = { workspace = true }
+utoipa = { workspace = true, features = ["axum_extras", "macros"] }
 
 [dev-dependencies]
-tempfile.workspace = true
+tempfile = { workspace = true }
+
+[lints.rust]
+unsafe_code = "deny"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+nursery = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+redundant_pub_crate = "allow"
+unwrap_used = "deny"
+undocumented_unsafe_blocks = "deny"
 
 [lib]
 doctest = false

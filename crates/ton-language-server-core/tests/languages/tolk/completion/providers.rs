@@ -3,6 +3,8 @@
 #[path = "../../../support.rs"]
 mod common;
 
+mod comments;
+
 mod providers {
     mod acton_contract_id;
     mod acton_get_method;
@@ -25,7 +27,7 @@ mod providers {
     mod returns;
     mod statement_snippets;
     mod storage;
-    mod support;
+    pub(crate) mod support;
     mod throw_assert;
     mod top_level;
     mod variable_size_types;

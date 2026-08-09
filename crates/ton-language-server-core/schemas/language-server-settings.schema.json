@@ -1,0 +1,384 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LanguageServerSettings",
+  "description": "Runtime settings accepted by the TON language server.\n\nSend this object through `initializationOptions` or `workspace/didChangeConfiguration`. VS Code nests this object under a `ton` property when it sends a configuration change.",
+  "default": {
+    "fift": {
+      "hints": {
+        "showGasConsumption": true
+      },
+      "semanticHighlighting": {
+        "enabled": true
+      }
+    },
+    "tlb": {
+      "hints": {
+        "disable": false,
+        "showConstructorTag": true
+      }
+    },
+    "tolk": {
+      "completion": {
+        "addImports": true,
+        "typeAware": true
+      },
+      "diagnostics": {
+        "compiler": {
+          "enabled": true
+        },
+        "enabled": true,
+        "linter": {
+          "enabled": true
+        }
+      },
+      "findUsages": {
+        "scope": "workspace"
+      },
+      "hints": {
+        "constantValues": true,
+        "disable": false,
+        "parameters": true,
+        "showMethodId": true,
+        "types": true
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "fift": {
+      "description": "Settings for the Fift language.",
+      "default": {
+        "hints": {
+          "showGasConsumption": true
+        },
+        "semanticHighlighting": {
+          "enabled": true
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/definitions/FiftSettings"
+        }
+      ]
+    },
+    "tlb": {
+      "description": "Settings for the TL-B language.",
+      "default": {
+        "hints": {
+          "disable": false,
+          "showConstructorTag": true
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/definitions/TlbSettings"
+        }
+      ]
+    },
+    "tolk": {
+      "description": "Settings for the Tolk language.",
+      "default": {
+        "completion": {
+          "addImports": true,
+          "typeAware": true
+        },
+        "diagnostics": {
+          "compiler": {
+            "enabled": true
+          },
+          "enabled": true,
+          "linter": {
+            "enabled": true
+          }
+        },
+        "findUsages": {
+          "scope": "workspace"
+        },
+        "hints": {
+          "constantValues": true,
+          "disable": false,
+          "parameters": true,
+          "showMethodId": true,
+          "types": true
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/definitions/TolkSettings"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "DiagnosticProviderSettings": {
+      "description": "Enables or disables one diagnostic provider.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enables diagnostics from this provider.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "FiftHintSettings": {
+      "description": "Controls the inlay hints shown in Fift source files.",
+      "type": "object",
+      "properties": {
+        "showGasConsumption": {
+          "description": "Shows gas consumption for Fift instructions.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "FiftSettings": {
+      "description": "Fift language features.",
+      "type": "object",
+      "properties": {
+        "hints": {
+          "description": "Fift inlay hint settings.",
+          "default": {
+            "showGasConsumption": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/FiftHintSettings"
+            }
+          ]
+        },
+        "semanticHighlighting": {
+          "description": "Fift semantic highlighting settings.",
+          "default": {
+            "enabled": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticHighlightingSettings"
+            }
+          ]
+        }
+      }
+    },
+    "FindUsagesScope": {
+      "description": "Files that can appear in Tolk reference results.",
+      "oneOf": [
+        {
+          "description": "Searches only files inside the current workspace.",
+          "type": "string",
+          "enum": [
+            "workspace"
+          ]
+        },
+        {
+          "description": "Searches workspace files and external sources, including the standard library.",
+          "type": "string",
+          "enum": [
+            "everywhere"
+          ]
+        }
+      ]
+    },
+    "FindUsagesSettings": {
+      "description": "Controls the scope of Tolk reference searches.",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "description": "Selects which indexed files can appear in reference results.",
+          "default": "workspace",
+          "allOf": [
+            {
+              "$ref": "#/definitions/FindUsagesScope"
+            }
+          ]
+        }
+      }
+    },
+    "SemanticHighlightingSettings": {
+      "description": "Controls semantic highlighting for a language.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enables semantic highlighting when set to `true`.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "TlbHintSettings": {
+      "description": "Controls the inlay hints shown in TL-B source files.",
+      "type": "object",
+      "properties": {
+        "disable": {
+          "description": "Disables every TL-B inlay hint when set to `true`.",
+          "default": false,
+          "type": "boolean"
+        },
+        "showConstructorTag": {
+          "description": "Shows computed constructor tags for constructors without an explicit tag.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "TlbSettings": {
+      "description": "TL-B language features.",
+      "type": "object",
+      "properties": {
+        "hints": {
+          "description": "TL-B inlay hint settings.",
+          "default": {
+            "disable": false,
+            "showConstructorTag": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/TlbHintSettings"
+            }
+          ]
+        }
+      }
+    },
+    "TolkCompletionSettings": {
+      "description": "Controls completion behavior in Tolk source files.",
+      "type": "object",
+      "properties": {
+        "addImports": {
+          "description": "Adds an import edit when completion inserts a symbol from another file.",
+          "default": true,
+          "type": "boolean"
+        },
+        "typeAware": {
+          "description": "Ranks completion items by their relevance to the expected type.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "TolkDiagnosticSettings": {
+      "description": "Controls all Tolk diagnostics and each diagnostic provider.",
+      "type": "object",
+      "properties": {
+        "compiler": {
+          "description": "Controls diagnostics produced by the native Tolk compiler.",
+          "default": {
+            "enabled": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/DiagnosticProviderSettings"
+            }
+          ]
+        },
+        "enabled": {
+          "description": "Enables all Tolk diagnostics when set to `true`.\n\nThis setting takes precedence over individual provider settings.",
+          "default": true,
+          "type": "boolean"
+        },
+        "linter": {
+          "description": "Controls diagnostics produced by the Acton Tolk linter.",
+          "default": {
+            "enabled": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/DiagnosticProviderSettings"
+            }
+          ]
+        }
+      }
+    },
+    "TolkHintSettings": {
+      "description": "Controls the inlay hints shown in Tolk source files.",
+      "type": "object",
+      "properties": {
+        "constantValues": {
+          "description": "Shows computed values for constants and enum members.",
+          "default": true,
+          "type": "boolean"
+        },
+        "disable": {
+          "description": "Disables every Tolk inlay hint when set to `true`.",
+          "default": false,
+          "type": "boolean"
+        },
+        "parameters": {
+          "description": "Shows parameter name hints at call sites.",
+          "default": true,
+          "type": "boolean"
+        },
+        "showMethodId": {
+          "description": "Shows computed method IDs for get methods.",
+          "default": true,
+          "type": "boolean"
+        },
+        "types": {
+          "description": "Shows inferred type hints for variables and expressions.",
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "TolkSettings": {
+      "description": "Tolk language features and diagnostics.",
+      "type": "object",
+      "properties": {
+        "completion": {
+          "description": "Tolk completion settings.",
+          "default": {
+            "addImports": true,
+            "typeAware": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/TolkCompletionSettings"
+            }
+          ]
+        },
+        "diagnostics": {
+          "description": "Tolk diagnostic settings.",
+          "default": {
+            "compiler": {
+              "enabled": true
+            },
+            "enabled": true,
+            "linter": {
+              "enabled": true
+            }
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/TolkDiagnosticSettings"
+            }
+          ]
+        },
+        "findUsages": {
+          "description": "Tolk reference search settings.",
+          "default": {
+            "scope": "workspace"
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/FindUsagesSettings"
+            }
+          ]
+        },
+        "hints": {
+          "description": "Tolk inlay hint settings.",
+          "default": {
+            "constantValues": true,
+            "disable": false,
+            "parameters": true,
+            "showMethodId": true,
+            "types": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/TolkHintSettings"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

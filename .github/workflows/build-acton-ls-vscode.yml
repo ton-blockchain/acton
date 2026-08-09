@@ -22,16 +22,10 @@ on:
       - master
     paths:
       - ".github/workflows/build-acton-ls-vscode.yml"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "biome.jsonc"
-      - "bun.lock"
-      - "package.json"
       - "src/bin/acton.rs"
       - "src/commands/ls/**"
       - "crates/ton-language-server-core/**"
-      - "crates/ton-language-server-native/Cargo.toml"
-      - "crates/ton-language-server-native/src/**"
+      - "crates/ton-language-server-native/**"
       - "packages/vscode-ton/**"
   workflow_dispatch:
 
@@ -67,7 +61,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile --filter vscode-ton
+        run: bun install --frozen-lockfile
 
       - name: Audit dependencies
         working-directory: packages/vscode-ton

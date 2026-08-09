@@ -33,6 +33,18 @@ impl LspTestClient {
     }
 
     pub(crate) async fn request(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
+        let message = self.request_response(method, params).await?;
+        if let Some(error) = message.get("error") {
+            anyhow::bail!("request {method} failed: {error}");
+        }
+        Ok(message.get("result").cloned().unwrap_or(Value::Null))
+    }
+
+    pub(crate) async fn request_response(
+        &mut self,
+        method: &str,
+        params: Value,
+    ) -> anyhow::Result<Value> {
         let id = self.next_request_id;
         self.next_request_id += 1;
         let mut message = json!({
@@ -50,18 +62,10 @@ impl LspTestClient {
             if message.get("id").and_then(Value::as_u64) == Some(id)
                 && message.get("method").is_none()
             {
-                if let Some(error) = message.get("error") {
-                    anyhow::bail!("request {method} failed: {error}");
-                }
-                return Ok(message.get("result").cloned().unwrap_or(Value::Null));
+                return Ok(message);
             }
             if let (Some(request_id), Some(_)) = (message.get("id"), message.get("method")) {
-                self.write_message(&json!({
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "result": null,
-                }))
-                .await?;
+                self.acknowledge_server_request(request_id.clone()).await?;
             } else {
                 self.notifications.push(message);
             }
@@ -81,6 +85,17 @@ impl LspTestClient {
 
     pub(crate) fn notifications(&self) -> &[Value] {
         &self.notifications
+    }
+
+    pub(crate) async fn receive_server_request(&mut self) -> anyhow::Result<Value> {
+        loop {
+            let message = self.read_message().await?;
+            if let (Some(request_id), Some(_)) = (message.get("id"), message.get("method")) {
+                self.acknowledge_server_request(request_id.clone()).await?;
+                return Ok(message);
+            }
+            self.notifications.push(message);
+        }
     }
 
     pub(crate) async fn shutdown(
@@ -105,6 +120,15 @@ impl LspTestClient {
         self.writer.write_all(&body).await?;
         self.writer.flush().await?;
         Ok(())
+    }
+
+    async fn acknowledge_server_request(&mut self, request_id: Value) -> anyhow::Result<()> {
+        self.write_message(&json!({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": null,
+        }))
+        .await
     }
 
     async fn read_message(&mut self) -> anyhow::Result<Value> {

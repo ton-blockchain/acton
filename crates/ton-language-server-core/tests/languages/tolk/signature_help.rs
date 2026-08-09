@@ -1,5 +1,7 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
+#[path = "signature_help/coverage.rs"]
+mod coverage;
 #[path = "../../support.rs"]
 mod support;
 

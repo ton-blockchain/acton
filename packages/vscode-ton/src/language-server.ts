@@ -78,10 +78,6 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
     ],
     synchronize: {
       configurationSection: "ton",
-      fileEvents: [
-        vscode.workspace.createFileSystemWatcher("**/*.{tolk,tasm,fif,fift,tlb}"),
-        vscode.workspace.createFileSystemWatcher("**/Acton.toml"),
-      ],
     },
   }
 

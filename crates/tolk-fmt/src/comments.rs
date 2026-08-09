@@ -151,6 +151,15 @@ pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
             // If the comment is on the same line as the previous node,
             // we always consider this comment as inline relative to that node
             comments_with_owner.push((comment, p, CommentKind::Inline));
+        } else if let Some(p) = prev
+            && p.kind() == "annotation_list"
+        {
+            // A comment between an annotation list and the declaration keyword has no named
+            // declaration sibling after it: for example, `fun` is anonymous in the syntax tree,
+            // so the next named sibling is the function name. Keep the comment after the
+            // annotations instead of attaching it to a child that declaration printers do not
+            // own.
+            comments_with_owner.push((comment, p, CommentKind::Trailing));
         } else if let Some(n) = next {
             // If there is a node after the comment, we prefer to attach it
             // as leading to that node.

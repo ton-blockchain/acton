@@ -268,8 +268,8 @@ fn execute_script(
                 )
         })
         .transpose()?;
-    let execution_unixtime = if let Some(snapshot) = &fork_snapshot {
-        i64::from(snapshot.gen_utime)
+    let execution_now = if let Some(snapshot) = &fork_snapshot {
+        snapshot.gen_utime
     } else {
         let now = std::time::SystemTime::now();
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -282,7 +282,7 @@ fn execute_script(
         verbosity,
         libs: String::new(),
         address: formatted_address,
-        unixtime: execution_unixtime,
+        unixtime: i64::from(execution_now),
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
@@ -312,9 +312,7 @@ fn execute_script(
         None => AccountsState::Local(LocalAccountsState::new()),
     };
     let mut world_state = WorldState::new(resolver, Some(config_b64))?;
-    if let Some(snapshot) = &fork_snapshot {
-        world_state.set_now(snapshot.gen_utime);
-    }
+    world_state.set_now(execution_now);
     let mut build_cache = BuildCache::new();
     build_cache.memoize(
         "script",

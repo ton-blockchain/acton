@@ -2,6 +2,7 @@ mod add_import;
 mod fill_struct_fields;
 mod generate_struct_opcode;
 
+use super::diagnostics::lint_code_actions;
 use super::{TolkProjectConfig, TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{CodeAction, DocumentEdits, DocumentSnapshot, Range, TextEdit, WorkspaceEdit};
 use std::sync::Arc;
@@ -57,6 +58,7 @@ impl TolkWorkspaceEngine {
         for provider in providers {
             let _ = provider.collect(&context, &mut actions);
         }
+        actions.extend(lint_code_actions(&snapshot, &config, file_id, range));
         actions
     }
 }
@@ -83,14 +85,7 @@ impl TolkCodeActionContext<'_> {
     where
         N: TryFromNode<'tree>,
     {
-        let mut node = self.cursor_node()?;
-
-        loop {
-            if let Ok(typed) = N::try_from_node(node) {
-                return Some(typed);
-            }
-            node = node.parent()?;
-        }
+        self.cursor_node()?.ancestor_as()
     }
 
     fn text_of<'tree, N>(&self, node: N) -> &str

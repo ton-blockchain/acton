@@ -33,7 +33,7 @@ fn source_with_inline_hints(source: &str, hints: &[InlayHint]) -> String {
             (
                 index.position_to_offset(source, hint.position),
                 order,
-                format!("/* {} */", hint.label.trim()),
+                format!("/* {} */", hint.label.text().trim()),
             )
         })
         .collect::<Vec<_>>();

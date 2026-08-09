@@ -5,6 +5,7 @@ mod logging;
 mod profiling;
 mod semantic_tokens;
 mod service;
+mod settings;
 mod text;
 mod types;
 
@@ -16,12 +17,13 @@ pub use completion::{
 };
 pub use custom::TypeAtPosition;
 pub use language::{
-    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
-    DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet, FileRenameRequest,
-    FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin,
-    ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest,
-    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
-    WorkspaceLanguage, WorkspaceSymbolRequest,
+    CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
+    CompletionRequest, DefinitionRequest, DiagnosticRequest, DocumentHighlightRequest,
+    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    PrepareRenameRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
+    WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
@@ -36,12 +38,19 @@ pub use semantic_tokens::{
     SemanticTokenType, SemanticTokens, SemanticTokensBuilder,
 };
 pub use service::{LanguageService, LanguageServiceConfig};
+pub use settings::{
+    DiagnosticProviderSettings, FiftHintSettings, FiftSettings, FindUsagesScope,
+    FindUsagesSettings, LanguageServerSettings, SemanticHighlightingSettings, TlbHintSettings,
+    TlbSettings, TolkCompletionSettings, TolkDiagnosticSettings, TolkHintSettings, TolkSettings,
+};
 pub use text::TextIndex;
 pub use types::{
-    CodeAction, CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight,
-    DocumentHighlightKind, DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId,
-    Location, Position, PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
+    CodeActionKind, CodeLens, Command, Diagnostic, DiagnosticSeverity, DiagnosticTag,
+    DocumentEdits, DocumentHighlight, DocumentHighlightKind, DocumentSnapshot, DocumentSymbol,
+    DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory,
+    InlayHintKind, InlayHintLabel, InlayHintLabelPart, LanguageId, Location, Position,
+    PrepareRename, Range, SelectionRange, SignatureHelp, SignatureInformation, TextEdit,
     WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 

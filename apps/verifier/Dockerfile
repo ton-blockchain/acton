@@ -37,6 +37,16 @@ COPY apps/verifier/compiler-worker/languages ./languages
 COPY apps/verifier/compiler-worker/fixtures ./fixtures
 
 FROM node:22-bookworm-slim AS runtime
+ARG BUILD_VERSION=dev
+ARG SOURCE_URL=https://github.com/ton-blockchain/acton
+ARG VCS_REF=unknown
+
+LABEL org.opencontainers.image.title="verifier" \
+      org.opencontainers.image.description="TON smart contract source verification service" \
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT OR Apache-2.0" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git openssh-client tini \

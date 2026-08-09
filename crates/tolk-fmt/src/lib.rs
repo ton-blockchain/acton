@@ -6,9 +6,9 @@ pub mod pretty;
 pub mod stmts;
 pub mod types;
 
-use anyhow::anyhow;
 use std::collections::HashMap;
 use std::rc::Rc;
+use thiserror::Error;
 use tree_sitter::Node;
 
 pub use comments::{Comment, CommentKind, collect_comments};
@@ -42,6 +42,20 @@ impl Default for FormatOptions {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum FormatError {
+    #[error(transparent)]
+    Parse(#[from] anyhow::Error),
+    #[error("Cannot format code with syntax error")]
+    SyntaxErrors,
+    #[error("Failed to format source")]
+    Source,
+    #[error("Failed to render: {0}")]
+    Render(#[source] std::io::Error),
+    #[error("Invalid UTF-8: {0}")]
+    InvalidUtf8(#[from] std::string::FromUtf8Error),
+}
+
 #[derive(Clone)]
 pub struct Context<'tree> {
     pub code: Rc<str>,
@@ -49,10 +63,10 @@ pub struct Context<'tree> {
     pub options: FormatOptions,
 }
 
-pub fn format_source(source: &str, options: FormatOptions) -> anyhow::Result<String> {
+pub fn format_source(source: &str, options: FormatOptions) -> Result<String, FormatError> {
     let source_file = tolk_syntax::parse(source)?;
     if source_file.has_errors() {
-        anyhow::bail!("Cannot format code with syntax error");
+        return Err(FormatError::SyntaxErrors);
     }
     let root_node = source_file.tree.root_node();
     let comments_map = collect_comments(root_node);
@@ -63,13 +77,12 @@ pub fn format_source(source: &str, options: FormatOptions) -> anyhow::Result<Str
         options,
     };
 
-    let doc = decls::print_source_file(&ctx, &source_file)
-        .ok_or_else(|| anyhow!("Failed to format source"))?;
+    let doc = decls::print_source_file(&ctx, &source_file).ok_or(FormatError::Source)?;
     let mut out = Vec::new();
     doc.render(options.width, &mut out)
-        .map_err(|e| anyhow!("Failed to render: {e}"))?;
+        .map_err(FormatError::Render)?;
 
-    let res = String::from_utf8(out).map_err(|e| anyhow!("Invalid UTF-8: {e}"))?;
+    let res = String::from_utf8(out).map_err(FormatError::InvalidUtf8)?;
 
     // TODO: for some reason there are lines with whitespace only, trim manually for now
     Ok(res

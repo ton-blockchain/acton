@@ -59,6 +59,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
+    "check:mainnet-config": "bun scripts/check-mainnet-config.ts",
     "doctor": "CI=1 react-doctor",
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",

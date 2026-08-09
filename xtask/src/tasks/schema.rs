@@ -10,10 +10,13 @@ use schemars::r#gen::SchemaSettings;
 use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject};
 use schemars::{JsonSchema, Map};
 use tolk_linter::Linter;
+use ton_language_server_core::LanguageServerSettings;
 
 const ACTON_TOML_OUTPUT_PATH: &str = "crates/acton-config/schemas/acton.schema.json";
 const LINT_REPORT_OUTPUT_PATH: &str = "crates/acton-config/schemas/lint-report.schema.json";
 const MUTATION_RULES_OUTPUT_PATH: &str = "crates/acton-config/schemas/mutation-rules.schema.json";
+const LANGUAGE_SERVER_SETTINGS_OUTPUT_PATH: &str =
+    "crates/ton-language-server-core/schemas/language-server-settings.schema.json";
 const LINT_RULE_LEVEL_SCHEMA_NAME: &str = "LintRuleLevel";
 
 #[derive(Args)]
@@ -31,6 +34,7 @@ pub(crate) enum SchemaTarget {
     ActonToml,
     LintReport,
     MutationRules,
+    LanguageServerSettings,
 }
 
 impl SchemaTarget {
@@ -39,6 +43,7 @@ impl SchemaTarget {
             Self::ActonToml => ACTON_TOML_OUTPUT_PATH,
             Self::LintReport => LINT_REPORT_OUTPUT_PATH,
             Self::MutationRules => MUTATION_RULES_OUTPUT_PATH,
+            Self::LanguageServerSettings => LANGUAGE_SERVER_SETTINGS_OUTPUT_PATH,
         }
     }
 
@@ -47,6 +52,7 @@ impl SchemaTarget {
             Self::ActonToml => "Acton.toml",
             Self::LintReport => "lint JSON report",
             Self::MutationRules => "custom mutation rules",
+            Self::LanguageServerSettings => "language server settings",
         }
     }
 }
@@ -59,6 +65,7 @@ pub(crate) fn run(args: SchemaArgs) -> Result<()> {
         SchemaTarget::ActonToml => acton_toml_schema_content()?,
         SchemaTarget::LintReport => schema_content::<LintJsonReport>()?,
         SchemaTarget::MutationRules => schema_content::<CustomMutationRulesFile>()?,
+        SchemaTarget::LanguageServerSettings => language_server_settings_schema_content()?,
     };
 
     if args.check {
@@ -92,6 +99,15 @@ fn acton_toml_schema_content() -> Result<String> {
 
 fn schema_content<T: JsonSchema>() -> Result<String> {
     serialize_schema(&root_schema::<T>())
+}
+
+fn language_server_settings_schema_content() -> Result<String> {
+    let mut schema = root_schema::<LanguageServerSettings>();
+    schema.schema.metadata().default = Some(
+        serde_json::to_value(LanguageServerSettings::default())
+            .context("failed to serialize default language server settings")?,
+    );
+    serialize_schema(&schema)
 }
 
 fn root_schema<T: JsonSchema>() -> RootSchema {

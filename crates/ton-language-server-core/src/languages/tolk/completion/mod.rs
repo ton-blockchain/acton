@@ -29,6 +29,9 @@ impl TolkWorkspaceEngine {
         let context_started_at = profiler.start();
         let context = TolkCompletionContext::new(document, source_file, position)?;
         profiler.finish("tolk.completion.context", context_started_at);
+        let Some(context) = context else {
+            return Ok(CompletionList::default());
+        };
 
         let workspace_started_at = profiler.start();
         let (snapshot, paths, stdlib_path, mappings, contract_ids, wallet_names) = {

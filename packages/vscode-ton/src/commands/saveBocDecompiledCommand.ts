@@ -42,11 +42,11 @@ async function saveBoc(fileUri: vscode.Uri | undefined): Promise<void> {
 
   const decompileUri = actualFileUri.with({
     scheme: BocDecompilerProvider.scheme,
-    path: actualFileUri.path + ".decompiled.tasm",
+    path: `${actualFileUri.path}.decompiled.tasm`,
   })
   const content = await decompiler.provideTextDocumentContent(decompileUri)
 
-  const outputPath = actualFileUri.fsPath + ".decompiled.tasm"
+  const outputPath = `${actualFileUri.fsPath}.decompiled.tasm`
 
   const bytes = new TextEncoder().encode(content)
   await vscode.workspace.fs.writeFile(vscode.Uri.file(outputPath), bytes)

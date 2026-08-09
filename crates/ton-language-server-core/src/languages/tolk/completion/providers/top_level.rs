@@ -79,8 +79,8 @@ const TOP_LEVEL_SNIPPETS: &[(&str, &str, &str)] = &[
     ),
     (
         "asm fun",
-        " name() asm \"...\"",
-        "fun ${1:name}($2)$3 asm \"$0\"",
+        " name(): int asm \"...\"",
+        "fun ${1:name}($2): ${3:int} asm \"$0\"",
     ),
     (
         "method fun",

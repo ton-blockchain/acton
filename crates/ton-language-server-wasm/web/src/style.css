@@ -121,7 +121,7 @@ input[type="checkbox"] {
   min-width: 0;
 }
 
-#app-shell[data-show-acton-config="true"] #main-panel {
+#app-shell[data-show-config="true"] #main-panel {
   grid-template-rows: minmax(0, 1fr) minmax(160px, 30%);
 }
 
@@ -129,14 +129,36 @@ input[type="checkbox"] {
   min-height: 0;
 }
 
-#acton-config-editor-root {
+#config-panel {
   border-top: 1px solid #2a2f3a;
   display: none;
   min-height: 0;
+  min-width: 0;
 }
 
-#app-shell[data-show-acton-config="true"] #acton-config-editor-root {
+#app-shell[data-show-config="true"] #config-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#app-shell[data-show-acton-config="true"][data-show-settings="true"] #config-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#acton-config-editor-root,
+#settings-editor-root {
+  display: none;
+  min-height: 0;
+  min-width: 0;
+}
+
+#app-shell[data-show-acton-config="true"] #acton-config-editor-root,
+#app-shell[data-show-settings="true"] #settings-editor-root {
   display: block;
+}
+
+#app-shell[data-show-acton-config="true"][data-show-settings="true"] #settings-editor-root {
+  border-left: 1px solid #2a2f3a;
 }
 
 #side-panel {
@@ -193,6 +215,22 @@ input[type="checkbox"] {
   }
 
   #side-panel {
+    border-left: 0;
+    border-top: 1px solid #2a2f3a;
+  }
+}
+
+@media (max-width: 560px) {
+  #app-shell[data-show-acton-config="true"][data-show-settings="true"] #main-panel {
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 44%);
+  }
+
+  #app-shell[data-show-acton-config="true"][data-show-settings="true"] #config-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  #app-shell[data-show-acton-config="true"][data-show-settings="true"] #settings-editor-root {
     border-left: 0;
     border-top: 1px solid #2a2f3a;
   }

@@ -1001,6 +1001,7 @@ fn localnet_historical_fork_uses_block_config_and_time() {
             .ready_timeout(Duration::from_secs(5))
             .start()
     };
+    let fork_started_at = Instant::now();
     let node = start_fork("state/first.sqlite");
     let config_param = node.get_json("/api/v2/getConfigParam?param=8");
     let config_param_cell = Boc::decode_base64(
@@ -1019,6 +1020,9 @@ fn localnet_historical_fork_uses_block_config_and_time() {
     let mined_gen_utime = response_payload(&mined_header)["gen_utime"]
         .as_u64()
         .expect("masterchain block header must expose gen_utime") as u32;
+    let max_expected_gen_utime = FORK_GEN_UTIME
+        .saturating_add(u32::try_from(fork_started_at.elapsed().as_secs()).unwrap_or(u32::MAX))
+        .saturating_add(1);
 
     let snapshot = json!({
         "config": {
@@ -1027,7 +1031,8 @@ fn localnet_historical_fork_uses_block_config_and_time() {
                 == mocked_global_version_cell(GLOBAL_VERSION, GLOBAL_CAPABILITIES).repr_hash(),
         },
         "time": {
-            "mined_block_uses_fork_clock": (FORK_GEN_UTIME..=FORK_GEN_UTIME + 10).contains(&mined_gen_utime),
+            "mined_block_uses_fork_clock":
+                (FORK_GEN_UTIME..=max_expected_gen_utime).contains(&mined_gen_utime),
         }
     });
     assertion().eq(

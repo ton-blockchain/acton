@@ -82,14 +82,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": true,
     },
     {
+      "format": "duration",
       "label": "MC catchain lifetime",
       "value": 36,
     },
     {
+      "format": "duration",
       "label": "Shard catchain lifetime",
       "value": 37,
     },
     {
+      "format": "duration",
       "label": "Shard validators lifetime",
       "value": 38,
     },

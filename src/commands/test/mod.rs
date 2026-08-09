@@ -309,8 +309,8 @@ impl<'a> TestRunner<'a> {
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.effective_log_verbosity();
 
-        let execution_unixtime = if let Some(snapshot) = &self.fork_snapshot {
-            i64::from(snapshot.gen_utime)
+        let execution_now = if let Some(snapshot) = &self.fork_snapshot {
+            snapshot.gen_utime
         } else {
             let now = std::time::SystemTime::now();
             let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -323,7 +323,7 @@ impl<'a> TestRunner<'a> {
             verbosity,
             libs: Default::default(),
             address: dest_address.to_owned(),
-            unixtime: execution_unixtime,
+            unixtime: i64::from(execution_now),
             balance: "10".to_owned(),
             rand_seed: "0000000000000000000000000000000000000000000000000000000000000000"
                 .to_owned(),
@@ -350,9 +350,7 @@ impl<'a> TestRunner<'a> {
             None => AccountsState::Local(LocalAccountsState::new()),
         };
         let mut world_state = WorldState::new(state, Some(config_b64))?;
-        if let Some(snapshot) = &self.fork_snapshot {
-            world_state.set_now(snapshot.gen_utime);
-        }
+        world_state.set_now(execution_now);
 
         // Register all ref dependency to correct work
         for cell in self.ref_contracts.values() {

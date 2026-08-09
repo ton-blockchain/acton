@@ -7,7 +7,7 @@ use ton_language_server_core::{
     LanguageService, LanguageServiceConfig, Position, Range, TextEdit, TextIndex, WorkspaceConfig,
 };
 
-pub(super) struct CompletionTest<'a> {
+pub(crate) struct CompletionTest<'a> {
     source: &'a str,
     uri: &'a str,
     manifest: &'a str,
@@ -18,7 +18,7 @@ pub(super) struct CompletionTest<'a> {
 }
 
 impl<'a> CompletionTest<'a> {
-    pub(super) const fn new(source: &'a str) -> Self {
+    pub(crate) const fn new(source: &'a str) -> Self {
         Self {
             source,
             uri: "file:///workspace/main.tolk",
@@ -45,7 +45,7 @@ impl<'a> CompletionTest<'a> {
         self
     }
 
-    pub(super) fn labels(mut self, labels: &'a [&'a str]) -> Self {
+    pub(crate) fn labels(mut self, labels: &'a [&'a str]) -> Self {
         self.labels.extend_from_slice(labels);
         self
     }
@@ -55,12 +55,12 @@ impl<'a> CompletionTest<'a> {
         self
     }
 
-    pub(super) fn trigger_character(mut self, character: &'a str) -> Self {
+    pub(crate) fn trigger_character(mut self, character: &'a str) -> Self {
         self.trigger = CompletionTrigger::character(character);
         self
     }
 
-    pub(super) fn check(self, expected: Expect) {
+    pub(crate) fn check(self, expected: Expect) {
         let completion = self
             .complete()
             .unwrap_or_else(|error| panic!("completion test failed: {error:#}"));

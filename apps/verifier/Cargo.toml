@@ -1,7 +1,18 @@
 [package]
 name = "verifier"
-version = "0.1.0"
+description = "TON smart contract source verification service"
+version = { workspace = true }
 publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[workspace]
+
+[workspace.package]
+version = "0.1.0"
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.96.1"

@@ -16,7 +16,6 @@ import {WalletWebviewProvider} from "./providers/wallet/WalletWebviewProvider"
 import {ActonTomlCodeLensProvider} from "./acton/toml/ActonTomlCodeLensProvider"
 import {ActonTomlHoverProvider} from "./acton/toml/ActonTomlHoverProvider"
 import {ActonTolkCodeLensProvider} from "./acton/tolk/ActonTolkCodeLensProvider"
-import {ActonLinter} from "./acton/ActonLinter"
 import {ActonTestController} from "./acton/ActonTestController"
 import {registerActonRetraceDebugCommand} from "./acton/retrace/ActonRetraceDebug"
 import {registerActonSetupNotifications} from "./acton/ActonSetup"
@@ -49,11 +48,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const actonTomlCodeLensProvider = new ActonTomlCodeLensProvider()
   const actonTomlHoverProvider = new ActonTomlHoverProvider()
   const actonTestController = new ActonTestController()
-  const actonLinter = new ActonLinter()
   const actonAssemblyPreviewProvider = new ActonAssemblyPreviewProvider()
   actonAssemblyPreviewProvider.register(context)
   context.subscriptions.push(
-    actonLinter,
     actonTestController,
     vscode.languages.registerCodeLensProvider({language: "tolk"}, actonTolkCodeLensProvider),
     vscode.languages.registerCodeLensProvider(
@@ -150,7 +147,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidChange((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(
@@ -165,7 +162,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidDelete((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(
@@ -180,7 +177,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidCreate((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(

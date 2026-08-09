@@ -657,9 +657,9 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                     size="sm"
                     leadingIcon={<FileJson size={14} />}
                     disabled={blockActions.configSeqno === undefined}
-                    onClick={() =>
+                    onClick={event =>
                       blockActions.configSeqno !== undefined &&
-                      void navigate(routes.configPath(blockActions.configSeqno))
+                      openPath(routes.configPath(blockActions.configSeqno), event)
                     }
                   >
                     Config

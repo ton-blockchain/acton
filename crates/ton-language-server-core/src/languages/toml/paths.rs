@@ -103,8 +103,16 @@ fn resolve_configured_path(document_uri: &DocumentUri, configured_path: &str) ->
     fs::metadata(&normalized).ok().map(|_| normalized)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn path_uri(path: &Path) -> Option<String> {
     Url::from_file_path(path).ok().map(|uri| uri.to_string())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn path_uri(path: &Path) -> Option<String> {
+    let mut uri = Url::parse("file:///").ok()?;
+    uri.set_path(path.to_str()?);
+    Some(uri.to_string())
 }
 
 #[cfg(test)]

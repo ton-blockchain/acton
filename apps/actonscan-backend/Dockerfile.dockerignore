@@ -1,8 +1,6 @@
 *
 
 !Cargo.toml
-!Cargo.lock
-!rust-toolchain.toml
 !build.rs
 !src/
 !crates/
@@ -12,4 +10,11 @@ crates/**/target/
 !apps/
 apps/*
 !apps/actonscan-backend/
-apps/actonscan-backend/target/
+apps/actonscan-backend/*
+!apps/actonscan-backend/Cargo.toml
+!apps/actonscan-backend/Cargo.lock
+!apps/actonscan-backend/rust-toolchain.toml
+!apps/actonscan-backend/src/
+!apps/actonscan-backend/docker/
+apps/actonscan-backend/docker/*
+!apps/actonscan-backend/docker/config.toml

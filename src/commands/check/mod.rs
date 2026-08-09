@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, CheckOutputFormat, ContractConfig, LintLevel,
+    ActonConfig, CheckOutputFormat, ContractConfig, LintEntry, LintLevel as ConfigLintLevel,
     project_root as configured_project_root,
 };
 use anyhow::anyhow;
@@ -14,7 +14,7 @@ use std::str::FromStr;
 use std::time::Instant;
 use std::{fs, io};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, Severity};
-use tolk_linter::{Checker, Linter, Rule, Tolk};
+use tolk_linter::{Checker, LintLevel, Linter, Rule, RuleSettingsBuilder, Tolk};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::project_index::ProjectIndex;
@@ -351,6 +351,41 @@ fn parse_exact_rule_code(code: &str) -> Option<Rule> {
     Some(rule)
 }
 
+fn build_lint_settings(
+    config: &ActonConfig,
+    contract_name: Option<&str>,
+) -> HashMap<Rule, LintLevel> {
+    let mut settings = RuleSettingsBuilder::new();
+    let Some(rules) = config.lint.as_ref().and_then(|lint| lint.rules.as_ref()) else {
+        return settings.build();
+    };
+
+    settings.apply_rules(rules.entries.iter().filter_map(|(name, entry)| {
+        let LintEntry::Level(level) = entry else {
+            return None;
+        };
+        Some((name, lint_level(level)))
+    }));
+    if let Some(contract_name) = contract_name
+        && let Some(LintEntry::Config(overrides)) = rules.entries.get(contract_name)
+    {
+        settings.apply_rules(
+            overrides
+                .iter()
+                .map(|(name, level)| (name, lint_level(level))),
+        );
+    }
+    settings.build()
+}
+
+const fn lint_level(level: &ConfigLintLevel) -> LintLevel {
+    match level {
+        ConfigLintLevel::Allow => LintLevel::Allow,
+        ConfigLintLevel::Warn => LintLevel::Warn,
+        ConfigLintLevel::Deny => LintLevel::Deny,
+    }
+}
+
 fn apply_rules_filter(
     mut lint_settings: HashMap<Rule, LintLevel>,
     selected_rules: Option<&HashSet<Rule>>,
@@ -536,7 +571,7 @@ fn check_contract(
     }
 
     let root = dunce::canonicalize(source_path)?;
-    let lint_settings = Checker::build_settings(options.acton_config, Some(contract_id));
+    let lint_settings = build_lint_settings(options.acton_config, Some(contract_id));
     let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
     check_root_file(
@@ -567,7 +602,7 @@ fn check_test_file(
         );
     }
 
-    let mut lint_settings = Checker::build_settings(options.acton_config, None);
+    let mut lint_settings = build_lint_settings(options.acton_config, None);
     // we can import any files in tests
     lint_settings.insert(Rule::ActonImportInContract, LintLevel::Allow);
     // random is not so important in tests

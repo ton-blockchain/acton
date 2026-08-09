@@ -12,7 +12,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ton-objs = { workspace = true, features = ["tolk"] }
+ton-objs = { workspace = true, features = ["emulator", "tolk"] }
 tolk-source-map = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -22,6 +22,7 @@ dunce = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

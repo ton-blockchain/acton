@@ -14,6 +14,7 @@ import {
 import editorWorkerUrl from "@codingame/monaco-vscode-editor-api/esm/vs/editor/editor.worker.js?url"
 
 import LanguageServerWorker from "./language-server.worker?worker"
+import languageServerSettingsSchema from "../../../ton-language-server-core/schemas/language-server-settings.schema.json"
 import {
   defaultLanguageId,
   isSupportedLanguage,
@@ -91,7 +92,9 @@ type PersistedState = {
   logsVisible: boolean
   profileVisible: boolean
   actonTomlVisible: boolean
+  settingsVisible: boolean
   actonToml: string
+  settingsJson: string
   files: Record<SupportedLanguage, string>
 }
 
@@ -121,15 +124,20 @@ type SmokeApi = {
   setLogsVisible: (visible: boolean) => void
   setProfileVisible: (visible: boolean) => void
   setActonTomlVisible: (visible: boolean) => void
+  setSettingsVisible: (visible: boolean) => void
   setActonTomlText: (text: string) => void
+  setSettingsText: (text: string) => Promise<void>
   editorText: () => string
   actonTomlText: () => string
+  settingsText: () => string
   actonTomlLanguageId: () => string | undefined
+  settingsLanguageId: () => string | undefined
   languageId: () => string | undefined
 }
 
 const workspaceUri = vscode.Uri.file("/workspace")
 const actonTomlUri = vscode.Uri.file("/workspace/Acton.toml")
+const settingsUri = monaco.Uri.parse("inmemory://ton-language-server/settings.json")
 const storageKey = "ton-language-server-web-state:v1"
 const logLevelRequest = "ton/setLogLevel"
 const logsRequest = "ton/logs"
@@ -138,6 +146,11 @@ const profileRequest = "ton/profile"
 const addSourceFileRequest = "ton/addSourceFile"
 const removeSourceFileRequest = "ton/removeSourceFile"
 const setWorkspaceConfigRequest = "ton/setWorkspaceConfig"
+const defaultSettingsJson = JSON.stringify(
+  (languageServerSettingsSchema as {default?: unknown}).default ?? {},
+  null,
+  2,
+)
 
 const logLevels: readonly LogLevelName[] = ["off", "error", "warn", "info", "debug", "trace"]
 
@@ -156,13 +169,16 @@ export function App() {
   const currentLanguageRef = useRef(persisted.selectedLanguage)
   const editorRootRef = useRef<HTMLDivElement | null>(null)
   const actonConfigRootRef = useRef<HTMLDivElement | null>(null)
+  const settingsRootRef = useRef<HTMLDivElement | null>(null)
   const profileRootRef = useRef<HTMLDivElement | null>(null)
   const logsRootRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const actonConfigEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
+  const settingsEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const profileEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const logsEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const actonConfigModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
+  const settingsModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const profileModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const logsModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const profileRefreshTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | undefined>(
@@ -171,12 +187,16 @@ export function App() {
   const logsRefreshTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | undefined>(
     undefined,
   )
+  const settingsApplyTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | undefined>(
+    undefined,
+  )
   const switchingLanguageRef = useRef(false)
   const switchLanguageRef = useRef<(languageId: SupportedLanguage) => Promise<void>>(async () => {})
   const setLogLevelRef = useRef<(level: LogLevelName) => Promise<void>>(async () => {})
   const setLogsVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const setProfileVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const setActonTomlVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
+  const setSettingsVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const clearLogsRef = useRef<() => Promise<void>>(async () => {})
   const formatDocumentRef = useRef<() => Promise<void>>(async () => {})
 
@@ -236,6 +256,7 @@ export function App() {
         actonTomlLanguageSupport.id,
         actonTomlLanguageSupport.monarchLanguage,
       )
+      monaco.languages.register({id: "json", extensions: [".json"], aliases: ["JSON", "json"]})
       languagesRegistered = true
     }
 
@@ -267,9 +288,10 @@ export function App() {
     const start = async () => {
       const editorRoot = editorRootRef.current
       const actonConfigRoot = actonConfigRootRef.current
+      const settingsRoot = settingsRootRef.current
       const profileRoot = profileRootRef.current
       const logsRoot = logsRootRef.current
-      if (!editorRoot || !actonConfigRoot || !profileRoot || !logsRoot) {
+      if (!editorRoot || !actonConfigRoot || !settingsRoot || !profileRoot || !logsRoot) {
         throw new Error("TON LS editor roots are missing")
       }
 
@@ -312,6 +334,7 @@ export function App() {
           },
         },
         clientOptions: {
+          initializationOptions: settingsForInitialization(persistedRef.current.settingsJson),
           documentSelector: [
             ...languageSupports.map(language => ({
               language: language.id,
@@ -339,6 +362,19 @@ export function App() {
           throw new Error("language client is not available")
         }
         return client.sendRequest(method, params)
+      }
+
+      const applyLanguageServerSettings = async (text: string) => {
+        const model = settingsModelRef.current
+        const settings = parseSettingsJson(text)
+        if (model) {
+          monaco.editor.setModelMarkers(model, "language-server-settings", [])
+        }
+        const client = languageClient.getLanguageClient()
+        if (!client) {
+          throw new Error("language client is not available")
+        }
+        await client.sendNotification("workspace/didChangeConfiguration", {settings})
       }
 
       const applyWorkspaceConfig = async (text = persistedRef.current.actonToml) => {
@@ -409,9 +445,10 @@ export function App() {
         }
       }
 
-      const applyActonTomlVisibility = async () => {
+      const applyConfigVisibility = async () => {
         editorRef.current?.layout()
         actonConfigEditorRef.current?.layout()
+        settingsEditorRef.current?.layout()
       }
 
       const clearLogs = async () => {
@@ -476,6 +513,25 @@ export function App() {
         renderLineHighlight: "line",
         scrollBeyondLastLine: false,
       })
+
+      settingsModelRef.current = monaco.editor.createModel(
+        persistedRef.current.settingsJson,
+        "json",
+        settingsUri,
+      )
+      settingsEditorRef.current = monaco.editor.create(settingsRoot, {
+        automaticLayout: true,
+        fixedOverflowWidgets: true,
+        glyphMargin: false,
+        lineDecorationsWidth: 8,
+        lineNumbersMinChars: 3,
+        minimap: {enabled: false},
+        model: settingsModelRef.current,
+        padding: {top: 8, bottom: 8},
+        renderLineHighlight: "line",
+        scrollBeyondLastLine: false,
+      })
+      settingsModelRef.current.updateOptions({insertSpaces: true, tabSize: 2})
 
       profileModelRef.current = monaco.editor.createModel("No profiling data", "plaintext")
       profileEditorRef.current = monaco.editor.create(profileRoot, {
@@ -553,6 +609,47 @@ export function App() {
           }),
         )
       }
+      const settingsModel = settingsModelRef.current
+      if (settingsModel) {
+        disposables.push(
+          settingsModel.onDidChangeContent(() => {
+            const settingsJson = settingsModel.getValue()
+            persist(
+              {
+                ...persistedRef.current,
+                settingsJson,
+              },
+              false,
+            )
+            if (settingsApplyTimerRef.current !== undefined) {
+              globalThis.clearTimeout(settingsApplyTimerRef.current)
+            }
+            settingsApplyTimerRef.current = globalThis.setTimeout(() => {
+              settingsApplyTimerRef.current = undefined
+              void applyLanguageServerSettings(settingsJson)
+                .then(async () => {
+                  setStatus({state: "ready", text: "LS settings applied"})
+                  await refreshLogs()
+                  await refreshProfile()
+                })
+                .catch((error: unknown) => {
+                  const message = errorText(error)
+                  monaco.editor.setModelMarkers(settingsModel, "language-server-settings", [
+                    {
+                      severity: monaco.MarkerSeverity.Error,
+                      message,
+                      startLineNumber: 1,
+                      startColumn: 1,
+                      endLineNumber: settingsModel.getLineCount(),
+                      endColumn: settingsModel.getLineMaxColumn(settingsModel.getLineCount()),
+                    },
+                  ])
+                  setStatus({state: "error", text: message})
+                })
+            }, 300)
+          }),
+        )
+      }
 
       const switchLanguage = async (languageId: SupportedLanguage) => {
         if (languageId === currentLanguageRef.current) {
@@ -589,7 +686,8 @@ export function App() {
       setLogLevelRef.current = applyLogLevel
       setLogsVisibleRef.current = applyLogsVisibility
       setProfileVisibleRef.current = applyProfileVisibility
-      setActonTomlVisibleRef.current = applyActonTomlVisibility
+      setActonTomlVisibleRef.current = applyConfigVisibility
+      setSettingsVisibleRef.current = applyConfigVisibility
       clearLogsRef.current = clearLogs
 
       const flushCurrentFile = () => saveCurrentFile(currentLanguageRef.current)
@@ -605,7 +703,7 @@ export function App() {
       window.addEventListener("resize", layoutEditors)
       cleanupCallbacks.push(() => window.removeEventListener("resize", layoutEditors))
       await applyLogLevel(persistedRef.current.logLevel)
-      await applyActonTomlVisibility()
+      await applyConfigVisibility()
       await applyLogsVisibility(persistedRef.current.logsVisible)
       await applyProfileVisibility(persistedRef.current.profileVisible)
 
@@ -784,10 +882,22 @@ export function App() {
         },
         setActonTomlVisible(visible: boolean) {
           persist({...persistedRef.current, actonTomlVisible: visible})
-          void applyActonTomlVisibility()
+          void applyConfigVisibility()
+        },
+        setSettingsVisible(visible: boolean) {
+          persist({...persistedRef.current, settingsVisible: visible})
+          void applyConfigVisibility()
         },
         setActonTomlText(text: string) {
           actonConfigModelRef.current?.setValue(text)
+        },
+        async setSettingsText(text: string) {
+          settingsModelRef.current?.setValue(text)
+          if (settingsApplyTimerRef.current !== undefined) {
+            globalThis.clearTimeout(settingsApplyTimerRef.current)
+            settingsApplyTimerRef.current = undefined
+          }
+          await applyLanguageServerSettings(text)
         },
         editorText() {
           return editorRef.current?.getModel()?.getValue() ?? ""
@@ -795,8 +905,14 @@ export function App() {
         actonTomlText() {
           return actonConfigModelRef.current?.getValue() ?? ""
         },
+        settingsText() {
+          return settingsModelRef.current?.getValue() ?? ""
+        },
         actonTomlLanguageId() {
           return actonConfigModelRef.current?.getLanguageId()
+        },
+        settingsLanguageId() {
+          return settingsModelRef.current?.getLanguageId()
         },
         languageId() {
           return editorRef.current?.getModel()?.getLanguageId()
@@ -814,6 +930,7 @@ export function App() {
       function layoutEditors() {
         editorRef.current?.layout()
         actonConfigEditorRef.current?.layout()
+        settingsEditorRef.current?.layout()
         profileEditorRef.current?.layout()
         logsEditorRef.current?.layout()
       }
@@ -834,6 +951,9 @@ export function App() {
       if (profileRefreshTimerRef.current !== undefined) {
         globalThis.clearInterval(profileRefreshTimerRef.current)
       }
+      if (settingsApplyTimerRef.current !== undefined) {
+        globalThis.clearTimeout(settingsApplyTimerRef.current)
+      }
       for (const disposable of disposables) {
         disposable.dispose()
       }
@@ -842,6 +962,8 @@ export function App() {
       }
       actonConfigEditorRef.current?.dispose()
       actonConfigModelRef.current?.dispose()
+      settingsEditorRef.current?.dispose()
+      settingsModelRef.current?.dispose()
       profileEditorRef.current?.dispose()
       profileModelRef.current?.dispose()
       logsEditorRef.current?.dispose()
@@ -895,6 +1017,15 @@ export function App() {
     })
   }
 
+  const handleSettingsVisibleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const settingsVisible = event.currentTarget.checked
+    persist({...persistedRef.current, settingsVisible})
+    void setSettingsVisibleRef.current(settingsVisible).catch((error: unknown) => {
+      console.error(error)
+      setStatus({state: "error", text: errorText(error)})
+    })
+  }
+
   const handleClearLogs = () => {
     void clearLogsRef.current().catch((error: unknown) => {
       console.error(error)
@@ -915,6 +1046,8 @@ export function App() {
       data-show-logs={String(persisted.logsVisible)}
       data-show-profile={String(persisted.profileVisible)}
       data-show-acton-config={String(persisted.actonTomlVisible)}
+      data-show-settings={String(persisted.settingsVisible)}
+      data-show-config={String(persisted.actonTomlVisible || persisted.settingsVisible)}
       data-show-panel={String(persisted.logsVisible || persisted.profileVisible)}
     >
       <div id="toolbar">
@@ -974,6 +1107,15 @@ export function App() {
         </label>
         <label className="check-field">
           <input
+            id="settings-toggle"
+            type="checkbox"
+            checked={persisted.settingsVisible}
+            onChange={handleSettingsVisibleChange}
+          />
+          <span>LS settings</span>
+        </label>
+        <label className="check-field">
+          <input
             id="profile-toggle"
             type="checkbox"
             checked={persisted.profileVisible}
@@ -988,7 +1130,10 @@ export function App() {
       <div id="editor-shell">
         <div id="main-panel">
           <div id="monaco-editor-root" ref={editorRootRef} />
-          <div id="acton-config-editor-root" ref={actonConfigRootRef} />
+          <div id="config-panel">
+            <div id="acton-config-editor-root" ref={actonConfigRootRef} />
+            <div id="settings-editor-root" ref={settingsRootRef} />
+          </div>
         </div>
         <div id="side-panel">
           <div id="profile-editor-root" ref={profileRootRef} />
@@ -1059,7 +1204,9 @@ function loadState(): PersistedState {
     logsVisible: false,
     profileVisible: false,
     actonTomlVisible: false,
+    settingsVisible: false,
     actonToml: defaultActonTomlSource,
+    settingsJson: defaultSettingsJson,
     files: defaultFiles(),
   }
   const raw = localStorage.getItem(storageKey)
@@ -1074,7 +1221,10 @@ function loadState(): PersistedState {
       logsVisible: parsed.logsVisible === true,
       profileVisible: parsed.profileVisible === true,
       actonTomlVisible: parsed.actonTomlVisible === true,
+      settingsVisible: parsed.settingsVisible === true,
       actonToml: typeof parsed.actonToml === "string" ? parsed.actonToml : defaultActonTomlSource,
+      settingsJson:
+        typeof parsed.settingsJson === "string" ? parsed.settingsJson : defaultSettingsJson,
       files: readPersistedFiles(parsed.files),
     }
   } catch {
@@ -1100,6 +1250,22 @@ function readPersistedFiles(value: unknown): Record<SupportedLanguage, string> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function parseSettingsJson(text: string): Record<string, unknown> {
+  const settings: unknown = JSON.parse(text)
+  if (!isRecord(settings) || Array.isArray(settings)) {
+    throw new Error("LS settings must be a JSON object")
+  }
+  return settings
+}
+
+function settingsForInitialization(text: string): Record<string, unknown> {
+  try {
+    return parseSettingsJson(text)
+  } catch {
+    return parseSettingsJson(defaultSettingsJson)
+  }
 }
 
 function languageLabel(languageId: SupportedLanguage) {

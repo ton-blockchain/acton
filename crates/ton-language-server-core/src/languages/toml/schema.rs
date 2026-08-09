@@ -3,7 +3,7 @@ use crate::{DocumentSnapshot, DocumentUri};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use toml_syntax::{AstNode, Key, Pair, TopLevel, TryFromNode, Value as TomlValue};
+use toml_syntax::{AstNode, Key, Pair, TopLevel, Value as TomlValue};
 use ton_json_schema::{SchemaDoc, SchemaPathSegment, SchemaStore};
 use tree_sitter::Node;
 
@@ -288,18 +288,6 @@ pub(super) fn ancestor<'tree>(mut node: Node<'tree>, kind: &str) -> Option<Node<
     loop {
         if node.kind() == kind {
             return Some(node);
-        }
-        node = node.parent()?;
-    }
-}
-
-pub(super) fn ancestor_as<'tree, N>(mut node: Node<'tree>) -> Option<N>
-where
-    N: TryFromNode<'tree>,
-{
-    loop {
-        if let Ok(result) = N::try_from_node(node) {
-            return Some(result);
         }
         node = node.parent()?;
     }

@@ -390,7 +390,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
               <article className={styles.historyPanel}>
                 <header className={styles.historyPanelHeading}>
                   <span className={styles.summaryLabel}>Registry growth</span>
-                  <h3>Cumulative verified contracts</h3>
+                  <h3>Verified contracts by language</h3>
                 </header>
                 <div className={styles.historyChart}>
                   {isLoading ? (
@@ -442,7 +442,6 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                             fillOpacity={0.16}
                             isAnimationActive={false}
                             name={language.label}
-                            stackId="contracts"
                             stroke={language.color}
                             strokeWidth={2}
                             type="monotone"

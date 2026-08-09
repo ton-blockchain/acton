@@ -230,6 +230,21 @@
       {
         "title": "Editor › Inspections",
         "properties": {
+          "ton.tolk.diagnostics.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable Tolk diagnostics"
+          },
+          "ton.tolk.diagnostics.linter.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable Acton lint diagnostics"
+          },
+          "ton.tolk.diagnostics.compiler.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable native Tolk compiler diagnostics"
+          },
           "ton.func.inspections.disabled": {
             "type": "array",
             "items": {
@@ -327,16 +342,6 @@
             "type": "boolean",
             "default": true,
             "description": "Check for Acton CLI updates in Acton projects"
-          },
-          "ton.acton.linter.enabled": {
-            "type": "boolean",
-            "default": true,
-            "description": "Enable Acton linter (runs `acton check` on file changes)"
-          },
-          "ton.acton.linter.debounce": {
-            "type": "number",
-            "default": 100,
-            "description": "Debounce time in milliseconds for the Acton linter"
           }
         }
       }
@@ -618,16 +623,16 @@
     "onLanguage:toml"
   ],
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-icons": "^5.5.0",
     "smol-toml": "^1.6.1",
     "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.2.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "@types/vscode": "^1.88.0",
     "@vitejs/plugin-react": "^6.0.2",
     "@vscode/test-electron": "^2.4.1",

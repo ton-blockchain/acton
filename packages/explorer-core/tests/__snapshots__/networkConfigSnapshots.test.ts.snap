@@ -746,14 +746,17 @@ exports[`real network configuration snapshots parses mainnet config at mastercha
           "value": true,
         },
         {
+          "format": "duration",
           "label": "MC catchain lifetime",
           "value": 250,
         },
         {
+          "format": "duration",
           "label": "Shard catchain lifetime",
           "value": 250,
         },
         {
+          "format": "duration",
           "label": "Shard validators lifetime",
           "value": 1000,
         },
@@ -6971,14 +6974,17 @@ exports[`real network configuration snapshots parses testnet config at mastercha
           "value": true,
         },
         {
+          "format": "duration",
           "label": "MC catchain lifetime",
           "value": 250,
         },
         {
+          "format": "duration",
           "label": "Shard catchain lifetime",
           "value": 250,
         },
         {
+          "format": "duration",
           "label": "Shard validators lifetime",
           "value": 1000,
         },

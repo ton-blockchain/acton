@@ -1,5 +1,9 @@
 use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
-use crate::{DocumentSnapshot, InlayHint, InlayHintKind, Position, Range};
+use crate::{
+    DocumentSnapshot, InlayHint, InlayHintKind, InlayHintLabel, InlayHintLabelPart, Location,
+    Position, Range,
+};
+use std::sync::Arc;
 use tolk_analysis::{
     ConstantEvaluationContext, ConstantEvaluator, ConstantValue, compute_get_method_id,
     is_simple_literal,
@@ -8,7 +12,7 @@ use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
 use tolk_resolver::{AstNodeSpanExt, FileDb, FileId, ProjectIndex, Resolved, Span, SymbolKind};
 use tolk_syntax::ast::expressions::{Call, Expr};
 use tolk_syntax::{AstNode, BaseFunction, HasName, TopLevel, TryFromNode};
-use tolk_ty::{InferenceResult, TyId, TypeInterner};
+use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 
 impl TolkWorkspaceEngine {
     pub(super) fn inlay_hints(&self, document: &DocumentSnapshot, range: Range) -> Vec<InlayHint> {
@@ -53,7 +57,7 @@ impl TolkResolveSnapshot {
                 let Some(inference) = inferences.get(&symbol.id) else {
                     continue;
                 };
-                let _ = collect_local_hint(inference, &self.type_interner, local, &mut builder);
+                let _ = collect_local_hint(self, inference, local, &mut builder);
             }
         }
 
@@ -65,18 +69,8 @@ impl TolkResolveSnapshot {
                 if !builder.intersects_span(declaration.span()) {
                     continue;
                 }
-                let _ = collect_return_type_hint(
-                    inference,
-                    &self.type_interner,
-                    &declaration,
-                    &mut builder,
-                );
-                let _ = collect_constant_hint(
-                    inference,
-                    &self.type_interner,
-                    &declaration,
-                    &mut builder,
-                );
+                let _ = collect_return_type_hint(self, inference, &declaration, &mut builder);
+                let _ = collect_constant_hint(self, inference, &declaration, &mut builder);
             }
         }
 
@@ -159,16 +153,17 @@ impl<'a> TolkInlayHintsBuilder<'a> {
         }
     }
 
-    fn add_type_hint_at_span(&mut self, span: Span, typ: String) {
-        self.add_type_hint(self.position_for_offset(span.end()), typ);
+    fn add_type_hint_at_span(&mut self, span: Span, snapshot: &TolkResolveSnapshot, ty_id: TyId) {
+        self.add_type_hint(self.position_for_offset(span.end()), snapshot, ty_id);
     }
 
-    fn add_type_hint(&mut self, position: Position, typ: String) {
-        self.add_hint(InlayHint::new(
-            position,
-            format!(": {typ}"),
-            InlayHintKind::Type,
-        ));
+    fn add_type_hint(&mut self, position: Position, snapshot: &TolkResolveSnapshot, ty_id: TyId) {
+        let typ = snapshot.type_interner.format(ty_id);
+        let mut hint = InlayHint::new(position, format!(": {typ}"), InlayHintKind::Type);
+        if let Some(parts) = type_hint_label_parts(snapshot, ty_id, &typ) {
+            hint.label = InlayHintLabel::Parts(parts);
+        }
+        self.add_hint(hint);
     }
 
     fn add_hint(&mut self, hint: InlayHint) {
@@ -195,15 +190,15 @@ impl<'a> TolkInlayHintsBuilder<'a> {
         self.hints.sort_by(|left, right| {
             left.position
                 .cmp(&right.position)
-                .then(left.label.cmp(&right.label))
+                .then_with(|| left.label.text().cmp(&right.label.text()))
         });
         self.hints
     }
 }
 
 fn collect_local_hint(
+    snapshot: &TolkResolveSnapshot,
     inference: &InferenceResult,
-    interner: &TypeInterner,
     local: &LocalDef,
     builder: &mut TolkInlayHintsBuilder<'_>,
 ) -> Option<()> {
@@ -223,21 +218,21 @@ fn collect_local_hint(
         return None;
     }
     let ty_id = inference.type_of(local.def_span)?;
-    if is_undefined_type(interner, ty_id) {
+    if is_undefined_type(&snapshot.type_interner, ty_id) {
         return None;
     }
-    builder.add_type_hint_at_span(local.def_span, interner.format(ty_id));
+    builder.add_type_hint_at_span(local.def_span, snapshot, ty_id);
     Some(())
 }
 
 fn collect_return_type_hint(
+    snapshot: &TolkResolveSnapshot,
     inference: &InferenceResult,
-    interner: &TypeInterner,
     declaration: &TopLevel<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
 ) -> Option<()> {
     let return_ty = inference.inferred_return_type?;
-    if is_undefined_type(interner, return_ty) {
+    if is_undefined_type(&snapshot.type_interner, return_ty) {
         return None;
     }
 
@@ -254,14 +249,15 @@ fn collect_return_type_hint(
     let parameters = function.parameter_list()?;
     builder.add_type_hint(
         builder.position_for_offset(parameters.syntax().end_byte()),
-        interner.format(return_ty),
+        snapshot,
+        return_ty,
     );
     Some(())
 }
 
 fn collect_constant_hint(
+    snapshot: &TolkResolveSnapshot,
     inference: &InferenceResult,
-    interner: &TypeInterner,
     declaration: &TopLevel<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
 ) -> Option<()> {
@@ -280,11 +276,11 @@ fn collect_constant_hint(
     }
 
     let ty_id = inference.type_of(expression.span())?;
-    if is_undefined_type(interner, ty_id) {
+    if is_undefined_type(&snapshot.type_interner, ty_id) {
         return None;
     }
 
-    builder.add_type_hint_at_span(name.span(), interner.format(ty_id));
+    builder.add_type_hint_at_span(name.span(), snapshot, ty_id);
     Some(())
 }
 
@@ -303,6 +299,107 @@ fn has_obvious_type(expression: &Expr<'_>, source: &str) -> bool {
 
 fn is_undefined_type(interner: &TypeInterner, ty_id: TyId) -> bool {
     ty_id == interner.ty_undefined
+}
+
+fn type_hint_label_parts(
+    snapshot: &TolkResolveSnapshot,
+    ty_id: TyId,
+    formatted: &str,
+) -> Option<Vec<InlayHintLabelPart>> {
+    let mut linked_names = Vec::new();
+    collect_linked_type_names(snapshot, ty_id, &mut linked_names);
+
+    let label = format!(": {formatted}");
+    let mut parts = Vec::new();
+    let mut rest = label.as_str();
+    let mut has_link = false;
+    for (name, location) in linked_names {
+        let Some(index) = rest.find(name.as_ref()) else {
+            continue;
+        };
+        if index != 0 {
+            parts.push(InlayHintLabelPart::plain(&rest[..index]));
+        }
+        parts.push(InlayHintLabelPart::linked(name.as_ref(), location));
+        rest = &rest[index + name.len()..];
+        has_link = true;
+    }
+    if !rest.is_empty() {
+        parts.push(InlayHintLabelPart::plain(rest));
+    }
+    has_link.then_some(parts)
+}
+
+fn collect_linked_type_names(
+    snapshot: &TolkResolveSnapshot,
+    ty_id: TyId,
+    names: &mut Vec<(Arc<str>, Location)>,
+) {
+    match snapshot.type_interner.data(ty_id) {
+        TyData::MapKV { key, value } => {
+            collect_linked_type_names(snapshot, *key, names);
+            collect_linked_type_names(snapshot, *value, names);
+        }
+        TyData::Tuple(types) | TyData::Tensor(types) | TyData::Union(types) => {
+            for ty in types {
+                collect_linked_type_names(snapshot, *ty, names);
+            }
+        }
+        TyData::Array(ty) => collect_linked_type_names(snapshot, *ty, names),
+        TyData::Func { params, return_ty } => {
+            for ty in params {
+                collect_linked_type_names(snapshot, *ty, names);
+            }
+            collect_linked_type_names(snapshot, *return_ty, names);
+        }
+        TyData::Struct {
+            name, args, def, ..
+        }
+        | TyData::TypeAlias {
+            name, args, def, ..
+        } => {
+            add_linked_type_name(snapshot, name, *def, names);
+            for ty in args.iter().flatten() {
+                collect_linked_type_names(snapshot, *ty, names);
+            }
+        }
+        TyData::Enum { name, def, .. } => add_linked_type_name(snapshot, name, *def, names),
+        TyData::GenericTypeWithTs { inner_ty, types } => {
+            if let Some(symbol_id) = snapshot.type_symbol(*inner_ty)
+                && let Some(name) = named_type_name(&snapshot.type_interner, *inner_ty)
+            {
+                add_linked_type_name(snapshot, name, symbol_id, names);
+            }
+            for ty in types {
+                collect_linked_type_names(snapshot, *ty, names);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn named_type_name(interner: &TypeInterner, ty_id: TyId) -> Option<&Arc<str>> {
+    match interner.data(ty_id) {
+        TyData::Struct { name, .. }
+        | TyData::Enum { name, .. }
+        | TyData::TypeAlias { name, .. } => Some(name),
+        _ => None,
+    }
+}
+
+fn add_linked_type_name(
+    snapshot: &TolkResolveSnapshot,
+    name: &Arc<str>,
+    symbol_id: tolk_resolver::SymbolId,
+    names: &mut Vec<(Arc<str>, Location)>,
+) {
+    if let Some(location) = snapshot
+        .location_for_resolved(&Resolved::Global(symbol_id))
+        .into_iter()
+        .next()
+    {
+        names.push((name.clone(), location));
+    }
 }
 
 fn collect_parameter_hints(
@@ -361,9 +458,9 @@ fn collect_call_parameter_hints(
         ),
         _ => return None,
     };
-    let parameters = parameters.iter().skip(usize::from(skip_self));
+    let parameters = parameters.iter().enumerate().skip(usize::from(skip_self));
 
-    for (parameter, argument) in parameters.zip(call.arguments()) {
+    for ((parameter_index, parameter), argument) in parameters.zip(call.arguments()) {
         let name = parameter.name.as_ref();
         if name.chars().count() == 1 || name == "constString" {
             continue;
@@ -389,14 +486,48 @@ fn collect_call_parameter_hints(
         {
             continue;
         }
+        if let Expr::NotNull(not_null) = expression
+            && not_null
+                .inner()
+                .is_some_and(|inner| inner.text(source) == name)
+        {
+            continue;
+        }
 
-        builder.add_hint(InlayHint::new(
+        let mut hint = InlayHint::new(
             builder.position_for_offset(argument.syntax().start_byte()),
             format!("{name}:"),
             InlayHintKind::Parameter,
-        ));
+        );
+        if let Some(location) = parameter_hint_location(snapshot, symbol.id, parameter_index) {
+            hint.label = InlayHintLabel::Parts(vec![
+                InlayHintLabelPart::linked(name, location),
+                InlayHintLabelPart::plain(":"),
+            ]);
+        }
+        builder.add_hint(hint);
     }
     Some(())
+}
+
+fn parameter_hint_location(
+    snapshot: &TolkResolveSnapshot,
+    symbol_id: tolk_resolver::SymbolId,
+    parameter_index: usize,
+) -> Option<Location> {
+    let file = snapshot.file_db.get_by_id(symbol_id.file_id)?;
+    let declaration = file.find_syntax_declaration(symbol_id)?;
+    let function = match declaration {
+        TopLevel::Func(function) => BaseFunction::Function(function),
+        TopLevel::Method(method) => BaseFunction::MethodDeclaration(method),
+        TopLevel::GetMethod(method) => BaseFunction::GetMethodDeclaration(method),
+        _ => return None,
+    };
+    let name = function.parameters().nth(parameter_index)?.name()?;
+    snapshot
+        .location_for_span(symbol_id.file_id, name.span())
+        .into_iter()
+        .next()
 }
 
 fn collect_constant_value_hint(

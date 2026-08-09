@@ -13,6 +13,7 @@ license = { workspace = true }
 [features]
 default = ["all-languages"]
 all-languages = ["tlb", "tasm", "fift", "tolk", "toml"]
+schema = ["dep:schemars"]
 tlb = ["dep:tlb-syntax"]
 tasm = ["dep:tasm-syntax"]
 fift = ["dep:fift-syntax"]
@@ -22,24 +23,31 @@ tolk = [
     "dep:rustc-hash",
     "dep:tolk-analysis",
     "dep:tolk-fmt",
+    "dep:tolk-linter",
     "dep:tolk-resolver",
     "dep:tolk-syntax",
     "dep:tolk-ty",
     "dep:toml",
 ]
+tolk-compiler = ["tolk", "dep:dunce", "dep:tolk-compiler"]
 
 [dependencies]
 anyhow = { workspace = true }
+dunce = { workspace = true, optional = true }
 include_dir = { workspace = true, optional = true }
 rustc-hash = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 fift-syntax = { workspace = true, optional = true }
 tasm-syntax = { workspace = true, optional = true }
 tlb-syntax = { workspace = true, optional = true }
 tolk-resolver = { workspace = true, optional = true }
 tolk-analysis = { workspace = true, optional = true }
+tolk-compiler = { workspace = true, optional = true }
 tolk-fmt = { workspace = true, optional = true }
+tolk-linter = { workspace = true, optional = true }
 tolk-syntax = { workspace = true, optional = true }
 tolk-ty = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
@@ -49,6 +57,7 @@ ton-syntax = { workspace = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
 url = { workspace = true }
+urlencoding = { workspace = true }
 web-time = { workspace = true }
 
 [dev-dependencies]
@@ -181,6 +190,16 @@ path = "tests/languages/tolk/folding.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_selection_ranges"
+path = "tests/languages/tolk/selection_ranges.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_diagnostics"
+path = "tests/languages/tolk/diagnostics.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_hover"
 path = "tests/languages/tolk/hover.rs"
 required-features = ["tolk"]
@@ -243,6 +262,11 @@ required-features = ["tolk"]
 [[test]]
 name = "tolk_references"
 path = "tests/languages/tolk/references.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_call_hierarchy"
+path = "tests/languages/tolk/call_hierarchy.rs"
 required-features = ["tolk"]
 
 [[test]]

@@ -10,6 +10,7 @@ use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::fs;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Compiles passed file with Tolk compiler.
 ///
@@ -83,6 +84,8 @@ pub struct Compiler {
     pub allow_no_entrypoint: bool,
     /// Mappings for paths (e.g. "@core" -> "/path/to/core")
     pub mappings: FxHashMap<String, String>,
+    /// In-memory sources that take precedence over files on disk.
+    source_overrides: FxHashMap<PathBuf, Arc<str>>,
 }
 
 impl Compiler {
@@ -94,6 +97,7 @@ impl Compiler {
             with_src_line_comments: true,
             allow_no_entrypoint: false,
             mappings: FxHashMap::default(),
+            source_overrides: FxHashMap::default(),
         }
     }
 
@@ -115,6 +119,28 @@ impl Compiler {
         if let Some(mappings) = mappings {
             self.mappings = mappings.clone().into_iter().collect();
         }
+        self
+    }
+
+    /// Supplies in-memory source files that take precedence over files on disk.
+    ///
+    /// Paths are canonicalized when possible. Non-existent paths are preserved, which allows
+    /// editor integrations to compile newly created, unsaved files.
+    #[must_use]
+    pub fn with_source_overrides<I, P, S>(mut self, sources: I) -> Self
+    where
+        I: IntoIterator<Item = (P, S)>,
+        P: Into<PathBuf>,
+        S: Into<Arc<str>>,
+    {
+        self.source_overrides = sources
+            .into_iter()
+            .map(|(path, source)| {
+                let path = path.into();
+                let path = dunce::canonicalize(&path).unwrap_or(path);
+                (path, source.into())
+            })
+            .collect();
         self
     }
 
@@ -194,6 +220,7 @@ impl Compiler {
     ) -> anyhow::Result<TBody> {
         let mut callback_context = FsCallbackContext {
             mappings: self.mappings.clone(),
+            source_overrides: self.source_overrides.clone(),
         };
 
         let config = serde_json::to_string(&CompilerConfig {
@@ -299,6 +326,8 @@ impl Compiler {
                                 unsafe { *dest_error = raw_str.into_raw() };
                                 return;
                             }
+                        } else if let Some(content) = callback_context.source(file_path) {
+                            content.to_owned()
                         } else {
                             match read_to_string(file_path) {
                                 Ok(content) => content,
@@ -341,6 +370,7 @@ impl Compiler {
 
 struct FsCallbackContext {
     mappings: FxHashMap<String, String>,
+    source_overrides: FxHashMap<PathBuf, Arc<str>>,
 }
 
 impl FsCallbackContext {
@@ -355,6 +385,9 @@ impl FsCallbackContext {
 
     fn realpath(&self, path_str: &str) -> Result<PathBuf, String> {
         if Path::new(path_str).is_absolute() {
+            if let Some(path) = self.source_path(Path::new(path_str)) {
+                return Ok(path);
+            }
             Self::fail_if_symlink(Path::new(path_str))?;
             return dunce::canonicalize(path_str).map_err(|e| e.to_string());
         }
@@ -375,12 +408,33 @@ impl FsCallbackContext {
                 .ok_or_else(|| format!("Unknown path mapping '{prefix}'"))?;
             let cur_mapped_path = Path::new(target).join(suffix);
 
+            if let Some(path) = self.source_path(&cur_mapped_path) {
+                return Ok(path);
+            }
             Self::fail_if_symlink(&cur_mapped_path)?;
             return dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string());
         }
 
+        if let Some(path) = self.source_path(Path::new(path_str)) {
+            return Ok(path);
+        }
         Self::fail_if_symlink(Path::new(path_str))?;
         dunce::canonicalize(path_str).map_err(|e| e.to_string())
+    }
+
+    fn source_path(&self, path: &Path) -> Option<PathBuf> {
+        if self.source_overrides.contains_key(path) {
+            return Some(path.to_owned());
+        }
+        let canonical = dunce::canonicalize(path).ok()?;
+        self.source_overrides
+            .contains_key(&canonical)
+            .then_some(canonical)
+    }
+
+    fn source(&self, path: &str) -> Option<&str> {
+        let path = self.source_path(Path::new(path))?;
+        self.source_overrides.get(&path).map(AsRef::as_ref)
     }
 }
 
@@ -534,7 +588,8 @@ type WasmFsReadCallback = Option<
 
 #[cfg(test)]
 mod tests {
-    use super::CompilerError;
+    use super::{Compiler, CompilerError};
+    use std::sync::Arc;
 
     #[test]
     fn compiler_error_deserializes_warning_flag() {
@@ -575,5 +630,42 @@ mod tests {
         .expect("failed to deserialize compiler error");
 
         assert!(!error.is_warning);
+    }
+
+    #[test]
+    fn compiler_reads_a_nonexistent_source_from_memory() {
+        let directory = tempfile::tempdir().expect("failed to create temporary directory");
+        let path = directory.path().join("new.tolk");
+        let errors = Compiler::new(2)
+            .with_allow_no_entrypoint(true)
+            .with_source_overrides([(
+                path.clone(),
+                Arc::<str>::from("fun helper(): int { return 1; }\n"),
+            )])
+            .check(&path)
+            .expect("compiler failed to read in-memory source");
+
+        assert!(errors.is_empty(), "unexpected compiler errors: {errors:?}");
+    }
+
+    #[test]
+    fn in_memory_source_takes_precedence_over_disk() {
+        let directory = tempfile::tempdir().expect("failed to create temporary directory");
+        let path = directory.path().join("main.tolk");
+        std::fs::write(&path, "fun helper(): int { return 1; }\n")
+            .expect("failed to write source file");
+        let errors = Compiler::new(2)
+            .with_allow_no_entrypoint(true)
+            .with_source_overrides([(
+                path.clone(),
+                Arc::<str>::from("fun helper(): int { return missingName; }\n"),
+            )])
+            .check(&path)
+            .expect("compiler failed to read in-memory source");
+
+        assert!(
+            !errors.is_empty(),
+            "compiler unexpectedly read the disk source"
+        );
     }
 }

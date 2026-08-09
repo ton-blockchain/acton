@@ -112,7 +112,7 @@ export interface NetworkConfig {
   readonly rawHex: string
 }
 
-interface ConfigParameterMetadata {
+export interface ConfigParameterMetadata {
   readonly title: string
   readonly description: string
 }
@@ -478,6 +478,13 @@ const EXTENSION_PARAMETER_METADATA: ConfigParameterMetadata = {
     "Negative configuration identifiers are reserved for implementation-specific extension data",
 }
 
+export function getConfigParameterMetadata(id: number): ConfigParameterMetadata {
+  return (
+    CONFIG_PARAMETER_METADATA[id] ??
+    (id < 0 ? EXTENSION_PARAMETER_METADATA : UNKNOWN_PARAMETER_METADATA)
+  )
+}
+
 export function parseNetworkConfig(rawBoc: string): NetworkConfig {
   const rootCell = Cell.fromBase64(rawBoc)
   const {config, configAddress} = readConfigState(rootCell)
@@ -546,9 +553,7 @@ function loadConfigDictionary(rootCell: Cell): Dictionary<number, Cell> {
 }
 
 function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
-  const metadata =
-    CONFIG_PARAMETER_METADATA[id] ??
-    (id < 0 ? EXTENSION_PARAMETER_METADATA : UNKNOWN_PARAMETER_METADATA)
+  const metadata = getConfigParameterMetadata(id)
   const parameter: NetworkConfigParameter = {
     id,
     title: metadata.title,
@@ -1043,6 +1048,13 @@ function configurationValueFormat(
 
   if (kind === "MsgForwardPrices" && ["bit_price", "_cell_price"].includes(key)) {
     return "gram-per-65536"
+  }
+
+  if (
+    kind?.startsWith("CatchainConfig") &&
+    ["mc_catchain_lifetime", "shard_catchain_lifetime", "shard_validators_lifetime"].includes(key)
+  ) {
+    return "duration"
   }
 
   return configurationFieldFormat(key)

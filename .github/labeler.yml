@@ -125,17 +125,22 @@
       - any-glob-to-any-file:
           - "packages/**"
 
+"actonscan":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/actonscan-backend/**"
+
 "faucet":
   - changed-files:
       - any-glob-to-any-file:
           - "apps/faucet/**"
 
-"verifier":
-  - changed-files:
-      - any-glob-to-any-file:
-          - "apps/verifier/**"
-
 "localton":
   - changed-files:
       - any-glob-to-any-file:
           - "apps/localton/**"
+
+"verifier":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/verifier/**"

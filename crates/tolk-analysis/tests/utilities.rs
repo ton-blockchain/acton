@@ -126,6 +126,7 @@ fn formats_constant_values() {
     let values = [
         ConstantValue::Int(BigInt::from(0)),
         ConstantValue::Int(BigInt::from(31)),
+        ConstantValue::Int(BigInt::from(-1)),
         ConstantValue::Int(BigInt::from(1_u64 << 32)),
         ConstantValue::Bool(true),
         ConstantValue::String("acton".to_owned()),
@@ -141,6 +142,7 @@ fn formats_constant_values() {
     expect![[r#"
         0
         31 (0x1F)
+        -0x1
         0x100000000
         true
         "acton"

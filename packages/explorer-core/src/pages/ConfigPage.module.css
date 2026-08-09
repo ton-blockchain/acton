@@ -240,6 +240,21 @@
   background: var(--acton-color-surface);
 }
 
+.configValueLink {
+  color: var(--acton-color-accent);
+  font-weight: var(--acton-font-weight-medium);
+  text-decoration: none;
+}
+
+.configValueLink:hover {
+  text-decoration: underline;
+}
+
+.configValueLink:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
 .validatorSetValue {
   background: var(--acton-color-surface);
 }
@@ -259,6 +274,11 @@
 
 .validatorWeight {
   white-space: nowrap;
+}
+
+.validatorWeightShare {
+  font-variant-numeric: tabular-nums;
+  cursor: help;
 }
 
 .validatorListFade {
@@ -303,6 +323,14 @@
 .validatorShowMore:focus-visible {
   outline: 2px solid var(--acton-color-focus-ring);
   outline-offset: 2px;
+}
+
+.validatorShowLess {
+  position: static;
+  display: flex;
+  width: fit-content;
+  margin: 8px auto 0;
+  transform: none;
 }
 
 .validatorShowMoreExpanded {
@@ -404,6 +432,16 @@
 .configParameterIdAnchor .parameterAnchorIcon {
   width: 14px;
   height: 14px;
+}
+
+.configParameterIdTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.configParameterIdTooltip strong {
+  font-weight: var(--acton-font-weight-semibold);
 }
 
 .configParameterIdEmpty {

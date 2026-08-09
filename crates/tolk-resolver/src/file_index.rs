@@ -10,7 +10,9 @@ use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast};
+use tolk_syntax::{
+    AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast, clean_comment,
+};
 use tree_sitter::Node;
 
 /// Represents a byte range in the source code.
@@ -182,8 +184,8 @@ pub struct Symbol {
     pub name_span: Span,
     /// Span of the entire declaration body (useful for "document symbols").
     pub body_span: Span,
-    /// Span of the associated documentation comment (if any).
-    pub doc_span: Option<Span>,
+    /// Documentation associated with this symbol.
+    pub doc: Arc<str>,
     /// If this symbol is deprecated.
     pub is_deprecated: bool,
     /// If this symbol is marked as `@pure`.
@@ -260,6 +262,26 @@ pub enum SymbolKind {
     },
 }
 
+/// A contract header indexed separately from ordinary Tolk symbols.
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct IndexedContract {
+    pub name: Arc<str>,
+    pub name_span: Span,
+    pub body_span: Span,
+    pub doc: Arc<str>,
+    pub fields: Vec<IndexedContractField>,
+}
+
+/// A field declared in an indexed contract header.
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct IndexedContractField {
+    pub name: Arc<str>,
+    pub value: Arc<str>,
+    pub name_span: Span,
+    pub body_span: Span,
+    pub doc: Arc<str>,
+}
+
 impl Symbol {
     /// Returns `true` if this declaration defines a type (struct, enum, or alias).
     #[must_use]
@@ -322,6 +344,8 @@ pub struct FileIndex {
     pub imports: Vec<Import>,
     /// List of top-level declarations in this file.
     pub decls: Vec<Symbol>,
+    /// Contract header, which is indexed but does not participate in name resolution.
+    pub contract: Option<IndexedContract>,
     /// Mapping from `local_id` of the [`SymbolId`] to index in tree root children.
     pub symbol_id_to_decl_index: BTreeMap<u32, usize>, // SymbolId.local_id to idx in top levels
     /// Sorted list of spans for top-level declarations, used for efficient lookup.
@@ -329,6 +353,26 @@ pub struct FileIndex {
 }
 
 impl FileIndex {
+    #[must_use]
+    pub fn find_contract_at(&self, offset: usize) -> Option<&IndexedContract> {
+        self.contract
+            .as_ref()
+            .filter(|contract| contract.name_span.contains(offset))
+    }
+
+    #[must_use]
+    pub fn find_contract_field_at(
+        &self,
+        offset: usize,
+    ) -> Option<(&IndexedContract, &IndexedContractField)> {
+        let contract = self.contract.as_ref()?;
+        contract
+            .fields
+            .iter()
+            .find(|field| field.name_span.contains(offset))
+            .map(|field| (contract, field))
+    }
+
     /// Returns whether replacing this file leaves project-wide lookup tables valid.
     ///
     /// Declaration spans and semantic metadata may change. Import paths and every
@@ -442,16 +486,20 @@ impl FileIndex {
 
         let mut decls = vec![];
         let mut imports = vec![];
+        let mut contract = None;
 
         let mut local_id: u32 = 0;
 
         let mut symbol_id_to_decl_index = BTreeMap::new();
 
         for (idx, decl) in file.top_levels().enumerate() {
+            if let tolk_syntax::TopLevel::Contract(contract_ast) = decl {
+                contract = Self::extract_contract(file, contract_ast);
+                continue;
+            }
             if matches!(
                 decl,
                 tolk_syntax::TopLevel::TolkRequiredVersion(_)
-                    | tolk_syntax::TopLevel::Contract(_)
                     | tolk_syntax::TopLevel::EmptyStmt(_)
                     | tolk_syntax::TopLevel::Unmapped(_)
             ) {
@@ -465,7 +513,7 @@ impl FileIndex {
             let fqn = name.clone();
             let id = SymbolId { file_id, local_id };
             let body_span = decl.span();
-            let doc_span = None; // TODO: future work
+            let doc = extract_preceding_documentation(decl.syntax(), content);
             let is_deprecated = Self::is_deprecated(content, decl);
             let is_pure = Self::is_pure(content, decl);
 
@@ -477,7 +525,7 @@ impl FileIndex {
                     kind: SymbolKind::GlobalVariable,
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
                     is_private: false,
@@ -489,7 +537,7 @@ impl FileIndex {
                     kind: SymbolKind::Constant,
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
                     is_private: false,
@@ -507,7 +555,7 @@ impl FileIndex {
                     },
                     name_span,
                     body_span,
-                    doc_span,
+                    doc,
                     is_deprecated,
                     is_pure,
                     is_private: false,
@@ -524,7 +572,7 @@ impl FileIndex {
                             let fqn = Arc::from(format!("{struct_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
-                            let doc_span = None;
+                            let doc = extract_field_documentation(f.syntax(), content);
                             Some(Symbol {
                                 id,
                                 name,
@@ -532,7 +580,7 @@ impl FileIndex {
                                 kind: SymbolKind::StructField,
                                 name_span,
                                 body_span,
-                                doc_span,
+                                doc,
                                 is_deprecated: false,
                                 is_pure: false,
                                 is_private: f.has_private(),
@@ -550,7 +598,7 @@ impl FileIndex {
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
                         is_private: false,
@@ -568,7 +616,7 @@ impl FileIndex {
                             let fqn = Arc::from(format!("{enum_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
-                            let doc_span = None;
+                            let doc = extract_field_documentation(f.syntax(), content);
                             Some(Symbol {
                                 id,
                                 name,
@@ -576,7 +624,7 @@ impl FileIndex {
                                 kind: SymbolKind::EnumMember,
                                 name_span,
                                 body_span,
-                                doc_span,
+                                doc,
                                 is_deprecated: false,
                                 is_pure: false,
                                 is_private: false,
@@ -590,7 +638,7 @@ impl FileIndex {
                         kind: SymbolKind::Enum { members },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
                         is_private: false,
@@ -609,7 +657,7 @@ impl FileIndex {
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
                         is_private: false,
@@ -652,7 +700,7 @@ impl FileIndex {
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
                         is_private: false,
@@ -671,7 +719,7 @@ impl FileIndex {
                         },
                         name_span,
                         body_span,
-                        doc_span,
+                        doc,
                         is_deprecated,
                         is_pure,
                         is_private: false,
@@ -710,9 +758,41 @@ impl FileIndex {
             source_kind,
             imports,
             decls,
+            contract,
             symbol_id_to_decl_index,
             body_spans,
         }
+    }
+
+    fn extract_contract(
+        file: &ast::SourceFile,
+        contract: ast::Contract<'_>,
+    ) -> Option<IndexedContract> {
+        let source = file.source.as_ref();
+        let name = contract.name()?;
+        let fields = contract
+            .body()
+            .into_iter()
+            .flat_map(|body| body.fields())
+            .filter_map(|field| {
+                let name = field.name()?;
+                Some(IndexedContractField {
+                    name: Arc::from(name.text(source)),
+                    value: Arc::from(field.value().map_or("", |value| value.text(source))),
+                    name_span: name.span(),
+                    body_span: field.span(),
+                    doc: extract_field_documentation(field.syntax(), source),
+                })
+            })
+            .collect();
+
+        Some(IndexedContract {
+            name: Arc::from(name.text(source)),
+            name_span: name.span(),
+            body_span: contract.span(),
+            doc: extract_preceding_documentation(contract.syntax(), source),
+            fields,
+        })
     }
 
     fn extract_type_parameters<'a, Node: HasGenericParams<'a>>(
@@ -768,6 +848,50 @@ impl FileIndex {
             })
         })
     }
+}
+
+fn extract_preceding_documentation(node: Node<'_>, source: &str) -> Arc<str> {
+    let mut comments = Vec::new();
+    let mut sibling = node.prev_named_sibling();
+    let mut boundary = node.start_byte();
+    while let Some(comment) = sibling {
+        if comment.kind() != "comment" {
+            break;
+        }
+        if comment.prev_named_sibling().is_some_and(|previous| {
+            previous.kind() != "comment"
+                && previous.end_position().row == comment.start_position().row
+        }) {
+            break;
+        }
+        let Some(gap) = source.get(comment.end_byte()..boundary) else {
+            break;
+        };
+        if gap.matches('\n').count() > 1 {
+            break;
+        }
+        comments.push(clean_comment(comment.text(source)));
+        boundary = comment.start_byte();
+        sibling = comment.prev_named_sibling();
+    }
+    comments.reverse();
+    Arc::from(comments.join("\n"))
+}
+
+fn extract_field_documentation(node: Node<'_>, source: &str) -> Arc<str> {
+    let preceding = extract_preceding_documentation(node, source);
+    if !preceding.is_empty() {
+        return preceding;
+    }
+
+    let Some(comment) = node.next_named_sibling() else {
+        return preceding;
+    };
+    if comment.kind() != "comment" || comment.start_position().row != node.end_position().row {
+        return preceding;
+    }
+
+    Arc::from(clean_comment(comment.text(source)))
 }
 
 fn symbols_have_same_global_identity(left: &[Symbol], right: &[Symbol]) -> bool {

@@ -1,6 +1,6 @@
 ---
-title: "Language server protocol extensions"
-description: "Custom requests exposed by the Acton language server"
+title: "Language server protocol"
+description: "Settings and custom requests exposed by the Acton language server"
 ---
 
 `acton ls` implements the standard Language Server Protocol and a small set of custom requests.
@@ -9,6 +9,72 @@ Use standard LSP methods for editor features whenever one exists. For example, f
 
 Positions and ranges use the LSP UTF-16 coordinate system. File locations are absolute `file:`
 URIs unless a request says otherwise.
+
+## Runtime settings
+
+The language server has one settings object for every supported language. Its generated
+[JSON Schema](https://raw.githubusercontent.com/ton-blockchain/acton/master/crates/ton-language-server-core/schemas/language-server-settings.schema.json)
+contains every property, default value, enum value, and description.
+
+Pass the settings object through `initializationOptions` to configure the server before it opens
+documents:
+
+```json title="Initialize params"
+{
+  "processId": null,
+  "rootUri": "file:///workspace",
+  "capabilities": {},
+  "initializationOptions": {
+    "tolk": {
+      "diagnostics": {
+        "enabled": true,
+        "linter": {"enabled": true},
+        "compiler": {"enabled": true}
+      }
+    }
+  }
+}
+```
+
+Send the same object in `workspace/didChangeConfiguration` when settings change:
+
+```json title="Configuration change params"
+{
+  "settings": {
+    "tolk": {
+      "hints": {"parameters": false},
+      "diagnostics": {
+        "linter": {"enabled": false}
+      }
+    }
+  }
+}
+```
+
+VS Code sends its configuration section inside a `ton` property. The server accepts this wrapper
+too:
+
+```json title="VS Code configuration change params"
+{
+  "settings": {
+    "ton": {
+      "tolk": {
+        "completion": {"addImports": false}
+      }
+    }
+  }
+}
+```
+
+Omitted properties use the defaults from the schema. A configuration change replaces the previous
+settings object. Send every non-default value again with each change.
+
+Changes to diagnostic settings republish diagnostics for every open Tolk document. Changes to
+inlay hints and semantic highlighting request a client refresh. Other changes apply to the next
+matching request.
+
+Lint rule levels and contract-specific overrides stay in `Acton.toml`. Runtime settings only enable
+or disable the linter as a diagnostic provider.
 
 ## `tolk.getTypeAtPosition`
 

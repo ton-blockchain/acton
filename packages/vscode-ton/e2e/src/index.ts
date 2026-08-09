@@ -3,22 +3,20 @@ import process from "node:process"
 import * as vscode from "vscode"
 
 const extensionId = "ton-core.vscode-ton"
-const mainUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, "main.tolk")
-const libraryUri = vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, "lib.tolk")
+const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
+assert.ok(workspaceFolder, "E2E workspace folder is unavailable")
+const mainUri = vscode.Uri.joinPath(workspaceFolder.uri, "main.tolk")
+const libraryUri = vscode.Uri.joinPath(workspaceFolder.uri, "lib.tolk")
 
 async function waitFor<T>(operation: () => Thenable<T>, accept: (value: T) => boolean): Promise<T> {
   const deadline = Date.now() + 20_000
-  let lastValue: T
-
-  do {
-    lastValue = await operation()
-    if (accept(lastValue)) {
-      return lastValue
-    }
+  let lastValue = await operation()
+  while (!accept(lastValue) && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 100))
-  } while (Date.now() < deadline)
+    lastValue = await operation()
+  }
 
-  return lastValue!
+  return lastValue
 }
 
 async function definitionAt(

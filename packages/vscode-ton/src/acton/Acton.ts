@@ -335,7 +335,7 @@ export class Acton {
       return undefined
     }
 
-    const pathValue = process.env["PATH"]
+    const pathValue = process.env.PATH
     if (!pathValue) {
       return undefined
     }
@@ -343,7 +343,7 @@ export class Acton {
     const pathEntries = pathValue.split(path.delimiter).filter(Boolean)
     const extensions =
       process.platform === "win32"
-        ? (process.env["PATHEXT"] ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
+        ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT;.COM").split(";").filter(Boolean)
         : [""]
     const candidates =
       process.platform === "win32" && path.extname(command) === ""

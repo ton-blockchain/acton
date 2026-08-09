@@ -1,5 +1,6 @@
 import {
   ByteSize,
+  BooleanValue,
   ContentTabs,
   DataTable,
   DataTableBody,
@@ -17,15 +18,17 @@ import {
   Input,
   NumberValue,
   ParsedValueView,
+  Percentage,
   RawDataBlock,
   Skeleton,
   SkeletonText,
   TechnicalValue,
   TokenAmount,
+  Tooltip,
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
 import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
-import {useParams} from "react-router"
+import {Link, useLocation, useParams} from "react-router"
 
 import type {TonClient} from "../api/client"
 import {
@@ -35,6 +38,7 @@ import {
   type BridgeOracle,
   type ExtraCurrency,
   type FundamentalSmartContract,
+  getConfigParameterMetadata,
   type GlobalVersionConfiguration,
   type NetworkConfig,
   type NetworkConfigParameter,
@@ -344,11 +348,13 @@ function ConfigParameterCard({parameter}: {readonly parameter: NetworkConfigPara
 function ConfigParameterAnchor({
   id,
   className,
+  tooltip,
 }: {
   readonly id: number
   readonly className?: string
+  readonly tooltip?: ReactNode
 }) {
-  return (
+  const anchor = (
     <a
       className={`${styles.parameterAnchor} ${className ?? ""}`}
       href={`#config-parameter-${id}`}
@@ -358,6 +364,8 @@ function ConfigParameterAnchor({
       <Link2 className={styles.parameterAnchorIcon} size={16} aria-hidden="true" />
     </a>
   )
+
+  return tooltip === undefined ? anchor : <Tooltip content={tooltip}>{anchor}</Tooltip>
 }
 
 function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigParameter}) {
@@ -621,12 +629,12 @@ function ValidatorSetValue({configuration}: {readonly configuration: ValidatorSe
           },
           {
             id: "total",
-            label: "Total",
+            label: "Total validators",
             value: <NumberValue value={configuration.total} />,
           },
           {
             id: "main",
-            label: "Main",
+            label: "Masterchain validators",
             value: <NumberValue value={configuration.main} />,
           },
           ...(configuration.totalWeight === undefined
@@ -640,15 +648,29 @@ function ValidatorSetValue({configuration}: {readonly configuration: ValidatorSe
               ]),
         ]}
       />
-      <ValidatorList validators={configuration.validators} />
+      <ValidatorList
+        mainValidators={configuration.main}
+        validators={configuration.validators}
+        totalWeight={configuration.totalWeight}
+      />
     </div>
   )
 }
 
 const VALIDATOR_PREVIEW_COUNT = 7
 
-function ValidatorList({validators}: {readonly validators: readonly ValidatorConfiguration[]}) {
+function ValidatorList({
+  mainValidators,
+  validators,
+  totalWeight,
+}: {
+  readonly mainValidators: number
+  readonly validators: readonly ValidatorConfiguration[]
+  readonly totalWeight?: bigint
+}) {
   const [expanded, setExpanded] = useState(false)
+  const effectiveTotalWeight =
+    totalWeight ?? validators.reduce((sum, validator) => sum + validator.weight, 0n)
   const hasMore = validators.length > VALIDATOR_PREVIEW_COUNT
   const visibleValidators = expanded
     ? validators
@@ -656,19 +678,20 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
 
   return (
     <div className={styles.validatorList}>
-      <DataTable minWidth="42rem" variant="nested">
+      <DataTable minWidth="50rem" variant="nested">
         <DataTableTable aria-label="Validators">
           <DataTableHead>
             <DataTableRow>
               <DataTableHeaderCell columnWidth="3.5rem">#</DataTableHeaderCell>
               <DataTableHeaderCell>Public key</DataTableHeaderCell>
               <DataTableHeaderCell>ADNL</DataTableHeaderCell>
-              <DataTableHeaderCell columnWidth="13rem">Weight</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="8rem">Masterchain</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="13rem">Weight share</DataTableHeaderCell>
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
             {visibleValidators.length === 0 ? (
-              <DataTableEmpty colSpan={4}>No validators configured</DataTableEmpty>
+              <DataTableEmpty colSpan={5}>No validators configured</DataTableEmpty>
             ) : (
               visibleValidators.map(validator => (
                 <DataTableRow key={validator.index}>
@@ -686,17 +709,28 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
                   <DataTableCell className={styles.validatorHash} truncate>
                     <TechnicalValue
                       copyLabel="validator ADNL address"
-                      endLength={5}
+                      endLength={10}
                       fallback="—"
-                      startLength={5}
+                      startLength={10}
                       value={validator.adnlAddress}
                     />
                   </DataTableCell>
+                  <DataTableCell>
+                    <BooleanValue value={validator.index < mainValidators} />
+                  </DataTableCell>
                   <DataTableCell className={styles.validatorWeight}>
-                    <ConfigTechnicalNumberValue
-                      copyLabel="validator weight"
-                      value={validator.weight}
-                    />
+                    <Tooltip
+                      content={`${formatNumberValue(validator.weight)} of ${formatNumberValue(effectiveTotalWeight)}`}
+                    >
+                      <span className={styles.validatorWeightShare}>
+                        <Percentage
+                          maximumFractionDigits={3}
+                          minimumFractionDigits={2}
+                          total={Number(effectiveTotalWeight)}
+                          value={validator.weight}
+                        />
+                      </span>
+                    </Tooltip>
                   </DataTableCell>
                 </DataTableRow>
               ))
@@ -710,7 +744,7 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
       {hasMore ? (
         <button
           type="button"
-          className={styles.validatorShowMore}
+          className={`${styles.validatorShowMore} ${expanded ? styles.validatorShowLess : ""}`}
           aria-expanded={expanded}
           onClick={() => setExpanded(value => !value)}
         >
@@ -732,6 +766,8 @@ function SuspendedAddressesValue({
   readonly configuration: SuspendedAddressesConfiguration
 }) {
   const [expanded, setExpanded] = useState(false)
+  const routes = useExplorerRoutePaths()
+  const {search} = useLocation()
   const hasMore = configuration.addresses.length > VALIDATOR_PREVIEW_COUNT
   const visibleAddresses = expanded
     ? configuration.addresses
@@ -746,6 +782,18 @@ function SuspendedAddressesValue({
             label: "Suspended until",
             value: (
               <DateTime display="compact" unit="seconds" value={configuration.suspendedUntil} />
+            ),
+          },
+          {
+            id: "suspended-addresses-page",
+            label: "Suspended addresses page",
+            value: (
+              <Link
+                className={styles.configValueLink}
+                to={{pathname: routes.suspendedAddressesPath, search}}
+              >
+                Open overview
+              </Link>
             ),
           },
         ]}
@@ -783,7 +831,7 @@ function SuspendedAddressesValue({
         {hasMore ? (
           <button
             type="button"
-            className={styles.validatorShowMore}
+            className={`${styles.validatorShowMore} ${expanded ? styles.validatorShowLess : ""}`}
             aria-expanded={expanded}
             onClick={() => setExpanded(value => !value)}
           >
@@ -994,11 +1042,24 @@ function ConfigParameterIdList({ids}: {readonly ids: readonly number[]}) {
       {ids.length === 0 ? (
         <li className={styles.configParameterIdEmpty}>No parameters configured</li>
       ) : (
-        ids.map(id => (
-          <li key={id} className={styles.configParameterIdItem}>
-            <ConfigParameterAnchor id={id} className={styles.configParameterIdAnchor} />
-          </li>
-        ))
+        ids.map(id => {
+          const metadata = getConfigParameterMetadata(id)
+
+          return (
+            <li key={id} className={styles.configParameterIdItem}>
+              <ConfigParameterAnchor
+                id={id}
+                className={styles.configParameterIdAnchor}
+                tooltip={
+                  <span className={styles.configParameterIdTooltip}>
+                    <strong>{metadata.title}</strong>
+                    <span>{metadata.description}</span>
+                  </span>
+                }
+              />
+            </li>
+          )
+        })
       )}
     </ul>
   )

@@ -114,6 +114,28 @@ fn returns_no_edits_for_formatted_source() {
 }
 
 #[test]
+fn reports_a_formatting_error_for_a_syntax_error() {
+    let uri = DocumentUri::from("file:///workspace/main.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    service
+        .set_workspace_config(
+            LANGUAGE_ID,
+            WorkspaceConfig::new("file:///workspace", None, ""),
+        )
+        .expect("workspace configuration should be accepted");
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, "fun main( {\n".to_owned())
+        .expect("Tolk document should open even when it contains a syntax error");
+
+    let error = service
+        .formatting(&uri, None)
+        .expect_err("formatting malformed Tolk should fail");
+
+    expect!["Cannot format code with syntax error"].assert_eq(&error.to_string());
+}
+
+#[test]
 fn formatter_settings_do_not_rebuild_semantic_analysis() {
     let uri = DocumentUri::from("file:///workspace/main.tolk");
     let mut service = LanguageService::new(LanguageServiceConfig {

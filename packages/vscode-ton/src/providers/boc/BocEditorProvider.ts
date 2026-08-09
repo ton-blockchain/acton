@@ -36,7 +36,7 @@ export class BocEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
     const decompileUri = document.uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: document.uri.path + ".decompiled.tasm",
+      path: `${document.uri.path}.decompiled.tasm`,
     })
 
     const doc = await vscode.workspace.openTextDocument(decompileUri)

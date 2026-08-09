@@ -55,7 +55,6 @@ fun main(): int {
     path.join(workspacePath, ".vscode", "settings.json"),
     JSON.stringify(
       {
-        "ton.acton.linter.enabled": false,
         "ton.acton.path": actonPath,
         "ton.acton.updateChecks.enabled": false,
         "ton.languageServer.args": [

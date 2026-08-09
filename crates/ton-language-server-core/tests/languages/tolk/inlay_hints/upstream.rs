@@ -410,11 +410,11 @@ fn basic_evaluation_03_unary_operations_evaluation() {
         ",
         full_document_range(),
         expect![[r#"
-            const NEG_CONST/* : int */ = -42/* = 0x-2A */;
-            const POS_CONST/* : int */ = +100/* = 100 (0x64) */;
+            const NEG_CONST/* : int */ = -42;
+            const POS_CONST/* : int */ = +100;
             const NOT_CONST/* : bool */ = !true/* = false */;
             const NOT_FALSE/* : bool */ = !false/* = true */;
-            const BIT_NOT/* : int */ = ~0xFF/* = 0x-100 */;
+            const BIT_NOT/* : int */ = ~0xFF/* = -0x100 */;
 
             fun main()/* : int */ {
                 return 0;

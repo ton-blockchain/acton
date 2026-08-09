@@ -24,6 +24,7 @@ Commands:
   disasm           [BOC_FILE]          Disassemble TVM code into TASM
   doc              <COMMAND>           Look up reference documentation and contract ABIs
 
+  ls                                   Run LSP server for the TON languages and technologies
   up                                   Install or update Acton CLI releases
   help             [COMMAND]           Show top-level or command-specific help
   hooks            <COMMAND>           Install and manage project Git hooks

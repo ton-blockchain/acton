@@ -69,11 +69,14 @@ type SmokeGlobal = typeof globalThis & {
     profilePanelText: () => string
     editorText: () => string
     actonTomlText: () => string
+    settingsText: () => string
     languageId: () => string | undefined
     actonTomlLanguageId: () => string | undefined
+    settingsLanguageId: () => string | undefined
     selectedLanguage: () => "tolk" | "tasm" | "tlb" | "fift"
     setEditorText: (text: string) => void
     setActonTomlText: (text: string) => void
+    setSettingsText: (text: string) => Promise<void>
     setLanguage: (languageId: "tolk" | "tasm" | "tlb" | "fift") => Promise<void>
     setProfileVisible: (visible: boolean) => void
   }
@@ -209,6 +212,34 @@ fun main(): void {
     tooltip: "Evaluated value: 3 (0x3)",
   })
   expect(valueHint).not.toHaveProperty("kind")
+
+  await page.getByLabel("LS settings").check()
+  await expect(page.locator("#settings-editor-root")).toBeVisible()
+  expect(
+    await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.settingsLanguageId()),
+  ).toBe("json")
+  const defaultSettings = await page.evaluate(
+    () => (globalThis as SmokeGlobal).__tonLsSmoke?.settingsText() ?? "{}",
+  )
+  await page.evaluate(async () => {
+    await (globalThis as SmokeGlobal).__tonLsSmoke?.setSettingsText(
+      JSON.stringify({tolk: {hints: {disable: true}}}, null, 2),
+    )
+  })
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.inlayHints()))
+    .toEqual([])
+  await page.evaluate(async settings => {
+    await (globalThis as SmokeGlobal).__tonLsSmoke?.setSettingsText(settings)
+  }, defaultSettings)
+  await expect
+    .poll(async () => {
+      const hints = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.inlayHints(),
+      )
+      return hints?.map(hint => hint.label)
+    })
+    .toContain("destination:")
 
   const unformattedSource = `fun main(){
 val value=1+2;
@@ -346,8 +377,10 @@ output-format = "json"
   await expect(page.locator("#log-level-select")).toHaveValue("debug")
   await expect(page.locator("#logs-toggle")).toBeChecked()
   await expect(page.locator("#profile-toggle")).toBeChecked()
+  await expect(page.locator("#settings-toggle")).toBeChecked()
   await expect(page.locator("#logs-editor-root")).toBeVisible()
   await expect(page.locator("#profile-editor-root")).toBeVisible()
+  await expect(page.locator("#settings-editor-root")).toBeVisible()
   await expect
     .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
     .toBe("one$0 a:# = SavedTlb;\n")
@@ -438,4 +471,20 @@ fun main(): int { return helper(); }
       return definitions?.[0]?.uri
     })
     .toBe(libraryUri)
+})
+
+test("invalid persisted LS settings do not prevent startup", async ({page}) => {
+  await page.addInitScript(() => {
+    localStorage.clear()
+    localStorage.setItem(
+      "ton-language-server-web-state:v1",
+      JSON.stringify({settingsJson: "undefined"}),
+    )
+  })
+
+  await page.goto("/")
+  await expect(page.locator("#status")).toHaveText(/Tolk saved locally, 0 hovers/)
+  expect(
+    await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.settingsText()),
+  ).toBe("undefined")
 })

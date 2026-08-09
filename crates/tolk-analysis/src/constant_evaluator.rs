@@ -36,7 +36,10 @@ impl ConstantValue {
     pub fn format(&self) -> String {
         match self {
             Self::Int(value) if value.is_zero() => "0".to_owned(),
-            Self::Int(value) if value.sign() != Sign::Minus && value.bits() <= 32 => {
+            Self::Int(value) if value.sign() == Sign::Minus => {
+                format!("-0x{}", value.magnitude().to_str_radix(16).to_uppercase())
+            }
+            Self::Int(value) if value.bits() <= 32 => {
                 format!("{value} (0x{})", value.to_str_radix(16).to_uppercase())
             }
             Self::Int(value) => format!("0x{}", value.to_str_radix(16).to_uppercase()),
@@ -304,11 +307,17 @@ impl<'a> ConstantEvaluator<'a> {
 }
 
 #[must_use]
-pub const fn is_simple_literal(expression: &Expr<'_>) -> bool {
-    matches!(
-        expression,
-        Expr::NumberLit(_) | Expr::StringLit(_) | Expr::BoolLit(_) | Expr::NullLit(_)
-    )
+pub fn is_simple_literal(expression: &Expr<'_>) -> bool {
+    match expression {
+        Expr::NumberLit(_) | Expr::StringLit(_) | Expr::BoolLit(_) | Expr::NullLit(_) => true,
+        Expr::Unary(unary) => {
+            unary
+                .operator()
+                .is_some_and(|operator| matches!(operator.kind(), "+" | "-"))
+                && matches!(unary.argument(), Some(Expr::NumberLit(_)))
+        }
+        _ => false,
+    }
 }
 
 fn parse_integer(text: &str) -> ConstantValue {

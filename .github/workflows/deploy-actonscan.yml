@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/deploy-actonscan.yml"
       - "packages/**"
+      - "!packages/vscode-ton/**"
       - "crates/acton-abi-catalog/**"
       - "xtask/src/tasks/deploy_explorer.rs"
   workflow_dispatch:

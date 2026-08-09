@@ -15,6 +15,16 @@ COPY apps/faucet/src ./src
 RUN cargo build --release --locked --bin faucet
 
 FROM debian:bookworm-slim AS runtime
+ARG BUILD_VERSION=dev
+ARG SOURCE_URL=https://github.com/ton-blockchain/acton
+ARG VCS_REF=unknown
+
+LABEL org.opencontainers.image.title="faucet" \
+      org.opencontainers.image.description="TON testnet faucet backend" \
+      org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT OR Apache-2.0" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 libsqlite3-0 tini wget \

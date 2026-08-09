@@ -58,8 +58,8 @@ export class BocDecompilerProvider implements vscode.TextDocumentContentProvider
   private formatError(error: string): string {
     return [
       "// Failed to disassemble BoC file",
-      "// Error: " + error,
-      "// Time: " + new Date().toISOString(),
+      `// Error: ${error}`,
+      `// Time: ${new Date().toISOString()}`,
     ].join("\n")
   }
 

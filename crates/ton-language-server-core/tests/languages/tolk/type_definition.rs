@@ -1,5 +1,7 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
+#[path = "type_definition/coverage.rs"]
+mod coverage;
 #[path = "../../support.rs"]
 mod support;
 #[path = "type_definition/upstream.rs"]

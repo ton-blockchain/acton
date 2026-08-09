@@ -3,8 +3,9 @@ use crate::custom::TypeAtPosition;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
-    CodeAction, CodeLens, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
+    Diagnostic, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename,
+    FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range, SelectionRange,
     SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
@@ -17,9 +18,11 @@ pub struct FeatureSet {
     pub document_symbols: bool,
     pub diagnostics: bool,
     pub references: bool,
+    pub call_hierarchy: bool,
     pub hover: bool,
     pub code_lens: bool,
     pub folding_ranges: bool,
+    pub selection_ranges: bool,
     pub completion: bool,
     pub semantic_tokens: bool,
     pub inlay_hints: bool,
@@ -93,6 +96,17 @@ pub struct ReferenceRequest<'a> {
     pub include_declaration: bool,
 }
 
+pub struct CallHierarchyPrepareRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct CallHierarchyRequest<'a> {
+    pub uri: &'a DocumentUri,
+    pub position: Position,
+    pub profiler: &'a mut Profiler,
+}
+
 pub struct HoverRequest<'a> {
     pub context: PluginContext<'a>,
     pub position: Position,
@@ -106,8 +120,18 @@ pub struct FoldingRangeRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
+pub struct SelectionRangeRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub positions: &'a [Position],
+}
+
 pub struct DocumentSymbolRequest<'a> {
     pub context: PluginContext<'a>,
+}
+
+pub struct DiagnosticRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub settings: &'a crate::LanguageServerSettings,
 }
 
 pub struct SignatureHelpRequest<'a> {
@@ -197,6 +221,27 @@ pub trait LanguagePlugin: Send + Sync {
         Ok(Vec::new())
     }
 
+    fn prepare_call_hierarchy(
+        &self,
+        _request: CallHierarchyPrepareRequest<'_>,
+    ) -> anyhow::Result<Option<CallHierarchyItem>> {
+        Ok(None)
+    }
+
+    fn incoming_calls(
+        &self,
+        _request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<CallHierarchyIncomingCall>> {
+        Ok(Vec::new())
+    }
+
+    fn outgoing_calls(
+        &self,
+        _request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<CallHierarchyOutgoingCall>> {
+        Ok(Vec::new())
+    }
+
     fn hover(&self, _request: HoverRequest<'_>) -> anyhow::Result<Option<Hover>> {
         Ok(None)
     }
@@ -212,10 +257,21 @@ pub trait LanguagePlugin: Send + Sync {
         Ok(Vec::new())
     }
 
+    fn selection_ranges(
+        &self,
+        _request: SelectionRangeRequest<'_>,
+    ) -> anyhow::Result<Vec<SelectionRange>> {
+        Ok(Vec::new())
+    }
+
     fn document_symbols(
         &self,
         _request: DocumentSymbolRequest<'_>,
     ) -> anyhow::Result<Vec<DocumentSymbol>> {
+        Ok(Vec::new())
+    }
+
+    fn diagnostics(&self, _request: DiagnosticRequest<'_>) -> anyhow::Result<Vec<Diagnostic>> {
         Ok(Vec::new())
     }
 

@@ -76,6 +76,26 @@ get fun `test aj stdlib vm set time and logical slots 3 4 5`() {
 }
 
 #[test]
+fn initial_world_state_time_matches_vm_time_for_new_accounts() {
+    run_success_case(
+        "aj-stdlib-vm-initial-world-state-time",
+        r#"
+get fun `test initial world state time matches vm time for new accounts`() {
+    val initialNow = testing.getNow();
+
+    expect(initialNow > 0).toBeTrue();
+    expect(initialNow).toEqual(blockchain.now());
+
+    val account = testing.treasury("initial-time-account");
+    val accountState = testing.getAccountState(account.address)!;
+    expect(accountState.storageStat.lastPaid).toEqual(initialNow);
+}
+"#,
+        "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/initial_world_state_time_matches_vm_time_for_new_accounts.stdout.txt",
+    );
+}
+
+#[test]
 fn set_original_balance_updates_balance_tuple_with_and_without_extra_dict() {
     run_success_case(
         "aj-stdlib-vm-set-original-balance-slot-7",

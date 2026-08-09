@@ -1,8 +1,12 @@
 [package]
 name = "xtask"
-version = "0.1.0"
+version = { workspace = true }
 publish = false
-edition = "2024"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 anyhow = "1.0"

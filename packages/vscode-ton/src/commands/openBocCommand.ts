@@ -16,7 +16,7 @@ export function registerOpenBocCommand(_context: vscode.ExtensionContext): Dispo
 
         const decompileUri = actualFileUri.with({
           scheme: BocDecompilerProvider.scheme,
-          path: actualFileUri.path + ".decompiled.tasm",
+          path: `${actualFileUri.path}.decompiled.tasm`,
         })
 
         const doc = await vscode.workspace.openTextDocument(decompileUri)

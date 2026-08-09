@@ -53,8 +53,11 @@ const getLanguageServer = async () => {
   return languageServerPromise
 }
 
-connection.onInitialize(async (): Promise<InitializeResult> => {
+connection.onInitialize(async (params): Promise<InitializeResult> => {
   const server = await getLanguageServer()
+  if (params.initializationOptions !== undefined) {
+    server.setSettings(languageServerSettings(params.initializationOptions))
+  }
   return {
     capabilities: {
       definitionProvider: true,
@@ -85,6 +88,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
         resolveProvider: false,
       },
       foldingRangeProvider: true,
+      selectionRangeProvider: true,
       documentSymbolProvider: true,
       workspaceSymbolProvider: true,
       signatureHelpProvider: {
@@ -112,6 +116,17 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
   }
 })
 
+connection.onDidChangeConfiguration(async params => {
+  await withLanguageServer("workspace/didChangeConfiguration", server =>
+    server.setSettings(languageServerSettings(params.settings)),
+  )
+  await publishAllTolkDiagnostics()
+  await Promise.allSettled([
+    connection.sendRequest("workspace/inlayHint/refresh"),
+    connection.sendRequest("workspace/semanticTokens/refresh"),
+  ])
+})
+
 documents.onDidOpen(async event => {
   await withLanguageServer("textDocument/didOpen", server =>
     server.openDocument(
@@ -121,6 +136,7 @@ documents.onDidOpen(async event => {
       event.document.getText(),
     ),
   )
+  await publishDocumentDiagnostics(event.document)
 })
 
 documents.onDidChangeContent(async event => {
@@ -133,6 +149,7 @@ documents.onDidChangeContent(async event => {
   await withLanguageServer("textDocument/didChange", server =>
     server.editDocument(event.document.uri, event.document.version, JSON.stringify(changes)),
   )
+  await publishDocumentDiagnostics(event.document)
 })
 
 documents.onDidClose(async event => {
@@ -140,6 +157,7 @@ documents.onDidClose(async event => {
   await withLanguageServer("textDocument/didClose", server =>
     server.closeDocument(event.document.uri),
   )
+  await connection.sendDiagnostics({uri: event.document.uri, diagnostics: []})
 })
 
 connection.onDefinition(async params =>
@@ -251,6 +269,12 @@ connection.onFoldingRanges(async params =>
   ),
 )
 
+connection.onSelectionRanges(async params =>
+  withLanguageServer("textDocument/selectionRange", server =>
+    server.selectionRanges(params.textDocument.uri, params.positions),
+  ),
+)
+
 connection.onDocumentSymbol(async params =>
   withLanguageServer("textDocument/documentSymbol", server =>
     server.documentSymbols(params.textDocument.uri),
@@ -351,8 +375,8 @@ connection.onRequest(REMOVE_SOURCE_FILE_REQUEST, async params =>
   }),
 )
 
-connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params =>
-  withLanguageServer(SET_WORKSPACE_CONFIG_REQUEST, server => {
+connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params => {
+  await withLanguageServer(SET_WORKSPACE_CONFIG_REQUEST, server => {
     if (!isRecord(params)) {
       throw new Error("expected { languageId, rootUri, manifestUri?, text } params")
     }
@@ -361,9 +385,10 @@ connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params =>
     const manifestUri = typeof params.manifestUri === "string" ? params.manifestUri : ""
     const text = requiredString(params.text, "text")
     server.setWorkspaceConfigForLanguage(languageId, rootUri, manifestUri, text)
-    return null
-  }),
-)
+  })
+  await publishAllTolkDiagnostics()
+  return null
+})
 
 documents.listen(connection)
 connection.listen()
@@ -377,6 +402,24 @@ async function withLanguageServer<T>(
   } catch (error) {
     throw new Error(`${operation} failed: ${errorText(error)}`)
   }
+}
+
+async function publishDocumentDiagnostics(document: TextDocument): Promise<void> {
+  if (document.languageId !== "tolk") {
+    return
+  }
+  const diagnostics = await withLanguageServer("textDocument/diagnostic", server =>
+    server.diagnostics(document.uri),
+  )
+  await connection.sendDiagnostics({
+    uri: document.uri,
+    version: document.version,
+    diagnostics,
+  })
+}
+
+async function publishAllTolkDiagnostics(): Promise<void> {
+  await Promise.all(documents.all().map(document => publishDocumentDiagnostics(document)))
 }
 
 function errorText(error: unknown): string {
@@ -404,6 +447,13 @@ function errorText(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function languageServerSettings(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {}
+  }
+  return isRecord(value.ton) ? value.ton : value
 }
 
 function requiredString(value: unknown, name: string): string {

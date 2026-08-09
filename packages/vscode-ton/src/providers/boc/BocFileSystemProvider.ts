@@ -34,7 +34,7 @@ export class BocFileSystemProvider implements vscode.FileSystemProvider {
 
       const decompileUri = uri.with({
         scheme: BocDecompilerProvider.scheme,
-        path: uri.path + ".decompiled.tasm",
+        path: `${uri.path}.decompiled.tasm`,
       })
       console.log("Disassemble URI:", decompileUri.toString())
 

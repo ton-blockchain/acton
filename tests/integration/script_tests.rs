@@ -4138,6 +4138,43 @@ fun main() {
 }
 
 #[test]
+fn test_script_initial_world_state_time_matches_vm_time() {
+    let project = ProjectBuilder::new("script-initial-world-state-time")
+        .script_file(
+            "show_initial_time",
+            r#"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val initialNow = testing.getNow();
+    if (initialNow == 0 || initialNow != blockchain.now()) {
+        throw 100;
+    }
+
+    val account = testing.treasury("initial-time-account");
+    val accountState = testing.getAccountState(account.address)!;
+    if (accountState.storageStat.lastPaid != initialNow) {
+        throw 101;
+    }
+
+    println("World state time matches VM time");
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/show_initial_time.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_initial_world_state_time_matches_vm_time.stdout.txt",
+        );
+}
+
+#[test]
 fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
     let last_hash_bytes = [0x33_u8; 32];
     let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);

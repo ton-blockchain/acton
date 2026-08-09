@@ -1810,7 +1810,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("doc", "<COMMAND>"),
     ];
     let support_commands = vec![
-        // ("ls", ""),
+        ("ls", ""),
         ("up", ""),
         ("help", "[COMMAND]"),
         ("hooks", "<COMMAND>"),

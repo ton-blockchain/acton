@@ -1,6 +1,6 @@
 use super::TomlParsedDocument;
 use super::paths::resolve_path;
-use super::schema::{ancestor_as, schema_path};
+use super::schema::schema_path;
 use crate::{DocumentSnapshot, Location, Position, Range};
 use toml_syntax::{AstNode, StringLit};
 
@@ -20,7 +20,7 @@ pub(super) fn definition(
     else {
         return Vec::new();
     };
-    let Some(string) = ancestor_as::<StringLit<'_>>(node) else {
+    let Some(string) = node.ancestor_as::<StringLit<'_>>() else {
         return Vec::new();
     };
     let Some(path) = schema_path(document, parsed, string.syntax()) else {

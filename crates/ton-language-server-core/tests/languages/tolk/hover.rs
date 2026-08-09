@@ -1,5 +1,7 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
+#[path = "hover/documentation_matrix.rs"]
+mod documentation_matrix;
 #[path = "../../support.rs"]
 mod support;
 #[path = "hover/upstream.rs"]
@@ -237,10 +239,25 @@ fn shows_documentation_for_all_supported_annotations() {
             @<caret>test.skip
             fun foo() {}
 
+            @<caret>method_id(0x100)
+            fun exported() {}
+
+            @<caret>abi.minimalMsgValue(1)
+            @<caret>abi.preferredSendMode(0)
             struct Message {
                 @<caret>abi.clientType(Cell)
                 body: cell
             }
+
+            @<caret>test
+            @<caret>test.todo("implement later")
+            @<caret>test.fail_with(42)
+            @<caret>test.gas_limit(1000)
+            @<caret>test.fuzz(64)
+            fun testFoo() {}
+
+            @<caret>test.custom
+            fun customTest() {}
         "#,
         expect![[r#"
             Function with this annotation will be automatically inlined during compilation
@@ -250,7 +267,16 @@ fn shows_documentation_for_all_supported_annotations() {
             Defines the policy for handling potential builder overflow. Right now, only `"suppress"` value is supported. See <https://docs.ton.org/v3/documentation/smart-contracts/tolk/tolk-vs-func/pack-to-from-cells#what-if-data-exceeds-1023-bits> for more details
             Function with this annotation has no side effects and can be optimized away by the compiler
             Marks the test as skipped.
-            Overrides the client-facing ABI type for a struct field. This is useful when generated wrappers should expose a different representation than the serialized Tolk field type."#]],
+            Specifies the method ID (as a number literal) for the function in smart contract interface. See <https://docs.ton.org/v3/guidelines/smart-contracts/get-methods> for more details
+            Defines the minimal message value for a message struct in ABI metadata.
+            Defines the preferred send mode for a message struct in ABI metadata.
+            Overrides the client-facing ABI type for a struct field. This is useful when generated wrappers should expose a different representation than the serialized Tolk field type.
+            Describes additional metadata for a test function, such as skipping, TODO state, expected exit code, gas limit, or fuzzing configuration.
+            Marks the test as TODO. Use `@test.todo("...")` to attach a description.
+            Declares the expected exit code for the test.
+            Overrides the per-test gas limit.
+            Enables fuzzing for parameterized tests. Supports `@test.fuzz`, `@test.fuzz(64)`, and `@test.fuzz({ ... })`.
+            Describes additional metadata for a test function, such as skipping, TODO state, expected exit code, gas limit, or fuzzing configuration."#]],
     );
 }
 
@@ -280,6 +306,91 @@ fn shows_contract_and_contract_field_documentation() {
             Author of the contract.
 
             Custom author docs."#]],
+    );
+}
+
+#[test]
+fn shows_contract_field_documentation_while_value_is_incomplete() {
+    case_tolk_hover(
+        r#"
+            contract Demo {
+                /// Custom storage docs.
+                <caret>storage:
+            }
+        "#,
+        expect![[r#"
+            ```tolk
+            contract Demo
+            storage
+            ```
+            Defines the persistent storage structure for the contract. This field usually points to a struct type.
+
+            Custom storage docs."#]],
+    );
+}
+
+#[test]
+fn shows_documentation_for_all_contract_header_fields() {
+    case_tolk_hover(
+        r#"
+            contract Demo {
+                <caret>contractName: "Demo",
+                <caret>author: "TON Foundation",
+                <caret>version: "1.0.0",
+                <caret>description: "Example contract",
+                <caret>incomingMessages: InternalMessage,
+                <caret>incomingExternal: ExternalMessage,
+                <caret>storage: Storage,
+                <caret>storageAtDeployment: InitialStorage,
+                <caret>forceAbiExport: ExportedType
+            }
+        "#,
+        expect![[r#"
+            ```tolk
+            contract Demo
+            contractName
+            ```
+            Name of the contract.
+            ```tolk
+            contract Demo
+            author
+            ```
+            Author of the contract.
+            ```tolk
+            contract Demo
+            version
+            ```
+            Version of the contract.
+            ```tolk
+            contract Demo
+            description
+            ```
+            Description of the contract.
+            ```tolk
+            contract Demo
+            incomingMessages
+            ```
+            Defines the type of allowed incoming internal messages. Usually a union type of all supported message structs.
+            ```tolk
+            contract Demo
+            incomingExternal
+            ```
+            Defines the type of allowed incoming external messages.
+            ```tolk
+            contract Demo
+            storage
+            ```
+            Defines the persistent storage structure for the contract. This field usually points to a struct type.
+            ```tolk
+            contract Demo
+            storageAtDeployment
+            ```
+            Defines the storage structure at the moment of deployment.
+            ```tolk
+            contract Demo
+            forceAbiExport
+            ```
+            List of types to additionally export to ABI."#]],
     );
 }
 
@@ -441,6 +552,73 @@ fn shows_tlb_documentation_for_fixed_and_arbitrary_integers() {
             ```tolk
             type uint9999 = builtin
             ```"#]],
+    );
+}
+
+#[test]
+fn shows_tlb_documentation_for_small_large_and_variable_integers() {
+    case_tolk_hover(
+        r"
+            struct Integers {
+                tinyUnsigned: <caret>uint8,
+                tinySigned: <caret>int8,
+                largestSigned: <caret>int257,
+                variableUnsigned: <caret>varuint16,
+                variableSigned: <caret>varint32,
+            }
+        ",
+        expect![[r#"
+            ```tolk
+            type uint8 = builtin
+            ```
+
+            - **Range**: 0 to 255 (2^8 - 1)
+            - **Size**: 8 bits = 1 byte
+            - **TL-B**: uint8
+
+            `uint32`, `uint64`, `uint111`, etc. is "a fixed-width unsigned integer with N bits", N <= 256.
+            Note: it's still `int` at runtime, you can assign "100500" to "uint8":
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
+            ```tolk
+            type int8 = builtin
+            ```
+
+            - **Range**: -128 to 127 (-2^7 to 2^7 - 1)
+            - **Size**: 8 bits = 1 byte
+            - **TL-B**: int8
+
+            `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
+            Note: it's still `int` at runtime, you can assign "100500" to "int8":
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
+            ```tolk
+            type int257 = builtin
+            ```
+
+            - **Range**: -2^256 to 2^256 - 1
+            - **Size**: 257 bits = 32 bytes + 1 bit
+            - **TL-B**: int257
+
+            `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
+            Note: it's still `int` at runtime, you can assign "100500" to "int8":
+            overflow will happen at serialization to a cell/builder, NOT at assignment. 
+            ```tolk
+            type varuint16 = builtin
+            ```
+
+            - **Range**: 0 to 2^120 - 1
+            - **Size**: 4 to 124 bits
+            - **TL-B**: varuint16
+
+            `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120. 
+            ```tolk
+            type varint32 = builtin
+            ```
+
+            - **Range**: -2^247 to 2^247 - 1
+            - **Size**: 5 to 253 bits
+            - **TL-B**: varint32
+
+            `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247. "#]],
     );
 }
 
@@ -1131,6 +1309,64 @@ fn shows_imported_file_documentation_below_its_path() {
         Module for reusable helpers.
 
         Use it from contracts and scripts."#]]
+    .assert_eq(&actual);
+}
+
+#[test]
+fn distinguishes_file_documentation_from_headers_and_declaration_comments() {
+    let marked = MarkedSource::parse(
+        r#"
+            import "<caret:block>block"
+            import "<caret:plain>plain"
+            import "<caret:attached>attached"
+        "#,
+    );
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    for (name, source) in [
+        (
+            "block",
+            "/** Module documented with a block comment. */\n\nfun helper() {}\n",
+        ),
+        ("plain", "// Generated file header.\n\nfun helper() {}\n"),
+        (
+            "attached",
+            "/// Documents the helper declaration.\nfun helper() {}\n",
+        ),
+    ] {
+        service
+            .add_source_file(LANGUAGE_ID, format!("file:///fixture/{name}.tolk"), source)
+            .expect("imported file should be added");
+    }
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let actual = marked
+        .markers()
+        .iter()
+        .map(|marker| {
+            service
+                .hover(&uri, marker.position)
+                .expect("hover request should succeed")
+                .expect("import hover should exist")
+                .contents
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    expect![[r#"
+        ```tolk
+        import "/fixture/block.tolk"
+        ```
+
+        Module documented with a block comment.
+        ```tolk
+        import "/fixture/plain.tolk"
+        ```
+        ```tolk
+        import "/fixture/attached.tolk"
+        ```"#]]
     .assert_eq(&actual);
 }
 

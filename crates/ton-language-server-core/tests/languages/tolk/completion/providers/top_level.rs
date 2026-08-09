@@ -25,7 +25,7 @@ fn completes_top_level_declarations_but_not_inside_functions() {
         .labels(&labels)
         .check(expect![[r#"
             label              kind     detail                  edit     text
-            asm fun            Keyword   name() asm "..."       0:0-0:0  fun ${1:name}($2)$3 asm "$0"
+            asm fun            Keyword   name(): int asm "..."  0:0-0:0  fun ${1:name}($2): ${3:int} asm "$0"
             const              Keyword   FOO: <type> = <value>  0:0-0:0  const ${1:FOO}: ${2:int} = ${3:0}$0
             contract           Keyword   Name {}                0:0-0:0  contract ${1:Name} {\n    author: "${2:}"\n    version: "${3:1.0.0}"\n    description: "${4:My TON contract}"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0
             enum               Keyword   Name {}                0:0-0:0  enum ${1:Name} {\n    $0\n}
@@ -119,7 +119,7 @@ fn applies_top_level_templates() {
 
     // Assembly completion expands the function signature and assembly body.
     CompletionTest::new("asm<caret>")
-        .check_applied("asm fun", expect![[r#"fun name<caret>() asm """#]]);
+        .check_applied("asm fun", expect![[r#"fun name<caret>(): int asm """#]]);
 
     // Plain function completion expands a complete declaration.
     CompletionTest::new("fun<caret>").check_applied(

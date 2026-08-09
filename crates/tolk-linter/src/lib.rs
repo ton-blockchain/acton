@@ -17,7 +17,6 @@ use crate::rules::ast::{
     send_mode_literal, unused_expression, unused_import, unused_variable, used_ignored_identifier,
     write_only_variable,
 };
-use acton_config::config::{LintEntry, LintLevel};
 use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
 use rustc_hash::FxHashMap;
@@ -84,6 +83,57 @@ pub struct Checker<'a> {
 }
 
 const SUPPRESSION_MARKER: &str = "check-disable-next-line";
+
+#[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LintLevel {
+    Allow,
+    Warn,
+    Deny,
+}
+
+/// Builds lint rule settings without depending on a configuration format.
+///
+/// Settings start with the linter defaults. Rules are applied by their public names, and later
+/// calls override earlier ones. Callers can therefore apply global settings first and
+/// contract-specific settings second.
+#[derive(Debug, Clone)]
+pub struct RuleSettingsBuilder {
+    settings: HashMap<Rule, LintLevel>,
+}
+
+impl RuleSettingsBuilder {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn apply_rules<I, N>(&mut self, rules: I)
+    where
+        I: IntoIterator<Item = (N, LintLevel)>,
+        N: AsRef<str>,
+    {
+        for (name, level) in rules {
+            if let Some(rule) = find_rule_by_name(name.as_ref()) {
+                self.settings.insert(rule, level);
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn build(self) -> HashMap<Rule, LintLevel> {
+        self.settings
+    }
+}
+
+impl Default for RuleSettingsBuilder {
+    fn default() -> Self {
+        let mut settings = HashMap::new();
+        settings.insert(Rule::UnauthorizedAccess, LintLevel::Allow);
+        settings.insert(Rule::ThrowRequiresDocumentedErrorValue, LintLevel::Allow);
+        Self { settings }
+    }
+}
 
 impl<'a> Checker<'a> {
     pub fn new(
@@ -195,43 +245,6 @@ impl<'a> Checker<'a> {
             }
         }
         self.diagnostics.push(diagnostic);
-    }
-
-    #[must_use]
-    pub fn build_settings(
-        config: &acton_config::config::ActonConfig,
-        contract_name: Option<&str>,
-    ) -> HashMap<Rule, LintLevel> {
-        let mut settings = HashMap::new();
-
-        settings.insert(Rule::UnauthorizedAccess, LintLevel::Allow); // disabled by default for now
-        settings.insert(Rule::ThrowRequiresDocumentedErrorValue, LintLevel::Allow);
-
-        let Some(lint) = config.lint.as_ref().and_then(|lint| lint.rules.as_ref()) else {
-            return settings;
-        };
-
-        // 1. Apply global settings
-        for (name, entry) in &lint.entries {
-            if let LintEntry::Level(level) = entry
-                && let Some(rule) = find_rule_by_name(name)
-            {
-                settings.insert(rule, level.clone());
-            }
-        }
-
-        // 2. Apply contract overrides
-        if let Some(contract_name) = contract_name
-            && let Some(LintEntry::Config(override_settings)) = lint.entries.get(contract_name)
-        {
-            for (name, level) in override_settings {
-                if let Some(rule) = find_rule_by_name(name) {
-                    settings.insert(rule, level.clone());
-                }
-            }
-        }
-
-        settings
     }
 
     #[must_use]
@@ -935,5 +948,32 @@ impl CheckerWalker<'_, '_> {
                 )
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod rule_settings_tests {
+    use super::{LintLevel, Rule, RuleSettingsBuilder};
+
+    #[test]
+    fn starts_with_defaults_and_applies_later_overrides() {
+        let mut builder = RuleSettingsBuilder::new();
+        builder.apply_rules([
+            ("name-case-checker", LintLevel::Warn),
+            ("unknown-rule", LintLevel::Deny),
+        ]);
+        builder.apply_rules([("name-case-checker", LintLevel::Deny)]);
+        let settings = builder.build();
+
+        assert_eq!(
+            settings.get(&Rule::UnauthorizedAccess),
+            Some(&LintLevel::Allow)
+        );
+        assert_eq!(
+            settings.get(&Rule::ThrowRequiresDocumentedErrorValue),
+            Some(&LintLevel::Allow)
+        );
+        assert_eq!(settings.get(&Rule::NameCaseChecker), Some(&LintLevel::Deny));
+        assert_eq!(settings.len(), 3);
     }
 }

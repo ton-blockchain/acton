@@ -17,7 +17,6 @@ tolk-ty = { workspace = true }
 tolk-analysis = { workspace = true }
 tolk-macros = { workspace = true }
 tolk-dataflow = { workspace = true }
-acton-config = { workspace = true }
 tree-sitter = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

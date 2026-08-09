@@ -72,7 +72,7 @@ fn symbol_to_document_symbol(symbol: &Symbol, file: &FileInfo, source: &str) -> 
     result
 }
 
-fn symbol_detail(symbol: &Symbol, file: &FileInfo, source: &str) -> Option<String> {
+pub(super) fn symbol_detail(symbol: &Symbol, file: &FileInfo, source: &str) -> Option<String> {
     match symbol.kind {
         SymbolKind::StructField => {
             let field = child_declaration::<StructField<'_>>(symbol, file)?;

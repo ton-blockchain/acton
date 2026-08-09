@@ -248,11 +248,9 @@ fun testing.setNow(now: uint32): void {
 
 /// Get the current Unix timestamp used in emulation.
 ///
-/// Returns the current time in the emulated blockchain.
-///
-/// Get-method execution prefers this mocked time once you have called
-/// [testing.setNow]. If the emulated time is still `0` (the default before any
-/// override), Acton falls back to the real wall clock for get-method runs.
+/// Test and script runs initialize this value from the current wall clock. A
+/// forked run uses the pinned block timestamp instead. Call [testing.setNow] to
+/// override it for time-dependent scenarios.
 ///
 /// Example:
 /// ```tolk

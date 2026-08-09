@@ -326,7 +326,7 @@ ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="localton" \
       org.opencontainers.image.description="Headless local TON network with TON HTTP API v2 and indexed API v3" \
       org.opencontainers.image.source="${SOURCE_URL}" \
-      org.opencontainers.image.licenses="GPL-3.0-or-later" \
+      org.opencontainers.image.licenses="MIT OR Apache-2.0" \
       org.opencontainers.image.version="${BUILD_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 

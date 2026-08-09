@@ -7,7 +7,7 @@ export function createClientLog(): vscode.LogOutputChannel {
   if (!consoleLogChannel) {
     consoleLogChannel = vscode.window.createOutputChannel("TON", {log: true})
 
-    if (process.env["TON_LS_DEV"] === "true") {
+    if (process.env.TON_LS_DEV === "true") {
       consoleLogChannel.show(true)
     }
   }
@@ -15,7 +15,7 @@ export function createClientLog(): vscode.LogOutputChannel {
 }
 
 export function consoleError(...items: unknown[]): void {
-  consoleLogChannel?.appendLine("[ERROR] " + items.map(element => itemToString(element)).join(" "))
+  consoleLogChannel?.appendLine(`[ERROR] ${items.map(element => itemToString(element)).join(" ")}`)
 }
 
 function itemToString(item: unknown): string {

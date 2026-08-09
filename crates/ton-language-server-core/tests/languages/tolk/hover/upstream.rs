@@ -303,7 +303,7 @@ fn basic_10_empty_struct_documentation() {
         ",
         expect![[r"
             ```tolk
-            struct Foo {}
+            struct Foo
             ```
             **Size:** 0 bits.
             

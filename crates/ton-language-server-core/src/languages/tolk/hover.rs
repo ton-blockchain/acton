@@ -6,12 +6,13 @@ use tolk_analysis::{
     estimate_serialization_size, is_simple_literal,
 };
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
-use tolk_resolver::{Resolved, Symbol, SymbolId, SymbolKind};
+use tolk_resolver::{
+    IndexedContract, IndexedContractField, Resolved, Symbol, SymbolId, SymbolKind,
+};
 use tolk_syntax::{
-    Annotation, Assert, AstNode, CatchClause, Contract, ContractField, EnumMember, FunctionLike,
-    HasGenericParams, HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw,
-    TopLevel, TryFromNode, Type, TypeAliasUnderlyingType, TypeParameter, VarDecl, clean_comment,
-    parse_tolk_int_literal,
+    Annotation, Assert, AstNode, CatchClause, EnumMember, Expr, FunctionLike, HasGenericParams,
+    HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw, TopLevel, TryFromNode,
+    Type, TypeAliasUnderlyingType, TypeParameter, Unary, VarDecl,
 };
 use tolk_ty::{TyData, TyId, TypeInterner};
 
@@ -56,6 +57,18 @@ impl TolkResolveSnapshot {
     fn special_hover(&self, file_id: u32, offset: usize) -> Option<Hover> {
         let file = self.file_db.get_by_id(file_id)?;
         let source = file.source().source.as_ref();
+        if let Some((contract, field)) = file.index().find_contract_field_at(offset) {
+            return Some(Hover::new(
+                contract_field_hover(contract, field),
+                self.range_for_span(file_id, field.name_span),
+            ));
+        }
+        if let Some(contract) = file.index().find_contract_at(offset) {
+            return Some(Hover::new(
+                contract_hover(contract),
+                self.range_for_span(file_id, contract.name_span),
+            ));
+        }
         let mut node = file
             .source()
             .tree
@@ -63,28 +76,6 @@ impl TolkResolveSnapshot {
             .descendant_for_byte_range(offset, offset.saturating_add(1))?;
 
         loop {
-            if let Ok(field) = ContractField::try_from_node(node)
-                && field
-                    .name()
-                    .is_some_and(|name| contains_offset(name.syntax(), offset))
-            {
-                let contents = contract_field_hover(field, source)?;
-                return Some(Hover::new(
-                    contents,
-                    self.range_for_node(file_id, field.name()?.syntax()),
-                ));
-            }
-            if let Ok(contract) = Contract::try_from_node(node)
-                && contract
-                    .name()
-                    .is_some_and(|name| contains_offset(name.syntax(), offset))
-            {
-                let contents = contract_hover(contract, source)?;
-                return Some(Hover::new(
-                    contents,
-                    self.range_for_node(file_id, contract.name()?.syntax()),
-                ));
-            }
             if let Ok(string) = StringLit::try_from_node(node)
                 && Import::try_from_node(string.syntax().parent()?).is_ok()
             {
@@ -105,6 +96,15 @@ impl TolkResolveSnapshot {
                 return Some(Hover::new(
                     contents,
                     self.range_for_node(file_id, string.syntax()),
+                ));
+            }
+            if let Ok(unary) = Unary::try_from_node(node)
+                && let Some(Expr::NumberLit(number)) = unary.argument()
+                && let Some(contents) = exit_code_hover(number, source)
+            {
+                return Some(Hover::new(
+                    contents,
+                    self.range_for_node(file_id, unary.syntax()),
                 ));
             }
             if let Ok(number) = NumberLit::try_from_node(node)
@@ -216,10 +216,12 @@ impl TolkResolveSnapshot {
                         .name()
                         .map(|name| compute_get_method_id(name.normalized_name(source)))
                 })?;
-                let docs = documentation_before(declaration.syntax(), source);
-                join_documentation(format!("Method ID: `0x{method_id:x}`"), docs)
+                join_documentation(
+                    format!("Method ID: `0x{method_id:x}`"),
+                    symbol.doc.to_string(),
+                )
             }
-            _ => documentation_before(declaration.syntax(), source),
+            _ => symbol.doc.to_string(),
         };
 
         let supports_serialized_size = matches!(
@@ -270,8 +272,7 @@ impl TolkResolveSnapshot {
             owner.name()?.text(source),
             struct_field_signature(field, source)?
         );
-        let documentation = field_documentation(field, source);
-        Some(render_hover(signature, documentation))
+        Some(render_hover(signature, symbol.doc.to_string()))
     }
 
     fn render_enum_member_hover(&self, symbol: &Symbol, source: &str) -> Option<String> {
@@ -289,7 +290,7 @@ impl TolkResolveSnapshot {
             member.name()?.text(source),
             default
         );
-        Some(render_hover(signature, field_documentation(member, source)))
+        Some(render_hover(signature, symbol.doc.to_string()))
     }
 
     fn render_local_hover(&self, local: &LocalDef) -> Option<String> {
@@ -310,7 +311,7 @@ impl TolkResolveSnapshot {
                 local_variable_signature(variable, source, &ty)?
             }
             LocalDefKind::Catch => {
-                let _catch = ancestor_as::<CatchClause<'_>>(node)?;
+                let _catch = node.ancestor_as::<CatchClause<'_>>()?;
                 format!("catch ({})", local.name)
             }
             LocalDefKind::TypeParameter => {
@@ -402,11 +403,22 @@ impl SerializationSizeContext for TolkResolveSnapshot {
 }
 
 fn exit_code_hover(number: NumberLit<'_>, source: &str) -> Option<String> {
-    let parent = number.syntax().parent()?;
+    let number_parent = number.syntax().parent()?;
+    let (expression, value) = if let Ok(unary) = Unary::try_from_node(number_parent)
+        && unary.operator_name(source) == "-"
+        && unary
+            .argument()
+            .is_some_and(|argument| argument.syntax() == number.syntax())
+    {
+        (unary.syntax(), number.parse_i32(source)?.checked_neg()?)
+    } else {
+        (number.syntax(), number.parse_i32(source)?)
+    };
+    let parent = expression.parent()?;
     let is_exit_code = if let Ok(statement) = Throw::try_from_node(parent) {
-        statement.expr()?.syntax() == number.syntax()
+        statement.expr()?.syntax() == expression
     } else if let Ok(statement) = Assert::try_from_node(parent) {
-        statement.expr()?.syntax() == number.syntax()
+        statement.expr()?.syntax() == expression
     } else {
         false
     };
@@ -414,7 +426,6 @@ fn exit_code_hover(number: NumberLit<'_>, source: &str) -> Option<String> {
         return None;
     }
 
-    let value = parse_tolk_int_literal(number.text(source))?.parse_i32()?;
     let (origin, description) = exit_code_info(value)?;
     Some(format!(
         "{description}\n\n**Phase**: {origin}\n\nLearn more about exit codes in documentation: \
@@ -515,12 +526,13 @@ fn struct_signature(structure: tolk_syntax::Struct<'_>, source: &str) -> Option<
         .filter_map(|field| struct_field_signature(field, source))
         .map(|field| format!("    {field}"))
         .collect::<Vec<_>>();
-    let body = if fields.is_empty() {
-        "{}".to_owned()
-    } else {
-        format!("{{\n{}\n}}", fields.join("\n"))
-    };
-    Some(format!("struct {prefix}{name}{type_parameters} {body}"))
+    if fields.is_empty() {
+        return Some(format!("struct {prefix}{name}{type_parameters}"));
+    }
+    Some(format!(
+        "struct {prefix}{name}{type_parameters} {{\n{}\n}}",
+        fields.join("\n")
+    ))
 }
 
 fn struct_field_signature(field: StructField<'_>, source: &str) -> Option<String> {
@@ -622,19 +634,12 @@ fn render_hover(signature: String, documentation: String) -> String {
     }
 }
 
-fn contract_hover(contract: Contract<'_>, source: &str) -> Option<String> {
-    let name = contract.name()?.text(source);
+fn contract_hover(contract: &IndexedContract) -> String {
     let fields = contract
-        .body()
-        .into_iter()
-        .flat_map(|body| body.fields())
-        .filter_map(|field| {
-            Some(format!(
-                "    {}: {}",
-                field.name()?.text(source),
-                field.value()?.text(source)
-            ))
-        })
+        .fields
+        .iter()
+        .filter(|field| !field.value.is_empty())
+        .map(|field| format!("    {}: {}", field.name, field.value))
         .collect::<Vec<_>>();
     let body = if fields.is_empty() {
         "{}".to_owned()
@@ -642,23 +647,20 @@ fn contract_hover(contract: Contract<'_>, source: &str) -> Option<String> {
         format!("{{\n{}\n}}", fields.join("\n"))
     };
 
-    Some(render_hover(
-        format!("contract {name} {body}"),
-        documentation_before(contract.syntax(), source),
-    ))
+    render_hover(
+        format!("contract {} {body}", contract.name),
+        contract.doc.to_string(),
+    )
 }
 
-fn contract_field_hover(field: ContractField<'_>, source: &str) -> Option<String> {
-    let name = field.name()?.text(source);
-    let owner = field.owner()?.name()?.text(source);
-    let standard = documentation::contract_field(name).unwrap_or_default();
-    let custom = field_documentation(field, source);
-    let documentation = join_documentation(standard.to_owned(), custom);
+fn contract_field_hover(contract: &IndexedContract, field: &IndexedContractField) -> String {
+    let standard = documentation::contract_field(&field.name).unwrap_or_default();
+    let documentation = join_documentation(standard.to_owned(), field.doc.to_string());
 
-    Some(render_hover(
-        format!("contract {owner}\n{name}"),
+    render_hover(
+        format!("contract {}\n{}", contract.name, field.name),
         documentation,
-    ))
+    )
 }
 
 fn parameter_signature(parameter: Parameter<'_>, source: &str, inferred: &str) -> Option<String> {
@@ -754,76 +756,10 @@ fn type_parameter_owner_signature(owner: TopLevel<'_>, source: &str) -> Option<S
     })
 }
 
-fn ancestor_as<'tree, N>(mut node: tree_sitter::Node<'tree>) -> Option<N>
-where
-    N: TryFromNode<'tree>,
-{
-    loop {
-        if let Ok(result) = N::try_from_node(node) {
-            return Some(result);
-        }
-        node = node.parent()?;
-    }
-}
-
-fn contains_offset(node: tree_sitter::Node<'_>, offset: usize) -> bool {
-    node.start_byte() <= offset && offset < node.end_byte()
-}
-
 fn join_documentation(first: String, second: String) -> String {
     match (first.is_empty(), second.is_empty()) {
         (true, _) => second,
         (_, true) => first,
         (false, false) => format!("{first}\n\n{second}"),
     }
-}
-
-fn documentation_before(node: tree_sitter::Node<'_>, source: &str) -> String {
-    let mut comments = Vec::new();
-    let mut sibling = node.prev_named_sibling();
-    let mut boundary = node.start_byte();
-    while let Some(comment) = sibling {
-        if comment.kind() != "comment" {
-            break;
-        }
-        if comment.prev_named_sibling().is_some_and(|previous| {
-            previous.kind() != "comment"
-                && previous.end_position().row == comment.start_position().row
-        }) {
-            break;
-        }
-        let gap = &source[comment.end_byte()..boundary];
-        if gap.matches('\n').count() > 1 {
-            break;
-        }
-        comments.push(comment.text(source).to_owned());
-        boundary = comment.start_byte();
-        sibling = comment.prev_named_sibling();
-    }
-    comments.reverse();
-    comments
-        .into_iter()
-        .map(|comment| clean_comment(&comment))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn field_documentation<'tree, N>(node: N, source: &str) -> String
-where
-    N: AstNode<'tree>,
-{
-    let node = node.syntax();
-    let preceding = documentation_before(node, source);
-    if !preceding.is_empty() {
-        return preceding;
-    }
-
-    let Some(comment) = node.next_named_sibling() else {
-        return String::new();
-    };
-    if comment.kind() != "comment" || comment.start_position().row != node.end_position().row {
-        return String::new();
-    }
-
-    clean_comment(comment.text(source))
 }

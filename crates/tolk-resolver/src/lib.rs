@@ -16,7 +16,8 @@ mod resolve_tests;
 
 pub use file_db::{FileDb, FileInfo};
 pub use file_index::{
-    AstNodeSpanExt, FileId, FileIndex, Import, Span, Symbol, SymbolId, SymbolKind,
+    AstNodeSpanExt, FileId, FileIndex, Import, IndexedContract, IndexedContractField, Span, Symbol,
+    SymbolId, SymbolKind,
 };
 pub use project_index::{
     ProjectIndex, ProjectIndexBuilder, ProjectSource, ProjectSourceProvider, ResolvedImport,
