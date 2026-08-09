@@ -292,21 +292,29 @@ fn suppresses_redundant_parameter_hints() {
 }
 
 #[test]
-fn skips_self_parameter_for_generic_method_calls() {
+fn maps_parameters_for_generic_calls() {
     case_tolk_inlay_hints(
         r"
+            fun genericFunction<T>(params: int): void {}
+            fun int.genericStatic<T>(params: int): void {}
             fun int.genericMethod<T>(self, params: int): void {}
 
             fun main(): void {
-                1.genericMethod<int>(2);
+                genericFunction<int>(1);
+                int.genericStatic<int>(2);
+                1.genericMethod<int>(3);
             }
         ",
         full_document_range(),
         expect![[r#"
+            fun genericFunction<T>(params: int): void {}
+            fun int.genericStatic<T>(params: int): void {}
             fun int.genericMethod<T>(self, params: int): void {}
 
             fun main(): void {
-                1.genericMethod<int>(/* params: */2);
+                genericFunction<int>(/* params: */1);
+                int.genericStatic<int>(/* params: */2);
+                1.genericMethod<int>(/* params: */3);
             }"#]],
     );
 }

@@ -550,14 +550,8 @@ impl<'tree> Call<'tree> {
 
     #[must_use]
     pub fn callee_identifier(&self) -> Option<Node<'tree>> {
-        let callee = self.callee()?;
-        match callee {
+        match self.callee_without_type_arguments()? {
             Expr::DotAccess(dot_access) => Some(dot_access.field()?.syntax()),
-            Expr::Instantiation(inst) => match inst.expr()? {
-                Expr::DotAccess(dot_access) => Some(dot_access.field()?.syntax()),
-                Expr::Ident(ident) => Some(ident.syntax()),
-                _ => None,
-            },
             Expr::Ident(ident) => Some(ident.syntax()),
             _ => None,
         }
@@ -577,14 +571,16 @@ impl<'tree> Call<'tree> {
 
     #[must_use]
     pub fn callee_qualifier(&self) -> Option<Expr<'tree>> {
-        let callee = self.callee()?;
-        match callee {
+        match self.callee_without_type_arguments()? {
             Expr::DotAccess(dot_access) => dot_access.obj(),
-            Expr::Instantiation(instantiation) => match instantiation.expr()? {
-                Expr::DotAccess(dot_access) => dot_access.obj(),
-                _ => None,
-            },
             _ => None,
+        }
+    }
+
+    fn callee_without_type_arguments(&self) -> Option<Expr<'tree>> {
+        match self.callee()? {
+            Expr::Instantiation(instantiation) => instantiation.expr(),
+            callee => Some(callee),
         }
     }
 }
@@ -1141,6 +1137,42 @@ impl<'tree> HasName<'tree> for InstanceArg<'tree> {
 mod tests {
     use super::{Call, parse_tolk_int_literal};
     use crate::{TryFromNode, parse};
+
+    #[test]
+    fn call_callee_parts_support_generic_instantiation() {
+        for (call_source, expected_name, expected_qualifier) in [
+            ("target(1)", "target", None),
+            ("target<int>(1)", "target", None),
+            ("value.target(1)", "target", Some("value")),
+            ("value.target<int>(1)", "target", Some("value")),
+            ("make().target<int>(1)", "target", Some("make()")),
+        ] {
+            let source = format!("fun main() {{ {call_source}; }}");
+            let target_offset = source.find("target").expect("call must exist");
+            let parsed = parse(&source).expect("source must parse");
+            let mut node = parsed
+                .tree
+                .root_node()
+                .descendant_for_byte_range(target_offset, target_offset + 1)
+                .expect("call identifier must exist");
+            let call = loop {
+                if let Ok(call) = Call::try_from_node(node) {
+                    break call;
+                }
+                node = node.parent().expect("identifier must be inside a call");
+            };
+
+            let callee = call
+                .callee_identifier()
+                .expect("call must have a callee identifier");
+            assert_eq!(callee.utf8_text(source.as_bytes()), Ok(expected_name));
+            assert_eq!(
+                call.callee_qualifier()
+                    .and_then(|qualifier| qualifier.syntax().utf8_text(source.as_bytes()).ok()),
+                expected_qualifier,
+            );
+        }
+    }
 
     #[test]
     fn argument_list_range_excludes_the_offset_after_the_closing_parenthesis() {

@@ -141,6 +141,48 @@ fn shows_static_and_instance_method_signatures() {
 }
 
 #[test]
+fn shows_generic_call_signatures() {
+    case_signature_help(
+        "
+            fun genericFunction<T>(params: int) {}
+            fun test() {
+                genericFunction<int>(<caret>1);
+            }
+        ",
+        expect![[r"
+            params: int
+            fun genericFunction(params: int)"]],
+    );
+
+    case_signature_help(
+        "
+            struct Foo {}
+            fun Foo.genericStatic<T>(params: int) {}
+            fun test() {
+                Foo.genericStatic<int>(<caret>1);
+            }
+        ",
+        expect![[r"
+            params: int
+            fun Foo.genericStatic(params: int)"]],
+    );
+
+    case_signature_help(
+        "
+            struct Foo {}
+            fun Foo.genericMethod<T>(self, params: int) {}
+            fun test() {
+                val foo: Foo = {};
+                foo.genericMethod<int>(<caret>1);
+            }
+        ",
+        expect![[r"
+            params: int
+            fun Foo.genericMethod(params: int)"]],
+    );
+}
+
+#[test]
 fn selects_the_innermost_nested_call() {
     case_signature_help(
         "
