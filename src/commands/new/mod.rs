@@ -21,10 +21,9 @@ pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";
+
 const BASE_GITIGNORE: &str = include_str!("templates/base/gitignore");
-
 const BASE_ENV_EXAMPLE: &str = include_str!("templates/base/env.example");
-
 const BASE_EDITORCONFIG: &str = include_str!("templates/base/editorconfig");
 
 const ACTON_TOML_REFERENCE_FOOTER: &str = "
@@ -234,9 +233,9 @@ pub fn new_cmd(
         fs::write("LICENSE", license_text)?;
     }
 
-    fs::write(".gitignore", BASE_GITIGNORE.trim_start())?;
-    fs::write(".env.example", BASE_ENV_EXAMPLE.trim_start())?;
-    fs::write(".editorconfig", BASE_EDITORCONFIG.trim_start())?;
+    fs::write(".gitignore", BASE_GITIGNORE)?;
+    fs::write(".env.example", BASE_ENV_EXAMPLE)?;
+    fs::write(".editorconfig", BASE_EDITORCONFIG)?;
 
     if let Err(e) = symlink_global_wallets() {
         println!(

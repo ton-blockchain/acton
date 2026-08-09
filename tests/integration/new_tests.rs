@@ -381,7 +381,15 @@ fn test_new_empty_project_non_interactive() {
         .assert_contains("Created new Acton project")
         .assert_contains("Project name: test-project")
         .assert_contains("Template: empty")
-        .assert_contains("License: MIT");
+        .assert_contains("License: MIT")
+        .assert_file_snapshot_matches(
+            "foobar/.gitignore",
+            "integration/snapshots/new/test_new_empty_project_gitignore.gen",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/.env.example",
+            "integration/snapshots/new/test_new_empty_project_env_example.gen",
+        );
 
     let acton_toml = project.path().join("foobar/Acton.toml");
     assert!(acton_toml.exists());
