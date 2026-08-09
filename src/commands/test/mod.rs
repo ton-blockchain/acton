@@ -1234,7 +1234,14 @@ fn run_file_tests(
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
-        let regex = match Regex::new(pattern) {
+        let regex_pattern = pattern
+            .strip_prefix('`')
+            .and_then(|pattern| pattern.strip_suffix('`'))
+            .map_or_else(
+                || Cow::Borrowed(pattern),
+                |test_name| Cow::Owned(format!("^{}$", regex::escape(test_name))),
+            );
+        let regex = match Regex::new(&regex_pattern) {
             Ok(r) => r,
             Err(e) => {
                 anyhow::bail!("Invalid regex pattern {}: {e}", pattern.yellow());

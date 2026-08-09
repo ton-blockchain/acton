@@ -1,7 +1,8 @@
 [
   {
     "label": "Acton: Run script",
-    "command": "acton script \"$ZED_FILE\"",
+    "command": "acton",
+    "args": ["script", "$ZED_FILE"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "reveal": "always",
@@ -9,7 +10,8 @@
   },
   {
     "label": "Acton: Test $ZED_CUSTOM_acton_test_name",
-    "command": "test_name=\"$(printenv ZED_CUSTOM_acton_test_name | sed 's/^`//; s/`$//')\"; acton test \"$(printenv ZED_FILE)\" --filter \"$test_name\"",
+    "command": "acton",
+    "args": ["test", "$ZED_FILE", "--filter", "$ZED_CUSTOM_acton_test_name"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "reveal": "always",
@@ -17,14 +19,16 @@
   },
   {
     "label": "Acton: Check current file",
-    "command": "acton check \"$ZED_FILE\"",
+    "command": "acton",
+    "args": ["check", "$ZED_FILE"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "reveal": "always"
   },
   {
     "label": "Acton: Format current file",
-    "command": "acton fmt \"$ZED_FILE\"",
+    "command": "acton",
+    "args": ["fmt", "$ZED_FILE"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "reveal": "always"
