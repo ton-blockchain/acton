@@ -3,9 +3,9 @@
 <img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
 Acton is an all-in-one TON smart contract development toolkit written in Rust.
-It combines project scaffolding, build, testing, scripting, wallet and network
-operations, verification, linting, formatting, debugging, and low-level VM
-tooling in one CLI.
+It combines project scaffolding, dependency-aware builds, native emulation,
+local networks, scripting, wallets, verification, language tooling, and
+low-level VM inspection in one CLI.
 
 Built for **humans**. Perfect for **AI**.
 
@@ -15,13 +15,28 @@ Built for **humans**. Perfect for **AI**.
 
 ## Why Acton
 
-- Single CLI for the full contract lifecycle: create, build, test, debug,
-  deploy, verify.
-- Native speed (Rust-based toolchain and test runtime).
-- Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
-- Ready for dApp development with project templates and automatically generated TypeScript wrappers.
-- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzz testing, and the browser Test UI.
-- Browser test UI for failed tests, traces, logs, and coverage inspection.
+- One project model from `Acton.toml`: dependency-aware compilation, caching,
+  generated Tolk and TypeScript wrappers, BoC-backed contracts, and reusable
+  scripts stay in one workflow.
+- A native testing loop for real TON behavior: external messages, pinned fork
+  tests, fuzzing, mutation testing, coverage, gas snapshots, and per-function
+  gas profiling.
+- Debugging that connects source to the chain: transaction retracing, source
+  maps, VM logs, and browser views for traces, storage, actions, and value flow.
+- A built-in local network for fast iteration, with wallets, faucet, manual or
+  clock-controlled mining, network forks, TonCenter-compatible APIs, LiteAPI,
+  persistence, snapshots, and checkpoints.
+- Acton Studio as a browser workspace for test history, simulated and
+  Docker-backed full localnet environments, explorer views, wallets, message
+  simulation, contract source and ABI, and API diagnostics.
+- Chain operations without a collection of unrelated tools: scripts, wallet
+  management, TON Connect approvals, contract verification, on-chain libraries,
+  custom networks, and explorer integration.
+- A Tolk-native developer experience with the bundled compiler and standard
+  libraries, formatter, linter, language server, VS Code support, and FunC-to-
+  Tolk migration tooling.
+- CI-friendly and automation-ready output, including JSON, SARIF, GitHub,
+  GitLab, JUnit, saved traces, and Docker workflows.
 
 ## Install
 
@@ -70,8 +85,8 @@ For more installation details, see the
 
 Acton is stable on the latest numbered GitHub release. The first-class platform
 matrix is macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
-documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
-today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
+documented baseline is Ubuntu 22 or newer. Native Windows is not supported
+today. If you use Windows, run Acton inside WSL with Ubuntu 22 or newer and
 follow the Linux installation path there. `trunk` builds installed via
 `acton up --trunk`, WSL installs, and other source-built targets are beta /
 best-effort surfaces for now. The full policy is documented at
