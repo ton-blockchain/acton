@@ -3,6 +3,7 @@ import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import {
   buildStorageDiff,
+  Checkbox,
   formatOpcode,
   formatGramAmount,
   formatNumberValue,
@@ -135,23 +136,54 @@ interface TreeLayout {
   }
 }
 
-const TREE_NODE_SIZE = {x: 200, y: 120} as const
+type TreeOrientation = "horizontal" | "vertical"
+
+interface TreeGeometry {
+  readonly nodeSize: {readonly x: number; readonly y: number}
+  readonly minSize: {readonly height: number; readonly width: number}
+  readonly padding: {
+    readonly top: number
+    readonly right: number
+    readonly bottom: number
+    readonly left: number
+  }
+  readonly initialTranslate: {readonly x: number; readonly y: number}
+}
+
+const TREE_GEOMETRY = {
+  horizontal: {
+    nodeSize: {x: 200, y: 120},
+    minSize: {height: 80, width: 800},
+    padding: {top: 8, right: 32, bottom: 8, left: 50},
+    initialTranslate: {x: 50, y: 40},
+  },
+  vertical: {
+    nodeSize: {x: 280, y: 220},
+    minSize: {height: 320, width: 800},
+    padding: {top: 24, right: 50, bottom: 32, left: 50},
+    initialTranslate: {x: 400, y: 24},
+  },
+} as const satisfies Record<TreeOrientation, TreeGeometry>
+
 const TREE_SEPARATION = {siblings: 0.7, nonSiblings: 1} as const
-const TREE_MIN_SIZE = {height: 80, width: 800} as const
-const TREE_PADDING = {top: 8, right: 32, bottom: 8, left: 50} as const
 const TREE_DETAILS_GAP = 15
-const TREE_EDGE_LABEL = {width: 150, height: 64, failedHeight: 84, x: -180, y: -40} as const
+const TREE_EDGE_LABEL = {
+  horizontal: {width: 150, height: 64, failedHeight: 84, x: -180, y: -40},
+  vertical: {width: 170, height: 64, failedHeight: 84, x: -190, y: -100},
+} as const satisfies Record<TreeOrientation, Record<string, number>>
 const TREE_ACCOUNT_LABEL_MAX_LENGTH = 20
 const ACTION_HIGHLIGHT_SCROLL_DELAY_MS = 200
 
-const INITIAL_TREE_LAYOUT: TreeLayout = {
-  height: TREE_MIN_SIZE.height,
-  width: TREE_MIN_SIZE.width,
-  translate: {
-    x: TREE_PADDING.left,
-    y: TREE_MIN_SIZE.height / 2,
-  },
+function getInitialTreeLayout(orientation: TreeOrientation): TreeLayout {
+  const geometry = TREE_GEOMETRY[orientation]
+  return {
+    height: geometry.minSize.height,
+    width: geometry.minSize.width,
+    translate: geometry.initialTranslate,
+  }
 }
+
+const INITIAL_TREE_LAYOUT: TreeLayout = getInitialTreeLayout("horizontal")
 
 function EdgeTransactionTooltipContent({
   data,
@@ -326,7 +358,11 @@ export function TransactionTree({
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
+  const [treeOrientation, setTreeOrientation] = useState<TreeOrientation>("horizontal")
   const [treeLayout, setTreeLayout] = useState<TreeLayout>(INITIAL_TREE_LAYOUT)
+  const treeGeometry = TREE_GEOMETRY[treeOrientation]
+  const treeEdgeLabel = TREE_EDGE_LABEL[treeOrientation]
+  const isVerticalTree = treeOrientation === "vertical"
   const shouldDecodeMessageBodies =
     transactions.length <= EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT
 
@@ -801,10 +837,10 @@ export function TransactionTree({
           )}
           {isTraceGapContinuation && (
             <foreignObject
-              width={TREE_EDGE_LABEL.width}
-              height={TREE_EDGE_LABEL.height}
-              x={TREE_EDGE_LABEL.x}
-              y={TREE_EDGE_LABEL.y}
+              width={treeEdgeLabel.width}
+              height={treeEdgeLabel.height}
+              x={treeEdgeLabel.x}
+              y={treeEdgeLabel.y}
             >
               <div className={styles.edgeText} role="note">
                 <div className={styles.topText}>
@@ -857,10 +893,10 @@ export function TransactionTree({
             />
           </g>
           <foreignObject
-            width={TREE_EDGE_LABEL.width}
-            height={traceGapError ? 96 : TREE_EDGE_LABEL.height}
-            x={TREE_EDGE_LABEL.x}
-            y={TREE_EDGE_LABEL.y}
+            width={treeEdgeLabel.width}
+            height={traceGapError ? 96 : treeEdgeLabel.height}
+            x={treeEdgeLabel.x}
+            y={treeEdgeLabel.y}
           >
             <div className={`${styles.edgeText} ${styles.traceGapLabel}`}>
               <div className={styles.topText}>
@@ -930,10 +966,10 @@ export function TransactionTree({
       return (
         <g>
           <foreignObject
-            width="4"
-            height="6"
-            x="-20"
-            y="-3"
+            width={isVerticalTree ? 6 : 4}
+            height={6}
+            x={isVerticalTree ? -3 : -20}
+            y={isVerticalTree ? -20 : -3}
             className={styles.foreignObjectContainer}
           >
             <svg
@@ -971,10 +1007,10 @@ export function TransactionTree({
           />
 
           <foreignObject
-            width={TREE_EDGE_LABEL.width}
-            height={TREE_EDGE_LABEL.height}
-            x={TREE_EDGE_LABEL.x}
-            y={TREE_EDGE_LABEL.y}
+            width={treeEdgeLabel.width}
+            height={treeEdgeLabel.height}
+            x={treeEdgeLabel.x}
+            y={treeEdgeLabel.y}
           >
             <div className={styles.edgeText}>
               <div className={styles.topText}>
@@ -1010,10 +1046,10 @@ export function TransactionTree({
     return (
       <g>
         <foreignObject
-          width="4"
-          height="6"
-          x="-20"
-          y="-3"
+          width={isVerticalTree ? 6 : 4}
+          height={6}
+          x={isVerticalTree ? -3 : -20}
+          y={isVerticalTree ? -20 : -3}
           className={styles.foreignObjectContainer}
         >
           <svg
@@ -1122,10 +1158,10 @@ export function TransactionTree({
           </g>
         )}
         <foreignObject
-          width={TREE_EDGE_LABEL.width}
-          height={hasFailureDetails ? TREE_EDGE_LABEL.failedHeight : TREE_EDGE_LABEL.height}
-          x={TREE_EDGE_LABEL.x}
-          y={TREE_EDGE_LABEL.y}
+          width={treeEdgeLabel.width}
+          height={hasFailureDetails ? treeEdgeLabel.failedHeight : treeEdgeLabel.height}
+          x={treeEdgeLabel.x}
+          y={treeEdgeLabel.y}
         >
           <div
             className={styles.edgeText}
@@ -1202,16 +1238,21 @@ export function TransactionTree({
     const groupTop = groupRect.top - wrapperRect.top
     const nextLayout: TreeLayout = {
       height: Math.max(
-        TREE_MIN_SIZE.height,
-        Math.ceil(groupRect.height + TREE_PADDING.top + TREE_PADDING.bottom + TREE_DETAILS_GAP),
+        treeGeometry.minSize.height,
+        Math.ceil(
+          groupRect.height +
+            treeGeometry.padding.top +
+            treeGeometry.padding.bottom +
+            TREE_DETAILS_GAP,
+        ),
       ),
       width: Math.max(
-        TREE_MIN_SIZE.width,
-        Math.ceil(groupRect.width + TREE_PADDING.left + TREE_PADDING.right),
+        treeGeometry.minSize.width,
+        Math.ceil(groupRect.width + treeGeometry.padding.left + treeGeometry.padding.right),
       ),
       translate: {
-        x: Math.round(treeLayout.translate.x + TREE_PADDING.left - groupLeft),
-        y: Math.round(treeLayout.translate.y + TREE_PADDING.top - groupTop),
+        x: Math.round(treeLayout.translate.x + treeGeometry.padding.left - groupLeft),
+        y: Math.round(treeLayout.translate.y + treeGeometry.padding.top - groupTop),
       },
     }
 
@@ -1224,7 +1265,7 @@ export function TransactionTree({
     if (!isSameLayout) {
       setTreeLayout(nextLayout)
     }
-  }, [treeData, treeLayout])
+  }, [treeData, treeGeometry, treeLayout])
 
   useLayoutEffect(() => {
     const container = treeContainerRef.current
@@ -1318,8 +1359,21 @@ export function TransactionTree({
 
   return (
     <div className={styles.container}>
+      <div className={styles.treeControls}>
+        <Checkbox
+          checked={isVerticalTree}
+          label="Render downward"
+          onChange={event => {
+            const nextOrientation = event.currentTarget.checked ? "vertical" : "horizontal"
+            forceHideTooltip()
+            setTreeOrientation(nextOrientation)
+            setTreeLayout(getInitialTreeLayout(nextOrientation))
+            treeContainerRef.current?.scrollTo({left: 0})
+          }}
+        />
+      </div>
       <div
-        className={styles.treeContainer}
+        className={`${styles.treeContainer} ${isVerticalTree ? styles.treeVertical : ""}`}
         ref={treeContainerRef}
         style={{height: `${treeLayout.height}px`}}
       >
@@ -1330,8 +1384,13 @@ export function TransactionTree({
         >
           <Tree
             data={treeData}
-            orientation="horizontal"
+            orientation={treeOrientation}
             pathFunc={event => {
+              if (isVerticalTree) {
+                const branchY = event.source.y + (event.target.y - event.source.y) / 2
+                return `M${event.source.x},${event.source.y}V${branchY}H${event.target.x}V${event.target.y - 18}`
+              }
+
               const t = event.target.data.attributes ?? {}
               return t.isFirst
                 ? "M"
@@ -1351,7 +1410,7 @@ export function TransactionTree({
                       .concat(event.target.x.toString(), "H")
                       .concat((event.target.y - 18).toString())
             }}
-            nodeSize={TREE_NODE_SIZE}
+            nodeSize={treeGeometry.nodeSize}
             separation={TREE_SEPARATION}
             renderCustomNodeElement={renderCustomNodeElement}
             pathClassFunc={getDynamicPathClass}

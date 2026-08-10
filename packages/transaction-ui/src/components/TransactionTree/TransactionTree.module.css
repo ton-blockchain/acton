@@ -23,6 +23,16 @@
   overflow: visible;
 }
 
+.treeControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 36px;
+  padding: 0 var(--acton-space-4);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+}
+
 .treeContainer {
   width: 100%;
   height: auto;
@@ -334,6 +344,17 @@
 .iconSvg {
   display: block;
   stroke: none;
+}
+
+.treeVertical .iconSvg {
+  transform: rotate(90deg);
+  transform-origin: center;
+}
+
+.treeVertical .edgeText {
+  border-radius: var(--acton-radius-control-sm);
+  background: var(--acton-color-surface);
+  box-shadow: 0 0 0 4px var(--acton-color-surface);
 }
 
 .transactionDetails {
