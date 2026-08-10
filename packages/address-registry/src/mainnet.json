@@ -1180,6 +1180,10 @@
     "name": "Notcoin Voucher Swap 1"
   },
   {
+    "address": "0:130a97c6c89d4954fc4781c7e906086060814d3e20f32f116e0e9ee7804f44ba",
+    "name": "Portals"
+  },
+  {
     "address": "0:1340f782c2d33343dbb9e274e350d70ae27ff45514b13ce39138b7ff204d0e53",
     "name": "ARKENSTON NFT"
   },
@@ -2590,6 +2594,10 @@
   {
     "address": "0:b200c91be9b37236528f1f4b496ee6e4d55563012ab2abdb19c2427c01bc4c93",
     "name": "Trapped Hearts"
+  },
+  {
+    "address": "0:b213aef5c7bfba6b54bc00ff94413d0185b4f2ea8d3d5d7c7272519159ac2c99",
+    "name": "Triple-A"
   },
   {
     "address": "0:b308c7f9b4f596f6250175885972549871b05c70ed3619fd5a939401eea972e4",
