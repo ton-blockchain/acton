@@ -634,7 +634,7 @@ fn shows_tlb_documentation_for_small_large_and_variable_integers() {
             - **Size**: 5 to 253 bits
             - **TL-B**: varint32
 
-            `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247. "#]],
+            `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247."#]],
     );
 }
 

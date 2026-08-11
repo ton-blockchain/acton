@@ -60,12 +60,12 @@ type never = builtin
 
 /// `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
 /// Note: it's still `int` at runtime, you can assign "100500" to "int8":
-/// overflow will happen at serialization to a cell/builder, NOT at assignment. 
+/// overflow will happen at serialization to a cell/builder, NOT at assignment.
 type intN = builtin
 
 /// `uint32`, `uint64`, `uint111`, etc. is "a fixed-width unsigned integer with N bits", N <= 256.
 /// Note: it's still `int` at runtime, you can assign "100500" to "uint8":
-/// overflow will happen at serialization to a cell/builder, NOT at assignment. 
+/// overflow will happen at serialization to a cell/builder, NOT at assignment.
 type uintN = builtin
 
 /// `coins` is a special primitive representing "nanograms". One GRAM = 10^9 nanograms.
@@ -73,16 +73,16 @@ type uintN = builtin
 /// Arithmetic operations on `coins` degrade to 257-bit `int` type.
 type coins = builtin
 
-/// `varint16` is `int` at runtime, but serialized as "variadic signed int", -2^119 <= X < 2^119. 
+/// `varint16` is `int` at runtime, but serialized as "variadic signed int", -2^119 <= X < 2^119.
 type varint16 = builtin
 
-/// `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120. 
+/// `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120.
 type varuint16 = builtin
 
-/// `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247. 
+/// `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247.
 type varint32 = builtin
 
-/// `varuint32` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^248. 
+/// `varuint32` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^248.
 type varuint32 = builtin
 
 /// `string` represents text data stored as a cell in snake format.
@@ -2025,5 +2025,4 @@ fun slice.skipMessageQueryId(mutate self): self
 @deprecated("use `createMessage` instead of composing messages manually")
 fun builder.storeMessageQueryId(mutate self, queryId: int): self
     asm(queryId self) "64 STU"
-
 
