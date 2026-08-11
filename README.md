@@ -12,7 +12,7 @@ Built for **humans**. Perfect for **AI**.
 
 <br clear="right" />
 
-## Act on-chain: from first line to live dApp
+## Act on-chain: one platform for every step
 
 - **Start a project.** Scaffold a new application or bring an existing one
   under a single `Acton.toml` project model for contracts, dependencies,
