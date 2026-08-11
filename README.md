@@ -3,7 +3,7 @@
 <img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
 Acton is an end-to-end platform that guides a TON project from its first smart
-contract to a complete dApp. Write, test, profile, and debug contracts with
+contract to a dApp. Write, test, profile, and debug contracts with
 integrated language and IDE tooling, connect them to a client, then run the
 whole application on `acton localnet` or real local TON nodes with Localton.
 When you are ready to go on-chain, Acton helps you deploy, verify contract
@@ -48,7 +48,7 @@ Built for **humans**. Perfect for **AI**.
   block production, and can run the same environment in CI.
 - **Move beyond simulation.** When `acton localnet` is not enough, use Localton
   to start real TON nodes and the supporting network stack on your computer,
-  then test the complete dApp locally before moving to Testnet.
+  then test the dApp locally before moving to Testnet.
 - **Work visually.** Acton Studio brings test history, local environments,
   explorer views, wallets, and message simulation into one browser workspace
   for developing and debugging the entire dApp.
