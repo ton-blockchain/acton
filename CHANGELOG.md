@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Stdlib
+
+- Added a `@acton/json` module for reading values out of JSON documents during
+  tests and scripts, complementing `fs.readFile`. Values are addressed with a
+  JSON Pointer (RFC 6901): `json.getInt`, `json.getString`, and `json.getBool`
+  return `null` on invalid JSON, a missing path, or a type mismatch (consistent
+  with `@acton/env`), and `json.exists` reports whether a pointer resolves.
+
 ## [1.1.0] - 22.05.2026
 
 Acton 1.1.0 is the first feature release after `v1.0.0`. It focuses on
