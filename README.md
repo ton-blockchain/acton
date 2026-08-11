@@ -16,7 +16,7 @@ Built for **humans**. Perfect for **AI**.
 
 <br clear="right" />
 
-## From contract to dApp
+## Act on-chain: from first line to live dApp
 
 - **Start a project.** Scaffold a new application or bring an existing one
   under a single `Acton.toml` project model for contracts, dependencies,
