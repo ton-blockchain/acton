@@ -69,7 +69,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read or parsed as TOML.
+    /// Returns an error if the config file cannot be read, parsed as TOML, or
+    /// selects a network other than testnet.
     pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let path = path.as_ref();
         let raw_config = fs::read_to_string(path).map_err(|source| ConfigError::Read {

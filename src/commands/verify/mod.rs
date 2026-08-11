@@ -396,6 +396,7 @@ pub fn verify_cmd(
 
     let source_max_attempts = 8;
     let mut response = None;
+    let mut last_send_error = None;
 
     for attempt in 1..=source_max_attempts {
         let form = build_verify_form(&upload_parts, &json_str)?;
@@ -821,8 +822,9 @@ struct NewVerifierErrorResponse {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum NewVerifierPaymentError {
+enum NewVerifierKnownError {
     RecoveryInProgress,
+    VerificationRetryable,
     InvalidTransactionHash,
     NotFound,
     Invalid,
@@ -832,7 +834,7 @@ enum NewVerifierPaymentError {
     InProgress,
 }
 
-impl NewVerifierPaymentError {
+impl NewVerifierKnownError {
     fn from_response_body(body: &str) -> Option<Self> {
         let response = serde_json::from_str::<NewVerifierErrorResponse>(body).ok()?;
         let code = response
@@ -842,6 +844,7 @@ impl NewVerifierPaymentError {
 
         match code {
             "payment_recovery_in_progress" => Some(Self::RecoveryInProgress),
+            "verification_retryable" => Some(Self::VerificationRetryable),
             "payment_tx_hash_invalid" => Some(Self::InvalidTransactionHash),
             "payment_not_found" => Some(Self::NotFound),
             "payment_invalid" => Some(Self::Invalid),
@@ -858,6 +861,9 @@ impl NewVerifierPaymentError {
             Self::RecoveryInProgress => {
                 "Acton verifier is rebuilding payment history. Try again shortly"
             }
+            Self::VerificationRetryable => {
+                "Verifier source storage is temporarily unavailable. The payment remains reusable; try again shortly"
+            }
             Self::InvalidTransactionHash => {
                 "Payment transaction hash is invalid. Use a 64-character hexadecimal or 32-byte base64 hash"
             }
@@ -873,7 +879,7 @@ impl NewVerifierPaymentError {
             Self::CodeHashMismatch => {
                 "Payment transaction is for a different code hash. Request a new ticket and pay with the exact payment comment"
             }
-            Self::Used => "Payment transaction has already been used for a verification",
+            Self::Used => "Payment transaction was already used for a verification",
             Self::InProgress => {
                 "Payment transaction is already being processed. Wait for the current verification to finish"
             }
@@ -881,7 +887,10 @@ impl NewVerifierPaymentError {
     }
 
     const fn is_transient(self) -> bool {
-        matches!(Self::RecoveryInProgress | Self::InProgress, self)
+        matches!(
+            self,
+            Self::RecoveryInProgress | Self::VerificationRetryable | Self::InProgress
+        )
     }
 }
 
@@ -894,7 +903,7 @@ fn normalize_new_verifier_transaction_hash(transaction_hash: &str) -> anyhow::Re
 }
 
 fn friendly_new_verifier_error(body: &str) -> Option<&'static str> {
-    NewVerifierPaymentError::from_response_body(body).map(NewVerifierPaymentError::friendly_message)
+    NewVerifierKnownError::from_response_body(body).map(NewVerifierKnownError::friendly_message)
 }
 
 struct NewVerifierPaymentQuote {
@@ -1212,7 +1221,7 @@ fn is_expected_payment_transaction(
 ) -> bool {
     if transaction.emulated
         || transaction.finality != "finalized"
-        || transaction.description.aborted.unwrap_or(false)
+        || transaction.description.aborted != Some(false)
         || !ton_addresses_equal(&transaction.account, &quote.payment_address)
     {
         return false;
@@ -1220,7 +1229,7 @@ fn is_expected_payment_transaction(
     let Some(incoming) = transaction.in_msg.as_ref() else {
         return false;
     };
-    if incoming.bounced.unwrap_or(false)
+    if incoming.bounced != Some(false)
         || !incoming
             .destination
             .as_deref()
@@ -1243,14 +1252,30 @@ fn is_expected_payment_transaction(
     incoming
         .message_content
         .as_ref()
-        .and_then(|content| content.decoded.as_ref())
+        .and_then(toncenter_message_comment)
+        .as_deref()
+        == Some(quote.comment.as_str())
+}
+
+fn toncenter_message_comment(content: &v3::MessageContent) -> Option<String> {
+    content
+        .decoded
+        .as_ref()
         .and_then(|decoded| {
             decoded
                 .get("comment")
                 .or_else(|| decoded.get("text"))
                 .and_then(serde_json::Value::as_str)
         })
-        == Some(quote.comment.as_str())
+        .map(ToOwned::to_owned)
+        .or_else(|| content.body.as_deref().and_then(parse_ton_comment_boc))
+}
+
+fn parse_ton_comment_boc(body: &str) -> Option<String> {
+    let cell = Boc::decode_base64(body).ok()?;
+    let mut slice = cell.as_slice().ok()?;
+    (slice.load_u32().ok()? == 0).then_some(())?;
+    Tuple::parse_snake_string_slice(&mut slice)
 }
 
 fn ton_addresses_equal(left: &str, right: &str) -> bool {
@@ -1369,7 +1394,6 @@ fn verify_with_new_verifier(
 
     let source_max_attempts = 8;
     let mut response = None;
-    let mut last_send_error = None;
 
     for attempt in 1..=source_max_attempts {
         let form = build_new_verify_form(
@@ -1402,8 +1426,8 @@ fn verify_with_new_verifier(
                 }
 
                 let error_text = res.text().unwrap_or_else(|_| "Unknown error".to_string());
-                let payment_error = NewVerifierPaymentError::from_response_body(&error_text);
-                let should_retry = payment_error.is_some_and(NewVerifierPaymentError::is_transient)
+                let known_error = NewVerifierKnownError::from_response_body(&error_text);
+                let should_retry = known_error.is_some_and(NewVerifierKnownError::is_transient)
                     && attempt < source_max_attempts;
                 if should_retry {
                     println!(
@@ -1417,8 +1441,8 @@ fn verify_with_new_verifier(
                     continue;
                 }
 
-                if let Some(payment_error) = payment_error {
-                    anyhow::bail!(payment_error.friendly_message());
+                if let Some(known_error) = known_error {
+                    anyhow::bail!(known_error.friendly_message());
                 }
                 let body = truncate_for_display(&error_text, 4_000);
                 anyhow::bail!(
@@ -2158,6 +2182,30 @@ mod tests {
         pending.finality = "unfinalized".to_owned();
         assert!(!is_expected_payment_transaction(&pending, &quote));
 
+        let mut missing_aborted = transaction.clone();
+        missing_aborted.description.aborted = None;
+        assert!(!is_expected_payment_transaction(&missing_aborted, &quote));
+
+        let mut aborted = transaction.clone();
+        aborted.description.aborted = Some(true);
+        assert!(!is_expected_payment_transaction(&aborted, &quote));
+
+        let mut missing_bounced = transaction.clone();
+        missing_bounced
+            .in_msg
+            .as_mut()
+            .expect("payment should have an incoming message")
+            .bounced = None;
+        assert!(!is_expected_payment_transaction(&missing_bounced, &quote));
+
+        let mut bounced = transaction.clone();
+        bounced
+            .in_msg
+            .as_mut()
+            .expect("payment should have an incoming message")
+            .bounced = Some(true);
+        assert!(!is_expected_payment_transaction(&bounced, &quote));
+
         let mut insufficient = transaction.clone();
         insufficient
             .in_msg
@@ -2183,5 +2231,28 @@ mod tests {
             .expect("payment should have a decoded comment")["comment"] =
             json!("acton-verify:v1:wrong-code-hash");
         assert!(!is_expected_payment_transaction(&wrong_comment, &quote));
+    }
+
+    #[test]
+    fn payment_trace_decodes_the_comment_from_raw_boc() {
+        let quote = payment_quote();
+        let mut transaction = payment_transaction();
+        let mut body = CellBuilder::new();
+        body.store_u32(0).expect("comment opcode should store");
+        body.store_raw(
+            COMMENT.as_bytes(),
+            u16::try_from(COMMENT.len() * 8).expect("comment should fit in a cell"),
+        )
+        .expect("comment should store");
+        let body = body.build().expect("comment body should build");
+        let content = transaction
+            .in_msg
+            .as_mut()
+            .and_then(|message| message.message_content.as_mut())
+            .expect("payment should have message content");
+        content.decoded = None;
+        content.body = Some(Boc::encode_base64(&body));
+
+        assert!(is_expected_payment_transaction(&transaction, &quote));
     }
 }

@@ -1,0 +1,1 @@
+Error: Payment transaction is already being processed. Wait for the current verification to finish

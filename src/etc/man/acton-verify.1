@@ -62,7 +62,7 @@ Defaults to \fB52258\fR\&.
 .RS 4
 Tolk compiler version to request on the verifier side.
 .sp
-Currently defaults to \fB1.4.1\fR\&.
+Currently defaults to \fB1.4.2\fR\&.
 .RE
 .sp
 \fB\-\-dry\-run\fR
@@ -264,7 +264,7 @@ wallet selected in the TON Connect page
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'if a contract with the same code hash is already verified, the backend may
+\h'-04'\(bu\h'+03'if a contract with the same code hash is already verified, the backend can
 skip the final transaction
 .RE
 .SH "COST AND BACKEND NOTES"
@@ -396,6 +396,16 @@ Acton starts a local TON Connect page and opens it in the browser. Use
 \h'-04'\(bu\h'+03'backend problems can also be narrowed down by pointing
 \fBACTON_VERIFY_BACKEND\fR at a specific endpoint
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-new\fR, only an explicitly retryable source storage failure permits
+reuse of the same payment
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'other \fB\-\-new\fR results after the payment claim consume the payment, including
+generic internal failures
+.RE
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -475,7 +485,7 @@ acton verify Counter \-\-new \-\-wallet deployer
 .sp
 .RS 4
 .nf
-acton verify Counter \-\-new \-\-payment\-tx\-hash <transaction\-hash>
+acton verify Counter \-\-new \-\-payment\-tx\-hash '<transaction\-hash>'
 .fi
 .RE
 .RE

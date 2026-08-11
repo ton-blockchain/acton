@@ -1,0 +1,1 @@
+Error: Acton verifier is rebuilding payment history. Try again shortly

@@ -1,6 +1,10 @@
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    io,
+    path::PathBuf,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use async_trait::async_trait;
@@ -33,6 +37,14 @@ impl MockSourceStorage {
     pub fn failing(message: &str) -> Self {
         Self {
             outcome: MockSourceStorageOutcome::Failed(message.to_owned()),
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+            stored_bundles: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn failing_io(message: &str) -> Self {
+        Self {
+            outcome: MockSourceStorageOutcome::IoFailed(message.to_owned()),
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
             stored_bundles: Arc::new(Mutex::new(Vec::new())),
         }
@@ -102,13 +114,14 @@ impl SourceStorage for MockSourceStorage {
             MockSourceStorageOutcome::Failed(message) => {
                 Err(SourceStorageError::Operation(message.clone()))
             }
+            MockSourceStorageOutcome::IoFailed(message) => Err(write_error(message)),
             MockSourceStorageOutcome::FailOnce {
                 message,
                 receipt,
                 failed,
             } => {
                 if !failed.swap(true, Ordering::AcqRel) {
-                    return Err(SourceStorageError::Operation(message.clone()));
+                    return Err(write_error(message));
                 }
                 Ok(self.store_confirmed(&request, receipt))
             }
@@ -176,11 +189,19 @@ impl RecordedSourceStorageRequest {
 enum MockSourceStorageOutcome {
     Confirmed(SourceStorageReceipt),
     Failed(String),
+    IoFailed(String),
     FailOnce {
         message: String,
         receipt: SourceStorageReceipt,
         failed: AtomicBool,
     },
+}
+
+fn write_error(message: &str) -> SourceStorageError {
+    SourceStorageError::WriteFile {
+        path: PathBuf::from("mock-source-storage-write"),
+        source: io::Error::other(message.to_owned()),
+    }
 }
 
 fn stored_bundle_from_request(

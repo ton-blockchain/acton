@@ -1,0 +1,1 @@
+Error: Payment transaction hash is invalid. Use a 64-character hexadecimal or 32-byte base64 hash

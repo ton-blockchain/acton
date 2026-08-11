@@ -15,7 +15,11 @@ use verifier::{
     blockchain::ToncenterClient,
     compilers::{CompileGeneratedSource, CompileRequest, NodeCompilerService},
     config::Config,
-    payment::{PaymentAttemptOutcome, PaymentClaim, PaymentError, PaymentQuote, PaymentVerifier},
+    payment::{
+        HistorySort, OnchainPaymentVerifier, PaymentAttemptOutcome, PaymentBlockchainClient,
+        PaymentClaim, PaymentError, PaymentLedger, PaymentMessage, PaymentQuote,
+        PaymentTransaction, PaymentVerifier,
+    },
     registry::SourceVerificationRegistry,
     registry_index::SqliteVerificationIndex,
     source_storage::{SharedSourceStorage, SourceMapData},
@@ -27,6 +31,10 @@ mod mock_compiler;
 mod mock_source_storage;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
+pub const PAYMENT_ADDRESS: &str =
+    "0:1111111111111111111111111111111111111111111111111111111111111111";
+pub const PAYMENT_TX_HASH: &str =
+    "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b";
 
 pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppState {
     let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
@@ -47,6 +55,7 @@ pub fn recovering_payment_app_state(compiled_code_hash: &str) -> AppState {
         Arc::new(MockPaymentVerifier {
             ready: false,
             outcomes: None,
+            claim_error: Mutex::new(None),
         }),
     )
 }
@@ -64,6 +73,58 @@ pub fn recording_payment_app_state(
             payment_verifier,
         ),
         outcomes,
+    )
+}
+
+pub fn payment_error_app_state(compiled_code_hash: &str, error: PaymentError) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    app_state_from_parts_with_payment(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+        Arc::new(compiler_service),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+        Arc::new(MockPaymentVerifier {
+            ready: true,
+            outcomes: None,
+            claim_error: Mutex::new(Some(error)),
+        }),
+    )
+}
+
+pub async fn fail_once_source_storage_app_state(
+    compiled_code_hash: &str,
+    code_hash: &str,
+) -> (
+    AppState,
+    Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>,
+) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let source_storage = mock_source_storage::MockSourceStorage::failing_once(
+        "source storage internal test details",
+    );
+    let recorded_requests = source_storage.recorded_requests();
+    let client = Arc::new(StaticPaymentBlockchainClient::new(
+        Some(payment_transaction(PAYMENT_TX_HASH, code_hash)),
+        Vec::new(),
+    ));
+    let payment_verifier = Arc::new(OnchainPaymentVerifier::new(
+        client,
+        PaymentLedger::in_memory().expect("in-memory payment ledger should open"),
+        PAYMENT_ADDRESS.to_owned(),
+        1_000_000,
+    ));
+    payment_verifier
+        .recover()
+        .await
+        .expect("empty payment history recovery should succeed");
+
+    (
+        app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(source_storage),
+            payment_verifier,
+        ),
+        recorded_requests,
     )
 }
 
@@ -234,7 +295,7 @@ pub fn failing_source_storage_app_state_with_payment_outcomes(
         app_state_from_parts_with_payment(
             Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
             Arc::new(compiler_service),
-            Arc::new(mock_source_storage::MockSourceStorage::failing(
+            Arc::new(mock_source_storage::MockSourceStorage::failing_io(
                 "source storage failed",
             )),
             payment_verifier,
@@ -250,6 +311,38 @@ pub fn failing_compiler_app_state(code_hashes: &[(&str, &str)], error: &str) -> 
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
         Arc::new(compiler_service),
         Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
+pub fn failing_compiler_app_state_with_payment_outcomes(
+    error: &str,
+) -> (AppState, Arc<Mutex<Vec<PaymentAttemptOutcome>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::failing(error);
+    let (payment_verifier, outcomes) = recording_payment_verifier();
+    (
+        app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+            payment_verifier,
+        ),
+        outcomes,
+    )
+}
+
+pub fn timing_out_compiler_app_state_with_payment_outcomes(
+    timeout_ms: u128,
+) -> (AppState, Arc<Mutex<Vec<PaymentAttemptOutcome>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::timing_out(timeout_ms);
+    let (payment_verifier, outcomes) = recording_payment_verifier();
+    (
+        app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+            payment_verifier,
+        ),
+        outcomes,
     )
 }
 
@@ -278,6 +371,7 @@ fn app_state_from_parts(
         Arc::new(MockPaymentVerifier {
             ready: true,
             outcomes: None,
+            claim_error: Mutex::new(None),
         }),
     )
 }
@@ -304,6 +398,7 @@ fn app_state_from_parts_with_payment(
 struct MockPaymentVerifier {
     ready: bool,
     outcomes: Option<Arc<Mutex<Vec<PaymentAttemptOutcome>>>>,
+    claim_error: Mutex<Option<PaymentError>>,
 }
 
 fn recording_payment_verifier() -> (
@@ -315,6 +410,7 @@ fn recording_payment_verifier() -> (
         Arc::new(MockPaymentVerifier {
             ready: true,
             outcomes: Some(Arc::clone(&outcomes)),
+            claim_error: Mutex::new(None),
         }),
         outcomes,
     )
@@ -344,8 +440,17 @@ impl PaymentVerifier for MockPaymentVerifier {
         transaction_hash: &str,
         _code_hash: &str,
     ) -> Result<PaymentClaim, PaymentError> {
+        let claim_error = self
+            .claim_error
+            .lock()
+            .expect("payment claim error mutex should not be poisoned")
+            .take();
+        if let Some(error) = claim_error {
+            return Err(error);
+        }
         Ok(PaymentClaim {
             transaction_hash: transaction_hash.to_owned(),
+            claim_version: 1,
         })
     }
 
@@ -361,6 +466,66 @@ impl PaymentVerifier for MockPaymentVerifier {
                 .push(outcome);
         }
         Ok(())
+    }
+}
+
+pub struct StaticPaymentBlockchainClient {
+    transaction: Option<PaymentTransaction>,
+    history: Vec<PaymentTransaction>,
+}
+
+impl StaticPaymentBlockchainClient {
+    pub const fn new(
+        transaction: Option<PaymentTransaction>,
+        history: Vec<PaymentTransaction>,
+    ) -> Self {
+        Self {
+            transaction,
+            history,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl PaymentBlockchainClient for StaticPaymentBlockchainClient {
+    async fn transaction_by_hash(
+        &self,
+        _transaction_hash: &str,
+    ) -> Result<Option<PaymentTransaction>, PaymentError> {
+        Ok(self.transaction.clone())
+    }
+
+    async fn transactions(
+        &self,
+        _account: &str,
+        limit: usize,
+        offset: usize,
+        sort: HistorySort,
+    ) -> Result<Vec<PaymentTransaction>, PaymentError> {
+        let mut history = self.history.clone();
+        history.sort_by(|left, right| (left.lt, &left.hash).cmp(&(right.lt, &right.hash)));
+        if matches!(sort, HistorySort::Descending) {
+            history.reverse();
+        }
+        Ok(history.into_iter().skip(offset).take(limit).collect())
+    }
+}
+
+pub fn payment_transaction(transaction_hash: &str, code_hash: &str) -> PaymentTransaction {
+    PaymentTransaction {
+        account: PAYMENT_ADDRESS.to_owned(),
+        hash: transaction_hash.to_owned(),
+        lt: 42,
+        timestamp: 1_700_000_000,
+        emulated: false,
+        finality: "finalized".to_owned(),
+        aborted: false,
+        incoming: Some(PaymentMessage {
+            destination: Some(PAYMENT_ADDRESS.to_owned()),
+            value: Some(1_000_000),
+            bounced: false,
+            comment: Some(format!("acton-verify:v1:{code_hash}")),
+        }),
     }
 }
 
@@ -387,10 +552,7 @@ async fn post_verify_request(
     include_payment: bool,
 ) -> Response {
     if include_payment {
-        parts.push(text_part(
-            "tx_hash",
-            "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b",
-        ));
+        parts.push(text_part("tx_hash", PAYMENT_TX_HASH));
     }
     let body = multipart_body(parts);
     let mut request = Request::builder()

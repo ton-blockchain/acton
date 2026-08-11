@@ -62,7 +62,7 @@ Defaults to `52258`.
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
-Currently defaults to `1.4.1`.
+Currently defaults to `1.4.2`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
@@ -170,7 +170,7 @@ With `--new`, the process is:
 - one payment transaction can authorize only one verification attempt
 - verification requires a funded local or TON Connect wallet when not using
   `--dry-run`
-- if a contract with the same code hash is already verified, the backend may
+- if a contract with the same code hash is already verified, the backend can
   skip the final transaction
 
 ## Cost And Backend Notes
@@ -254,6 +254,10 @@ Acton starts a local TON Connect page and opens it in the browser. Use
 - 5xx failures suggest retrying later and using `ACTON_VERIFY_DEBUG=1`
 - backend problems can also be narrowed down by pointing
   `ACTON_VERIFY_BACKEND` at a specific endpoint
+- with `--new`, only an explicitly retryable source storage failure permits
+  reuse of the same payment
+- other `--new` results after the payment claim consume the payment, including
+  generic internal failures
 
 ## Exit Status
 
@@ -304,7 +308,7 @@ Acton starts a local TON Connect page and opens it in the browser. Use
 7. Retry an upload with an existing finalized payment:
 
    ```bash
-   acton verify Counter --new --payment-tx-hash <transaction-hash>
+   acton verify Counter --new --payment-tx-hash '<transaction-hash>'
    ```
 
 ## See Also

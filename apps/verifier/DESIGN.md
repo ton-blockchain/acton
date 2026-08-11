@@ -30,7 +30,7 @@ the payment wallet history after each restart.
 - Keep exactly one current source bundle for each code hash.
 - Make the registry rebuildable from Git without relying on process-local state.
 - Keep the registry implementation pluggable behind Rust traits.
-- Require one testnet payment for each new verification attempt.
+- Require one testnet payment for each new public verification attempt.
 - Bind each payment to one code hash through the transaction comment.
 - Rebuild payment replay state from TON history after a server restart.
 
@@ -53,10 +53,12 @@ Etherscan and Blockscout:
   a source bundle to the registry.
 - Git is the source of record for accepted source bundles.
 - The SQLite registry index is derived state and can be rebuilt from Git.
+- The configured TonCenter v3 provider is trusted to report payment
+  transactions, message bodies, and finality correctly.
 - Users who need stronger assurance can download a bundle, recompute its
   `source_bundle_hash`, recompile it, and compare the resulting `code_hash`.
 
-This is not a trustless proof system. The product should use wording such as
+This is not a trustless proof system. The product must use wording such as
 "verified by this source registry" and avoid claiming external anchoring.
 
 ## Architecture
@@ -99,6 +101,12 @@ Responsibilities:
 Payment verification always uses TON testnet. The CLI does not accept `--net`
 with `--new`.
 
+The ticket always binds a code hash, even when the final `/verify` request also
+contains an address. The client computes or resolves the code hash before it
+requests the ticket. The backend then uses the address as a consistency check.
+If the address changes code before submission, verification fails before the
+payment claim.
+
 `POST /api/v1/take-ticket` accepts a code hash. If the code hash is verified,
 the endpoint returns the stored bundle metadata. No payment is necessary.
 
@@ -122,28 +130,64 @@ only when all these conditions are true:
 - The incoming value is not less than the configured minimum.
 - The comment equals the ticket comment for the requested code hash.
 
+TonCenter sees the configured payment address, wallet-history reads, and each
+transaction hash that the backend checks. Operators must treat this metadata as
+visible to their provider. A compromised provider can bypass the payment gate,
+but it cannot make mismatched source code pass compilation.
+
 The payment ledger uses the transaction hash as its primary key. Ledger states
 are `processing`, `retryable`, and `consumed`. Concurrent claims for one hash
 return a conflict.
 
-A deterministic result consumes the payment. This includes a source mismatch
-or a client error. An internal `5xx` error makes the payment retryable in the
-same server process.
+A deterministic result consumes the payment. This includes a source mismatch,
+a client error, or a generic internal error after the claim. Only a source
+storage failure that the backend explicitly classifies as retryable returns the
+payment to `retryable` in the same server process.
+
+One payment permits at most three claims, including claims after an expired
+processing lease. The fourth claim returns `payment_used` without another
+TonCenter request. Each claim has a generation number. A stale worker cannot
+finish a newer claim after its lease expires.
 
 For a successful public verification, the backend stores the payment
 transaction hash in lowercase hexadecimal form. The source manifest and lookup
 API include this hash. The verifier UI links the hash to Actonscan testnet.
 
 At startup, the payment verifier is not ready. It reads every page of incoming
-testnet history up to a captured chain tip. It replaces the ledger with these
-historical protocol payments and marks every entry as `consumed`.
+testnet history up to a captured chain tip. It marks all known ledger entries
+as `consumed`, then adds funded historical protocol payments as `consumed`.
+The merge never deletes existing replay evidence.
 
-The startup scan includes protocol payments even when their amount is too
-small. This rule prevents replay after a database loss. Payments without the
-protocol comment cannot authorize verification.
+The startup scan ignores payments below the configured minimum. These payments
+cannot authorize verification. Payments without the protocol comment also
+cannot authorize verification.
 
 During recovery, `/healthz` and `/take-ticket` return `503`. The server retries
 a failed scan with an exponential delay of up to 30 seconds.
+
+For unverified code, `/verify` also returns `503` before it claims the payment.
+An already-verified lookup can still return successfully during recovery.
+
+Recovery conservatively consumes a payment that reached the payment wallet
+before a server crash. This rule also applies when compilation or storage did
+not finish before the crash.
+
+Another request can verify the code after ticket issuance but before source
+submission. In this race, `/verify` returns `already_verified` without claiming
+the payment. The payment cannot verify another code hash and recovery later
+marks it as consumed.
+
+The payment ledger is a local SQLite database. The current claim and recovery
+protocol supports one write-capable verifier process for each payment wallet.
+Horizontal replicas require a shared transactional ledger and coordinated
+recovery before they can accept verification requests safely.
+
+Payment tickets are not persisted and do not freeze the quoted configuration.
+An address rotation invalidates payments sent to the old address. A minimum
+amount increase can invalidate a payment that used an earlier quote. Operators
+must stop ticket issuance and drain or discard outstanding quotes before either
+configuration change. Startup recovery scans only the currently configured
+payment address.
 
 ### Source Storage
 
@@ -202,6 +246,8 @@ This means:
 - Address-specific state is out of scope.
 - A checker must first read the current code hash of the address they care
   about, then query the registry with that code hash.
+- A public address submission must request its ticket with that resolved code
+  hash. It can include the address in `/verify` to detect a later code change.
 
 ## Source Bundle
 
@@ -243,7 +289,8 @@ not expose a base64 source-content field.
 12. If the hashes differ, the response is `mismatch` and no bundle is stored.
 13. If the hashes match, the registry stores the payment hash and source bundle.
 14. The API returns `match`, `source_bundle_hash`, and `storage_revision`.
-15. The backend consumes the payment unless an internal server error occurred.
+15. The backend consumes the payment unless an allowlisted source storage
+    failure occurred and the retry budget remains.
 
 ## Lookup Flow
 
@@ -263,12 +310,15 @@ Current public endpoints:
 POST /api/v1/take-ticket
 POST /api/v1/verify
 GET /api/v1/openapi.json
+GET /healthz
 GET /api/v1/verification/status?code_hash=...
 GET /api/v1/verification/status?address=...
 GET /api/v1/verification/source?code_hash=...
 GET /api/v1/verification/source?address=...
 GET /api/v1/last_verified?limit=50&offset=0
 GET /api/v1/abi?code_hash=...
+GET /api/v1/statistics
+GET /api/v1/statistics/history
 ```
 
 Status responses include:
@@ -282,13 +332,21 @@ Source responses include:
 - `verified`
 - `bundle`, which is `null` when the code hash is not verified
 
-Each source bundle includes `source_bundle_hash`, `verified_at`,
-`storage_revision`, `entrypoint`, a grouped `compiler` object, and source
-`files`.
+Each source bundle includes `source_bundle_hash`, optional `payment_tx_hash`,
+`verified_at`, `storage_revision`, `entrypoint`, a grouped `compiler` object,
+optional `source_map`, and source `files`.
 
-Last verified and ABI requests accept `limit` and `offset`, but responses only
-include `items`. Last verified items are ordered by recent verification time;
-ABI items contain the `code_hash` and parsed `abi` JSON.
+`payment_tx_hash` is absent only for an authenticated administrative submission
+that sets `verified_at` and skips the public payment flow.
+
+Last verified and ABI requests accept `limit` and `offset`. Last verified
+responses include `items` and `total`. ABI responses include `items`. Last
+verified items are ordered by recent verification time. ABI items contain the
+`code_hash` and parsed `abi` JSON.
+
+The API also provides `/api/v1/statistics` and
+`/api/v1/statistics/history`. The OpenAPI document defines the response shapes
+and all error status codes.
 
 ## Failure Handling
 
@@ -298,7 +356,16 @@ Important cases:
 - Payment is missing, invalid, insufficient, or for another code hash: request
   fails before compilation.
 - Payment is already used or processing: request fails with a conflict.
-- Internal verification failure: payment state changes to `retryable`.
+- Source directory and file I/O failures are retryable. A failed Git push is
+  also retryable. The payment state changes to `retryable`.
+- Invalid storage configuration, repository integrity errors, Git commit
+  errors, and cleanup errors consume the payment.
+- A payment can enter `processing` at most three times. Later claims return
+  `payment_used` without a TonCenter request.
+- An expired claim cannot finish a newer claim because each claim has a
+  generation number.
+- Other results after a payment claim, including generic internal failures:
+  payment state changes to `consumed`.
 - Deterministic verification result: payment state changes to `consumed`.
 - Compilation fails: no storage write.
 - Hash mismatch: no storage write.

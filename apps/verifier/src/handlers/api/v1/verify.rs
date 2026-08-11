@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
+    blockchain::{is_valid_code_hash, is_valid_hash, normalize_code_hash, normalize_hash},
     compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
     payment::PaymentAttemptOutcome,
@@ -40,6 +40,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
 #[utoipa::path(
     post,
     path = "/api/v1/verify",
+    operation_id = "verify",
     request_body(
         content = VerifyMultipartRequest,
         content_type = "multipart/form-data",
@@ -47,10 +48,13 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
     ),
     responses(
         (status = 200, description = "Verification completed", body = VerifyResponse),
-        (status = 400, description = "Invalid verification request or compilation mismatch input", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid verification request or compilation failure", body = crate::error::ErrorResponse),
         (status = 401, description = "A valid API key is required to set verified_at", body = crate::error::ErrorResponse),
+        (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
-        (status = 502, description = "Compiler, blockchain, or source storage failure", body = crate::error::ErrorResponse)
+        (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
+        (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
+        (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
         ("X-Verifier-Key" = Option<String>, Header, description = "API key required only when verified_at is provided")
@@ -166,6 +170,19 @@ async fn handle_multipart(
         ));
     }
 
+    let code_hash = match non_empty_text(code_hash) {
+        Some(code_hash) => {
+            let code_hash = normalize_code_hash(code_hash.trim());
+            if !is_valid_code_hash(&code_hash) {
+                return Err(ApiError::bad_request(
+                    "code_hash must contain exactly 64 hexadecimal characters".to_owned(),
+                ));
+            }
+            Some(code_hash)
+        }
+        None => None,
+    };
+
     let language = language
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| ApiError::bad_request("missing required field: language".to_owned()))?;
@@ -177,7 +194,7 @@ async fn handle_multipart(
 
     let target = VerificationTarget {
         address: non_empty_text(address),
-        code_hash: non_empty_text(code_hash),
+        code_hash,
     };
 
     let resolved_target = state.verification_service().resolve_target(target).await?;
@@ -235,7 +252,7 @@ async fn handle_multipart(
     .await;
 
     if let Some(claim) = payment_claim {
-        let outcome = if result.as_ref().is_err_and(ApiError::is_server_error) {
+        let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
             PaymentAttemptOutcome::Retryable
         } else {
             PaymentAttemptOutcome::Consumed

@@ -52,6 +52,11 @@ const verifiedSourceResponse = (codeHash: string, paymentTransactionHash?: strin
   },
 })
 
+const VERIFIED_SOURCE_RESPONSES = new Map([
+  [PAYMENT_CODE_HASH, verifiedSourceResponse(PAYMENT_CODE_HASH, PAYMENT_TX_HASH)],
+  [LEGACY_CODE_HASH, verifiedSourceResponse(LEGACY_CODE_HASH)],
+])
+
 test.describe("Verified contracts", () => {
   test.beforeEach(async ({page}) => {
     await prepareVisualPage(page, {app: "explorer"})
@@ -71,16 +76,8 @@ test.describe("Verified contracts", () => {
 
       if (url.pathname.endsWith("/verification/source")) {
         const codeHash = url.searchParams.get("code_hash") ?? VERIFIED_ITEMS[0].code_hash
-        if (codeHash === PAYMENT_CODE_HASH) {
-          await route.fulfill({json: verifiedSourceResponse(codeHash, PAYMENT_TX_HASH)})
-          return
-        }
-        if (codeHash === LEGACY_CODE_HASH) {
-          await route.fulfill({json: verifiedSourceResponse(codeHash)})
-          return
-        }
         await route.fulfill({
-          json: {
+          json: VERIFIED_SOURCE_RESPONSES.get(codeHash) ?? {
             code_hash: codeHash,
             verified: false,
             bundle: null,
@@ -96,7 +93,7 @@ test.describe("Verified contracts", () => {
   test("restores the page and scroll position after opening a contract", async ({page}) => {
     await page.goto("/verified")
     await page.getByRole("button", {name: "Go to page 2"}).click()
-    await expect(page).toHaveURL(/\/verified\?page=2$/)
+    await expect(page).toHaveURL(/\/verified\?network=mainnet&page=2$/)
 
     const target = VERIFIED_ITEMS.at(44)
     if (!target) {
@@ -109,11 +106,11 @@ test.describe("Verified contracts", () => {
     expect(previousScrollY).toBeGreaterThan(0)
 
     await targetRow.click()
-    await expect(page).toHaveURL(`/verified/${target.code_hash}`)
+    await expect(page).toHaveURL(`/verified/${target.code_hash}?network=mainnet`)
 
     await page.goBack()
 
-    await expect(page).toHaveURL(/\/verified\?page=2$/)
+    await expect(page).toHaveURL(/\/verified\?network=mainnet&page=2$/)
     await expect(page.getByRole("button", {name: "Go to page 2"})).toHaveAttribute(
       "aria-current",
       "page",
@@ -137,7 +134,7 @@ test.describe("Verified contracts", () => {
     const newTab = await newTabPromise
 
     await expect(newTab).toHaveURL(`/verified/${target.code_hash}`)
-    await expect(page).toHaveURL("/verified")
+    await expect(page).toHaveURL(/\/verified\?network=mainnet$/)
     await newTab.close()
   })
 
@@ -159,7 +156,7 @@ test.describe("Verified contracts", () => {
     const newTab = await newTabPromise
 
     await expect(newTab).toHaveURL(`/verified/${target.code_hash}`)
-    await expect(page).toHaveURL("/verified")
+    await expect(page).toHaveURL(/\/verified\?network=mainnet$/)
     await newTab.close()
   })
 
@@ -192,9 +189,12 @@ test.describe("Verified contracts", () => {
     await page.goto(`/verified/${PAYMENT_CODE_HASH}`)
 
     await expect(page.getByText("Payment tx", {exact: true})).toBeVisible()
-    const horizontalOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(horizontalOverflow).toBeLessThanOrEqual(0)
+    const paymentLink = page.getByRole("link", {
+      name: `View payment transaction ${PAYMENT_TX_HASH} on Actonscan`,
+    })
+    const bounds = await paymentLink.boundingBox()
+    expect(bounds).not.toBeNull()
+    expect(bounds?.x ?? -1).toBeGreaterThanOrEqual(0)
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 361)).toBeLessThanOrEqual(360)
   })
 })

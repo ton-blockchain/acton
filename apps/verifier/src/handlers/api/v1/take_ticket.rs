@@ -13,10 +13,12 @@ use crate::{
 #[utoipa::path(
     post,
     path = "/api/v1/take-ticket",
+    operation_id = "take_ticket",
     request_body = TakeTicketRequest,
     responses(
         (status = 200, description = "Verification status or testnet payment quote", body = TakeTicketResponse),
         (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
+        (status = 502, description = "Verification registry failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     tag = "verification"

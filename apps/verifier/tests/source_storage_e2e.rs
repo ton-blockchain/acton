@@ -315,8 +315,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
             payment_tx_hash: Some(
-                "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b"
-                    .to_owned(),
+                "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b".to_owned(),
             ),
             verified_at: None,
             compiler: CompilerMetadata {
@@ -503,6 +502,175 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     assert_eq!(remote_head, receipt.revision);
 
     Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_cleans_up_after_commit_failure_and_allows_retry()
+-> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+    let initial_revision = storage
+        .current_revision()
+        .await?
+        .expect("fixture should have an initial revision");
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["config", "commit.gpgsign", "true"],
+        )?,
+        "git config commit.gpgsign",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["config", "gpg.program", "/path/that/does/not/exist/gpg"],
+        )?,
+        "git config gpg.program",
+    )?;
+
+    let error = storage
+        .store_bundle(source_bundle_request())
+        .await
+        .expect_err("commit should fail when the signing program is unavailable");
+    assert!(matches!(error, SourceStorageError::Git { .. }));
+    assert_eq!(
+        git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?,
+        initial_revision
+    );
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["status", "--porcelain=v1", "--untracked-files=all"]
+        )?,
+        ""
+    );
+    assert!(!fixture.repo_path.join("sources").join(CODE_HASH).exists());
+
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["config", "--unset", "commit.gpgsign"],
+        )?,
+        "git config --unset commit.gpgsign",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["config", "--unset", "gpg.program"],
+        )?,
+        "git config --unset gpg.program",
+    )?;
+
+    let receipt = storage.store_bundle(source_bundle_request()).await?;
+    assert!(receipt.created);
+    assert!(storage.load_bundle(CODE_HASH).await?.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
+-> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+    let initial_revision = storage
+        .current_revision()
+        .await?
+        .expect("fixture should have an initial revision");
+    let unavailable_remote = fixture.temp.path().join("unavailable.git");
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "remote",
+                "set-url",
+                "origin",
+                path_str(&unavailable_remote)?,
+            ],
+        )?,
+        "git remote set-url unavailable",
+    )?;
+
+    let error = storage
+        .store_bundle(source_bundle_request())
+        .await
+        .expect_err("push should fail when the remote does not exist");
+    assert!(matches!(error, SourceStorageError::Git { .. }));
+    assert_eq!(
+        git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?,
+        initial_revision
+    );
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["status", "--porcelain=v1", "--untracked-files=all"]
+        )?,
+        ""
+    );
+    assert!(!fixture.repo_path.join("sources").join(CODE_HASH).exists());
+
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "remote",
+                "set-url",
+                "origin",
+                path_str(&fixture.remote_path)?,
+            ],
+        )?,
+        "git remote set-url restored",
+    )?;
+
+    let receipt = storage.store_bundle(source_bundle_request()).await?;
+    assert!(receipt.created);
+    assert_eq!(
+        git_output(
+            fixture.temp.path(),
+            [
+                "--git-dir",
+                path_str(&fixture.remote_path)?,
+                "rev-parse",
+                "refs/heads/main",
+            ]
+        )?,
+        receipt.revision
+    );
+
+    Ok(())
+}
+
+fn source_bundle_request() -> StoreSourceBundleRequest {
+    StoreSourceBundleRequest {
+        code_hash: CODE_HASH.to_owned(),
+        source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+        payment_tx_hash: Some(
+            "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b".to_owned(),
+        ),
+        verified_at: Some(ORIGINAL_VERIFIED_AT),
+        compiler: CompilerMetadata {
+            language: "tolk".to_owned(),
+            version: "1.4.2".to_owned(),
+            entrypoint: "main.tolk".to_owned(),
+            params: json!({"compiler_version": "1.4.2"}),
+        },
+        files: vec![SourceStorageFile {
+            path: "main.tolk".to_owned(),
+            content: "fun main() {}".to_owned(),
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        }],
+        source_map: None,
+    }
 }
 
 fn unix_timestamp() -> Result<u64, Box<dyn Error>> {

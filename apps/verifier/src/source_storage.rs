@@ -160,6 +160,7 @@ impl GitSourceStorage {
 
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash);
         let bundle_dir = repo_path.join(&bundle_path);
+        let mut rollback_revision = None;
         let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
             .await
             .map_err(|source| SourceStorageError::ReadDir {
@@ -169,35 +170,58 @@ impl GitSourceStorage {
             let bundle = read_bundle(repo_path, &bundle_path).await?;
             Some(bundle.storage_revision)
         } else {
-            let verified_at = request
-                .verified_at
-                .map_or_else(current_unix_timestamp, Ok)?;
-            let files_dir = bundle_dir.join("files");
-            fs::create_dir_all(&files_dir).await.map_err(|source| {
-                SourceStorageError::CreateDir {
-                    path: files_dir.clone(),
-                    source,
+            let previous_revision = if self.commit_enabled {
+                Some(git_output(repo_path, &["rev-parse", "HEAD"]).await?)
+            } else {
+                None
+            };
+            let write_result = async {
+                let verified_at = request
+                    .verified_at
+                    .map_or_else(current_unix_timestamp, Ok)?;
+                let files_dir = bundle_dir.join("files");
+                fs::create_dir_all(&files_dir).await.map_err(|source| {
+                    SourceStorageError::CreateDir {
+                        path: files_dir.clone(),
+                        source,
+                    }
+                })?;
+
+                write_bundle_files(&files_dir, &request.files).await?;
+                let manifest_hash = write_manifest(&bundle_dir, &request, verified_at).await?;
+
+                if self.commit_enabled {
+                    git(repo_path, &["add", "--", &bundle_path]).await?;
+
+                    let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
+                    if staged {
+                        let message = commit_message(&request, &manifest_hash);
+                        git_with_author(
+                            repo_path,
+                            &["commit", "-m", &message, "--", &bundle_path],
+                            self,
+                            verified_at,
+                        )
+                        .await?;
+                    }
                 }
-            })?;
 
-            write_bundle_files(&files_dir, &request.files).await?;
-            let manifest_hash = write_manifest(&bundle_dir, &request, verified_at).await?;
-
-            if self.commit_enabled {
-                git(repo_path, &["add", "--", &bundle_path]).await?;
-
-                let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
-                if staged {
-                    let message = commit_message(&request, &manifest_hash);
-                    git_with_author(
-                        repo_path,
-                        &["commit", "-m", &message, "--", &bundle_path],
-                        self,
-                        verified_at,
-                    )
-                    .await?;
-                }
+                Ok::<(), SourceStorageError>(())
             }
+            .await;
+            if let Err(operation) = write_result {
+                if let Err(cleanup) =
+                    cleanup_uncommitted_bundle(repo_path, &bundle_path, &bundle_dir).await
+                {
+                    return Err(SourceStorageError::CleanupFailed {
+                        operation: Box::new(operation),
+                        cleanup: Box::new(cleanup),
+                    });
+                }
+                return Err(operation);
+            }
+
+            rollback_revision = previous_revision;
             None
         };
 
@@ -213,7 +237,18 @@ impl GitSourceStorage {
                 None => current_branch(repo_path).await?,
             };
             let refspec = format!("HEAD:{branch}");
-            git(repo_path, &["push", &self.remote, &refspec]).await?;
+            if let Err(operation) = git(repo_path, &["push", &self.remote, &refspec]).await {
+                if let Some(previous_revision) = rollback_revision
+                    && let Err(cleanup) =
+                        rollback_committed_bundle(repo_path, &previous_revision, &bundle_dir).await
+                {
+                    return Err(SourceStorageError::CleanupFailed {
+                        operation: Box::new(operation),
+                        cleanup: Box::new(cleanup),
+                    });
+                }
+                return Err(operation);
+            }
         }
 
         Ok(SourceStorageReceipt { revision, created })
@@ -357,6 +392,11 @@ pub enum SourceStorageError {
         path: PathBuf,
         source: std::io::Error,
     },
+    #[error("failed to remove directory {path}: {source}", path = path.display())]
+    RemoveDir {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to read directory {path}: {source}", path = path.display())]
     ReadDir {
         path: PathBuf,
@@ -407,8 +447,46 @@ pub enum SourceStorageError {
     },
     #[error("git repository has detached HEAD; configure source_repository.branch")]
     DetachedHead,
+    #[error("source storage operation failed: {operation}; cleanup also failed: {cleanup}")]
+    CleanupFailed {
+        operation: Box<Self>,
+        cleanup: Box<Self>,
+    },
     #[error("{0}")]
     Operation(String),
+}
+
+async fn cleanup_uncommitted_bundle(
+    repo_path: &Path,
+    bundle_path: &str,
+    bundle_dir: &Path,
+) -> Result<(), SourceStorageError> {
+    let reset_result = git(repo_path, &["reset", "--", bundle_path]).await;
+    let remove_result = remove_bundle_dir(bundle_dir).await;
+    reset_result?;
+    remove_result
+}
+
+async fn rollback_committed_bundle(
+    repo_path: &Path,
+    previous_revision: &str,
+    bundle_dir: &Path,
+) -> Result<(), SourceStorageError> {
+    let reset_result = git(repo_path, &["reset", "--mixed", previous_revision]).await;
+    let remove_result = remove_bundle_dir(bundle_dir).await;
+    reset_result?;
+    remove_result
+}
+
+async fn remove_bundle_dir(bundle_dir: &Path) -> Result<(), SourceStorageError> {
+    match fs::remove_dir_all(bundle_dir).await {
+        Ok(()) => Ok(()),
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(SourceStorageError::RemoveDir {
+            path: bundle_dir.to_path_buf(),
+            source,
+        }),
+    }
 }
 
 async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {

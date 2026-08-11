@@ -51,7 +51,7 @@ OPTIONS
        --compiler-version version
            Tolk compiler version to request on the verifier side.
 
-           Currently defaults to 1.4.1.
+           Currently defaults to 1.4.2.
 
        --dry-run
            Run verification without submitting the final blockchain
@@ -185,7 +185,7 @@ REQUIREMENTS AND LIMITATIONS
           using --dry-run
 
        o  if a contract with the same code hash is already verified, the
-          backend may skip the final transaction
+          backend can skip the final transaction
 
 COST AND BACKEND NOTES
        o  when --dry-run is not used, the final verification transaction sends
@@ -273,6 +273,12 @@ RETRIES AND FAILURE HINTS
        o  backend problems can also be narrowed down by pointing
           ACTON_VERIFY_BACKEND at a specific endpoint
 
+       o  with --new, only an explicitly retryable source storage failure
+          permits reuse of the same payment
+
+       o  other --new results after the payment claim consume the payment,
+          including generic internal failures
+
 EXIT STATUS
        o  0: Verification completed successfully, including successful dry runs
           and flows where the backend decides that no final transaction is
@@ -309,7 +315,7 @@ EXAMPLES
 
        7. Retry an upload with an existing finalized payment:
 
-              acton verify Counter --new --payment-tx-hash <transaction-hash>
+              acton verify Counter --new --payment-tx-hash '<transaction-hash>'
 
 SEE ALSO
        o  Contract verification guide

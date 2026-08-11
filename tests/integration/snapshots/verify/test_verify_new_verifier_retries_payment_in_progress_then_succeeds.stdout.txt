@@ -3,9 +3,6 @@
   ✓ Compiled successfully
   → Code hash: 0xe67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
   → Requesting verification ticket
-  → Contract address: [WALLET_ADDRESS_BASE]
-  → Checking deployed code hash for address
-  ✓ Address code hash matches compiled code
   → Collecting source files
   ✓ Collected 1 source file
   → Using new Acton verifier
@@ -16,7 +13,10 @@
   → Payment comment: acton-verify:v1:e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
   → Reusing testnet payment transaction: a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b
   → Sending sources to new verifier
+  ↻ New verifier returned 409 Conflict (HTTP/1.1, cf-ray=-) on attempt 1/8, retrying...
   ✓ New verifier accepted source bundle
+  → Source bundle: a7f1d1a6aabbccddeeff00112233445566778899aabbccddeeff001122334455
+  → Storage revision: 0123456789abcdef
 
 ✓ Contract verification completed!
 View at: [LOCALHOST_URL]/e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973

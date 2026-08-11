@@ -60,6 +60,13 @@ impl MockCompilerService {
         }
     }
 
+    pub fn timing_out(timeout_ms: u128) -> Self {
+        Self {
+            result: MockCompilerResult::Timeout { timeout_ms },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     pub fn by_compiler(compilers: &[(&str, &str, &str)]) -> Self {
         Self {
             result: MockCompilerResult::ByCompiler(
@@ -91,6 +98,9 @@ enum MockCompilerResult {
     CompileFailed {
         error: String,
     },
+    Timeout {
+        timeout_ms: u128,
+    },
     ByCompiler(BTreeMap<(String, String), String>),
 }
 
@@ -119,6 +129,9 @@ impl CompilerService for MockCompilerService {
             MockCompilerResult::CompileFailed { error } => {
                 Err(CompilerError::CompileFailed(error.clone()))
             }
+            MockCompilerResult::Timeout { timeout_ms } => Err(CompilerError::Timeout {
+                timeout_ms: *timeout_ms,
+            }),
             MockCompilerResult::ByCompiler(code_hashes) => {
                 let code_hash = code_hashes.get(&compiler).ok_or_else(|| {
                     CompilerError::CompileFailed(format!(

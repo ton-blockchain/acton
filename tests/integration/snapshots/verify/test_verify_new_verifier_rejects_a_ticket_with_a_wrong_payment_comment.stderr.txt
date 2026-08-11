@@ -1,0 +1,1 @@
+Error: Verifier ticket returned a payment comment for a different code hash

@@ -1,0 +1,1 @@
+Error: Payment transaction was not found on TON testnet. Check the transaction hash and try again

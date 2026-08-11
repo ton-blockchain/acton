@@ -1,0 +1,1 @@
+Error: Payment transaction was already used for a verification

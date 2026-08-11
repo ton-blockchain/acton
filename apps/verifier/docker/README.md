@@ -41,7 +41,7 @@ Run with generated config:
 docker run --rm -p 3000:3000 \
   -e VERIFIER_NETWORK=testnet \
   -e VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com \
-  -e VERIFIER_PAYMENT_ADDRESS=0:<64-hex-character-testnet-wallet-address> \
+  -e 'VERIFIER_PAYMENT_ADDRESS=0:<64-hex-character-testnet-wallet-address>' \
   -e VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000 \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
   -e SOURCE_REPOSITORY_STORAGE_ROOT=sources \
@@ -55,7 +55,7 @@ docker run --rm -p 3000:3000 \
 The verifier accepts payments only on TON testnet. The payment address must
 use raw basechain form. At startup, the service rebuilds the payment ledger
 from wallet history and reports `503` until the scan is complete. This example
-sets the minimum payment to `0.5 TON`.
+sets the minimum payment to `0.5 GRAM`.
 
 Or mount a full TOML config:
 

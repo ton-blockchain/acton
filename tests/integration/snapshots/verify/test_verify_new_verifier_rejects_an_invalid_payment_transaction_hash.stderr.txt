@@ -1,0 +1,1 @@
+Error: Invalid --payment-tx-hash: expected a 64-character hexadecimal or 32-byte base64 TON transaction hash

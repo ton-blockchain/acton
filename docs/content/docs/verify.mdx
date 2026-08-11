@@ -78,7 +78,7 @@ If an upload retry needs an existing payment, pass its finalized recipient
 transaction hash:
 
 ```bash
-acton verify Counter --new --payment-tx-hash <transaction-hash>
+acton verify Counter --new --payment-tx-hash '<transaction-hash>'
 ```
 
 ## Choose the wallet for the verification transaction
@@ -124,10 +124,12 @@ acton verify Counter --address EQDt7LL... --dry-run
 The built-in verifier still uploads sources and collects signatures. It skips
 only the final blockchain transaction.
 
-With `--new`, Acton requests a ticket and prepares the source request. It does
-not send the testnet payment or upload the sources.
+For the built-in verifier, use this mode to confirm that the backend accepts the
+source package before the wallet spends GRAM.
 
-Use this mode to confirm that the verifier backend accepts the source package before spending GRAM from the wallet.
+With `--new`, Acton requests a ticket and prepares the source request. It does
+not send the testnet payment or upload the sources. Therefore, this mode does
+not confirm that the backend accepts the source package.
 
 ## Pin the compiler version
 
@@ -182,7 +184,10 @@ ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
 ```
 
-If the backend returns a transient `5xx` error, retry the command. Acton automatically retries source upload failures before exiting.
+The built-in verifier retries transient source upload failures. With `--new`,
+reuse the same payment only when the backend explicitly reports a retryable
+source storage failure. Other results after the payment claim consume the
+payment.
 
 ## See also
 

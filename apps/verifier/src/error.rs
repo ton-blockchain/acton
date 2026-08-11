@@ -13,12 +13,16 @@ use crate::{
 };
 
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
+const RETRYABLE_SOURCE_STORAGE_ERROR: &str =
+    "verification_retryable: source storage is temporarily unavailable";
 
 #[derive(Debug)]
 pub struct ApiError {
     status: StatusCode,
     message: String,
     expose_message: bool,
+    public_fallback: &'static str,
+    payment_retryable: bool,
 }
 
 impl ApiError {
@@ -27,14 +31,8 @@ impl ApiError {
             status: StatusCode::BAD_REQUEST,
             message,
             expose_message: true,
-        }
-    }
-
-    pub const fn bad_gateway(message: String) -> Self {
-        Self {
-            status: StatusCode::BAD_GATEWAY,
-            message,
-            expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 
@@ -43,6 +41,18 @@ impl ApiError {
             status: StatusCode::BAD_GATEWAY,
             message,
             expose_message: false,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
+        }
+    }
+
+    const fn retryable_source_storage(message: String) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message,
+            expose_message: false,
+            public_fallback: RETRYABLE_SOURCE_STORAGE_ERROR,
+            payment_retryable: true,
         }
     }
 
@@ -51,6 +61,8 @@ impl ApiError {
             status: StatusCode::UNAUTHORIZED,
             message,
             expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 
@@ -59,6 +71,8 @@ impl ApiError {
             status: StatusCode::PAYMENT_REQUIRED,
             message,
             expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 
@@ -67,6 +81,8 @@ impl ApiError {
             status: StatusCode::CONFLICT,
             message,
             expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 
@@ -75,12 +91,14 @@ impl ApiError {
             status: StatusCode::SERVICE_UNAVAILABLE,
             message,
             expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 
     #[must_use]
-    pub fn is_server_error(&self) -> bool {
-        self.status.is_server_error()
+    pub const fn is_payment_retryable(&self) -> bool {
+        self.payment_retryable
     }
 
     pub const fn not_found(message: String) -> Self {
@@ -88,6 +106,8 @@ impl ApiError {
             status: StatusCode::NOT_FOUND,
             message,
             expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
         }
     }
 }
@@ -97,7 +117,7 @@ impl From<VerificationError> for ApiError {
         match err {
             VerificationError::CodeHashNotFound { .. } => Self::not_found(err.to_string()),
             VerificationError::Blockchain(blockchain_err) => {
-                Self::bad_gateway(blockchain_err.to_string())
+                Self::hidden_bad_gateway(blockchain_err.to_string())
             }
             err => Self::bad_request(err.to_string()),
         }
@@ -108,7 +128,7 @@ impl From<CompilerError> for ApiError {
     fn from(err: CompilerError) -> Self {
         match err {
             CompilerError::CompileFailed(message) => Self::bad_request(message),
-            err => Self::bad_gateway(err.to_string()),
+            err => Self::hidden_bad_gateway(err.to_string()),
         }
     }
 }
@@ -120,7 +140,7 @@ impl From<RegistryError> for ApiError {
             | RegistryError::VerificationIndex(VerificationIndexError::SourceStorage(err)) => {
                 Self::from(err)
             }
-            err => Self::bad_gateway(err.to_string()),
+            err => Self::hidden_bad_gateway(err.to_string()),
         }
     }
 }
@@ -133,14 +153,38 @@ impl From<SourceBundleError> for ApiError {
 
 impl From<SourceStorageError> for ApiError {
     fn from(err: SourceStorageError) -> Self {
-        let should_hide_message = should_hide_source_storage_message(&err);
+        let retryable = source_storage_error_is_payment_retryable(&err);
         let message = err.to_string();
-
-        if should_hide_message {
-            Self::hidden_bad_gateway(message)
+        if retryable {
+            Self::retryable_source_storage(message)
         } else {
-            Self::bad_gateway(message)
+            Self::hidden_bad_gateway(message)
         }
+    }
+}
+
+fn source_storage_error_is_payment_retryable(err: &SourceStorageError) -> bool {
+    match err {
+        SourceStorageError::CreateDir { .. }
+        | SourceStorageError::WriteFile { .. }
+        | SourceStorageError::RemoveDir { .. }
+        | SourceStorageError::ReadDir { .. }
+        | SourceStorageError::ReadFile { .. } => true,
+        SourceStorageError::Git { command, .. } | SourceStorageError::GitSpawn { command, .. } => {
+            command.starts_with("git push ")
+        }
+        SourceStorageError::MissingConfig(_)
+        | SourceStorageError::InvalidPath { .. }
+        | SourceStorageError::ReadFileUtf8 { .. }
+        | SourceStorageError::SerializeManifest(_)
+        | SourceStorageError::DeserializeManifest { .. }
+        | SourceStorageError::FileHashMismatch { .. }
+        | SourceStorageError::UnpreparedSourceRepository { .. }
+        | SourceStorageError::DirtySourceRepository { .. }
+        | SourceStorageError::GitOutputUtf8 { .. }
+        | SourceStorageError::DetachedHead
+        | SourceStorageError::CleanupFailed { .. }
+        | SourceStorageError::Operation(_) => false,
     }
 }
 
@@ -154,22 +198,8 @@ impl From<PaymentError> for ApiError {
             | PaymentError::MissingAmount
             | PaymentError::InsufficientAmount { .. }
             | PaymentError::CodeHashMismatch => Self::payment_required(err.to_string()),
-            _ => Self::bad_gateway(err.to_string()),
+            _ => Self::hidden_bad_gateway(err.to_string()),
         }
-    }
-}
-
-fn should_hide_source_storage_message(err: &SourceStorageError) -> bool {
-    match err {
-        SourceStorageError::Git { .. }
-        | SourceStorageError::GitSpawn { .. }
-        | SourceStorageError::GitOutputUtf8 { .. } => true,
-        SourceStorageError::UnpreparedSourceRepository { message, .. } => {
-            message.starts_with("git command failed:")
-                || message.starts_with("failed to spawn git command ")
-                || message.starts_with("git output was not valid UTF-8 for ")
-        }
-        _ => false,
     }
 }
 
@@ -183,7 +213,7 @@ impl IntoResponse for ApiError {
                 error = %self.message,
                 "verifier operation failed"
             );
-            INTERNAL_ERROR_MESSAGE.to_owned()
+            self.public_fallback.to_owned()
         };
 
         (self.status, Json(ErrorResponse { error: message })).into_response()
@@ -274,14 +304,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn git_error_details_are_not_returned_to_client() {
+    async fn transient_source_storage_errors_are_retryable_without_exposing_details() {
         let secret = "secret-token";
 
-        for error in git_errors(secret) {
-            let response = ApiError::from(error).into_response();
+        for error in git_errors(secret).into_iter().take(2) {
+            let error = ApiError::from(error);
+            assert!(error.is_payment_retryable());
+            let response = error.into_response();
             assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
             let body = response_body(response).await;
-            assert_eq!(body, r#"{"error":"internal verifier error"}"#);
+            assert_eq!(
+                body,
+                r#"{"error":"verification_retryable: source storage is temporarily unavailable"}"#
+            );
             assert!(!body.contains(secret));
         }
     }
@@ -295,7 +330,9 @@ mod tests {
                 path: PathBuf::from("source-repository"),
                 message: error.to_string(),
             };
-            let response = ApiError::from(error).into_response();
+            let error = ApiError::from(error);
+            assert!(!error.is_payment_retryable());
+            let response = error.into_response();
             assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
             let body = response_body(response).await;
             assert_eq!(body, r#"{"error":"internal verifier error"}"#);
@@ -304,16 +341,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ordinary_unprepared_repository_message_is_returned_to_client() {
+    async fn ordinary_unprepared_repository_message_is_not_returned_to_client() {
         let message = "root commit must contain only `.gitattributes`";
         let error = SourceStorageError::UnpreparedSourceRepository {
             path: PathBuf::from("source-repository"),
             message: message.to_owned(),
         };
-        let response = ApiError::from(error).into_response();
+        let error = ApiError::from(error);
+        assert!(!error.is_payment_retryable());
+        let response = error.into_response();
 
         assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
-        assert!(response_body(response).await.contains(message));
+        let body = response_body(response).await;
+        assert_eq!(body, r#"{"error":"internal verifier error"}"#);
+        assert!(!body.contains(message));
+    }
+
+    #[tokio::test]
+    async fn deterministic_source_storage_error_is_not_payment_retryable() {
+        let secret = "invalid-storage-path-detail";
+        let error = ApiError::from(SourceStorageError::InvalidPath {
+            path: PathBuf::from("source-repository"),
+            message: secret.to_owned(),
+        });
+        assert!(!error.is_payment_retryable());
+
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+        let body = response_body(response).await;
+        assert_eq!(body, r#"{"error":"internal verifier error"}"#);
+        assert!(!body.contains(secret));
     }
 
     #[tokio::test]
@@ -330,7 +387,47 @@ mod tests {
         ];
 
         for error in errors {
-            let response = ApiError::from(error).into_response();
+            let error = ApiError::from(error);
+            assert!(error.is_payment_retryable());
+            let response = error.into_response();
+            assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+            let body = response_body(response).await;
+            assert_eq!(
+                body,
+                r#"{"error":"verification_retryable: source storage is temporarily unavailable"}"#
+            );
+            assert!(!body.contains(secret));
+        }
+    }
+
+    #[tokio::test]
+    async fn compiler_server_error_is_hidden_and_not_payment_retryable() {
+        let error = ApiError::from(CompilerError::Timeout { timeout_ms: 5_000 });
+        assert!(!error.is_payment_retryable());
+
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+        assert_eq!(
+            response_body(response).await,
+            r#"{"error":"internal verifier error"}"#
+        );
+    }
+
+    #[tokio::test]
+    async fn payment_provider_and_sqlite_details_are_hidden() {
+        let secret = "internal-payment-detail";
+        let errors = [
+            PaymentError::Provider {
+                status: 500,
+                body: secret.to_owned(),
+            },
+            PaymentError::Sqlite(rusqlite::Error::InvalidQuery),
+        ];
+
+        for error in errors {
+            let error = ApiError::from(error);
+            assert!(!error.is_payment_retryable());
+            let response = error.into_response();
             assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
             let body = response_body(response).await;
             assert_eq!(body, r#"{"error":"internal verifier error"}"#);

@@ -1,0 +1,1 @@
+Error: Payment transaction is for a different code hash. Request a new ticket and pay with the exact payment comment

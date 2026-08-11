@@ -17,7 +17,7 @@ name = "testnet"
 [payment]
 # Required in production. Use a raw basechain address.
 # address = "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-# min_amount_nano = 500000000 # 0.5 TON
+# min_amount_nano = 500000000 # 0.5 GRAM
 ledger_path = "verifier-payments.sqlite3"
 
 [source_repository]

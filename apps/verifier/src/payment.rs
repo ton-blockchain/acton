@@ -25,6 +25,7 @@ pub const PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
 const HISTORY_PAGE_SIZE: usize = 1_000;
 const PROCESSING_LEASE: Duration = Duration::from_mins(5);
 const PROVIDER_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_PAYMENT_ATTEMPTS: u64 = 3;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PaymentQuote {
@@ -213,14 +214,11 @@ impl OnchainPaymentVerifier {
 
             for transaction in page {
                 let transaction_key = (transaction.lt, transaction.hash.clone());
-                if previous_transaction
-                    .as_ref()
-                    .is_some_and(|previous| {
-                        transaction_key.0 < previous.0
-                            || (transaction_key.0 == previous.0
-                                && transaction_key.1.as_str() <= previous.1.as_str())
-                    })
-                {
+                if previous_transaction.as_ref().is_some_and(|previous| {
+                    transaction_key.0 < previous.0
+                        || (transaction_key.0 == previous.0
+                            && transaction_key.1.as_str() <= previous.1.as_str())
+                }) {
                     return Err(PaymentError::HistoryChangedDuringRecovery);
                 }
                 previous_transaction = Some(transaction_key);
@@ -488,13 +486,18 @@ impl PaymentLedger {
             return Err(PaymentError::AlreadyUsed);
         }
         match existing.state.as_str() {
-            "retryable" => Ok(()),
+            "retryable" if existing.claim_version < MAX_PAYMENT_ATTEMPTS => Ok(()),
             "processing"
-                if now.saturating_sub(existing.updated_at) >= PROCESSING_LEASE.as_secs() =>
+                if now.saturating_sub(existing.updated_at) >= PROCESSING_LEASE.as_secs()
+                    && existing.claim_version < MAX_PAYMENT_ATTEMPTS =>
             {
                 Ok(())
             }
-            "processing" => Err(PaymentError::InProgress),
+            "processing"
+                if now.saturating_sub(existing.updated_at) < PROCESSING_LEASE.as_secs() =>
+            {
+                Err(PaymentError::InProgress)
+            }
             _ => Err(PaymentError::AlreadyUsed),
         }
     }
@@ -569,6 +572,9 @@ impl PaymentLedger {
                 return Err(PaymentError::AlreadyUsed);
             }
             Some(existing) if existing.state == "retryable" => {
+                if existing.claim_version >= MAX_PAYMENT_ATTEMPTS {
+                    return Err(PaymentError::AlreadyUsed);
+                }
                 claim_version = next_claim_version(existing.claim_version)?;
                 reclaim_payment(
                     &transaction,
@@ -584,6 +590,9 @@ impl PaymentLedger {
                     now.saturating_sub(existing.updated_at) >= PROCESSING_LEASE.as_secs();
                 if !lease_expired {
                     return Err(PaymentError::InProgress);
+                }
+                if existing.claim_version >= MAX_PAYMENT_ATTEMPTS {
+                    return Err(PaymentError::AlreadyUsed);
                 }
                 claim_version = next_claim_version(existing.claim_version)?;
                 reclaim_payment(
@@ -670,12 +679,10 @@ fn existing_payment(
 }
 
 fn next_claim_version(current: u64) -> Result<u64, PaymentError> {
-    current
-        .checked_add(1)
-        .ok_or(PaymentError::IntegerOverflow {
-            field: "claim_version",
-            value: current,
-        })
+    current.checked_add(1).ok_or(PaymentError::IntegerOverflow {
+        field: "claim_version",
+        value: current,
+    })
 }
 
 fn reclaim_payment(
@@ -795,7 +802,8 @@ struct ToncenterTransaction {
     lt: String,
     #[serde(default)]
     now: u64,
-    emulated: bool,
+    #[serde(default)]
+    emulated: Option<bool>,
     finality: String,
     description: ToncenterTransactionDescription,
     #[serde(default)]
@@ -804,7 +812,8 @@ struct ToncenterTransaction {
 
 #[derive(Debug, Deserialize)]
 struct ToncenterTransactionDescription {
-    aborted: bool,
+    #[serde(default)]
+    aborted: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -813,7 +822,8 @@ struct ToncenterMessage {
     destination: Option<String>,
     #[serde(default)]
     value: Option<String>,
-    bounced: bool,
+    #[serde(default)]
+    bounced: Option<bool>,
     #[serde(default)]
     message_content: Option<ToncenterMessageContent>,
 }
@@ -842,9 +852,9 @@ impl TryFrom<ToncenterTransaction> for PaymentTransaction {
                 .parse()
                 .map_err(|_| PaymentError::InvalidLogicalTime(transaction.lt))?,
             timestamp: transaction.now,
-            emulated: transaction.emulated,
+            emulated: transaction.emulated.unwrap_or(true),
             finality: transaction.finality,
-            aborted: transaction.description.aborted,
+            aborted: transaction.description.aborted.unwrap_or(true),
             incoming: transaction
                 .in_msg
                 .map(PaymentMessage::try_from)
@@ -869,7 +879,7 @@ impl TryFrom<ToncenterMessage> for PaymentMessage {
         Ok(Self {
             destination: message.destination,
             value,
-            bounced: message.bounced,
+            bounced: message.bounced.unwrap_or(true),
             comment,
         })
     }
@@ -990,15 +1000,23 @@ pub enum PaymentError {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{
+        collections::VecDeque,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
 
     use async_trait::async_trait;
+    use rusqlite::OptionalExtension;
     use serde_json::json;
 
     use super::{
-        HISTORY_PAGE_SIZE, HistorySort, OnchainPaymentVerifier, PaymentAttemptOutcome,
-        PaymentBlockchainClient, PaymentError, PaymentLedger, PaymentMessage, PaymentTransaction,
-        PaymentVerifier, ToncenterTransaction, code_hash_from_comment, payment_comment,
+        HISTORY_PAGE_SIZE, HistorySort, MAX_PAYMENT_ATTEMPTS, OnchainPaymentVerifier,
+        PaymentAttemptOutcome, PaymentBlockchainClient, PaymentError, PaymentLedger,
+        PaymentMessage, PaymentTransaction, PaymentVerifier, ToncenterTransaction,
+        code_hash_from_comment, payment_comment,
     };
 
     const CODE_HASH: &str = "af8f72e22d3dd6eec1f312693c026e4d1751e2dfec9b3f6577e8c8b3a668947c";
@@ -1013,6 +1031,7 @@ mod tests {
         history: Vec<PaymentTransaction>,
         transactions: Vec<PaymentTransaction>,
         history_error: bool,
+        lookup_count: Arc<AtomicUsize>,
     }
 
     #[async_trait]
@@ -1021,6 +1040,7 @@ mod tests {
             &self,
             transaction_hash: &str,
         ) -> Result<Option<PaymentTransaction>, PaymentError> {
+            self.lookup_count.fetch_add(1, Ordering::Relaxed);
             Ok(self
                 .transactions
                 .iter()
@@ -1052,6 +1072,63 @@ mod tests {
         }
     }
 
+    struct FixedTransactionClient {
+        transaction: PaymentTransaction,
+    }
+
+    #[async_trait]
+    impl PaymentBlockchainClient for FixedTransactionClient {
+        async fn transaction_by_hash(
+            &self,
+            _transaction_hash: &str,
+        ) -> Result<Option<PaymentTransaction>, PaymentError> {
+            Ok(Some(self.transaction.clone()))
+        }
+
+        async fn transactions(
+            &self,
+            _account: &str,
+            _limit: usize,
+            _offset: usize,
+            _sort: HistorySort,
+        ) -> Result<Vec<PaymentTransaction>, PaymentError> {
+            Ok(Vec::new())
+        }
+    }
+
+    struct ScriptedHistoryClient {
+        newest: PaymentTransaction,
+        pages: Mutex<VecDeque<Vec<PaymentTransaction>>>,
+    }
+
+    #[async_trait]
+    impl PaymentBlockchainClient for ScriptedHistoryClient {
+        async fn transaction_by_hash(
+            &self,
+            _transaction_hash: &str,
+        ) -> Result<Option<PaymentTransaction>, PaymentError> {
+            Ok(None)
+        }
+
+        async fn transactions(
+            &self,
+            _account: &str,
+            _limit: usize,
+            _offset: usize,
+            sort: HistorySort,
+        ) -> Result<Vec<PaymentTransaction>, PaymentError> {
+            if matches!(sort, HistorySort::Descending) {
+                return Ok(vec![self.newest.clone()]);
+            }
+            Ok(self
+                .pages
+                .lock()
+                .expect("scripted pages mutex should not be poisoned")
+                .pop_front()
+                .unwrap_or_default())
+        }
+    }
+
     fn payment(transaction_hash: &str, code_hash: &str, amount_nano: u64) -> PaymentTransaction {
         PaymentTransaction {
             account: PAYMENT_ADDRESS.to_owned(),
@@ -1074,12 +1151,31 @@ mod tests {
         history: Vec<PaymentTransaction>,
         transactions: Vec<PaymentTransaction>,
     ) -> OnchainPaymentVerifier {
-        OnchainPaymentVerifier::new(
+        verifier_with_lookup_count(history, transactions).0
+    }
+
+    fn verifier_with_lookup_count(
+        history: Vec<PaymentTransaction>,
+        transactions: Vec<PaymentTransaction>,
+    ) -> (OnchainPaymentVerifier, Arc<AtomicUsize>) {
+        let lookup_count = Arc::new(AtomicUsize::new(0));
+        let verifier = OnchainPaymentVerifier::new(
             Arc::new(MockBlockchainClient {
                 history,
                 transactions,
                 history_error: false,
+                lookup_count: Arc::clone(&lookup_count),
             }),
+            PaymentLedger::in_memory().expect("in-memory payment ledger should open"),
+            PAYMENT_ADDRESS.to_owned(),
+            10,
+        );
+        (verifier, lookup_count)
+    }
+
+    fn verifier_with_client(client: Arc<dyn PaymentBlockchainClient>) -> OnchainPaymentVerifier {
+        OnchainPaymentVerifier::new(
+            client,
             PaymentLedger::in_memory().expect("in-memory payment ledger should open"),
             PAYMENT_ADDRESS.to_owned(),
             10,
@@ -1136,8 +1232,84 @@ mod tests {
         );
     }
 
+    #[test]
+    fn toncenter_safety_flags_are_required() {
+        let transaction = json!({
+            "account": PAYMENT_ADDRESS,
+            "hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "lt": "1",
+            "now": 1_728_000_000,
+            "emulated": false,
+            "finality": "finalized",
+            "description": {"aborted": false},
+            "in_msg": {
+                "destination": PAYMENT_ADDRESS,
+                "value": "10",
+                "bounced": false,
+                "message_content": {
+                    "decoded": {"comment": payment_comment(CODE_HASH)}
+                }
+            }
+        });
+        let is_valid_payment = |value| {
+            let transaction = serde_json::from_value::<ToncenterTransaction>(value)
+                .expect("nullable safety flags should deserialize");
+            let transaction = PaymentTransaction::try_from(transaction)
+                .expect("transaction should convert after deserialization");
+            super::valid_incoming_message(&transaction, PAYMENT_ADDRESS).is_some()
+        };
+        assert!(is_valid_payment(transaction.clone()));
+
+        for field in ["emulated", "aborted", "bounced"] {
+            for missing in [true, false] {
+                let mut unsafe_transaction = transaction.clone();
+                let object = match field {
+                    "emulated" => unsafe_transaction
+                        .as_object_mut()
+                        .expect("transaction should be an object"),
+                    "aborted" => unsafe_transaction["description"]
+                        .as_object_mut()
+                        .expect("description should be an object"),
+                    "bounced" => unsafe_transaction["in_msg"]
+                        .as_object_mut()
+                        .expect("incoming message should be an object"),
+                    _ => unreachable!("all safety fields should be covered"),
+                };
+                if missing {
+                    object.remove(field);
+                } else {
+                    object.insert(field.to_owned(), serde_json::Value::Null);
+                }
+                assert!(
+                    !is_valid_payment(unsafe_transaction),
+                    "{field} must fail closed when {}",
+                    if missing { "missing" } else { "null" }
+                );
+            }
+        }
+    }
+
     #[tokio::test]
-    async fn recovery_marks_every_historical_protocol_payment_as_consumed() {
+    async fn claim_rejects_a_provider_transaction_with_another_hash() {
+        let requested_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+        let returned_hash = "2222222222222222222222222222222222222222222222222222222222222222";
+        let verifier = verifier_with_client(Arc::new(FixedTransactionClient {
+            transaction: payment(returned_hash, CODE_HASH, 10),
+        }));
+        verifier
+            .recover()
+            .await
+            .expect("empty payment history recovery should succeed");
+
+        assert!(matches!(
+            verifier.claim(requested_hash, CODE_HASH).await,
+            Err(PaymentError::TransactionHashMismatch { expected, actual })
+                if expected == requested_hash && actual == returned_hash
+        ));
+    }
+
+    #[tokio::test]
+    async fn recovery_consumes_funded_protocol_payments_and_ignores_dust() {
         let full_payment = payment("full-payment", CODE_HASH, 10);
         let insufficient_payment = payment("insufficient-payment", OTHER_CODE_HASH, 1);
         let verifier = verifier(
@@ -1151,25 +1323,30 @@ mod tests {
             .expect("payment history recovery should succeed");
 
         assert!(verifier.is_ready());
-        let recovered_states = {
+        let recovered_state = {
             let connection = verifier
                 .ledger
                 .connection()
                 .expect("payment ledger should be readable");
-            ["full-payment", "insufficient-payment"]
-                .into_iter()
-                .map(|transaction_hash| {
-                    connection
-                        .query_row(
-                            "select state from payment_transactions where transaction_hash = ?1",
-                            [transaction_hash],
-                            |row| row.get::<_, String>(0),
-                        )
-                        .expect("historical payment should be present in the ledger")
-                })
-                .collect::<Vec<_>>()
+            let full_state = connection
+                .query_row(
+                    "select state from payment_transactions where transaction_hash = ?1",
+                    ["full-payment"],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("funded historical payment should be present in the ledger");
+            let dust_state = connection
+                .query_row(
+                    "select state from payment_transactions where transaction_hash = ?1",
+                    ["insufficient-payment"],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .expect("dust payment lookup should succeed");
+            drop(connection);
+            (full_state, dust_state)
         };
-        assert_eq!(recovered_states, ["consumed", "consumed"]);
+        assert_eq!(recovered_state, ("consumed".to_owned(), None));
         assert!(matches!(
             verifier.claim("full-payment", CODE_HASH).await,
             Err(PaymentError::AlreadyUsed)
@@ -1217,13 +1394,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn retryable_payment_has_a_bounded_claim_budget() {
+        let (verifier, lookup_count) =
+            verifier_with_lookup_count(Vec::new(), vec![payment("bounded-payment", CODE_HASH, 10)]);
+        verifier
+            .recover()
+            .await
+            .expect("empty payment history recovery should succeed");
+
+        for claim_version in 1..=MAX_PAYMENT_ATTEMPTS {
+            let claim = verifier
+                .claim("bounded-payment", CODE_HASH)
+                .await
+                .expect("payment attempt within the budget should be reserved");
+            assert_eq!(claim.claim_version, claim_version);
+            verifier
+                .finish(&claim, PaymentAttemptOutcome::Retryable)
+                .expect("failed attempt should become retryable");
+        }
+
+        assert!(matches!(
+            verifier.claim("bounded-payment", CODE_HASH).await,
+            Err(PaymentError::AlreadyUsed)
+        ));
+        assert_eq!(
+            lookup_count.load(Ordering::Relaxed),
+            usize::try_from(MAX_PAYMENT_ATTEMPTS).expect("attempt limit should fit usize")
+        );
+    }
+
+    #[tokio::test]
     async fn expired_processing_lease_allows_the_payment_to_retry() {
         let verifier = verifier(Vec::new(), vec![payment("leased-payment", CODE_HASH, 10)]);
         verifier
             .recover()
             .await
             .expect("empty payment history recovery should succeed");
-        verifier
+        let stale_claim = verifier
             .claim("leased-payment", CODE_HASH)
             .await
             .expect("new payment should be reserved");
@@ -1245,9 +1452,98 @@ mod tests {
             .claim("leased-payment", CODE_HASH)
             .await
             .expect("expired processing lease should be reclaimable");
+        assert!(matches!(
+            verifier.finish(&stale_claim, PaymentAttemptOutcome::Retryable),
+            Err(PaymentError::LedgerInvariant)
+        ));
         verifier
             .finish(&retry, PaymentAttemptOutcome::Consumed)
             .expect("reclaimed payment should be consumable");
+    }
+
+    #[tokio::test]
+    async fn local_replay_state_rejects_without_another_provider_lookup() {
+        let (verifier, lookup_count) =
+            verifier_with_lookup_count(Vec::new(), vec![payment("known-payment", CODE_HASH, 10)]);
+        verifier
+            .recover()
+            .await
+            .expect("empty payment history recovery should succeed");
+
+        let claim = verifier
+            .claim("known-payment", CODE_HASH)
+            .await
+            .expect("new payment should be reserved");
+        assert_eq!(lookup_count.load(Ordering::Relaxed), 1);
+        assert!(matches!(
+            verifier.claim("known-payment", CODE_HASH).await,
+            Err(PaymentError::InProgress)
+        ));
+        assert_eq!(lookup_count.load(Ordering::Relaxed), 1);
+
+        verifier
+            .finish(&claim, PaymentAttemptOutcome::Consumed)
+            .expect("payment should be consumed");
+        assert!(matches!(
+            verifier.claim("known-payment", CODE_HASH).await,
+            Err(PaymentError::AlreadyUsed)
+        ));
+        assert_eq!(lookup_count.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn empty_recovery_consumes_and_preserves_known_replay_state() {
+        let verifier = verifier(
+            Vec::new(),
+            vec![
+                payment("processing-payment", CODE_HASH, 10),
+                payment("retryable-payment", CODE_HASH, 10),
+            ],
+        );
+        verifier
+            .recover()
+            .await
+            .expect("initial empty recovery should succeed");
+        let processing = verifier
+            .claim("processing-payment", CODE_HASH)
+            .await
+            .expect("processing payment should be reserved");
+        let retryable = verifier
+            .claim("retryable-payment", CODE_HASH)
+            .await
+            .expect("retryable payment should be reserved");
+        verifier
+            .finish(&retryable, PaymentAttemptOutcome::Retryable)
+            .expect("payment should become retryable");
+
+        verifier
+            .recover()
+            .await
+            .expect("empty recovery should preserve local replay state");
+        assert!(matches!(
+            verifier.claim("processing-payment", CODE_HASH).await,
+            Err(PaymentError::AlreadyUsed)
+        ));
+        assert!(matches!(
+            verifier.claim("retryable-payment", CODE_HASH).await,
+            Err(PaymentError::AlreadyUsed)
+        ));
+        assert!(matches!(
+            verifier.finish(&processing, PaymentAttemptOutcome::Retryable),
+            Err(PaymentError::LedgerInvariant)
+        ));
+
+        let consumed_count = verifier
+            .ledger
+            .connection()
+            .expect("payment ledger should be readable")
+            .query_row(
+                "select count(*) from payment_transactions where state = 'consumed'",
+                [],
+                |row| row.get::<_, usize>(0),
+            )
+            .expect("consumed count should be readable");
+        assert_eq!(consumed_count, 2);
     }
 
     #[tokio::test]
@@ -1384,12 +1680,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn recovery_rejects_out_of_order_history() {
+        let mut first = payment("first", CODE_HASH, 10);
+        first.lt = 1;
+        let mut second = payment("second", CODE_HASH, 10);
+        second.lt = 2;
+        let verifier = verifier_with_client(Arc::new(ScriptedHistoryClient {
+            newest: second.clone(),
+            pages: Mutex::new(VecDeque::from([vec![second, first]])),
+        }));
+
+        assert!(matches!(
+            verifier.recover().await,
+            Err(PaymentError::HistoryChangedDuringRecovery)
+        ));
+        assert!(!verifier.is_ready());
+    }
+
+    #[tokio::test]
+    async fn recovery_rejects_a_repeated_full_page_without_progress() {
+        let page = (0..HISTORY_PAGE_SIZE)
+            .map(|index| {
+                let mut transaction = payment(&format!("old-payment-{index}"), CODE_HASH, 10);
+                transaction.lt = index as u64;
+                transaction
+            })
+            .collect::<Vec<_>>();
+        let mut newest = payment("newest-payment", CODE_HASH, 10);
+        newest.lt = HISTORY_PAGE_SIZE as u64;
+        let verifier = verifier_with_client(Arc::new(ScriptedHistoryClient {
+            newest,
+            pages: Mutex::new(VecDeque::from([page.clone(), page])),
+        }));
+
+        assert!(matches!(
+            verifier.recover().await,
+            Err(PaymentError::HistoryChangedDuringRecovery)
+        ));
+        assert!(!verifier.is_ready());
+    }
+
+    #[tokio::test]
     async fn failed_recovery_keeps_payment_verifier_unready() {
         let verifier = OnchainPaymentVerifier::new(
             Arc::new(MockBlockchainClient {
                 history: Vec::new(),
                 transactions: Vec::new(),
                 history_error: true,
+                lookup_count: Arc::new(AtomicUsize::new(0)),
             }),
             PaymentLedger::in_memory().expect("in-memory payment ledger should open"),
             PAYMENT_ADDRESS.to_owned(),

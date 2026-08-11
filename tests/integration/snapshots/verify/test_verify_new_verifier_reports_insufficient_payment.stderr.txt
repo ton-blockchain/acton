@@ -1,0 +1,1 @@
+Error: Payment amount is too small. Send at least the amount shown in the verification ticket
