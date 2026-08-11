@@ -111,8 +111,8 @@ For more installation details, see the
 
 Acton is stable on the latest numbered GitHub release. The first-class platform
 matrix is macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
-documented baseline is Ubuntu 22 or newer. Native Windows is not supported
-today. If you use Windows, run Acton inside WSL with Ubuntu 22 or newer and
+documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
+today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
 follow the Linux installation path there. `trunk` builds installed via
 `acton up --trunk`, WSL installs, and other source-built targets are beta /
 best-effort surfaces for now. The full policy is documented at
