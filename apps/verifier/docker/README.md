@@ -39,15 +39,23 @@ Run with generated config:
 
 ```bash
 docker run --rm -p 3000:3000 \
-  -e VERIFIER_NETWORK=localnet \
-  -e VERIFIER_TONCENTER_BASE_URL=http://host.docker.internal:5412 \
+  -e VERIFIER_NETWORK=testnet \
+  -e VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com \
+  -e VERIFIER_PAYMENT_ADDRESS=0:<64-hex-character-testnet-wallet-address> \
+  -e VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000 \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
   -e SOURCE_REPOSITORY_STORAGE_ROOT=sources \
   -e SOURCE_REPOSITORY_BRANCH=main \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
   -v verifier-registry-index:/var/lib/verifier/registry-index \
+  -v verifier-payment-ledger:/var/lib/verifier/payment-ledger \
   ghcr.io/i582/verifier:latest
 ```
+
+The verifier accepts payments only on TON testnet. The payment address must
+use raw basechain form. At startup, the service rebuilds the payment ledger
+from wallet history and reports `503` until the scan is complete. This example
+sets the minimum payment to `0.5 TON`.
 
 Or mount a full TOML config:
 
@@ -57,6 +65,7 @@ docker run --rm -p 3000:3000 \
   -v ./config.toml:/etc/verifier/config.toml:ro \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
   -v verifier-registry-index:/var/lib/verifier/registry-index \
+  -v verifier-payment-ledger:/var/lib/verifier/payment-ledger \
   ghcr.io/i582/verifier:latest
 ```
 

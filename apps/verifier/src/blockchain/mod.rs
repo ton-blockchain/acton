@@ -47,18 +47,15 @@ impl ToncenterClient {
         }
     }
 
-    fn account_states_url(&self) -> String {
-        format!(
-            "{}/api/v3/accountStates",
-            self.base_url.trim_end_matches('/')
-        )
+    fn account_states_request(&self, address: &str) -> RequestBuilder {
+        self.toncenter_request("/api/v3/accountStates")
+            .query(&[("address", address), ("include_boc", "false")])
     }
 
-    fn account_states_request(&self, address: &str) -> RequestBuilder {
+    pub(crate) fn toncenter_request(&self, path: &str) -> RequestBuilder {
         let mut request = self
             .http
-            .get(self.account_states_url())
-            .query(&[("address", address), ("include_boc", "false")])
+            .get(format!("{}{}", self.base_url.trim_end_matches('/'), path))
             .header(USER_AGENT, user_agent());
 
         if let Some(api_key) = &self.api_key {
@@ -105,7 +102,11 @@ fn non_empty_text(value: Option<String>) -> Option<String> {
 }
 
 pub(crate) fn normalize_code_hash(value: &str) -> String {
-    if is_hex_code_hash(value) {
+    normalize_hash(value)
+}
+
+pub(crate) fn normalize_hash(value: &str) -> String {
+    if is_valid_hash(value) {
         return value.to_ascii_lowercase();
     }
 
@@ -113,7 +114,11 @@ pub(crate) fn normalize_code_hash(value: &str) -> String {
         .map_or_else(|| value.to_owned(), |bytes| bytes_to_lower_hex(&bytes))
 }
 
-fn is_hex_code_hash(value: &str) -> bool {
+pub(crate) fn is_valid_code_hash(value: &str) -> bool {
+    is_valid_hash(value)
+}
+
+pub(crate) fn is_valid_hash(value: &str) -> bool {
     value.len() == CODE_HASH_BYTES * 2 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 

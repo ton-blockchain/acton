@@ -838,8 +838,12 @@ enum Commands {
         contract_id: Option<String>,
         #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
-        #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: String,
+        #[arg(
+            long,
+            help = "Network to use with the built-in verifier (defaults to testnet)",
+            conflicts_with = "new_verifier"
+        )]
+        net: Option<String>,
         #[arg(
             long,
             help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)",
@@ -850,8 +854,18 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
-        #[arg(long = "new", hide = true, help = "Use the new Acton verifier service")]
+        #[arg(
+            long = "new",
+            help = "Use the testnet Acton verifier with an on-chain spam payment"
+        )]
         new_verifier: bool,
+        #[arg(
+            long,
+            help = "Reuse a finalized testnet payment transaction",
+            requires = "new_verifier",
+            conflicts_with_all = ["wallet", "tonconnect", "dry_run"]
+        )]
+        payment_tx_hash: Option<String>,
         #[arg(
             long,
             help = "Use TON Connect wallet approval for the verification transaction",
@@ -2554,6 +2568,7 @@ fn main() {
             tonconnect,
             tonconnect_port,
             new_verifier,
+            payment_tx_hash,
         } => verify_cmd(
             contract_id,
             address,
@@ -2562,6 +2577,7 @@ fn main() {
             compiler_version,
             dry_run,
             new_verifier,
+            payment_tx_hash,
             tonconnect,
             tonconnect_port,
         ),

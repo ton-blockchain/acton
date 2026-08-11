@@ -9,10 +9,12 @@ use crate::context::{
 use crate::contract_interface::{
     compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
 };
+use crate::explorer::public_network_transaction_link;
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
 use crate::retrace;
 use crate::tonconnect;
+use crate::transaction_hash::toncenter_transaction_hash_hex;
 use crate::wallets::wallet_message_expire_at;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
@@ -1415,7 +1417,7 @@ fn execute_message_iter_batch(
 
 /// Broadcast an internal message through an opened wallet. Returns the external-in cell
 /// the wallet SDK built and its TEP-467 normalized hash returned by `sendBocReturnHash`.
-fn send_wallet_message(
+pub(crate) fn send_wallet_message(
     message: &Cell,
     wallet: Wallet,
     network: &Network,
@@ -1448,7 +1450,7 @@ fn send_wallet_message(
     Ok((external_in_cell, norm_hash))
 }
 
-fn send_tonconnect_message(
+pub(crate) fn send_tonconnect_message(
     message: &Cell,
     tonconnect: &tonconnect::TonConnectContext,
     network: &Network,
@@ -3252,9 +3254,7 @@ fn poll_send_result_v2(
             continue;
         }
         let send_result = tx_cell_to_send_result_tuple(tx_cell, &parsed_tx, &[], None);
-        let tx_hash_hex = base64::engine::general_purpose::STANDARD
-            .decode(&tx.transaction_id.hash)
-            .map_or_else(|_| tx.transaction_id.hash.clone(), hex::encode);
+        let tx_hash_hex = toncenter_transaction_hash_hex(&tx.transaction_id.hash)?;
         return Ok(Some(PolledSendResult {
             tx_hash_hex,
             lt: parsed_tx.lt,
@@ -3302,37 +3302,6 @@ fn transaction_link_from_parts(
     }
 
     public_network_transaction_link(&network, explorer, address_str, tx_hash_hex, lt, utime)
-}
-
-fn public_network_transaction_link(
-    network: &Network,
-    explorer: Explorer,
-    address_str: &str,
-    tx_hash_hex: &str,
-    lt: u64,
-    utime: u32,
-) -> String {
-    let network_prefix = if network.uses_testnet_address_format() {
-        "testnet."
-    } else {
-        ""
-    };
-    match explorer {
-        Explorer::Actonscan if network.uses_testnet_address_format() => {
-            format!("https://actonscan.com/tx/{tx_hash_hex}?network=testnet")
-        }
-        Explorer::Actonscan => {
-            format!("https://actonscan.com/tx/{tx_hash_hex}?network=mainnet")
-        }
-        Explorer::Tonscan => format!("https://{network_prefix}tonscan.org/tx/{tx_hash_hex}"),
-        Explorer::Toncx => {
-            format!("https://{network_prefix}ton.cx/tx/{lt}:{tx_hash_hex}:{address_str}")
-        }
-        Explorer::Dton => format!("https://{network_prefix}dton.io/tx/{tx_hash_hex}?time={utime}"),
-        Explorer::Tonviewer => {
-            format!("https://{network_prefix}tonviewer.com/transaction/{tx_hash_hex}")
-        }
-    }
 }
 
 fn custom_network_transaction_link(

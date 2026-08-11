@@ -11,11 +11,8 @@
   → Payment amount: 0.01 GRAM
   → Payment address: [WALLET_ADDRESS_BASE]
   → Payment comment: acton-verify:v1:e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
-  → Reusing testnet payment transaction: test-payment-transaction-hash
-  → Sending sources to new verifier
-  ✓ New verifier accepted source bundle
-  → Source bundle: a7f1d1a6aabbccddeeff00112233445566778899aabbccddeeff001122334455
-  → Storage revision: 0123456789abcdef
+  ℹ Dry run mode: skipping testnet payment and source upload
 
-✓ Contract verification completed!
-View at: [LOCALHOST_URL]/e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
+✓ New verifier request prepared successfully!
+  Backend: [LOCALHOST_URL]/api/v1/verify
+  Source files: 1

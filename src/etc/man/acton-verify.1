@@ -14,6 +14,9 @@ contract from your project.
 The verification flow compiles local sources, prepares data for the verifier
 backend, collects the required signatures, and optionally submits the final
 verification transaction to the blockchain.
+.sp
+With \fB\-\-new\fR, Acton uses a testnet\-only verifier. This flow requires a payment
+before a new source bundle is uploaded.
 .SH "OPTIONS"
 .SS "Verify Options"
 .sp
@@ -66,6 +69,21 @@ Currently defaults to \fB1.4.1\fR\&.
 .RS 4
 Run verification without submitting the final blockchain transaction.
 .RE
+.sp
+\fB\-\-new\fR
+.RS 4
+Use the Acton verifier with a TON testnet spam payment.
+.sp
+This option conflicts with \fB\-\-net\fR\&.
+.RE
+.sp
+\fB\-\-payment\-tx\-hash\fR \fIpayment\-tx\-hash\fR
+.RS 4
+Reuse a finalized testnet payment transaction.
+.sp
+The transaction must contain the code hash from the current verification. This
+option requires \fB\-\-new\fR\&.
+.RE
 .SS "Network Options"
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -73,6 +91,8 @@ Run verification without submitting the final blockchain transaction.
 Network to verify against.
 .sp
 Defaults to \fBtestnet\fR\&.
+.sp
+This option conflicts with \fB\-\-new\fR\&. The Acton verifier always uses testnet.
 .RE
 .SH "TONCENTER API KEYS"
 Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
@@ -107,7 +127,7 @@ defaults.
 This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "PROCESS"
-Verification usually consists of:
+The built\-in verifier flow consists of:
 .sp
 .RS 4
 \h'-04' 1.\h'+01'compiling the local contract
@@ -133,6 +153,36 @@ Acton prepares the local compilation artifacts and uploads them to the
 verification service. The final deployed\-code match is established by the
 verifier flow itself; \fBacton verify\fR does not first perform a separate local
 on\-chain code\-hash comparison against the target address before upload.
+.sp
+With \fB\-\-new\fR, the process is:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Compile the local contract and compute its code hash.
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Request a ticket from \fB/api/v1/take\-ticket\fR\&.
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Stop successfully if the code hash is already verified.
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Get wallet approval for the returned testnet amount and address.
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Send the payment with the returned code\-hash comment.
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Wait for the finalized recipient transaction.
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Upload the sources and recipient transaction hash to \fB/api/v1/verify\fR\&.
+.RE
 .SH "PREREQUISITES"
 .sp
 .RS 4
@@ -140,7 +190,11 @@ on\-chain code\-hash comparison against the target address before upload.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'a supported verifier network: \fBtestnet\fR or \fBmainnet\fR
+\h'-04'\(bu\h'+03'testnet funds when \fB\-\-new\fR is used without \fB\-\-dry\-run\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'a supported built\-in verifier network: \fBtestnet\fR or \fBmainnet\fR
 .RE
 .sp
 .RS 4
@@ -193,6 +247,18 @@ wallet selected in the TON Connect page
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-new\fR always uses testnet and does not accept \fB\-\-net\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'each new \fB\-\-new\fR verification payment contains the code hash in its comment
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'one payment transaction can authorize only one verification attempt
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'verification requires a funded local or TON Connect wallet when not using
 \fB\-\-dry\-run\fR
 .RE
@@ -205,7 +271,11 @@ skip the final transaction
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'when \fB\-\-dry\-run\fR is not used, the final verification transaction sends
-\fB0.1 GRAM\fR
+\fB0.1 GRAM\fR in the built\-in verifier flow
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-new\fR, the ticket defines the minimum testnet payment amount
 .RE
 .sp
 .RS 4
@@ -226,6 +296,10 @@ source upload
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fBACTON_VERIFY_BACKENDS\fR replaces the later signer \fB/sign\fR backend list
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBACTON_NEW_VERIFY_BACKEND\fR overrides the Acton verifier used by \fB\-\-new\fR
 .RE
 .sp
 .RS 4
@@ -274,9 +348,11 @@ acton verify Counter \-\-address EQDt7LL... \-\-net mainnet \-\-dry\-run
 .fi
 .RE
 .SH "DRY RUN"
-\fB\-\-dry\-run\fR still compiles the contract, uploads sources to the verifier
-backend, and collects the required signatures. It skips only the final
-blockchain transaction.
+For the built\-in verifier, \fB\-\-dry\-run\fR uploads sources and collects signatures.
+It skips the final blockchain transaction.
+.sp
+With \fB\-\-new\fR, \fB\-\-dry\-run\fR requests a ticket and prepares the source request. It
+does not send a payment or upload sources.
 .SH "TON CONNECT"
 Use \fB\-\-tonconnect\fR to approve the final verification transaction through a TON
 Connect wallet instead of a wallet configured in \fBwallets.toml\fR:
@@ -284,6 +360,14 @@ Connect wallet instead of a wallet configured in \fBwallets.toml\fR:
 .RS 4
 .nf
 acton verify Counter \-\-address EQDt7LL... \-\-net mainnet \-\-tonconnect
+.fi
+.RE
+.sp
+With \fB\-\-new\fR, do not pass \fB\-\-net\fR:
+.sp
+.RS 4
+.nf
+acton verify Counter \-\-new \-\-tonconnect
 .fi
 .RE
 .sp
@@ -321,8 +405,8 @@ flows where the backend decides that no final transaction is needed.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: Compilation failed, the verifier backend rejected the request, not
-enough signatures could be collected, wallet resolution failed, or the final
-blockchain transaction could not be sent.
+enough signatures were collected, wallet resolution failed, or a blockchain
+transaction failed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -372,6 +456,26 @@ acton verify Counter \-\-address EQDt7LL... \-\-dry\-run
 .RS 4
 .nf
 acton verify Counter \-\-address EQDt7LL... \-\-compiler\-version 1.2.0
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Use the Acton testnet verifier:
+.sp
+.RS 4
+.nf
+acton verify Counter \-\-new \-\-wallet deployer
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Retry an upload with an existing finalized payment:
+.sp
+.RS 4
+.nf
+acton verify Counter \-\-new \-\-payment\-tx\-hash <transaction\-hash>
 .fi
 .RE
 .RE

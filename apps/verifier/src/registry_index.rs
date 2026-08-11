@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-const INDEX_SCHEMA_VERSION: i64 = 8;
+const INDEX_SCHEMA_VERSION: i64 = 9;
 const UNKNOWN_REVISION: &str = "unknown";
 
 #[async_trait]
@@ -327,6 +327,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                 r"
                 select
                   source_bundle_hash,
+                  payment_tx_hash,
                   verified_at,
                   compiler_json,
                   storage_revision,
@@ -338,10 +339,11 @@ impl VerificationIndex for SqliteVerificationIndex {
                 |row| {
                     Ok(IndexedBundleRow {
                         source_bundle_hash: row.get(0)?,
-                        verified_at: row.get(1)?,
-                        compiler_json: row.get(2)?,
-                        storage_revision: row.get(3)?,
-                        source_map_json: row.get(4)?,
+                        payment_tx_hash: row.get(1)?,
+                        verified_at: row.get(2)?,
+                        compiler_json: row.get(3)?,
+                        storage_revision: row.get(4)?,
+                        source_map_json: row.get(5)?,
                     })
                 },
             )
@@ -585,6 +587,7 @@ pub enum VerificationIndexError {
 
 struct IndexedBundleRow {
     source_bundle_hash: String,
+    payment_tx_hash: Option<String>,
     verified_at: i64,
     compiler_json: String,
     storage_revision: String,
@@ -636,6 +639,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), VerificationIndexErr
         create table if not exists verified_bundles (
           code_hash text primary key,
           source_bundle_hash text not null,
+          payment_tx_hash text,
           verified_at integer not null,
           compiler_json text not null,
           storage_revision text not null,
@@ -686,14 +690,16 @@ fn insert_bundle(
         insert into verified_bundles (
           code_hash,
           source_bundle_hash,
+          payment_tx_hash,
           verified_at,
           compiler_json,
           storage_revision,
           source_map_json,
           indexed_at
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         on conflict (code_hash) do update set
           source_bundle_hash = excluded.source_bundle_hash,
+          payment_tx_hash = excluded.payment_tx_hash,
           verified_at = excluded.verified_at,
           compiler_json = excluded.compiler_json,
           storage_revision = excluded.storage_revision,
@@ -703,6 +709,7 @@ fn insert_bundle(
         params![
             &manifest.code_hash,
             &manifest.source_bundle_hash,
+            &manifest.payment_tx_hash,
             i64::try_from(manifest.verified_at).map_err(|_| {
                 VerificationIndexError::TimestampOutOfRange(manifest.verified_at)
             })?,
@@ -824,6 +831,7 @@ fn bundle_from_row(
         manifest: SourceBundleManifest {
             code_hash: code_hash.to_owned(),
             source_bundle_hash: row.source_bundle_hash,
+            payment_tx_hash: row.payment_tx_hash,
             verified_at: i64_to_u64("verified_at", row.verified_at)?,
             compiler,
             source_map,

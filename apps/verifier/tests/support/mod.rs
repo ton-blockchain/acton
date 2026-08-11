@@ -15,6 +15,7 @@ use verifier::{
     blockchain::ToncenterClient,
     compilers::{CompileGeneratedSource, CompileRequest, NodeCompilerService},
     config::Config,
+    payment::{PaymentAttemptOutcome, PaymentClaim, PaymentError, PaymentQuote, PaymentVerifier},
     registry::SourceVerificationRegistry,
     registry_index::SqliteVerificationIndex,
     source_storage::{SharedSourceStorage, SourceMapData},
@@ -34,6 +35,35 @@ pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppS
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
         Arc::new(compiler_service),
         source_storage,
+    )
+}
+
+pub fn recovering_payment_app_state(compiled_code_hash: &str) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    app_state_from_parts_with_payment(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+        Arc::new(compiler_service),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+        Arc::new(MockPaymentVerifier {
+            ready: false,
+            outcomes: None,
+        }),
+    )
+}
+
+pub fn recording_payment_app_state(
+    compiled_code_hash: &str,
+) -> (AppState, Arc<Mutex<Vec<PaymentAttemptOutcome>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let (payment_verifier, outcomes) = recording_payment_verifier();
+    (
+        app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+            payment_verifier,
+        ),
+        outcomes,
     )
 }
 
@@ -195,6 +225,24 @@ pub fn failing_source_storage_app_state(
     )
 }
 
+pub fn failing_source_storage_app_state_with_payment_outcomes(
+    compiled_code_hash: &str,
+) -> (AppState, Arc<Mutex<Vec<PaymentAttemptOutcome>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let (payment_verifier, outcomes) = recording_payment_verifier();
+    (
+        app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(mock_source_storage::MockSourceStorage::failing(
+                "source storage failed",
+            )),
+            payment_verifier,
+        ),
+        outcomes,
+    )
+}
+
 pub fn failing_compiler_app_state(code_hashes: &[(&str, &str)], error: &str) -> AppState {
     let compiler_service = mock_compiler::MockCompilerService::failing(error);
 
@@ -223,6 +271,23 @@ fn app_state_from_parts(
     compiler_service: Arc<dyn verifier::compilers::CompilerService>,
     source_storage: SharedSourceStorage,
 ) -> AppState {
+    app_state_from_parts_with_payment(
+        blockchain_client,
+        compiler_service,
+        source_storage,
+        Arc::new(MockPaymentVerifier {
+            ready: true,
+            outcomes: None,
+        }),
+    )
+}
+
+fn app_state_from_parts_with_payment(
+    blockchain_client: Arc<dyn verifier::blockchain::BlockchainClient>,
+    compiler_service: Arc<dyn verifier::compilers::CompilerService>,
+    source_storage: SharedSourceStorage,
+    payment_verifier: Arc<dyn PaymentVerifier>,
+) -> AppState {
     let verification_index =
         Arc::new(SqliteVerificationIndex::in_memory().expect("SQLite index should open"));
     AppState::new(
@@ -232,11 +297,79 @@ fn app_state_from_parts(
             source_storage,
             verification_index,
         )),
+        payment_verifier,
     )
 }
 
+struct MockPaymentVerifier {
+    ready: bool,
+    outcomes: Option<Arc<Mutex<Vec<PaymentAttemptOutcome>>>>,
+}
+
+fn recording_payment_verifier() -> (
+    Arc<dyn PaymentVerifier>,
+    Arc<Mutex<Vec<PaymentAttemptOutcome>>>,
+) {
+    let outcomes = Arc::new(Mutex::new(Vec::new()));
+    (
+        Arc::new(MockPaymentVerifier {
+            ready: true,
+            outcomes: Some(Arc::clone(&outcomes)),
+        }),
+        outcomes,
+    )
+}
+
+#[async_trait::async_trait]
+impl PaymentVerifier for MockPaymentVerifier {
+    fn quote(&self, code_hash: &str) -> PaymentQuote {
+        PaymentQuote {
+            payment_address: "0:1111111111111111111111111111111111111111111111111111111111111111"
+                .to_owned(),
+            amount_nano: "10000000".to_owned(),
+            comment: format!("acton-verify:v1:{code_hash}"),
+        }
+    }
+
+    fn is_ready(&self) -> bool {
+        self.ready
+    }
+
+    async fn recover(&self) -> Result<(), PaymentError> {
+        Ok(())
+    }
+
+    async fn claim(
+        &self,
+        transaction_hash: &str,
+        _code_hash: &str,
+    ) -> Result<PaymentClaim, PaymentError> {
+        Ok(PaymentClaim {
+            transaction_hash: transaction_hash.to_owned(),
+        })
+    }
+
+    fn finish(
+        &self,
+        _claim: &PaymentClaim,
+        outcome: PaymentAttemptOutcome,
+    ) -> Result<(), PaymentError> {
+        if let Some(outcomes) = &self.outcomes {
+            outcomes
+                .lock()
+                .expect("payment outcomes mutex should not be poisoned")
+                .push(outcome);
+        }
+        Ok(())
+    }
+}
+
 pub async fn post_verify(state: AppState, parts: Vec<MultipartPart>) -> Response {
-    post_verify_with_optional_api_key(state, parts, None).await
+    post_verify_request(state, parts, None, true).await
+}
+
+pub async fn post_verify_without_payment(state: AppState, parts: Vec<MultipartPart>) -> Response {
+    post_verify_request(state, parts, None, false).await
 }
 
 pub async fn post_verify_with_api_key(
@@ -244,14 +377,21 @@ pub async fn post_verify_with_api_key(
     parts: Vec<MultipartPart>,
     api_key: &str,
 ) -> Response {
-    post_verify_with_optional_api_key(state, parts, Some(api_key)).await
+    post_verify_request(state, parts, Some(api_key), true).await
 }
 
-async fn post_verify_with_optional_api_key(
+async fn post_verify_request(
     state: AppState,
-    parts: Vec<MultipartPart>,
+    mut parts: Vec<MultipartPart>,
     api_key: Option<&str>,
+    include_payment: bool,
 ) -> Response {
+    if include_payment {
+        parts.push(text_part(
+            "tx_hash",
+            "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b",
+        ));
+    }
     let body = multipart_body(parts);
     let mut request = Request::builder()
         .method(Method::POST)

@@ -1,0 +1,5 @@
+error: the argument '--net <NET>' cannot be used with '--new'
+
+Usage: acton verify --net <NET> <CONTRACT_NAME>
+
+For more information, try '--help'.

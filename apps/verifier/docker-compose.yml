@@ -5,10 +5,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      VERIFIER_NETWORK: ${VERIFIER_NETWORK:-mainnet}
+      VERIFIER_NETWORK: testnet
       VERIFIER_API_KEY: ${VERIFIER_API_KEY:-}
-      VERIFIER_TONCENTER_BASE_URL: ${VERIFIER_TONCENTER_BASE_URL:-https://toncenter.com}
+      VERIFIER_TONCENTER_BASE_URL: ${VERIFIER_TONCENTER_BASE_URL:-https://testnet.toncenter.com}
       VERIFIER_TONCENTER_API_KEY: ${VERIFIER_TONCENTER_API_KEY:-}
+      VERIFIER_PAYMENT_ADDRESS: ${VERIFIER_PAYMENT_ADDRESS:?set testnet payment address}
+      VERIFIER_PAYMENT_MIN_AMOUNT_NANO: ${VERIFIER_PAYMENT_MIN_AMOUNT_NANO:?set verification price in nanoGRAM}
+      VERIFIER_PAYMENT_LEDGER_PATH: ${VERIFIER_PAYMENT_LEDGER_PATH:-/var/lib/verifier/payment-ledger/payment-ledger.sqlite3}
       SOURCE_REPOSITORY_URL: ${SOURCE_REPOSITORY_URL:?set source repository URL}
       SOURCE_REPOSITORY_STORAGE_ROOT: ${SOURCE_REPOSITORY_STORAGE_ROOT:-sources}
       SOURCE_REPOSITORY_BRANCH: ${SOURCE_REPOSITORY_BRANCH:-main}
@@ -20,6 +23,7 @@ services:
     volumes:
       - source-repo:/var/lib/verifier/source-repo
       - registry-index:/var/lib/verifier/registry-index
+      - payment-ledger:/var/lib/verifier/payment-ledger
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -32,3 +36,4 @@ services:
 volumes:
   source-repo:
   registry-index:
+  payment-ledger:

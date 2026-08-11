@@ -46,7 +46,7 @@ function DetailRow({
       <dd>
         {href ? (
           <a
-            className={styles.compilerLink}
+            className={styles.externalLink}
             href={href}
             target="_blank"
             rel="noreferrer"
@@ -99,6 +99,26 @@ function compilerVersionUrl(language: string, version: string): string | undefin
   return `${source.repositoryUrl}/releases/tag/${encodeURIComponent(tag)}`
 }
 
+function paymentTransactionUrl(transactionHash: string): string {
+  return `https://actonscan.com/tx/${encodeURIComponent(transactionHash)}?network=testnet`
+}
+
+function PaymentTransactionLink({transactionHash}: {readonly transactionHash: string}) {
+  return (
+    <a
+      className={styles.externalLink}
+      href={paymentTransactionUrl(transactionHash)}
+      target="_blank"
+      rel="noreferrer"
+      title="View payment transaction on Actonscan"
+      aria-label={`View payment transaction ${transactionHash} on Actonscan`}
+    >
+      <TechnicalValue copyable={false} tooltip={false} value={transactionHash} />
+      <ExternalLink size={13} aria-hidden="true" />
+    </a>
+  )
+}
+
 function CompilerVersionLink({
   language,
   version,
@@ -114,7 +134,7 @@ function CompilerVersionLink({
 
   return (
     <a
-      className={styles.compilerLink}
+      className={styles.externalLink}
       href={href}
       target="_blank"
       rel="noreferrer"
@@ -363,6 +383,13 @@ function VerifiedContract({
                 />
               }
             />
+            {bundle.payment_tx_hash && (
+              <DetailRow
+                label="Payment tx"
+                value={<PaymentTransactionLink transactionHash={bundle.payment_tx_hash} />}
+                copyable={false}
+              />
+            )}
           </dl>
           <div className={detailsStyles.metadataJson}>
             <div className={detailsStyles.metadataJsonTitle}>Compile params</div>

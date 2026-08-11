@@ -36,6 +36,7 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+            payment_tx_hash: None,
             verified_at: Some(ORIGINAL_VERIFIED_AT),
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),
@@ -313,6 +314,10 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+            payment_tx_hash: Some(
+                "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b"
+                    .to_owned(),
+            ),
             verified_at: None,
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),
@@ -415,6 +420,10 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
         Some("te6cckEBAQEAAgAAAEysuc0=")
     );
     assert_eq!(stored_bundle.storage_revision, receipt.revision);
+    assert_eq!(
+        stored_bundle.manifest.payment_tx_hash.as_deref(),
+        Some("a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b")
+    );
     assert_eq!(stored_bundle.files.len(), 2);
     assert_eq!(stored_bundle.files[0].path, "imports/lib.tolk");
     assert_eq!(stored_bundle.files[0].content, "fun helper() {}");
@@ -428,6 +437,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SECOND_BUNDLE_HASH.to_owned(),
+            payment_tx_hash: None,
             verified_at: None,
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),

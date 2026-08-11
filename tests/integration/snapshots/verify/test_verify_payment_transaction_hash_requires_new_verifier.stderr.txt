@@ -1,0 +1,6 @@
+error: the following required arguments were not provided:
+  --new
+
+Usage: acton verify --new --payment-tx-hash <PAYMENT_TX_HASH> <CONTRACT_NAME>
+
+For more information, try '--help'.

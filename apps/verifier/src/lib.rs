@@ -2,6 +2,7 @@ pub mod app;
 pub mod blockchain;
 pub mod compilers;
 pub mod config;
+pub mod payment;
 pub mod registry;
 pub mod registry_index;
 pub mod source_storage;

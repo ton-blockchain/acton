@@ -17,6 +17,10 @@ rebuilt from the Git repository by scanning
 `{source_repository.storage_root}/{code_hash}/`. The storage root defaults to
 `sources`.
 
+The verifier uses TON testnet payments to limit automated spam. A separate
+SQLite ledger prevents payment replay. The backend rebuilds this ledger from
+the payment wallet history after each restart.
+
 ## Goals
 
 - Allow developers to publish source code that reproducibly compiles to a known
@@ -26,6 +30,9 @@ rebuilt from the Git repository by scanning
 - Keep exactly one current source bundle for each code hash.
 - Make the registry rebuildable from Git without relying on process-local state.
 - Keep the registry implementation pluggable behind Rust traits.
+- Require one testnet payment for each new verification attempt.
+- Bind each payment to one code hash through the transaction comment.
+- Rebuild payment replay state from TON history after a server restart.
 
 ## Non-Goals
 
@@ -54,11 +61,12 @@ This is not a trustless proof system. The product should use wording such as
 
 ## Architecture
 
-The system has three main parts:
+The system has four main parts:
 
 1. Verification backend.
-2. Source storage.
-3. Verification registry.
+2. Payment verification.
+3. Source storage.
+4. Verification registry.
 
 ### Verification Backend
 
@@ -68,6 +76,7 @@ Input:
 
 - Target `code_hash`, or an address whose current code hash can be read from
   TON.
+- Payment transaction hash for a normal public verification request.
 - Source files.
 - Compiler configuration.
 - Optional build configuration.
@@ -84,6 +93,57 @@ Responsibilities:
 - Build a deterministic source bundle.
 - Store the bundle through the registry layer.
 - Return verification status and storage metadata.
+
+### Payment Verification
+
+Payment verification always uses TON testnet. The CLI does not accept `--net`
+with `--new`.
+
+`POST /api/v1/take-ticket` accepts a code hash. If the code hash is verified,
+the endpoint returns the stored bundle metadata. No payment is necessary.
+
+For new code, the endpoint returns:
+
+- The testnet payment address.
+- The minimum amount in nanoGRAM.
+- The exact comment `acton-verify:v1:<code_hash>`.
+
+The CLI sends a bounceable internal message with this comment. Then it
+waits for the finalized recipient transaction and sends its hash to `/verify`.
+After `Payment finalized:`, the CLI displays a testnet Actonscan URL. The URL
+contains the finalized transaction hash in lowercase hexadecimal form.
+
+The backend gets the transaction from TonCenter v3. It accepts the transaction
+only when all these conditions are true:
+
+- The transaction is finalized and is not emulated or aborted.
+- The transaction account and incoming destination equal the payment address.
+- The incoming message is not bounced.
+- The incoming value is not less than the configured minimum.
+- The comment equals the ticket comment for the requested code hash.
+
+The payment ledger uses the transaction hash as its primary key. Ledger states
+are `processing`, `retryable`, and `consumed`. Concurrent claims for one hash
+return a conflict.
+
+A deterministic result consumes the payment. This includes a source mismatch
+or a client error. An internal `5xx` error makes the payment retryable in the
+same server process.
+
+For a successful public verification, the backend stores the payment
+transaction hash in lowercase hexadecimal form. The source manifest and lookup
+API include this hash. The verifier UI links the hash to Actonscan testnet.
+
+At startup, the payment verifier is not ready. It reads every page of incoming
+testnet history up to a captured chain tip. It replaces the ledger with these
+historical protocol payments and marks every entry as `consumed`.
+
+The startup scan includes protocol payments even when their amount is too
+small. This rule prevents replay after a database loss. Payments without the
+protocol comment cannot authorize verification.
+
+During recovery, `/healthz` and `/take-ticket` return `503`. The server retries
+a failed scan with an exponential delay of up to 30 seconds.
 
 ### Source Storage
 
@@ -151,6 +211,7 @@ It contains:
 
 - All source files required by the build.
 - A manifest.
+- The payment transaction hash for a public verification.
 - Compiler configuration.
 - Entrypoint and source metadata.
 - Compilation parameters.
@@ -168,20 +229,21 @@ not expose a base64 source-content field.
 
 ## Submission Flow
 
-1. Developer submits target and sources.
-2. Backend resolves the target `code_hash`.
-3. If the code hash is already verified, the API immediately returns
-   `verification_result=already_verified` with the stored `source_bundle_hash`.
-4. Backend validates source paths and build metadata.
-5. Backend compiles sources with the selected compiler.
-6. Backend compares compiled hash with target hash.
-7. If hashes differ, response is `mismatch` and nothing is stored.
-8. If hashes match, backend computes `source_bundle_hash`.
-9. Registry stores the bundle in Git.
-10. Registry validates that the stored bundle is indexable.
-11. Registry upserts the bundle into SQLite.
-12. API returns `verification_result=match`, `source_bundle_hash`, and
-    `storage_revision`.
+1. Acton compiles the local contract and computes its code hash.
+2. Acton sends the code hash to `/take-ticket`.
+3. If the code hash is verified, Acton stops successfully without payment.
+4. For new code, the backend returns a testnet payment quote.
+5. Acton gets wallet approval and sends the payment with the exact comment.
+6. Acton waits for the finalized recipient transaction.
+7. Acton sends the sources and recipient transaction hash to `/verify`.
+8. The backend resolves the target code hash.
+9. The backend claims the payment transaction in the ledger.
+10. The backend validates source paths and build metadata.
+11. The backend compiles the sources and compares both code hashes.
+12. If the hashes differ, the response is `mismatch` and no bundle is stored.
+13. If the hashes match, the registry stores the payment hash and source bundle.
+14. The API returns `match`, `source_bundle_hash`, and `storage_revision`.
+15. The backend consumes the payment unless an internal server error occurred.
 
 ## Lookup Flow
 
@@ -190,7 +252,7 @@ To check whether an address uses verified code:
 1. Read the current code hash of the address from TON.
 2. Query the registry by `code_hash`.
 3. If a valid source bundle exists, the code hash is verified.
-4. Return the source bundle and build metadata.
+4. Return the source bundle, payment hash, and build metadata.
 5. A user can independently recompute file hashes and recompile the bundle.
 
 ## API Model
@@ -198,6 +260,7 @@ To check whether an address uses verified code:
 Current public endpoints:
 
 ```text
+POST /api/v1/take-ticket
 POST /api/v1/verify
 GET /api/v1/openapi.json
 GET /api/v1/verification/status?code_hash=...
@@ -231,11 +294,18 @@ ABI items contain the `code_hash` and parsed `abi` JSON.
 
 Important cases:
 
+- Payment history recovery fails: readiness stays false and the server retries.
+- Payment is missing, invalid, insufficient, or for another code hash: request
+  fails before compilation.
+- Payment is already used or processing: request fails with a conflict.
+- Internal verification failure: payment state changes to `retryable`.
+- Deterministic verification result: payment state changes to `consumed`.
 - Compilation fails: no storage write.
 - Hash mismatch: no storage write.
 - Git write fails: verification request fails.
 - Stored bundle cannot be re-read or validated: verification request fails.
-- Backend process state is lost: registry can be rebuilt from Git.
+- Backend process state is lost: the registry is rebuilt from Git.
+- Payment database state is lost: the ledger is rebuilt from testnet history.
 - Git content is unavailable: source lookup is temporarily unavailable.
 
 The backend keeps writes deterministic by using `code_hash` as the storage key

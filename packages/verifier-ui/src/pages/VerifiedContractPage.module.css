@@ -53,7 +53,7 @@
   border-color: color-mix(in srgb, var(--acton-color-status-failed) 35%, transparent);
 }
 
-.compilerLink {
+.externalLink {
   min-width: 0;
   width: fit-content;
   max-width: 100%;
@@ -64,19 +64,19 @@
   text-decoration: none;
 }
 
-.compilerLink span {
+.externalLink span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.compilerLink svg {
+.externalLink svg {
   flex: 0 0 auto;
 }
 
-.compilerLink:hover,
-.compilerLink:focus-visible {
+.externalLink:hover,
+.externalLink:focus-visible {
   text-decoration: underline;
 }
 

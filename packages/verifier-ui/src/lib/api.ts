@@ -8,6 +8,7 @@ export interface VerificationSourceResponse {
 
 export interface SourceBundle {
   readonly source_bundle_hash: string
+  readonly payment_tx_hash?: string
   readonly verified_at: number
   readonly storage_revision: string
   readonly entrypoint: string

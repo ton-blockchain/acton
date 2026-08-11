@@ -74,11 +74,17 @@ write_generated_config() {
         printf 'level = "%s"\n\n' "$(toml_escape "${VERIFIER_LOG_LEVEL:-info}")"
 
         printf '[network]\n'
-        printf 'name = "%s"\n\n' "$(toml_escape "${VERIFIER_NETWORK:-mainnet}")"
+        printf 'name = "%s"\n\n' "$(toml_escape "${VERIFIER_NETWORK:-testnet}")"
 
         printf '[toncenter]\n'
         write_optional_string base_url "${VERIFIER_TONCENTER_BASE_URL:-}"
         write_optional_string api_key "${VERIFIER_TONCENTER_API_KEY:-}"
+        printf '\n'
+
+        printf '[payment]\n'
+        write_optional_string address "${VERIFIER_PAYMENT_ADDRESS:-}"
+        write_optional_int min_amount_nano "${VERIFIER_PAYMENT_MIN_AMOUNT_NANO:-}"
+        write_optional_string ledger_path "${VERIFIER_PAYMENT_LEDGER_PATH:-/var/lib/verifier/payment-ledger/payment-ledger.sqlite3}"
         printf '\n'
 
         printf '[source_repository]\n'

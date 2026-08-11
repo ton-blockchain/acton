@@ -7,12 +7,18 @@ bind_addr = "127.0.0.1:3000"
 level = "info"
 
 [network]
-# Supported values: mainnet, testnet, localnet.
-name = "mainnet"
+# Payment verification supports only testnet.
+name = "testnet"
 
 [toncenter]
-# base_url = "https://toncenter.com"
+# base_url = "https://testnet.toncenter.com"
 # api_key = "your-api-key"
+
+[payment]
+# Required in production. Use a raw basechain address.
+# address = "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+# min_amount_nano = 500000000 # 0.5 TON
+ledger_path = "verifier-payments.sqlite3"
 
 [source_repository]
 # path = "source-repo"

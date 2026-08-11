@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
@@ -35,8 +38,46 @@ impl MockSourceStorage {
         }
     }
 
+    pub fn failing_once(message: &str) -> Self {
+        Self {
+            outcome: MockSourceStorageOutcome::FailOnce {
+                message: message.to_owned(),
+                receipt: SourceStorageReceipt {
+                    revision: "mock-revision".to_owned(),
+                    created: true,
+                },
+                failed: AtomicBool::new(false),
+            },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+            stored_bundles: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     pub fn recorded_requests(&self) -> Arc<Mutex<Vec<RecordedSourceStorageRequest>>> {
         Arc::clone(&self.recorded_requests)
+    }
+
+    fn store_confirmed(
+        &self,
+        request: &StoreSourceBundleRequest,
+        receipt: &SourceStorageReceipt,
+    ) -> SourceStorageReceipt {
+        let mut stored_bundles = self
+            .stored_bundles
+            .lock()
+            .expect("stored source bundles mutex should not be poisoned");
+        if stored_bundles
+            .iter()
+            .any(|stored| stored.manifest.code_hash == request.code_hash)
+        {
+            return SourceStorageReceipt {
+                revision: receipt.revision.clone(),
+                created: false,
+            };
+        }
+        stored_bundles.push(stored_bundle_from_request(request, receipt));
+        drop(stored_bundles);
+        receipt.clone()
     }
 }
 
@@ -56,25 +97,20 @@ impl SourceStorage for MockSourceStorage {
 
         match &self.outcome {
             MockSourceStorageOutcome::Confirmed(receipt) => {
-                let mut stored_bundles = self
-                    .stored_bundles
-                    .lock()
-                    .expect("stored source bundles mutex should not be poisoned");
-                if stored_bundles
-                    .iter()
-                    .any(|stored| stored.manifest.code_hash == request.code_hash)
-                {
-                    return Ok(SourceStorageReceipt {
-                        revision: receipt.revision.clone(),
-                        created: false,
-                    });
-                }
-                stored_bundles.push(stored_bundle_from_request(&request, receipt));
-                drop(stored_bundles);
-                Ok(receipt.clone())
+                Ok(self.store_confirmed(&request, receipt))
             }
             MockSourceStorageOutcome::Failed(message) => {
                 Err(SourceStorageError::Operation(message.clone()))
+            }
+            MockSourceStorageOutcome::FailOnce {
+                message,
+                receipt,
+                failed,
+            } => {
+                if !failed.swap(true, Ordering::AcqRel) {
+                    return Err(SourceStorageError::Operation(message.clone()));
+                }
+                Ok(self.store_confirmed(&request, receipt))
             }
         }
     }
@@ -140,6 +176,11 @@ impl RecordedSourceStorageRequest {
 enum MockSourceStorageOutcome {
     Confirmed(SourceStorageReceipt),
     Failed(String),
+    FailOnce {
+        message: String,
+        receipt: SourceStorageReceipt,
+        failed: AtomicBool,
+    },
 }
 
 fn stored_bundle_from_request(
@@ -168,6 +209,7 @@ fn stored_bundle_from_request(
         manifest: SourceBundleManifest {
             code_hash: request.code_hash.clone(),
             source_bundle_hash: request.source_bundle_hash.clone(),
+            payment_tx_hash: request.payment_tx_hash.clone(),
             verified_at: request.verified_at.unwrap_or(MOCK_VERIFIED_AT),
             compiler: request.compiler.clone(),
             source_map: request.source_map.clone(),

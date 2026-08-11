@@ -16,8 +16,8 @@ fn example_config_toml_loads() {
     );
     assert_eq!(config.api_key(), None);
     assert_eq!(config.logging_level(), "info");
-    assert_eq!(config.network().to_string(), "mainnet");
-    assert_eq!(config.toncenter_base_url(), "https://toncenter.com");
+    assert_eq!(config.network().to_string(), "testnet");
+    assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
     assert_eq!(config.toncenter_api_key(), None);
     assert_eq!(config.source_repository_path(), None);
     assert_eq!(config.source_repository_remote(), "origin");
@@ -34,6 +34,12 @@ fn example_config_toml_loads() {
         config.registry_index_path().to_string_lossy(),
         "verifier-index.sqlite3"
     );
+    assert_eq!(config.payment_address(), None);
+    assert_eq!(config.payment_min_amount_nano(), None);
+    assert_eq!(
+        config.payment_ledger_path().to_string_lossy(),
+        "verifier-payments.sqlite3"
+    );
     assert_eq!(config.compiler_node_bin(), "node");
     assert_eq!(
         config.compiler_worker_path().to_string_lossy(),
@@ -43,26 +49,41 @@ fn example_config_toml_loads() {
 }
 
 #[test]
-fn localnet_network_uses_localnet_endpoint_by_default() {
+fn omitted_network_uses_testnet() {
     let mut config_file =
         tempfile::NamedTempFile::new().expect("temporary config file should be created");
-    writeln!(
-        config_file,
-        r#"
-[network]
-name = "localnet"
-"#
-    )
-    .expect("temporary config should be writable");
+    writeln!(config_file, "[logging]\nlevel = \"debug\"")
+        .expect("temporary config should be writable");
     config_file
         .flush()
         .expect("temporary config should be flushed");
 
-    let config = Config::load_from_path(config_file.path()).expect("localnet config should load");
+    let config = Config::load_from_path(config_file.path()).expect("default config should load");
 
-    assert_eq!(config.logging_level(), "info");
-    assert_eq!(config.network().to_string(), "localnet");
-    assert_eq!(config.toncenter_base_url(), "http://127.0.0.1:5411");
+    assert_eq!(config.logging_level(), "debug");
+    assert_eq!(config.network().to_string(), "testnet");
+    assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
+}
+
+#[test]
+fn non_testnet_networks_are_rejected() {
+    for network in ["mainnet", "localnet"] {
+        let mut config_file =
+            tempfile::NamedTempFile::new().expect("temporary config file should be created");
+        writeln!(config_file, "[network]\nname = \"{network}\"")
+            .expect("temporary config should be writable");
+        config_file
+            .flush()
+            .expect("temporary config should be flushed");
+
+        let error = Config::load_from_path(config_file.path())
+            .expect_err("non-testnet config should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            format!("unsupported network {network}: verifier supports only testnet")
+        );
+    }
 }
 
 #[test]
@@ -97,6 +118,11 @@ author_email = "verifier@example.com"
 
 [registry_index]
 path = "/tmp/verifier-index.sqlite3"
+
+[payment]
+address = "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+min_amount_nano = 10000000
+ledger_path = "/tmp/verifier-payments.sqlite3"
 "#
     )
     .expect("temporary config should be writable");
@@ -133,5 +159,14 @@ path = "/tmp/verifier-index.sqlite3"
     assert_eq!(
         config.registry_index_path().to_string_lossy(),
         "/tmp/verifier-index.sqlite3"
+    );
+    assert_eq!(
+        config.payment_address(),
+        Some("0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+    );
+    assert_eq!(config.payment_min_amount_nano(), Some(10_000_000));
+    assert_eq!(
+        config.payment_ledger_path().to_string_lossy(),
+        "/tmp/verifier-payments.sqlite3"
     );
 }

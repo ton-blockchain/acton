@@ -40,6 +40,7 @@ pub type SharedSourceStorage = Arc<dyn SourceStorage>;
 pub struct StoreSourceBundleRequest {
     pub code_hash: String,
     pub source_bundle_hash: String,
+    pub payment_tx_hash: Option<String>,
     // TODO: Remove this field after migrating contracts from the legacy verifier.
     pub verified_at: Option<u64>,
     pub compiler: CompilerMetadata,
@@ -596,6 +597,7 @@ async fn write_manifest(
     let manifest = DiskSourceBundleManifest {
         code_hash: request.code_hash.clone(),
         source_bundle_hash: request.source_bundle_hash.clone(),
+        payment_tx_hash: request.payment_tx_hash.clone(),
         verified_at,
         compiler: request.compiler.clone(),
         source_map: request.source_map.clone(),
@@ -654,6 +656,7 @@ async fn read_bundle(
         manifest: SourceBundleManifest {
             code_hash: disk_manifest.code_hash,
             source_bundle_hash: disk_manifest.source_bundle_hash,
+            payment_tx_hash: disk_manifest.payment_tx_hash,
             verified_at: disk_manifest.verified_at,
             compiler: disk_manifest.compiler,
             source_map: disk_manifest.source_map,
@@ -873,6 +876,8 @@ pub struct StoredSourceFile {
 pub struct SourceBundleManifest {
     pub code_hash: String,
     pub source_bundle_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_tx_hash: Option<String>,
     pub verified_at: u64,
     pub compiler: CompilerMetadata,
     pub source_map: Option<SourceMapData>,
@@ -882,6 +887,8 @@ pub struct SourceBundleManifest {
 struct DiskSourceBundleManifest {
     code_hash: String,
     source_bundle_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    payment_tx_hash: Option<String>,
     verified_at: u64,
     compiler: CompilerMetadata,
     source_map: Option<SourceMapData>,

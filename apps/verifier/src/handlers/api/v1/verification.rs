@@ -271,6 +271,8 @@ pub(super) struct VerificationSourceResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(super) struct SourceBundleResponse {
     source_bundle_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payment_tx_hash: Option<String>,
     verified_at: u64,
     storage_revision: String,
     entrypoint: String,
@@ -284,6 +286,7 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
         let manifest = bundle.manifest;
         Self {
             source_bundle_hash: manifest.source_bundle_hash,
+            payment_tx_hash: manifest.payment_tx_hash,
             verified_at: manifest.verified_at,
             storage_revision: bundle.storage_revision,
             entrypoint: manifest.compiler.entrypoint.clone(),

@@ -14,7 +14,7 @@ Prepare these inputs before running `acton verify`:
 
 - a [wallet configured in Acton](/docs/wallets) or a TON Connect wallet
 - a deployed `.tolk` contract that is defined in `Acton.toml`
-- enough GRAM on the wallet to cover the final verification transaction when not using `--dry-run`; Acton sends `0.1 GRAM` plus normal wallet/network fees
+- enough GRAM for the selected verifier flow and normal network fees
 
 Only Tolk contracts can be verified. Arbitrary `.boc` contracts are not supported by the verifier flow.
 
@@ -28,7 +28,8 @@ Run `acton verify` with the contract name from `Acton.toml` and the deployed add
 acton verify Counter --address EQDt7LL...
 ```
 
-`testnet` is the default network, so `--net testnet` is optional.
+`testnet` is the default built-in verifier network. Therefore, `--net testnet`
+is optional for this flow.
 
 If the project defines only one contract, the contract name can be omitted. If multiple contracts are available, Acton prompts for the selection. If `--address` is omitted, Acton prompts for the address.
 
@@ -47,6 +48,39 @@ Pass `--net mainnet` to target a mainnet deployment:
 acton verify Counter --address UQDt7LL... --net mainnet
 ```
 
+## Use the Acton payment verifier
+
+The Acton verifier uses TON testnet for all payments and contract lookups. Do
+not use `--net` with `--new`.
+
+```bash
+acton verify Counter --new --wallet deployer
+```
+
+Acton first sends the compiled code hash to `/api/v1/take-ticket`. If that code
+hash is verified, Acton stops successfully and does not request wallet access.
+
+For new code, the backend returns a testnet address, a minimum amount, and a
+comment. The comment has this form:
+
+```text
+acton-verify:v1:<code_hash>
+```
+
+Acton displays the quote and requests payment approval. Then Acton sends the
+payment and waits for the finalized recipient transaction. The source upload
+contains that transaction hash.
+
+One transaction can authorize only one verification attempt. The backend also
+makes sure that the amount, destination, finality, and comment are correct.
+
+If an upload retry needs an existing payment, pass its finalized recipient
+transaction hash:
+
+```bash
+acton verify Counter --new --payment-tx-hash <transaction-hash>
+```
+
 ## Choose the wallet for the verification transaction
 
 When more than one wallet is configured, use `--wallet` to pick the sender for the final verification transaction:
@@ -57,7 +91,11 @@ acton verify Counter --address EQDt7LL... --wallet deployer
 
 If exactly one wallet is configured, Acton selects it automatically. If multiple wallets are available and `--wallet` is omitted, Acton prompts for the selection.
 
-When `--dry-run` is not used, the final verification transaction sends `0.1 GRAM`. If the verifier backend reports that the same code hash is already verified, Acton exits successfully without sending another transaction.
+The built-in verifier sends `0.1 GRAM` in its final transaction. The Acton
+verifier uses the amount from the payment ticket.
+
+If a backend reports that the code hash is verified, Acton exits successfully
+without another transaction.
 
 ## Use TON Connect for the verification transaction
 
@@ -65,6 +103,12 @@ Pass `--tonconnect` to approve the final verification transaction through a TON 
 
 ```bash
 acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+```
+
+For the Acton verifier, omit `--net`:
+
+```bash
+acton verify Counter --new --tonconnect
 ```
 
 Acton starts a local TON Connect page and opens it in the browser. If the default page port is busy, pass `--tonconnect-port <PORT>`.
@@ -77,7 +121,11 @@ Use `--dry-run` to run the verifier flow without publishing the final transactio
 acton verify Counter --address EQDt7LL... --dry-run
 ```
 
-`--dry-run` still compiles the contract, uploads the sources, and collects the required verifier signatures. It skips only the final blockchain transaction.
+The built-in verifier still uploads sources and collects signatures. It skips
+only the final blockchain transaction.
+
+With `--new`, Acton requests a ticket and prepares the source request. It does
+not send the testnet payment or upload the sources.
 
 Use this mode to confirm that the verifier backend accepts the source package before spending GRAM from the wallet.
 
@@ -117,6 +165,13 @@ To test a specific verifier backend, set `ACTON_VERIFY_BACKEND`:
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
 ACTON_VERIFY_DEBUG=1 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
+```
+
+For `--new`, set `ACTON_NEW_VERIFY_BACKEND`:
+
+```acton-cli
+ACTON_NEW_VERIFY_BACKEND=http://127.0.0.1:3000 \
+acton verify Counter --new --dry-run
 ```
 
 To replace the signer backend list, set `ACTON_VERIFY_BACKENDS`:

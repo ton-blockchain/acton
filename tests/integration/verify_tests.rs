@@ -40,7 +40,7 @@ keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region sh
 const VERIFY_TEST_ADDRESS: &str = "EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot";
 const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";
 const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
-const TEST_TONCENTER_MAINNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V3_URL";
+const TEST_TONCENTER_TESTNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V3_URL";
 const VERIFY_BACKENDS_ENV: &str = "ACTON_VERIFY_BACKENDS";
 const VERIFY_TEST_REGISTRY_ADDRESS: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
 const VERIFY_TEST_API_KEY: &str = "verify-test-api-key";
@@ -48,6 +48,10 @@ const VERIFY_TEST_CODE_HASH: &str =
     "e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
 const VERIFY_TEST_SOURCE_BUNDLE_HASH: &str =
     "a7f1d1a6aabbccddeeff00112233445566778899aabbccddeeff001122334455";
+const VERIFY_TEST_PAYMENT_ADDRESS: &str =
+    "0:1111111111111111111111111111111111111111111111111111111111111111";
+const VERIFY_TEST_PAYMENT_TX_HASH: &str =
+    "a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b";
 
 static VERIFY_BACKEND_MOCK_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -77,6 +81,52 @@ fn build_verify_backend_project(name: &str) -> Project {
         .build();
     write_deployer_wallets(project.path());
     project
+}
+
+fn payment_ticket_response() -> VerifierMockResponse {
+    VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "status": "payment_required",
+            "code_hash": VERIFY_TEST_CODE_HASH,
+            "payment_address": VERIFY_TEST_PAYMENT_ADDRESS,
+            "amount_nano": "10000000",
+            "comment": format!("acton-verify:v1:{VERIFY_TEST_CODE_HASH}")
+        })
+        .to_string(),
+        headers: vec![],
+    }
+}
+
+fn assert_new_verifier_payment_error(project_name: &str, status: u16, error: &str, snapshot: &str) {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project(project_name);
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        payment_ticket_response(),
+        VerifierMockResponse {
+            status,
+            body: serde_json::json!({"error": error}).to_string(),
+            headers: vec![],
+        },
+    ]);
+
+    project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(snapshot);
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
 }
 
 fn compile_simple_contract_boc_base64(project: &Project) -> String {
@@ -840,18 +890,21 @@ fn test_verify_debug_mode_prints_source_details_and_builds_multipart_upload() {
 fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-new-verifier-success");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "code_hash": VERIFY_TEST_CODE_HASH,
-            "compiled_code_hash": VERIFY_TEST_CODE_HASH,
-            "verification_result": "match",
-            "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
-            "storage_revision": "0123456789abcdef"
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        payment_ticket_response(),
+        VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "code_hash": VERIFY_TEST_CODE_HASH,
+                "compiled_code_hash": VERIFY_TEST_CODE_HASH,
+                "verification_result": "match",
+                "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
+                "storage_revision": "0123456789abcdef"
+            })
+            .to_string(),
+            headers: vec![],
+        },
+    ]);
 
     let output = project
         .acton()
@@ -859,7 +912,8 @@ fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
         .verify()
         .new_verifier()
         .verify_contract("simple")
-        .verify_network("mainnet")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
         .run()
         .success();
 
@@ -872,10 +926,17 @@ fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
     assert_eq!(captured[0].method, "POST");
-    assert_eq!(captured[0].path, "/api/v1/verify");
-    let body = String::from_utf8_lossy(&captured[0].body);
+    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[1].method, "POST");
+    assert_eq!(captured[1].path, "/api/v1/verify");
+    let ticket_body = String::from_utf8_lossy(&captured[0].body);
+    assert!(
+        ticket_body.contains(VERIFY_TEST_CODE_HASH),
+        "ticket request must include target code hash, got: {ticket_body}"
+    );
+    let body = String::from_utf8_lossy(&captured[1].body);
     assert!(
         body.contains("name=\"code_hash\"") && body.contains(VERIFY_TEST_CODE_HASH),
         "multipart request must include target code hash, got: {body}"
@@ -902,6 +963,115 @@ fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
         body.contains("name=\"files\"") && body.contains("filename=\"contracts/simple.tolk\""),
         "multipart request must upload source files under matching paths, got: {body}"
     );
+    assert!(
+        body.contains("name=\"tx_hash\"") && body.contains(VERIFY_TEST_PAYMENT_TX_HASH),
+        "multipart request must include the payment transaction hash, got: {body}"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_stops_when_code_is_already_verified() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-already-verified");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "status": "already_verified",
+            "code_hash": VERIFY_TEST_CODE_HASH,
+            "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
+            "storage_revision": "0123456789abcdef"
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_stops_when_code_is_already_verified.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected only the ticket request");
+    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_dry_run_formats_payment_without_sending_it() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-dry-run");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![payment_ticket_response()]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .arg("--dry-run")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_dry_run_formats_payment_without_sending_it.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected only the ticket request");
+    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_rejects_a_ticket_for_another_code_hash() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-ticket-code-hash-mismatch");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "status": "payment_required",
+            "code_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "payment_address": VERIFY_TEST_PAYMENT_ADDRESS,
+            "amount_nano": "10000000",
+            "comment": "acton-verify:v1:1111111111111111111111111111111111111111111111111111111111111111"
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/test_verify_new_verifier_rejects_a_ticket_for_another_code_hash.stderr.txt",
+        );
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected only the ticket request");
+    assert_eq!(captured[0].path, "/api/v1/take-ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -916,27 +1086,31 @@ fn test_verify_new_verifier_address_option_validates_deployed_code_hash() {
             Some(&contract_code_boc),
             "active",
         )]);
-    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "code_hash": VERIFY_TEST_CODE_HASH,
-            "compiled_code_hash": VERIFY_TEST_CODE_HASH,
-            "verification_result": "match",
-            "source_bundle_hash": null
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![
+        payment_ticket_response(),
+        VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "code_hash": VERIFY_TEST_CODE_HASH,
+                "compiled_code_hash": VERIFY_TEST_CODE_HASH,
+                "verification_result": "match",
+                "source_bundle_hash": null
+            })
+            .to_string(),
+            headers: vec![],
+        },
+    ]);
 
     let output = project
         .acton()
         .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
-        .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &toncenter_url)
+        .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, &toncenter_url)
         .verify()
         .new_verifier()
         .verify_contract("simple")
         .verify_address(VERIFY_TEST_ADDRESS)
-        .verify_network("mainnet")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
         .run()
         .success();
 
@@ -979,12 +1153,11 @@ fn test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash
 
     let output = project
         .acton()
-        .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &toncenter_url)
+        .env(TEST_TONCENTER_TESTNET_V3_URL_ENV, &toncenter_url)
         .verify()
         .new_verifier()
         .verify_contract("simple")
         .verify_address(VERIFY_TEST_ADDRESS)
-        .verify_network("mainnet")
         .run()
         .failure();
 
@@ -1003,18 +1176,21 @@ fn test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash
 fn test_verify_new_verifier_reports_mismatch() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-new-verifier-mismatch");
-    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "code_hash": "1111111111111111111111111111111111111111111111111111111111111111",
-            "compiled_code_hash": "2222222222222222222222222222222222222222222222222222222222222222",
-            "verification_result": "mismatch",
-            "source_bundle_hash": null,
-            "storage_revision": null
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![
+        payment_ticket_response(),
+        VerifierMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "code_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                "compiled_code_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+                "verification_result": "mismatch",
+                "source_bundle_hash": null,
+                "storage_revision": null
+            })
+            .to_string(),
+            headers: vec![],
+        },
+    ]);
 
     let output = project
         .acton()
@@ -1022,7 +1198,8 @@ fn test_verify_new_verifier_reports_mismatch() {
         .verify()
         .new_verifier()
         .verify_contract("simple")
-        .verify_network("mainnet")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
         .run()
         .failure();
 
@@ -1041,14 +1218,17 @@ fn test_verify_new_verifier_reports_mismatch() {
 fn test_verify_new_verifier_reports_http_error_body() {
     let _guard = verify_backend_mock_guard();
     let project = build_verify_backend_project("verify-new-verifier-http-error");
-    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
-        status: 400,
-        body: serde_json::json!({
-            "error": "new verifier rejected sources"
-        })
-        .to_string(),
-        headers: vec![],
-    }]);
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![
+        payment_ticket_response(),
+        VerifierMockResponse {
+            status: 400,
+            body: serde_json::json!({
+                "error": "new verifier rejected sources"
+            })
+            .to_string(),
+            headers: vec![],
+        },
+    ]);
 
     let output = project
         .acton()
@@ -1056,7 +1236,8 @@ fn test_verify_new_verifier_reports_http_error_body() {
         .verify()
         .new_verifier()
         .verify_contract("simple")
-        .verify_network("mainnet")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
         .run()
         .failure();
 
@@ -1069,31 +1250,127 @@ fn test_verify_new_verifier_reports_http_error_body() {
     let captured = captured
         .lock()
         .expect("captured verifier requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
-    assert_eq!(captured[0].path, "/api/v1/verify");
+    assert_eq!(captured.len(), 2, "expected ticket and verify requests");
+    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[1].path, "/api/v1/verify");
 }
 
 #[test]
-fn test_verify_new_verifier_rejects_wallet_option() {
-    let project = build_verify_backend_project("verify-new-verifier-wallet-option");
+fn test_verify_new_verifier_rejects_an_invalid_payment_transaction_hash() {
+    let project = build_verify_backend_project("verify-new-verifier-invalid-payment-hash");
 
     project
         .acton()
         .verify()
         .new_verifier()
         .verify_contract("simple")
-        .verify_network("mainnet")
-        .wallet("deployer")
+        .arg("--payment-tx-hash")
+        .arg("123")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/verify/test_verify_new_verifier_rejects_wallet_option.stderr.txt",
+            "integration/snapshots/verify/test_verify_new_verifier_rejects_an_invalid_payment_transaction_hash.stderr.txt",
         );
 }
 
 #[test]
-fn test_verify_new_verifier_rejects_tonconnect_option() {
-    let project = build_verify_backend_project("verify-new-verifier-tonconnect-option");
+fn test_verify_new_verifier_reports_payment_not_found() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-payment-not-found",
+        402,
+        "payment_not_found: transaction was not found on TON testnet",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_payment_not_found.stderr.txt",
+    );
+}
+
+#[test]
+fn test_verify_new_verifier_reports_invalid_payment() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-invalid-payment",
+        402,
+        "payment_invalid: transaction is not a finalized incoming payment",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_invalid_payment.stderr.txt",
+    );
+}
+
+#[test]
+fn test_verify_new_verifier_reports_insufficient_payment() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-insufficient-payment",
+        402,
+        "payment_insufficient: expected at least 1000000 nanoGRAM, received 999999",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_insufficient_payment.stderr.txt",
+    );
+}
+
+#[test]
+fn test_verify_new_verifier_reports_payment_code_hash_mismatch() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-payment-code-hash-mismatch",
+        402,
+        "payment_code_hash_mismatch: transaction comment does not match the requested code hash",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_payment_code_hash_mismatch.stderr.txt",
+    );
+}
+
+#[test]
+fn test_verify_new_verifier_reports_used_payment() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-used-payment",
+        409,
+        "payment_used: transaction has already been used",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_used_payment.stderr.txt",
+    );
+}
+
+#[test]
+fn test_verify_new_verifier_reports_payment_in_progress() {
+    assert_new_verifier_payment_error(
+        "verify-new-verifier-payment-in-progress",
+        409,
+        "payment_in_progress: transaction is already being processed",
+        "integration/snapshots/verify/test_verify_new_verifier_reports_payment_in_progress.stderr.txt",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_reports_payment_recovery() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-payment-recovery");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 503,
+        body: serde_json::json!({
+            "error": "payment_recovery_in_progress: payment history is still being recovered"
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/test_verify_new_verifier_reports_payment_recovery.stderr.txt",
+        );
+
+    mock_handle.join().expect("mock verifier must finish");
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected only the ticket request");
+}
+
+#[test]
+fn test_verify_new_verifier_rejects_network_option() {
+    let project = build_verify_backend_project("verify-new-verifier-network-option");
 
     project
         .acton()
@@ -1101,11 +1378,27 @@ fn test_verify_new_verifier_rejects_tonconnect_option() {
         .new_verifier()
         .verify_contract("simple")
         .verify_network("mainnet")
-        .arg("--tonconnect")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/verify/test_verify_new_verifier_rejects_tonconnect_option.stderr.txt",
+            "integration/snapshots/verify/test_verify_new_verifier_rejects_network_option.stderr.txt",
+        );
+}
+
+#[test]
+fn test_verify_payment_transaction_hash_requires_new_verifier() {
+    let project = build_verify_backend_project("verify-payment-transaction-requires-new");
+
+    project
+        .acton()
+        .verify()
+        .verify_contract("simple")
+        .arg("--payment-tx-hash")
+        .arg(VERIFY_TEST_PAYMENT_TX_HASH)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/test_verify_payment_transaction_hash_requires_new_verifier.stderr.txt",
         );
 }
 

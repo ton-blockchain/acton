@@ -24,6 +24,7 @@ const DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED: bool = true;
 const DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME: &str = "ton-verifier";
 const DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL: &str = "ton-verifier@example.invalid";
 const DEFAULT_REGISTRY_INDEX_PATH: &str = "verifier-index.sqlite3";
+const DEFAULT_PAYMENT_LEDGER_PATH: &str = "verifier-payments.sqlite3";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -42,6 +43,9 @@ pub struct Config {
     source_repository_author_name: String,
     source_repository_author_email: String,
     registry_index_path: PathBuf,
+    payment_address: Option<String>,
+    payment_min_amount_nano: Option<u64>,
+    payment_ledger_path: PathBuf,
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
@@ -52,7 +56,8 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if the config file cannot be read or parsed as TOML.
+    /// Returns an error if the config file cannot be read, parsed as TOML, or
+    /// selects a network other than testnet.
     pub fn load() -> Result<Self, ConfigError> {
         let path = env::var_os(CONFIG_PATH_ENV)
             .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH), PathBuf::from);
@@ -77,7 +82,14 @@ impl Config {
                 source,
             })?;
 
-        Ok(file.into_config())
+        let config = file.into_config();
+        if config.network != TonNetwork::Testnet {
+            return Err(ConfigError::UnsupportedNetwork {
+                network: config.network,
+            });
+        }
+
+        Ok(config)
     }
 
     #[must_use]
@@ -158,6 +170,21 @@ impl Config {
     }
 
     #[must_use]
+    pub fn payment_address(&self) -> Option<&str> {
+        self.payment_address.as_deref()
+    }
+
+    #[must_use]
+    pub const fn payment_min_amount_nano(&self) -> Option<u64> {
+        self.payment_min_amount_nano
+    }
+
+    #[must_use]
+    pub fn payment_ledger_path(&self) -> &Path {
+        &self.payment_ledger_path
+    }
+
+    #[must_use]
     pub fn compiler_node_bin(&self) -> &str {
         &self.compiler_node_bin
     }
@@ -179,7 +206,7 @@ impl Default for Config {
             bind_addr: default_bind_addr(),
             api_key: None,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
-            network: TonNetwork::Mainnet,
+            network: TonNetwork::Testnet,
             toncenter_base_url: None,
             toncenter_api_key: None,
             source_repository_path: None,
@@ -191,6 +218,9 @@ impl Default for Config {
             source_repository_author_name: DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned(),
             source_repository_author_email: DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned(),
             registry_index_path: PathBuf::from(DEFAULT_REGISTRY_INDEX_PATH),
+            payment_address: None,
+            payment_min_amount_nano: None,
+            payment_ledger_path: PathBuf::from(DEFAULT_PAYMENT_LEDGER_PATH),
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
@@ -198,7 +228,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TonNetwork {
     Mainnet,
@@ -240,6 +270,8 @@ pub enum ConfigError {
         path: PathBuf,
         source: toml::de::Error,
     },
+    #[error("unsupported network {network}: verifier supports only testnet")]
+    UnsupportedNetwork { network: TonNetwork },
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -257,6 +289,8 @@ struct ConfigFile {
     #[serde(default)]
     registry_index: RegistryIndexConfig,
     #[serde(default)]
+    payment: PaymentConfig,
+    #[serde(default)]
     compiler: CompilerConfig,
 }
 
@@ -269,7 +303,7 @@ impl ConfigFile {
                 .logging
                 .level
                 .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
-            network: self.network.name.unwrap_or(TonNetwork::Mainnet),
+            network: self.network.name.unwrap_or(TonNetwork::Testnet),
             toncenter_base_url: self.toncenter.base_url,
             toncenter_api_key: self.toncenter.api_key,
             source_repository_path: self.source_repository.path,
@@ -302,6 +336,12 @@ impl ConfigFile {
                 .registry_index
                 .path
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_REGISTRY_INDEX_PATH)),
+            payment_address: self.payment.address.filter(|address| !address.is_empty()),
+            payment_min_amount_nano: self.payment.min_amount_nano,
+            payment_ledger_path: self
+                .payment
+                .ledger_path
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_PAYMENT_LEDGER_PATH)),
             compiler_node_bin: self
                 .compiler
                 .node_bin
@@ -356,6 +396,13 @@ struct SourceRepositoryConfig {
 #[derive(Debug, Default, Deserialize)]
 struct RegistryIndexConfig {
     path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct PaymentConfig {
+    address: Option<String>,
+    min_amount_nano: Option<u64>,
+    ledger_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]

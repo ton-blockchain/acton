@@ -7,9 +7,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    compilers::CompilerError, registry::RegistryError, registry_index::VerificationIndexError,
-    source_bundle::SourceBundleError, source_storage::SourceStorageError,
-    verification::VerificationError,
+    compilers::CompilerError, payment::PaymentError, registry::RegistryError,
+    registry_index::VerificationIndexError, source_bundle::SourceBundleError,
+    source_storage::SourceStorageError, verification::VerificationError,
 };
 
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
@@ -52,6 +52,35 @@ impl ApiError {
             message,
             expose_message: true,
         }
+    }
+
+    pub const fn payment_required(message: String) -> Self {
+        Self {
+            status: StatusCode::PAYMENT_REQUIRED,
+            message,
+            expose_message: true,
+        }
+    }
+
+    pub const fn conflict(message: String) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message,
+            expose_message: true,
+        }
+    }
+
+    pub const fn service_unavailable(message: String) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            message,
+            expose_message: true,
+        }
+    }
+
+    #[must_use]
+    pub fn is_server_error(&self) -> bool {
+        self.status.is_server_error()
     }
 
     pub const fn not_found(message: String) -> Self {
@@ -111,6 +140,21 @@ impl From<SourceStorageError> for ApiError {
             Self::hidden_bad_gateway(message)
         } else {
             Self::bad_gateway(message)
+        }
+    }
+}
+
+impl From<PaymentError> for ApiError {
+    fn from(err: PaymentError) -> Self {
+        match err {
+            PaymentError::RecoveryInProgress => Self::service_unavailable(err.to_string()),
+            PaymentError::AlreadyUsed | PaymentError::InProgress => Self::conflict(err.to_string()),
+            PaymentError::TransactionNotFound
+            | PaymentError::InvalidTransaction
+            | PaymentError::MissingAmount
+            | PaymentError::InsufficientAmount { .. }
+            | PaymentError::CodeHashMismatch => Self::payment_required(err.to_string()),
+            _ => Self::bad_gateway(err.to_string()),
         }
     }
 }

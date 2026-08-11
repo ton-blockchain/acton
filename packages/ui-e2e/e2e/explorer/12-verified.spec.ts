@@ -21,6 +21,37 @@ const VERIFIED_ITEMS = Array.from({length: 50}, (_, index) => {
   }
 })
 
+const PAYMENT_CODE_HASH = "5e3bd9ba054aa0c98c6d0244aa7e7f4e381a603ee022063a266db29dbb06e6dd"
+const LEGACY_CODE_HASH = "7f3f78e3b8c68282b629bd8a6d49726f97902f4b36d9295d170a0e67ac9daa04"
+const PAYMENT_TX_HASH = "a67afe0194b06c636a87ec5c5876d7d0c02579eb43755d7dc106647f08f89175"
+
+const verifiedSourceResponse = (codeHash: string, paymentTransactionHash?: string) => ({
+  code_hash: codeHash,
+  verified: true,
+  bundle: {
+    source_bundle_hash: "4e3017a5b9b184a201d7e25490f1585ac1c2a1ee8b95f8478c72601481ac5a16",
+    ...(paymentTransactionHash ? {payment_tx_hash: paymentTransactionHash} : {}),
+    verified_at: 1_750_000_000,
+    storage_revision: "263e28a9dbfffb7cd5a7cff7d70ceef28a9d1134",
+    entrypoint: "contracts/JettonMinter.tolk",
+    compiler: {
+      language: "tolk",
+      version: "1.4.2",
+      params: {compiler_version: "1.4.2"},
+    },
+    files: [
+      {
+        path: "contracts/JettonMinter.tolk",
+        content_hash: "1".repeat(64),
+        include_in_command: null,
+        is_stdlib: null,
+        has_include_directives: null,
+        content: "fun onInternalMessage() {}",
+      },
+    ],
+  },
+})
+
 test.describe("Verified contracts", () => {
   test.beforeEach(async ({page}) => {
     await prepareVisualPage(page, {app: "explorer"})
@@ -40,6 +71,14 @@ test.describe("Verified contracts", () => {
 
       if (url.pathname.endsWith("/verification/source")) {
         const codeHash = url.searchParams.get("code_hash") ?? VERIFIED_ITEMS[0].code_hash
+        if (codeHash === PAYMENT_CODE_HASH) {
+          await route.fulfill({json: verifiedSourceResponse(codeHash, PAYMENT_TX_HASH)})
+          return
+        }
+        if (codeHash === LEGACY_CODE_HASH) {
+          await route.fulfill({json: verifiedSourceResponse(codeHash)})
+          return
+        }
         await route.fulfill({
           json: {
             code_hash: codeHash,
@@ -122,5 +161,40 @@ test.describe("Verified contracts", () => {
     await expect(newTab).toHaveURL(`/verified/${target.code_hash}`)
     await expect(page).toHaveURL("/verified")
     await newTab.close()
+  })
+
+  test("links a verification payment to Actonscan without a copy action", async ({page}) => {
+    await page.goto(`/verified/${PAYMENT_CODE_HASH}`)
+
+    const paymentLink = page.getByRole("link", {
+      name: `View payment transaction ${PAYMENT_TX_HASH} on Actonscan`,
+    })
+    const shortenedHash = `${PAYMENT_TX_HASH.slice(0, 8)}…${PAYMENT_TX_HASH.slice(-8)}`
+
+    await expect(page.getByText("Payment tx", {exact: true})).toBeVisible()
+    await expect(paymentLink).toHaveAttribute(
+      "href",
+      `https://actonscan.com/tx/${PAYMENT_TX_HASH}?network=testnet`,
+    )
+    await expect(paymentLink).toHaveText(shortenedHash)
+    await expect(page.getByRole("button", {name: /copy payment/i})).toHaveCount(0)
+  })
+
+  test("omits payment metadata for bundles without a payment transaction", async ({page}) => {
+    await page.goto(`/verified/${LEGACY_CODE_HASH}`)
+
+    await expect(page.getByText("Payment tx", {exact: true})).toHaveCount(0)
+    await expect(page.getByRole("link", {name: /payment transaction/i})).toHaveCount(0)
+  })
+
+  test("keeps payment metadata inside a narrow viewport", async ({page}) => {
+    await page.setViewportSize({width: 360, height: 800})
+    await page.goto(`/verified/${PAYMENT_CODE_HASH}`)
+
+    await expect(page.getByText("Payment tx", {exact: true})).toBeVisible()
+    const horizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(horizontalOverflow).toBeLessThanOrEqual(0)
   })
 })

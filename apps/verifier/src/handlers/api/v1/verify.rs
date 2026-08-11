@@ -18,9 +18,10 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::normalize_code_hash,
+    blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
     compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
+    payment::PaymentAttemptOutcome,
     registry::VerifiedBundleRequest,
     source_bundle::{
         SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
@@ -75,6 +76,7 @@ async fn handle_multipart(
     let mut compile_params = json!({});
     let mut sources = None;
     let mut verified_at = None;
+    let mut tx_hash = None;
     let mut files = Vec::new();
 
     while let Some(field) = multipart
@@ -137,6 +139,14 @@ async fn handle_multipart(
                     .map_err(|err| ApiError::bad_request(format!("invalid verified_at: {err}")))?;
                 verified_at = Some(verified_at_millis / 1_000);
             }
+            Some("tx_hash") => {
+                tx_hash = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
+                );
+            }
             Some("files") => {
                 files.push(read_file_part(field).await?);
             }
@@ -156,22 +166,20 @@ async fn handle_multipart(
         ));
     }
 
-    let target = VerificationTarget {
-        address: non_empty_text(address),
-        code_hash: non_empty_text(code_hash),
-    };
-
     let language = language
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| ApiError::bad_request("missing required field: language".to_owned()))?;
-
     if files.is_empty() {
         return Err(ApiError::bad_request(
             "missing required field: files".to_owned(),
         ));
     }
 
-    let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
+    let target = VerificationTarget {
+        address: non_empty_text(address),
+        code_hash: non_empty_text(code_hash),
+    };
+
     let resolved_target = state.verification_service().resolve_target(target).await?;
     if let Some(bundle) = state
         .verification_registry()
@@ -189,6 +197,67 @@ async fn handle_multipart(
             storage_revision: Some(bundle.storage_revision),
         }));
     }
+
+    let payment_claim = if verified_at.is_some() {
+        None
+    } else {
+        let tx_hash = non_empty_text(tx_hash).ok_or_else(|| {
+            ApiError::payment_required("missing required field: tx_hash".to_owned())
+        })?;
+        let tx_hash = normalize_hash(&tx_hash);
+        if !is_valid_hash(&tx_hash) {
+            return Err(ApiError::bad_request(
+                "payment_tx_hash_invalid: transaction hash must be 64 hexadecimal characters or a 32-byte base64 value"
+                    .to_owned(),
+            ));
+        }
+        Some(
+            state
+                .payment_verifier()
+                .claim(&tx_hash, &resolved_target.code_hash)
+                .await?,
+        )
+    };
+    let payment_tx_hash = payment_claim
+        .as_ref()
+        .map(|claim| claim.transaction_hash.clone());
+
+    let result = verify_unverified(
+        state,
+        resolved_target,
+        language,
+        compile_params,
+        sources,
+        files,
+        verified_at,
+        payment_tx_hash,
+    )
+    .await;
+
+    if let Some(claim) = payment_claim {
+        let outcome = if result.as_ref().is_err_and(ApiError::is_server_error) {
+            PaymentAttemptOutcome::Retryable
+        } else {
+            PaymentAttemptOutcome::Consumed
+        };
+        state.payment_verifier().finish(&claim, outcome)?;
+    }
+
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn verify_unverified(
+    state: &AppState,
+    resolved_target: ResolvedVerificationTarget,
+    language: String,
+    compile_params: Value,
+    sources: Option<Vec<SourceMetadata>>,
+    files: Vec<ReceivedFile>,
+    verified_at: Option<u64>,
+    payment_tx_hash: Option<String>,
+) -> Result<Json<VerifyResponse>, ApiError> {
+    let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
     let compiled = state
         .compiler_service()
         .compile(CompileRequest {
@@ -237,6 +306,7 @@ async fn handle_multipart(
                 .store_verified_bundle(StoreSourceBundleRequest {
                     code_hash: resolved_target.code_hash.clone(),
                     source_bundle_hash: source_bundle_hash.clone(),
+                    payment_tx_hash,
                     verified_at,
                     compiler: CompilerMetadata {
                         language: compile_input.language.clone(),
@@ -667,6 +737,8 @@ pub(super) struct VerifyMultipartRequest {
     /// Requires a valid `X-Verifier-Key` header.
     #[schema(nullable = false, example = 1_700_000_000_000_u64)]
     verified_at: Option<u64>,
+    /// Finalized TON testnet transaction hash for this verification attempt.
+    tx_hash: Option<String>,
     #[schema(
         value_type = String,
         format = Binary,

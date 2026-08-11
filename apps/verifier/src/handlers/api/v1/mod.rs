@@ -6,6 +6,7 @@ use utoipa::OpenApi;
 
 use crate::{error::ErrorResponse, state::AppState};
 
+mod take_ticket;
 mod verification;
 mod verify;
 
@@ -19,6 +20,7 @@ pub fn router() -> Router<AppState> {
             get(verification::statistics_history_handler),
         )
         .route("/abi", get(verification::abi_handler))
+        .route("/take-ticket", post(take_ticket::handler))
         .route("/verify", post(verify::handler))
         .route("/verification/status", get(verification::status_handler))
         .route("/verification/source", get(verification::source_handler))
@@ -41,6 +43,7 @@ fn openapi() -> utoipa::openapi::OpenApi {
     ),
     paths(
         verify::handler,
+        take_ticket::handler,
         verification::last_verified_handler,
         verification::statistics_handler,
         verification::statistics_history_handler,
@@ -50,6 +53,8 @@ fn openapi() -> utoipa::openapi::OpenApi {
     ),
     components(schemas(
         ErrorResponse,
+        take_ticket::TakeTicketRequest,
+        take_ticket::TakeTicketResponse,
         verify::SourceMetadata,
         verify::VerifyMultipartRequest,
         verify::VerifyResponse,

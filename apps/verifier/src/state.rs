@@ -6,6 +6,7 @@ use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
     compilers::{CompilerService, NodeCompilerService},
     config::Config,
+    payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
     source_storage::GitSourceStorage,
@@ -18,6 +19,7 @@ pub struct AppState {
     compiler_service: Arc<dyn CompilerService>,
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
+    payment_verifier: Arc<dyn PaymentVerifier>,
 }
 
 impl AppState {
@@ -34,11 +36,13 @@ impl AppState {
             source_storage,
             verification_index,
         ));
+        let payment_verifier = Arc::new(OnchainPaymentVerifier::from_config(config)?);
 
         Ok(Self::new(
             Arc::new(ToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
             verification_registry,
+            payment_verifier,
         )
         .with_api_key(config.api_key()))
     }
@@ -48,12 +52,14 @@ impl AppState {
         blockchain_client: Arc<dyn BlockchainClient>,
         compiler_service: Arc<dyn CompilerService>,
         verification_registry: Arc<dyn VerificationRegistry>,
+        payment_verifier: Arc<dyn PaymentVerifier>,
     ) -> Self {
         Self {
             api_key: None,
             compiler_service,
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
+            payment_verifier,
         }
     }
 
@@ -86,6 +92,11 @@ impl AppState {
         &self.verification_service
     }
 
+    #[must_use]
+    pub fn payment_verifier(&self) -> &dyn PaymentVerifier {
+        self.payment_verifier.as_ref()
+    }
+
     /// Rebuilds or refreshes the registry index when it is behind source storage.
     ///
     /// # Errors
@@ -93,6 +104,16 @@ impl AppState {
     /// Returns an error when source storage or registry index access fails.
     pub async fn ensure_registry_current(&self) -> Result<(), StateError> {
         self.verification_registry.ensure_current().await?;
+        Ok(())
+    }
+
+    /// Rebuilds payment replay state from TON testnet history.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when blockchain history or the payment ledger is unavailable.
+    pub async fn recover_payment_history(&self) -> Result<(), StateError> {
+        self.payment_verifier.recover().await?;
         Ok(())
     }
 }
@@ -103,4 +124,6 @@ pub enum StateError {
     Registry(#[from] crate::registry::RegistryError),
     #[error(transparent)]
     VerificationIndex(#[from] VerificationIndexError),
+    #[error(transparent)]
+    Payment(#[from] PaymentError),
 }
