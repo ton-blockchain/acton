@@ -2,13 +2,9 @@
 
 <img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
-Acton is an end-to-end platform that guides a TON project from its first smart
-contract to a dApp. Write, test, profile, and debug contracts with
-integrated language and IDE tooling, connect them to a client, then run the
-whole application on `acton localnet` or real local TON nodes with Localton.
-When you are ready to go on-chain, Acton helps you deploy, verify contract
-source with the Acton Verifier, index network data, and understand activity
-through Actonscan.
+Acton is an end-to-end platform for building TON dApps. It guides projects from
+the first smart contract to a live application and supports every step along
+the way.
 
 Built for **humans**. Perfect for **AI**.
 
