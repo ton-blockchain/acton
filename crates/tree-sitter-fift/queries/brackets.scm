@@ -1,0 +1,15 @@
+; Editor bracket pairing rules for Fift assembly blocks.
+
+("PROGRAM{" @open "END>c" @close)
+("PROC:<{" @open "}>" @close)
+("PROCINLINE:<{" @open "}>" @close)
+("PROCREF:<{" @open "}>" @close)
+("METHOD:<{" @open "}>" @close)
+("IF:<{" @open "}>" @close)
+("ELSE<{" @open "}>" @close)
+("IFJMP:<{" @open "}>" @close)
+("WHILE:<{" @open "}>" @close)
+("}>DO<{" @open "}>" @close)
+("REPEAT:<{" @open "}>" @close)
+("UNTIL:<{" @open "}>" @close)
+("<{" @open "}>" @close)

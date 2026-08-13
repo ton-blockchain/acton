@@ -812,6 +812,35 @@ fn test_filter_single_test() {
 }
 
 #[test]
+fn test_filter_accepts_tolk_quoted_identifier() {
+    ProjectBuilder::new("quoted-filter")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test alpha`() {
+                expect(1).toEqual(1);
+            }
+
+            get fun `test beta`() {
+                expect(2).toEqual(2);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .filter("`test beta`")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_filter_accepts_tolk_quoted_identifier.stdout.txt",
+        );
+}
+
+#[test]
 fn test_combined_path_and_filter() {
     let project = ProjectBuilder::new("path-and-filter")
         .contract("simple", SIMPLE_CONTRACT)

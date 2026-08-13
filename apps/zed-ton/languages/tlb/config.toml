@@ -1,0 +1,5 @@
+name = "TL-B"
+grammar = "tlb"
+path_suffixes = ["tlb"]
+line_comments = ["// "]
+block_comment = ["/*", "*/"]

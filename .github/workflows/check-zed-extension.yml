@@ -1,0 +1,62 @@
+name: Check Zed extension
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-zed-extension.yml"
+      - "apps/zed-ton/**"
+      - "crates/tree-sitter-*/queries/**"
+      - "justfile"
+      - "xtask/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/check-zed-extension.yml"
+      - "apps/zed-ton/**"
+      - "crates/tree-sitter-*/queries/**"
+      - "justfile"
+      - "xtask/**"
+  workflow_dispatch:
+
+concurrency:
+  group: zed-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  check:
+    name: Check TON for Zed
+    runs-on: ubicloud-standard-4-ubuntu-2204
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install
+          rustup target add wasm32-wasip2
+
+      - name: Install just
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: |
+            . -> target
+            apps/zed-ton -> apps/zed-ton/target
+
+      - name: Check the extension
+        run: just check-zed-extension

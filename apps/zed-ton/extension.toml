@@ -1,0 +1,50 @@
+id = "ton"
+name = "TON"
+version = "0.1.0"
+schema_version = 1
+description = "First-class TON development for Zed: Tolk, TL-B, TASM, Fift, Acton and ton-ls"
+repository = "https://github.com/ton-blockchain/acton"
+authors = ["TON Core"]
+themes = []
+icon_themes = []
+languages = [
+    "languages/tolk",
+    "languages/tlb",
+    "languages/tasm",
+    "languages/fift",
+]
+capabilities = []
+
+[lib]
+kind = "Rust"
+version = "0.7.0"
+
+[grammars.tolk]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-tolk"
+
+[grammars.tlb]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-tlb"
+
+[grammars.tasm]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-tasm"
+
+[grammars.fift]
+repository = "https://github.com/ton-blockchain/acton"
+rev = "18f24aa9c0dc40f954a8680805d1a7c988b581da"
+path = "crates/tree-sitter-fift"
+
+[language_servers.ton-ls]
+name = "TON Language Server"
+languages = ["Tolk", "TL-B", "TASM", "Fift", "TOML"]
+
+[context_servers]
+
+[agent_servers]
+
+[slash_commands]

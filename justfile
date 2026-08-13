@@ -26,6 +26,18 @@ build-faucet-pow-wasm:
 sync-artifacts:
     cargo xtask sync-artifacts
 
+sync-zed-queries:
+    cargo xtask sync-zed-queries
+
+check-zed-queries:
+    cargo xtask sync-zed-queries --check
+
+check-zed-extension: check-zed-queries
+    cargo fmt --manifest-path apps/zed-ton/Cargo.toml --check
+    cargo test --manifest-path apps/zed-ton/Cargo.toml --locked
+    cargo clippy --manifest-path apps/zed-ton/Cargo.toml --all-targets --locked -- -D warnings
+    cargo build --manifest-path apps/zed-ton/Cargo.toml --release --locked --target wasm32-wasip2
+
 install-tools:
     cargo install cargo-shear --version 1.13.1 --locked
     cargo install cargo-deny --version 0.19.8 --locked

@@ -1,0 +1,4 @@
+name = "TASM"
+grammar = "tasm"
+path_suffixes = ["tasm"]
+line_comments = ["// "]

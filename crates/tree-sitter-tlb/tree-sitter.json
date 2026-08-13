@@ -7,6 +7,7 @@
             "title": "TL-B",
             "scope": "source.tlb",
             "file-types": ["tlb"],
+            "highlights": ["queries/highlights.scm"],
             "injection-regex": "^tlb$",
             "class-name": "TreeSitterTlb"
         }

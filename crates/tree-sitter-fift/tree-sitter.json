@@ -7,6 +7,7 @@
             "title": "Fift",
             "scope": "source.fift",
             "file-types": ["fif"],
+            "highlights": ["queries/highlights.scm"],
             "injection-regex": "^fift$",
             "class-name": "TreeSitterFift"
         }

@@ -1,0 +1,4 @@
+name = "Tolk"
+grammar = "tolk"
+path_suffixes = ["tolk"]
+line_comments = ["// "]

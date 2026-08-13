@@ -26,6 +26,7 @@ docs/out
 **/.wrangler
 **/.eslintcache
 test-results/
+crates/ton-ls/editors/zed/grammars/*/
 
 # OS files
 .DS_Store
