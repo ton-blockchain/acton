@@ -277,6 +277,11 @@ export const CONFLICT_RESOLUTIONS = [
     name: "Zero Address",
   },
   {
+    address: "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
+    source: "acton",
+    name: "Tether USD (USDT)",
+  },
+  {
     address: "-1:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     source: "ton-assets",
     name: "Blackhole Address",

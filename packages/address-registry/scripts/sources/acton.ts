@@ -20,6 +20,10 @@ export const ACTON_MAINNET_ADDRESSES = [
     address: "Ef_q19o4m94xfF-yhYB85Qe6rTHDX-VTSzxBh4XpAfZMaOvk",
     name: "BTC Teleport Coordinator",
   },
+  {
+    address: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
+    name: "Tether USD (USDT)",
+  },
 ] as const satisfies readonly SourceAddress[]
 
 export const ACTON_TESTNET_ADDRESSES = [
