@@ -36,6 +36,15 @@ test.describe("Explorer shell", () => {
     )
   })
 
+  test("focuses explorer search with Control+K", async ({page}) => {
+    const search = page.getByRole("combobox", {name: "Explorer search"}).last()
+    await page.getByRole("link", {name: "Blocks"}).focus()
+
+    await page.keyboard.press("Control+K")
+
+    await expect(search).toBeFocused()
+  })
+
   test("explicit mainnet link overrides the stored testnet selection", async ({page}) => {
     await page.evaluate(() => localStorage.setItem("explorerNetwork", "testnet"))
     await page.goto("/?network=mainnet")

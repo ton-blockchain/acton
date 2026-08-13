@@ -287,6 +287,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   return (
     <SearchInput
       ariaLabel="Explorer search"
+      shortcut="K"
       autoFocus={autoFocus}
       className={className}
       invalid={isInvalid}

@@ -36,6 +36,7 @@ export interface SearchInputProps {
   readonly open?: boolean
   readonly placeholder?: string
   readonly size?: SearchInputSize
+  readonly shortcut?: string
   readonly value: string
   readonly variant?: SearchInputVariant
 }
@@ -55,6 +56,7 @@ export function SearchInput({
   open,
   placeholder,
   size = "lg",
+  shortcut,
   value,
   variant = "search",
 }: SearchInputProps) {
@@ -64,6 +66,22 @@ export function SearchInput({
   const inputRef = useRef<HTMLInputElement>(null)
   const highlightedItemRef = useRef<SearchInputItem | undefined>(undefined)
   const isOpen = open ?? uncontrolledOpen
+
+  useEffect(() => {
+    if (shortcut === undefined || disabled) return
+
+    const shortcutKey = shortcut.toLowerCase()
+    const handleShortcut = (event: globalThis.KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== shortcutKey) return
+
+      event.preventDefault()
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+
+    globalThis.addEventListener("keydown", handleShortcut)
+    return () => globalThis.removeEventListener("keydown", handleShortcut)
+  }, [disabled, shortcut])
 
   useEffect(() => {
     if (autoFocus && !disabled) {
