@@ -29,6 +29,7 @@ jobs:
       matrix:
         language:
           - fift
+          - func
           - tasm
           - tlb
           - tolk
@@ -53,12 +54,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn install --immutable --check-cache --check-resolutions
+        run: npm ci
 
       - name: Build
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn tree-sitter generate
+        run: npx tree-sitter generate
 
       - name: Test parsers
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn tree-sitter test
+        run: npx tree-sitter test
