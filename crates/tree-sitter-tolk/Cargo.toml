@@ -1,13 +1,13 @@
 [package]
 name = "tree-sitter-tolk"
-description = "Tolk grammar for tree-sitter"
-version = "0.0.5"
+description = "Tolk grammar generated with Tree-sitter"
+version = "0.4.5"
 authors = ["TON Core"]
 license = "MIT"
 readme = "README.md"
 keywords = ["incremental", "parsing", "tree-sitter", "tolk"]
 categories = ["parser-implementations", "parsing", "text-editors"]
-repository = "https://github.com/ton-blockchain/tree-sitter-tolk"
+repository = "https://github.com/ton-blockchain/acton"
 edition = "2021"
 autoexamples = false
 
@@ -25,11 +25,10 @@ include = [
 path = "bindings/rust/lib.rs"
 
 [dependencies]
-tree-sitter-language = { workspace = true }
+tree-sitter-language = "0.1"
 
 [build-dependencies]
-cc = { workspace = true }
-tree-sitter-language = { workspace = true }
+cc = "1.2"
 
 [dev-dependencies]
-tree-sitter = { workspace = true }
+tree-sitter = "0.26.12"

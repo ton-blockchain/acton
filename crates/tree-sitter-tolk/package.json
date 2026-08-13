@@ -1,8 +1,12 @@
 {
   "name": "tree-sitter-tolk",
   "version": "0.4.5",
-  "description": "Tolk grammar for tree-sitter",
-  "repository": "https://github.com/ton-blockchain/tree-sitter-tolk",
+  "description": "Tolk grammar generated with Tree-sitter",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ton-blockchain/acton.git"
+  },
   "license": "MIT",
   "author": {
     "name": "TON Core"
@@ -31,19 +35,11 @@
   },
   "devDependencies": {
     "prebuildify": "^6.0.1",
-    "tree-sitter": "^0.22.4",
-    "tree-sitter-cli": "^0.25.10"
-  },
-  "dependenciesMeta": {
-    "tree-sitter": {
-      "built": true
-    },
-    "tree-sitter-cli": {
-      "built": true
-    }
+    "tree-sitter": "^0.25.0",
+    "tree-sitter-cli": "^0.26.12"
   },
   "peerDependencies": {
-    "tree-sitter": "^0.22.4"
+    "tree-sitter": "^0.25.0"
   },
   "peerDependenciesMeta": {
     "tree-sitter": {
@@ -55,6 +51,5 @@
     "prestart": "tree-sitter build --wasm",
     "start": "tree-sitter playground",
     "test": "node --test bindings/node/*_test.js"
-  },
-  "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8"
+  }
 }

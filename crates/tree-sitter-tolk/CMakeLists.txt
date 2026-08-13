@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(tree-sitter-tolk
         VERSION "0.4.5"
-        DESCRIPTION "Tolk grammar for tree-sitter"
-        HOMEPAGE_URL "https://github.com/ton-blockchain/tree-sitter-tolk"
+        DESCRIPTION "Tolk grammar generated with Tree-sitter"
+        HOMEPAGE_URL "https://github.com/ton-blockchain/acton"
         LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
@@ -19,7 +19,17 @@ include(GNUInstallDirs)
 
 find_program(TREE_SITTER_CLI tree-sitter DOC "Tree-sitter CLI")
 
+add_custom_command(OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/grammar.json"
+                          "${CMAKE_CURRENT_SOURCE_DIR}/src/node-types.json"
+                   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/grammar.js"
+                   COMMAND "${TREE_SITTER_CLI}" generate grammar.js --no-parser
+                   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                   COMMENT "Generating grammar.json")
+
 add_custom_command(OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/parser.c"
+                   BYPRODUCTS "${CMAKE_CURRENT_SOURCE_DIR}/src/tree_sitter/parser.h"
+                              "${CMAKE_CURRENT_SOURCE_DIR}/src/tree_sitter/alloc.h"
+                              "${CMAKE_CURRENT_SOURCE_DIR}/src/tree_sitter/array.h"
                    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/grammar.json"
                    COMMAND "${TREE_SITTER_CLI}" generate src/grammar.json
                             --abi=${TREE_SITTER_ABI_VERSION}

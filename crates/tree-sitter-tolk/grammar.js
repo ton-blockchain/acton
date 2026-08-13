@@ -1,5 +1,5 @@
 /**
- * @file Tolk grammar for tree-sitter
+ * @file Tolk grammar generated with Tree-sitter
  * @author TON Core
  * @license MIT
  */
@@ -712,7 +712,7 @@ const TOLK_GRAMMAR = {
     comment: $ => token(choice(seq("//", /[^\r\n]*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),
 }
 
-module.exports = grammar({
+export default grammar({
     name: "tolk",
 
     conflicts: $ => [

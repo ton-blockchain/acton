@@ -1,20 +1,13 @@
 # Rust artifacts
 target/
-Cargo.lock
 
 # Node artifacts
 build/
 prebuilds/
 node_modules/
-package-lock.json
-
-# Yarn artifacts
-yarn-error.log
-.yarn/
 
 # Swift artifacts
 .build/
-Package.resolved
 
 # Go artifacts
 _obj/
@@ -52,3 +45,4 @@ zig-out/
 *.tar.gz
 *.tgz
 *.zip
+*.jar

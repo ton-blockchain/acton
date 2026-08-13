@@ -1,4 +1,4 @@
-module github.com/ton-blockchain/tree-sitter-tolk
+module github.com/ton-blockchain/acton
 
 go 1.22
 
