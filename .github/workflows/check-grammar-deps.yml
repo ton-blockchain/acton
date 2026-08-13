@@ -28,7 +28,7 @@ permissions: { }
 
 jobs:
   yarn-audit:
-    name: Yarn audit
+    name: NPM audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
@@ -54,5 +54,5 @@ jobs:
         with:
           node-version: 22.x
 
-      - name: Run Yarn audits
+      - name: Run npm audit
         run: just check-grammar-security

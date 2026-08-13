@@ -140,11 +140,11 @@ check-templates-security:
   cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
 
 check-grammar-security:
-    cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-func && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+    cd crates/tree-sitter-fift && npm audit --audit-level=moderate
+    cd crates/tree-sitter-func && npm audit --audit-level=moderate
+    cd crates/tree-sitter-tasm && npm audit --audit-level=moderate
+    cd crates/tree-sitter-tlb && npm audit --audit-level=moderate
+    cd crates/tree-sitter-tolk && npm audit --audit-level=moderate
 
 check-ui-security:
   bun audit --audit-level=moderate
