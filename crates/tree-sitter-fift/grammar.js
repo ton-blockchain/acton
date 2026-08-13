@@ -1,5 +1,5 @@
 /**
- * @file Fift grammar for tree-sitter
+ * @file Fift grammar generated with Tree-sitter
  * @author TON Core
  * @author TON Studio
  * @license MIT
@@ -8,7 +8,7 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
-module.exports = grammar({
+export default grammar({
     name: "fift",
 
     extras: $ => [/\s/, $.comment],
