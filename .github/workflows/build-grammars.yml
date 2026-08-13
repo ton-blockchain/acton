@@ -54,7 +54,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: npm ci
+        run: |
+          npm ci
+          npm rebuild tree-sitter-cli --ignore-scripts=false
 
       - name: Build
         working-directory: crates/tree-sitter-${{ matrix.language }}
