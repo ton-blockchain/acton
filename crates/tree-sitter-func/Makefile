@@ -1,6 +1,7 @@
 LANGUAGE_NAME := tree-sitter-func
-HOMEPAGE_URL := https://github.com/ton-blockchain/ton-language-server
+HOMEPAGE_URL := https://github.com/ton-blockchain/acton
 VERSION := 0.1.0
+DESCRIPTION := FunC grammar generated with Tree-sitter
 
 # repository
 SRC_DIR := src

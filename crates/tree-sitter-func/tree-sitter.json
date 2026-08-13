@@ -1,41 +1,44 @@
 {
-    "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
-    "grammars": [
-        {
-            "name": "func",
-            "camelcase": "FunC",
-            "title": "FunC",
-            "scope": "source.func",
-            "file-types": ["func", "fc"],
-            "injection-regex": "^func$",
-            "class-name": "TreeSitterFunc"
-        }
-    ],
-    "metadata": {
-        "version": "0.1.0",
-        "license": "MIT",
-        "description": "FunC grammar for tree-sitter",
-        "authors": [
-            {
-                "name": "TON Core"
-            },
-            {
-                "name": "akifoq",
-                "url": "https://github.com/akifoq"
-            }
-        ],
-        "links": {
-            "repository": "https://github.com/ton-blockchain/ton-language-server"
-        }
-    },
-    "bindings": {
-        "c": true,
-        "go": true,
-        "java": false,
-        "node": true,
-        "python": false,
-        "rust": true,
-        "swift": false,
-        "zig": false
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "func",
+      "camelcase": "FunC",
+      "title": "FunC",
+      "scope": "source.func",
+      "file-types": [
+        "func",
+        "fc"
+      ],
+      "injection-regex": "^func$",
+      "class-name": "TreeSitterFunc"
     }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "FunC grammar generated with Tree-sitter",
+    "authors": [
+      {
+        "name": "TON Core"
+      },
+      {
+        "name": "akifoq",
+        "url": "https://github.com/akifoq"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/ton-blockchain/acton"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "java": false,
+    "node": true,
+    "python": false,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
 }

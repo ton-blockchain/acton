@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(tree-sitter-func
         VERSION "0.1.0"
-        DESCRIPTION "FunC grammar for tree-sitter"
-        HOMEPAGE_URL "https://github.com/ton-blockchain/ton-language-server"
+        DESCRIPTION "FunC grammar generated with Tree-sitter"
+        HOMEPAGE_URL "https://github.com/ton-blockchain/acton"
         LANGUAGES C)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)

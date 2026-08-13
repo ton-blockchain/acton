@@ -1,4 +1,4 @@
-module github.com/ton-blockchain/ton-language-server
+module github.com/ton-blockchain/acton
 
 go 1.22
 

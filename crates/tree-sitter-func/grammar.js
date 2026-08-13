@@ -1,7 +1,6 @@
 /**
- * @file FunC grammar for tree-sitter
+ * @file FunC grammar generated with Tree-sitter
  * @author TON Core
- * @author akifoq
  * @license MIT
  */
 
@@ -404,7 +403,7 @@ const FUNC_GRAMMAR = {
         ),
 }
 
-module.exports = grammar({
+export default grammar({
     name: "func",
 
     conflicts: $ => [
