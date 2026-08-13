@@ -1,5 +1,5 @@
 /**
- * @file TL-B grammar for tree-sitter
+ * @file TL-B grammar generated with Tree-sitter
  * @author TON Core
  * @author TON Studio
  * @license MIT
@@ -8,7 +8,7 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
-module.exports = grammar({
+export default grammar({
     name: "tlb",
 
     extras: $ => [/\s/, $.comment],
