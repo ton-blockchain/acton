@@ -32,3 +32,6 @@ cc = "1.2"
 
 [dev-dependencies]
 tree-sitter = "0.26.12"
+
+[lints.clippy]
+const_is_empty = "allow"
