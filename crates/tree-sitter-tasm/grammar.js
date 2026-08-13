@@ -1,5 +1,5 @@
 /**
- * @file TASM grammar for tree-sitter
+ * @file TASM grammar generated with Tree-sitter
  * @author TON Core
  * @license MIT
  */
@@ -73,7 +73,7 @@ const TASM_GRAMMAR = {
   comment: _ => token(seq("//", /[^\r\n]*/)),
 }
 
-module.exports = grammar({
+export default grammar({
   name: "tasm",
 
   extras: $ => [/\s/, $.comment],
