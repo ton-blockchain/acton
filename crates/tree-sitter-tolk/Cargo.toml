@@ -25,13 +25,13 @@ include = [
 path = "bindings/rust/lib.rs"
 
 [dependencies]
-tree-sitter-language = "0.1"
+tree-sitter-language.workspace = true
 
 [build-dependencies]
-cc = "1.2"
+cc.workspace = true
 
 [dev-dependencies]
-tree-sitter = "0.26.12"
+tree-sitter.workspace = true
 
 [lints.clippy]
 const_is_empty = "allow"
