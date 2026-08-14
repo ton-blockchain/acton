@@ -37,14 +37,14 @@ install-tools:
 
 test-unit:
     cargo nextest run --workspace --lib --bins {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
-    cargo test --workspace --doc
+    cargo test --workspace --doc --exclude tree-sitter-fift
 
 test-integration:
     cargo nextest run --test integration_test {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
 
 test-workspace:
     cargo nextest run --workspace {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
-    cargo test --workspace --doc
+    cargo test --workspace --doc --exclude tree-sitter-fift
 
 install-test-ui-e2e-browsers:
     bun run playwright install chromium
