@@ -66,7 +66,11 @@ test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
     CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
 
 _tree-sitter-test grammar:
-    cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+    cd crates/tree-sitter-{{ grammar }}
+    npm ci
+    npm rebuild tree-sitter-cli --ignore-scripts=false
+    npx tree-sitter generate
+    npx tree-sitter test
 
 test-tree-sitter-tolk:
     just _tree-sitter-test tolk
@@ -86,10 +90,18 @@ test-tree-sitter-tlb:
 test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-func test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter-tolk
 
 update-test-tree-sitter-tolk:
-    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
+    cd crates/tree-sitter-tolk
+    npm ci
+    npm rebuild tree-sitter-cli --ignore-scripts=false
+    npx tree-sitter generate
+    npx tree-sitter test -u
 
 update-test-tree-sitter-func:
-    cd crates/tree-sitter-func && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
+    cd crates/tree-sitter-func
+    npm ci
+    npm rebuild tree-sitter-cli --ignore-scripts=false
+    npx tree-sitter generate
+    npx tree-sitter test -u
 
 test: test-workspace
 
@@ -195,10 +207,20 @@ fmt-ui:
     bun run fmt
 
 play-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter build --wasm && yarn tree-sitter playground
+    cd crates/tree-sitter-tolk
+    npm ci
+    npm rebuild tree-sitter-cli --ignore-scripts=false
+    npx tree-sitter generate
+    npx tree-sitter build --wasm
+    npx tree-sitter playground
 
 play-tree-sitter-func:
-    cd crates/tree-sitter-func && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter build --wasm && yarn tree-sitter playground
+    cd crates/tree-sitter-func
+    npm ci
+    npm rebuild tree-sitter-cli --ignore-scripts=false
+    npx tree-sitter generate
+    npx tree-sitter build --wasm
+    npx tree-sitter playground
 
 update-template-wrappers:
     cargo xtask update-template-wrappers

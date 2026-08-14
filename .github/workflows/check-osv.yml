@@ -10,7 +10,6 @@ on:
       - "**/Cargo.lock"
       - "**/bun.lock"
       - "**/package-lock.json"
-      - "**/yarn.lock"
       - "**/osv-scanner.toml"
   push:
     branches:
@@ -20,7 +19,6 @@ on:
       - "**/Cargo.lock"
       - "**/bun.lock"
       - "**/package-lock.json"
-      - "**/yarn.lock"
       - "**/osv-scanner.toml"
   workflow_dispatch:
 
