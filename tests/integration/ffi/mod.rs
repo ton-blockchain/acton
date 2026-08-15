@@ -13,14 +13,14 @@ get fun getParam() {
 }
 "#;
 
-    const CONFIG_READER_CONTRACT: &str = r#"
+    const CONFIG_READER_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 get fun readNegParam(): int {
     val c = blockchain.configParam(-137);
     return c!.beginParse().loadUint(32);
 }
-"#;
+";
 
     #[test]
     fn test_get_config() {
