@@ -509,6 +509,48 @@ function TransactionDetailsContent({
         </div>
       )}
 
+      {!isTickTock && inMessage && inMessage.info.type === "external-in" && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>In Message</div>
+
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created At</div>
+                <DateTime
+                  className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
+                  data-visual-dynamic="timestamp"
+                  data-visual-placeholder="<timestamp>"
+                  display="date-time-numeric-seconds"
+                  unit="seconds"
+                  value={tx.transaction.now}
+                />
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created Lt</div>
+                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                  {tx.transaction.lt.toString()}
+                </div>
+              </div>
+              {messageHashHex && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Hash</div>
+                  <div className={styles.multiColumnItemValue}>
+                    <TechnicalValue
+                      copyLabel="message hash"
+                      endLength={3}
+                      startLength={3}
+                      value={messageHashHex}
+                      copyVisibility="always"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {!isTickTock && (
         <div className={styles.labeledSectionRow}>
           <div className={styles.labeledSectionTitle}>Message Data</div>
