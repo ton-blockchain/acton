@@ -40,6 +40,61 @@ get fun `test bad config`() {
     expect(result).toBeFalse();
 }
 
+get fun `test set negative config param`() {
+    var config = testing.getConfig();
+
+    val negPayload = beginCell().storeUint(0xABCD1234, 32).endCell();
+    // Before the fix this call threw "Range check error": the config map used
+    // uint32 keys, so a signed id like -137 could not be encoded. TON's config
+    // dict is `Hashmap 32 ^Cell` keyed by the *signed* 32-bit index.
+    config.setParamRaw(-137, negPayload);
+
+    // the negative id round-trips locally
+    expect(config.getParamRaw(-137)).toEqual(negPayload);
+
+    // and does not collide with its positive twin (+137)
+    val posPayload = beginCell().storeUint(0x5555AAAA, 32).endCell();
+    config.setParamRaw(137, posPayload);
+    expect(config.getParamRaw(-137)).toEqual(negPayload);
+    expect(config.getParamRaw(137)).toEqual(posPayload);
+}
+
+get fun `test negative config param read by contract`() {
+    // Deploy a contract that reads an out-of-consensus param via CONFIGOPTPARAM.
+    val readerCode = build("config_reader");
+    val readerInit = AutoDeployAddress {
+        stateInit: { code: readerCode, data: beginCell().endCell() },
+    };
+    val readerAddr = readerInit.calculateAddress();
+
+    val deployMsg = createMessage({
+        dest: readerInit,
+        bounce: false,
+        value: ton("1"),
+    });
+    val deployer = testing.treasury("deployer");
+    val deployRes = net.send(deployer.address, deployMsg);
+    expect(deployRes).toHaveSuccessfulDeploy({
+        from: deployer.address,
+        to: readerAddr,
+    });
+
+    // Set the out-of-consensus negative param and commit it.
+    var config = testing.getConfig();
+    val payload = beginCell().storeUint(0x00C0FFEE, 32).endCell();
+    config.setParamRaw(-137, payload);
+    expect(testing.setConfig(config)).toBeTrue();
+
+    // It survives the round-trip through the raw config dict...
+    expect(testing.getConfig().getParamRaw(-137)).toEqual(payload);
+
+    // ...and the deployed contract reads back the same value via
+    // `blockchain.configParam(-137)` (CONFIGOPTPARAM), proving the 32-bit
+    // signed key bit-pattern matches what the VM looks up on-chain.
+    val readBack = net.runGetMethod(readerAddr, "readNegParam") as int;
+    expect(readBack).toEqual(0x00C0FFEE);
+}
+
 get fun `test get executor config`() {
     val simpleCode = build("simple");
     val getAddress = AutoDeployAddress {

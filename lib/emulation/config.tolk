@@ -33,17 +33,19 @@ import "../testing/assert"
 
 /// Type representing the blockchain configuration.
 ///
-/// The configuration is a key-value map where keys are parameter indices (0-255)
-/// and values are cells containing the serialized configuration parameter data.
-/// Configuration parameters are defined in the [`block.tlb`](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb)
-/// TL-B schema.
+/// The configuration is a key-value map where keys are parameter indices and
+/// values are cells containing the serialized configuration parameter data.
+/// It mirrors TON's `HashmapE 32 ^Cell = ConfigParam` (see [`block.tlb`](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb)):
+/// keys are **signed** 32-bit integers, so besides the in-consensus params
+/// (typically 0-90) it can also carry the out-of-consensus **negative** params
+/// (e.g. -137, -138, -1000) that `CONFIGPARAM`/`CONFIGOPTPARAM` read on-chain.
 ///
 /// `BlockchainConfigMap.set*` methods mutate only this in-memory map.
 /// To apply updates to the emulator globally, call [testing.setConfig] with the
 /// mutated config. That apply step updates both the emulator world state and
 /// the current VM context's C7-visible config mirrors, so follow-up reads in
 /// the same test run see the committed values.
-type BlockchainConfigMap = map<uint32, cell>
+type BlockchainConfigMap = map<int32, cell>
 
 /// Sets a raw configuration parameter at the given index.
 ///
@@ -53,14 +55,16 @@ type BlockchainConfigMap = map<uint32, cell>
 /// This mutates only the local [BlockchainConfigMap] value until you call [testing.setConfig].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index (typically 0-90)
+/// - `index`: The configuration parameter index. It is a signed 32-bit integer,
+///   so negative (out-of-consensus) indices such as `-137` are valid.
 /// - `data`: The serialized cell containing the parameter value
 ///
 /// Example:
 /// ```tolk
 /// config.setParamRaw(20, gasCell);
+/// config.setParamRaw(-137, someCell); // out-of-consensus param
 /// ```
-fun BlockchainConfigMap.setParamRaw(mutate self, index: uint32, data: cell): void {
+fun BlockchainConfigMap.setParamRaw(mutate self, index: int32, data: cell): void {
     self.set(index, data);
 }
 
@@ -71,7 +75,8 @@ fun BlockchainConfigMap.setParamRaw(mutate self, index: uint32, data: cell): voi
 /// [BlockchainConfigMap.getGasPrices], [BlockchainConfigMap.getStoragePrices], or [BlockchainConfigMap.getGlobalVersion].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index (typically 0-90)
+/// - `index`: The configuration parameter index. It is a signed 32-bit integer,
+///   so negative (out-of-consensus) indices such as `-137` are valid.
 ///
 /// Returns: The raw cell containing the serialized parameter value.
 ///
@@ -79,7 +84,7 @@ fun BlockchainConfigMap.setParamRaw(mutate self, index: uint32, data: cell): voi
 /// ```tolk
 /// val paramCell = config.getParamRaw(20);
 /// ```
-fun BlockchainConfigMap.getParamRaw(self, index: uint32): cell {
+fun BlockchainConfigMap.getParamRaw(self, index: int32): cell {
     return self.get(index).loadValue();
 }
 

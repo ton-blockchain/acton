@@ -13,6 +13,15 @@ get fun getParam() {
 }
 "#;
 
+    const CONFIG_READER_CONTRACT: &str = r#"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+get fun readNegParam(): int {
+    val c = blockchain.configParam(-137);
+    return c!.beginParse().loadUint(32);
+}
+"#;
+
     #[test]
     fn test_get_config() {
         ProjectBuilder::new("simple")
@@ -50,6 +59,34 @@ get fun getParam() {
             .acton()
             .test()
             .filter("test bad config")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
+
+    #[test]
+    fn test_set_negative_config_param() {
+        ProjectBuilder::new("simple")
+            .contract("simple", SIMPLE_CONTRACT)
+            .test_file_from_path("test", "tests/integration/ffi/config.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test set negative config param")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
+
+    #[test]
+    fn test_negative_config_param_read_by_contract() {
+        ProjectBuilder::new("simple")
+            .contract("config_reader", CONFIG_READER_CONTRACT)
+            .test_file_from_path("test", "tests/integration/ffi/config.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test negative config param read by contract")
             .run()
             .success()
             .assert_passed(1);

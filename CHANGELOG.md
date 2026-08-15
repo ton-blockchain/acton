@@ -140,6 +140,11 @@ integration remains hidden and preview-only.
   automatic fix. Compiler and linter diagnostics are also available through the
   language server.
 - `tolkfmt` now preserves comments placed between annotations and declarations.
+- Fixed the emulation config map (`BlockchainConfigMap`) to key parameters by a
+  signed 32-bit id, matching TON's `Hashmap 32 ^Cell = ConfigParams`. This lets
+  `setParamRaw`/`getParamRaw` address out-of-consensus **negative** config
+  params (for example `-137`) instead of throwing a range-check error, and the
+  values round-trip with `blockchain.configParam` (`CONFIGOPTPARAM`).
 
 ### Acton Studio
 
