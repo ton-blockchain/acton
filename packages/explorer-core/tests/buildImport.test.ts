@@ -1,6 +1,10 @@
 import {describe, expect, test} from "bun:test"
 
-import {buildAbiImportPlan, type AbiImportFile} from "../src/components/abiBuildImport"
+import {
+  buildAbiImportPlan,
+  buildSourceImportPlan,
+  type AbiImportFile,
+} from "../src/components/buildImport"
 
 const HASH_A = "1BFC588273D9DE92326658D6ADFC7762B322DD850E3EA84FC3D0B4AA04E3AAAA"
 const HASH_B = "2c0e51710a1bc02b0fa1a2a2f162b0a3df6a32d1c2c1b0e51710a1bc02b0bbbb"
@@ -149,5 +153,102 @@ describe("buildAbiImportPlan", () => {
     ])
 
     expect(plan.registrations).toHaveLength(1)
+  })
+})
+
+function sourceBundle(entrypoint: string): Record<string, unknown> {
+  return {
+    source_bundle_hash: "ab".repeat(32),
+    verified_at: 0,
+    storage_revision: "local",
+    entrypoint,
+    compiler: {language: "tolk", version: "1.4.2", params: {}},
+    files: [
+      {
+        path: entrypoint,
+        content_hash: "cd".repeat(32),
+        include_in_command: true,
+        is_stdlib: false,
+        has_include_directives: null,
+        content: "fun onInternalMessage() {}",
+      },
+    ],
+  }
+}
+
+function sourceArtifactFile(path: string, hash: string, entrypoint: string): AbiImportFile {
+  return {
+    path,
+    text: JSON.stringify({code_hash: hash, verified: true, bundle: sourceBundle(entrypoint)}),
+  }
+}
+
+describe("buildSourceImportPlan", () => {
+  test("finds source artifacts anywhere in a dropped project tree", () => {
+    const plan = buildSourceImportPlan([
+      {path: "project/Acton.toml.json", text: "not json"},
+      {path: "project/tps_shards.json", text: JSON.stringify({shards: []})},
+      abiFile("project/build/abi/WalletSpam.json", "WalletSpam"),
+      codeFile("project/build/WalletSpam.json", HASH_A),
+      sourceArtifactFile(
+        "project/build/sources/WalletSpam.source.json",
+        HASH_A,
+        "contracts/WalletSpam.tolk",
+      ),
+      sourceArtifactFile("project/build/sources/Fat.source.json", HASH_B, "contracts/Fat.tolk"),
+    ])
+
+    expect(plan.warnings).toEqual([])
+    expect(plan.registeredNames.toSorted()).toEqual([
+      "contracts/Fat.tolk",
+      "contracts/WalletSpam.tolk",
+    ])
+    expect(plan.registrations.map(entry => entry.codeHash).toSorted()).toEqual(
+      [HASH_A.toLowerCase(), HASH_B.toLowerCase()].toSorted(),
+    )
+  })
+
+  test("accepts the legacy bundles-array artifact shape", () => {
+    const plan = buildSourceImportPlan([
+      {
+        path: "build/sources/WalletSpam.source.json",
+        text: JSON.stringify({
+          code_hash: HASH_A,
+          verified: true,
+          bundles: [sourceBundle("contracts/WalletSpam.tolk")],
+        }),
+      },
+    ])
+
+    expect(plan.registrations).toHaveLength(1)
+    expect(plan.registrations[0]?.codeHash).toBe(HASH_A.toLowerCase())
+    expect(plan.registrations[0]?.source.bundle?.entrypoint).toBe("contracts/WalletSpam.tolk")
+  })
+
+  test("dedupes artifacts with the same code hash", () => {
+    const plan = buildSourceImportPlan([
+      sourceArtifactFile("a/WalletSpam.source.json", HASH_A, "contracts/WalletSpam.tolk"),
+      sourceArtifactFile("b/WalletSpam.source.json", HASH_A, "contracts/WalletSpam.tolk"),
+    ])
+
+    expect(plan.registrations).toHaveLength(1)
+  })
+
+  test("warns with a how-to when no artifacts are present", () => {
+    const plan = buildSourceImportPlan([
+      abiFile("build/abi/Fat.json", "Fat"),
+      codeFile("build/Fat.json", HASH_A),
+    ])
+
+    expect(plan.registrations).toEqual([])
+    expect(plan.warnings[0]).toContain("acton build --output-sources")
+  })
+
+  test("ignores artifacts inside skipped directories", () => {
+    const plan = buildSourceImportPlan([
+      sourceArtifactFile("build/cache/WalletSpam.source.json", HASH_A, "contracts/WalletSpam.tolk"),
+    ])
+
+    expect(plan.registrations).toEqual([])
   })
 })

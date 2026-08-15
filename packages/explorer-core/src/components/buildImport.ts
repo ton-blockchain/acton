@@ -1,8 +1,15 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import type {
+  SourceBundle,
+  SourceCompiler,
+  SourceFile,
+  VerificationSourceResponse,
+} from "../api/types"
 import {normalizeCodeHash} from "../metadata/codeHash"
-import type {CompilerAbiRegistration} from "../metadata/types"
+import {sourceRegistrationFromResponse} from "../metadata/sourceRegistration"
+import type {CompilerAbiRegistration, SourceRegistration} from "../metadata/types"
 
 export interface AbiImportFile {
   readonly path: string
@@ -15,9 +22,17 @@ export interface AbiImportPlan {
   readonly warnings: readonly string[]
 }
 
-// Acton build dirs carry compilation caches and run logs next to the artifacts;
-// none of them hold registrable ABIs, and `cache/` holds stale contract versions.
-const SKIPPED_DIRS: ReadonlySet<string> = new Set(["cache", "logs", "sessions", "node_modules"])
+// A dropped acton project (or its build/ dir) carries plenty of JSON that is
+// not a registrable artifact: `cache/` holds stale contract versions, and the
+// rest are logs, run sessions and dependency/output trees.
+const SKIPPED_DIRS: ReadonlySet<string> = new Set([
+  "cache",
+  "logs",
+  "sessions",
+  "node_modules",
+  "target",
+  "dist",
+])
 
 const MAX_IMPORT_FILES = 2000
 const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024
@@ -165,13 +180,142 @@ export function buildAbiImportPlan(files: readonly AbiImportFile[]): AbiImportPl
   }
 }
 
-export async function collectDroppedAbiFiles(dataTransfer: DataTransfer): Promise<AbiImportFile[]> {
+export interface SourceImportPlan {
+  readonly registrations: readonly SourceRegistration[]
+  readonly registeredNames: readonly string[]
+  readonly warnings: readonly string[]
+}
+
+/**
+ * Finds `acton build --output-sources` artifacts anywhere in a dropped
+ * directory (typically the whole project root - the artifacts live in
+ * `build/sources/<Name>.source.json`), so nothing needs to be cherry-picked
+ * per contract. Recognizes both the current `bundle` artifact shape and the
+ * legacy `bundles` array emitted by older CLIs.
+ */
+export function buildSourceImportPlan(files: readonly AbiImportFile[]): SourceImportPlan {
+  const registrations: SourceRegistration[] = []
+  const registeredNames: string[] = []
+  const warnings: string[] = []
+  const seenCodeHashes = new Set<string>()
+
+  for (const file of files) {
+    const path = normalizePath(file.path)
+    if (!path.toLowerCase().endsWith(".json") || isInSkippedDir(path)) {
+      continue
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(file.text)
+    } catch {
+      continue
+    }
+
+    const source = sourceArtifactFromJson(parsed)
+    if (!source) {
+      continue
+    }
+
+    const registration = sourceRegistrationFromResponse(source)
+    if (!registration) {
+      continue
+    }
+    if (seenCodeHashes.has(registration.codeHash)) {
+      continue
+    }
+    seenCodeHashes.add(registration.codeHash)
+    registrations.push(registration)
+    registeredNames.push(source.bundle?.entrypoint ?? splitJsonPath(path).base)
+  }
+
+  if (registrations.length === 0) {
+    warnings.push(
+      "No source artifacts found. Generate them with `acton build --output-sources build/sources` and drop the project again.",
+    )
+  }
+
+  return {registrations, registeredNames, warnings}
+}
+
+// Accepts both the current artifact shape ({code_hash, verified, bundle}) and
+// the legacy one ({code_hash, verified, bundles: [...]}) written by CLIs
+// predating the single-bundle-per-code-hash change.
+export function sourceArtifactFromJson(value: unknown): VerificationSourceResponse | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  const codeHash =
+    typeof value.code_hash === "string" ? normalizeCodeHash(value.code_hash) : undefined
+  if (!codeHash || typeof value.verified !== "boolean") {
+    return undefined
+  }
+
+  const bundle = isSourceBundle(value.bundle)
+    ? value.bundle
+    : Array.isArray(value.bundles)
+      ? value.bundles.find(isSourceBundle)
+      : undefined
+  if (!bundle) {
+    return undefined
+  }
+
+  return {code_hash: value.code_hash as string, verified: value.verified, bundle}
+}
+
+function isSourceBundle(value: unknown): value is SourceBundle {
+  return (
+    isRecord(value) &&
+    typeof value.source_bundle_hash === "string" &&
+    typeof value.verified_at === "number" &&
+    typeof value.storage_revision === "string" &&
+    typeof value.entrypoint === "string" &&
+    isSourceCompiler(value.compiler) &&
+    Array.isArray(value.files) &&
+    value.files.length > 0 &&
+    value.files.every(isSourceFile)
+  )
+}
+
+function isSourceCompiler(value: unknown): value is SourceCompiler {
+  return (
+    isRecord(value) &&
+    typeof value.language === "string" &&
+    typeof value.version === "string" &&
+    "params" in value
+  )
+}
+
+function isSourceFile(value: unknown): value is SourceFile {
+  return (
+    isRecord(value) &&
+    typeof value.path === "string" &&
+    typeof value.content_hash === "string" &&
+    isNullableBool(value.include_in_command) &&
+    isNullableBool(value.is_stdlib) &&
+    isNullableBool(value.has_include_directives) &&
+    typeof value.content === "string"
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isNullableBool(value: unknown): value is boolean | null {
+  return value === null || typeof value === "boolean"
+}
+
+export async function collectDroppedImportFiles(
+  dataTransfer: DataTransfer,
+): Promise<AbiImportFile[]> {
   const entries = [...dataTransfer.items]
     .map(item => (item.kind === "file" ? item.webkitGetAsEntry() : null))
     .filter((entry): entry is FileSystemEntry => Boolean(entry))
 
   if (entries.length === 0) {
-    return collectPickedAbiFiles(dataTransfer.files)
+    return collectPickedImportFiles(dataTransfer.files)
   }
 
   const files: AbiImportFile[] = []
@@ -181,7 +325,9 @@ export async function collectDroppedAbiFiles(dataTransfer: DataTransfer): Promis
   return files
 }
 
-export async function collectPickedAbiFiles(fileList: FileList | null): Promise<AbiImportFile[]> {
+export async function collectPickedImportFiles(
+  fileList: FileList | null,
+): Promise<AbiImportFile[]> {
   const files: AbiImportFile[] = []
   for (const file of [...(fileList ?? [])]) {
     if (files.length >= MAX_IMPORT_FILES) {

@@ -19,11 +19,11 @@ import {
 } from "../api/compilerAbiCatalog"
 import {
   buildAbiImportPlan,
-  collectDroppedAbiFiles,
-  collectPickedAbiFiles,
+  collectDroppedImportFiles,
+  collectPickedImportFiles,
   extendedAbiFromUpload,
   type AbiImportFile,
-} from "./abiBuildImport"
+} from "./buildImport"
 import {JsonUploadField} from "./JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useSearchParamPagination} from "../hooks/useSearchParamPagination"
@@ -211,11 +211,11 @@ export const AbiCatalog: FC = () => {
     event.preventDefault()
     dragDepth.current = 0
     setDropActive(false)
-    await importAbiFiles(await collectDroppedAbiFiles(event.dataTransfer))
+    await importAbiFiles(await collectDroppedImportFiles(event.dataTransfer))
   }
 
   const handleDirectoryPick = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = await collectPickedAbiFiles(event.target.files)
+    const files = await collectPickedImportFiles(event.target.files)
     event.target.value = ""
     await importAbiFiles(files)
   }
