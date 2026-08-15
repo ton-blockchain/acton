@@ -34,6 +34,14 @@ const SKIPPED_DIRS: ReadonlySet<string> = new Set([
   "dist",
 ])
 
+// Hidden directories are skipped (.git alone makes walking them prohibitive),
+// but acton-studio legitimately keeps generated artifacts under .studio/.
+const ALLOWED_HIDDEN_DIRS: ReadonlySet<string> = new Set([".studio"])
+
+function isSkippedDirName(name: string): boolean {
+  return SKIPPED_DIRS.has(name) || (name.startsWith(".") && !ALLOWED_HIDDEN_DIRS.has(name))
+}
+
 const MAX_IMPORT_FILES = 2000
 const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024
 
@@ -153,12 +161,15 @@ export function buildAbiImportPlan(files: readonly AbiImportFile[]): AbiImportPl
     }
   }
 
-  const seenAbiBases = new Set<string>()
+  // Key on dir+base, not base alone: a drop spanning several build trees may
+  // legitimately carry same-named contracts with different code hashes.
+  const seenAbiPaths = new Set<string>()
   for (const candidate of abiCandidates) {
-    if (seenAbiBases.has(candidate.base)) {
+    const candidateKey = `${candidate.dir}/${candidate.base}`
+    if (seenAbiPaths.has(candidateKey)) {
       continue
     }
-    seenAbiBases.add(candidate.base)
+    seenAbiPaths.add(candidateKey)
 
     const hashes = matchCodeHashes(candidate, codeCandidates)
     if (hashes.length === 0) {
@@ -367,7 +378,7 @@ async function walkEntry(entry: FileSystemEntry, out: AbiImportFile[]): Promise<
   }
 
   if (entry.isDirectory) {
-    if (SKIPPED_DIRS.has(entry.name) || entry.name.startsWith(".")) {
+    if (isSkippedDirName(entry.name)) {
       return
     }
     const reader = (entry as FileSystemDirectoryEntry).createReader()
@@ -397,10 +408,7 @@ function normalizePath(path: string): string {
 }
 
 function isInSkippedDir(path: string): boolean {
-  return path
-    .split("/")
-    .slice(0, -1)
-    .some(segment => SKIPPED_DIRS.has(segment) || segment.startsWith("."))
+  return path.split("/").slice(0, -1).some(isSkippedDirName)
 }
 
 function splitJsonPath(path: string): {readonly dir: string; readonly base: string} {
@@ -462,20 +470,36 @@ function matchCodeHashes(
   return [...new Set(matched.map(candidate => candidate.hash))]
 }
 
+// Deduplicates on the COMPLETE code-hash sets: a later registration sharing any
+// hash with an earlier one merges its remaining hashes into that entry instead
+// of being dropped (or duplicating the shared hash in the registry).
 function dedupeByCodeHash(
   registrations: readonly CompilerAbiRegistration[],
 ): readonly CompilerAbiRegistration[] {
-  const seen = new Set<string>()
-  const unique: CompilerAbiRegistration[] = []
+  const merged: CompilerAbiRegistration[] = []
+  const indexByHash = new Map<string, number>()
   for (const registration of registrations) {
-    const key = registration.abi.code_hashes[0]
-    if (key && seen.has(key)) {
+    const hashes = registration.abi.code_hashes
+    const existingIndex = hashes
+      .map(hash => indexByHash.get(hash))
+      .find((index): index is number => index !== undefined)
+    if (existingIndex === undefined) {
+      const index = merged.length
+      merged.push(registration)
+      for (const hash of hashes) {
+        indexByHash.set(hash, index)
+      }
       continue
     }
-    if (key) {
-      seen.add(key)
+
+    const existing = merged[existingIndex]
+    const union = [...new Set([...existing.abi.code_hashes, ...hashes])]
+    if (union.length !== existing.abi.code_hashes.length) {
+      merged[existingIndex] = {abi: {...existing.abi, code_hashes: union}}
     }
-    unique.push(registration)
+    for (const hash of hashes) {
+      indexByHash.set(hash, existingIndex)
+    }
   }
-  return unique
+  return merged
 }

@@ -154,6 +154,53 @@ describe("buildAbiImportPlan", () => {
 
     expect(plan.registrations).toHaveLength(1)
   })
+
+  test("merges alias hashes instead of dropping overlapping registrations", () => {
+    const plan = buildAbiImportPlan([
+      {
+        path: "first.json",
+        text: JSON.stringify({compiler_abi: compilerAbi("Fat"), code_hashes: [HASH_A]}),
+      },
+      {
+        path: "second.json",
+        text: JSON.stringify({compiler_abi: compilerAbi("Fat"), code_hashes: [HASH_A, HASH_B]}),
+      },
+    ])
+
+    expect(plan.registrations).toHaveLength(1)
+    expect(plan.registrations[0]?.abi.code_hashes.map(h => h.toLowerCase()).toSorted()).toEqual(
+      [HASH_A.toLowerCase(), HASH_B.toLowerCase()].toSorted(),
+    )
+  })
+
+  test("dedupes on any shared hash, not only the first one", () => {
+    const plan = buildAbiImportPlan([
+      {
+        path: "first.json",
+        text: JSON.stringify({compiler_abi: compilerAbi("Fat"), code_hashes: [HASH_A, HASH_B]}),
+      },
+      {
+        path: "second.json",
+        text: JSON.stringify({compiler_abi: compilerAbi("Fat"), code_hashes: [HASH_B]}),
+      },
+    ])
+
+    expect(plan.registrations).toHaveLength(1)
+  })
+
+  test("keeps same-named ABIs from separate build trees", () => {
+    const plan = buildAbiImportPlan([
+      abiFile("project-a/build/abi/Wallet.json", "Wallet"),
+      codeFile("project-a/build/Wallet.json", HASH_A),
+      abiFile("project-b/build/abi/Wallet.json", "Wallet"),
+      codeFile("project-b/build/Wallet.json", HASH_B),
+    ])
+
+    expect(plan.registrations).toHaveLength(2)
+    expect(plan.registrations.flatMap(entry => [...entry.abi.code_hashes]).toSorted()).toEqual(
+      [HASH_A.toLowerCase(), HASH_B.toLowerCase()].toSorted(),
+    )
+  })
 })
 
 function sourceBundle(entrypoint: string): Record<string, unknown> {
@@ -250,5 +297,19 @@ describe("buildSourceImportPlan", () => {
     ])
 
     expect(plan.registrations).toEqual([])
+  })
+
+  test("finds artifacts under .studio/ while other hidden dirs stay skipped", () => {
+    const plan = buildSourceImportPlan([
+      sourceArtifactFile(
+        "project/.studio/sources/Simple.source.json",
+        HASH_A,
+        "contracts/Simple.tolk",
+      ),
+      sourceArtifactFile("project/.git/objects/Fake.source.json", HASH_B, "contracts/Fake.tolk"),
+    ])
+
+    expect(plan.registrations).toHaveLength(1)
+    expect(plan.registrations[0]?.codeHash).toBe(HASH_A.toLowerCase())
   })
 })
