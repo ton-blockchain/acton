@@ -35,6 +35,9 @@ interface SourceCatalogState {
 
 interface SourceTableEntry {
   readonly artifactId: string
+  // Set only for sources the backend registered (localnet/studio); sources
+  // registered into the browser environment have no backend artifact.
+  readonly backendArtifactId?: string
   readonly codeHash: string
   readonly entrypoint: string
   readonly compiler: string
@@ -186,9 +189,16 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
     await importSourceFiles(files)
   }
 
-  const handleDeleteSource = async (artifactId: string) => {
+  const handleDeleteSource = async (entry: SourceTableEntry) => {
     try {
-      await client.deleteRegisteredVerifiedSourceArtifact(artifactId)
+      // Backend-registered artifacts (localnet/studio) delete through the
+      // control API; browser-environment registrations live in the metadata
+      // registry, which the control endpoint knows nothing about.
+      if (entry.backendArtifactId) {
+        await client.deleteRegisteredVerifiedSourceArtifact(entry.backendArtifactId)
+      } else {
+        await metadataRegistry.deleteSource(entry.codeHash)
+      }
       showToast({
         title: "Source deleted",
         variant: "success",
@@ -320,7 +330,7 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                               <InlineAction
                                 label="Delete source"
                                 icon={<Trash2 />}
-                                onClick={() => void handleDeleteSource(entry.artifactId)}
+                                onClick={() => void handleDeleteSource(entry)}
                               />
                             ) : undefined
                           }
@@ -409,6 +419,7 @@ function sourceToTableEntry(source: RegisteredSource): SourceTableEntry {
   const bundle = source.source.bundle
   return {
     artifactId: source.artifactId ?? bundle?.source_bundle_hash ?? source.codeHash,
+    backendArtifactId: source.artifactId,
     codeHash: source.codeHash,
     entrypoint: bundle?.entrypoint ?? "unknown",
     compiler: formatCompilerLabel(bundle?.compiler, "unknown"),
