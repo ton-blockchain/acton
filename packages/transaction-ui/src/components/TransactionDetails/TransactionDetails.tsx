@@ -238,10 +238,10 @@ function TransactionDetailsContent({
     })()
   const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
   const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
-  const messageHashHex = inMessage ? formatMessageHashHex(inMessage) : undefined
-  // For external-driven transactions the hash shown is the transaction's own
-  // hash, taken from the raw cell the backend returned (not re-serialized).
-  const transactionHashHex = tx.transaction.hash().toString("hex")
+  // Prefer the data source's in-message hash; hashing the re-serialized
+  // message is a fallback that can diverge from the on-chain cell.
+  const messageHashHex =
+    tx.inMessageHash ?? (inMessage ? formatMessageHashHex(inMessage) : undefined)
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
@@ -535,18 +535,20 @@ function TransactionDetailsContent({
                   {tx.transaction.lt.toString()}
                 </div>
               </div>
-              <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Hash</div>
-                <div className={styles.multiColumnItemValue}>
-                  <TechnicalValue
-                    copyLabel="transaction hash"
-                    endLength={3}
-                    startLength={3}
-                    value={transactionHashHex}
-                    copyVisibility="always"
-                  />
+              {messageHashHex && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Hash</div>
+                  <div className={styles.multiColumnItemValue}>
+                    <TechnicalValue
+                      copyLabel="message hash"
+                      endLength={3}
+                      startLength={3}
+                      value={messageHashHex}
+                      copyVisibility="always"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

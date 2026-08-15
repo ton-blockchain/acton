@@ -72,6 +72,9 @@ export interface TransactionInfo {
   readonly blockRef?: TransactionBlockRef
   readonly address: Address | undefined
   readonly transaction: Transaction
+  // In-message hash as reported by the data source (hex). Preferred over
+  // hashing a re-serialized message, which can diverge from the on-chain cell.
+  readonly inMessageHash?: string
   readonly vmLogDiff: string
   readonly executorLogs: string
   readonly executorActions: readonly BackendExecutorAction[]

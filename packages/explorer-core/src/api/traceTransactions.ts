@@ -50,6 +50,7 @@ export const buildTraceTransactionInfos = (
       blockRef: tx.block_ref,
       address: parseTonAddress(tx.account),
       transaction: synthesizeTransaction(tx),
+      inMessageHash: hashToHex(tx.in_msg?.hash),
       vmLogDiff: "",
       executorLogs: "",
       executorActions: [],
