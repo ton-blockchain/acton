@@ -12,6 +12,9 @@ DESCRIPTION
        Library metadata can also be stored locally in libraries.toml or
        globally in global.libraries.toml for later inspection and maintenance.
 
+       Regular accounts cannot publish libraries on mainnet or testnet. Only
+       special masterchain accounts can perform change-library actions.
+
 LIFECYCLE
        A typical library workflow is:
 

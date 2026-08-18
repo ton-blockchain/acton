@@ -12,6 +12,12 @@ On-chain libraries let the TON blockchain store code once and reuse it across mu
 
 ## Publishing a library
 
+<Callout type="warn">
+  Currently, regular accounts cannot publish libraries on mainnet or testnet. Only special masterchain accounts, such as the ones hosting [elector](https://actonscan.com/config?network=mainnet#config-parameter-1) and [config](https://actonscan.com/config?network=mainnet#config-parameter-0) smart contracts, can publish libraries or perform change-library actions.
+
+  Operations such as obtaining library metadata or performing a top-up are allowed for existing libraries.
+</Callout>
+
 Acton provides `acton library publish` to publish code as a library on the masterchain.
 
 ### Step 1: Create a contract

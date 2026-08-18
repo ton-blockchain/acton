@@ -743,6 +743,12 @@ See the [verification guide](/docs/verify) for more.
 
 ## Manage on-chain libraries
 
+<Callout type="warn">
+  Currently, regular accounts cannot publish libraries on mainnet or testnet. Only special masterchain accounts, such as the ones hosting [elector](https://actonscan.com/config?network=mainnet#config-parameter-1) and [config](https://actonscan.com/config?network=mainnet#config-parameter-0) smart contracts, can publish libraries or perform change-library actions.
+
+  Operations such as obtaining library metadata or performing a top-up are allowed for existing libraries.
+</Callout>
+
 The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in a single masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
 
 Publish a configured contract as a library:
@@ -751,7 +757,9 @@ Publish a configured contract as a library:
 acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net testnet --local
 ```
 
-Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`. After publishing, inspect the library and top it up before storage fees run out. `info` and `topup` use the network saved in the library metadata:
+Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`.
+
+After publishing, inspect the library and top it up before storage fees run out. `info` and `topup` use the network saved in the library metadata:
 
 ```bash
 acton library info <LIBRARY_NAME>
