@@ -190,14 +190,14 @@ impl<'a> TestRunner<'a> {
 
                 let Some(cached) = cache.get(&contract_info.src, config.debug, false, 2, "1.4")
                 else {
-                    warn!("No build cache for contract {}", &contract_info.src);
+                    warn!("No build cache for contract {}", contract_info.src);
                     continue;
                 };
 
                 let Ok(cell) = Boc::decode_base64(&cached.code_boc64) else {
                     warn!(
                         "Cannot deserialize code of {}: {}",
-                        &contract_info.src, cached.code_boc64
+                        contract_info.src, cached.code_boc64
                     );
                     continue;
                 };

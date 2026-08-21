@@ -75,6 +75,7 @@ fn ancestor<'tree>(
     None
 }
 
+#[allow(clippy::question_mark)]
 fn arbitrary_integer_doc(name: &str) -> Option<String> {
     let (kind, width) = if let Some(width) = name.strip_prefix("uint") {
         ("unsigned integer", width)

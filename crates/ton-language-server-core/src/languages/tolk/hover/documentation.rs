@@ -131,6 +131,7 @@ fn known_tlb_type(name: &str) -> Option<TlbTypeInfo> {
     })
 }
 
+#[allow(clippy::question_mark)]
 fn arbitrary_int_type(name: &str) -> Option<TlbTypeInfo> {
     let (prefix, width) = if let Some(width) = name.strip_prefix("uint") {
         ("uint", width)

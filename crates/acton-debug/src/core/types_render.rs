@@ -2047,7 +2047,7 @@ fn abi_object_field_ty(
     field_name: &str,
 ) -> Option<TyIdx> {
     match symbols.ty_by_idx(ty_idx)? {
-        Ty::StructRef { struct_name: _, .. } => symbols
+        Ty::StructRef { .. } => symbols
             .struct_fields_for(ty_idx)?
             .into_iter()
             .find(|field| field.name == field_name)

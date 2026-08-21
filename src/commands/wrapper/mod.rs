@@ -478,13 +478,7 @@ fn wrapper_file_name(contract_name: &str, generate_typescript: bool) -> String {
 }
 
 fn non_empty_path(path: Option<String>) -> Option<String> {
-    path.and_then(|path| {
-        if path.trim().is_empty() {
-            None
-        } else {
-            Some(path)
-        }
-    })
+    path.filter(|path| !path.trim().is_empty())
 }
 
 fn has_non_empty_path(path: Option<&str>) -> bool {
