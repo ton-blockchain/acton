@@ -1,5 +1,6 @@
 .tableFrame {
   box-sizing: border-box;
+  position: relative;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -7,6 +8,28 @@
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-panel);
   background: var(--acton-color-surface-raised);
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--acton-color-focus-ring);
+  border-radius: var(--acton-radius-panel);
+  background: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 88%,
+    var(--acton-color-focus-ring)
+  );
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: 650;
+  pointer-events: none;
 }
 
 .primaryButton {
@@ -161,6 +184,52 @@
     var(--acton-color-focus-ring) 5%,
     var(--acton-color-surface-raised)
   );
+}
+
+.actionButtonsRow {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.actionButtonsRow .registerSourceButton {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.importProjectButton {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--acton-space-5);
+  border: 0;
+  border-left: 1px solid var(--acton-color-border);
+  background: transparent;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-weight: 750;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.importProjectButton:hover:not(:disabled) {
+  background: var(--acton-color-surface-row);
+}
+
+.importProjectButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.importProjectButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.hiddenFileInput {
+  display: none;
 }
 
 .registerSourceButton {

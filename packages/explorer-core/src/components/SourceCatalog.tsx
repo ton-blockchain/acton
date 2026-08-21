@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import type {ChangeEvent, DragEvent, FC, FormEvent, JSX} from "react"
 import {
   DateTime,
   formatCompilerLabel,
@@ -9,19 +9,20 @@ import {
   TechnicalValue,
   useToast,
 } from "@acton/ui"
-import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
+import {CircleAlert, FolderUp, Plus, Trash2, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
-import type {
-  SourceBundle,
-  SourceCompiler,
-  SourceFile,
-  VerificationSourceResponse,
-} from "../api/types"
+import type {VerificationSourceResponse} from "../api/types"
+import {
+  buildSourceImportPlan,
+  collectDroppedImportFiles,
+  collectPickedImportFiles,
+  sourceArtifactFromJson,
+  type AbiImportFile,
+} from "./buildImport"
 import {JsonUploadField} from "./JsonUploadField"
 import {useSearchParamPagination} from "../hooks/useSearchParamPagination"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
-import {normalizeCodeHash} from "../metadata/codeHash"
 import {sourceRegistrationFromResponse} from "../metadata/sourceRegistration"
 import type {RegisteredSource} from "../metadata/types"
 
@@ -34,6 +35,9 @@ interface SourceCatalogState {
 
 interface SourceTableEntry {
   readonly artifactId: string
+  // Set only for sources the backend registered (localnet/studio); sources
+  // registered into the browser environment have no backend artifact.
+  readonly backendArtifactId?: string
   readonly codeHash: string
   readonly entrypoint: string
   readonly compiler: string
@@ -50,6 +54,10 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   const [state, setState] = useState<SourceCatalogState>({loading: true, sources: []})
   const [sourceJson, setSourceJson] = useState("")
   const [sourceFormExpanded, setSourceFormExpanded] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const dragDepth = useRef(0)
+  const directoryInputRef = useRef<HTMLInputElement>(null)
 
   const loadSources = useCallback(async () => {
     setState(current => ({...current, loading: true}))
@@ -106,9 +114,91 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
     }
   }
 
-  const handleDeleteSource = async (artifactId: string) => {
+  const importSourceFiles = useCallback(
+    async (files: readonly AbiImportFile[]) => {
+      if (importing) {
+        return
+      }
+      setImporting(true)
+      try {
+        if (!metadataRegistry.canWriteSources) {
+          throw new Error("This environment does not accept source registrations.")
+        }
+        const plan = buildSourceImportPlan(files)
+        if (plan.registrations.length === 0) {
+          throw new Error(plan.warnings[0] ?? "No source artifacts found in the drop.")
+        }
+        await metadataRegistry.registerSources(plan.registrations)
+        showToast({
+          title: `Registered ${plan.registrations.length} source${plan.registrations.length === 1 ? "" : "s"}`,
+          description: plan.registeredNames.join(", "),
+          variant: "success",
+        })
+        await loadSources()
+      } catch (error) {
+        showToast({
+          title: "Sources not registered",
+          description: error instanceof Error ? error.message : "Failed to import sources.",
+          variant: "error",
+        })
+      } finally {
+        setImporting(false)
+      }
+    },
+    [importing, loadSources, metadataRegistry, showToast],
+  )
+
+  const handleDragEnter = (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    event.preventDefault()
+    dragDepth.current += 1
+    setDropActive(true)
+  }
+
+  const handleDragOver = (event: DragEvent) => {
+    if (event.dataTransfer.types.includes("Files")) {
+      event.preventDefault()
+    }
+  }
+
+  const handleDragLeave = (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) {
+      setDropActive(false)
+    }
+  }
+
+  const handleDrop = async (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    event.preventDefault()
+    dragDepth.current = 0
+    setDropActive(false)
+    await importSourceFiles(await collectDroppedImportFiles(event.dataTransfer))
+  }
+
+  const handleDirectoryPick = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = await collectPickedImportFiles(event.target.files)
+    event.target.value = ""
+    await importSourceFiles(files)
+  }
+
+  const handleDeleteSource = async (entry: SourceTableEntry) => {
     try {
-      await client.deleteRegisteredVerifiedSourceArtifact(artifactId)
+      // Backend-registered artifacts (localnet/studio) delete through the
+      // control API; browser-environment registrations live in the metadata
+      // registry, which the control endpoint knows nothing about.
+      if (entry.backendArtifactId) {
+        await client.deleteRegisteredVerifiedSourceArtifact(entry.backendArtifactId)
+      } else {
+        await metadataRegistry.deleteSource(entry.codeHash)
+      }
       showToast({
         title: "Source deleted",
         variant: "success",
@@ -129,7 +219,22 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   const toggleSourceForm = () => setSourceFormExpanded(expanded => !expanded)
 
   return (
-    <section className={styles.tableFrame}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop is a pointer-only shortcut; the "Import project folder" button is the accessible path.
+    <section
+      className={styles.tableFrame}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={event => {
+        void handleDrop(event)
+      }}
+    >
+      {dropActive && (
+        <div className={styles.dropOverlay}>
+          <FolderUp size={28} />
+          <span>Drop your acton project folder to register its source artifacts</span>
+        </div>
+      )}
       {state.loading ? (
         <SourceCatalogSkeleton />
       ) : (
@@ -149,15 +254,37 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
               <tbody>
                 <tr className={styles.formButtonRow}>
                   <td colSpan={6}>
-                    <button
-                      type="button"
-                      className={styles.registerSourceButton}
-                      aria-expanded={sourceFormExpanded}
-                      onClick={toggleSourceForm}
-                    >
-                      <Plus size={16} />
-                      <span>Register source</span>
-                    </button>
+                    <div className={styles.actionButtonsRow}>
+                      <button
+                        type="button"
+                        className={styles.registerSourceButton}
+                        aria-expanded={sourceFormExpanded}
+                        onClick={toggleSourceForm}
+                      >
+                        <Plus size={16} />
+                        <span>Register source</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.importProjectButton}
+                        disabled={importing || !metadataRegistry.canWriteSources}
+                        onClick={() => directoryInputRef.current?.click()}
+                        title="Register every source artifact found in an acton project folder (or drop the folder anywhere on this table). Artifacts come from `acton build --output-sources build/sources`."
+                      >
+                        <FolderUp size={16} />
+                        <span>{importing ? "Importing…" : "Import project folder"}</span>
+                      </button>
+                      <input
+                        ref={directoryInputRef}
+                        className={styles.hiddenFileInput}
+                        type="file"
+                        multiple
+                        {...directoryInputProps}
+                        onChange={event => {
+                          void handleDirectoryPick(event)
+                        }}
+                      />
+                    </div>
                   </td>
                 </tr>
                 {sourceFormExpanded && (
@@ -203,7 +330,7 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                               <InlineAction
                                 label="Delete source"
                                 icon={<Trash2 />}
-                                onClick={() => void handleDeleteSource(entry.artifactId)}
+                                onClick={() => void handleDeleteSource(entry)}
                               />
                             ) : undefined
                           }
@@ -268,6 +395,10 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   )
 }
 
+// `webkitdirectory` enables directory picking but is missing from React's input
+// prop types, so it goes in via a spread.
+const directoryInputProps = {webkitdirectory: ""} as Record<string, string>
+
 function parseSourceArtifact(raw: string): VerificationSourceResponse {
   let parsed: unknown
   try {
@@ -276,69 +407,19 @@ function parseSourceArtifact(raw: string): VerificationSourceResponse {
     throw new Error(SOURCE_UPLOAD_ERROR)
   }
 
-  if (!isVerificationSourceResponse(parsed)) {
+  const source = sourceArtifactFromJson(parsed)
+  if (!source) {
     throw new Error(SOURCE_UPLOAD_ERROR)
   }
 
-  return parsed
-}
-
-function isVerificationSourceResponse(value: unknown): value is VerificationSourceResponse {
-  if (!isRecord(value)) {
-    return false
-  }
-  const codeHash =
-    typeof value.code_hash === "string" ? normalizeCodeHash(value.code_hash) : undefined
-  return Boolean(codeHash) && typeof value.verified === "boolean" && isSourceBundle(value.bundle)
-}
-
-function isSourceBundle(value: unknown): value is SourceBundle {
-  return (
-    isRecord(value) &&
-    typeof value.source_bundle_hash === "string" &&
-    typeof value.verified_at === "number" &&
-    typeof value.storage_revision === "string" &&
-    typeof value.entrypoint === "string" &&
-    isSourceCompiler(value.compiler) &&
-    Array.isArray(value.files) &&
-    value.files.length > 0 &&
-    value.files.every(isSourceFile)
-  )
-}
-
-function isSourceCompiler(value: unknown): value is SourceCompiler {
-  return (
-    isRecord(value) &&
-    typeof value.language === "string" &&
-    typeof value.version === "string" &&
-    "params" in value
-  )
-}
-
-function isSourceFile(value: unknown): value is SourceFile {
-  return (
-    isRecord(value) &&
-    typeof value.path === "string" &&
-    typeof value.content_hash === "string" &&
-    isNullableBool(value.include_in_command) &&
-    isNullableBool(value.is_stdlib) &&
-    isNullableBool(value.has_include_directives) &&
-    typeof value.content === "string"
-  )
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function isNullableBool(value: unknown): value is boolean | null {
-  return value === null || typeof value === "boolean"
+  return source
 }
 
 function sourceToTableEntry(source: RegisteredSource): SourceTableEntry {
   const bundle = source.source.bundle
   return {
     artifactId: source.artifactId ?? bundle?.source_bundle_hash ?? source.codeHash,
+    backendArtifactId: source.artifactId,
     codeHash: source.codeHash,
     entrypoint: bundle?.entrypoint ?? "unknown",
     compiler: formatCompilerLabel(bundle?.compiler, "unknown"),

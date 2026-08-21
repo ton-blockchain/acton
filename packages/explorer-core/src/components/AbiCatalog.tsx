@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import type {ChangeEvent, DragEvent, FC, FormEvent, JSX} from "react"
 import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import {
   InlineAction,
@@ -9,8 +9,7 @@ import {
   humanizeIdentifier,
   useToast,
 } from "@acton/ui"
-import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
+import {CircleAlert, FolderUp, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useNavigate} from "react-router"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -18,6 +17,13 @@ import {
   getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
 } from "../api/compilerAbiCatalog"
+import {
+  buildAbiImportPlan,
+  collectDroppedImportFiles,
+  collectPickedImportFiles,
+  extendedAbiFromUpload,
+  type AbiImportFile,
+} from "./buildImport"
 import {JsonUploadField} from "./JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useSearchParamPagination} from "../hooks/useSearchParamPagination"
@@ -58,6 +64,10 @@ export const AbiCatalog: FC = () => {
   const [abiCodeHashes, setAbiCodeHashes] = useState<readonly string[]>([""])
   const [abiJson, setAbiJson] = useState("")
   const [abiFormExpanded, setAbiFormExpanded] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const dragDepth = useRef(0)
+  const directoryInputRef = useRef<HTMLInputElement>(null)
 
   const loadRegisteredMetadata = useCallback(async () => {
     setRegisteredState(current => ({...current, loading: true}))
@@ -132,6 +142,84 @@ export const AbiCatalog: FC = () => {
     }
   }
 
+  const importAbiFiles = useCallback(
+    async (files: readonly AbiImportFile[]) => {
+      if (importing) {
+        return
+      }
+      setImporting(true)
+      try {
+        if (!metadataRegistry.canWriteCompilerAbis) {
+          throw new Error("This environment does not accept ABI registrations.")
+        }
+        const plan = buildAbiImportPlan(files)
+        if (plan.registrations.length === 0) {
+          throw new Error(
+            plan.warnings[0] ??
+              "No ABI JSON files found. Drop an acton build/ directory (or its abi/ files together with the compiled <Name>.json files).",
+          )
+        }
+        await metadataRegistry.registerCompilerAbis(plan.registrations)
+        showToast({
+          title: `Registered ${plan.registrations.length} ABI${plan.registrations.length === 1 ? "" : "s"}`,
+          description: formatImportSummary(plan.registeredNames, plan.warnings),
+          variant: "success",
+        })
+        await loadRegisteredMetadata()
+      } catch (error) {
+        showToast({
+          title: "ABIs not registered",
+          description: error instanceof Error ? error.message : "Failed to import ABIs.",
+          variant: "error",
+        })
+      } finally {
+        setImporting(false)
+      }
+    },
+    [importing, loadRegisteredMetadata, metadataRegistry, showToast],
+  )
+
+  const handleDragEnter = (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    event.preventDefault()
+    dragDepth.current += 1
+    setDropActive(true)
+  }
+
+  const handleDragOver = (event: DragEvent) => {
+    if (event.dataTransfer.types.includes("Files")) {
+      event.preventDefault()
+    }
+  }
+
+  const handleDragLeave = (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) {
+      setDropActive(false)
+    }
+  }
+
+  const handleDrop = async (event: DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) {
+      return
+    }
+    event.preventDefault()
+    dragDepth.current = 0
+    setDropActive(false)
+    await importAbiFiles(await collectDroppedImportFiles(event.dataTransfer))
+  }
+
+  const handleDirectoryPick = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = await collectPickedImportFiles(event.target.files)
+    event.target.value = ""
+    await importAbiFiles(files)
+  }
+
   const handleDeleteAbi = async (codeHash: string) => {
     try {
       await metadataRegistry.deleteCompilerAbi(codeHash)
@@ -168,7 +256,22 @@ export const AbiCatalog: FC = () => {
   }
 
   return (
-    <section className={styles.tableFrame}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop is a pointer-only shortcut; the "Import build folder" button is the accessible path.
+    <section
+      className={styles.tableFrame}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={event => {
+        void handleDrop(event)
+      }}
+    >
+      {dropActive && (
+        <div className={styles.dropOverlay}>
+          <FolderUp size={28} />
+          <span>Drop an acton build/ directory to register its ABIs</span>
+        </div>
+      )}
       {tableLoading ? (
         <AbiCatalogSkeleton />
       ) : (
@@ -188,15 +291,37 @@ export const AbiCatalog: FC = () => {
               <tbody>
                 <tr className={styles.formButtonRow}>
                   <td colSpan={6}>
-                    <button
-                      type="button"
-                      className={styles.registerAbiButton}
-                      aria-expanded={abiFormExpanded}
-                      onClick={toggleAbiForm}
-                    >
-                      <Plus size={16} />
-                      <span>Register ABI</span>
-                    </button>
+                    <div className={styles.actionButtonsRow}>
+                      <button
+                        type="button"
+                        className={styles.registerAbiButton}
+                        aria-expanded={abiFormExpanded}
+                        onClick={toggleAbiForm}
+                      >
+                        <Plus size={16} />
+                        <span>Register ABI</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.importBuildButton}
+                        disabled={importing || !metadataRegistry.canWriteCompilerAbis}
+                        onClick={() => directoryInputRef.current?.click()}
+                        title="Register every ABI from an acton build/ directory (or drop the directory anywhere on this table)"
+                      >
+                        <FolderUp size={16} />
+                        <span>{importing ? "Importing…" : "Import build folder"}</span>
+                      </button>
+                      <input
+                        ref={directoryInputRef}
+                        className={styles.hiddenFileInput}
+                        type="file"
+                        multiple
+                        {...directoryInputProps}
+                        onChange={event => {
+                          void handleDirectoryPick(event)
+                        }}
+                      />
+                    </div>
                   </td>
                 </tr>
                 {abiFormExpanded && (
@@ -478,49 +603,20 @@ function parseCodeHashes(raw: string, source: unknown): readonly string[] {
   ]
 }
 
-function extendedAbiFromUpload(
-  source: unknown,
-  codeHashes: readonly string[],
-  displayName: string,
-): ExtendedContractABI {
-  const record =
-    source && typeof source === "object" ? (source as Partial<ExtendedContractABI>) : {}
-  const compilerAbi =
-    record.compiler_abi && typeof record.compiler_abi === "object"
-      ? (record.compiler_abi as ContractABI)
-      : (source as ContractABI)
+// `webkitdirectory` enables directory picking but is missing from React's input
+// prop types, so it goes in via a spread.
+const directoryInputProps = {webkitdirectory: ""} as Record<string, string>
 
-  if (!isCompilerAbi(compilerAbi)) {
-    throw new Error("Uploaded JSON must be a compiler ABI.")
+function formatImportSummary(names: readonly string[], warnings: readonly string[]): string {
+  const shownNames = names.slice(0, 8)
+  const parts = [
+    shownNames.join(", ") +
+      (names.length > shownNames.length ? ` +${names.length - shownNames.length} more` : ""),
+  ]
+  if (warnings.length > 0) {
+    parts.push(`Skipped: ${warnings.join("; ")}`)
   }
-
-  return {
-    compiler_abi: compilerAbi,
-    display_name:
-      displayName.trim() ||
-      (typeof record.display_name === "string" ? record.display_name.trim() : "") ||
-      compilerAbi.contract_name,
-    code_hashes: codeHashes,
-    links: Array.isArray(record.links) ? record.links : [],
-  }
-}
-
-function isCompilerAbi(value: unknown): value is ContractABI {
-  if (!value || typeof value !== "object") {
-    return false
-  }
-
-  const abi = value as Partial<ContractABI>
-  return (
-    typeof abi.contract_name === "string" &&
-    Array.isArray(abi.get_methods) &&
-    Array.isArray(abi.incoming_messages) &&
-    Array.isArray(abi.incoming_external) &&
-    Array.isArray(abi.outgoing_messages) &&
-    Array.isArray(abi.emitted_events) &&
-    Array.isArray(abi.declarations) &&
-    Array.isArray(abi.thrown_errors)
-  )
+  return parts.join(". ")
 }
 
 function buildAbiTableEntries(
