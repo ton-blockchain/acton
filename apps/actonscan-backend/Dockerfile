@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.96.1-slim-bookworm AS rust-builder
+FROM rust:1.97.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/actonscan-backend
 
