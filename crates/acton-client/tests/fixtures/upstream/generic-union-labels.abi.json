@@ -1,0 +1,1062 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GenericUnionLabels",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgPair"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericPair",
+      "type_args_ty_idx": [
+        8,
+        10
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T1"
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T2"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericPair",
+      "type_args_ty_idx": [
+        15,
+        16
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 15,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgOrInt16"
+    },
+    {
+      "kind": "intN",
+      "n": 16
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericOrInt8",
+      "type_args_ty_idx": [
+        20
+      ]
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 20,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 22,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericOrInt8",
+      "type_args_ty_idx": [
+        24
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 24,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 22,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgAliasInt16"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AliasOrInt8",
+      "type_args_ty_idx": [
+        20
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AliasOrInt8",
+      "type_args_ty_idx": [
+        24
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "GenericUnionLabelsStorage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Point"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyNullable",
+      "type_args_ty_idx": [
+        31
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 31,
+      "stack_type_id": 135,
+      "stack_width": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyNullable",
+      "type_args_ty_idx": [
+        24
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 24
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 32
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        32,
+        36
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbMessageRelaxedGeneric"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbIntMsgInfoRelaxed"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StateInit"
+    },
+    {
+      "kind": "uintN",
+      "n": 5
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 41
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        5,
+        5
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 43,
+      "stack_type_id": 136,
+      "stack_width": 3
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 40
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbEither",
+      "type_args_ty_idx": [
+        40,
+        46
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherLeft",
+      "type_args_ty_idx": [
+        40
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "X"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherLeft",
+      "type_args_ty_idx": [
+        49
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherRight",
+      "type_args_ty_idx": [
+        46
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherRight",
+      "type_args_ty_idx": [
+        49
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 48,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 137,
+          "stack_width": 7
+        },
+        {
+          "variant_ty_idx": 51,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 138,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 8
+    },
+    {
+      "kind": "genericT",
+      "name_t": "Y"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbEither",
+      "type_args_ty_idx": [
+        49,
+        54
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherRight",
+      "type_args_ty_idx": [
+        54
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 50,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 56,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbMaybe",
+      "type_args_ty_idx": [
+        47
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbNone"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbJust",
+      "type_args_ty_idx": [
+        47
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbJust",
+      "type_args_ty_idx": [
+        49
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 59,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 129,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 60,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 139,
+          "stack_width": 8
+        }
+      ],
+      "stack_width": 9
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbMaybe",
+      "type_args_ty_idx": [
+        49
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 59,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 61,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbEither",
+      "type_args_ty_idx": [
+        8,
+        5
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherLeft",
+      "type_args_ty_idx": [
+        8
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherRight",
+      "type_args_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 67,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 130,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 68,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 140,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TlbEither",
+      "type_args_ty_idx": [
+        5,
+        5
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TlbEitherLeft",
+      "type_args_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 71,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "stack_type_id": 131,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 68,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "stack_type_id": 140,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "RawEither",
+      "type_args_ty_idx": [
+        8,
+        5
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "RawEither",
+      "type_args_ty_idx": [
+        49,
+        54
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 49,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 13,
+      "struct_name": "GenericPair<int32, int64>",
+      "monomorphic_fields_ty_idx": [
+        14
+      ]
+    },
+    {
+      "ty_idx": 21,
+      "struct_name": "GenericOrInt8<int16>",
+      "monomorphic_fields_ty_idx": [
+        23
+      ]
+    },
+    {
+      "ty_idx": 48,
+      "struct_name": "TlbEitherLeft<StateInit>",
+      "monomorphic_fields_ty_idx": [
+        40
+      ]
+    },
+    {
+      "ty_idx": 51,
+      "struct_name": "TlbEitherRight<Cell<StateInit>>",
+      "monomorphic_fields_ty_idx": [
+        46
+      ]
+    },
+    {
+      "ty_idx": 60,
+      "struct_name": "TlbJust<TlbEither<StateInit, Cell<StateInit>>>",
+      "monomorphic_fields_ty_idx": [
+        47
+      ]
+    },
+    {
+      "ty_idx": 67,
+      "struct_name": "TlbEitherLeft<int32>",
+      "monomorphic_fields_ty_idx": [
+        8
+      ]
+    },
+    {
+      "ty_idx": 68,
+      "struct_name": "TlbEitherRight<bool>",
+      "monomorphic_fields_ty_idx": [
+        5
+      ]
+    },
+    {
+      "ty_idx": 71,
+      "struct_name": "TlbEitherLeft<bool>",
+      "monomorphic_fields_ty_idx": [
+        5
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 28,
+      "alias_name": "AliasOrInt8<int16>",
+      "monomorphic_target_ty_idx": 23
+    },
+    {
+      "ty_idx": 32,
+      "alias_name": "MyNullable<Point>",
+      "monomorphic_target_ty_idx": 33
+    },
+    {
+      "ty_idx": 47,
+      "alias_name": "TlbEither<StateInit, Cell<StateInit>>",
+      "monomorphic_target_ty_idx": 53
+    },
+    {
+      "ty_idx": 58,
+      "alias_name": "TlbMaybe<TlbEither<StateInit, Cell<StateInit>>>",
+      "monomorphic_target_ty_idx": 62
+    },
+    {
+      "ty_idx": 66,
+      "alias_name": "TlbEither<int32, bool>",
+      "monomorphic_target_ty_idx": 69
+    },
+    {
+      "ty_idx": 70,
+      "alias_name": "TlbEither<bool, bool>",
+      "monomorphic_target_ty_idx": 72
+    },
+    {
+      "ty_idx": 73,
+      "alias_name": "RawEither<int32, bool>",
+      "monomorphic_target_ty_idx": 74
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "StateInit",
+      "ty_idx": 40,
+      "fields": [
+        {
+          "name": "fixedPrefixLength",
+          "ty_idx": 42
+        },
+        {
+          "name": "special",
+          "ty_idx": 44
+        },
+        {
+          "name": "code",
+          "ty_idx": 45
+        },
+        {
+          "name": "data",
+          "ty_idx": 45
+        },
+        {
+          "name": "library",
+          "ty_idx": 45
+        }
+      ],
+      "description": "`StateInit` is a \"canonical TL/B representation from block.tlb\" of a contract initial state.\nBut for everyday tasks, it's too complicated. It is not used in practice.\nTo represent code+data, consider [ContractState].\nTo represent sharding (fixedPrefixLength, formerly splitDepth), consider [AutoDeployAddress]."
+    },
+    {
+      "kind": "struct",
+      "name": "Point",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 22
+        },
+        {
+          "name": "y",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "MyNullable",
+      "ty_idx": 34,
+      "target_ty_idx": 35,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GenericUnionLabelsStorage",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "dummy",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GenericPair",
+      "ty_idx": 17,
+      "type_params": [
+        "T1",
+        "T2"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 18
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "GenericOrInt8",
+      "ty_idx": 25,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "AliasOrInt8",
+      "ty_idx": 29,
+      "target_ty_idx": 26,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "RawEither",
+      "ty_idx": 75,
+      "target_ty_idx": 76,
+      "type_params": [
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgPair",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 268435457,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgOrInt16",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 268435459,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgAliasInt16",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 268435461,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 28
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TlbIntMsgInfoRelaxed",
+      "ty_idx": 39,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "bounce",
+          "ty_idx": 5
+        },
+        {
+          "name": "dest",
+          "ty_idx": 7
+        },
+        {
+          "name": "value",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TlbMessageRelaxedGeneric",
+      "ty_idx": 38,
+      "fields": [
+        {
+          "name": "info",
+          "ty_idx": 39
+        },
+        {
+          "name": "init",
+          "ty_idx": 58
+        },
+        {
+          "name": "body",
+          "ty_idx": 65
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "TlbEither",
+      "ty_idx": 55,
+      "target_ty_idx": 57,
+      "type_params": [
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TlbEitherLeft",
+      "ty_idx": 50,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 49
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TlbEitherRight",
+      "ty_idx": 52,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 49
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "TlbMaybe",
+      "ty_idx": 63,
+      "target_ty_idx": 64,
+      "type_params": [
+        "X"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TlbNone",
+      "ty_idx": 59,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 1
+      },
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "TlbJust",
+      "ty_idx": 61,
+      "type_params": [
+        "X"
+      ],
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 1
+      },
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 49
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 30
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 19
+    },
+    {
+      "body_ty_idx": 27
+    }
+  ],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 70848,
+      "name": "getPair",
+      "parameters": [],
+      "return_ty_idx": 13
+    },
+    {
+      "tvm_method_id": 121049,
+      "name": "getOrInt16",
+      "parameters": [],
+      "return_ty_idx": 21
+    },
+    {
+      "tvm_method_id": 116893,
+      "name": "getAliasInt16",
+      "parameters": [],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 115672,
+      "name": "idMyNullablePoint",
+      "parameters": [
+        {
+          "name": "p",
+          "ty_idx": 32
+        }
+      ],
+      "return_ty_idx": 37
+    },
+    {
+      "tvm_method_id": 103120,
+      "name": "getRelaxedMessage",
+      "parameters": [],
+      "return_ty_idx": 38
+    },
+    {
+      "tvm_method_id": 85526,
+      "name": "checkRelaxedMessage",
+      "parameters": [
+        {
+          "name": "msg",
+          "ty_idx": 38
+        }
+      ],
+      "return_ty_idx": 1
+    },
+    {
+      "tvm_method_id": 127993,
+      "name": "getEitherInt32Bool",
+      "parameters": [],
+      "return_ty_idx": 66
+    },
+    {
+      "tvm_method_id": 117210,
+      "name": "getEitherBoolBool",
+      "parameters": [],
+      "return_ty_idx": 70
+    },
+    {
+      "tvm_method_id": 70143,
+      "name": "getRawEitherInt32Bool",
+      "parameters": [],
+      "return_ty_idx": 73
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "plain_int",
+      "err_code": 101
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 102
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 103
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBFAEA4AABFP8A9KQT9LzyyAsBAgFiAgMAAtACASAEBQIBIAYHAgEgCgsCAnIICQA3uOFjtfCQLy4GUBggr68IC68uBmxwDy4GeBAwmAAMqf+AFIAuAAqowHqALgBzuS0H+NCGACk8smqufTdbmPpf4D9OgShMBL98KCqM9CnMMTzewgBsSCCvrwgG1tbW1tbW1tgQCBiwiAIBIAwNAgEgDg8AD7Z/MAJwIBBQAgEgEBEADbI2YAMgCyAAKa3sZBDNZ8GR54UDkWeFA8lnwPFkwAIBYhITAAuidgA6ALIAC6Np/gQCDg=="
+}

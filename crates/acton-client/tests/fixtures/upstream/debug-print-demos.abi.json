@@ -1,0 +1,960 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "DebugPrintDemos",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DebugStorage"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        8,
+        13,
+        5,
+        6
+      ]
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        15,
+        15,
+        15
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Point"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Empty"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        17,
+        18
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Nested"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        8
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        22
+      ]
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Color"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Sign"
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        24,
+        24,
+        26
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        29,
+        29,
+        30,
+        30
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ArrayOfInt"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        8,
+        36,
+        17
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "IntOrBool"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 1,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 1,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "intN",
+      "n": 16
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        40
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 1,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 1,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 41,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 129,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        42,
+        42
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PointOrNull"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 17,
+      "stack_type_id": 130,
+      "stack_width": 3
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        44,
+        44
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        44,
+        44
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        49
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 50
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        48,
+        51
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithCells"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 54
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 56
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 58
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 59
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 61
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        62,
+        63
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 63,
+      "stack_type_id": 131,
+      "stack_width": 2
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        65,
+        65
+      ]
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 1
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        68,
+        7
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        17
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        1
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 71,
+      "stack_type_id": 132,
+      "stack_width": 3
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        45,
+        45,
+        72,
+        72
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 15
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        8,
+        17,
+        24,
+        74
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithWeirdUnions"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": []
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        77,
+        17
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 17,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 130,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 78,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 134,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 77,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 133,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 1,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 1,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "nullLiteral"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 77,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 133,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 71,
+          "prefix_num": 3,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 81,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 76,
+      "stack_type_id": 135,
+      "stack_width": 9
+    },
+    {
+      "kind": "bitsN",
+      "n": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        4,
+        84
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "tuple"
+    },
+    {
+      "kind": "unknown"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 87
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 21,
+      "struct_name": "Wrapper<int32>",
+      "monomorphic_fields_ty_idx": [
+        8
+      ]
+    },
+    {
+      "ty_idx": 36,
+      "struct_name": "Wrapper<bool>",
+      "monomorphic_fields_ty_idx": [
+        5
+      ]
+    },
+    {
+      "ty_idx": 50,
+      "struct_name": "Wrapper<int8 | int16>",
+      "monomorphic_fields_ty_idx": [
+        49
+      ]
+    },
+    {
+      "ty_idx": 70,
+      "struct_name": "Wrapper<Point>",
+      "monomorphic_fields_ty_idx": [
+        17
+      ]
+    }
+  ],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "tuple",
+      "ty_idx": 86,
+      "target_ty_idx": 88,
+      "description": "`tuple` represents a TVM tuple. Essentially, it's \"an array of unknown elements\".\nReading an individual element results in `unknown`, cast it to perform some actions:\n```\n// wrong:\nvar elem = someTuple.get(0);    // unknown\nreturn elem + 123;              // error, can not apply `+`\n\n// correct:\nvar elem = someTuple.get(0) as int;\nreturn elem + 123;\n```"
+    },
+    {
+      "kind": "struct",
+      "name": "DebugStorage",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "dummy",
+          "ty_idx": 9
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithWeirdUnions",
+      "ty_idx": 76,
+      "fields": [
+        {
+          "name": "u1",
+          "ty_idx": 79
+        },
+        {
+          "name": "u2",
+          "ty_idx": 80
+        },
+        {
+          "name": "u3",
+          "ty_idx": 82
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Point",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 1,
+          "default_value": {
+            "kind": "int",
+            "v": "10"
+          }
+        },
+        {
+          "name": "y",
+          "ty_idx": 1,
+          "default_value": {
+            "kind": "int",
+            "v": "20"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Wrapper",
+      "ty_idx": 23,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "item",
+          "ty_idx": 22
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Nested",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "p",
+          "ty_idx": 17
+        },
+        {
+          "name": "w",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Empty",
+      "ty_idx": 18,
+      "fields": []
+    },
+    {
+      "kind": "enum",
+      "name": "Color",
+      "ty_idx": 24,
+      "encoded_as_ty_idx": 25,
+      "members": [
+        {
+          "name": "Red",
+          "value": "0"
+        },
+        {
+          "name": "Green",
+          "value": "1"
+        },
+        {
+          "name": "Blue",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "Sign",
+      "ty_idx": 26,
+      "encoded_as_ty_idx": 27,
+      "members": [
+        {
+          "name": "Negative",
+          "value": "-1"
+        },
+        {
+          "name": "Zero",
+          "value": "0"
+        },
+        {
+          "name": "Positive",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithCells",
+      "ty_idx": 53,
+      "fields": [
+        {
+          "name": "r1",
+          "ty_idx": 55
+        },
+        {
+          "name": "r2",
+          "ty_idx": 55
+        },
+        {
+          "name": "r3",
+          "ty_idx": 57
+        },
+        {
+          "name": "r4",
+          "ty_idx": 60
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "IntOrBool",
+      "ty_idx": 38,
+      "target_ty_idx": 39
+    },
+    {
+      "kind": "alias",
+      "name": "PointOrNull",
+      "ty_idx": 44,
+      "target_ty_idx": 45
+    },
+    {
+      "kind": "alias",
+      "name": "ArrayOfInt",
+      "ty_idx": 34,
+      "target_ty_idx": 32
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 12
+  },
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 116416,
+      "name": "primitives",
+      "parameters": [],
+      "return_ty_idx": 14
+    },
+    {
+      "tvm_method_id": 71222,
+      "name": "justStrings",
+      "parameters": [],
+      "return_ty_idx": 16
+    },
+    {
+      "tvm_method_id": 104024,
+      "name": "structures1",
+      "parameters": [],
+      "return_ty_idx": 19
+    },
+    {
+      "tvm_method_id": 108091,
+      "name": "structures2",
+      "parameters": [],
+      "return_ty_idx": 20
+    },
+    {
+      "tvm_method_id": 94812,
+      "name": "enumValues",
+      "parameters": [],
+      "return_ty_idx": 28
+    },
+    {
+      "tvm_method_id": 100718,
+      "name": "nullables1",
+      "parameters": [],
+      "return_ty_idx": 31
+    },
+    {
+      "tvm_method_id": 101925,
+      "name": "arrays1",
+      "parameters": [],
+      "return_ty_idx": 35
+    },
+    {
+      "tvm_method_id": 115563,
+      "name": "shapedTuple1",
+      "parameters": [],
+      "return_ty_idx": 37
+    },
+    {
+      "tvm_method_id": 115521,
+      "name": "union1",
+      "parameters": [],
+      "return_ty_idx": 38
+    },
+    {
+      "tvm_method_id": 127778,
+      "name": "union2",
+      "parameters": [],
+      "return_ty_idx": 43
+    },
+    {
+      "tvm_method_id": 67412,
+      "name": "unionNull",
+      "parameters": [],
+      "return_ty_idx": 46
+    },
+    {
+      "tvm_method_id": 129306,
+      "name": "unionNullInShape",
+      "parameters": [],
+      "return_ty_idx": 47
+    },
+    {
+      "tvm_method_id": 85708,
+      "name": "cellRefs",
+      "parameters": [],
+      "return_ty_idx": 52
+    },
+    {
+      "tvm_method_id": 114528,
+      "name": "cellOfCells",
+      "parameters": [],
+      "return_ty_idx": 53
+    },
+    {
+      "tvm_method_id": 101026,
+      "name": "maps",
+      "parameters": [],
+      "return_ty_idx": 64
+    },
+    {
+      "tvm_method_id": 113336,
+      "name": "nullableMaps",
+      "parameters": [],
+      "return_ty_idx": 66
+    },
+    {
+      "tvm_method_id": 119722,
+      "name": "lispList1",
+      "parameters": [],
+      "return_ty_idx": 67
+    },
+    {
+      "tvm_method_id": 108476,
+      "name": "address1",
+      "parameters": [],
+      "return_ty_idx": 7
+    },
+    {
+      "tvm_method_id": 71677,
+      "name": "addressOpt",
+      "parameters": [],
+      "return_ty_idx": 69
+    },
+    {
+      "tvm_method_id": 75772,
+      "name": "wrapperPoint",
+      "parameters": [],
+      "return_ty_idx": 70
+    },
+    {
+      "tvm_method_id": 127826,
+      "name": "voidReturn",
+      "parameters": [],
+      "return_ty_idx": 0
+    },
+    {
+      "tvm_method_id": 66614,
+      "name": "wideNullables",
+      "parameters": [],
+      "return_ty_idx": 73
+    },
+    {
+      "tvm_method_id": 83428,
+      "name": "combo1",
+      "parameters": [],
+      "return_ty_idx": 75
+    },
+    {
+      "tvm_method_id": 105102,
+      "name": "weirdUnion1",
+      "parameters": [],
+      "return_ty_idx": 76
+    },
+    {
+      "tvm_method_id": 109293,
+      "name": "weirdUnion2",
+      "parameters": [],
+      "return_ty_idx": 83
+    },
+    {
+      "tvm_method_id": 123614,
+      "name": "rawCell",
+      "parameters": [],
+      "return_ty_idx": 3
+    },
+    {
+      "tvm_method_id": 115908,
+      "name": "rawSlices",
+      "parameters": [],
+      "return_ty_idx": 85
+    },
+    {
+      "tvm_method_id": 99739,
+      "name": "unknowns",
+      "parameters": [],
+      "return_ty_idx": 86
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgECPwEAAsAAART/APSkE/S88sgLAQIBYgIDAAzQMPiR8kACASAEBQIBIAYHAgEgFxgCASAICQIBIBITAgEgCgsACbT/j+4wAgFmDA0CAnMODwA3pGzm6NqmQtsCAQTa4QIBCNpEILIgsCCOIGwgRwAVpqju8NsCAQQC2uEDCaDaIiIiEDoRABOj9bYIBp7ztQ9iAApoZWxsbwAKaW50MzICAUgUFQALtkuODk/wAR2u8kCBhMBOQIBkOMQ3gMAWABuvZmRnwhFk5GfFAArkwAAIdGVzdAIBIBkaAgEgLi8CASAbHAIBICYnAgEgHR4CASAkJQEhrs24xEWTCxQ9QAo3gTa3gsAfAgEgICEABmFiYQIBICIjACyqJXFyc28DeoAUbwKAHoAobwJvAm8AAA2m3NsAVNr/AFulRNrjAMmQQtzYJSWfAy2fJAAAAZPEBPHohOTbkELdJmOfAymfB5Q/xATx6ITbAA2vLEB7QApAAB+tRz1ACkCAQTbAgEK2tpFAAgEgKCkCAVgsLQIBbiorACGtdr1AI0CAQzm4tra4QIBDwAALoO3V2gGOAEui8jQhgApPLJqrn03W5j6X+A/ToEoTAS/fCgqjPQpzDE83sIAbEgASqrhtbYEAgwFwAICrYMjPkAAAABbJbcjPg8nIzMmLAsjOyY0IYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMjOyW8CAgEgMDECASA4OQIBSDIzAB2w6p6gBSAHm1vAm8CbwKACA3tgNDUCASA2NwAJqGAKnGAAE6renBxcm8CbwOAAI6WJkRaMLExskZGdk54pFkwsUQAZpYEAVQgO/wQgdzWUAQEHsLeiIDoCASA7PAAAAgN5oD0+ADmsjTu8N4E2t4ABN5EIEcCAQTeBt8YAtrg3gbfGQAAZtE/vEAINoG5LUCAQMAADslA="
+}

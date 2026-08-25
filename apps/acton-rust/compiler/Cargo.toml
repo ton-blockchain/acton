@@ -1,0 +1,23 @@
+[package]
+name = "acton-rust-compiler"
+description = "Minimal Rust DSL to Tolk compiler prototype"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+syn.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "acton-rustc"
+path = "src/main.rs"

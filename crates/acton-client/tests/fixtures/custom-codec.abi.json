@@ -1,0 +1,45 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "CustomCodec",
+  "unique_types": [
+    { "kind": "void" },
+    { "kind": "int" },
+    { "kind": "slice" },
+    { "kind": "cell" },
+    { "kind": "builder" },
+    { "kind": "bool" },
+    { "kind": "coins" },
+    { "kind": "address" },
+    { "kind": "intN", "n": 32 },
+    { "kind": "uintN", "n": 32 },
+    { "kind": "intN", "n": 64 },
+    { "kind": "uintN", "n": 64 },
+    { "kind": "StructRef", "struct_name": "CustomPoint" }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "CustomPoint",
+      "ty_idx": 12,
+      "fields": [
+        { "name": "x", "ty_idx": 8 },
+        { "name": "y", "ty_idx": 8 }
+      ],
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

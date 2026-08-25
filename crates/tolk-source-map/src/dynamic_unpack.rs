@@ -458,7 +458,37 @@ fn unpack_union<S: UnpackSchema + ?Sized>(
     u_label_ty_idx: Option<TyIdx>,
 ) -> anyhow::Result<UnpackedValue> {
     let variants = resolve_union_variants(symbols, variants, u_label_ty_idx)?;
-    for variant in variants {
+    let has_void = variants
+        .last()
+        .is_some_and(|variant| matches!(symbols.ty_by_idx(variant.variant_ty_idx), Some(Ty::Void)));
+    let wrap_value = |variant: &ResolvedUnionVariant, value| {
+        if variant.has_value_field {
+            UnpackedValue::Object {
+                name: variant.label.clone(),
+                fields: vec![("value".to_owned(), value)],
+            }
+        } else {
+            value
+        }
+    };
+
+    if has_void && variants.len() == 2 {
+        if data.size_bits() == 0 && data.size_refs() == 0 {
+            return Ok(wrap_value(&variants[1], UnpackedValue::Void));
+        }
+        let variant = &variants[0];
+        if variant.prefix_eat_in_place {
+            data.skip_first(
+                u16::try_from(variant.prefix_len).context("union prefix length exceeds u16")?,
+                0,
+            )?;
+        }
+        let value = unpack_type(data, symbols, variant.variant_ty_idx, None)?;
+        return Ok(wrap_value(variant, value));
+    }
+
+    let dispatch_len = variants.len() - usize::from(has_void);
+    for variant in variants.iter().take(dispatch_len) {
         if !matches_prefix(data, variant.prefix_num, variant.prefix_len)? {
             continue;
         }
@@ -471,14 +501,14 @@ fn unpack_union<S: UnpackSchema + ?Sized>(
         }
 
         let value = unpack_type(data, symbols, variant.variant_ty_idx, None)?;
-        if !variant.has_value_field {
-            return Ok(value);
-        }
+        return Ok(wrap_value(variant, value));
+    }
 
-        return Ok(UnpackedValue::Object {
-            name: variant.label,
-            fields: vec![("value".to_owned(), value)],
-        });
+    if has_void && data.size_bits() == 0 && data.size_refs() == 0 {
+        return Ok(wrap_value(
+            variants.last().expect("void variant exists"),
+            UnpackedValue::Void,
+        ));
     }
 
     anyhow::bail!("none of union prefixes matched")
@@ -836,7 +866,8 @@ fn union_label_simple<S: UnpackSchema + ?Sized>(
             format!("{}?", union_label_simple(symbols, *inner_ty_idx)?)
         }
         Ty::CellOf { .. } => "Cell".to_owned(),
-        Ty::Tensor { .. } | Ty::ShapedTuple { .. } => "tensor".to_owned(),
+        Ty::Tensor { .. } => "tensor".to_owned(),
+        Ty::ShapedTuple { .. } => "shaped".to_owned(),
         Ty::MapKV { .. } => "map".to_owned(),
         Ty::EnumRef { enum_name } => enum_name.clone(),
         Ty::StructRef { struct_name, .. } => struct_name.clone(),
@@ -895,6 +926,7 @@ mod tests {
     fn empty_abi() -> ContractABI {
         ContractABI {
             abi_schema_version: "1".to_owned(),
+            code_boc64: String::new(),
             contract_name: "Test".to_owned(),
             author: String::new(),
             version: String::new(),
@@ -1283,6 +1315,80 @@ mod tests {
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
         assert!(matches!(fields[0].1, UnpackedValue::Number(_)));
+    }
+
+    #[test]
+    fn decodes_int32_or_void_like_upstream() {
+        let mut abi = empty_abi();
+        let int32_ty_idx = add_ty(&mut abi, Ty::IntN { n: 32 });
+        let void_ty_idx = add_ty(&mut abi, Ty::Void);
+        let union_ty_idx = add_ty(
+            &mut abi,
+            Ty::Union {
+                variants: vec![
+                    UnionVariant {
+                        variant_ty_idx: int32_ty_idx,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: Some(true),
+                        stack_type_id: None,
+                        stack_width: None,
+                    },
+                    UnionVariant {
+                        variant_ty_idx: void_ty_idx,
+                        prefix_num: 0,
+                        prefix_len: 0,
+                        is_prefix_implicit: Some(true),
+                        stack_type_id: None,
+                        stack_width: None,
+                    },
+                ],
+                stack_width: None,
+            },
+        );
+
+        let mut builder = CellBuilder::new();
+        builder.store_uint(u64::from(i32::MAX as u32), 32).unwrap();
+        let int_cell = builder.build().unwrap();
+        let mut int_slice = int_cell.as_slice_allow_exotic();
+        let int_value = unpack_from_slice(&mut int_slice, &abi, union_ty_idx).unwrap();
+
+        let empty_cell = CellBuilder::new().build().unwrap();
+        let mut empty_slice = empty_cell.as_slice_allow_exotic();
+        let void_value = unpack_from_slice(&mut empty_slice, &abi, union_ty_idx).unwrap();
+
+        expect![[r#"
+            (
+                Object {
+                    name: "int32",
+                    fields: [
+                        (
+                            "value",
+                            Number(
+                                2147483647,
+                            ),
+                        ),
+                    ],
+                },
+                Object {
+                    name: "void",
+                    fields: [
+                        (
+                            "value",
+                            Void,
+                        ),
+                    ],
+                },
+                0,
+                0,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            int_value,
+            void_value,
+            int_slice.size_bits(),
+            empty_slice.size_bits(),
+        ));
     }
 
     #[test]

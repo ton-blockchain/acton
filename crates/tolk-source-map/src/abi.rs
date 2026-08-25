@@ -222,6 +222,9 @@ pub struct ABIThrownError {
 pub struct ContractABI {
     pub abi_schema_version: String,
 
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub code_boc64: String,
+
     pub contract_name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub author: String,
@@ -897,6 +900,7 @@ mod tests {
     fn empty_abi() -> ContractABI {
         ContractABI {
             abi_schema_version: "1.0".to_owned(),
+            code_boc64: String::new(),
             contract_name: "Test".to_owned(),
             author: String::new(),
             version: String::new(),

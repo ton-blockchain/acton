@@ -1,0 +1,117 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "TrailingVoid",
+  "unique_types": [
+    { "kind": "void" },
+    { "kind": "intN", "n": 32 },
+    { "kind": "intN", "n": 8 },
+    { "kind": "intN", "n": 16 },
+    { "kind": "StructRef", "struct_name": "PrefixedSome" },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 4, "prefix_num": 1, "prefix_len": 8 },
+        { "variant_ty_idx": 0, "prefix_num": 0, "prefix_len": 0 }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "AliasRef", "alias_name": "PrefixedOrVoid" },
+    { "kind": "StructRef", "struct_name": "PlainSome" },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 7, "prefix_num": 0, "prefix_len": 0, "is_prefix_implicit": true },
+        { "variant_ty_idx": 0, "prefix_num": 0, "prefix_len": 0, "is_prefix_implicit": true }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "AliasRef", "alias_name": "PlainOrVoid" },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 1, "prefix_num": 0, "prefix_len": 0, "is_prefix_implicit": true },
+        { "variant_ty_idx": 0, "prefix_num": 0, "prefix_len": 0, "is_prefix_implicit": true }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "AliasRef", "alias_name": "Int32OrVoid" },
+    { "kind": "StructRef", "struct_name": "ThreeP1" },
+    { "kind": "StructRef", "struct_name": "ThreeP2" },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 12, "prefix_num": 0, "prefix_len": 2 },
+        { "variant_ty_idx": 13, "prefix_num": 1, "prefix_len": 2 },
+        { "variant_ty_idx": 0, "prefix_num": 0, "prefix_len": 0 }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "AliasRef", "alias_name": "ThreeWayWithVoid" },
+    { "kind": "StructRef", "struct_name": "InsideStructWithVoid" },
+    { "kind": "nullLiteral" },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 1, "prefix_num": 1, "prefix_len": 1, "is_prefix_implicit": true },
+        { "variant_ty_idx": 17, "prefix_num": 0, "prefix_len": 1, "is_prefix_implicit": true },
+        { "variant_ty_idx": 0, "prefix_num": 0, "prefix_len": 0, "is_prefix_implicit": true }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "AliasRef", "alias_name": "Int32OrNullOrVoid" }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "PrefixedSome",
+      "ty_idx": 4,
+      "prefix": { "prefix_num": 1, "prefix_len": 8 },
+      "fields": [{ "name": "x", "ty_idx": 1 }]
+    },
+    { "kind": "alias", "name": "PrefixedOrVoid", "ty_idx": 6, "target_ty_idx": 5 },
+    {
+      "kind": "struct",
+      "name": "PlainSome",
+      "ty_idx": 7,
+      "fields": [{ "name": "x", "ty_idx": 1 }]
+    },
+    { "kind": "alias", "name": "PlainOrVoid", "ty_idx": 9, "target_ty_idx": 8 },
+    { "kind": "alias", "name": "Int32OrVoid", "ty_idx": 11, "target_ty_idx": 10 },
+    {
+      "kind": "struct",
+      "name": "ThreeP1",
+      "ty_idx": 12,
+      "prefix": { "prefix_num": 0, "prefix_len": 2 },
+      "fields": [{ "name": "v", "ty_idx": 2 }]
+    },
+    {
+      "kind": "struct",
+      "name": "ThreeP2",
+      "ty_idx": 13,
+      "prefix": { "prefix_num": 1, "prefix_len": 2 },
+      "fields": [{ "name": "v", "ty_idx": 3 }]
+    },
+    { "kind": "alias", "name": "ThreeWayWithVoid", "ty_idx": 15, "target_ty_idx": 14 },
+    {
+      "kind": "struct",
+      "name": "InsideStructWithVoid",
+      "ty_idx": 16,
+      "fields": [
+        { "name": "a", "ty_idx": 2 },
+        { "name": "tail", "ty_idx": 6 }
+      ]
+    },
+    { "kind": "alias", "name": "Int32OrNullOrVoid", "ty_idx": 19, "target_ty_idx": 18 }
+  ],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

@@ -1,0 +1,76 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "Err",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "callable"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        12
+      ]
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 80080,
+      "name": "returningContinuation",
+      "parameters": [],
+      "return_ty_idx": 13
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBBAEAHwABFP8A9KQT9LzyyAsBAgFiAgMAAtAAD6BxoOMWEdo9"
+}

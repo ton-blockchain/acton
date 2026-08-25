@@ -1,0 +1,16 @@
+[package]
+name = "acton-lang"
+description = "Rust types for the Acton TON contract DSL"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+acton-lang-macros.workspace = true
+
+[lints]
+workspace = true

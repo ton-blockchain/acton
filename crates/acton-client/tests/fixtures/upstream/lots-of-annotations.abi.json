@@ -1,0 +1,334 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "LotsOfAnnotations",
+  "author": "A K",
+  "version": "1.0",
+  "description": "some d",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Msg1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResetTo",
+      "type_args_ty_idx": [
+        8
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ResetTo",
+      "type_args_ty_idx": [
+        14
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Transfer"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ActualExternalShape"
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MyStorage"
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Out2"
+    },
+    {
+      "kind": "intN",
+      "n": 16
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        21,
+        23
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Out3",
+      "type_args_ty_idx": [
+        24
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "PayloadT"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Out3",
+      "type_args_ty_idx": [
+        26
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "OutExt4"
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 13,
+      "struct_name": "ResetTo<int32>",
+      "monomorphic_fields_ty_idx": [
+        8,
+        8
+      ]
+    },
+    {
+      "ty_idx": 25,
+      "struct_name": "Out3<(int8, int16)>",
+      "monomorphic_fields_ty_idx": [
+        24
+      ]
+    }
+  ],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Msg1",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 305419896,
+        "prefix_len": 32
+      },
+      "fields": [],
+      "description": "mmm1\nmmm2"
+    },
+    {
+      "kind": "struct",
+      "name": "ResetTo",
+      "ty_idx": 15,
+      "type_params": [
+        "T"
+      ],
+      "prefix": {
+        "prefix_num": 591751049,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "counter_id",
+          "ty_idx": 8
+        },
+        {
+          "name": "reset_to",
+          "ty_idx": 14
+        }
+      ],
+      "description": "mmmReset"
+    },
+    {
+      "kind": "struct",
+      "name": "Transfer",
+      "ty_idx": 16,
+      "prefix": {
+        "prefix_num": 878082202,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "owner",
+          "ty_idx": 7
+        },
+        {
+          "name": "forwardPayload",
+          "ty_idx": 17,
+          "description": "actually it's not a slice"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Out2",
+      "ty_idx": 22,
+      "fields": [
+        {
+          "name": "v2",
+          "ty_idx": 21
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Out3",
+      "ty_idx": 27,
+      "type_params": [
+        "PayloadT"
+      ],
+      "fields": [
+        {
+          "name": "payload",
+          "ty_idx": 26
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "OutExt4",
+      "ty_idx": 28,
+      "fields": [
+        {
+          "name": "v4",
+          "ty_idx": 21
+        }
+      ],
+      "description": "mmmOut4"
+    },
+    {
+      "kind": "struct",
+      "name": "MyStorage",
+      "ty_idx": 20,
+      "fields": [
+        {
+          "name": "collectionAddress",
+          "ty_idx": 7
+        },
+        {
+          "name": "content",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ActualExternalShape",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "v",
+          "ty_idx": 8
+        },
+        {
+          "name": "sign",
+          "ty_idx": 19
+        }
+      ],
+      "description": "mmmShape"
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 20
+  },
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 13
+    },
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 21
+    },
+    {
+      "body_ty_idx": 16
+    },
+    {
+      "body_ty_idx": 22
+    },
+    {
+      "body_ty_idx": 25
+    }
+  ],
+  "emitted_events": [
+    {
+      "body_ty_idx": 28
+    }
+  ],
+  "get_methods": [
+    {
+      "tvm_method_id": 90137,
+      "name": "getFirst",
+      "parameters": [
+        {
+          "name": "spec",
+          "ty_idx": 1,
+          "description": "some number",
+          "default_value": {
+            "kind": "int",
+            "v": "50"
+          }
+        }
+      ],
+      "return_ty_idx": 1,
+      "description": "get1"
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBBgEATQABFP8A9KQT9LzyyAsBAgEgAgMCAUgEBQAE8jAAUtAw+JHyQPiVIMAAkTDgIMAKkTDgIMAUkTDgIMAekTDgIMAokTDgwDLcAAmgwDJg4w=="
+}

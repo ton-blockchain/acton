@@ -1,0 +1,5011 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "LotsOfWrappers",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JustUint5"
+    },
+    {
+      "kind": "uintN",
+      "n": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JustInt32"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JustMaybeInt32"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TwoInts32AndCoins"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TwoInts32And64"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TwoInts32AndRef64"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 11
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TwoInts32AndMaybe64"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 11
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "JustAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TwoInts32And64SepByAddress"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndEitherInt8Or256"
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "intN",
+      "n": 256
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 28,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 52,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndEither32OrRef64"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Inner2"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 31
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 32,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 129,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Inner1"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 34
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 35
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndEither8OrMaybe256"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Either",
+      "type_args_ty_idx": [
+        27,
+        38
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherLeft",
+      "type_args_ty_idx": [
+        27
+      ]
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherLeft",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherRight",
+      "type_args_ty_idx": [
+        38
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherRight",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 40,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 130,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 43,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 131,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "L"
+    },
+    {
+      "kind": "genericT",
+      "name_t": "R"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Either",
+      "type_args_ty_idx": [
+        46,
+        47
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherLeft",
+      "type_args_ty_idx": [
+        46
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherRight",
+      "type_args_ty_idx": [
+        47
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 49,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 50,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndMaybeMaybe8"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        27
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeNothing"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        27
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 55,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 133,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 56,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        53
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        53
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 61,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 134,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SomeBytesFields"
+    },
+    {
+      "kind": "bitsN",
+      "n": 8
+    },
+    {
+      "kind": "bitsN",
+      "n": 3
+    },
+    {
+      "kind": "bitsN",
+      "n": 20
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 66
+    },
+    {
+      "kind": "bitsN",
+      "n": 100
+    },
+    {
+      "kind": "bitsN",
+      "n": 200
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 68,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 135,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 69,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 136,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndRestInlineCell"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndRestRefCell"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "IntAndRestEitherCellOrRefCell"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 72,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 4,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 3,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 3,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DifferentMaybeRefs"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "dict"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 79
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DifferentIntsWithMaybe"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 14
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 15,
+      "stack_type_id": 137,
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DifferentMix1"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DifferentMix2"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 30
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "DifferentMix3"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 17
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 89,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 138,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 79,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 139,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 17,
+      "stack_type_id": 140,
+      "stack_width": 3
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        8,
+        10
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 92,
+      "stack_type_id": 141,
+      "stack_width": 3
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithVariadicInts"
+    },
+    {
+      "kind": "varuintN",
+      "n": 16
+    },
+    {
+      "kind": "varintN",
+      "n": 16
+    },
+    {
+      "kind": "varuintN",
+      "n": 32
+    },
+    {
+      "kind": "varintN",
+      "n": 32
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EdgeCaseInts"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "intN",
+      "n": 257
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WriteWithBuilder"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WriteWithSlice"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWrittenWithBuilder"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": []
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWriteRest",
+      "type_args_ty_idx": [
+        105
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWriteRest",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Tail224"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 109
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 23
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWriteMid",
+      "type_args_ty_idx": [
+        105
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWriteMid",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithTwoRestFields"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMoreTrickyCells"
+    },
+    {
+      "kind": "intN",
+      "n": 16
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 55,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 133,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 116,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MoreTrickyCells",
+      "type_args_ty_idx": [
+        18,
+        117
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 119
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 121
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 18
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 123
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 117
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 125,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 142,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T3"
+    },
+    {
+      "kind": "genericT",
+      "name_t": "T4"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MoreTrickyCells",
+      "type_args_ty_idx": [
+        127,
+        128
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 127
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 130
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 128
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 132,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        },
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true
+        }
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMoreTrickyAddresses1"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyInt32"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 136,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MaybeJustOfAddress"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 18,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 143,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 138,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 144,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 135
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 141
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 121,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 145,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMoreTrickyAddresses2"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        7
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 139,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 144,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        135
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        135
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 148,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 146,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "nullLiteral"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 3,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 150,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 7
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 152,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 147,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithAnyAddress"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 25,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 9,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 25,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 9,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Maybe",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MaybeJust",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 54,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 132,
+          "stack_width": 0
+        },
+        {
+          "variant_ty_idx": 159,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 148,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 155
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 161
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgSinglePrefix32"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgSinglePrefix48"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 6,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 17,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 11,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 49,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "CounterIncrementAlias"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CounterIncrement"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "MsgTransfer"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TransferParams"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferParams1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "TransferParams2"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 6
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        8,
+        172,
+        11
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 170,
+          "prefix_num": 1940,
+          "prefix_len": 12,
+          "stack_type_id": 149,
+          "stack_width": 3
+        },
+        {
+          "variant_ty_idx": 171,
+          "prefix_num": 9,
+          "prefix_len": 4,
+          "stack_type_id": 150,
+          "stack_width": 4
+        }
+      ],
+      "stack_width": 5
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 169
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Either",
+      "type_args_ty_idx": [
+        169,
+        176
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherLeft",
+      "type_args_ty_idx": [
+        169
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EitherRight",
+      "type_args_ty_idx": [
+        176
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 178,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 151,
+          "stack_width": 5
+        },
+        {
+          "variant_ty_idx": 179,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 152,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 6
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ReadRest_Remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ReadWriteRest",
+      "type_args_ty_idx": [
+        72
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "AddressAlias"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MsgCounter1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CounterDecrement"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CounterReset0"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CounterResetTo"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 166,
+          "prefix_num": 305419896,
+          "prefix_len": 32,
+          "stack_type_id": 153,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 185,
+          "prefix_num": 591751049,
+          "prefix_len": 32,
+          "stack_type_id": 154,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 186,
+          "prefix_num": 878082192,
+          "prefix_len": 32,
+          "stack_type_id": 155,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 187,
+          "prefix_num": 1590016,
+          "prefix_len": 32,
+          "stack_type_id": 156,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "BodyPayload"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BodyPayload1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "BodyPayload2"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 190,
+          "prefix_num": 1,
+          "prefix_len": 3,
+          "stack_type_id": 157,
+          "stack_width": 3
+        },
+        {
+          "variant_ty_idx": 191,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "stack_type_id": 158,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 4
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MsgExternal1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SayHiAndGoodbye"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "SayStoreInChain"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 189
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 194,
+          "prefix_num": 137,
+          "prefix_len": 8,
+          "stack_type_id": 159,
+          "stack_width": 5
+        },
+        {
+          "variant_ty_idx": 195,
+          "prefix_num": 19,
+          "prefix_len": 16,
+          "stack_type_id": 160,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 6
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Union_8_16_32"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 116,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Union_8_16_32_n"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 4,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 116,
+          "prefix_num": 5,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 6,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 150,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithEnums"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EStoredAsInt8"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EStoredAsUint1"
+    },
+    {
+      "kind": "uintN",
+      "n": 1
+    },
+    {
+      "kind": "uintN",
+      "n": 7
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Point"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Test4_8"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Test4_16"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Test4_32"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StorWithStr"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TelegramString"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PointWithCustomInt"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Custom8"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMyBorder"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyBorderedInt"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithFakeWriter"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyCustomNothing"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithEnumsUnion"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EFits8Bits"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EStartFromM2"
+    },
+    {
+      "kind": "intN",
+      "n": 3
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 221,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 161,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 222,
+          "prefix_num": 3,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 162,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 150,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "UnionStructs_8_16_32"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 209,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 163,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 210,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 164,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "UnionStructs_8_16_32_n"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 208,
+          "prefix_num": 4,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 165,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 116,
+          "prefix_num": 5,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 6,
+          "prefix_len": 3,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 150,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "U105"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "U106"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 27,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 116,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 44,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 3,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Tensor3Skipping1"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        215,
+        215,
+        215
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "TwoRoles"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Role"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        236,
+        236
+      ]
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Color"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EFits2Bits"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EStartFrom1"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EMinMax"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "E0Max"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "EncodedVari"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "ECollisionNames"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMaps0"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 116,
+      "value_ty_idx": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        27
+      ]
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 116,
+      "value_ty_idx": 248
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 250,
+      "value_ty_idx": 25
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 7,
+      "value_ty_idx": 72
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithNullableMaps"
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 8,
+      "value_ty_idx": 10
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 254,
+      "stack_type_id": 166,
+      "stack_width": 2
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 254,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 166,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 27
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 116,
+      "value_ty_idx": 116
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 8,
+      "value_ty_idx": 8
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 257,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 167,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 258,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 168,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 259,
+          "prefix_num": 2,
+          "prefix_len": 2,
+          "is_prefix_implicit": true,
+          "stack_type_id": 169,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithMoreTrickyTypes"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        116
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        116,
+        8
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 262,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 170,
+          "stack_width": 2
+        },
+        {
+          "variant_ty_idx": 263,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 171,
+          "stack_width": 3
+        }
+      ],
+      "stack_width": 4
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        27
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 265
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        25
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 25,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 9,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 268,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 172,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 269
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 166,
+      "stack_type_id": 153,
+      "stack_width": 3
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 250,
+      "value_ty_idx": 14
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 27,
+      "value_ty_idx": 272
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Wrapper",
+      "type_args_ty_idx": [
+        116
+      ]
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 265,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 173,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 274,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 174,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithRef"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 152
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ArrayAlias",
+      "type_args_ty_idx": [
+        105
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 105
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ArrayAlias",
+      "type_args_ty_idx": [
+        41
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 41
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithArrays"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 284
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 72
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithArrays2"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 283
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithArrays4"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 207
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 276
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 292
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 293
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "LotsOfCoins"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "EmptyE"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ArrayOfLotsCoins"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 295
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "EmptyShape"
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": []
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "MyShape1"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 301
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 303
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        16,
+        207,
+        300,
+        297,
+        304,
+        27
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Recurrent"
+    },
+    {
+      "kind": "intN",
+      "n": 4
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 306
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 308
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        307,
+        309
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithLispLists1"
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 27
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 207
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithLispLists2"
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 28
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CustomPoint"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "CustomPointAlias"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithStrings1"
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 320
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithStrings2"
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 320
+    },
+    {
+      "kind": "cellOf",
+      "inner_ty_idx": 321
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 324
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 320
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "invalid-js-naming%"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable1"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        1
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable3"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "tuple"
+    },
+    {
+      "kind": "unknown"
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 332
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable5"
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        27,
+        4
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable6"
+    },
+    {
+      "kind": "callable"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable7"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotPackable8"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "NotUnpackable1"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        4
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        341
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithNotPackable"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "NotPackable3Alias"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "NotPackable4Alias"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        27,
+        116,
+        1
+      ]
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "OnlyWithPack"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "OnlyWithUnpack"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "HasOnlyWithUnpack"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PrefixedOrVoid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PrefixedSome"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 351,
+          "prefix_num": 1,
+          "prefix_len": 8,
+          "stack_type_id": 175,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 0,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "stack_type_id": 10,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "PlainOrVoid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "PlainSome"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 354,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "is_prefix_implicit": true,
+          "stack_type_id": 176,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 0,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "is_prefix_implicit": true,
+          "stack_type_id": 10,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Int32OrVoid"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 0,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "is_prefix_implicit": true,
+          "stack_type_id": 10,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "ThreeWayWithVoid"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ThreeP1"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "ThreeP2"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 359,
+          "prefix_num": 0,
+          "prefix_len": 2,
+          "stack_type_id": 177,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 360,
+          "prefix_num": 1,
+          "prefix_len": 2,
+          "stack_type_id": 178,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 0,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "stack_type_id": 10,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "InsideStructWithVoid"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "Int32OrNullOrVoid"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 150,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 0,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 0,
+          "prefix_num": 0,
+          "prefix_len": 0,
+          "is_prefix_implicit": true,
+          "stack_type_id": 10,
+          "stack_width": 0
+        }
+      ],
+      "stack_width": 2
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 40,
+      "struct_name": "EitherLeft<int8>",
+      "monomorphic_fields_ty_idx": [
+        27
+      ]
+    },
+    {
+      "ty_idx": 43,
+      "struct_name": "EitherRight<int256?>",
+      "monomorphic_fields_ty_idx": [
+        38
+      ]
+    },
+    {
+      "ty_idx": 55,
+      "struct_name": "MaybeJust<int8>",
+      "monomorphic_fields_ty_idx": [
+        27
+      ]
+    },
+    {
+      "ty_idx": 61,
+      "struct_name": "MaybeJust<Maybe<int8>>",
+      "monomorphic_fields_ty_idx": [
+        53
+      ]
+    },
+    {
+      "ty_idx": 106,
+      "struct_name": "ReadWriteRest<()>",
+      "monomorphic_fields_ty_idx": [
+        8,
+        6,
+        105
+      ]
+    },
+    {
+      "ty_idx": 112,
+      "struct_name": "ReadWriteMid<()>",
+      "monomorphic_fields_ty_idx": [
+        8,
+        105,
+        6
+      ]
+    },
+    {
+      "ty_idx": 118,
+      "struct_name": "MoreTrickyCells<TwoInts32And64, MaybeJust<int8> | int16 | MaybeNothing>",
+      "monomorphic_fields_ty_idx": [
+        120,
+        122,
+        124,
+        126
+      ]
+    },
+    {
+      "ty_idx": 139,
+      "struct_name": "MaybeJust<address>",
+      "monomorphic_fields_ty_idx": [
+        7
+      ]
+    },
+    {
+      "ty_idx": 148,
+      "struct_name": "MaybeJust<address?>",
+      "monomorphic_fields_ty_idx": [
+        135
+      ]
+    },
+    {
+      "ty_idx": 159,
+      "struct_name": "MaybeJust<any_address>",
+      "monomorphic_fields_ty_idx": [
+        25
+      ]
+    },
+    {
+      "ty_idx": 178,
+      "struct_name": "EitherLeft<TransferParams>",
+      "monomorphic_fields_ty_idx": [
+        169
+      ]
+    },
+    {
+      "ty_idx": 179,
+      "struct_name": "EitherRight<Cell<TransferParams>>",
+      "monomorphic_fields_ty_idx": [
+        176
+      ]
+    },
+    {
+      "ty_idx": 182,
+      "struct_name": "ReadWriteRest<RemainingBitsAndRefs>",
+      "monomorphic_fields_ty_idx": [
+        8,
+        6,
+        72
+      ]
+    },
+    {
+      "ty_idx": 265,
+      "struct_name": "Wrapper<int8>",
+      "monomorphic_fields_ty_idx": [
+        27
+      ]
+    },
+    {
+      "ty_idx": 268,
+      "struct_name": "Wrapper<any_address>",
+      "monomorphic_fields_ty_idx": [
+        25
+      ]
+    },
+    {
+      "ty_idx": 274,
+      "struct_name": "Wrapper<int16>",
+      "monomorphic_fields_ty_idx": [
+        116
+      ]
+    }
+  ],
+  "alias_instantiations": [
+    {
+      "ty_idx": 39,
+      "alias_name": "Either<int8, int256?>",
+      "monomorphic_target_ty_idx": 45
+    },
+    {
+      "ty_idx": 53,
+      "alias_name": "Maybe<int8>",
+      "monomorphic_target_ty_idx": 57
+    },
+    {
+      "ty_idx": 60,
+      "alias_name": "Maybe<Maybe<int8>>",
+      "monomorphic_target_ty_idx": 62
+    },
+    {
+      "ty_idx": 145,
+      "alias_name": "Maybe<address>",
+      "monomorphic_target_ty_idx": 146
+    },
+    {
+      "ty_idx": 147,
+      "alias_name": "Maybe<address?>",
+      "monomorphic_target_ty_idx": 149
+    },
+    {
+      "ty_idx": 158,
+      "alias_name": "Maybe<any_address>",
+      "monomorphic_target_ty_idx": 160
+    },
+    {
+      "ty_idx": 177,
+      "alias_name": "Either<TransferParams, Cell<TransferParams>>",
+      "monomorphic_target_ty_idx": 180
+    },
+    {
+      "ty_idx": 278,
+      "alias_name": "ArrayAlias<()>",
+      "monomorphic_target_ty_idx": 279
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "alias",
+      "name": "tuple",
+      "ty_idx": 331,
+      "target_ty_idx": 333,
+      "description": "`tuple` represents a TVM tuple. Essentially, it's \"an array of unknown elements\".\nReading an individual element results in `unknown`, cast it to perform some actions:\n```\n// wrong:\nvar elem = someTuple.get(0);    // unknown\nreturn elem + 123;              // error, can not apply `+`\n\n// correct:\nvar elem = someTuple.get(0) as int;\nreturn elem + 123;\n```"
+    },
+    {
+      "kind": "alias",
+      "name": "dict",
+      "ty_idx": 78,
+      "target_ty_idx": 77,
+      "description": "Think of it as \"a map with unknown keys and unknown values\".\nPrefer using `map<K, V>`, not `dict`."
+    },
+    {
+      "kind": "struct",
+      "name": "JustUint5",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 13
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JustInt32",
+      "ty_idx": 14,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JustMaybeInt32",
+      "ty_idx": 15,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 16,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TwoInts32AndCoins",
+      "ty_idx": 17,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "1000000000"
+            },
+            "cast_to_ty_idx": 6
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TwoInts32And64",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "query_id",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TwoInts32AndRef64",
+      "ty_idx": 19,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "query_id_ref",
+          "ty_idx": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TwoInts32AndMaybe64",
+      "ty_idx": 21,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "query_id",
+          "ty_idx": 22
+        },
+        {
+          "name": "demo_bool_field",
+          "ty_idx": 5
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "JustAddress",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "addr",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TwoInts32And64SepByAddress",
+      "ty_idx": 24,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "addr_e",
+          "ty_idx": 25
+        },
+        {
+          "name": "query_id",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndEitherInt8Or256",
+      "ty_idx": 26,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "i8or256",
+          "ty_idx": 29
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Inner1",
+      "ty_idx": 34,
+      "fields": [
+        {
+          "name": "query_id_ref",
+          "ty_idx": 11
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Inner2",
+      "ty_idx": 31,
+      "fields": [
+        {
+          "name": "i64_in_ref",
+          "ty_idx": 10
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndEither32OrRef64",
+      "ty_idx": 30,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "i32orRef",
+          "ty_idx": 33
+        },
+        {
+          "name": "query_id_maybe_ref",
+          "ty_idx": 36
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EitherLeft",
+      "ty_idx": 42,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EitherRight",
+      "ty_idx": 44,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndEither8OrMaybe256",
+      "ty_idx": 37,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 39
+        },
+        {
+          "name": "op",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MaybeNothing",
+      "ty_idx": 54,
+      "fields": []
+    },
+    {
+      "kind": "struct",
+      "name": "MaybeJust",
+      "ty_idx": 56,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndMaybeMaybe8",
+      "ty_idx": 52,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 60
+        },
+        {
+          "name": "op",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SomeBytesFields",
+      "ty_idx": 63,
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 64
+        },
+        {
+          "name": "f2",
+          "ty_idx": 65
+        },
+        {
+          "name": "f3",
+          "ty_idx": 67
+        },
+        {
+          "name": "f4",
+          "ty_idx": 70
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndRestInlineCell",
+      "ty_idx": 71,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest",
+          "ty_idx": 72
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndRestRefCell",
+      "ty_idx": 73,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest",
+          "ty_idx": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "IntAndRestEitherCellOrRefCell",
+      "ty_idx": 74,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest",
+          "ty_idx": 75
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DifferentMaybeRefs",
+      "ty_idx": 76,
+      "fields": [
+        {
+          "name": "op",
+          "ty_idx": 8,
+          "default_value": {
+            "kind": "int",
+            "v": "123"
+          }
+        },
+        {
+          "name": "ref1m",
+          "ty_idx": 77
+        },
+        {
+          "name": "ref2m",
+          "ty_idx": 78
+        },
+        {
+          "name": "ref3",
+          "ty_idx": 3
+        },
+        {
+          "name": "ref4m32",
+          "ty_idx": 80
+        },
+        {
+          "name": "query_id",
+          "ty_idx": 10
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DifferentIntsWithMaybe",
+      "ty_idx": 81,
+      "fields": [
+        {
+          "name": "ji",
+          "ty_idx": 14
+        },
+        {
+          "name": "jmi",
+          "ty_idx": 15
+        },
+        {
+          "name": "jiMaybe",
+          "ty_idx": 82
+        },
+        {
+          "name": "jmiMaybe",
+          "ty_idx": 83
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DifferentMix1",
+      "ty_idx": 84,
+      "fields": [
+        {
+          "name": "ja1",
+          "ty_idx": 23
+        },
+        {
+          "name": "ja2m",
+          "ty_idx": 85
+        },
+        {
+          "name": "ext_nn",
+          "ty_idx": 25
+        },
+        {
+          "name": "imm",
+          "ty_idx": 52
+        },
+        {
+          "name": "tis",
+          "ty_idx": 24
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DifferentMix2",
+      "ty_idx": 86,
+      "fields": [
+        {
+          "name": "iae",
+          "ty_idx": 87
+        },
+        {
+          "name": "tic",
+          "ty_idx": 17
+        },
+        {
+          "name": "rest",
+          "ty_idx": 72
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "DifferentMix3",
+      "ty_idx": 88,
+      "fields": [
+        {
+          "name": "bod",
+          "ty_idx": 90
+        },
+        {
+          "name": "tim",
+          "ty_idx": 91
+        },
+        {
+          "name": "pairm",
+          "ty_idx": 93,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithVariadicInts",
+      "ty_idx": 94,
+      "fields": [
+        {
+          "name": "ui16",
+          "ty_idx": 95
+        },
+        {
+          "name": "i16",
+          "ty_idx": 96
+        },
+        {
+          "name": "ui32",
+          "ty_idx": 97
+        },
+        {
+          "name": "i32",
+          "ty_idx": 98
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EdgeCaseInts",
+      "ty_idx": 99,
+      "fields": [
+        {
+          "name": "maxUint",
+          "ty_idx": 100,
+          "default_value": {
+            "kind": "int",
+            "v": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          }
+        },
+        {
+          "name": "maxInt",
+          "ty_idx": 101,
+          "default_value": {
+            "kind": "int",
+            "v": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          }
+        },
+        {
+          "name": "minInt",
+          "ty_idx": 101,
+          "default_value": {
+            "kind": "int",
+            "v": "-115792089237316195423570985008687907853269984665640564039457584007913129639936"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WriteWithBuilder",
+      "ty_idx": 102,
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest",
+          "ty_idx": 4
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WriteWithSlice",
+      "ty_idx": 103,
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest",
+          "ty_idx": 2
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReadWrittenWithBuilder",
+      "ty_idx": 104,
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 8
+        },
+        {
+          "name": "someInt",
+          "ty_idx": 9
+        },
+        {
+          "name": "someCell",
+          "ty_idx": 77
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReadWriteRest",
+      "ty_idx": 107,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 8
+        },
+        {
+          "name": "f2",
+          "ty_idx": 6
+        },
+        {
+          "name": "rest",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Tail224",
+      "ty_idx": 108,
+      "fields": [
+        {
+          "name": "ji",
+          "ty_idx": 14
+        },
+        {
+          "name": "addr",
+          "ty_idx": 7
+        },
+        {
+          "name": "ref1",
+          "ty_idx": 110
+        },
+        {
+          "name": "ref2",
+          "ty_idx": 111
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ReadWriteMid",
+      "ty_idx": 113,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 8
+        },
+        {
+          "name": "mid",
+          "ty_idx": 41
+        },
+        {
+          "name": "f3",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithTwoRestFields",
+      "ty_idx": 114,
+      "fields": [
+        {
+          "name": "i32",
+          "ty_idx": 8
+        },
+        {
+          "name": "rest1",
+          "ty_idx": 72
+        },
+        {
+          "name": "rest2",
+          "ty_idx": 72
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MoreTrickyCells",
+      "ty_idx": 129,
+      "type_params": [
+        "T3",
+        "T4"
+      ],
+      "fields": [
+        {
+          "name": "c1",
+          "ty_idx": 120
+        },
+        {
+          "name": "c2",
+          "ty_idx": 122
+        },
+        {
+          "name": "c3",
+          "ty_idx": 131
+        },
+        {
+          "name": "c4",
+          "ty_idx": 133
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMoreTrickyCells",
+      "ty_idx": 115,
+      "fields": [
+        {
+          "name": "before",
+          "ty_idx": 27
+        },
+        {
+          "name": "tricky",
+          "ty_idx": 118
+        },
+        {
+          "name": "after",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMoreTrickyAddresses1",
+      "ty_idx": 134,
+      "fields": [
+        {
+          "name": "a1",
+          "ty_idx": 135
+        },
+        {
+          "name": "a2",
+          "ty_idx": 137
+        },
+        {
+          "name": "a3",
+          "ty_idx": 140
+        },
+        {
+          "name": "a4",
+          "ty_idx": 142
+        },
+        {
+          "name": "a5",
+          "ty_idx": 143
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMoreTrickyAddresses2",
+      "ty_idx": 144,
+      "fields": [
+        {
+          "name": "a1",
+          "ty_idx": 145
+        },
+        {
+          "name": "a2",
+          "ty_idx": 147
+        },
+        {
+          "name": "a3",
+          "ty_idx": 85
+        },
+        {
+          "name": "a4",
+          "ty_idx": 151
+        },
+        {
+          "name": "a5",
+          "ty_idx": 153
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithAnyAddress",
+      "ty_idx": 154,
+      "fields": [
+        {
+          "name": "a1",
+          "ty_idx": 25
+        },
+        {
+          "name": "a2",
+          "ty_idx": 155
+        },
+        {
+          "name": "a3",
+          "ty_idx": 156
+        },
+        {
+          "name": "a4",
+          "ty_idx": 157
+        },
+        {
+          "name": "a5",
+          "ty_idx": 158
+        },
+        {
+          "name": "a6",
+          "ty_idx": 121
+        },
+        {
+          "name": "a7",
+          "ty_idx": 162
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgSinglePrefix32",
+      "ty_idx": 163,
+      "prefix": {
+        "prefix_num": 2271560481,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "amount1",
+          "ty_idx": 6
+        },
+        {
+          "name": "amount2",
+          "ty_idx": 6
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgSinglePrefix48",
+      "ty_idx": 164,
+      "prefix": {
+        "prefix_num": 148868987687476,
+        "prefix_len": 48
+      },
+      "fields": [
+        {
+          "name": "amount",
+          "ty_idx": 165
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CounterIncrement",
+      "ty_idx": 167,
+      "prefix": {
+        "prefix_num": 305419896,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "counter_id",
+          "ty_idx": 27
+        },
+        {
+          "name": "inc_by",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CounterDecrement",
+      "ty_idx": 185,
+      "prefix": {
+        "prefix_num": 591751049,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "counter_id",
+          "ty_idx": 27
+        },
+        {
+          "name": "dec_by",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CounterReset0",
+      "ty_idx": 186,
+      "prefix": {
+        "prefix_num": 878082192,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "counter_id",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CounterResetTo",
+      "ty_idx": 187,
+      "prefix": {
+        "prefix_num": 1590016,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "counter_id",
+          "ty_idx": 27
+        },
+        {
+          "name": "initial_value",
+          "ty_idx": 10
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "CounterIncrementAlias",
+      "ty_idx": 166,
+      "target_ty_idx": 167
+    },
+    {
+      "kind": "struct",
+      "name": "BodyPayload1",
+      "ty_idx": 190,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 3
+      },
+      "fields": [
+        {
+          "name": "should_forward",
+          "ty_idx": 5
+        },
+        {
+          "name": "n_times",
+          "ty_idx": 8
+        },
+        {
+          "name": "content",
+          "ty_idx": 72
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "BodyPayload2",
+      "ty_idx": 191,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 2
+      },
+      "fields": [
+        {
+          "name": "master_id",
+          "ty_idx": 27
+        },
+        {
+          "name": "owner_address",
+          "ty_idx": 7
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SayHiAndGoodbye",
+      "ty_idx": 194,
+      "prefix": {
+        "prefix_num": 137,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "dest_addr",
+          "ty_idx": 135
+        },
+        {
+          "name": "body",
+          "ty_idx": 189
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "SayStoreInChain",
+      "ty_idx": 195,
+      "prefix": {
+        "prefix_num": 19,
+        "prefix_len": 16
+      },
+      "fields": [
+        {
+          "name": "in_masterchain",
+          "ty_idx": 5
+        },
+        {
+          "name": "contents",
+          "ty_idx": 196
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferParams1",
+      "ty_idx": 170,
+      "prefix": {
+        "prefix_num": 1940,
+        "prefix_len": 12
+      },
+      "fields": [
+        {
+          "name": "dest_int",
+          "ty_idx": 7
+        },
+        {
+          "name": "amount",
+          "ty_idx": 6
+        },
+        {
+          "name": "dest_ext",
+          "ty_idx": 25
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "TransferParams2",
+      "ty_idx": 171,
+      "prefix": {
+        "prefix_num": 9,
+        "prefix_len": 4
+      },
+      "fields": [
+        {
+          "name": "intVector",
+          "ty_idx": 173
+        },
+        {
+          "name": "needs_more",
+          "ty_idx": 174
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgTransfer",
+      "ty_idx": 168,
+      "prefix": {
+        "prefix_num": 4214686207,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "params",
+          "ty_idx": 177
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "ReadRest_Remaining",
+      "ty_idx": 181,
+      "target_ty_idx": 182
+    },
+    {
+      "kind": "alias",
+      "name": "MyInt32",
+      "ty_idx": 136,
+      "target_ty_idx": 8
+    },
+    {
+      "kind": "alias",
+      "name": "MaybeJustOfAddress",
+      "ty_idx": 138,
+      "target_ty_idx": 139
+    },
+    {
+      "kind": "alias",
+      "name": "AddressAlias",
+      "ty_idx": 183,
+      "target_ty_idx": 7
+    },
+    {
+      "kind": "alias",
+      "name": "Either",
+      "ty_idx": 48,
+      "target_ty_idx": 51,
+      "type_params": [
+        "L",
+        "R"
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "Maybe",
+      "ty_idx": 58,
+      "target_ty_idx": 59,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "MsgCounter1",
+      "ty_idx": 184,
+      "target_ty_idx": 188
+    },
+    {
+      "kind": "alias",
+      "name": "BodyPayload",
+      "ty_idx": 189,
+      "target_ty_idx": 192
+    },
+    {
+      "kind": "alias",
+      "name": "MsgExternal1",
+      "ty_idx": 193,
+      "target_ty_idx": 197
+    },
+    {
+      "kind": "alias",
+      "name": "TransferParams",
+      "ty_idx": 169,
+      "target_ty_idx": 175
+    },
+    {
+      "kind": "alias",
+      "name": "Union_8_16_32",
+      "ty_idx": 198,
+      "target_ty_idx": 199
+    },
+    {
+      "kind": "alias",
+      "name": "Union_8_16_32_n",
+      "ty_idx": 200,
+      "target_ty_idx": 201
+    },
+    {
+      "kind": "enum",
+      "name": "EStoredAsInt8",
+      "ty_idx": 203,
+      "encoded_as_ty_idx": 27,
+      "members": [
+        {
+          "name": "M100",
+          "value": "-100"
+        },
+        {
+          "name": "Z",
+          "value": "0"
+        },
+        {
+          "name": "P100",
+          "value": "100"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EStoredAsUint1",
+      "ty_idx": 204,
+      "encoded_as_ty_idx": 205,
+      "members": [
+        {
+          "name": "ZERO",
+          "value": "0"
+        },
+        {
+          "name": "ONE",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithEnums",
+      "ty_idx": 202,
+      "fields": [
+        {
+          "name": "e1",
+          "ty_idx": 203
+        },
+        {
+          "name": "e2",
+          "ty_idx": 204
+        },
+        {
+          "name": "rem",
+          "ty_idx": 206
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Point",
+      "ty_idx": 207,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 27,
+          "default_value": {
+            "kind": "int",
+            "v": "10"
+          }
+        },
+        {
+          "name": "y",
+          "ty_idx": 27,
+          "default_value": {
+            "kind": "int",
+            "v": "20"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Test4_8",
+      "ty_idx": 208,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Test4_16",
+      "ty_idx": 209,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 116
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Test4_32",
+      "ty_idx": 210,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StorWithStr",
+      "ty_idx": 211,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 8
+        },
+        {
+          "name": "str",
+          "ty_idx": 212
+        },
+        {
+          "name": "b",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "PointWithCustomInt",
+      "ty_idx": 213,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 214
+        },
+        {
+          "name": "b",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMyBorder",
+      "ty_idx": 216,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 27
+        },
+        {
+          "name": "b",
+          "ty_idx": 217
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithFakeWriter",
+      "ty_idx": 218,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 27
+        },
+        {
+          "name": "fake",
+          "ty_idx": 219
+        },
+        {
+          "name": "b",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithEnumsUnion",
+      "ty_idx": 220,
+      "fields": [
+        {
+          "name": "u",
+          "ty_idx": 224
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "UnionStructs_8_16_32",
+      "ty_idx": 225,
+      "target_ty_idx": 226
+    },
+    {
+      "kind": "alias",
+      "name": "UnionStructs_8_16_32_n",
+      "ty_idx": 227,
+      "target_ty_idx": 228
+    },
+    {
+      "kind": "alias",
+      "name": "U105",
+      "ty_idx": 229,
+      "target_ty_idx": 230
+    },
+    {
+      "kind": "alias",
+      "name": "U106",
+      "ty_idx": 231,
+      "target_ty_idx": 232
+    },
+    {
+      "kind": "alias",
+      "name": "TelegramString",
+      "ty_idx": 212,
+      "target_ty_idx": 2,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "Custom8",
+      "ty_idx": 214,
+      "target_ty_idx": 215,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "MyBorderedInt",
+      "ty_idx": 217,
+      "target_ty_idx": 101,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "MyCustomNothing",
+      "ty_idx": 219,
+      "target_ty_idx": 105,
+      "custom_pack_unpack": {
+        "pack_to_builder": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "Tensor3Skipping1",
+      "ty_idx": 233,
+      "target_ty_idx": 234,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "TwoRoles",
+      "ty_idx": 235,
+      "target_ty_idx": 237
+    },
+    {
+      "kind": "enum",
+      "name": "Color",
+      "ty_idx": 238,
+      "encoded_as_ty_idx": 239,
+      "members": [
+        {
+          "name": "Red",
+          "value": "0"
+        },
+        {
+          "name": "Green",
+          "value": "1"
+        },
+        {
+          "name": "Blue",
+          "value": "2"
+        }
+      ],
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "enum",
+      "name": "EFits2Bits",
+      "ty_idx": 240,
+      "encoded_as_ty_idx": 239,
+      "members": [
+        {
+          "name": "ZERO",
+          "value": "0"
+        },
+        {
+          "name": "ONE",
+          "value": "1"
+        },
+        {
+          "name": "TWO",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EStartFrom1",
+      "ty_idx": 241,
+      "encoded_as_ty_idx": 239,
+      "members": [
+        {
+          "name": "ONE",
+          "value": "1"
+        },
+        {
+          "name": "TWO",
+          "value": "2"
+        },
+        {
+          "name": "THREE",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EStartFromM2",
+      "ty_idx": 222,
+      "encoded_as_ty_idx": 223,
+      "members": [
+        {
+          "name": "M2",
+          "value": "-2"
+        },
+        {
+          "name": "M1",
+          "value": "-1"
+        },
+        {
+          "name": "ZERO",
+          "value": "0"
+        },
+        {
+          "name": "P1",
+          "value": "1"
+        },
+        {
+          "name": "P2",
+          "value": "2"
+        },
+        {
+          "name": "P3",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EFits8Bits",
+      "ty_idx": 221,
+      "encoded_as_ty_idx": 215,
+      "members": [
+        {
+          "name": "E0",
+          "value": "0"
+        },
+        {
+          "name": "E110",
+          "value": "110"
+        },
+        {
+          "name": "E220",
+          "value": "220"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EMinMax",
+      "ty_idx": 242,
+      "encoded_as_ty_idx": 101,
+      "members": [
+        {
+          "name": "MIN_INT",
+          "value": "-115792089237316195423570985008687907853269984665640564039457584007913129639936"
+        },
+        {
+          "name": "MAX_INT",
+          "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "E0Max",
+      "ty_idx": 243,
+      "encoded_as_ty_idx": 100,
+      "members": [
+        {
+          "name": "ZERO",
+          "value": "0"
+        },
+        {
+          "name": "MAX_INT",
+          "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "Role",
+      "ty_idx": 236,
+      "encoded_as_ty_idx": 27,
+      "members": [
+        {
+          "name": "Admin",
+          "value": "0"
+        },
+        {
+          "name": "User",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "EncodedVari",
+      "ty_idx": 244,
+      "encoded_as_ty_idx": 96,
+      "members": [
+        {
+          "name": "ONE",
+          "value": "1"
+        },
+        {
+          "name": "TWO",
+          "value": "2"
+        },
+        {
+          "name": "MANY",
+          "value": "1267650600228229401496703205376"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "ECollisionNames",
+      "ty_idx": 245,
+      "encoded_as_ty_idx": 239,
+      "members": [
+        {
+          "name": "fromSlice",
+          "value": "0"
+        },
+        {
+          "name": "store",
+          "value": "1"
+        },
+        {
+          "name": "toCell",
+          "value": "2"
+        },
+        {
+          "name": "ToCell",
+          "value": "3"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Wrapper",
+      "ty_idx": 266,
+      "type_params": [
+        "T"
+      ],
+      "fields": [
+        {
+          "name": "item",
+          "ty_idx": 41
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMaps0",
+      "ty_idx": 246,
+      "fields": [
+        {
+          "name": "m1",
+          "ty_idx": 247
+        },
+        {
+          "name": "m2",
+          "ty_idx": 249
+        },
+        {
+          "name": "m3",
+          "ty_idx": 251
+        },
+        {
+          "name": "m4",
+          "ty_idx": 252
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithNullableMaps",
+      "ty_idx": 253,
+      "fields": [
+        {
+          "name": "m1",
+          "ty_idx": 255
+        },
+        {
+          "name": "m2",
+          "ty_idx": 255
+        },
+        {
+          "name": "m3",
+          "ty_idx": 255
+        },
+        {
+          "name": "m4",
+          "ty_idx": 256
+        },
+        {
+          "name": "m5",
+          "ty_idx": 260
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithMoreTrickyTypes",
+      "ty_idx": 261,
+      "fields": [
+        {
+          "name": "uni1",
+          "ty_idx": 264
+        },
+        {
+          "name": "r1",
+          "ty_idx": 267
+        },
+        {
+          "name": "r2",
+          "ty_idx": 270
+        },
+        {
+          "name": "nullable1",
+          "ty_idx": 271
+        },
+        {
+          "name": "nestedM",
+          "ty_idx": 273
+        },
+        {
+          "name": "uni2",
+          "ty_idx": 275
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithRef",
+      "ty_idx": 276,
+      "fields": [
+        {
+          "name": "id",
+          "ty_idx": 16
+        },
+        {
+          "name": "ref",
+          "ty_idx": 277
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "ArrayAlias",
+      "ty_idx": 280,
+      "target_ty_idx": 281,
+      "type_params": [
+        "T"
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithArrays",
+      "ty_idx": 282,
+      "fields": [
+        {
+          "name": "a1",
+          "ty_idx": 283
+        },
+        {
+          "name": "a2",
+          "ty_idx": 285
+        },
+        {
+          "name": "a3",
+          "ty_idx": 286
+        },
+        {
+          "name": "after",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": true
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithArrays2",
+      "ty_idx": 287,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 288
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithArrays4",
+      "ty_idx": 289,
+      "fields": [
+        {
+          "name": "before",
+          "ty_idx": 16
+        },
+        {
+          "name": "a0",
+          "ty_idx": 290
+        },
+        {
+          "name": "a1",
+          "ty_idx": 291
+        },
+        {
+          "name": "a2",
+          "ty_idx": 294
+        },
+        {
+          "name": "after",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LotsOfCoins",
+      "ty_idx": 295,
+      "fields": [
+        {
+          "name": "nums",
+          "ty_idx": 296
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "EmptyE",
+      "ty_idx": 297,
+      "prefix": {
+        "prefix_num": 4660,
+        "prefix_len": 16
+      },
+      "fields": []
+    },
+    {
+      "kind": "alias",
+      "name": "ArrayOfLotsCoins",
+      "ty_idx": 298,
+      "target_ty_idx": 299
+    },
+    {
+      "kind": "alias",
+      "name": "EmptyShape",
+      "ty_idx": 300,
+      "target_ty_idx": 301
+    },
+    {
+      "kind": "alias",
+      "name": "MyShape1",
+      "ty_idx": 302,
+      "target_ty_idx": 305
+    },
+    {
+      "kind": "struct",
+      "name": "Recurrent",
+      "ty_idx": 306,
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 116
+        },
+        {
+          "name": "nextSh",
+          "ty_idx": 310
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithLispLists1",
+      "ty_idx": 311,
+      "fields": [
+        {
+          "name": "lInt8_1",
+          "ty_idx": 312
+        },
+        {
+          "name": "lInt8_2",
+          "ty_idx": 312
+        },
+        {
+          "name": "lPoint_1",
+          "ty_idx": 313
+        },
+        {
+          "name": "lPoint_2",
+          "ty_idx": 313
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithLispLists2",
+      "ty_idx": 314,
+      "fields": [
+        {
+          "name": "before",
+          "ty_idx": 27
+        },
+        {
+          "name": "lInt8",
+          "ty_idx": 312
+        },
+        {
+          "name": "lInt32",
+          "ty_idx": 315
+        },
+        {
+          "name": "lInt256",
+          "ty_idx": 316
+        },
+        {
+          "name": "after",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "CustomPoint",
+      "ty_idx": 317,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 1
+        },
+        {
+          "name": "y",
+          "ty_idx": 1
+        }
+      ],
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "CustomPointAlias",
+      "ty_idx": 318,
+      "target_ty_idx": 317,
+      "custom_pack_unpack": {
+        "pack_to_builder": true,
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "struct",
+      "name": "WithStrings1",
+      "ty_idx": 319,
+      "fields": [
+        {
+          "name": "s1",
+          "ty_idx": 320
+        },
+        {
+          "name": "s2",
+          "ty_idx": 321
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithStrings2",
+      "ty_idx": 322,
+      "fields": [
+        {
+          "name": "ref",
+          "ty_idx": 323
+        },
+        {
+          "name": "refo",
+          "ty_idx": 325
+        },
+        {
+          "name": "arrs",
+          "ty_idx": 326,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": []
+            },
+            "cast_to_ty_idx": 326
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "invalid-js-naming%",
+      "ty_idx": 327,
+      "fields": [
+        {
+          "name": "foo-bar",
+          "ty_idx": 8
+        },
+        {
+          "name": "rule()",
+          "ty_idx": 8
+        },
+        {
+          "name": "A^@'\"B",
+          "ty_idx": 8
+        },
+        {
+          "name": "void",
+          "ty_idx": 0
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable1",
+      "ty_idx": 328,
+      "fields": [
+        {
+          "name": "n",
+          "ty_idx": 27
+        },
+        {
+          "name": "a",
+          "ty_idx": 329
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable3",
+      "ty_idx": 330,
+      "fields": [
+        {
+          "name": "t",
+          "ty_idx": 331
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable5",
+      "ty_idx": 334,
+      "fields": [
+        {
+          "name": "t",
+          "ty_idx": 335
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable6",
+      "ty_idx": 336,
+      "fields": [
+        {
+          "name": "c",
+          "ty_idx": 337
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable7",
+      "ty_idx": 338,
+      "fields": [
+        {
+          "name": "f",
+          "ty_idx": 337
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotPackable8",
+      "ty_idx": 339,
+      "fields": [
+        {
+          "name": "u",
+          "ty_idx": 332
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "NotUnpackable1",
+      "ty_idx": 340,
+      "fields": [
+        {
+          "name": "e",
+          "ty_idx": 342
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithNotPackable",
+      "ty_idx": 343,
+      "fields": [
+        {
+          "name": "k",
+          "ty_idx": 27
+        },
+        {
+          "name": "nestedNot",
+          "ty_idx": 330
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "NotPackable3Alias",
+      "ty_idx": 344,
+      "target_ty_idx": 330
+    },
+    {
+      "kind": "alias",
+      "name": "NotPackable4Alias",
+      "ty_idx": 345,
+      "target_ty_idx": 346
+    },
+    {
+      "kind": "struct",
+      "name": "PrefixedSome",
+      "ty_idx": 351,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "PrefixedOrVoid",
+      "ty_idx": 350,
+      "target_ty_idx": 352
+    },
+    {
+      "kind": "struct",
+      "name": "PlainSome",
+      "ty_idx": 354,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 8
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "PlainOrVoid",
+      "ty_idx": 353,
+      "target_ty_idx": 355
+    },
+    {
+      "kind": "alias",
+      "name": "Int32OrVoid",
+      "ty_idx": 356,
+      "target_ty_idx": 357
+    },
+    {
+      "kind": "struct",
+      "name": "ThreeP1",
+      "ty_idx": 359,
+      "prefix": {
+        "prefix_num": 0,
+        "prefix_len": 2
+      },
+      "fields": [
+        {
+          "name": "v",
+          "ty_idx": 27
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "ThreeP2",
+      "ty_idx": 360,
+      "prefix": {
+        "prefix_num": 1,
+        "prefix_len": 2
+      },
+      "fields": [
+        {
+          "name": "v",
+          "ty_idx": 116
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "ThreeWayWithVoid",
+      "ty_idx": 358,
+      "target_ty_idx": 361
+    },
+    {
+      "kind": "struct",
+      "name": "InsideStructWithVoid",
+      "ty_idx": 362,
+      "fields": [
+        {
+          "name": "a",
+          "ty_idx": 27
+        },
+        {
+          "name": "tail",
+          "ty_idx": 350
+        }
+      ]
+    },
+    {
+      "kind": "alias",
+      "name": "Int32OrNullOrVoid",
+      "ty_idx": 363,
+      "target_ty_idx": 364
+    },
+    {
+      "kind": "alias",
+      "name": "OnlyWithPack",
+      "ty_idx": 347,
+      "target_ty_idx": 27,
+      "custom_pack_unpack": {
+        "pack_to_builder": true
+      }
+    },
+    {
+      "kind": "alias",
+      "name": "OnlyWithUnpack",
+      "ty_idx": 348,
+      "target_ty_idx": 1,
+      "custom_pack_unpack": {
+        "unpack_from_slice": true
+      }
+    },
+    {
+      "kind": "struct",
+      "name": "HasOnlyWithUnpack",
+      "ty_idx": 349,
+      "fields": [
+        {
+          "name": "wu",
+          "ty_idx": 348
+        }
+      ]
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBAgEAEAABFP8A9KQT9LzyyAsBAALT"
+}

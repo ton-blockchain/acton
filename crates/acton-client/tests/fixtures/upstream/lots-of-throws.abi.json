@@ -1,0 +1,428 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "LotsOfThrows",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WithUnsupportedDefaults"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 1,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 1,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 2,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 4,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 14,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 42,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Err"
+    },
+    {
+      "kind": "uintN",
+      "n": 7
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Point"
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 16,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 129,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 18,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 130,
+          "stack_width": 2
+        }
+      ],
+      "stack_width": 3
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 7,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 8,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        20
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        21
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        5
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 5,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 2,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 4,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 5,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 25
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "enum",
+      "name": "Err",
+      "ty_idx": 16,
+      "encoded_as_ty_idx": 17,
+      "members": [
+        {
+          "name": "EInEnum1",
+          "value": "80"
+        },
+        {
+          "name": "EInEnum2",
+          "value": "81",
+          "description": "desc for EInEnum2"
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Point",
+      "ty_idx": 18,
+      "fields": [
+        {
+          "name": "x",
+          "ty_idx": 14
+        },
+        {
+          "name": "y",
+          "ty_idx": 14
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "WithUnsupportedDefaults",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "f1",
+          "ty_idx": 13,
+          "default_value": {
+            "kind": "int",
+            "v": "10"
+          }
+        },
+        {
+          "name": "f2",
+          "ty_idx": 15,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "10"
+            },
+            "cast_to_ty_idx": 8
+          }
+        },
+        {
+          "name": "f3",
+          "ty_idx": 19,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "81"
+            },
+            "cast_to_ty_idx": 16
+          }
+        },
+        {
+          "name": "f4",
+          "ty_idx": 22,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "int",
+                "v": "5"
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "bool",
+                      "v": true
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 23
+              }
+            ]
+          }
+        },
+        {
+          "name": "f5",
+          "ty_idx": 24,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "int",
+                  "v": "1"
+                },
+                {
+                  "kind": "int",
+                  "v": "2"
+                }
+              ]
+            },
+            "cast_to_ty_idx": 24
+          }
+        },
+        {
+          "name": "f6",
+          "ty_idx": 26,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": []
+            },
+            "cast_to_ty_idx": 26
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [],
+  "incoming_external": [
+    {
+      "body_ty_idx": 2
+    }
+  ],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 0,
+      "name": "main",
+      "parameters": [],
+      "return_ty_idx": 0
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Err.EInEnum1",
+      "err_code": 80
+    },
+    {
+      "kind": "enum_member",
+      "name": "Err.EInEnum2",
+      "description": "desc for EInEnum2",
+      "err_code": 81
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_100",
+      "err_code": 100
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_101",
+      "err_code": 101
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_102",
+      "err_code": 102
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_103",
+      "err_code": 103
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_104",
+      "err_code": 104
+    },
+    {
+      "kind": "constant",
+      "name": "ERR_105",
+      "description": "desc for 105",
+      "err_code": 105
+    },
+    {
+      "kind": "constant",
+      "name": "AGAIN_105",
+      "err_code": 105
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 200
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 1234
+    },
+    {
+      "kind": "plain_int",
+      "err_code": 2345
+    },
+    {
+      "kind": "constant",
+      "name": "CantDeserializePoint",
+      "err_code": 9999
+    },
+    {
+      "kind": "constant",
+      "name": "CantGetMapElement",
+      "err_code": 10000
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBBAEAHAABFP8A9KQT9LzyyAsBAgEgAgMACNLywGQABPIw"
+}

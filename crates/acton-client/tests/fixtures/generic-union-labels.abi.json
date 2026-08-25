@@ -1,0 +1,92 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "GenericUnionLabels",
+  "unique_types": [
+    { "kind": "void" },
+    { "kind": "int" },
+    { "kind": "slice" },
+    { "kind": "cell" },
+    { "kind": "builder" },
+    { "kind": "bool" },
+    { "kind": "coins" },
+    { "kind": "address" },
+    { "kind": "intN", "n": 32 },
+    { "kind": "uintN", "n": 32 },
+    { "kind": "intN", "n": 64 },
+    { "kind": "uintN", "n": 64 },
+    { "kind": "StructRef", "struct_name": "MsgPair" },
+    { "kind": "StructRef", "struct_name": "GenericPair", "type_args_ty_idx": [8, 10] },
+    {
+      "kind": "union",
+      "variants": [
+        {
+          "variant_ty_idx": 8,
+          "prefix_num": 0,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 46,
+          "stack_width": 1
+        },
+        {
+          "variant_ty_idx": 10,
+          "prefix_num": 1,
+          "prefix_len": 1,
+          "is_prefix_implicit": true,
+          "stack_type_id": 48,
+          "stack_width": 1
+        }
+      ],
+      "stack_width": 2
+    },
+    { "kind": "genericT", "name_t": "T1" },
+    { "kind": "genericT", "name_t": "T2" },
+    { "kind": "StructRef", "struct_name": "GenericPair", "type_args_ty_idx": [15, 16] },
+    {
+      "kind": "union",
+      "variants": [
+        { "variant_ty_idx": 15, "prefix_num": 0, "prefix_len": 1, "is_prefix_implicit": true },
+        { "variant_ty_idx": 16, "prefix_num": 1, "prefix_len": 1, "is_prefix_implicit": true }
+      ]
+    }
+  ],
+  "struct_instantiations": [
+    {
+      "ty_idx": 13,
+      "struct_name": "GenericPair<int32, int64>",
+      "monomorphic_fields_ty_idx": [14]
+    }
+  ],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "GenericPair",
+      "ty_idx": 17,
+      "type_params": ["T1", "T2"],
+      "fields": [{ "name": "value", "ty_idx": 18 }]
+    },
+    {
+      "kind": "struct",
+      "name": "MsgPair",
+      "ty_idx": 12,
+      "prefix": { "prefix_num": 268435457, "prefix_len": 32 },
+      "fields": [{ "name": "value", "ty_idx": 13 }]
+    }
+  ],
+  "storage": {},
+  "incoming_messages": [{ "body_ty_idx": 12 }],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "tvm_method_id": 70848,
+      "name": "getPair",
+      "parameters": [],
+      "return_ty_idx": 13
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

@@ -124,6 +124,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "acton-client"
+version = "1.1.0"
+dependencies = [
+ "acton-client-macros",
+ "expect-test",
+ "num-bigint",
+ "serde_json",
+ "tokio",
+ "tolk-source-map",
+ "ton-emulator",
+ "ton-executor",
+ "tvm-ffi",
+ "tycho-types",
+]
+
+[[package]]
+name = "acton-client-codegen"
+version = "1.1.0"
+dependencies = [
+ "expect-test",
+ "heck 0.5.0",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.114",
+ "tolk-source-map",
+]
+
+[[package]]
+name = "acton-client-macros"
+version = "1.1.0"
+dependencies = [
+ "acton-client-codegen",
+ "dunce",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
 name = "acton-config"
 version = "1.1.0"
 dependencies = [

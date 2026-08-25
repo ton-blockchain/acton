@@ -1,0 +1,792 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "LotsOfStorage",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StWithAllDefaults"
+    },
+    {
+      "kind": "intN",
+      "n": 8
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "intN",
+      "n": 256
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 13
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Color"
+    },
+    {
+      "kind": "uintN",
+      "n": 2
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "E0Max"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "bitsN",
+      "n": 8
+    },
+    {
+      "kind": "bitsN",
+      "n": 16
+    },
+    {
+      "kind": "string"
+    },
+    {
+      "kind": "addressOpt"
+    },
+    {
+      "kind": "addressAny"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 25
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        13,
+        13,
+        13
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 27,
+      "stack_type_id": 129,
+      "stack_width": 4
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        20,
+        7,
+        6
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        13,
+        13
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        16,
+        30
+      ]
+    },
+    {
+      "kind": "uintN",
+      "n": 16
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        9,
+        32,
+        14,
+        9,
+        15
+      ]
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 30,
+      "stack_type_id": 131,
+      "stack_width": 3
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 5
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        13,
+        35
+      ]
+    },
+    {
+      "kind": "nullLiteral"
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        1,
+        37
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        13,
+        35
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        23
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        39,
+        40
+      ]
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        1,
+        37
+      ]
+    },
+    {
+      "kind": "shapedTuple",
+      "items_ty_idx": [
+        42,
+        40
+      ]
+    },
+    {
+      "kind": "arrayOf",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "lispListOf",
+      "inner_ty_idx": 8
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        44,
+        45
+      ]
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Inner"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 47,
+      "stack_type_id": 130,
+      "stack_width": 3
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "Inner",
+      "ty_idx": 47,
+      "fields": [
+        {
+          "name": "in1",
+          "ty_idx": 8
+        },
+        {
+          "name": "in2",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": true
+          }
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "StWithAllDefaults",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "i1",
+          "ty_idx": 8,
+          "default_value": {
+            "kind": "int",
+            "v": "0"
+          }
+        },
+        {
+          "name": "i2",
+          "ty_idx": 6,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "50000000"
+            },
+            "cast_to_ty_idx": 6
+          }
+        },
+        {
+          "name": "i3",
+          "ty_idx": 13,
+          "default_value": {
+            "kind": "int",
+            "v": "1"
+          }
+        },
+        {
+          "name": "i4",
+          "ty_idx": 8,
+          "default_value": {
+            "kind": "int",
+            "v": "2"
+          }
+        },
+        {
+          "name": "i5",
+          "ty_idx": 14,
+          "default_value": {
+            "kind": "int",
+            "v": "1267650600228229401496703205376"
+          }
+        },
+        {
+          "name": "i6",
+          "ty_idx": 15,
+          "default_value": {
+            "kind": "int",
+            "v": "-1267650600228229401496703205375"
+          }
+        },
+        {
+          "name": "i7",
+          "ty_idx": 16,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "e1",
+          "ty_idx": 17,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "1"
+            },
+            "cast_to_ty_idx": 17
+          }
+        },
+        {
+          "name": "e2",
+          "ty_idx": 19,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "int",
+              "v": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+            },
+            "cast_to_ty_idx": 19
+          }
+        },
+        {
+          "name": "b1",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": true
+          }
+        },
+        {
+          "name": "b2",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        },
+        {
+          "name": "b3",
+          "ty_idx": 5,
+          "default_value": {
+            "kind": "bool",
+            "v": false
+          }
+        },
+        {
+          "name": "s1",
+          "ty_idx": 20,
+          "default_value": {
+            "kind": "slice",
+            "hex": "0102"
+          }
+        },
+        {
+          "name": "s2",
+          "ty_idx": 21,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "castTo",
+              "inner": {
+                "kind": "slice",
+                "hex": "61"
+              },
+              "cast_to_ty_idx": 2
+            },
+            "cast_to_ty_idx": 21
+          }
+        },
+        {
+          "name": "s3",
+          "ty_idx": 22,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "castTo",
+              "inner": {
+                "kind": "slice",
+                "hex": "0809"
+              },
+              "cast_to_ty_idx": 2
+            },
+            "cast_to_ty_idx": 22
+          }
+        },
+        {
+          "name": "s4",
+          "ty_idx": 20,
+          "default_value": {
+            "kind": "slice",
+            "hex": "68656c6c6f312340"
+          }
+        },
+        {
+          "name": "s5",
+          "ty_idx": 23,
+          "default_value": {
+            "kind": "string",
+            "str": "kopi"
+          }
+        },
+        {
+          "name": "a1",
+          "ty_idx": 7,
+          "default_value": {
+            "kind": "address",
+            "addr": "0:ca6e321c7cce9ecedf0a8ca2492ec8592494aa5fb5ce0387dff96ef6af982a3e"
+          }
+        },
+        {
+          "name": "a2",
+          "ty_idx": 7,
+          "default_value": {
+            "kind": "address",
+            "addr": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+          }
+        },
+        {
+          "name": "a3",
+          "ty_idx": 24,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "a4",
+          "ty_idx": 25,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "address",
+              "addr": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+            },
+            "cast_to_ty_idx": 25
+          }
+        },
+        {
+          "name": "a5",
+          "ty_idx": 26,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "t1",
+          "ty_idx": 28,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "int",
+                "v": "1"
+              },
+              {
+                "kind": "int",
+                "v": "2"
+              },
+              {
+                "kind": "int",
+                "v": "3"
+              }
+            ]
+          }
+        },
+        {
+          "name": "t2",
+          "ty_idx": 29,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "slice",
+                "hex": ""
+              },
+              {
+                "kind": "address",
+                "addr": "9:527964d55cfa6eb731f4bfc07e9d025098097ef8505519e853986279bd8400d8"
+              },
+              {
+                "kind": "int",
+                "v": "1000000"
+              }
+            ]
+          }
+        },
+        {
+          "name": "t3",
+          "ty_idx": 31,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "null"
+              },
+              {
+                "kind": "tensor",
+                "items": [
+                  {
+                    "kind": "int",
+                    "v": "20"
+                  },
+                  {
+                    "kind": "int",
+                    "v": "30"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "t4",
+          "ty_idx": 33,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "int",
+                "v": "907060870"
+              },
+              {
+                "kind": "int",
+                "v": "50018"
+              },
+              {
+                "kind": "int",
+                "v": "20329878786436204988385760252021328656300425018755239228739303522659023427620"
+              },
+              {
+                "kind": "int",
+                "v": "754077114"
+              },
+              {
+                "kind": "int",
+                "v": "448378203247"
+              }
+            ]
+          }
+        },
+        {
+          "name": "t5",
+          "ty_idx": 34,
+          "default_value": {
+            "kind": "null"
+          }
+        },
+        {
+          "name": "sh1",
+          "ty_idx": 36,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "int",
+                  "v": "1"
+                },
+                {
+                  "kind": "null"
+                }
+              ]
+            },
+            "cast_to_ty_idx": 38
+          }
+        },
+        {
+          "name": "sh2",
+          "ty_idx": 41,
+          "default_value": {
+            "kind": "castTo",
+            "inner": {
+              "kind": "shapedTuple",
+              "items": [
+                {
+                  "kind": "tensor",
+                  "items": [
+                    {
+                      "kind": "int",
+                      "v": "1"
+                    },
+                    {
+                      "kind": "null"
+                    }
+                  ]
+                },
+                {
+                  "kind": "castTo",
+                  "inner": {
+                    "kind": "shapedTuple",
+                    "items": [
+                      {
+                        "kind": "string",
+                        "str": "10"
+                      }
+                    ]
+                  },
+                  "cast_to_ty_idx": 40
+                }
+              ]
+            },
+            "cast_to_ty_idx": 43
+          }
+        },
+        {
+          "name": "arr1",
+          "ty_idx": 46,
+          "default_value": {
+            "kind": "tensor",
+            "items": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "int",
+                      "v": "1"
+                    },
+                    {
+                      "kind": "int",
+                      "v": "2"
+                    },
+                    {
+                      "kind": "int",
+                      "v": "3"
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 44
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "shapedTuple",
+                  "items": [
+                    {
+                      "kind": "int",
+                      "v": "4"
+                    },
+                    {
+                      "kind": "int",
+                      "v": "5"
+                    },
+                    {
+                      "kind": "int",
+                      "v": "6"
+                    }
+                  ]
+                },
+                "cast_to_ty_idx": 45
+              }
+            ]
+          }
+        },
+        {
+          "name": "o1",
+          "ty_idx": 47,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Inner",
+            "fields": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "1"
+                },
+                "cast_to_ty_idx": 8
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "bool",
+                  "v": false
+                },
+                "cast_to_ty_idx": 5
+              }
+            ]
+          }
+        },
+        {
+          "name": "o2",
+          "ty_idx": 48,
+          "default_value": {
+            "kind": "object",
+            "struct_name": "Inner",
+            "fields": [
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "int",
+                  "v": "2"
+                },
+                "cast_to_ty_idx": 8
+              },
+              {
+                "kind": "castTo",
+                "inner": {
+                  "kind": "bool",
+                  "v": true
+                },
+                "cast_to_ty_idx": 5
+              }
+            ]
+          }
+        },
+        {
+          "name": "o3",
+          "ty_idx": 48,
+          "default_value": {
+            "kind": "null"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "Color",
+      "ty_idx": 17,
+      "encoded_as_ty_idx": 18,
+      "members": [
+        {
+          "name": "red",
+          "value": "0"
+        },
+        {
+          "name": "green",
+          "value": "1"
+        },
+        {
+          "name": "blue",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "E0Max",
+      "ty_idx": 19,
+      "encoded_as_ty_idx": 14,
+      "members": [
+        {
+          "name": "ZERO",
+          "value": "0"
+        },
+        {
+          "name": "MAX_INT",
+          "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "storage_ty_idx": 12
+  },
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "get_methods": [],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2",
+  "code_boc64": "te6ccgEBBwEAuQABFP8A9KQT9LzyyAsBBPbTbYsWGIsggJhtbXFtbwJxbW8CiG8BbwACbyIQI28Cb4wBb4xxcnNvA3R1dm1vAm8CbwIobjkIMCbXSzgH8kkGwAjyiSTXSzYF8kkEwBDyiSJuMwIwIG4xMG8RIG4xMCBvEG8ibCEgbjEwIG+IMYAfVHEQqQYzAorkW4gCAwQFAAQxMAAcUwG2CFEioSKRpORYoQEAAAEaipnIzAFvIgLKH8noWwYABiFusw=="
+}
