@@ -14,7 +14,7 @@ build-dev:
     cargo build
 
 build-localton-dev-image:
-    docker build --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --tag "{{ LOCALTON_DEV_IMAGE }}" apps/localton
+    docker build --file apps/localton/Dockerfile --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --tag "{{ LOCALTON_DEV_IMAGE }}" .
 
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm
@@ -193,6 +193,7 @@ build-ui:
     cd packages/test-ui && bun ci && bun run build
     cd packages/explorer-core && bun ci && bun run build
     cd packages/studio-ui && bun ci && bun run build
+    cd packages/localton-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint

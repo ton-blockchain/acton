@@ -138,6 +138,7 @@ impl Settings {
         let service_ports = vec![
             ("config HTTP", self.services.config_http.port),
             ("admin HTTP", self.services.admin_http.port),
+            ("observability HTTP", self.services.observability.port),
             ("TON HTTP API public proxy", self.services.ton_http_api.port),
             (
                 "TON HTTP API backend",
@@ -428,6 +429,8 @@ pub struct ServiceSettings {
     pub admin_http: HttpServiceSettings,
     /// TON HTTP API v2 settings
     pub ton_http_api: TonHttpApiSettings,
+    /// Public decentralized network observability and UI service
+    pub observability: ObservabilitySettings,
 }
 
 impl Default for ServiceSettings {
@@ -451,6 +454,7 @@ impl Default for ServiceSettings {
                 command: None,
                 static_config: None,
             },
+            observability: ObservabilitySettings::default(),
         }
     }
 }
@@ -460,6 +464,84 @@ impl ServiceSettings {
         self.config_http.validate("config HTTP")?;
         self.admin_http.validate("admin HTTP")?;
         self.ton_http_api.validate("TON HTTP API")?;
+        self.observability.validate()?;
+        Ok(())
+    }
+}
+
+/// Public decentralized observability service settings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(default)]
+pub struct ObservabilitySettings {
+    /// `true` when Localton publishes signed node observations and the UI
+    pub enabled: bool,
+    /// IPv4 address that accepts observability API and UI connections
+    #[schema(value_type = String, format = "ipv4")]
+    pub bind: Ipv4Addr,
+    /// TCP port for the observability API and UI
+    pub port: u16,
+    /// Signed observation publication interval in seconds
+    pub publish_interval_seconds: u64,
+    /// Time after which a signed observation is no longer live
+    pub observation_ttl_seconds: u64,
+    /// Rolling block-production window in seconds
+    pub block_window_seconds: u64,
+    /// Maximum peers contacted during one gossip round
+    pub gossip_fanout: usize,
+    /// Stable bootstrap observability endpoints
+    pub peers: Vec<String>,
+}
+
+impl Default for ObservabilitySettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            bind: Ipv4Addr::UNSPECIFIED,
+            port: 18_003,
+            publish_interval_seconds: 5,
+            observation_ttl_seconds: 20,
+            block_window_seconds: 10 * 60,
+            gossip_fanout: 3,
+            peers: Vec::new(),
+        }
+    }
+}
+
+impl ObservabilitySettings {
+    pub fn socket_addr(&self) -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(self.bind), self.port)
+    }
+
+    fn validate(&self) -> Result<()> {
+        ensure!(self.port > 0, "observability port must be positive");
+        ensure!(
+            self.publish_interval_seconds > 0,
+            "observability publish interval must be positive"
+        );
+        ensure!(
+            self.observation_ttl_seconds >= self.publish_interval_seconds * 2,
+            "observability TTL must cover at least two publication intervals"
+        );
+        ensure!(
+            self.block_window_seconds >= self.observation_ttl_seconds,
+            "observability block window must not be shorter than its TTL"
+        );
+        ensure!(
+            (1..=16).contains(&self.gossip_fanout),
+            "observability gossip fanout must be in 1..=16"
+        );
+        for peer in &self.peers {
+            let url = reqwest::Url::parse(peer)
+                .with_context(|| format!("invalid observability peer URL `{peer}`"))?;
+            ensure!(
+                matches!(url.scheme(), "http" | "https"),
+                "observability peer URL must use http or https"
+            );
+            ensure!(
+                url.host_str().is_some(),
+                "observability peer URL has no host"
+            );
+        }
         Ok(())
     }
 }
@@ -640,6 +722,7 @@ mod tests {
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
+        assert_eq!(settings.services.observability.port, 18_003);
         assert_eq!(settings.services.ton_http_api.backend_port, 18_005);
         assert_eq!(settings.services.ton_http_api.monitor_port, 18_006);
     }

@@ -1,7 +1,8 @@
-use std::{fs, path::Path};
+use std::{fs, net::Ipv4Addr, path::Path};
 
 use anyhow::{Context, Result, anyhow};
 use serde::Serialize;
+use serde_json::json;
 use tonutils::{
     liteclient::{
         boc::{SimpleAccount, SimpleAccountState},
@@ -51,6 +52,29 @@ impl LocalLiteClient {
     pub async fn connect(global_config: &Path) -> Result<Self> {
         let source = fs::read_to_string(global_config)
             .with_context(|| format!("failed to read global config {}", global_config.display()))?;
+        Self::connect_source(&source, global_config).await
+    }
+
+    pub async fn connect_node(global_config: &Path, port: u16, public_key: &str) -> Result<Self> {
+        let source = fs::read_to_string(global_config)
+            .with_context(|| format!("failed to read global config {}", global_config.display()))?;
+        let mut config: serde_json::Value = serde_json::from_str(&source)
+            .with_context(|| format!("invalid global config {}", global_config.display()))?;
+        config
+            .as_object_mut()
+            .context("global config root must be a JSON object")?
+            .insert(
+                "liteservers".to_owned(),
+                json!([{
+                    "id": {"@type": "pub.ed25519", "key": public_key},
+                    "ip": i32::from_be_bytes(Ipv4Addr::LOCALHOST.octets()),
+                    "port": port,
+                }]),
+            );
+        Self::connect_source(&serde_json::to_string(&config)?, global_config).await
+    }
+
+    async fn connect_source(source: &str, global_config: &Path) -> Result<Self> {
         let config: ConfigGlobal = source
             .parse()
             .with_context(|| format!("invalid global config {}", global_config.display()))?;
@@ -87,12 +111,7 @@ impl LocalLiteClient {
         seqno: u32,
     ) -> Result<(BlockRef, Vec<u8>)> {
         let id = self.lookup(workchain, shard, seqno).await?;
-        let bytes = self
-            .inner
-            .get_block(id.clone())
-            .await
-            .context("getBlock failed")?;
-        Ok((id.into(), bytes))
+        self.download_block(id).await
     }
 
     pub async fn transactions(
@@ -146,6 +165,15 @@ impl LocalLiteClient {
             .await
             .context("lookupBlock failed")?;
         Ok(header.id)
+    }
+
+    async fn download_block(&mut self, id: BlockIdExt) -> Result<(BlockRef, Vec<u8>)> {
+        let bytes = self
+            .inner
+            .get_block(id.clone())
+            .await
+            .context("getBlock failed")?;
+        Ok((id.into(), bytes))
     }
 }
 

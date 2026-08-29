@@ -177,6 +177,17 @@ TON_BIN_DIR=/path/to/ton localton run
 
 The launcher stores this path in `manifest.json`. Later commands use the stored path.
 
+### Shared TON binary cache
+
+Without `--ton-bin-dir`, localton downloads each pinned TON release once per user and
+reuses it across all state directories. The default cache is:
+
+- macOS: `~/Library/Caches/localton/ton/<version>/<platform>/`
+- Linux: `${XDG_CACHE_HOME:-~/.cache}/localton/ton/<version>/<platform>/`
+
+Set `LOCALTON_CACHE_DIR` to replace the `localton` cache root. An explicit
+`--ton-bin-dir` or `TON_BIN_DIR` still has the highest priority.
+
 ## Run a node agent
 
 The distributed topology starts with one genesis validator and an independent node on another host. Like mytonctrl, the agent needs a standard TON global config URL. The first launcher exposes that file and a development faucet for convenience, but neither service participates in consensus. The agent can keep its node as a full node or enter it into validator elections.
@@ -550,7 +561,9 @@ The API V2 proxy preserves methods, paths, queries, bodies, statuses, and end-to
 
 ## State and process lifecycle
 
-localton stores all persistent data under the selected state directory. The important files are:
+localton stores network-specific persistent data under the selected state directory.
+Downloaded official TON binaries live in the shared per-user cache described above.
+The important state files are:
 
 | Path | Content |
 | --- | --- |

@@ -84,8 +84,10 @@ pub struct AgentArgs {
     #[command(flatten)]
     pub state: StateArgs,
 
-    /// Full-node names owned by this agent.
-    #[arg(long = "node", default_value = "node2")]
+    /// Full-node aliases owned by this agent
+    ///
+    /// When omitted, the first run creates a stable alias from the agent identity
+    #[arg(long = "node")]
     pub nodes: Vec<String>,
 
     /// URL of a standard TON global configuration used to join the network.
@@ -106,6 +108,22 @@ pub struct AgentArgs {
     /// `validator disable` to change participation in future elections.
     #[arg(long)]
     pub validator: bool,
+
+    /// IPv4 address for the public observability API and UI
+    #[arg(
+        long,
+        env = "LOCALTON_OBSERVABILITY_BIND",
+        default_value_t = Ipv4Addr::UNSPECIFIED
+    )]
+    pub observability_bind: Ipv4Addr,
+
+    /// Public observability API and UI port
+    #[arg(long, env = "LOCALTON_OBSERVABILITY_PORT")]
+    pub observability_port: Option<u16>,
+
+    /// Do not publish signed observations or serve the observability UI
+    #[arg(long)]
+    pub no_observability: bool,
 
     /// Use an existing directory with official TON binaries.
     #[arg(long, env = "TON_BIN_DIR")]
@@ -205,6 +223,10 @@ pub struct RunArgs {
     #[arg(long, env = "LOCALTON_ADMIN_HTTP_BIND")]
     pub admin_http_bind: Option<Ipv4Addr>,
 
+    /// Runtime-only bind address for the observability API and UI
+    #[arg(long, env = "LOCALTON_OBSERVABILITY_BIND")]
+    pub observability_bind: Option<Ipv4Addr>,
+
     /// Runtime-only TON HTTP API V2 executable override.
     #[arg(long, env = "LOCALTON_HTTP_API_COMMAND")]
     pub ton_http_api_command: Option<PathBuf>,
@@ -220,6 +242,10 @@ pub struct RunArgs {
     /// Do not start the local administrative HTTP API.
     #[arg(long)]
     pub no_admin_http: bool,
+
+    /// Do not publish signed observations or serve the observability UI
+    #[arg(long)]
+    pub no_observability: bool,
 }
 
 impl Default for RunArgs {
@@ -235,10 +261,12 @@ impl Default for RunArgs {
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
             config_http_bind: None,
             admin_http_bind: None,
+            observability_bind: None,
             ton_http_api_command: None,
             ton_http_api_static_config: None,
             no_config_http: false,
             no_admin_http: false,
+            no_observability: false,
         }
     }
 }
@@ -322,6 +350,11 @@ pub enum LiteCommand {
     },
     /// Print all shards at the latest masterchain block.
     Shards {
+        #[command(flatten)]
+        state: StateArgs,
+    },
+    /// Print the on-chain validator election schedule and sets.
+    Elections {
         #[command(flatten)]
         state: StateArgs,
     },
@@ -496,22 +529,19 @@ pub enum ValidatorCommand {
     Enable {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
     },
     /// Stop participating in future elections and remain a full node.
     Disable {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
     },
     /// Create keys and submit an election participation request.
     Participate {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
         #[arg(long)]
         election_id: Option<u32>,
     },
@@ -519,8 +549,7 @@ pub enum ValidatorCommand {
     Reap {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
     },
     /// Run participation for every enabled validator.
     ParticipateAll {

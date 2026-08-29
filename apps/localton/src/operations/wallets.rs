@@ -511,6 +511,25 @@ pub async fn send(toolchain: &Toolchain, request: SendRequest<'_>) -> Result<u32
     client.send_boc(message.boc).await
 }
 
+pub(crate) async fn send_confirmed(toolchain: &Toolchain, request: SendRequest<'_>) -> Result<u32> {
+    let message = build_message(toolchain, request).await?;
+    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    let status = client.send_boc(message.boc).await?;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        if wallet_seqno(toolchain, &message.source_address).await? > message.seqno {
+            return Ok(status);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            bail!(
+                "wallet transaction with seqno {} did not become visible within 30 seconds",
+                message.seqno
+            )
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FundAccountMessage {
     pub boc: Vec<u8>,

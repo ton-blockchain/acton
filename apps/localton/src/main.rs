@@ -3,6 +3,7 @@ mod binaries;
 mod bootstrap;
 mod cli;
 mod http;
+mod observability;
 mod operations;
 mod runtime;
 mod storage;

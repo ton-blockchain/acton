@@ -152,6 +152,9 @@ fn prepare_settings(
     if args.no_admin_http {
         settings.services.admin_http.enabled = false;
     }
+    if args.no_observability {
+        settings.services.observability.enabled = false;
+    }
     settings.validate()?;
     ensure!(
         imported_accounts.is_empty() || settings.network.workchain_enabled,
@@ -166,6 +169,10 @@ fn prepare_settings(
     }
     if let Some(bind) = args.admin_http_bind {
         settings.services.admin_http.bind = bind;
+        settings.validate()?;
+    }
+    if let Some(bind) = args.observability_bind {
+        settings.services.observability.bind = bind;
         settings.validate()?;
     }
     if let Some(command) = args.ton_http_api_command.clone() {
@@ -211,7 +218,7 @@ async fn run_managed_network(
     processes: &ProcessRegistry,
     runtime: &mut RuntimeState,
 ) -> Result<()> {
-    record_core_processes(runtime, processes).await;
+    record_core_processes(runtime, processes, &launch.manifest).await;
     runtime.save_atomic(&launch.layout.runtime)?;
 
     // Step 4: prove actual block production through the liteserver.
@@ -331,7 +338,11 @@ async fn mark_network_ready(
 /// DHT is infrastructure and is therefore represented as a service. Each
 /// validator-engine process is a blockchain node. Status and admin APIs rely on
 /// this distinction even though both kinds share the same process registry.
-async fn record_core_processes(runtime: &mut RuntimeState, processes: &ProcessRegistry) {
+async fn record_core_processes(
+    runtime: &mut RuntimeState,
+    processes: &ProcessRegistry,
+    manifest: &Manifest,
+) {
     for process in processes.info().await {
         if process.name == "dht" {
             runtime.services.insert(
@@ -344,16 +355,20 @@ async fn record_core_processes(runtime: &mut RuntimeState, processes: &ProcessRe
                 },
             );
         } else {
-            runtime.nodes.insert(
-                process.name,
-                NodeRuntime {
-                    initialized: true,
-                    running: true,
-                    pid: process.pid,
-                    status: "running".to_owned(),
-                    ..NodeRuntime::default()
-                },
-            );
+            let mut node = NodeRuntime {
+                initialized: true,
+                running: true,
+                pid: process.pid,
+                status: "running".to_owned(),
+                ..NodeRuntime::default()
+            };
+            if process.name == "genesis" {
+                node.liteserver_public_key = Some(manifest.liteserver_public_key.clone());
+                if let Some(public_key) = &manifest.validator_public_key {
+                    node.remember_validator_public_key(public_key.clone());
+                }
+            }
+            runtime.nodes.insert(process.name, node);
         }
     }
 }

@@ -120,6 +120,10 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                     .await?
             );
         }
+        LiteCommand::Elections { state } => {
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            print_json(&crate::operations::validators::election_status(&toolchain).await?)?;
+        }
         LiteCommand::Config { state, params } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             if params.is_empty() {

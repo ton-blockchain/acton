@@ -22,7 +22,6 @@ pub const OUT_PORT: u16 = 3272;
 #[derive(Debug, Clone)]
 pub struct Layout {
     pub root: PathBuf,
-    pub cache: PathBuf,
     pub genesis: PathBuf,
     pub validator_db: PathBuf,
     pub validator_keyring: PathBuf,
@@ -36,6 +35,7 @@ pub struct Layout {
     pub settings: PathBuf,
     pub runtime: PathBuf,
     pub wallets: PathBuf,
+    pub observability: PathBuf,
     pub nodes: PathBuf,
     pub lock: PathBuf,
     pub logs: PathBuf,
@@ -47,7 +47,6 @@ impl Layout {
         let validator_db = genesis.join("db");
         let resources = genesis.join("resources");
         Self {
-            cache: root.join("cache"),
             validator_keyring: validator_db.join("keyring"),
             dht_db: root.join("dht"),
             certs: genesis.join("certs"),
@@ -58,6 +57,7 @@ impl Layout {
             settings: root.join("settings.json"),
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
+            observability: root.join("observability"),
             nodes: root.join("nodes"),
             lock: root.join("launcher.lock"),
             logs: root.join("logs"),
@@ -71,7 +71,6 @@ impl Layout {
     pub fn create_dirs(&self) -> Result<()> {
         for path in [
             &self.root,
-            &self.cache,
             &self.genesis,
             &self.validator_db,
             &self.validator_keyring,
@@ -82,6 +81,7 @@ impl Layout {
             &self.zerostate,
             &self.logs,
             &self.wallets,
+            &self.observability,
             &self.nodes,
         ] {
             fs::create_dir_all(path)
@@ -158,6 +158,8 @@ pub struct Manifest {
     pub ton_bin_dir: Option<PathBuf>,
     pub validator_id_hex: String,
     pub validator_id_base64: String,
+    #[serde(default)]
+    pub validator_public_key: Option<String>,
     pub liteserver_public_key: String,
     pub global_config: PathBuf,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

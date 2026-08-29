@@ -42,13 +42,21 @@ impl Toolchain {
     }
 
     pub async fn lite_client(&self, command_text: &str) -> Result<String> {
+        self.lite_client_commands(&[command_text]).await
+    }
+
+    pub async fn lite_client_commands(&self, commands: &[&str]) -> Result<String> {
+        ensure!(!commands.is_empty(), "lite-client command list is empty");
         let mut command = Command::new(self.binaries.command("lite-client"));
         command
             .args(["-t", "15", "-C"])
-            .arg(&self.layout.global_config)
-            .args(["-c", command_text]);
+            .arg(&self.layout.global_config);
+        for command_text in commands {
+            command.args(["-c", command_text]);
+        }
+        command.args(["-c", "quit"]);
         let output = run_checked(
-            &format!("lite-client {command_text}"),
+            &format!("lite-client {}", commands.join(", ")),
             command,
             Duration::from_secs(30),
         )

@@ -1,7 +1,8 @@
 //! Resolves and validates the official TON binary distribution.
 //!
 //! [`TonBinaries::resolve`] selects an explicit directory, the directory stored
-//! in the network manifest, or an automatically installed pinned release.
+//! in the network manifest, or an automatically installed pinned release from
+//! the shared per-user cache.
 //! Resolved installations must contain every executable and resource directory
 //! required to create and run the local network.
 
@@ -44,10 +45,10 @@ impl TonBinaries {
                     )
                 })?
             } else {
-                install::install_pinned_release(layout).await?
+                install::install_pinned_release().await?
             }
         } else {
-            install::install_pinned_release(layout).await?
+            install::install_pinned_release().await?
         };
         let binaries = Self { root };
         binaries.validate()?;

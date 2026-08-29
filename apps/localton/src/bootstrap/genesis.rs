@@ -157,6 +157,7 @@ pub(super) async fn initialize(
         ton_bin_dir: Some(binaries.root.clone()),
         validator_id_hex: validator_key.id_hex,
         validator_id_base64: validator_key.id_base64,
+        validator_public_key: Some(BASE64.encode(&validator_public)),
         liteserver_public_key,
         global_config: layout.global_config.clone(),
         imported_accounts: imported_accounts

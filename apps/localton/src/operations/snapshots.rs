@@ -694,6 +694,7 @@ hidden restore directory: true"#]]
                 ton_bin_dir: None,
                 validator_id_hex: "11".repeat(32),
                 validator_id_base64: "validator".to_owned(),
+                validator_public_key: None,
                 liteserver_public_key: "liteserver".to_owned(),
                 global_config: layout.global_config.clone(),
                 imported_accounts: Vec::new(),

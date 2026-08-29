@@ -17,6 +17,24 @@ use crate::{
 const VALIDATOR_KEY_EXPIRY_MARGIN_SECONDS: u32 = 300;
 const MAX_VALIDATOR_LAG_SECONDS: u64 = 60;
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ElectionChainStatus {
+    pub validators_elected_for: u32,
+    pub elections_start_before: u32,
+    pub elections_end_before: u32,
+    pub stake_held_for: u32,
+    pub current: ValidatorSetStatus,
+    pub next: Option<ValidatorSetStatus>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ValidatorSetStatus {
+    pub since: u32,
+    pub until: u32,
+    pub total: u16,
+    pub main: u16,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ElectionEntry {
     election_id: u32,
@@ -78,14 +96,16 @@ pub async fn execute(command: ValidatorCommand) -> Result<()> {
             print_status(&toolchain).await
         }
         ValidatorCommand::Enable { state, node } => {
+            let node = resolve_managed_node(&state, node.as_deref())?;
             set_election_mode(&state, &node, true)?;
             println!("validator mode enabled for `{node}`; it will enter future elections");
             Ok(())
         }
         ValidatorCommand::Disable { state, node } => {
+            let node = resolve_managed_node(&state, node.as_deref())?;
             set_election_mode(&state, &node, false)?;
             println!(
-                "validator mode disabled for `{node}`; it remains active until the current round ends"
+                "validator mode disabled for `{node}`; it stops entering elections and remains active until a replacement set is elected"
             );
             Ok(())
         }
@@ -95,12 +115,22 @@ pub async fn execute(command: ValidatorCommand) -> Result<()> {
             election_id,
         } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let node = resolve_managed_node_in_layout(
+                &toolchain.layout,
+                &toolchain.settings()?,
+                node.as_deref(),
+            )?;
             let result = participate(&toolchain, &node, election_id).await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
         }
         ValidatorCommand::Reap { state, node } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let node = resolve_managed_node_in_layout(
+                &toolchain.layout,
+                &toolchain.settings()?,
+                node.as_deref(),
+            )?;
             let result = reap(&toolchain, &node).await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
@@ -141,6 +171,94 @@ pub async fn execute(command: ValidatorCommand) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&results)?);
             Ok(())
         }
+    }
+}
+
+pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionChainStatus> {
+    let output = toolchain
+        .lite_client_commands(&["getconfig 15", "getconfig 34", "getconfig 36"])
+        .await?;
+    parse_election_status(&output)
+}
+
+fn parse_election_status(output: &str) -> Result<ElectionChainStatus> {
+    let timing = Regex::new(
+        r"validators_elected_for:(\d+)\s+elections_start_before:(\d+)\s+elections_end_before:(\d+)\s+stake_held_for:(\d+)",
+    )?
+    .captures(output)
+    .context("config parameter 15 does not contain election timing")?;
+    let number = |index: usize| -> Result<u32> {
+        timing[index]
+            .parse()
+            .with_context(|| format!("invalid config parameter 15 field at index {index}"))
+    };
+    Ok(ElectionChainStatus {
+        validators_elected_for: number(1)?,
+        elections_start_before: number(2)?,
+        elections_end_before: number(3)?,
+        stake_held_for: number(4)?,
+        current: parse_validator_set_status(output, 34)?
+            .context("config parameter 34 has no current validator set")?,
+        next: parse_validator_set_status(output, 36)?,
+    })
+}
+
+fn parse_validator_set_status(output: &str, parameter: u8) -> Result<Option<ValidatorSetStatus>> {
+    let marker = format!("ConfigParam({parameter})");
+    let section = output
+        .split_once(&marker)
+        .map(|(_, section)| section)
+        .with_context(|| format!("config parameter {parameter} is missing"))?;
+    let section = section.split("ConfigParam(").next().unwrap_or(section);
+    if section.contains("(null)") {
+        return Ok(None);
+    }
+    let values = Regex::new(r"utime_since:(\d+)\s+utime_until:(\d+)\s+total:(\d+)\s+main:(\d+)")?
+        .captures(section)
+        .with_context(|| format!("config parameter {parameter} has an invalid validator set"))?;
+    Ok(Some(ValidatorSetStatus {
+        since: values[1].parse()?,
+        until: values[2].parse()?,
+        total: values[3].parse()?,
+        main: values[4].parse()?,
+    }))
+}
+
+fn resolve_managed_node(state: &StateArgs, requested: Option<&str>) -> Result<String> {
+    let layout = Layout::new(crate::ton::toolchain::absolute_path(&state.state_dir)?);
+    layout.create_dirs()?;
+    let settings = Settings::load_or_create(&layout.settings)?;
+    resolve_managed_node_in_layout(&layout, &settings, requested)
+}
+
+fn resolve_managed_node_in_layout(
+    layout: &Layout,
+    settings: &Settings,
+    requested: Option<&str>,
+) -> Result<String> {
+    let runtime = RuntimeState::load(&layout.runtime)?;
+    if let Some(name) = requested {
+        settings.node(name)?;
+        ensure!(
+            runtime.nodes.contains_key(name),
+            "node `{name}` is not managed by this localton instance"
+        );
+        return Ok(name.to_owned());
+    }
+
+    let managed = settings
+        .nodes
+        .iter()
+        .filter(|node| node.enabled && runtime.nodes.contains_key(&node.name))
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    match managed.as_slice() {
+        [name] => Ok(name.clone()),
+        [] => anyhow::bail!("this localton instance has no managed nodes"),
+        _ => anyhow::bail!(
+            "this localton instance manages multiple nodes ({}); specify one explicitly",
+            managed.join(", ")
+        ),
     }
 }
 
@@ -202,6 +320,7 @@ pub(crate) async fn agent_auto_tick(
     ensure!(node.enabled, "node `{node_name}` is disabled");
     ensure!(node.validator, "node `{node_name}` is not a validator");
     let elector = elector_address(toolchain).await?;
+    let mut submitted = false;
     if settings.validation.auto_participate {
         let election_id = active_election_id(toolchain, &elector).await?;
         if election_id > 0 && node.participate_in_elections {
@@ -215,6 +334,7 @@ pub(crate) async fn agent_auto_tick(
             )
             .await?;
             if result.send_status.is_some() {
+                submitted = true;
                 tracing::info!(
                     node = result.node,
                     election_id = result.election_id,
@@ -223,7 +343,7 @@ pub(crate) async fn agent_auto_tick(
             }
         }
     }
-    if settings.validation.auto_reap {
+    if settings.validation.auto_reap && !submitted {
         reap_node(toolchain, &node, wallet_name, &elector).await?;
     }
     Ok(())
@@ -366,7 +486,7 @@ async fn prepare_election_entry(
     let signing_public_key = console_export_public(toolchain, node, &keys.signing_key).await?;
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
         let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        node_runtime.validator_public_key = Some(signing_public_key.clone());
+        node_runtime.set_validator_public_key(signing_public_key.clone());
         node_runtime.validator_adnl = Some(keys.adnl.clone());
         node_runtime.election_id = Some(election_id);
         node_runtime.election_end = Some(keys.election_end);
@@ -443,7 +563,7 @@ async fn submit_election_entry(
     )
     .await?;
 
-    let send_status = wallets::send(
+    let send_status = wallets::send_confirmed(
         toolchain,
         wallets::SendRequest {
             from: wallet_name,
@@ -460,7 +580,7 @@ async fn submit_election_entry(
 
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
         let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        node_runtime.validator_public_key = Some(entry.validator_public_key.clone());
+        node_runtime.set_validator_public_key(entry.validator_public_key.clone());
         node_runtime.validator_adnl = Some(entry.validator_adnl.clone());
         node_runtime.election_id = Some(entry.election_id);
         node_runtime.election_end = Some(entry.election_end);
@@ -612,7 +732,7 @@ async fn reap_node(
         vec![message.to_string_lossy().into_owned()],
     )
     .await?;
-    let status = wallets::send(
+    let status = wallets::send_confirmed(
         toolchain,
         wallets::SendRequest {
             from: wallet_name,
@@ -798,11 +918,51 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        election_key_expiry, existing_election_keys, nano_to_grams, parse_elector_address,
-        parse_first_result_number, parse_validator_stat, set_election_mode,
+        election_key_expiry, existing_election_keys, nano_to_grams, parse_election_status,
+        parse_elector_address, parse_first_result_number, parse_validator_stat,
+        resolve_managed_node_in_layout, set_election_mode,
     };
     use crate::cli::StateArgs;
-    use crate::storage::{Layout, NodeSettings, Settings};
+    use crate::storage::{Layout, NodeRuntime, NodeSettings, RuntimeState, Settings};
+
+    #[test]
+    fn validator_command_defaults_to_the_locally_managed_node() {
+        let root = tempdir().unwrap();
+        let layout = Layout::new(root.path().join("state"));
+        layout.create_dirs().unwrap();
+        let mut settings = Settings::default();
+        settings.node_mut("node2").unwrap().enabled = true;
+        settings.save_atomic(&layout.settings).unwrap();
+        let mut runtime = RuntimeState::new();
+        runtime
+            .nodes
+            .insert("node2".to_owned(), NodeRuntime::default());
+        runtime.save_atomic(&layout.runtime).unwrap();
+
+        assert_eq!(
+            resolve_managed_node_in_layout(&layout, &settings, None).unwrap(),
+            "node2"
+        );
+        assert!(resolve_managed_node_in_layout(&layout, &settings, Some("genesis")).is_err());
+    }
+
+    #[test]
+    fn parses_batched_election_config() {
+        let output = r#"
+ConfigParam(15) = ( validators_elected_for:120 elections_start_before:90 elections_end_before:30 stake_held_for:30)
+ConfigParam(34) = (cur_validators:(validators_ext utime_since:1000 utime_until:1120 total:2 main:2 total_weight:10))
+ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:1240 total:3 main:2 total_weight:20))
+"#;
+        let status = parse_election_status(output).unwrap();
+        assert_eq!(status.validators_elected_for, 120);
+        assert_eq!(status.elections_start_before, 90);
+        assert_eq!(status.elections_end_before, 30);
+        assert_eq!(status.stake_held_for, 30);
+        assert_eq!(status.current.since, 1000);
+        assert_eq!(status.current.until, 1120);
+        assert_eq!(status.current.total, 2);
+        assert_eq!(status.next.unwrap().total, 3);
+    }
 
     #[test]
     fn election_mode_can_change_without_disabling_the_node() {

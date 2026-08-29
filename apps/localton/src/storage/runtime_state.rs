@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub const RUNTIME_SCHEMA_VERSION: u32 = 1;
+const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
 
 /// Current launcher, node, and service state
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
@@ -147,6 +148,9 @@ pub struct NodeRuntime {
     pub liteserver_public_key: Option<String>,
     /// Public validator key
     pub validator_public_key: Option<String>,
+    /// Public validator keys used across election rounds
+    #[serde(default)]
+    pub validator_public_keys: Vec<String>,
     /// Validator ADNL address
     pub validator_adnl: Option<String>,
     /// Current election identifier
@@ -160,6 +164,25 @@ pub struct NodeRuntime {
     pub total_rewards_nano: String,
     /// Latest validator reward in nanotons
     pub last_reward_nano: String,
+}
+
+impl NodeRuntime {
+    pub fn remember_validator_public_key(&mut self, public_key: String) {
+        if !self.validator_public_keys.contains(&public_key) {
+            self.validator_public_keys.push(public_key);
+            if self.validator_public_keys.len() > MAX_RETAINED_VALIDATOR_KEYS {
+                self.validator_public_keys.remove(0);
+            }
+        }
+    }
+
+    pub fn set_validator_public_key(&mut self, public_key: String) {
+        if let Some(current) = self.validator_public_key.clone() {
+            self.remember_validator_public_key(current);
+        }
+        self.remember_validator_public_key(public_key.clone());
+        self.validator_public_key = Some(public_key);
+    }
 }
 
 /// Current state of one Localton service
@@ -235,5 +258,27 @@ mod tests {
             thread.join().unwrap();
         }
         assert_eq!(RuntimeState::load(&path).unwrap().nodes.len(), 8);
+    }
+
+    #[test]
+    fn validator_keys_are_retained_across_rounds() {
+        let mut node = NodeRuntime::default();
+        node.remember_validator_public_key("genesis".to_owned());
+        node.set_validator_public_key("round-1".to_owned());
+        node.set_validator_public_key("round-2".to_owned());
+
+        expect_test::expect![[r#"
+            (
+                Some(
+                    "round-2",
+                ),
+                [
+                    "genesis",
+                    "round-1",
+                    "round-2",
+                ],
+            )
+        "#]]
+        .assert_debug_eq(&(node.validator_public_key, node.validator_public_keys));
     }
 }
