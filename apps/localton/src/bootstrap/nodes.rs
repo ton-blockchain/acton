@@ -108,9 +108,10 @@ pub(super) async fn start_additional(
 /// Returns reusable metadata for a node, creating its persistent state if needed.
 ///
 /// An existing engine config is the node-level initialization marker. Otherwise
-/// the function copies genesis bootstrap data, asks validator-engine to create a
+/// the function installs the global config, asks validator-engine to create a
 /// fresh database, generates independent control/liteserver keys, and registers
-/// a full-node ADNL identity through a temporary engine process.
+/// a full-node ADNL identity through a temporary engine process. A launcher can
+/// also copy its local zerostate cache; a joined node obtains it over ADNL.
 pub(super) async fn ensure_initialized(
     layout: &Layout,
     binaries: &TonBinaries,
@@ -139,10 +140,10 @@ pub(super) async fn ensure_initialized(
         &layout.global_config,
         node_layout.db.join("global.config.json"),
     )?;
-    copy_tree(
-        &layout.validator_db.join("static"),
-        &node_layout.db.join("static"),
-    )?;
+    let static_states = layout.validator_db.join("static");
+    if static_states.is_dir() {
+        copy_tree(&static_states, &node_layout.db.join("static"))?;
+    }
 
     let output = run_checked(
         &format!("{} validator-engine initialization", node.name),
@@ -179,7 +180,10 @@ pub(super) async fn ensure_initialized(
         initialized: true,
         status: "initialized".to_owned(),
         console_public_key: Some(server.id_base64),
-        liteserver_public_key: node.liteserver.then_some(liteserver.id_base64),
+        liteserver_public_key: node
+            .liteserver
+            .then(|| read_key_id_base64(&liteserver.public_path))
+            .transpose()?,
         validator_adnl: Some(full_node_adnl),
         ..NodeRuntime::default()
     })
@@ -252,9 +256,10 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
     if runtime.console_public_key.is_none() {
         runtime.console_public_key = read_key_id_base64(&node_layout.server_public_key()).ok();
     }
-    if node.liteserver && runtime.liteserver_public_key.is_none() {
-        runtime.liteserver_public_key =
-            read_key_id_base64(&node_layout.keyring.join("liteserver.pub")).ok();
+    if node.liteserver {
+        runtime.liteserver_public_key = Some(read_key_id_base64(
+            &node_layout.keyring.join("liteserver.pub"),
+        )?);
     }
     recover_config_metadata(&node_layout.config_json(), &mut runtime)?;
     Ok(runtime)

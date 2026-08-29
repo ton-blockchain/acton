@@ -126,28 +126,6 @@ impl LauncherControl {
         Ok(updated.nodes.get(name).cloned().unwrap_or_default())
     }
 
-    /// Enables and starts the next preconfigured non-genesis validator slot.
-    ///
-    /// Ports and directories already exist in settings. This operation activates
-    /// one slot, marks it as a validator, optionally enables election
-    /// participation, persists the topology, and delegates normal node startup.
-    pub async fn add_validator(&self, participate: bool) -> Result<String> {
-        let mut settings = Settings::load_or_create(&self.layout.settings)?;
-        let node = settings
-            .nodes
-            .iter_mut()
-            .find(|node| node.name != "genesis" && !node.enabled)
-            .context("all configured local nodes are already enabled")?;
-        node.enabled = true;
-        node.validator = true;
-        node.participate_in_elections = participate;
-        let name = node.name.clone();
-        settings.validate()?;
-        settings.save_atomic(&self.layout.settings)?;
-        self.start_node(&name).await?;
-        Ok(name)
-    }
-
     pub async fn process_info(&self) -> Vec<ProcessInfo> {
         self.processes.info().await
     }

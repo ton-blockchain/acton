@@ -88,15 +88,22 @@ pub struct AgentArgs {
     #[arg(long = "node", default_value = "node2")]
     pub nodes: Vec<String>,
 
-    /// Configuration API of the running primary Localton network.
+    /// URL of a standard TON global configuration used to join the network.
     #[arg(long, env = "LOCALTON_AGENT_JOIN")]
     pub join: String,
+
+    /// Optional development faucet URL used to fund a validator wallet.
+    #[arg(long, env = "LOCALTON_AGENT_FAUCET")]
+    pub faucet: Option<String>,
 
     /// IPv4 address advertised by full nodes on this host.
     #[arg(long, env = "LOCALTON_AGENT_ADVERTISE_IP")]
     pub advertise_ip: Ipv4Addr,
 
-    /// Enter elections and validate from this host.
+    /// Enable validator mode when initializing a new agent node.
+    ///
+    /// Later starts reuse the persisted mode. Use `validator enable` or
+    /// `validator disable` to change participation in future elections.
     #[arg(long)]
     pub validator: bool,
 
@@ -484,6 +491,20 @@ pub enum ValidatorCommand {
     Status {
         #[command(flatten)]
         state: StateArgs,
+    },
+    /// Participate in future elections without restarting the full node.
+    Enable {
+        #[command(flatten)]
+        state: StateArgs,
+        #[arg(default_value = "genesis")]
+        node: String,
+    },
+    /// Stop participating in future elections and remain a full node.
+    Disable {
+        #[command(flatten)]
+        state: StateArgs,
+        #[arg(default_value = "genesis")]
+        node: String,
     },
     /// Create keys and submit an election participation request.
     Participate {

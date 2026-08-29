@@ -37,20 +37,15 @@ impl Toolchain {
         Ok(Self { layout, binaries })
     }
 
-    pub fn manifest(&self) -> Result<Manifest> {
-        Manifest::load(&self.layout.manifest)
-    }
-
     pub fn settings(&self) -> Result<Settings> {
         Settings::load_or_create(&self.layout.settings)
     }
 
     pub async fn lite_client(&self, command_text: &str) -> Result<String> {
-        let manifest = self.manifest()?;
         let mut command = Command::new(self.binaries.command("lite-client"));
         command
             .args(["-t", "15", "-C"])
-            .arg(&manifest.global_config)
+            .arg(&self.layout.global_config)
             .args(["-c", command_text]);
         let output = run_checked(
             &format!("lite-client {command_text}"),

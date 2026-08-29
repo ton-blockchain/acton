@@ -650,7 +650,10 @@ mod tests {
         assert_eq!(settings.network.elected_for_seconds, 120);
         assert_eq!(settings.network.election_start_before_seconds, 90);
         assert_eq!(settings.network.election_end_before_seconds, 30);
-        assert_eq!(settings.network.original_validator_set_valid_for_seconds, 90);
+        assert_eq!(
+            settings.network.original_validator_set_valid_for_seconds,
+            90
+        );
         assert_eq!(settings.validation.poll_interval_seconds, 5);
     }
 

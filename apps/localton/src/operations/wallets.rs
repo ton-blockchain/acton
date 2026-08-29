@@ -227,6 +227,16 @@ pub async fn ensure_wallet(
     wallet_id: u32,
 ) -> Result<PublicWallet> {
     let toolchain = Toolchain::resolve(state_dir, None).await?;
+    ensure_wallet_for_toolchain(&toolchain, name, version, workchain, wallet_id).await
+}
+
+pub(crate) async fn ensure_wallet_for_toolchain(
+    toolchain: &Toolchain,
+    name: &str,
+    version: WalletVersion,
+    workchain: i32,
+    wallet_id: u32,
+) -> Result<PublicWallet> {
     let registry = load_registry(&toolchain.layout)?;
     if let Some(existing) = registry.wallets.get(name) {
         ensure!(
@@ -236,8 +246,69 @@ pub async fn ensure_wallet(
         );
         return Ok(PublicWallet::from(existing));
     }
-    let wallet = create_wallet(&toolchain, name, version, workchain, wallet_id).await?;
+    let wallet = create_wallet(toolchain, name, version, workchain, wallet_id).await?;
     Ok(PublicWallet::from(&wallet))
+}
+
+pub(crate) async fn wallet_balance_nano(toolchain: &Toolchain, name: &str) -> Result<u128> {
+    let wallet = wallet(&toolchain.layout, name)?;
+    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    client
+        .account(&wallet.address)
+        .await?
+        .balance_nano
+        .parse()
+        .context("wallet balance exceeds u128")
+}
+
+pub(crate) async fn ensure_wallet_deployed(toolchain: &Toolchain, name: &str) -> Result<()> {
+    let wallet = wallet(&toolchain.layout, name)?;
+    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    let account = client.account(&wallet.address).await?;
+    if account.state == "active" {
+        return Ok(());
+    }
+    ensure!(
+        account.balance_nano.parse::<u128>().unwrap_or_default() > 0,
+        "wallet `{name}` must be funded before deployment"
+    );
+    let deploy = match wallet.version {
+        StoredWalletVersion::V4r2 | StoredWalletVersion::V5r1 => build_native_deploy(&wallet)?,
+        _ => {
+            let path = wallet
+                .deploy_boc
+                .as_ref()
+                .with_context(|| format!("wallet `{name}` has no deployment message"))?;
+            fs::read(path)
+                .with_context(|| format!("failed to read deployment BoC {}", path.display()))?
+        }
+    };
+    client.send_boc(deploy).await?;
+    wait_for_wallet_state(toolchain, &wallet.address, "active").await
+}
+
+pub(crate) async fn wait_for_wallet_balance(
+    toolchain: &Toolchain,
+    address: &str,
+    minimum_nano: u128,
+) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+        let balance = client
+            .account(address)
+            .await?
+            .balance_nano
+            .parse::<u128>()
+            .unwrap_or_default();
+        if balance >= minimum_nano {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            bail!("wallet funding did not become visible within 30 seconds")
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
 }
 
 pub struct FundWalletResult {
@@ -280,10 +351,6 @@ pub async fn fund_wallet(state_dir: &Path, wallet: &str, amount: &str) -> Result
         address: destination,
         status,
     })
-}
-
-pub fn read_address(path: &Path) -> Result<Address> {
-    read_address_file(path)
 }
 
 async fn create_wallet(
@@ -707,6 +774,20 @@ fn build_native_transfer(source: &WalletRecord, transfer: &TransferBuild<'_>) ->
         .map_err(Into::into)
 }
 
+fn build_native_deploy(source: &WalletRecord) -> Result<Vec<u8>> {
+    let seed = read_private_key(&source.key_base.with_extension("pk"))?;
+    let signing_key = SigningKey::from_bytes(&seed);
+    let version = match source.version {
+        StoredWalletVersion::V4r2 => TonWalletVersion::V4R2,
+        StoredWalletVersion::V5r1 => TonWalletVersion::V5R1,
+        _ => bail!("wallet version does not use the native deployment path"),
+    };
+    ton_wallet(version, &signing_key, source.workchain, source.wallet_id)?
+        .create_ext_in_msg(Vec::new(), 0, unix_time_u32()?.saturating_add(60), true)?
+        .to_boc()
+        .map_err(Into::into)
+}
+
 fn ton_wallet(
     version: TonWalletVersion,
     signing_key: &SigningKey,
@@ -801,6 +882,21 @@ async fn wait_for_balance(global_config: &Path, address: &str) -> Result<()> {
         }
         if tokio::time::Instant::now() >= deadline {
             bail!("wallet funding did not become visible within 30 seconds")
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+async fn wait_for_wallet_state(toolchain: &Toolchain, address: &str, expected: &str) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+        let state = client.account(address).await?.state;
+        if state == expected {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            bail!("wallet did not become `{expected}` within 30 seconds")
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
@@ -980,7 +1076,7 @@ fn parse_grams(value: &str) -> Result<u128> {
     Ok(amount)
 }
 
-fn format_nano_grams(value: u128) -> String {
+pub(crate) fn format_nano_grams(value: u128) -> String {
     let whole = value / 1_000_000_000;
     let fraction = value % 1_000_000_000;
     if fraction == 0 {
@@ -1030,10 +1126,7 @@ fn unix_time_u32() -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use ed25519_dalek::SigningKey;
-    use ton::{
-        ton_core::traits::tlb::TLB,
-        ton_wallet::WalletVersion as TonWalletVersion,
-    };
+    use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
     use tycho_types::boc::Boc;
 
     use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, parse_seqno, ton_wallet};

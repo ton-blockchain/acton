@@ -150,6 +150,24 @@ pub(super) async fn configure_genesis_identity(
         ] {
             console_retry(layout, binaries, node, &remote_command).await?;
         }
+        // `changefullnodeaddr` deliberately drops the active console command
+        // while the engine swaps its full-node ADNL identity. Some TON builds
+        // also terminate the temporary process with an ADNL unsubscribe error.
+        // Its database already contains the new identity, so restart it and
+        // continue instead of treating that implementation detail as a failed
+        // genesis bootstrap.
+        if let Err(error) = wait_for_console(layout, binaries, node, &mut temporary, timeout).await
+        {
+            warn!(%error, "temporary validator stopped after changing its full-node identity; restarting it");
+            temporary.stop().await?;
+            temporary = ManagedProcess::spawn(
+                "temporary validator-engine",
+                command(layout, binaries, node, false),
+                &layout.logs.join("validator-bootstrap.stdout.log"),
+                &layout.logs.join("validator-bootstrap.stderr.log"),
+            )?;
+            wait_for_console(layout, binaries, node, &mut temporary, timeout).await?;
+        }
         import_validator_key(layout, binaries, node, validator, timeout, &mut temporary).await
     }
     .await;

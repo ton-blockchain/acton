@@ -3,30 +3,29 @@
 //! `/` returns the current readiness state and URLs of enabled services.
 //! `/openapi.json` returns a generated OpenAPI description of this service.
 //! `/localhost.global.config.json` and `/config` return the generated TON global
-//! config. `/bootstrap/full-node` returns public zerostate data for a new full
-//! node. `/live` and `/healthz` report launcher readiness. Validator agent
-//! endpoints coordinate elections without transferring private validator keys.
+//! config. `/faucet` gives a new node an on-chain development balance. `/live`
+//! and `/healthz` report launcher readiness.
+
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::watch;
+use tokio::sync::{Mutex, watch};
 use tracing::info;
-use utoipa::{IntoParams, OpenApi, ToSchema};
+use utoipa::{OpenApi, ToSchema};
 
 use crate::{
     bootstrap::LauncherControl,
-    operations::validators::{
-        ParticipationResult, RemoteValidatorElectionEntry, RemoteValidatorTaskResponse,
-    },
-    storage::{FullNodeBootstrap, RuntimeState, Settings, StaticStateFile},
+    operations::wallets,
+    storage::{RuntimeState, Settings},
 };
 
 use super::{
@@ -39,29 +38,21 @@ use super::{
 #[openapi(
     info(
         title = "localton Configuration API",
-        description = "Network discovery, full-node bootstrap, health, and validator creation"
+        description = "Network discovery, health, and development funding"
     ),
     paths(
         root_handler,
         localhost_global_config_handler,
         global_config_handler,
-        full_node_bootstrap_handler,
+        development_faucet_handler,
         live_handler,
-        healthz_handler,
-        add_validator_handler,
-        remote_validator_task_handler,
-        remote_validator_participate_handler
+        healthz_handler
     ),
     components(schemas(
         ConfigDocument,
         ConfigEndpoints,
-        FullNodeBootstrap,
-        StaticStateFile,
-        AddValidatorResponse,
-        RemoteValidatorTaskResponse,
-        crate::operations::validators::RemoteValidatorTask,
-        RemoteValidatorElectionEntry,
-        ParticipationResult,
+        DevelopmentFaucetRequest,
+        DevelopmentFaucetResponse,
         ErrorResponse
     )),
     tags((name = "configuration", description = "Local TON network configuration and health"))
@@ -86,18 +77,12 @@ pub(super) struct ConfigEndpoints {
     pub global_config: String,
     /// Short URL of the same TON global config
     pub config: String,
-    /// Public network data required to initialize an independent full node
-    pub full_node_bootstrap: String,
     /// Readiness probe URL
     pub live: String,
     /// Health probe URL
     pub healthz: String,
-    /// URL that creates a validator node
-    pub add_validator: String,
-    /// URL template used by agents to request an election task
-    pub remote_validator_task: String,
-    /// URL template used by agents to submit a signed election entry
-    pub remote_validator_participate: String,
+    /// Development faucet used to fund a node-owned wallet
+    pub faucet: String,
     /// Admin API URL, if the service is enabled
     pub admin: Option<String>,
     /// Account funding URL, if the TON HTTP API is enabled
@@ -108,20 +93,27 @@ pub(super) struct ConfigEndpoints {
     pub ton_http_api_monitor: Option<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+struct DevelopmentFaucetRequest {
+    /// TON address that receives one development grant
+    address: String,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
-struct AddValidatorResponse {
-    /// Name of the new node
-    node: String,
-    /// `true` because the new node is a validator
-    validator: bool,
-    /// `true` when the node enters elections automatically
-    participate: bool,
+struct DevelopmentFaucetResponse {
+    /// TON address that received the grant
+    address: String,
+    /// Grant amount in nanotons
+    amount_nano: u64,
+    /// Liteserver send status
+    status: u32,
 }
 
 #[derive(Clone)]
 struct ConfigState {
     control: LauncherControl,
     settings: Settings,
+    faucet_lock: Arc<Mutex<()>>,
 }
 
 pub(super) async fn start(
@@ -138,19 +130,14 @@ pub(super) async fn start(
             get(localhost_global_config_handler),
         )
         .route("/config", get(global_config_handler))
-        .route("/bootstrap/full-node", get(full_node_bootstrap_handler))
+        .route("/faucet", post(development_faucet_handler))
         .route("/live", get(live_handler))
         .route("/healthz", get(healthz_handler))
-        .route("/add-validator", get(add_validator_handler))
-        .route(
-            "/validators/{name}/task",
-            post(remote_validator_task_handler),
-        )
-        .route(
-            "/validators/{name}/participate",
-            post(remote_validator_participate_handler),
-        )
-        .with_state(ConfigState { control, settings });
+        .with_state(ConfigState {
+            control,
+            settings,
+            faucet_lock: Arc::new(Mutex::new(())),
+        });
     let endpoint = format!("http://{address}");
     let running = server::start(
         "config HTTP service",
@@ -225,14 +212,9 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
         endpoints: ConfigEndpoints {
             global_config: format!("{config_endpoint}/localhost.global.config.json"),
             config: format!("{config_endpoint}/config"),
-            full_node_bootstrap: format!("{config_endpoint}/bootstrap/full-node"),
             live: format!("{config_endpoint}/live"),
             healthz: format!("{config_endpoint}/healthz"),
-            add_validator: format!("{config_endpoint}/add-validator"),
-            remote_validator_task: format!("{config_endpoint}/validators/{{name}}/task"),
-            remote_validator_participate: format!(
-                "{config_endpoint}/validators/{{name}}/participate"
-            ),
+            faucet: format!("{config_endpoint}/faucet"),
             admin: admin_endpoint,
             fund_account: fund_account_endpoint,
             ton_http_api: ton_http_api_endpoint,
@@ -284,27 +266,52 @@ async fn read_global_config(state: &ConfigState) -> Result<Json<Value>, HttpErro
     ))
 }
 
-/// Get public bootstrap data for an independent full node
+/// Fund a node-owned wallet from the development faucet
 ///
-/// The document contains the global config and immutable zerostates. It never
-/// contains validator, console, liteserver, or ADNL private keys
+/// The faucet only transfers test coins. The node keeps its wallet and
+/// validator keys locally and submits election messages to Elector itself
 #[utoipa::path(
-    get,
-    path = "/bootstrap/full-node",
+    post,
+    path = "/faucet",
     tag = "configuration",
+    request_body = DevelopmentFaucetRequest,
     responses(
-        (status = 200, description = "Public full-node bootstrap data", body = FullNodeBootstrap),
-        (status = 400, description = "Bootstrap data could not be read", body = ErrorResponse)
+        (status = 200, description = "Development grant submitted", body = DevelopmentFaucetResponse),
+        (status = 400, description = "Grant could not be submitted", body = ErrorResponse)
     )
 )]
-async fn full_node_bootstrap_handler(
+async fn development_faucet_handler(
     State(state): State<ConfigState>,
-) -> Result<Json<FullNodeBootstrap>, HttpError> {
-    let layout = state.control.layout().clone();
-    let bootstrap = tokio::task::spawn_blocking(move || FullNodeBootstrap::from_layout(&layout))
-        .await
-        .context("full-node bootstrap task failed")??;
-    Ok(Json(bootstrap))
+    Json(request): Json<DevelopmentFaucetRequest>,
+) -> Result<Json<DevelopmentFaucetResponse>, HttpError> {
+    let _guard = state.faucet_lock.lock().await;
+    let amount_nano = state
+        .settings
+        .nodes
+        .iter()
+        .map(|node| node.initial_wallet_amount_nano)
+        .max()
+        .context("network has no node wallet grant configured")?;
+    let amount = wallets::format_nano_grams(u128::from(amount_nano));
+    let status = wallets::send(
+        &state.control.toolchain(),
+        wallets::SendRequest {
+            from: "faucet",
+            to: &request.address,
+            amount: &amount,
+            comment: None,
+            body: None,
+            state_init: None,
+            mode: 3,
+            bounce: false,
+        },
+    )
+    .await?;
+    Ok(Json(DevelopmentFaucetResponse {
+        address: request.address,
+        amount_nano,
+        status,
+    }))
 }
 
 /// Get the network readiness state
@@ -353,89 +360,4 @@ async fn live_response(state: &ConfigState) -> Response {
         )
             .into_response(),
     }
-}
-
-#[derive(Debug, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-struct AddValidatorQuery {
-    /// Whether the new validator should enter elections immediately
-    #[serde(default = "default_true")]
-    participate: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-/// Create and start a validator node
-///
-/// By default, the new validator enters elections automatically
-#[utoipa::path(
-    get,
-    path = "/add-validator",
-    tag = "configuration",
-    params(AddValidatorQuery),
-    responses(
-        (status = 200, description = "Validator was added", body = AddValidatorResponse),
-        (status = 400, description = "Validator could not be added", body = ErrorResponse)
-    )
-)]
-async fn add_validator_handler(
-    State(state): State<ConfigState>,
-    Query(query): Query<AddValidatorQuery>,
-) -> Result<Json<AddValidatorResponse>, HttpError> {
-    let name = state.control.add_validator(query.participate).await?;
-    Ok(Json(AddValidatorResponse {
-        node: name,
-        validator: true,
-        participate: query.participate,
-    }))
-}
-
-/// Request the active election parameters for a validator agent
-#[utoipa::path(
-    post,
-    path = "/validators/{name}/task",
-    tag = "configuration",
-    params(("name" = String, Path, description = "Agent-owned node name")),
-    responses(
-        (status = 200, description = "Active election task or an empty task", body = RemoteValidatorTaskResponse),
-        (status = 400, description = "Election task could not be prepared", body = ErrorResponse)
-    )
-)]
-async fn remote_validator_task_handler(
-    State(state): State<ConfigState>,
-    Path(name): Path<String>,
-) -> Result<Json<RemoteValidatorTaskResponse>, HttpError> {
-    Ok(Json(
-        crate::operations::validators::remote_validator_task(&state.control.toolchain(), &name)
-            .await?,
-    ))
-}
-
-/// Submit an election entry signed by an agent-owned validator key
-#[utoipa::path(
-    post,
-    path = "/validators/{name}/participate",
-    tag = "configuration",
-    params(("name" = String, Path, description = "Agent-owned node name")),
-    request_body = RemoteValidatorElectionEntry,
-    responses(
-        (status = 200, description = "Election entry was submitted", body = ParticipationResult),
-        (status = 400, description = "Election entry could not be submitted", body = ErrorResponse)
-    )
-)]
-async fn remote_validator_participate_handler(
-    State(state): State<ConfigState>,
-    Path(name): Path<String>,
-    Json(entry): Json<RemoteValidatorElectionEntry>,
-) -> Result<Json<ParticipationResult>, HttpError> {
-    Ok(Json(
-        crate::operations::validators::submit_remote_validator_entry(
-            &state.control.toolchain(),
-            &name,
-            entry,
-        )
-        .await?,
-    ))
 }

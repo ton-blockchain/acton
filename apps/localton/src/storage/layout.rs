@@ -277,14 +277,7 @@ mod tests {
 
     #[test]
     fn global_config_has_matching_init_block() {
-        let config = global_config(
-            "root",
-            "file",
-            vec![],
-            Ipv4Addr::LOCALHOST,
-            28_004,
-            "pub",
-        );
+        let config = global_config("root", "file", vec![], Ipv4Addr::LOCALHOST, 28_004, "pub");
         assert_eq!(
             config.pointer("/validator/zero_state"),
             config.pointer("/validator/init_block")
