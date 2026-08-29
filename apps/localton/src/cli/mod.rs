@@ -27,6 +27,8 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
+    /// Join and supervise full nodes on this host.
+    Agent(AgentArgs),
     /// Start the network and all enabled headless services.
     Run(RunArgs),
     /// Inspect persisted and live network status.
@@ -75,6 +77,36 @@ pub struct StateArgs {
     /// Persistent network state.
     #[arg(long, default_value = ".localton", global = true)]
     pub state_dir: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct AgentArgs {
+    #[command(flatten)]
+    pub state: StateArgs,
+
+    /// Full-node names owned by this agent.
+    #[arg(long = "node", default_value = "node2")]
+    pub nodes: Vec<String>,
+
+    /// Configuration API of the running primary Localton network.
+    #[arg(long, env = "LOCALTON_AGENT_JOIN")]
+    pub join: String,
+
+    /// IPv4 address advertised by full nodes on this host.
+    #[arg(long, env = "LOCALTON_AGENT_ADVERTISE_IP")]
+    pub advertise_ip: Ipv4Addr,
+
+    /// Enter elections and validate from this host.
+    #[arg(long)]
+    pub validator: bool,
+
+    /// Use an existing directory with official TON binaries.
+    #[arg(long, env = "TON_BIN_DIR")]
+    pub ton_bin_dir: Option<PathBuf>,
+
+    /// Maximum node initialization and console readiness wait in seconds.
+    #[arg(long, default_value_t = 180)]
+    pub startup_timeout: u64,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -134,6 +166,12 @@ pub struct RunArgs {
     #[arg(long, value_parser = clap::value_parser!(usize))]
     pub validators: Option<usize>,
 
+    /// IPv4 address advertised by the genesis DHT and liteserver.
+    ///
+    /// Set this before first bootstrap when nodes on other hosts must join.
+    #[arg(long, env = "LOCALTON_ADVERTISE_IP")]
+    pub advertise_ip: Option<Ipv4Addr>,
+
     /// Add an active basechain account from a hex-encoded ShardAccount BoC.
     ///
     /// May be specified more than once. Only used when creating a new state.
@@ -184,6 +222,7 @@ impl Default for RunArgs {
             ton_bin_dir: None,
             startup_timeout: 180,
             validators: None,
+            advertise_ip: None,
             add_account: Vec::new(),
             ton_http_api: false,
             ton_http_api_bind: Ipv4Addr::LOCALHOST,

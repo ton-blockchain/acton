@@ -253,11 +253,11 @@ impl Default for NetworkSettings {
             max_validator_stake: 10_000_000,
             min_total_validator_stake: 10_000,
             max_stake_factor: 3,
-            elected_for_seconds: 30 * 60,
-            election_start_before_seconds: 25 * 60,
-            election_end_before_seconds: 10 * 60,
-            stakes_frozen_for_seconds: 5 * 60,
-            original_validator_set_valid_for_seconds: 25 * 60,
+            elected_for_seconds: 2 * 60,
+            election_start_before_seconds: 90,
+            election_end_before_seconds: 30,
+            stakes_frozen_for_seconds: 30,
+            original_validator_set_valid_for_seconds: 90,
             simplex_target_rate_ms: 300,
             simplex_slots_per_leader_window: 4,
             simplex_first_block_timeout_ms: 400,
@@ -575,7 +575,7 @@ impl Default for ValidationSettings {
         Self {
             auto_participate: true,
             auto_reap: true,
-            poll_interval_seconds: 15,
+            poll_interval_seconds: 5,
             max_factor: 3.0,
             reap_value_nano: 1_000_000_000,
         }
@@ -642,6 +642,16 @@ mod tests {
         assert_eq!(settings.services.ton_http_api.port, 18_002);
         assert_eq!(settings.services.ton_http_api.backend_port, 18_005);
         assert_eq!(settings.services.ton_http_api.monitor_port, 18_006);
+    }
+
+    #[test]
+    fn default_validator_round_is_two_minutes() {
+        let settings = Settings::default();
+        assert_eq!(settings.network.elected_for_seconds, 120);
+        assert_eq!(settings.network.election_start_before_seconds, 90);
+        assert_eq!(settings.network.election_end_before_seconds, 30);
+        assert_eq!(settings.network.original_validator_set_valid_for_seconds, 90);
+        assert_eq!(settings.validation.poll_interval_seconds, 5);
     }
 
     #[test]

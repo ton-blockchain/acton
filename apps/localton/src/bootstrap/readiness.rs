@@ -80,7 +80,7 @@ pub(super) async fn lite_client_seqno(binaries: &TonBinaries, manifest: &Manifes
 /// The registry reports the process name and exit status as an error; the outer
 /// pipeline then performs coordinated shutdown instead of leaving a partially
 /// functioning network running.
-pub(super) async fn supervise(processes: &ProcessRegistry) -> Result<()> {
+pub(crate) async fn supervise(processes: &ProcessRegistry) -> Result<()> {
     loop {
         sleep(Duration::from_millis(250)).await;
         processes.ensure_alive().await?;
@@ -92,7 +92,7 @@ pub(super) async fn supervise(processes: &ProcessRegistry) -> Result<()> {
 /// Unix handles both Ctrl-C (`SIGINT`) and `SIGTERM`, which is used by Docker and
 /// process supervisors. Returning normally sends execution through the same
 /// cleanup path as a child-process failure.
-pub(super) async fn shutdown_signal() -> Result<()> {
+pub(crate) async fn shutdown_signal() -> Result<()> {
     #[cfg(unix)]
     {
         let mut terminate = signal::unix::signal(signal::unix::SignalKind::terminate())

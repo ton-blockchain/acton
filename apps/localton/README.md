@@ -11,6 +11,7 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
 - The launcher manages full nodes, validators, elections, stakes, rewards, and wallets.
+- A host agent joins and supervises follower full nodes or validators from public bootstrap data.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
 - A new zerostate can include active basechain accounts from another network.
@@ -175,6 +176,55 @@ TON_BIN_DIR=/path/to/ton localton run
 ```
 
 The launcher stores this path in `manifest.json`. Later commands use the stored path.
+
+## Run a node agent
+
+The distributed topology starts with one genesis validator and an independent node on another host. The agent can keep that node as a follower or enter it into validator elections.
+
+On the primary host, advertise an address reachable by the second host and expose the configuration service to the private network:
+
+```bash
+localton run \
+  --state-dir .localton-primary \
+  --advertise-ip 10.0.0.1 \
+  --config-http-bind 0.0.0.0
+```
+
+On the second host, start the agent with its own empty state directory:
+
+```bash
+localton agent \
+  --state-dir .localton-node2 \
+  --join http://10.0.0.1:18000 \
+  --advertise-ip 10.0.0.2
+```
+
+On first start, the agent downloads the global config and immutable zerostates from the primary configuration service. It then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. It starts `node2` automatically and reuses its local state on later starts. Validator and other private keys are never downloaded from the primary.
+
+Add `--validator` to make the remote node enter elections:
+
+```bash
+localton agent \
+  --validator \
+  --state-dir .localton-node2 \
+  --join http://10.0.0.1:18000 \
+  --advertise-ip 10.0.0.2
+```
+
+The validator agent creates permanent, temporary, and validator ADNL keys on the second host. It sends only the public key, ADNL address, and election signature to the primary. The primary submits the stake from the pre-funded `validator-1` wallet and recovers it after the round. Private validator keys never leave the agent host.
+
+New networks use two-minute validator rounds. Elections are open from 90 to 30 seconds before the next round, and agents poll every five seconds. These values are embedded in the zerostate, so changing them requires creating a new state directory on every host.
+
+Allow TCP port `18000` and UDP port `6302` to the primary host from the private network. Allow the follower's configured ADNL UDP port, `4445` by default, when the hosts are separated by a firewall or NAT.
+
+Inspect the follower state from the second host:
+
+```bash
+localton node list --state-dir .localton-node2
+localton node stats --state-dir .localton-node2 node2
+```
+
+Keep the agent process active while the follower runs. `Ctrl-C` or `SIGTERM` stops every validator-engine process owned by the agent. A process supervisor such as systemd can restart the agent with the same command and state directory.
 
 ## Native ports
 
@@ -461,6 +511,8 @@ The configuration API on port `18000` provides these routes:
 - `GET /config` returns the same global configuration.
 - `GET /live` and `GET /healthz` return liveness data.
 - `GET /add-validator?participate=true` adds a validator and starts election participation.
+- `POST /validators/{name}/task` returns the active election parameters to a validator agent.
+- `POST /validators/{name}/participate` accepts an agent-signed election entry and submits its stake.
 
 The administrative API on port `18001` provides these routes:
 

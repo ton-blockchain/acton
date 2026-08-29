@@ -1,6 +1,6 @@
 use std::{
     fs,
-    net::{Ipv4Addr, SocketAddrV4},
+    net::Ipv4Addr,
     path::{Path, PathBuf},
 };
 
@@ -214,6 +214,8 @@ pub fn global_config(
     zero_root_hash: &str,
     zero_file_hash: &str,
     dht_nodes: Vec<Value>,
+    liteserver_ip: Ipv4Addr,
+    liteserver_port: u16,
     liteserver_public_key: &str,
 ) -> Value {
     let zero_state = json!({
@@ -240,8 +242,8 @@ pub fn global_config(
                 "@type": "pub.ed25519",
                 "key": liteserver_public_key,
             },
-            "ip": ipv4_to_i32(Ipv4Addr::LOCALHOST),
-            "port": LITESERVER_PORT,
+            "ip": ipv4_to_i32(liteserver_ip),
+            "port": liteserver_port,
         }],
         "validator": {
             "@type": "validator.config.global",
@@ -251,11 +253,7 @@ pub fn global_config(
     })
 }
 
-pub fn endpoint() -> SocketAddrV4 {
-    SocketAddrV4::new(Ipv4Addr::LOCALHOST, LITESERVER_PORT)
-}
-
-fn ipv4_to_i32(ip: Ipv4Addr) -> i32 {
+pub(crate) fn ipv4_to_i32(ip: Ipv4Addr) -> i32 {
     i32::from_be_bytes(ip.octets())
 }
 
@@ -272,13 +270,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn localhost_is_ton_signed_ip() {
+    fn ipv4_uses_ton_signed_representation() {
         assert_eq!(ipv4_to_i32(Ipv4Addr::LOCALHOST), 2_130_706_433);
+        assert_eq!(ipv4_to_i32(Ipv4Addr::new(192, 168, 27, 4)), -1_062_724_860);
     }
 
     #[test]
     fn global_config_has_matching_init_block() {
-        let config = global_config("root", "file", vec![], "pub");
+        let config = global_config(
+            "root",
+            "file",
+            vec![],
+            Ipv4Addr::LOCALHOST,
+            28_004,
+            "pub",
+        );
         assert_eq!(
             config.pointer("/validator/zero_state"),
             config.pointer("/validator/init_block")
@@ -287,5 +293,6 @@ mod tests {
             config.pointer("/liteservers/0/ip"),
             Some(&json!(2_130_706_433))
         );
+        assert_eq!(config.pointer("/liteservers/0/port"), Some(&json!(28_004)));
     }
 }

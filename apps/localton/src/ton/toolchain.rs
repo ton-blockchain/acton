@@ -131,6 +131,15 @@ impl Toolchain {
         ])
         .context("failed to build FIFTPATH")
     }
+
+    pub fn smartcont_script(&self, name: &str) -> PathBuf {
+        let state_script = self.layout.smartcont.join(name);
+        if state_script.is_file() {
+            state_script
+        } else {
+            self.binaries.smartcont_dir().join(name)
+        }
+    }
 }
 
 pub fn join_output(output: CommandOutput) -> String {
@@ -149,4 +158,29 @@ pub fn absolute_path(path: &Path) -> Result<PathBuf> {
     Ok(std::env::current_dir()
         .context("failed to determine current directory")?
         .join(path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smartcont_script_prefers_state_override_and_falls_back_to_release() {
+        let temp = tempfile::tempdir().unwrap();
+        let layout = Layout::new(temp.path().join("state"));
+        layout.create_dirs().unwrap();
+        let binaries = TonBinaries {
+            root: temp.path().join("ton"),
+        };
+        std::fs::create_dir_all(binaries.smartcont_dir()).unwrap();
+        let toolchain = Toolchain { layout, binaries };
+
+        let release_script = toolchain.binaries.smartcont_dir().join("wallet.fif");
+        std::fs::write(&release_script, "release").unwrap();
+        assert_eq!(toolchain.smartcont_script("wallet.fif"), release_script);
+
+        let state_script = toolchain.layout.smartcont.join("wallet.fif");
+        std::fs::write(&state_script, "state").unwrap();
+        assert_eq!(toolchain.smartcont_script("wallet.fif"), state_script);
+    }
 }

@@ -5,6 +5,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tonutils::tvm::Address;
+use utoipa::ToSchema;
 
 use crate::{
     cli::{StateArgs, ValidatorCommand},
@@ -15,15 +16,40 @@ use crate::{
     ton::toolchain::Toolchain,
 };
 
-#[derive(Debug, Serialize)]
-struct ParticipationResult {
-    node: String,
-    election_id: u32,
-    election_end: u32,
-    validator_public_key: String,
-    validator_adnl: String,
-    message: String,
-    send_status: Option<u32>,
+const VALIDATOR_KEY_EXPIRY_MARGIN_SECONDS: u32 = 300;
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RemoteValidatorTask {
+    pub node: String,
+    pub election_id: u32,
+    pub election_end: u32,
+    pub wallet_address: String,
+    pub max_factor: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RemoteValidatorTaskResponse {
+    pub task: Option<RemoteValidatorTask>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RemoteValidatorElectionEntry {
+    pub election_id: u32,
+    pub election_end: u32,
+    pub validator_public_key: String,
+    pub validator_adnl: String,
+    pub signature: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ParticipationResult {
+    pub node: String,
+    pub election_id: u32,
+    pub election_end: u32,
+    pub validator_public_key: String,
+    pub validator_adnl: String,
+    pub message: String,
+    pub send_status: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -135,9 +161,6 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
         .map(|node| node.name.clone())
         .collect();
     for name in names {
-        if settings.validation.auto_reap {
-            reap(&toolchain, &name).await?;
-        }
         let should_participate = election_id > 0
             && settings.node(&name)?.participate_in_elections
             && !runtime.nodes.get(&name).is_some_and(|node| {
@@ -145,6 +168,9 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
             });
         if should_participate {
             participate(&toolchain, &name, Some(election_id)).await?;
+        }
+        if settings.validation.auto_reap {
+            reap(&toolchain, &name).await?;
         }
     }
     Ok(())
@@ -202,54 +228,172 @@ async fn participate(
         None => active_election_id(toolchain, &elector).await?,
     };
     ensure!(election_id > 0, "there is no active election");
-    if let Some(runtime) = RuntimeState::load(&toolchain.layout.runtime)?
-        .nodes
-        .get(&node.name)
-        .filter(|runtime| {
-            runtime.election_id == Some(election_id)
-                && runtime.participation_message.is_some()
-                && runtime.validator_public_key.is_some()
-                && runtime.validator_adnl.is_some()
-        })
-    {
-        return Ok(ParticipationResult {
-            node: node.name,
-            election_id,
-            election_end: runtime.election_end.unwrap_or_default(),
-            validator_public_key: runtime.validator_public_key.clone().unwrap_or_default(),
-            validator_adnl: runtime.validator_adnl.clone().unwrap_or_default(),
-            message: runtime
-                .participation_message
-                .as_ref()
-                .map_or_else(String::new, |path| path.display().to_string()),
-            send_status: None,
-        });
+    if let Some(result) = existing_participation(toolchain, &node, election_id)? {
+        return Ok(result);
     }
 
-    let node_layout = toolchain.layout.node(&node);
-    let election_end = election_id.saturating_add(settings.network.election_end_before_seconds);
+    let election_end = election_key_expiry(&settings, election_id);
+    let entry = prepare_election_entry(
+        toolchain,
+        &node,
+        election_id,
+        election_end,
+        &wallet.address,
+        settings.validation.max_factor,
+    )
+    .await?;
+    submit_election_entry(toolchain, &settings, &node, &wallet_name, entry).await
+}
+
+pub(crate) async fn remote_validator_task(
+    toolchain: &Toolchain,
+    node_name: &str,
+) -> Result<RemoteValidatorTaskResponse> {
+    let settings = toolchain.settings()?;
+    let node = settings.node(node_name)?.clone();
+    ensure!(node.name != "genesis", "genesis cannot be owned by an agent");
+    ensure!(
+        !node.enabled,
+        "node `{node_name}` is already managed by the primary launcher"
+    );
+    let elector = elector_address(&toolchain.layout)?;
+    let election_id = active_election_id(toolchain, &elector).await?;
+    if election_id > 0 && existing_participation(toolchain, &node, election_id)?.is_none() {
+        let wallet_name = controlling_wallet_name(&settings, &node)?;
+        let wallet = wallets::wallet(&toolchain.layout, &wallet_name)?;
+        return Ok(RemoteValidatorTaskResponse {
+            task: Some(RemoteValidatorTask {
+                node: node.name,
+                election_id,
+                election_end: election_key_expiry(&settings, election_id),
+                wallet_address: wallet.address,
+                max_factor: settings.validation.max_factor,
+            }),
+        });
+    }
+    if settings.validation.auto_reap {
+        reap_node(toolchain, &settings, &node).await?;
+    }
+    Ok(RemoteValidatorTaskResponse { task: None })
+}
+
+pub(crate) async fn prepare_remote_validator_entry(
+    toolchain: &Toolchain,
+    task: &RemoteValidatorTask,
+) -> Result<RemoteValidatorElectionEntry> {
+    let settings = toolchain.settings()?;
+    let node = settings.node(&task.node)?.clone();
+    ensure!(node.enabled, "node `{}` is disabled", node.name);
+    ensure!(node.validator, "node `{}` is not a validator", node.name);
+    ensure!(task.election_id > 0, "remote election id must be positive");
+    ensure!(
+        task.election_end > task.election_id,
+        "remote validator key must outlive the election"
+    );
+    ensure!(
+        task.max_factor.is_finite() && task.max_factor > 0.0,
+        "remote max factor must be positive and finite"
+    );
+    prepare_election_entry(
+        toolchain,
+        &node,
+        task.election_id,
+        task.election_end,
+        &task.wallet_address,
+        task.max_factor,
+    )
+    .await
+}
+
+pub(crate) async fn submit_remote_validator_entry(
+    toolchain: &Toolchain,
+    node_name: &str,
+    entry: RemoteValidatorElectionEntry,
+) -> Result<ParticipationResult> {
+    let settings = toolchain.settings()?;
+    let node = settings.node(node_name)?.clone();
+    ensure!(node.name != "genesis", "genesis cannot be owned by an agent");
+    ensure!(
+        !node.enabled,
+        "node `{node_name}` is already managed by the primary launcher"
+    );
+    validate_remote_entry(&entry)?;
+    if let Some(result) = existing_participation(toolchain, &node, entry.election_id)? {
+        return Ok(result);
+    }
+
+    let elector = elector_address(&toolchain.layout)?;
+    let active = active_election_id(toolchain, &elector).await?;
+    ensure!(
+        active == entry.election_id,
+        "election {} is no longer active",
+        entry.election_id
+    );
+    ensure!(
+        entry.election_end == election_key_expiry(&settings, entry.election_id),
+        "validator key expiry does not match the network election"
+    );
+    let wallet_name = controlling_wallet_name(&settings, &node)?;
+    submit_election_entry(toolchain, &settings, &node, &wallet_name, entry).await
+}
+
+pub(crate) fn mark_remote_validator_submitted(
+    toolchain: &Toolchain,
+    node_name: &str,
+    result: &ParticipationResult,
+) -> Result<()> {
+    let settings = toolchain.settings()?;
+    let node = settings.node(node_name)?;
+    let marker = toolchain
+        .layout
+        .node(node)
+        .root
+        .join("elections")
+        .join(result.election_id.to_string())
+        .join("validator-entry.json");
+    RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
+        let node_runtime = runtime.nodes.entry(node_name.to_owned()).or_default();
+        node_runtime.validator_public_key = Some(result.validator_public_key.clone());
+        node_runtime.validator_adnl = Some(result.validator_adnl.clone());
+        node_runtime.election_id = Some(result.election_id);
+        node_runtime.election_end = Some(result.election_end);
+        node_runtime.participation_message = Some(marker.clone());
+        Ok(())
+    })?;
+    Ok(())
+}
+
+async fn prepare_election_entry(
+    toolchain: &Toolchain,
+    node: &NodeSettings,
+    election_id: u32,
+    election_end: u32,
+    wallet_address: &str,
+    max_factor: f64,
+) -> Result<RemoteValidatorElectionEntry> {
+    let node_layout = toolchain.layout.node(node);
     let keys = if let Some(keys) = existing_election_keys(&node_layout, election_id)? {
         keys
     } else {
-        let signing_key = console_new_key(toolchain, &node).await?;
+        let signing_key = console_new_key(toolchain, node).await?;
         console_expect(
             toolchain,
-            &node,
+            node,
             &format!("addpermkey {signing_key} {election_id} {election_end}"),
         )
         .await?;
         console_expect(
             toolchain,
-            &node,
+            node,
             &format!("addtempkey {signing_key} {signing_key} {election_end}"),
         )
         .await?;
 
-        let adnl = console_new_key(toolchain, &node).await?;
-        console_expect(toolchain, &node, &format!("addadnl {adnl} 0")).await?;
+        let adnl = console_new_key(toolchain, node).await?;
+        console_expect(toolchain, node, &format!("addadnl {adnl} 0")).await?;
         console_expect(
             toolchain,
-            &node,
+            node,
             &format!("addvalidatoraddr {signing_key} {adnl} {election_end}"),
         )
         .await?;
@@ -259,7 +403,7 @@ async fn participate(
             election_end,
         }
     };
-    let signing_public_key = console_export_public(toolchain, &node, &keys.signing_key).await?;
+    let signing_public_key = console_export_public(toolchain, node, &keys.signing_key).await?;
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
         let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
         node_runtime.validator_public_key = Some(signing_public_key.clone());
@@ -280,9 +424,9 @@ async fn participate(
         &request_dir,
         "validator-elect-req.fif",
         vec![
-            wallet.address.clone(),
+            wallet_address.to_owned(),
             election_id.to_string(),
-            settings.validation.max_factor.to_string(),
+            max_factor.to_string(),
             keys.adnl.clone(),
             unsigned.to_string_lossy().into_owned(),
         ],
@@ -291,7 +435,37 @@ async fn participate(
     let signing_payload = hex::encode(
         fs::read(&unsigned).with_context(|| format!("failed to read {}", unsigned.display()))?,
     );
-    let signature = console_sign(toolchain, &node, &keys.signing_key, &signing_payload).await?;
+    let signature = console_sign(toolchain, node, &keys.signing_key, &signing_payload).await?;
+    let entry = RemoteValidatorElectionEntry {
+        election_id,
+        election_end: keys.election_end,
+        validator_public_key: signing_public_key,
+        validator_adnl: keys.adnl,
+        signature,
+    };
+    fs::write(
+        request_dir.join("validator-entry.json"),
+        serde_json::to_vec_pretty(&entry)?,
+    )?;
+    Ok(entry)
+}
+
+async fn submit_election_entry(
+    toolchain: &Toolchain,
+    settings: &Settings,
+    node: &NodeSettings,
+    wallet_name: &str,
+    entry: RemoteValidatorElectionEntry,
+) -> Result<ParticipationResult> {
+    let wallet = wallets::wallet(&toolchain.layout, wallet_name)?;
+    let elector = elector_address(&toolchain.layout)?;
+    let request_dir = toolchain
+        .layout
+        .node(node)
+        .root
+        .join("elections")
+        .join(entry.election_id.to_string());
+    fs::create_dir_all(&request_dir)?;
     let signed = request_dir.join("validator-query.boc");
     run_fift(
         toolchain,
@@ -299,11 +473,11 @@ async fn participate(
         "validator-elect-signed.fif",
         vec![
             wallet.address,
-            election_id.to_string(),
+            entry.election_id.to_string(),
             settings.validation.max_factor.to_string(),
-            keys.adnl.clone(),
-            signing_public_key.clone(),
-            signature,
+            entry.validator_adnl.clone(),
+            entry.validator_public_key.clone(),
+            entry.signature,
             signed.to_string_lossy().into_owned(),
         ],
     )
@@ -312,7 +486,7 @@ async fn participate(
     let send_status = wallets::send(
         toolchain,
         wallets::SendRequest {
-            from: &wallet_name,
+            from: wallet_name,
             to: &elector,
             amount: &nano_to_grams(node.validator_stake_nano),
             comment: None,
@@ -326,23 +500,78 @@ async fn participate(
 
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
         let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        node_runtime.validator_public_key = Some(signing_public_key.clone());
-        node_runtime.validator_adnl = Some(keys.adnl.clone());
-        node_runtime.election_id = Some(election_id);
-        node_runtime.election_end = Some(keys.election_end);
+        node_runtime.validator_public_key = Some(entry.validator_public_key.clone());
+        node_runtime.validator_adnl = Some(entry.validator_adnl.clone());
+        node_runtime.election_id = Some(entry.election_id);
+        node_runtime.election_end = Some(entry.election_end);
         node_runtime.participation_message = Some(signed.clone());
         Ok(())
     })?;
 
     Ok(ParticipationResult {
-        node: node.name,
-        election_id,
-        election_end: keys.election_end,
-        validator_public_key: signing_public_key,
-        validator_adnl: keys.adnl,
+        node: node.name.clone(),
+        election_id: entry.election_id,
+        election_end: entry.election_end,
+        validator_public_key: entry.validator_public_key,
+        validator_adnl: entry.validator_adnl,
         message: signed.display().to_string(),
         send_status: Some(send_status),
     })
+}
+
+fn existing_participation(
+    toolchain: &Toolchain,
+    node: &NodeSettings,
+    election_id: u32,
+) -> Result<Option<ParticipationResult>> {
+    Ok(RuntimeState::load(&toolchain.layout.runtime)?
+        .nodes
+        .get(&node.name)
+        .filter(|runtime| {
+            runtime.election_id == Some(election_id)
+                && runtime.participation_message.is_some()
+                && runtime.validator_public_key.is_some()
+                && runtime.validator_adnl.is_some()
+        })
+        .map(|runtime| ParticipationResult {
+            node: node.name.clone(),
+            election_id,
+            election_end: runtime.election_end.unwrap_or_default(),
+            validator_public_key: runtime.validator_public_key.clone().unwrap_or_default(),
+            validator_adnl: runtime.validator_adnl.clone().unwrap_or_default(),
+            message: runtime
+                .participation_message
+                .as_ref()
+                .map_or_else(String::new, |path| path.display().to_string()),
+            send_status: None,
+        }))
+}
+
+fn election_key_expiry(settings: &Settings, election_id: u32) -> u32 {
+    election_id
+        .saturating_add(settings.network.elected_for_seconds)
+        .saturating_add(VALIDATOR_KEY_EXPIRY_MARGIN_SECONDS)
+}
+
+fn validate_remote_entry(entry: &RemoteValidatorElectionEntry) -> Result<()> {
+    ensure!(entry.election_id > 0, "remote election id must be positive");
+    ensure!(
+        entry.election_end > entry.election_id,
+        "remote validator key must outlive the election"
+    );
+    ensure!(
+        hex::decode(&entry.validator_adnl)?.len() == 32,
+        "validator ADNL must contain 32 bytes"
+    );
+    ensure!(
+        matches!(STANDARD.decode(&entry.validator_public_key)?.len(), 32 | 36),
+        "validator public key must contain 32 or 36 bytes"
+    );
+    ensure!(
+        STANDARD.decode(&entry.signature)?.len() == 64,
+        "validator signature must contain 64 bytes"
+    );
+    Ok(())
 }
 
 fn existing_election_keys(
@@ -385,7 +614,15 @@ async fn reap(toolchain: &Toolchain, node_name: &str) -> Result<ReapResult> {
     let settings = toolchain.settings()?;
     let node = settings.node(node_name)?.clone();
     ensure!(node.validator, "node `{node_name}` is not a validator");
-    let wallet_name = controlling_wallet_name(&settings, &node)?;
+    reap_node(toolchain, &settings, &node).await
+}
+
+async fn reap_node(
+    toolchain: &Toolchain,
+    settings: &Settings,
+    node: &NodeSettings,
+) -> Result<ReapResult> {
+    let wallet_name = controlling_wallet_name(settings, node)?;
     let wallet = wallets::wallet(&toolchain.layout, &wallet_name)?;
     let wallet_address = Address::from_str(&wallet.address)?;
     let elector = elector_address(&toolchain.layout)?;
@@ -398,14 +635,14 @@ async fn reap(toolchain: &Toolchain, node_name: &str) -> Result<ReapResult> {
     let available_nano = parse_first_result_number(&output)?;
     if available_nano == 0 {
         return Ok(ReapResult {
-            node: node.name,
+            node: node.name.clone(),
             available_nano,
             sent: false,
             send_status: None,
         });
     }
 
-    let reap_dir = toolchain.layout.node(&node).root.join("rewards");
+    let reap_dir = toolchain.layout.node(node).root.join("rewards");
     fs::create_dir_all(&reap_dir)?;
     let message = reap_dir.join(format!("recover-{}.boc", crate::storage::unix_time()));
     run_fift(
@@ -441,7 +678,7 @@ async fn reap(toolchain: &Toolchain, node_name: &str) -> Result<ReapResult> {
         Ok(())
     })?;
     Ok(ReapResult {
-        node: node.name,
+        node: node.name.clone(),
         available_nano,
         sent: true,
         send_status: Some(status),
@@ -554,9 +791,7 @@ async fn run_fift(
     let mut command = vec![
         "-s".to_owned(),
         toolchain
-            .layout
-            .smartcont
-            .join(script)
+            .smartcont_script(script)
             .to_string_lossy()
             .into_owned(),
     ];
@@ -593,8 +828,11 @@ mod tests {
     use serde_json::json;
     use tempfile::tempdir;
 
-    use super::{existing_election_keys, nano_to_grams, parse_first_result_number};
-    use crate::storage::{Layout, NodeSettings};
+    use super::{
+        RemoteValidatorElectionEntry, election_key_expiry, existing_election_keys, nano_to_grams,
+        parse_first_result_number, validate_remote_entry,
+    };
+    use crate::storage::{Layout, NodeSettings, Settings};
 
     #[test]
     fn parses_elector_result() {
@@ -608,6 +846,28 @@ mod tests {
     fn formats_nano_without_precision_loss() {
         assert_eq!(nano_to_grams(10_001_000_000_000), "10001");
         assert_eq!(nano_to_grams(1_250_000_001), "1.250000001");
+    }
+
+    #[test]
+    fn validator_keys_cover_the_full_round_and_margin() {
+        let settings = Settings::default();
+        assert_eq!(election_key_expiry(&settings, 1_000), 1_420);
+    }
+
+    #[test]
+    fn validates_remote_election_material() {
+        let entry = RemoteValidatorElectionEntry {
+            election_id: 1_000,
+            election_end: 1_420,
+            validator_public_key: STANDARD.encode([0x11; 36]),
+            validator_adnl: "22".repeat(32),
+            signature: STANDARD.encode([0x33; 64]),
+        };
+        validate_remote_entry(&entry).unwrap();
+
+        let mut invalid = entry;
+        invalid.validator_adnl = "22".repeat(31);
+        assert!(validate_remote_entry(&invalid).is_err());
     }
 
     #[test]

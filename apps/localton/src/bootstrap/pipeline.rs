@@ -21,7 +21,7 @@ use crate::{
     http,
     runtime::{self, ProcessRegistry},
     storage::Settings,
-    storage::{Layout, Manifest, endpoint},
+    storage::{Layout, Manifest},
     storage::{NodeRuntime, RuntimeState, ServiceRuntime},
     ton::accounts::{ImportedAccount, parse_imported_accounts},
 };
@@ -132,6 +132,18 @@ fn prepare_settings(
     let mut settings = Settings::load_or_create(&layout.settings)?;
     if let Some(validators) = args.validators {
         settings.enable_validator_count(validators)?;
+    }
+    if let Some(advertise_ip) = args.advertise_ip {
+        let genesis = settings.node_mut("genesis")?;
+        if layout.manifest.is_file() {
+            ensure!(
+                genesis.public_ip == advertise_ip,
+                "genesis advertises {}; --advertise-ip cannot change after network creation",
+                genesis.public_ip
+            );
+        } else {
+            genesis.public_ip = advertise_ip;
+        }
     }
     settings.services.ton_http_api.enabled |= args.ton_http_api;
     if args.no_config_http {
@@ -262,7 +274,7 @@ async fn run_managed_network(
     // Step 9: print connection data, start periodic maintenance, and supervise.
     // The launcher now blocks until Ctrl-C/SIGTERM or until any required child
     // exits; a child failure is treated as failure of the whole local network.
-    if let Err(error) = print_connection_details(&launch.manifest) {
+    if let Err(error) = print_connection_details(&launch.manifest, &launch.settings) {
         services.shutdown().await;
         return Err(error);
     }
@@ -361,17 +373,22 @@ pub async fn status(args: StatusArgs) -> Result<()> {
     let layout = Layout::new(state_root);
     let manifest = Manifest::load(&layout.manifest)?;
     persistence::validate_persisted_state(&layout, &manifest)?;
-    print_connection_details(&manifest)
+    let settings = Settings::load_or_create(&layout.settings)?;
+    print_connection_details(&manifest, &settings)
 }
 
-fn print_connection_details(manifest: &Manifest) -> Result<()> {
+fn print_connection_details(manifest: &Manifest, settings: &Settings) -> Result<()> {
     let global = dunce::canonicalize(&manifest.global_config).with_context(|| {
         format!(
             "global config is missing: {}",
             manifest.global_config.display()
         )
     })?;
-    println!("Liteserver endpoint: {}", endpoint());
+    let genesis = settings.node("genesis")?;
+    println!(
+        "Liteserver endpoint: {}:{}",
+        genesis.public_ip, genesis.liteserver_port
+    );
     println!("Liteserver public key: {}", manifest.liteserver_public_key);
     println!("Global config: {}", global.display());
     Ok(())

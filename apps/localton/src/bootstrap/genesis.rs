@@ -114,6 +114,8 @@ pub(super) async fn initialize(
         &zero_root_hash,
         &zero_file_hash,
         vec![],
+        genesis.public_ip,
+        genesis.liteserver_port,
         &liteserver_public_key,
     );
     write_json_atomic(&layout.global_config, &preliminary)?;
@@ -122,6 +124,8 @@ pub(super) async fn initialize(
         &zero_root_hash,
         &zero_file_hash,
         dht_nodes,
+        genesis.public_ip,
+        genesis.liteserver_port,
         &liteserver_public_key,
     );
     write_json_atomic(&layout.global_config, &global)?;

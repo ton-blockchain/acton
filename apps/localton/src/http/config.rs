@@ -3,16 +3,17 @@
 //! `/` returns the current readiness state and URLs of enabled services.
 //! `/openapi.json` returns a generated OpenAPI description of this service.
 //! `/localhost.global.config.json` and `/config` return the generated TON global
-//! config. `/live` and `/healthz` report launcher readiness. `/add-validator`
-//! creates an additional validator and can immediately enter it into elections.
+//! config. `/bootstrap/full-node` returns public zerostate data for a new full
+//! node. `/live` and `/healthz` report launcher readiness. Validator agent
+//! endpoints coordinate elections without transferring private validator keys.
 
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,7 +23,10 @@ use utoipa::{IntoParams, OpenApi, ToSchema};
 
 use crate::{
     bootstrap::LauncherControl,
-    storage::{RuntimeState, Settings},
+    operations::validators::{
+        ParticipationResult, RemoteValidatorElectionEntry, RemoteValidatorTaskResponse,
+    },
+    storage::{FullNodeBootstrap, RuntimeState, Settings, StaticStateFile},
 };
 
 use super::{
@@ -35,17 +39,31 @@ use super::{
 #[openapi(
     info(
         title = "localton Configuration API",
-        description = "Network discovery, generated TON global config, health, and validator creation"
+        description = "Network discovery, full-node bootstrap, health, and validator creation"
     ),
     paths(
         root_handler,
         localhost_global_config_handler,
         global_config_handler,
+        full_node_bootstrap_handler,
         live_handler,
         healthz_handler,
-        add_validator_handler
+        add_validator_handler,
+        remote_validator_task_handler,
+        remote_validator_participate_handler
     ),
-    components(schemas(ConfigDocument, ConfigEndpoints, AddValidatorResponse, ErrorResponse)),
+    components(schemas(
+        ConfigDocument,
+        ConfigEndpoints,
+        FullNodeBootstrap,
+        StaticStateFile,
+        AddValidatorResponse,
+        RemoteValidatorTaskResponse,
+        crate::operations::validators::RemoteValidatorTask,
+        RemoteValidatorElectionEntry,
+        ParticipationResult,
+        ErrorResponse
+    )),
     tags((name = "configuration", description = "Local TON network configuration and health"))
 )]
 struct ApiDoc;
@@ -68,12 +86,18 @@ pub(super) struct ConfigEndpoints {
     pub global_config: String,
     /// Short URL of the same TON global config
     pub config: String,
+    /// Public network data required to initialize an independent full node
+    pub full_node_bootstrap: String,
     /// Readiness probe URL
     pub live: String,
     /// Health probe URL
     pub healthz: String,
     /// URL that creates a validator node
     pub add_validator: String,
+    /// URL template used by agents to request an election task
+    pub remote_validator_task: String,
+    /// URL template used by agents to submit a signed election entry
+    pub remote_validator_participate: String,
     /// Admin API URL, if the service is enabled
     pub admin: Option<String>,
     /// Account funding URL, if the TON HTTP API is enabled
@@ -114,9 +138,18 @@ pub(super) async fn start(
             get(localhost_global_config_handler),
         )
         .route("/config", get(global_config_handler))
+        .route("/bootstrap/full-node", get(full_node_bootstrap_handler))
         .route("/live", get(live_handler))
         .route("/healthz", get(healthz_handler))
         .route("/add-validator", get(add_validator_handler))
+        .route(
+            "/validators/{name}/task",
+            post(remote_validator_task_handler),
+        )
+        .route(
+            "/validators/{name}/participate",
+            post(remote_validator_participate_handler),
+        )
         .with_state(ConfigState { control, settings });
     let endpoint = format!("http://{address}");
     let running = server::start(
@@ -192,9 +225,14 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
         endpoints: ConfigEndpoints {
             global_config: format!("{config_endpoint}/localhost.global.config.json"),
             config: format!("{config_endpoint}/config"),
+            full_node_bootstrap: format!("{config_endpoint}/bootstrap/full-node"),
             live: format!("{config_endpoint}/live"),
             healthz: format!("{config_endpoint}/healthz"),
             add_validator: format!("{config_endpoint}/add-validator"),
+            remote_validator_task: format!("{config_endpoint}/validators/{{name}}/task"),
+            remote_validator_participate: format!(
+                "{config_endpoint}/validators/{{name}}/participate"
+            ),
             admin: admin_endpoint,
             fund_account: fund_account_endpoint,
             ton_http_api: ton_http_api_endpoint,
@@ -244,6 +282,29 @@ async fn read_global_config(state: &ConfigState) -> Result<Json<Value>, HttpErro
     Ok(Json(
         serde_json::from_slice(&bytes).context("global config is invalid JSON")?,
     ))
+}
+
+/// Get public bootstrap data for an independent full node
+///
+/// The document contains the global config and immutable zerostates. It never
+/// contains validator, console, liteserver, or ADNL private keys
+#[utoipa::path(
+    get,
+    path = "/bootstrap/full-node",
+    tag = "configuration",
+    responses(
+        (status = 200, description = "Public full-node bootstrap data", body = FullNodeBootstrap),
+        (status = 400, description = "Bootstrap data could not be read", body = ErrorResponse)
+    )
+)]
+async fn full_node_bootstrap_handler(
+    State(state): State<ConfigState>,
+) -> Result<Json<FullNodeBootstrap>, HttpError> {
+    let layout = state.control.layout().clone();
+    let bootstrap = tokio::task::spawn_blocking(move || FullNodeBootstrap::from_layout(&layout))
+        .await
+        .context("full-node bootstrap task failed")??;
+    Ok(Json(bootstrap))
 }
 
 /// Get the network readiness state
@@ -329,4 +390,52 @@ async fn add_validator_handler(
         validator: true,
         participate: query.participate,
     }))
+}
+
+/// Request the active election parameters for a validator agent
+#[utoipa::path(
+    post,
+    path = "/validators/{name}/task",
+    tag = "configuration",
+    params(("name" = String, Path, description = "Agent-owned node name")),
+    responses(
+        (status = 200, description = "Active election task or an empty task", body = RemoteValidatorTaskResponse),
+        (status = 400, description = "Election task could not be prepared", body = ErrorResponse)
+    )
+)]
+async fn remote_validator_task_handler(
+    State(state): State<ConfigState>,
+    Path(name): Path<String>,
+) -> Result<Json<RemoteValidatorTaskResponse>, HttpError> {
+    Ok(Json(
+        crate::operations::validators::remote_validator_task(&state.control.toolchain(), &name)
+            .await?,
+    ))
+}
+
+/// Submit an election entry signed by an agent-owned validator key
+#[utoipa::path(
+    post,
+    path = "/validators/{name}/participate",
+    tag = "configuration",
+    params(("name" = String, Path, description = "Agent-owned node name")),
+    request_body = RemoteValidatorElectionEntry,
+    responses(
+        (status = 200, description = "Election entry was submitted", body = ParticipationResult),
+        (status = 400, description = "Election entry could not be submitted", body = ErrorResponse)
+    )
+)]
+async fn remote_validator_participate_handler(
+    State(state): State<ConfigState>,
+    Path(name): Path<String>,
+    Json(entry): Json<RemoteValidatorElectionEntry>,
+) -> Result<Json<ParticipationResult>, HttpError> {
+    Ok(Json(
+        crate::operations::validators::submit_remote_validator_entry(
+            &state.control.toolchain(),
+            &name,
+            entry,
+        )
+        .await?,
+    ))
 }

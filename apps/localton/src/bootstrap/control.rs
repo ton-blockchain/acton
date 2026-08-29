@@ -15,6 +15,7 @@ use crate::{
     storage::Layout,
     storage::Settings,
     storage::{NodeRuntime, RuntimeState},
+    ton::toolchain::Toolchain,
 };
 
 use super::{nodes, validator};
@@ -28,7 +29,7 @@ pub struct LauncherControl {
 }
 
 impl LauncherControl {
-    pub(super) fn new(
+    pub(crate) fn new(
         layout: Layout,
         binaries: TonBinaries,
         timeout: Duration,
@@ -44,6 +45,13 @@ impl LauncherControl {
 
     pub fn layout(&self) -> &Layout {
         &self.layout
+    }
+
+    pub(crate) fn toolchain(&self) -> Toolchain {
+        Toolchain {
+            layout: self.layout.clone(),
+            binaries: self.binaries.clone(),
+        }
     }
 
     /// Starts one enabled validator-engine node and publishes it as running.

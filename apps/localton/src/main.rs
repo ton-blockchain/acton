@@ -1,3 +1,4 @@
+mod agent;
 mod binaries;
 mod bootstrap;
 mod cli;
@@ -24,6 +25,7 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
+        Some(Command::Agent(args)) => agent::run(args).await,
         Some(Command::Run(args)) => bootstrap::run(args).await,
         Some(Command::Status(args)) => bootstrap::status(args).await,
         Some(Command::Config { command }) => cli::commands::config(command).await,

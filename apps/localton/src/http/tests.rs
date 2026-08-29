@@ -69,6 +69,18 @@ fn root_document_lists_enabled_service_endpoints() {
         "http://127.0.0.1:18000/localhost.global.config.json"
     );
     assert_eq!(
+        document.endpoints.full_node_bootstrap,
+        "http://127.0.0.1:18000/bootstrap/full-node"
+    );
+    assert_eq!(
+        document.endpoints.remote_validator_task,
+        "http://127.0.0.1:18000/validators/{name}/task"
+    );
+    assert_eq!(
+        document.endpoints.remote_validator_participate,
+        "http://127.0.0.1:18000/validators/{name}/participate"
+    );
+    assert_eq!(
         document.endpoints.fund_account.as_deref(),
         Some("http://127.0.0.1:18001/acton_fundAccount")
     );
@@ -86,9 +98,12 @@ fn openapi_documents_config_and_admin_routes() {
         "/",
         "/localhost.global.config.json",
         "/config",
+        "/bootstrap/full-node",
         "/live",
         "/healthz",
         "/add-validator",
+        "/validators/{name}/task",
+        "/validators/{name}/participate",
     ] {
         assert!(
             config_document["paths"][path].is_object(),
@@ -142,6 +157,10 @@ fn openapi_documents_config_and_admin_routes() {
     let documented_operations = [
         ("CONFIG /", &config_document["paths"]["/"]["get"]),
         (
+            "CONFIG /bootstrap/full-node",
+            &config_document["paths"]["/bootstrap/full-node"]["get"],
+        ),
+        (
             "CONFIG /add-validator",
             &config_document["paths"]["/add-validator"]["get"],
         ),
@@ -186,6 +205,11 @@ fn openapi_documents_config_and_admin_routes() {
         CONFIG /
         summary: Get network status and service URLs
         description: Use this endpoint to find the enabled Localton services
+
+        CONFIG /bootstrap/full-node
+        summary: Get public bootstrap data for an independent full node
+        description: The document contains the global config and immutable zerostates. It never
+        contains validator, console, liteserver, or ADNL private keys
 
         CONFIG /add-validator
         summary: Create and start a validator node
