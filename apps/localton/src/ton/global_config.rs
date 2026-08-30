@@ -5,7 +5,11 @@
 //! network entry points are therefore checked before a config reaches official TON
 //! binaries or is persisted as network identity.
 
-use std::net::Ipv4Addr;
+use std::{
+    fs,
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
@@ -17,6 +21,32 @@ use super::tools::types::{
 
 const MASTERCHAIN_ID: i32 = -1;
 const MASTERCHAIN_SHARD: i64 = i64::MIN;
+
+/// An on-disk global config that was parsed and accepted for joining a TON node.
+///
+/// Official binaries consume a filename, not a Rust value. This type keeps that
+/// filename while proving once, before any child starts, that the file matches
+/// the complete typed schema and contains at least one DHT entry point.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct GlobalConfigFile {
+    path: PathBuf,
+}
+
+impl GlobalConfigFile {
+    /// Opens the final network config used by persistent TON processes.
+    pub(crate) fn open(path: impl Into<PathBuf>) -> Result<Self> {
+        let path = path.into();
+        let bytes = fs::read(&path)
+            .with_context(|| format!("failed to read global config {}", path.display()))?;
+        GlobalConfig::from_json_bytes(&bytes)?.validate_for_node_join()?;
+        Ok(Self { path })
+    }
+
+    /// Returns the already validated file expected by official TON binaries.
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+}
 
 /// Complete `global.config.json` document consumed by TON nodes and clients.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

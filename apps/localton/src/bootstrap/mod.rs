@@ -6,18 +6,43 @@
 //! part of that sequence lives in a focused submodule so the top-level pipeline
 //! remains readable.
 
+use std::{fs::File, path::Path};
+
+use anyhow::{Context, Result};
+use fs2::FileExt;
+
 mod control;
 mod dht;
 mod files;
 mod genesis;
 mod nodes;
-mod persistence;
 mod pipeline;
 mod readiness;
 mod validator;
 mod zerostate;
 
 pub use control::LauncherControl;
-pub(crate) use persistence::{acquire_lock, validate_persisted_state};
 pub use pipeline::{run, status};
 pub(crate) use readiness::{shutdown_signal, supervise};
+
+/// Locks a state directory for the lifetime of one launcher process.
+///
+/// Two launchers sharing databases and fixed ports would corrupt runtime state
+/// and compete for the same sockets. The returned open file owns the advisory
+/// lock; dropping it releases the directory for the next invocation.
+pub(crate) fn acquire_lock(path: &Path) -> Result<File> {
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+        .with_context(|| format!("failed to open state lock {}", path.display()))?;
+    file.try_lock_exclusive().with_context(|| {
+        format!(
+            "another localton process is already using {}",
+            path.parent().unwrap_or(path).display()
+        )
+    })?;
+    Ok(file)
+}

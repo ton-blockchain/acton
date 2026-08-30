@@ -484,7 +484,10 @@ impl ChainCollector {
                         next_validators,
                     });
                 }
-                Err(error) => warn!(%error, "election observation update failed"),
+                Err(error) => warn!(
+                    error = %format_args!("{error:#}"),
+                    "election observation update failed"
+                ),
             }
         }
         if let Some(election) = &mut self.election {

@@ -880,7 +880,6 @@ async fn wallet_seqno(toolchain: &Toolchain, address: &str) -> Result<u32> {
             RunMethodRequest::new(address, "seqno", vec![])?,
         )
         .await?
-        .into_data()?
         .first_u64()?;
     u32::try_from(seqno).context("wallet seqno exceeds u32")
 }

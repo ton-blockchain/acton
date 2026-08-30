@@ -152,9 +152,9 @@ pub(super) async fn initialize(
         .await?;
     validator_database.install_control_and_liteserver(
         genesis,
-        server.public_key,
-        client.public_key,
-        liteserver.public_key,
+        server.id,
+        client.id,
+        liteserver.id,
     )?;
     validator::configure_genesis_identity(
         layout,
@@ -175,7 +175,6 @@ pub(super) async fn initialize(
         ton_bin_dir: tools.binaries.root.clone(),
         validator_public_key: validator_key.public_key,
         liteserver_public_key: liteserver.public_key,
-        global_config: layout.global_config.clone(),
         imported_accounts: imported_accounts
             .iter()
             .map(|account| account.descriptor.clone())

@@ -1,9 +1,12 @@
 use std::{fs, net::Ipv4Addr, path::Path};
 
 use anyhow::{Context, Result, anyhow};
+use crc::{CRC_16_XMODEM, Crc};
+use fastnum::I512;
 use num_bigint::BigInt;
 use serde::Serialize;
 use serde_json::json;
+use ton::{block_tlb::TVMStack, ton_core::traits::tlb::TLB};
 use tonutils::{
     liteclient::{
         boc::{SimpleAccount, SimpleAccountState},
@@ -14,9 +17,34 @@ use tonutils::{
         common::{BlockId, BlockIdExt},
         response::TransactionId,
     },
-    tlb::{Account, ConfigParams},
-    tvm::{Address, TvmStack, TvmStackEntry},
+    tlb::Account,
+    tvm::Address,
 };
+use tycho_types::{
+    boc::Boc,
+    cell::{Cell, CellFamily, LoadCell},
+    merkle::MerkleProof,
+    models::{ShardStateUnsplit, config::BlockchainConfigParams},
+};
+
+/// Requests the result and proof material returned by official `runmethod`.
+///
+/// `mode.2` carries the result stack. The remaining bits retain the shard and
+/// state proofs plus library extras, so this adapter can add local verification
+/// later without changing its wire contract.
+const RUN_METHOD_MODE: u32 = 0x17;
+
+/// Computes the selector used by TON to dispatch a named get method.
+///
+/// TON deliberately uses CRC-16/XMODEM here. `tonutils::method_name_to_id`
+/// currently uses CRC-16/IBM-SDLC, which produces a different selector and can
+/// make the VM execute the contract fallback path instead of the requested
+/// method. Keeping this small protocol rule next to the liteserver adapter makes
+/// every Localton get-method call use the same ID as the official lite-client.
+fn ton_method_id(name: &str) -> u64 {
+    const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
+    u64::from(CRC16.checksum(name.as_bytes())) | 0x1_0000
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct BlockRef {
@@ -123,6 +151,10 @@ impl LocalLiteClient {
         count: u32,
     ) -> Result<(BlockRef, Vec<TransactionRef>, bool)> {
         let id = self.lookup(workchain, shard, seqno).await?;
+        // `ShardStateUnsplit` validates its complete structural envelope while
+        // leaving large dictionaries lazy. Ask the liteserver to retain every
+        // state/config root needed for that parse; otherwise those references are
+        // pruned exotic cells even though the four requested config values exist.
         let response = self
             .inner
             .list_block_transactions(id, count, None, false, false)
@@ -152,7 +184,7 @@ impl LocalLiteClient {
         address: &str,
         method: &str,
         arguments: Vec<BigInt>,
-    ) -> Result<Vec<TvmStackEntry>> {
+    ) -> Result<TVMStack> {
         let account = Address::from_str(address)
             .with_context(|| format!("invalid TON address `{address}`"))?;
         let block = self
@@ -161,41 +193,79 @@ impl LocalLiteClient {
             .await
             .context("getMasterchainInfo failed before run method")?
             .last;
-        self.inner
-            .run_get_method_typed(
-                0,
+        let mut stack = TVMStack::default();
+        let max_exclusive: BigInt = BigInt::from(1_u8) << 256_usize;
+        let min_inclusive = -max_exclusive.clone();
+        for argument in arguments {
+            anyhow::ensure!(
+                argument >= min_inclusive && argument < max_exclusive,
+                "get method argument does not fit into a signed TVM int257"
+            );
+            stack.push_int(I512::parse_str(&argument.to_string()));
+        }
+        let result = self
+            .inner
+            .run_smc_method(
+                RUN_METHOD_MODE,
                 block,
                 account,
-                tonutils::utils::method_name_to_id(method),
-                TvmStack::new(arguments.into_iter().map(TvmStackEntry::Int).collect()),
+                ton_method_id(method),
+                stack
+                    .to_boc()
+                    .context("failed to serialize canonical TVM argument stack")?,
             )
             .await
-            .with_context(|| format!("run get method `{method}` failed for {address}"))
+            .with_context(|| format!("run get method `{method}` failed for {address}"))?;
+        anyhow::ensure!(
+            result.exit_code == 0,
+            "run get method `{method}` exited with code {}",
+            result.exit_code
+        );
+        TVMStack::from_boc(
+            result
+                .result
+                .context("liteserver omitted the requested TVM result stack")?,
+        )
+        .context("liteserver returned an invalid canonical TVM result stack")
     }
 
     /// Reads selected on-chain configuration parameters at the latest block.
     ///
-    /// The returned config dictionary preserves cells exactly as received. Typed
-    /// Localton adapters decode only the parameters their workflow owns.
-    pub async fn config_params(&mut self, params: Vec<i32>) -> Result<ConfigParams> {
+    /// The response contains a Merkle proof of the masterchain state, not a bare
+    /// config dictionary. We virtualize that proof and load `McStateExtra.config`
+    /// through canonical TON types so application code never guesses at proof-cell
+    /// references or relies on the presentation format of the official CLI.
+    pub async fn config_params(&mut self, params: Vec<i32>) -> Result<BlockchainConfigParams> {
         let block = self
             .inner
             .get_masterchain_info()
             .await
             .context("getMasterchainInfo failed before config query")?
             .last;
-        let decoded = self
+        let response = self
             .inner
-            .get_config_params_typed(
-                block, params, false, false, false, false, false, false, false, false, false,
-                false, false,
+            .get_config_params(
+                block, params, true, true, true, true, true, true, true, true, true, true, false,
             )
             .await
             .context("getConfigParams failed")?;
-        decoded
-            .config_proof
-            .map(|proof| proof.config)
-            .context("getConfigParams response has no config proof")
+        let proof_root = Boc::decode(&response.config_proof)
+            .context("getConfigParams returned an invalid config proof BoC")?;
+        let proof = MerkleProof::load_from_cell(proof_root.as_ref())
+            .context("getConfigParams config proof is not a Merkle proof")?;
+        let state_root = Cell::virtualize(proof.cell);
+        let state = state_root.parse::<ShardStateUnsplit>().with_context(|| {
+            format!(
+                "config proof does not contain a masterchain shard state (root type: {:?})",
+                state_root.cell_type()
+            )
+        })?;
+        let extra = state
+            .custom
+            .context("config proof masterchain state has no McStateExtra")?
+            .load()
+            .context("config proof contains invalid McStateExtra")?;
+        Ok(extra.config.params)
     }
 
     async fn lookup(&mut self, workchain: i32, shard: &str, seqno: u32) -> Result<BlockIdExt> {
@@ -315,12 +385,18 @@ pub fn require_existing_config(path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_shard;
+    use super::{parse_shard, ton_method_id};
 
     #[test]
     fn parses_signed_and_hex_shards() {
         assert_eq!(parse_shard("-9223372036854775808").unwrap(), i64::MIN);
         assert_eq!(parse_shard("8000000000000000").unwrap(), i64::MIN);
         assert_eq!(parse_shard("0x4000000000000000").unwrap(), 1_i64 << 62);
+    }
+
+    #[test]
+    fn get_method_ids_match_official_ton_crc16() {
+        assert_eq!(ton_method_id("seqno"), 85_143);
+        assert_eq!(ton_method_id("active_election_id"), 86_535);
     }
 }

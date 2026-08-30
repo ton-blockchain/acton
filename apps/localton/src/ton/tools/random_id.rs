@@ -306,9 +306,10 @@ pub fn read_public_key(path: &Path) -> Result<TonPublicKey> {
 
 /// Converts a generator invocation into a complete, validated artifact set.
 ///
-/// The executable emits whitespace-separated key ID and public identity fields,
-/// while writing both files as side effects. Validating all three outputs here
-/// prevents a partial generation from surfacing later as an opaque ADNL error.
+/// The executable emits one key ID in hexadecimal and base64 while writing the
+/// private key and TL-encoded public key as side effects. Validating both printed
+/// representations and deriving the same ID from `.pub` prevents a partial or
+/// mismatched generation from surfacing later as an opaque ADNL error.
 fn parse_generated_key(stdout: &str, private_path: &Path) -> Result<GeneratedKey> {
     let fields: Vec<&str> = stdout.split_whitespace().collect();
     ensure!(
@@ -317,8 +318,12 @@ fn parse_generated_key(stdout: &str, private_path: &Path) -> Result<GeneratedKey
         stdout.trim()
     );
     let id = KeyId::from_hex(fields[0]).context("generate-random-id returned invalid key id")?;
-    let public_key = TonPublicKey::from_base64(fields[1])
-        .context("generate-random-id returned invalid public key")?;
+    let base64_id = KeyId::from_base64(fields[1])
+        .context("generate-random-id returned invalid base64 key id")?;
+    ensure!(
+        base64_id == id,
+        "generate-random-id returned different hexadecimal and base64 key ids"
+    );
     let public_path = public_key_path(private_path);
     ensure!(
         private_path.is_file(),
@@ -332,11 +337,11 @@ fn parse_generated_key(stdout: &str, private_path: &Path) -> Result<GeneratedKey
     );
     let public_file = fs::read(&public_path)
         .with_context(|| format!("failed to read generated key {}", public_path.display()))?;
-    let persisted_public = TonPublicKey::from_tl_bytes(&public_file)
+    let public_key = TonPublicKey::from_tl_bytes(&public_file)
         .context("generated public key file is not a valid TON public key")?;
     ensure!(
-        persisted_public == public_key,
-        "generated public key file does not match command output"
+        public_key.key_id() == id,
+        "generated public key file does not match the reported key id"
     );
     Ok(GeneratedKey {
         id,
@@ -417,17 +422,18 @@ mod tests {
         let private_path = directory.path().join("validator.key");
         let public_path = directory.path().join("validator.key.pub");
         fs::write(&private_path, b"private").unwrap();
-        let mut public_artifact = [0_u8; 36];
-        public_artifact[4..].fill(7);
-        fs::write(&public_path, public_artifact).unwrap();
-        let id = "abcdef0123456789".repeat(4);
-        let public_key = BASE64.encode([7_u8; 32]);
+        let public_key = TonPublicKey::from_bytes([7_u8; 32]);
+        fs::write(&public_path, public_key.to_tl_bytes()).unwrap();
+        let id = public_key.key_id();
 
-        let generated =
-            parse_generated_key(&format!("{id} {public_key}\n"), &private_path).unwrap();
+        let generated = parse_generated_key(
+            &format!("{} {}\n", id.to_hex(), id.to_base64()),
+            &private_path,
+        )
+        .unwrap();
 
-        assert_eq!(generated.id.to_string(), id);
-        assert_eq!(generated.public_key.to_base64(), public_key);
+        assert_eq!(generated.id, id);
+        assert_eq!(generated.public_key, public_key);
         assert_eq!(generated.public_path, public_path);
     }
 
@@ -435,9 +441,11 @@ mod tests {
     fn strips_tl_constructor_from_persisted_public_key() {
         let directory = tempdir().unwrap();
         let public_path = directory.path().join("validator.pub");
-        let mut encoded = vec![0x12, 0x34, 0x56, 0x78];
-        encoded.extend([9_u8; 32]);
-        fs::write(&public_path, encoded).unwrap();
+        fs::write(
+            &public_path,
+            TonPublicKey::from_bytes([9_u8; 32]).to_tl_bytes(),
+        )
+        .unwrap();
 
         assert_eq!(
             read_public_key(&public_path).unwrap().to_base64(),

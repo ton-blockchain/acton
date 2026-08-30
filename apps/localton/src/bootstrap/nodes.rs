@@ -21,7 +21,7 @@ use crate::{
             dht_server::DhtStartRequest,
             random_id::{GenerateKeyRequest, read_public_key},
             types::{AdnlEndpoint, DhtDatabase, OperationContext},
-            validator_engine::ValidatorInitializeRequest,
+            validator_engine::{ValidatorDatabase, ValidatorInitializeRequest},
             validator_engine_config::ValidatorEngineConfig,
         },
     },
@@ -39,6 +39,8 @@ pub(super) async fn start_core(
     layout: &Layout,
     tools: &Toolchain,
     settings: &Settings,
+    dht_database: DhtDatabase,
+    validator_database: ValidatorDatabase,
 ) -> Result<ProcessRegistry> {
     info!("starting local DHT and validator-engine");
     let genesis = settings
@@ -52,7 +54,7 @@ pub(super) async fn start_core(
             &context,
             DhtStartRequest {
                 global_config: layout.global_config.clone(),
-                database: DhtDatabase::open(layout.dht_db.clone())?,
+                database: dht_database,
                 log_path: layout.logs.join("dht-engine"),
                 stdout_log: layout.logs.join("dht.stdout.log"),
                 stderr_log: layout.logs.join("dht.stderr.log"),
@@ -63,8 +65,13 @@ pub(super) async fn start_core(
         )
         .await?;
     registry.insert(dht).await?;
-    let validator =
-        validator::start_persistent(layout, tools.validator_engine.as_ref(), genesis).await?;
+    let validator = validator::start_persistent(
+        layout,
+        tools.validator_engine.as_ref(),
+        genesis,
+        validator_database,
+    )
+    .await?;
     registry.insert(validator).await?;
     Ok(registry)
 }
@@ -89,8 +96,14 @@ pub(super) async fn start_additional(
     {
         let initialized = ensure_initialized(layout, tools, node, timeout).await?;
         let context = OperationContext::for_node(timeout, &node.name);
-        let mut process =
-            validator::start_persistent(layout, tools.validator_engine.as_ref(), node).await?;
+        let node_layout = layout.node(node);
+        let mut process = validator::start_persistent(
+            layout,
+            tools.validator_engine.as_ref(),
+            node,
+            ValidatorDatabase::open(node_layout.db)?,
+        )
+        .await?;
         if let Err(error) = validator::wait_for_console(
             layout,
             tools.validator_console_tool.as_ref(),
@@ -184,12 +197,7 @@ pub(super) async fn ensure_initialized(
             GenerateKeyRequest::liteserver(&node_layout.keyring),
         )
         .await?;
-    validator_database.install_control_and_liteserver(
-        node,
-        server.public_key,
-        client.public_key,
-        liteserver.public_key,
-    )?;
+    validator_database.install_control_and_liteserver(node, server.id, client.id, liteserver.id)?;
 
     let full_node_adnl = validator::configure_full_node_identity(
         layout,
@@ -227,11 +235,8 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
     runtime.running = false;
     runtime.pid = None;
     runtime.status = "initialized".to_owned();
-    if runtime.console_public_key.is_none() {
-        runtime.console_public_key = read_public_key(&node_layout.server_public_key())
-            .map(|key| key.to_base64())
-            .ok();
-    }
+    runtime.console_public_key =
+        Some(read_public_key(&node_layout.server_public_key())?.to_base64());
     if node.liteserver {
         runtime.liteserver_public_key =
             Some(read_public_key(&node_layout.keyring.join("liteserver.pub"))?.to_base64());
@@ -240,19 +245,9 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
     Ok(runtime)
 }
 
-/// Fills identity fields that could not be recovered from standalone key files.
-///
-/// Values already present in runtime state win. Missing console/liteserver IDs
-/// come from their config arrays; full-node ADNL is decoded from the engine's
-/// base64 representation into the hexadecimal form exposed by the admin API.
+/// Recovers engine-owned ADNL metadata that has no standalone public-key file.
 fn recover_config_metadata(path: &std::path::Path, runtime: &mut NodeRuntime) -> Result<()> {
     let config = ValidatorEngineConfig::load(path)?;
-    if runtime.console_public_key.is_none() {
-        runtime.console_public_key = config.control_public_key().map(|key| key.to_base64());
-    }
-    if runtime.liteserver_public_key.is_none() {
-        runtime.liteserver_public_key = config.liteserver_public_key().map(|key| key.to_base64());
-    }
     if runtime.validator_adnl.is_none() {
         runtime.validator_adnl = Some(config.fullnode_adnl().to_hex());
     }

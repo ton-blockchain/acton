@@ -94,8 +94,7 @@ pub(super) async fn wait_for_blocks(
 ///
 /// [`LiteTarget`] binds the query to the same trusted global configuration and
 /// liteserver identity external clients use. This function requires structured
-/// protocol data: a diagnostic-only official CLI backend cannot accidentally make
-/// readiness depend on release-specific display text.
+/// protocol data, so readiness cannot depend on release-specific CLI display text.
 pub(super) async fn lite_client_seqno(
     lite_client: &dyn LiteClient,
     target: &LiteTarget,
@@ -104,14 +103,7 @@ pub(super) async fn lite_client_seqno(
         timeout: LITE_QUERY_TIMEOUT,
         node_name: target.label.clone(),
     };
-    let info = tokio::time::timeout(
-        LITE_QUERY_TIMEOUT,
-        lite_client.masterchain_info(&context, target),
-    )
-    .await
-    .context("masterchain info query timed out")??
-    .into_data()
-    .context("readiness requires structured masterchain info")?;
+    let info = lite_client.masterchain_info(&context, target).await?;
     Ok(info.last.seqno)
 }
 
@@ -168,8 +160,8 @@ mod tests {
         ton::lite::{AccountInfo, BlockRef},
         ton::tools::lite_client::{
             AccountStateRequest, BlockData, BlockTransactions, BlockTransactionsRequest, Boc,
-            ElectionStatus, LiteResponse, LookupBlock, MasterchainInfo, RunMethodRequest,
-            RunMethodResult, SendBocResult,
+            ElectionStatus, LookupBlock, MasterchainInfo, RunMethodRequest, RunMethodResult,
+            SendBocResult,
         },
     };
 
@@ -199,16 +191,16 @@ mod tests {
             &self,
             _context: &OperationContext,
             _target: &LiteTarget,
-        ) -> Result<LiteResponse<MasterchainInfo>> {
+        ) -> Result<MasterchainInfo> {
             let seqno = self
                 .seqnos
                 .lock()
                 .unwrap()
                 .pop_front()
                 .context("readiness requested more seqnos than expected")?;
-            Ok(LiteResponse::Data(MasterchainInfo {
+            Ok(MasterchainInfo {
                 last: block_ref(seqno),
-            }))
+            })
         }
 
         async fn account_state(
@@ -216,7 +208,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _request: AccountStateRequest,
-        ) -> Result<LiteResponse<AccountInfo>> {
+        ) -> Result<AccountInfo> {
             Self::unexpected()
         }
 
@@ -225,7 +217,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _request: LookupBlock,
-        ) -> Result<LiteResponse<BlockRef>> {
+        ) -> Result<BlockRef> {
             Self::unexpected()
         }
 
@@ -234,16 +226,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _request: LookupBlock,
-        ) -> Result<LiteResponse<BlockData>> {
-            Self::unexpected()
-        }
-
-        async fn download_block(
-            &self,
-            _context: &OperationContext,
-            _target: &LiteTarget,
-            _id: BlockRef,
-        ) -> Result<LiteResponse<BlockData>> {
+        ) -> Result<BlockData> {
             Self::unexpected()
         }
 
@@ -252,7 +235,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _request: BlockTransactionsRequest,
-        ) -> Result<LiteResponse<BlockTransactions>> {
+        ) -> Result<BlockTransactions> {
             Self::unexpected()
         }
 
@@ -261,7 +244,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _message: Boc,
-        ) -> Result<LiteResponse<SendBocResult>> {
+        ) -> Result<SendBocResult> {
             Self::unexpected()
         }
 
@@ -270,7 +253,7 @@ mod tests {
             _context: &OperationContext,
             _target: &LiteTarget,
             _request: RunMethodRequest,
-        ) -> Result<LiteResponse<RunMethodResult>> {
+        ) -> Result<RunMethodResult> {
             Self::unexpected()
         }
 
@@ -278,7 +261,7 @@ mod tests {
             &self,
             _context: &OperationContext,
             _target: &LiteTarget,
-        ) -> Result<LiteResponse<ElectionStatus>> {
+        ) -> Result<ElectionStatus> {
             Self::unexpected()
         }
     }

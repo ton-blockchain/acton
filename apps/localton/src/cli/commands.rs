@@ -59,8 +59,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
             let info = toolchain
                 .lite_client_tool
                 .masterchain_info(&OperationContext::new(Duration::from_secs(30)), &target)
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&info.last)?;
         }
         LiteCommand::Account { state, address } => {
@@ -72,8 +71,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                     &lite_target(&toolchain)?,
                     AccountStateRequest::new(&address)?,
                 )
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&account)?;
         }
         LiteCommand::RunMethod {
@@ -97,8 +95,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                             .collect::<Result<Vec<_>>>()?,
                     )?,
                 )
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&result)?;
         }
         LiteCommand::Send { state, boc } => {
@@ -112,8 +109,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                     &lite_target(&toolchain)?,
                     Boc::new(bytes)?,
                 )
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&serde_json::json!({
                 "status": result.status,
                 "boc": boc,
@@ -137,8 +133,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                         seqno,
                     },
                 )
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&serde_json::json!({
                 "id": block.id,
                 "boc_base64": STANDARD.encode(block.boc.as_bytes()),
@@ -169,13 +164,11 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
                                     seqno,
                                 },
                             )
-                            .await?
-                            .into_data()?,
+                            .await?,
                         count,
                     )?,
                 )
-                .await?
-                .into_data()?;
+                .await?;
             print_json(&serde_json::json!({
                 "block": block.block,
                 "transactions": block.transactions,

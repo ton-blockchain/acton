@@ -1,39 +1,23 @@
-//! Typed access to TON liteservers through native ADNL or the official client.
+//! Typed access to TON liteservers through native ADNL.
 //!
-//! Localton uses the native implementation for machine-readable chain data. The
-//! official executable remains valuable as an independent compatibility and
-//! diagnostic path, but its presentation-oriented stdout is deliberately not
-//! treated as a stable protocol schema.
+//! Localton needs machine-readable protocol data, so this boundary exposes only
+//! the native implementation. Human-oriented `lite-client` commands remain in
+//! the CLI command that prints their output and are not a second application API.
 
-use std::{
-    fmt,
-    future::Future,
-    io::Write,
-    os::unix::fs::OpenOptionsExt,
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::{fmt, future::Future, path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use num_bigint::BigInt;
-use rand::random;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use tokio::process::Command;
-use tonutils::tvm::{Address, TvmStackEntry, boc::serialize_boc};
+use ton::{block_tlb::TVMStackValue, ton_core::traits::tlb::TLB};
+use tonutils::tvm::Address;
 use tracing::{Instrument, debug, field, info_span};
-use tycho_types::{
-    boc::Boc as TychoBoc,
-    models::config::{BlockchainConfigParams, ValidatorSet as ChainValidatorSet},
-};
+use tycho_types::models::config::ValidatorSet as ChainValidatorSet;
 
-use crate::{
-    binaries::TonBinaries,
-    runtime::{CommandOutput, run_checked},
-    ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef},
-};
+use crate::ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef};
 
 use super::types::{OperationContext, TonPublicKey};
 
@@ -49,8 +33,6 @@ pub struct LiteTarget {
     pub global_config: PathBuf,
     /// Human-readable node or network identity used in traces and errors.
     pub label: Option<String>,
-    /// Selected `ip:port`, when the caller knows it without parsing the config.
-    pub endpoint: Option<String>,
 }
 
 impl LiteTarget {
@@ -59,7 +41,6 @@ impl LiteTarget {
         Self {
             global_config: global_config.into(),
             label: None,
-            endpoint: None,
         }
     }
 
@@ -69,22 +50,12 @@ impl LiteTarget {
         self
     }
 
-    /// Records the selected endpoint for telemetry and actionable failures.
-    ///
-    /// The endpoint remains diagnostic because the trusted global configuration,
-    /// rather than this string, owns the server public key and actual selection.
-    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
-        self.endpoint = Some(endpoint.into());
-        self
-    }
-
     /// Selects one non-secret identity for structured diagnostics.
     fn diagnostic_name(&self, context: &OperationContext) -> String {
         context
             .node_name
             .clone()
             .or_else(|| self.label.clone())
-            .or_else(|| self.endpoint.clone())
             .unwrap_or_else(|| self.global_config.display().to_string())
     }
 }
@@ -104,8 +75,6 @@ pub enum LiteOperation {
     LookupBlock,
     /// Resolve and download a block in one operation.
     Block,
-    /// Download an already resolved block identity.
-    DownloadBlock,
     /// List transaction identifiers contained in one block.
     BlockTransactions,
     /// Submit an external-message bag of cells.
@@ -124,7 +93,6 @@ impl LiteOperation {
             Self::AccountState => "account_state",
             Self::LookupBlock => "lookup_block",
             Self::Block => "block",
-            Self::DownloadBlock => "download_block",
             Self::BlockTransactions => "block_transactions",
             Self::SendBoc => "send_boc",
             Self::RunMethod => "run_method",
@@ -227,7 +195,8 @@ impl RunMethodRequest {
 /// Stable JSON representation of values returned on a TVM stack.
 ///
 /// Cell-like values are serialized as BoCs so the CLI never depends on Debug
-/// output from `tonutils`. Product workflows normally consume integer entries.
+/// output from a transport dependency. Product workflows normally consume
+/// integer entries.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StackValue {
@@ -241,8 +210,6 @@ pub enum StackValue {
     Slice { boc_base64: String },
     /// Ordered tuple values.
     Tuple { values: Vec<StackValue> },
-    /// Ordered list values.
-    List { values: Vec<StackValue> },
     /// Future stack constructor preserved without guessing its schema.
     Unsupported { bytes_hex: String },
 }
@@ -405,55 +372,13 @@ pub struct SendBocResult {
     pub status: u32,
 }
 
-/// Human-oriented result from the official `lite-client` compatibility adapter.
-///
-/// The executable prints C++ object renderings rather than a versioned machine
-/// format. Returning this explicit variant prevents workflows from silently
-/// depending on brittle regexes or confusing printed data with proof verification.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct LiteDiagnostic {
-    /// Semantic operation that produced the report.
-    pub operation: LiteOperation,
-    /// Combined stdout and stderr intended for an operator or compatibility test.
-    pub output: String,
-    /// Why this successful report was not converted into machine-readable data.
-    pub limitation: String,
-}
-
-/// A machine-readable native result or an explicit official-client diagnostic.
-///
-/// `OfficialLiteClient` uses [`Self::Diagnostic`] for operations whose CLI output
-/// has no stable schema. Callers that require data should keep `LocalLiteClient` as
-/// the production implementation and use the official adapter for comparison.
-#[derive(Clone, Debug)]
-pub enum LiteResponse<T> {
-    /// Structured response decoded from the TON liteserver protocol.
-    Data(T),
-    /// Successful official command whose output is presentation-oriented.
-    Diagnostic(LiteDiagnostic),
-}
-
-impl<T> LiteResponse<T> {
-    /// Extracts structured data or explains why a diagnostic backend cannot supply it.
-    pub fn into_data(self) -> Result<T> {
-        match self {
-            Self::Data(value) => Ok(value),
-            Self::Diagnostic(report) => bail!(
-                "{} returned diagnostic output instead of structured data: {}",
-                report.operation,
-                report.limitation
-            ),
-        }
-    }
-}
-
 /// Semantic, object-safe liteserver boundary used by Localton workflows.
 ///
 /// Implementations are stateless at this boundary so [`LiteClient`] can live in the
 /// shared toolchain as `Arc<dyn LiteClient>`. Every operation owns its connection:
-/// [`NativeLiteClient`] opens a fresh ADNL/TCP session from [`LiteTarget`], while the
-/// official adapter starts one bounded subprocess. A live ADNL client must not be
-/// cached behind this trait because its continuous cipher and request-correlation
+/// [`NativeLiteClient`] opens a fresh ADNL/TCP session from [`LiteTarget`]. A live
+/// ADNL client must not be cached behind this trait because its continuous cipher
+/// and request-correlation
 /// state would require hidden serialization and ambiguous reconnect ownership.
 #[async_trait]
 pub trait LiteClient: Send + Sync {
@@ -462,7 +387,7 @@ pub trait LiteClient: Send + Sync {
         &self,
         context: &OperationContext,
         target: &LiteTarget,
-    ) -> Result<LiteResponse<MasterchainInfo>>;
+    ) -> Result<MasterchainInfo>;
 
     /// Reads the current account state without claiming proof verification.
     async fn account_state(
@@ -470,7 +395,7 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         request: AccountStateRequest,
-    ) -> Result<LiteResponse<AccountInfo>>;
+    ) -> Result<AccountInfo>;
 
     /// Resolves a full block identity from workchain, shard, and seqno.
     async fn lookup_block(
@@ -478,7 +403,7 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         request: LookupBlock,
-    ) -> Result<LiteResponse<BlockRef>>;
+    ) -> Result<BlockRef>;
 
     /// Resolves and downloads a block while checking its serialized file hash.
     async fn block(
@@ -486,15 +411,7 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         request: LookupBlock,
-    ) -> Result<LiteResponse<BlockData>>;
-
-    /// Downloads a resolved block and rejects a response with different hashes.
-    async fn download_block(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        id: BlockRef,
-    ) -> Result<LiteResponse<BlockData>>;
+    ) -> Result<BlockData>;
 
     /// Lists a bounded page of transaction identifiers from a resolved block.
     async fn block_transactions(
@@ -502,7 +419,7 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         request: BlockTransactionsRequest,
-    ) -> Result<LiteResponse<BlockTransactions>>;
+    ) -> Result<BlockTransactions>;
 
     /// Submits an external-message BoC without logging its serialized payload.
     async fn send_boc(
@@ -510,7 +427,7 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         message: Boc,
-    ) -> Result<LiteResponse<SendBocResult>>;
+    ) -> Result<SendBocResult>;
 
     /// Executes a typed get method without accepting raw client command syntax.
     async fn run_method(
@@ -518,14 +435,14 @@ pub trait LiteClient: Send + Sync {
         context: &OperationContext,
         target: &LiteTarget,
         request: RunMethodRequest,
-    ) -> Result<LiteResponse<RunMethodResult>>;
+    ) -> Result<RunMethodResult>;
 
     /// Decodes election timing and validator sets from the latest chain config.
     async fn election_status(
         &self,
         context: &OperationContext,
         target: &LiteTarget,
-    ) -> Result<LiteResponse<ElectionStatus>>;
+    ) -> Result<ElectionStatus>;
 }
 
 /// Native typed adapter that opens one authenticated ADNL/TCP session per query.
@@ -550,12 +467,12 @@ impl LiteClient for NativeLiteClient {
         &self,
         context: &OperationContext,
         target: &LiteTarget,
-    ) -> Result<LiteResponse<MasterchainInfo>> {
-        observe(context, target, LiteOperation::MasterchainInfo, async {
+    ) -> Result<MasterchainInfo> {
+        observe_native(context, target, LiteOperation::MasterchainInfo, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            Ok(LiteResponse::Data(MasterchainInfo {
+            Ok(MasterchainInfo {
                 last: client.last().await?,
-            }))
+            })
         })
         .await
     }
@@ -565,10 +482,10 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         request: AccountStateRequest,
-    ) -> Result<LiteResponse<AccountInfo>> {
-        observe(context, target, LiteOperation::AccountState, async {
+    ) -> Result<AccountInfo> {
+        observe_native(context, target, LiteOperation::AccountState, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            Ok(LiteResponse::Data(client.account(request.address()).await?))
+            client.account(request.address()).await
         })
         .await
     }
@@ -578,8 +495,8 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         request: LookupBlock,
-    ) -> Result<LiteResponse<BlockRef>> {
-        observe(context, target, LiteOperation::LookupBlock, async {
+    ) -> Result<BlockRef> {
+        observe_native(context, target, LiteOperation::LookupBlock, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             // LocalLiteClient currently exposes lookup and download as one public
             // operation. Preserve the semantic result here and discard the checked
@@ -592,7 +509,7 @@ impl LiteClient for NativeLiteClient {
                 )
                 .await?;
             verify_file_hash(&id, &bytes)?;
-            Ok(LiteResponse::Data(id))
+            Ok(id)
         })
         .await
     }
@@ -602,8 +519,8 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         request: LookupBlock,
-    ) -> Result<LiteResponse<BlockData>> {
-        observe(context, target, LiteOperation::Block, async {
+    ) -> Result<BlockData> {
+        observe_native(context, target, LiteOperation::Block, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             let (id, bytes) = client
                 .block(
@@ -613,33 +530,10 @@ impl LiteClient for NativeLiteClient {
                 )
                 .await?;
             verify_file_hash(&id, &bytes)?;
-            Ok(LiteResponse::Data(BlockData {
+            Ok(BlockData {
                 id,
                 boc: Boc(bytes),
-            }))
-        })
-        .await
-    }
-
-    async fn download_block(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        expected: BlockRef,
-    ) -> Result<LiteResponse<BlockData>> {
-        observe(context, target, LiteOperation::DownloadBlock, async {
-            let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            // Re-resolve by coordinates because the native client's exact-id
-            // download primitive is private today, then reject any fork mismatch.
-            let (actual, bytes) = client
-                .block(expected.workchain, &expected.shard, expected.seqno)
-                .await?;
-            ensure_same_block(&expected, &actual)?;
-            verify_file_hash(&actual, &bytes)?;
-            Ok(LiteResponse::Data(BlockData {
-                id: actual,
-                boc: Boc(bytes),
-            }))
+            })
         })
         .await
     }
@@ -649,8 +543,8 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         request: BlockTransactionsRequest,
-    ) -> Result<LiteResponse<BlockTransactions>> {
-        observe(context, target, LiteOperation::BlockTransactions, async {
+    ) -> Result<BlockTransactions> {
+        observe_native(context, target, LiteOperation::BlockTransactions, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             let (block, transactions, incomplete) = client
                 .transactions(
@@ -661,11 +555,11 @@ impl LiteClient for NativeLiteClient {
                 )
                 .await?;
             ensure_same_block(&request.block, &block)?;
-            Ok(LiteResponse::Data(BlockTransactions {
+            Ok(BlockTransactions {
                 block,
                 transactions,
                 incomplete,
-            }))
+            })
         })
         .await
     }
@@ -675,14 +569,14 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         message: Boc,
-    ) -> Result<LiteResponse<SendBocResult>> {
+    ) -> Result<SendBocResult> {
         let byte_len = message.len();
-        observe(context, target, LiteOperation::SendBoc, async {
+        observe_native(context, target, LiteOperation::SendBoc, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             debug!(message.byte_len = byte_len, "submitting external message");
-            Ok(LiteResponse::Data(SendBocResult {
+            Ok(SendBocResult {
                 status: client.send_boc(message.into_bytes()).await?,
-            }))
+            })
         })
         .await
     }
@@ -692,8 +586,8 @@ impl LiteClient for NativeLiteClient {
         context: &OperationContext,
         target: &LiteTarget,
         request: RunMethodRequest,
-    ) -> Result<LiteResponse<RunMethodResult>> {
-        observe(context, target, LiteOperation::RunMethod, async {
+    ) -> Result<RunMethodResult> {
+        observe_native(context, target, LiteOperation::RunMethod, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             let stack = client
                 .run_method(
@@ -702,10 +596,10 @@ impl LiteClient for NativeLiteClient {
                     request.arguments().to_vec(),
                 )
                 .await?
-                .into_iter()
+                .iter()
                 .map(stack_value)
                 .collect::<Result<Vec<_>>>()?;
-            Ok(LiteResponse::Data(RunMethodResult { stack }))
+            Ok(RunMethodResult { stack })
         })
         .await
     }
@@ -714,15 +608,10 @@ impl LiteClient for NativeLiteClient {
         &self,
         context: &OperationContext,
         target: &LiteTarget,
-    ) -> Result<LiteResponse<ElectionStatus>> {
-        observe(context, target, LiteOperation::ElectionStatus, async {
+    ) -> Result<ElectionStatus> {
+        observe_native(context, target, LiteOperation::ElectionStatus, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
             let config = client.config_params(vec![1, 15, 34, 36]).await?;
-            let config_boc = serialize_boc(&config.config, false)
-                .context("failed to serialize liteserver config dictionary")?;
-            let config_root = TychoBoc::decode(&config_boc)
-                .context("failed to decode config dictionary with canonical TON types")?;
-            let config = BlockchainConfigParams::from_raw(config_root);
             let timing = config
                 .get_election_timings()
                 .context("config parameter 15 has invalid election timing")?;
@@ -735,7 +624,7 @@ impl LiteClient for NativeLiteClient {
             let next = config
                 .get_next_validator_set()
                 .context("config parameter 36 has an invalid next validator set")?;
-            Ok(LiteResponse::Data(ElectionStatus {
+            Ok(ElectionStatus {
                 elector_address: Address::new(-1, elector.0).to_raw(),
                 validators_elected_for: timing.validators_elected_for,
                 elections_start_before: timing.elections_start_before,
@@ -743,409 +632,36 @@ impl LiteClient for NativeLiteClient {
                 stake_held_for: timing.stake_held_for,
                 current: validator_set_info(current)?,
                 next: next.map(validator_set_info).transpose()?,
-            }))
+            })
         })
         .await
     }
 }
 
-/// Official subprocess-backed compatibility implementation of [`LiteClient`].
-///
-/// The executable is resolved from the same pinned [`TonBinaries`] distribution as
-/// the node. Each method builds exactly one typed command and a final `quit`; no raw
-/// command escape hatch is exposed. Successful human-readable output is returned as
-/// [`LiteResponse::Diagnostic`] because the official CLI offers no stable JSON/TL
-/// output contract for these presentation commands.
-#[derive(Clone, Debug)]
-pub struct OfficialLiteClient {
-    binaries: TonBinaries,
-}
-
-impl OfficialLiteClient {
-    /// Binds the adapter to a validated pinned TON distribution.
-    pub fn new(binaries: TonBinaries) -> Self {
-        Self { binaries }
-    }
-
-    /// Executes one typed official command under the workflow-owned deadline.
-    ///
-    /// The label contains only operation and target metadata. Neither raw argv nor
-    /// BoC content is included, so timeout and process failures remain actionable
-    /// without leaking signed messages into logs.
-    async fn execute(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        operation: LiteOperation,
-        command: OfficialLiteCommand,
-    ) -> Result<LiteDiagnostic> {
-        let command_texts = command.render()?;
-        let target_name = target.diagnostic_name(context);
-        debug!(progress.stage = "connect", progress.state = "starting");
-        let mut child = Command::new(self.binaries.command("lite-client"));
-        child
-            .args(["-r", "-v", "0", "-L", "1024", "-t"])
-            .arg(context.timeout.as_secs().max(1).to_string())
-            .arg("-C")
-            .arg(&target.global_config);
-        for command_text in command_texts {
-            child.args(["-c", &command_text]);
-        }
-        child.args(["-c", "quit"]);
-        debug!(progress.stage = "request", progress.state = "scheduled");
-        let output = run_checked(
-            &format!("official lite-client {operation} for {target_name}"),
-            child,
-            context.timeout,
-        )
-        .await?;
-        Ok(LiteDiagnostic {
-            operation,
-            output: joined_output(output),
-            limitation:
-                "official lite-client output is a human-readable, release-specific diagnostic"
-                    .to_owned(),
-        })
-    }
-}
-
-#[async_trait]
-impl LiteClient for OfficialLiteClient {
-    async fn masterchain_info(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-    ) -> Result<LiteResponse<MasterchainInfo>> {
-        observe(context, target, LiteOperation::MasterchainInfo, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::MasterchainInfo,
-                    OfficialLiteCommand::Last,
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn account_state(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        request: AccountStateRequest,
-    ) -> Result<LiteResponse<AccountInfo>> {
-        observe(context, target, LiteOperation::AccountState, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::AccountState,
-                    OfficialLiteCommand::AccountState(request),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn lookup_block(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        request: LookupBlock,
-    ) -> Result<LiteResponse<BlockRef>> {
-        observe(context, target, LiteOperation::LookupBlock, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::LookupBlock,
-                    OfficialLiteCommand::LookupBlock(request),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn block(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        request: LookupBlock,
-    ) -> Result<LiteResponse<BlockData>> {
-        observe(context, target, LiteOperation::Block, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::Block,
-                    OfficialLiteCommand::Block(request),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn download_block(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        id: BlockRef,
-    ) -> Result<LiteResponse<BlockData>> {
-        observe(context, target, LiteOperation::DownloadBlock, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::DownloadBlock,
-                    OfficialLiteCommand::DownloadBlock(id),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn block_transactions(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        request: BlockTransactionsRequest,
-    ) -> Result<LiteResponse<BlockTransactions>> {
-        observe(context, target, LiteOperation::BlockTransactions, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::BlockTransactions,
-                    OfficialLiteCommand::BlockTransactions(request),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn send_boc(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        message: Boc,
-    ) -> Result<LiteResponse<SendBocResult>> {
-        let byte_len = message.len();
-        observe(context, target, LiteOperation::SendBoc, async {
-            debug!(
-                message.byte_len = byte_len,
-                "staging external message for lite-client"
-            );
-            let staged = StagedBoc::write(message.as_bytes())?;
-            let diagnostic = self
-                .execute(
-                    context,
-                    target,
-                    LiteOperation::SendBoc,
-                    OfficialLiteCommand::SendFile(staged.path().to_path_buf()),
-                )
-                .await?;
-            Ok(LiteResponse::Diagnostic(diagnostic))
-        })
-        .await
-    }
-
-    async fn run_method(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-        request: RunMethodRequest,
-    ) -> Result<LiteResponse<RunMethodResult>> {
-        observe(context, target, LiteOperation::RunMethod, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::RunMethod,
-                    OfficialLiteCommand::RunMethod(request),
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-
-    async fn election_status(
-        &self,
-        context: &OperationContext,
-        target: &LiteTarget,
-    ) -> Result<LiteResponse<ElectionStatus>> {
-        observe(context, target, LiteOperation::ElectionStatus, async {
-            Ok(LiteResponse::Diagnostic(
-                self.execute(
-                    context,
-                    target,
-                    LiteOperation::ElectionStatus,
-                    OfficialLiteCommand::ElectionStatus,
-                )
-                .await?,
-            ))
-        })
-        .await
-    }
-}
-
-/// Closed set of official commands needed to implement [`LiteClient`].
-///
-/// Keeping this enum private makes it impossible for application workflows to
-/// regain the previous arbitrary `-c <text>` escape hatch. Rendering validates all
-/// values that enter the official client's own command parser.
-#[derive(Debug)]
-enum OfficialLiteCommand {
-    Last,
-    AccountState(AccountStateRequest),
-    LookupBlock(LookupBlock),
-    Block(LookupBlock),
-    DownloadBlock(BlockRef),
-    BlockTransactions(BlockTransactionsRequest),
-    SendFile(PathBuf),
-    RunMethod(RunMethodRequest),
-    ElectionStatus,
-}
-
-impl OfficialLiteCommand {
-    /// Translates semantic inputs to the pinned v2026.06 command vocabulary.
-    fn render(&self) -> Result<Vec<String>> {
-        let command = match self {
-            Self::Last => "last".to_owned(),
-            Self::AccountState(request) => format!("getaccount {}", request.address()),
-            Self::LookupBlock(request) | Self::Block(request) => format!(
-                "byseqno {} {} {}",
-                request.workchain,
-                format_shard(request.shard),
-                request.seqno
-            ),
-            Self::DownloadBlock(id) => format!("getblock {}", format_block_id(id)?),
-            Self::BlockTransactions(request) => format!(
-                "listblocktrans {} {}",
-                format_block_id(&request.block)?,
-                request.count
-            ),
-            Self::SendFile(path) => format!("sendfile {}", quote_path(path)?),
-            Self::RunMethod(request) => {
-                let arguments = request
-                    .arguments()
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!(
-                    "runmethod {} {} {}",
-                    request.address(),
-                    request.method(),
-                    arguments
-                )
-                .trim_end()
-                .to_owned()
-            }
-            Self::ElectionStatus => {
-                return Ok(vec![
-                    "getconfig 1".to_owned(),
-                    "getconfig 15".to_owned(),
-                    "getconfig 34".to_owned(),
-                    "getconfig 36".to_owned(),
-                ]);
-            }
-        };
-        Ok(vec![command])
-    }
-}
-
-/// Short-lived private file used because official `sendfile` has no stdin form.
-///
-/// `create_new` prevents following a pre-existing link, Unix mode `0600` avoids a
-/// window where another user can read a signed message, and `Drop` removes the file
-/// on success, failure, timeout, or cancellation.
-struct StagedBoc {
-    path: PathBuf,
-}
-
-impl StagedBoc {
-    /// Writes one uniquely named BoC without ever formatting its bytes for logs.
-    fn write(bytes: &[u8]) -> Result<Self> {
-        for _ in 0..8 {
-            let path = std::env::temp_dir().join(format!(
-                "localton-lite-client-{}-{:016x}.boc",
-                std::process::id(),
-                random::<u64>()
-            ));
-            match std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    if let Err(error) = file.write_all(bytes) {
-                        let _ = std::fs::remove_file(&path);
-                        return Err(error).with_context(|| {
-                            format!("failed to stage message BoC at {}", path.display())
-                        });
-                    }
-                    return Ok(Self { path });
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => {
-                    return Err(error).with_context(|| {
-                        format!("failed to create staged message BoC at {}", path.display())
-                    });
-                }
-            }
-        }
-        bail!("failed to allocate a unique temporary file for message BoC")
-    }
-
-    /// Borrows the non-secret temporary filename passed to official `sendfile`.
-    fn path(&self) -> &Path {
-        &self.path
-    }
-}
-
-impl Drop for StagedBoc {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
-    }
-}
-
-/// Converts transport-library stack values into Localton's stable response model.
-fn stack_value(value: TvmStackEntry) -> Result<StackValue> {
+/// Converts canonical TVM stack values into Localton's stable response model.
+fn stack_value(value: &TVMStackValue) -> Result<StackValue> {
     Ok(match value {
-        TvmStackEntry::Null => StackValue::Null,
-        TvmStackEntry::Int(value) => StackValue::Int {
-            decimal: value.to_string(),
+        TVMStackValue::Null(_) => StackValue::Null,
+        TVMStackValue::TinyInt(value) => StackValue::Int {
+            decimal: value.value.to_string(),
         },
-        TvmStackEntry::Cell(cell) => StackValue::Cell {
-            boc_base64: BASE64.encode(serialize_boc(&cell, false)?),
+        TVMStackValue::Int(value) => StackValue::Int {
+            decimal: value.value.to_string(),
         },
-        TvmStackEntry::Slice(cell) => StackValue::Slice {
-            boc_base64: BASE64.encode(serialize_boc(&cell, false)?),
+        TVMStackValue::Cell(cell) => StackValue::Cell {
+            boc_base64: BASE64.encode(cell.value.to_boc()?),
         },
-        TvmStackEntry::Tuple(values) => StackValue::Tuple {
-            values: values
-                .into_iter()
-                .map(stack_value)
-                .collect::<Result<Vec<_>>>()?,
+        TVMStackValue::CellSlice(slice) => StackValue::Slice {
+            boc_base64: BASE64.encode(slice.to_cell()?.to_boc()?),
         },
-        TvmStackEntry::List(values) => StackValue::List {
-            values: values
-                .into_iter()
-                .map(stack_value)
-                .collect::<Result<Vec<_>>>()?,
+        TVMStackValue::Tuple(values) => StackValue::Tuple {
+            values: values.iter().map(stack_value).collect::<Result<Vec<_>>>()?,
         },
-        TvmStackEntry::Unsupported(bytes) => StackValue::Unsupported {
-            bytes_hex: hex::encode(bytes),
-        },
+        TVMStackValue::Nan(_) | TVMStackValue::Builder(_) | TVMStackValue::Cont(_) => {
+            StackValue::Unsupported {
+                bytes_hex: hex::encode(value.to_boc()?),
+            }
+        }
     })
 }
 
@@ -1165,6 +681,31 @@ fn validator_set_info(set: ChainValidatorSet) -> Result<ValidatorSetInfo> {
     })
 }
 
+/// Applies the workflow deadline to one in-process liteserver request.
+///
+/// The subprocess adapter enforces the same context in its process runner. Native
+/// ADNL requests have no child-process boundary, so they consume the deadline here
+/// and callers must not add another timeout around the semantic operation.
+async fn observe_native<T>(
+    context: &OperationContext,
+    target: &LiteTarget,
+    operation: LiteOperation,
+    future: impl Future<Output = Result<T>>,
+) -> Result<T> {
+    let operation_name = operation.as_str();
+    observe(context, target, operation, async {
+        tokio::time::timeout(context.timeout, future)
+            .await
+            .with_context(|| {
+                format!(
+                    "native lite-client {operation_name} timed out after {}ms",
+                    context.timeout.as_millis()
+                )
+            })?
+    })
+    .await
+}
+
 /// Runs a semantic operation inside one structured telemetry span.
 ///
 /// `duration_ms` and `outcome` are recorded on every exit path. Progress events
@@ -1178,10 +719,7 @@ async fn observe<T>(
 ) -> Result<T> {
     let operation_name = operation.as_str();
     let target_name = target.diagnostic_name(context);
-    let endpoint = target
-        .endpoint
-        .as_deref()
-        .unwrap_or("configured liteserver");
+    let endpoint = "configured liteserver";
     let span = info_span!(
         "ton.tool.operation",
         ton.tool = "lite-client",
@@ -1229,32 +767,6 @@ fn format_shard(shard: i64) -> String {
     format!("{:016x}", shard as u64)
 }
 
-/// Validates and formats an extended TON block identity for official commands.
-fn format_block_id(id: &BlockRef) -> Result<String> {
-    ensure_hex(&id.shard, 16, "block shard")?;
-    ensure_hex(&id.root_hash, 64, "block root hash")?;
-    ensure_hex(&id.file_hash, 64, "block file hash")?;
-    Ok(format!(
-        "({},{},{}):{}:{}",
-        id.workchain, id.shard, id.seqno, id.root_hash, id.file_hash
-    ))
-}
-
-/// Quotes a filesystem token for the official client's command parser.
-fn quote_path(path: &Path) -> Result<String> {
-    let value = path
-        .to_str()
-        .with_context(|| format!("lite-client path is not UTF-8: {}", path.display()))?;
-    ensure!(
-        !value.chars().any(char::is_control),
-        "lite-client path contains control characters"
-    );
-    Ok(format!(
-        "\"{}\"",
-        value.replace('\\', "\\\\").replace('"', "\\\"")
-    ))
-}
-
 /// Checks one fixed-size hexadecimal field before it reaches command syntax.
 fn ensure_hex(value: &str, length: usize, label: &str) -> Result<()> {
     ensure!(
@@ -1288,73 +800,13 @@ fn verify_file_hash(id: &BlockRef, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-/// Preserves both official output streams as one operator-facing report.
-fn joined_output(output: CommandOutput) -> String {
-    match (output.stdout.trim(), output.stderr.trim()) {
-        ("", "") => "official lite-client completed without textual output".to_owned(),
-        (stdout, "") => stdout.to_owned(),
-        ("", stderr) => stderr.to_owned(),
-        (stdout, stderr) => format!("{stdout}\n{stderr}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use expect_test::expect;
 
     use super::*;
-
-    fn block_ref() -> BlockRef {
-        BlockRef {
-            workchain: -1,
-            shard: "8000000000000000".to_owned(),
-            seqno: 42,
-            root_hash: "11".repeat(32),
-            file_hash: "22".repeat(32),
-        }
-    }
-
-    #[test]
-    fn official_commands_are_semantic_and_release_scoped() {
-        let account = AccountStateRequest::new(
-            "-1:3333333333333333333333333333333333333333333333333333333333333333",
-        )
-        .unwrap();
-        let lookup = LookupBlock {
-            workchain: 0,
-            shard: i64::MIN,
-            seqno: 42,
-        };
-        let commands = [
-            OfficialLiteCommand::Last.render().unwrap(),
-            OfficialLiteCommand::AccountState(account).render().unwrap(),
-            OfficialLiteCommand::LookupBlock(lookup).render().unwrap(),
-            OfficialLiteCommand::Block(lookup).render().unwrap(),
-            OfficialLiteCommand::DownloadBlock(block_ref())
-                .render()
-                .unwrap(),
-            OfficialLiteCommand::BlockTransactions(
-                BlockTransactionsRequest::new(block_ref(), 100).unwrap(),
-            )
-            .render()
-            .unwrap(),
-            OfficialLiteCommand::SendFile(PathBuf::from("/tmp/message with spaces.boc"))
-                .render()
-                .unwrap(),
-        ]
-        .concat()
-        .join("\n");
-
-        expect![[r#"
-            last
-            getaccount -1:3333333333333333333333333333333333333333333333333333333333333333
-            byseqno 0 8000000000000000 42
-            byseqno 0 8000000000000000 42
-            getblock (-1,8000000000000000,42):1111111111111111111111111111111111111111111111111111111111111111:2222222222222222222222222222222222222222222222222222222222222222
-            listblocktrans (-1,8000000000000000,42):1111111111111111111111111111111111111111111111111111111111111111:2222222222222222222222222222222222222222222222222222222222222222 100
-            sendfile "/tmp/message with spaces.boc""#]]
-        .assert_eq(&commands);
-    }
 
     #[test]
     fn boc_debug_output_exposes_only_size() {
@@ -1363,20 +815,28 @@ mod tests {
     }
 
     #[test]
-    fn official_block_ids_reject_command_language_injection() {
-        let mut id = block_ref();
-        id.root_hash = format!("{} quit", "11".repeat(32));
-        let error = OfficialLiteCommand::DownloadBlock(id)
-            .render()
-            .unwrap_err()
-            .to_string();
-        expect![[r#"block root hash must contain exactly 64 hexadecimal characters"#]]
-            .assert_eq(&error);
-    }
-
-    #[test]
     fn trait_remains_object_safe() {
         fn accepts_object(_: &dyn LiteClient) {}
         let _ = accepts_object;
+    }
+
+    #[tokio::test]
+    async fn native_operation_consumes_the_context_timeout_once() {
+        let context = OperationContext::for_node(Duration::from_millis(1), "node2");
+        let target = LiteTarget::new("global.config.json");
+        let error = observe_native::<()>(
+            &context,
+            &target,
+            LiteOperation::MasterchainInfo,
+            std::future::pending(),
+        )
+        .await
+        .unwrap_err();
+        let error = format!("{error:#}");
+
+        expect![
+            "lite-client masterchain_info failed for node2 (configured liteserver): native lite-client masterchain_info timed out after 1ms: deadline has elapsed"
+        ]
+        .assert_eq(&error);
     }
 }

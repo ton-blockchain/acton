@@ -146,8 +146,7 @@ pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionSta
             &OperationContext::new(Duration::from_secs(30)),
             &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
         )
-        .await?
-        .into_data()
+        .await
 }
 
 fn resolve_managed_node(state: &StateArgs, requested: Option<&str>) -> Result<String> {
@@ -756,7 +755,6 @@ async fn run_method_u64(
             RunMethodRequest::new(address, method, arguments)?,
         )
         .await?
-        .into_data()?
         .first_u64()
 }
 

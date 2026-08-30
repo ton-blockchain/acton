@@ -15,7 +15,7 @@ use crate::{
     storage::Settings,
     storage::{NodeRuntime, RuntimeState},
     ton::toolchain::Toolchain,
-    ton::tools::types::OperationContext,
+    ton::tools::{types::OperationContext, validator_engine::ValidatorDatabase},
 };
 
 use super::{nodes, validator};
@@ -71,9 +71,14 @@ impl LauncherControl {
         let mut node_runtime =
             nodes::ensure_initialized(&self.layout, &self.tools, &node, self.timeout).await?;
         let context = OperationContext::for_node(self.timeout, &node.name);
-        let mut process =
-            validator::start_persistent(&self.layout, self.tools.validator_engine.as_ref(), &node)
-                .await?;
+        let node_layout = self.layout.node(&node);
+        let mut process = validator::start_persistent(
+            &self.layout,
+            self.tools.validator_engine.as_ref(),
+            &node,
+            ValidatorDatabase::open(node_layout.db)?,
+        )
+        .await?;
         if let Err(error) = validator::wait_for_console(
             &self.layout,
             self.tools.validator_console_tool.as_ref(),

@@ -22,7 +22,7 @@ use crate::{
 };
 
 use super::{
-    types::{AdnlEndpoint, OperationContext, TonPublicKey},
+    types::{AdnlEndpoint, KeyId, OperationContext},
     validator_engine_config::ValidatorEngineConfig,
 };
 
@@ -53,11 +53,10 @@ pub struct ValidatorDatabase {
 }
 
 impl ValidatorDatabase {
-    /// Describes an existing database without asserting that it is complete.
+    /// Describes a database path before an initialization operation creates it.
     ///
-    /// Start operations validate the config again, so callers may use this for a
-    /// persisted database loaded from Localton state without trusting stale
-    /// metadata.
+    /// Persisted state must enter through [`Self::open`], which proves the
+    /// generated config can be parsed before a long-running process is spawned.
     #[must_use]
     pub fn at(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
@@ -65,14 +64,32 @@ impl ValidatorDatabase {
         Self { path, config }
     }
 
+    /// Opens an existing engine database and validates its complete typed config.
+    ///
+    /// Persistent startup receives this value instead of a raw path, so it does
+    /// not need to rediscover or reparse `config.json` immediately before spawn.
+    pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
+        let database = Self::at(path);
+        OfficialValidatorEngine::validate_database(&database)?;
+        Ok(database)
+    }
+
     /// Adds host-local control and optional liteserver identities to this database.
     pub fn install_control_and_liteserver(
         &self,
         node: &NodeSettings,
-        control_server: TonPublicKey,
-        control_client: TonPublicKey,
-        liteserver: TonPublicKey,
+        control_server: KeyId,
+        control_client: KeyId,
+        liteserver: KeyId,
     ) -> Result<()> {
+        for id in std::iter::once(control_server).chain(node.liteserver.then_some(liteserver)) {
+            let path = self.private_key_path(id);
+            ensure!(
+                path.is_file(),
+                "validator service key {id} is missing from {}",
+                path.display()
+            );
+        }
         let mut config = ValidatorEngineConfig::load(&self.config)?;
         config.set_local_services(
             node.console_port,
@@ -82,6 +99,11 @@ impl ValidatorDatabase {
                 .then_some((node.liteserver_port, liteserver)),
         );
         config.save(&self.config)
+    }
+
+    /// Resolves one engine-owned identity to its canonical keyring filename.
+    pub fn private_key_path(&self, id: KeyId) -> PathBuf {
+        self.path.join("keyring").join(id.to_keyring_filename())
     }
 }
 
@@ -285,7 +307,15 @@ impl OfficialValidatorEngine {
             "validator config does not exist: {}",
             database.config.display()
         );
-        ValidatorEngineConfig::load(&database.config)?;
+        let config = ValidatorEngineConfig::load(&database.config)?;
+        for id in config.private_key_ids() {
+            let key = database.private_key_path(id);
+            ensure!(
+                key.is_file(),
+                "validator config references missing private key {id}: {}",
+                key.display()
+            );
+        }
         Ok(())
     }
 }
@@ -304,6 +334,9 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 request.threads > 0,
                 "validator-engine threads must be positive"
             );
+            request
+                .endpoint
+                .ensure_available("validator-engine initialization")?;
             let command = Self::finish_command(
                 self.base_command(
                     &request.global_config,
@@ -362,6 +395,9 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 "validator-engine threads must be positive"
             );
             Self::validate_database(&request.database)?;
+            request
+                .endpoint
+                .ensure_available("temporary validator-engine")?;
             let command = Self::finish_command(
                 self.base_command(
                     &request.global_config,
@@ -402,7 +438,7 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 request.threads > 0,
                 "validator-engine threads must be positive"
             );
-            Self::validate_database(&request.database)?;
+            request.endpoint.ensure_available("validator-engine")?;
             let mut command = self.base_command(
                 &request.global_config,
                 &request.database.path,

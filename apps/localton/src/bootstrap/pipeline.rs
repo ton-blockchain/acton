@@ -25,12 +25,13 @@ use crate::{
     storage::{NodeRuntime, RuntimeState, ServiceRuntime},
     ton::{
         accounts::{ImportedAccount, parse_imported_accounts},
+        global_config::GlobalConfigFile,
         toolchain::Toolchain,
-        tools::lite_client::LiteTarget,
+        tools::{lite_client::LiteTarget, types::DhtDatabase, validator_engine::ValidatorDatabase},
     },
 };
 
-use super::{LauncherControl, files::absolute_path, genesis, nodes, persistence, readiness};
+use super::{LauncherControl, acquire_lock, files::absolute_path, genesis, nodes, readiness};
 
 /// Everything fixed before child processes are started.
 ///
@@ -42,6 +43,9 @@ struct PreparedLaunch {
     timeout: Duration,
     settings: Settings,
     manifest: Manifest,
+    global_config: GlobalConfigFile,
+    dht_database: DhtDatabase,
+    validator_database: ValidatorDatabase,
     ton_http_api_bind: Ipv4Addr,
     _state_lock: File,
 }
@@ -73,7 +77,13 @@ pub async fn run(args: RunArgs) -> Result<()> {
         "launcher",
         "start_core",
         &state_target,
-        nodes::start_core(&launch.layout, &launch.tools, &launch.settings),
+        nodes::start_core(
+            &launch.layout,
+            &launch.tools,
+            &launch.settings,
+            launch.dht_database.clone(),
+            launch.validator_database.clone(),
+        ),
     )
     .await
     {
@@ -106,12 +116,21 @@ pub async fn run(args: RunArgs) -> Result<()> {
 /// creates its genesis. Returning successfully means the disk state is complete
 /// enough to start DHT and validator-engine.
 async fn prepare(args: RunArgs) -> Result<PreparedLaunch> {
-    let imported_accounts = parse_imported_accounts(&args.add_account)?;
     let state_root = absolute_path(&args.state_dir)?;
     let layout = Layout::new(state_root);
     layout.create_dirs()?;
 
-    let state_lock = persistence::acquire_lock(&layout.lock)?;
+    let state_lock = acquire_lock(&layout.lock)?;
+    let state_exists = layout.manifest.is_file();
+    ensure!(
+        !state_exists || args.add_account.is_empty(),
+        "--add-account can only be used when creating a network; use another --state-dir"
+    );
+    let imported_accounts = if state_exists {
+        Vec::new()
+    } else {
+        parse_imported_accounts(&args.add_account)?
+    };
     let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
     let tools = Toolchain::official(layout.clone(), binaries);
     let timeout = Duration::from_secs(args.startup_timeout);
@@ -120,15 +139,16 @@ async fn prepare(args: RunArgs) -> Result<PreparedLaunch> {
     // The manifest is bootstrap's commit marker. Existing state is validated
     // before reuse; without it, genesis initialization creates every artifact
     // and writes the manifest only after the network is complete.
-    let manifest = if layout.manifest.is_file() {
+    let manifest = if state_exists {
         let manifest = Manifest::load(&layout.manifest)?;
-        persistence::validate_persisted_state(&layout, &manifest)?;
-        persistence::validate_requested_imported_accounts(&manifest, &imported_accounts)?;
         info!("reusing persistent local TON state");
         manifest
     } else {
         genesis::initialize(&layout, &tools, &settings, &imported_accounts, timeout).await?
     };
+    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
+    let dht_database = DhtDatabase::open(layout.dht_db.clone())?;
+    let validator_database = ValidatorDatabase::open(layout.validator_db.clone())?;
 
     Ok(PreparedLaunch {
         layout,
@@ -136,6 +156,9 @@ async fn prepare(args: RunArgs) -> Result<PreparedLaunch> {
         timeout,
         settings,
         manifest,
+        global_config,
+        dht_database,
+        validator_database,
         ton_http_api_bind: args.ton_http_api_bind,
         _state_lock: state_lock,
     })
@@ -225,7 +248,7 @@ async fn run_managed_network(
     readiness::wait_for_blocks(
         &launch.layout,
         launch.tools.lite_client_tool.as_ref(),
-        &LiteTarget::new(&launch.manifest.global_config).with_label("genesis"),
+        &LiteTarget::new(launch.global_config.path()).with_label("genesis"),
         processes,
         launch.timeout,
     )
@@ -279,12 +302,16 @@ async fn run_managed_network(
     // Step 9: print connection data, start periodic maintenance, and supervise.
     // The launcher now blocks until Ctrl-C/SIGTERM or until any required child
     // exits; a child failure is treated as failure of the whole local network.
-    if let Err(error) = print_connection_details(&launch.manifest, &launch.settings) {
+    if let Err(error) =
+        print_connection_details(&launch.manifest, &launch.settings, &launch.global_config)
+    {
         services.shutdown().await;
         return Err(error);
     }
+
     let background = runtime::background::start(launch.layout.clone(), &launch.settings);
     info!("local TON is producing masterchain blocks; press Ctrl-C to stop");
+
     let supervision = tokio::select! {
         result = readiness::supervise(processes) => result,
         signal_result = readiness::shutdown_signal() => signal_result,
@@ -321,7 +348,7 @@ async fn mark_network_ready(
     runtime.ready = true;
     runtime.masterchain_seqno = readiness::lite_client_seqno(
         launch.tools.lite_client_tool.as_ref(),
-        &LiteTarget::new(&launch.manifest.global_config).with_label("genesis"),
+        &LiteTarget::new(launch.global_config.path()).with_label("genesis"),
     )
     .await
     .ok();
@@ -386,16 +413,22 @@ pub async fn status(args: StatusArgs) -> Result<()> {
     let state_root = absolute_path(&args.state.state_dir)?;
     let layout = Layout::new(state_root);
     let manifest = Manifest::load(&layout.manifest)?;
-    persistence::validate_persisted_state(&layout, &manifest)?;
+    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
+    DhtDatabase::open(layout.dht_db.clone())?;
+    ValidatorDatabase::open(layout.validator_db.clone())?;
     let settings = Settings::load_or_create(&layout.settings)?;
-    print_connection_details(&manifest, &settings)
+    print_connection_details(&manifest, &settings, &global_config)
 }
 
-fn print_connection_details(manifest: &Manifest, settings: &Settings) -> Result<()> {
-    let global = dunce::canonicalize(&manifest.global_config).with_context(|| {
+fn print_connection_details(
+    manifest: &Manifest,
+    settings: &Settings,
+    global_config: &GlobalConfigFile,
+) -> Result<()> {
+    let global = dunce::canonicalize(global_config.path()).with_context(|| {
         format!(
             "global config is missing: {}",
-            manifest.global_config.display()
+            global_config.path().display()
         )
     })?;
     let genesis = settings.node("genesis")?;

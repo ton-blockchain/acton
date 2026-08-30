@@ -19,10 +19,14 @@ use tracing::warn;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use crate::{
-    bootstrap::{acquire_lock, validate_persisted_state},
+    bootstrap::acquire_lock,
     cli::{SnapshotArgs, SnapshotCommand},
     storage::{Layout, Manifest, RuntimeState},
-    ton::toolchain::absolute_path,
+    ton::{
+        global_config::GlobalConfigFile,
+        toolchain::absolute_path,
+        tools::{types::DhtDatabase, validator_engine::ValidatorDatabase},
+    },
 };
 
 const SNAPSHOT_FORMAT_VERSION: u32 = 1;
@@ -80,7 +84,9 @@ fn create(paths: &SnapshotArgs, name: Option<String>) -> Result<SnapshotInfo> {
     let layout = Layout::new(state_dir.clone());
     let _lock = acquire_lock(&layout.lock)?;
     let manifest = Manifest::load(&layout.manifest)?;
-    validate_persisted_state(&layout, &manifest)?;
+    GlobalConfigFile::open(layout.global_config.clone())?;
+    DhtDatabase::open(layout.dht_db.clone())?;
+    ValidatorDatabase::open(layout.validator_db.clone())?;
 
     let name = normalize_name(name)?;
     let created_at = unix_time();
@@ -169,23 +175,25 @@ fn restore(paths: &SnapshotArgs, id: &str) -> Result<SnapshotInfo> {
     let result = (|| {
         extract_archive(&archive_path, &staging, info.state_size_bytes)?;
         let staged_layout = Layout::new(staging.clone());
-        let mut manifest = Manifest::load(&staged_layout.manifest)?;
+        let manifest = Manifest::load(&staged_layout.manifest)?;
         ensure!(
             manifest.schema_version == info.state_schema_version
                 && manifest.ton_release == info.ton_release,
             "snapshot state does not match its metadata"
         );
-        manifest.global_config.clone_from(&layout.global_config);
-        manifest.save_atomic(&staged_layout.manifest)?;
-        let mut validation_manifest = manifest.clone();
-        validation_manifest
-            .global_config
-            .clone_from(&staged_layout.global_config);
-        validate_persisted_state(&staged_layout, &validation_manifest)?;
+        GlobalConfigFile::open(staged_layout.global_config.clone())?;
+        DhtDatabase::open(staged_layout.dht_db.clone())?;
+        ValidatorDatabase::open(staged_layout.validator_db.clone())?;
 
         replace_state_entries(&state_dir, &staging, &backup)?;
-        let restored_manifest = Manifest::load(&layout.manifest)?;
-        if let Err(error) = validate_persisted_state(&layout, &restored_manifest) {
+        let restored_state = (|| {
+            Manifest::load(&layout.manifest)?;
+            GlobalConfigFile::open(layout.global_config.clone())?;
+            DhtDatabase::open(layout.dht_db.clone())?;
+            ValidatorDatabase::open(layout.validator_db.clone())?;
+            Ok::<_, anyhow::Error>(())
+        })();
+        if let Err(error) = restored_state {
             rollback_state_entries(&state_dir, &staging, &backup)?;
             return Err(error).context("restored snapshot is incomplete");
         }
@@ -589,6 +597,7 @@ mod tests {
     use crate::{
         cli::StateArgs,
         storage::{SCHEMA_VERSION, TON_RELEASE},
+        ton::tools::types::{KeyId, TonPublicKey},
     };
 
     #[test]
@@ -682,9 +691,51 @@ hidden restore directory: true"#]]
             let snapshot_dir = root.path().join("snapshots");
             let layout = Layout::new(state_dir.clone());
             layout.create_dirs().unwrap();
-            fs::write(&layout.global_config, "{}\n").unwrap();
-            fs::write(layout.validator_db.join("config.json"), "{}\n").unwrap();
+            fs::write(
+                &layout.global_config,
+                include_bytes!(
+                    "../../../../crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json"
+                ),
+            )
+            .unwrap();
+            fs::write(
+                layout.validator_db.join("config.json"),
+                serde_json::to_vec_pretty(&serde_json::json!({
+                    "@type": "engine.validator.config",
+                    "out_port": 3272,
+                    "addrs": [{
+                        "@type": "engine.addr",
+                        "ip": i32::from_be_bytes(std::net::Ipv4Addr::LOCALHOST.octets()),
+                        "port": 4442,
+                        "categories": [0, 1, 2, 3],
+                        "priority_categories": [],
+                    }],
+                    "adnl": [],
+                    "dht": [],
+                    "validators": [],
+                    "collators": [],
+                    "fullnode": KeyId::from_bytes([3; 32]),
+                    "fullnodeslaves": [],
+                    "fullnodemasters": [],
+                    "liteservers": [],
+                    "control": [],
+                    "shards_to_monitor": [],
+                    "gc": { "@type": "engine.gc", "ids": [] },
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            fs::write(
+                layout
+                    .validator_keyring
+                    .join(KeyId::from_bytes([3; 32]).to_keyring_filename()),
+                b"key",
+            )
+            .unwrap();
             fs::write(layout.dht_db.join("config.json"), "{}\n").unwrap();
+            let dht_keyring = layout.dht_db.join("keyring");
+            fs::create_dir(&dht_keyring).unwrap();
+            fs::write(dht_keyring.join("11".repeat(32)), b"key").unwrap();
             fs::write(layout.certs.join("client"), b"client").unwrap();
             fs::write(layout.certs.join("server.pub"), b"server").unwrap();
             fs::write(&layout.settings, "{}\n").unwrap();
@@ -692,9 +743,8 @@ hidden restore directory: true"#]]
                 schema_version: SCHEMA_VERSION,
                 ton_release: TON_RELEASE.to_owned(),
                 ton_bin_dir: root.path().join("ton"),
-                validator_public_key: crate::ton::tools::types::TonPublicKey::from_bytes([1; 32]),
-                liteserver_public_key: crate::ton::tools::types::TonPublicKey::from_bytes([2; 32]),
-                global_config: layout.global_config.clone(),
+                validator_public_key: TonPublicKey::from_bytes([1; 32]),
+                liteserver_public_key: TonPublicKey::from_bytes([2; 32]),
                 imported_accounts: Vec::new(),
             }
             .save_atomic(&layout.manifest)

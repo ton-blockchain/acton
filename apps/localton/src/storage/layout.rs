@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{storage::NodeSettings, ton::tools::types::TonPublicKey};
 
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 pub const TON_RELEASE: &str = "v2026.06";
 
 pub const VALIDATOR_CONSOLE_PORT: u16 = 4441;
@@ -151,7 +151,6 @@ pub struct Manifest {
     pub ton_bin_dir: PathBuf,
     pub validator_public_key: TonPublicKey,
     pub liteserver_public_key: TonPublicKey,
-    pub global_config: PathBuf,
     pub imported_accounts: Vec<ImportedAccountDescriptor>,
 }
 

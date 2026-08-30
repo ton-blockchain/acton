@@ -168,6 +168,9 @@ impl DhtServer for OfficialDhtServer {
         let started = Instant::now();
         let span = operation_span(context, "initialize");
         let result = async {
+            request
+                .endpoint
+                .ensure_available("dht-server initialization")?;
             info!(
                 milestone = "database_initialization_started",
                 database_path = %request.database.display(),
@@ -228,7 +231,7 @@ impl DhtServer for OfficialDhtServer {
         let started = Instant::now();
         let span = operation_span(context, "start");
         let result = async {
-            request.database.validate()?;
+            request.endpoint.ensure_available("dht-server")?;
             info!(
                 milestone = "service_spawn_started",
                 database_path = %request.database.path.display(),

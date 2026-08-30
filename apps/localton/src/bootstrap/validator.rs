@@ -257,13 +257,14 @@ pub(super) async fn start_persistent(
     layout: &Layout,
     engine: &dyn ValidatorEngine,
     node: &NodeSettings,
+    database: ValidatorDatabase,
 ) -> Result<ServiceHandle> {
     let node_layout = layout.node(node);
     engine
         .start_persistent(ValidatorStartRequest {
             node_name: node.name.clone(),
             global_config: node_layout.global_config,
-            database: ValidatorDatabase::at(node_layout.db),
+            database,
             logs: ValidatorLogPaths {
                 engine: node_layout.logs.join("validator-engine"),
                 stdout: node_layout.logs.join("validator.stdout.log"),

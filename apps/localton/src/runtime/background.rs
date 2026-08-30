@@ -106,7 +106,10 @@ async fn validation_loop(
     let interval = Duration::from_secs(interval_seconds);
     loop {
         if let Err(error) = validators::auto_tick(state.clone()).await {
-            warn!(%error, "validator automation iteration failed");
+            warn!(
+                error = %format_args!("{error:#}"),
+                "validator automation iteration failed"
+            );
         }
         tokio::select! {
             _ = sleep(interval) => {}

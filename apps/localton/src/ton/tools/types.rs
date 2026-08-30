@@ -5,12 +5,21 @@
 //! still own layout and ordering, while adapters own release-specific command
 //! syntax and output parsing.
 
-use std::{fmt, net::Ipv4Addr, path::PathBuf, str::FromStr, time::Duration};
+use std::{
+    fmt, io,
+    net::{Ipv4Addr, SocketAddrV4, UdpSocket},
+    path::PathBuf,
+    str::FromStr,
+    time::Duration,
+};
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
+use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
+
+const ED25519_PUBLIC_KEY_TL_CONSTRUCTOR: [u8; 4] = [0xc6, 0xb4, 0x13, 0x48];
 
 /// Execution policy and diagnostic identity shared by one semantic tool call.
 ///
@@ -20,7 +29,10 @@ use utoipa::ToSchema;
 /// or change their behavior.
 #[derive(Clone, Debug)]
 pub struct OperationContext {
-    /// Maximum wall-clock time allowed for a bounded subprocess operation.
+    /// Maximum wall-clock time allowed for one bounded tool operation.
+    ///
+    /// Each adapter owns this deadline exactly once. Callers compose semantic
+    /// operations and must not wrap the same request in another timeout.
     pub timeout: Duration,
     /// Human-readable Localton node associated with the operation, when any.
     pub node_name: Option<String>,
@@ -172,6 +184,29 @@ impl AdnlEndpoint {
     pub const fn new(ip: Ipv4Addr, port: u16) -> Self {
         Self { ip, port }
     }
+
+    /// Proves that a new TON process can bind this host-local UDP endpoint.
+    ///
+    /// Abrupt launcher termination can leave `validator-engine` alive after the
+    /// state-directory lock is released. Detecting the occupied ADNL socket before
+    /// spawn avoids an opaque console timeout and identifies the usual stale-child
+    /// failure directly. The socket is released immediately; the official process
+    /// remains the sole long-term owner and a spawn race is still reported by it.
+    pub fn ensure_available(self, service: &str) -> Result<()> {
+        match UdpSocket::bind(SocketAddrV4::new(self.ip, self.port)) {
+            Ok(socket) => {
+                drop(socket);
+                Ok(())
+            }
+            Err(error) if error.kind() == io::ErrorKind::AddrInUse => bail!(
+                "{service} cannot bind ADNL endpoint {self}: address is already in use; \
+                 a TON process from a previous Localton run may still be running"
+            ),
+            Err(error) => {
+                Err(error).with_context(|| format!("{service} cannot bind ADNL endpoint {self}"))
+            }
+        }
+    }
 }
 
 impl fmt::Display for AdnlEndpoint {
@@ -246,7 +281,7 @@ enum AdnlUdpAddressConstructor {
 /// The identifier is public metadata rather than private key material. Keeping the
 /// decoded bytes prevents subtly different lowercase/uppercase representations from
 /// referring to the same key in different parts of the bootstrap workflow.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct KeyId([u8; 32]);
 
 impl KeyId {
@@ -369,7 +404,27 @@ impl TonPublicKey {
             bytes.len() == 36,
             "TL-encoded TON public key must contain exactly 36 bytes"
         );
+        ensure!(
+            bytes[..4] == ED25519_PUBLIC_KEY_TL_CONSTRUCTOR,
+            "TON public key has an unexpected TL constructor"
+        );
         Self::from_slice(&bytes[4..])
+    }
+
+    /// Encodes the complete `pub.ed25519` TL artifact written by TON tools.
+    pub fn to_tl_bytes(self) -> [u8; 36] {
+        let mut encoded = [0_u8; 36];
+        encoded[..4].copy_from_slice(&ED25519_PUBLIC_KEY_TL_CONSTRUCTOR);
+        encoded[4..].copy_from_slice(&self.0);
+        encoded
+    }
+
+    /// Computes the identifier used by TON keyrings and console commands.
+    ///
+    /// TON hashes the complete `pub.ed25519` TL value, including its four-byte
+    /// constructor. Hashing only the raw Ed25519 bytes produces a different ID.
+    pub fn key_id(self) -> KeyId {
+        KeyId::from_bytes(Sha256::digest(self.to_tl_bytes()).into())
     }
 
     /// Borrows the raw key used by zerostate and protocol encoders.
@@ -619,6 +674,8 @@ impl DhtDatabase {
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
+
     use super::*;
 
     #[test]
@@ -629,6 +686,33 @@ mod tests {
         assert_eq!(key.to_string(), lower);
         assert_eq!(key.to_keyring_filename(), "ABCDEF0123456789".repeat(4));
         assert!(KeyId::from_hex("not-a-key").is_err());
+    }
+
+    #[test]
+    fn public_key_id_matches_the_official_tl_hash() {
+        // Captured from TON v2026.06 `generate-random-id -m keys`.
+        let bytes: [u8; 32] =
+            hex::decode("15945a6bce5c6ba2e2d1205a40ca827ef2131f1986c574344cafbfdf1baa5e17")
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+        expect!["c0028373a759ddf15c4f7f6c1abac7fa85ac34d8d82c335ce173fae5f6ee1f9c"]
+            .assert_eq(&TonPublicKey::from_bytes(bytes).key_id().to_hex());
+    }
+
+    #[test]
+    fn occupied_adnl_endpoint_reports_a_stale_ton_process() {
+        let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = socket.local_addr().unwrap().port();
+        let error = AdnlEndpoint::new(Ipv4Addr::LOCALHOST, port)
+            .ensure_available("temporary validator-engine")
+            .unwrap_err()
+            .to_string()
+            .replace(&port.to_string(), "<port>");
+
+        expect![[r#"temporary validator-engine cannot bind ADNL endpoint 127.0.0.1:<port>: address is already in use; a TON process from a previous Localton run may still be running"#]]
+            .assert_eq(&error);
     }
 
     #[test]

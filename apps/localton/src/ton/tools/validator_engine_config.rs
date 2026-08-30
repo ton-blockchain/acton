@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::storage::write_json_atomic;
 
-use super::types::{Ed25519PublicKey, KeyId, TonPublicKey};
+use super::types::{Ed25519PublicKey, KeyId};
 
 const CONTROL_PERMISSIONS: i32 = 15;
 
@@ -68,9 +68,9 @@ impl ValidatorEngineConfig {
     pub(crate) fn set_local_services(
         &mut self,
         console_port: u16,
-        control_server: TonPublicKey,
-        control_client: TonPublicKey,
-        liteserver: Option<(u16, TonPublicKey)>,
+        control_server: KeyId,
+        control_client: KeyId,
+        liteserver: Option<(u16, KeyId)>,
     ) {
         self.control = vec![EngineControlInterface {
             constructor: ControlInterfaceConstructor::Interface,
@@ -111,19 +111,29 @@ impl ValidatorEngineConfig {
             .transpose()
     }
 
-    /// Returns the public identity accepted by the local control interface.
-    pub(crate) fn control_public_key(&self) -> Option<TonPublicKey> {
-        self.control.first().map(|control| control.id)
-    }
-
-    /// Returns the public identity exposed by the configured liteserver.
-    pub(crate) fn liteserver_public_key(&self) -> Option<TonPublicKey> {
-        self.liteservers.first().map(|liteserver| liteserver.id)
-    }
-
     /// Returns the ADNL identifier used by the engine's full-node role.
     pub(crate) const fn fullnode_adnl(&self) -> KeyId {
         self.fullnode
+    }
+
+    /// Lists identities for which this engine must own private keyring files.
+    ///
+    /// Control clients and remote full nodes are intentionally excluded: their
+    /// IDs authorize peers, while their private keys live outside this engine.
+    pub(crate) fn private_key_ids(&self) -> Vec<KeyId> {
+        let mut ids = vec![self.fullnode];
+        ids.extend(self.adnl.iter().map(|entry| entry.id));
+        ids.extend(self.dht.iter().map(|entry| entry.id));
+        ids.extend(self.liteservers.iter().map(|entry| entry.id));
+        ids.extend(self.control.iter().map(|entry| entry.id));
+        for validator in self.validators.iter().chain(&self.collators) {
+            ids.push(validator.id);
+            ids.extend(validator.temp_keys.iter().map(|key| key.key));
+            ids.extend(validator.adnl_addrs.iter().map(|address| address.id));
+        }
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 }
 
@@ -240,7 +250,7 @@ enum ValidatorAdnlAddressConstructor {
 struct EngineLiteserver {
     #[serde(rename = "@type")]
     constructor: LiteserverConstructor,
-    id: TonPublicKey,
+    id: KeyId,
     port: u16,
 }
 
@@ -255,7 +265,7 @@ enum LiteserverConstructor {
 struct EngineControlInterface {
     #[serde(rename = "@type")]
     constructor: ControlInterfaceConstructor,
-    id: TonPublicKey,
+    id: KeyId,
     port: u16,
     allowed: Vec<EngineControlProcess>,
 }
@@ -271,7 +281,7 @@ enum ControlInterfaceConstructor {
 struct EngineControlProcess {
     #[serde(rename = "@type")]
     constructor: ControlProcessConstructor,
-    id: TonPublicKey,
+    id: KeyId,
     permissions: i32,
 }
 
@@ -351,6 +361,7 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+    use expect_test::expect;
 
     use super::*;
 
@@ -385,15 +396,26 @@ mod tests {
         let mut config: ValidatorEngineConfig = serde_json::from_value(config_json()).unwrap();
         config.set_local_services(
             4441,
-            TonPublicKey::from_bytes([2; 32]),
-            TonPublicKey::from_bytes([3; 32]),
-            Some((18_004, TonPublicKey::from_bytes([4; 32]))),
+            KeyId::from_bytes([2; 32]),
+            KeyId::from_bytes([3; 32]),
+            Some((18_004, KeyId::from_bytes([4; 32]))),
         );
+        let private_key_ids = config
+            .private_key_ids()
+            .into_iter()
+            .map(KeyId::to_hex)
+            .collect::<Vec<_>>()
+            .join("\n");
         let value = serde_json::to_value(config).unwrap();
 
         assert_eq!(value["control"][0]["port"], 4441);
         assert_eq!(value["control"][0]["allowed"][0]["permissions"], 15);
         assert_eq!(value["liteservers"][0]["port"], 18_004);
         assert!(value["liteservers"][0]["port"].is_number());
+        expect![[r#"
+            0101010101010101010101010101010101010101010101010101010101010101
+            0202020202020202020202020202020202020202020202020202020202020202
+            0404040404040404040404040404040404040404040404040404040404040404"#]]
+        .assert_eq(&private_key_ids);
     }
 }
