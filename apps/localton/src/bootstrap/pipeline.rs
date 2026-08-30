@@ -19,11 +19,15 @@ use crate::{
     binaries::TonBinaries,
     cli::{RunArgs, StatusArgs},
     http,
-    runtime::{self, ProcessRegistry},
+    runtime::{self, ProcessRegistry, run_stage},
     storage::Settings,
     storage::{Layout, Manifest},
     storage::{NodeRuntime, RuntimeState, ServiceRuntime},
-    ton::accounts::{ImportedAccount, parse_imported_accounts},
+    ton::{
+        accounts::{ImportedAccount, parse_imported_accounts},
+        toolchain::Toolchain,
+        tools::lite_client::LiteTarget,
+    },
 };
 
 use super::{LauncherControl, files::absolute_path, genesis, nodes, persistence, readiness};
@@ -34,7 +38,7 @@ use super::{LauncherControl, files::absolute_path, genesis, nodes, persistence, 
 /// network directory for the complete launcher lifetime.
 struct PreparedLaunch {
     layout: Layout,
-    binaries: TonBinaries,
+    tools: Toolchain,
     timeout: Duration,
     settings: Settings,
     manifest: Manifest,
@@ -52,7 +56,8 @@ pub async fn run(args: RunArgs) -> Result<()> {
     // Step 1: turn CLI input and on-disk files into a complete launch plan.
     // This also creates genesis on the first run. No long-lived TON process is
     // started until the state directory, settings, binaries, and manifest agree.
-    let launch = prepare(args).await?;
+    let state_target = args.state_dir.display().to_string();
+    let launch = run_stage("launcher", "prepare", &state_target, prepare(args)).await?;
 
     // Step 2: publish that the launcher owns this state directory.
     // `ready` is still false: at this point no claim is made that TON can answer
@@ -64,18 +69,30 @@ pub async fn run(args: RunArgs) -> Result<()> {
     // Step 3: start the minimum process set: local DHT and genesis validator.
     // DHT makes the network identity discoverable over ADNL; the validator then
     // uses the prepared zerostate and global config to begin the masterchain.
-    let processes =
-        match nodes::start_core(&launch.layout, &launch.binaries, &launch.settings).await {
-            Ok(processes) => processes,
-            Err(error) => {
-                mark_launcher_stopped(&launch.layout)?;
-                return Err(error);
-            }
-        };
+    let processes = match run_stage(
+        "launcher",
+        "start_core",
+        &state_target,
+        nodes::start_core(&launch.layout, &launch.tools, &launch.settings),
+    )
+    .await
+    {
+        Ok(processes) => processes,
+        Err(error) => {
+            mark_launcher_stopped(&launch.layout)?;
+            return Err(error);
+        }
+    };
 
     // Steps 4–10 run under one cleanup boundary. From here on, every exit stops
     // all registered children and records that the network is no longer live.
-    let result = run_managed_network(&launch, &processes, &mut runtime).await;
+    let result = run_stage(
+        "launcher",
+        "managed_network",
+        &state_target,
+        run_managed_network(&launch, &processes, &mut runtime),
+    )
+    .await;
     let stop_result = processes.stop_all().await;
     let state_result = mark_launcher_stopped(&launch.layout);
 
@@ -93,24 +110,29 @@ async fn prepare(args: RunArgs) -> Result<PreparedLaunch> {
     let state_root = absolute_path(&args.state_dir)?;
     let layout = Layout::new(state_root);
     layout.create_dirs()?;
+
     let state_lock = persistence::acquire_lock(&layout.lock)?;
     let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
+    let tools = Toolchain::official(layout.clone(), binaries);
     let timeout = Duration::from_secs(args.startup_timeout);
     let settings = prepare_settings(&layout, &args, &imported_accounts)?;
 
-    // This is the one-time bootstrap boundary for a new state directory.
-    // Without a manifest, `prepare_persistent_network` enters
-    // `genesis::initialize`, which creates zerostates, validator and liteserver
-    // keys, DHT/validator databases, global config, and finally the manifest.
-    // Every later startup step assumes those artifacts already form one complete
-    // network, so process creation must never bypass this call.
-    let manifest =
-        prepare_persistent_network(&layout, &binaries, &settings, &imported_accounts, timeout)
-            .await?;
+    // The manifest is bootstrap's commit marker. Existing state is validated
+    // before reuse; without it, genesis initialization creates every artifact
+    // and writes the manifest only after the network is complete.
+    let manifest = if layout.manifest.is_file() {
+        let manifest = Manifest::load(&layout.manifest)?;
+        persistence::validate_persisted_state(&layout, &manifest)?;
+        persistence::validate_requested_imported_accounts(&manifest, &imported_accounts)?;
+        info!("reusing persistent local TON state");
+        manifest
+    } else {
+        genesis::initialize(&layout, &tools, &settings, &imported_accounts, timeout).await?
+    };
 
     Ok(PreparedLaunch {
         layout,
-        binaries,
+        tools,
         timeout,
         settings,
         manifest,
@@ -184,30 +206,6 @@ fn prepare_settings(
     Ok(settings)
 }
 
-/// Reuses an existing network or creates a new immutable zerostate.
-///
-/// The manifest acts as bootstrap's commit marker. If it exists, the launcher
-/// verifies the referenced artifacts and rejects different imported accounts.
-/// Without a manifest, genesis creation produces every required artifact and
-/// writes the manifest only as its final step.
-async fn prepare_persistent_network(
-    layout: &Layout,
-    binaries: &TonBinaries,
-    settings: &Settings,
-    imported_accounts: &[ImportedAccount],
-    timeout: Duration,
-) -> Result<Manifest> {
-    if layout.manifest.is_file() {
-        let manifest = Manifest::load(&layout.manifest)?;
-        persistence::validate_persisted_state(layout, &manifest)?;
-        persistence::validate_requested_imported_accounts(&manifest, imported_accounts)?;
-        info!("reusing persistent local TON state");
-        Ok(manifest)
-    } else {
-        genesis::initialize(layout, binaries, settings, imported_accounts, timeout).await
-    }
-}
-
 /// Advances the core process set into a ready, supervised local network.
 ///
 /// The order is deliberate: block production is proven before optional nodes
@@ -226,8 +224,8 @@ async fn run_managed_network(
     // proves that validator consensus advances the masterchain over time.
     readiness::wait_for_blocks(
         &launch.layout,
-        &launch.binaries,
-        &launch.manifest,
+        launch.tools.lite_client_tool.as_ref(),
+        &LiteTarget::new(&launch.manifest.global_config).with_label("genesis"),
         processes,
         launch.timeout,
     )
@@ -238,7 +236,7 @@ async fn run_managed_network(
     // databases, ADNL identities, control keys, and optional liteservers.
     nodes::start_additional(
         &launch.layout,
-        &launch.binaries,
+        &launch.tools,
         &launch.settings,
         launch.timeout,
         processes,
@@ -251,7 +249,7 @@ async fn run_managed_network(
     // normal chain bootstrap into an API readiness failure.
     http::v2::start(
         &launch.layout,
-        &launch.binaries,
+        &launch.tools.binaries,
         &launch.settings,
         launch.timeout,
         processes,
@@ -264,7 +262,7 @@ async fn run_managed_network(
     // their handles are kept in `ServiceSet` for coordinated shutdown.
     let control = LauncherControl::new(
         launch.layout.clone(),
-        launch.binaries.clone(),
+        launch.tools.clone(),
         launch.timeout,
         processes.clone(),
     );
@@ -321,9 +319,12 @@ async fn mark_network_ready(
         );
     }
     runtime.ready = true;
-    runtime.masterchain_seqno = readiness::lite_client_seqno(&launch.binaries, &launch.manifest)
-        .await
-        .ok();
+    runtime.masterchain_seqno = readiness::lite_client_seqno(
+        launch.tools.lite_client_tool.as_ref(),
+        &LiteTarget::new(&launch.manifest.global_config).with_label("genesis"),
+    )
+    .await
+    .ok();
     runtime.last_block_at = Some(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -363,10 +364,8 @@ async fn record_core_processes(
                 ..NodeRuntime::default()
             };
             if process.name == "genesis" {
-                node.liteserver_public_key = Some(manifest.liteserver_public_key.clone());
-                if let Some(public_key) = &manifest.validator_public_key {
-                    node.remember_validator_public_key(public_key.clone());
-                }
+                node.liteserver_public_key = Some(manifest.liteserver_public_key.to_base64());
+                node.remember_validator_public_key(manifest.validator_public_key.to_base64());
             }
             runtime.nodes.insert(process.name, node);
         }
@@ -404,7 +403,10 @@ fn print_connection_details(manifest: &Manifest, settings: &Settings) -> Result<
         "Liteserver endpoint: {}:{}",
         genesis.public_ip, genesis.liteserver_port
     );
-    println!("Liteserver public key: {}", manifest.liteserver_public_key);
+    println!(
+        "Liteserver public key: {}",
+        manifest.liteserver_public_key.to_base64()
+    );
     println!("Global config: {}", global.display());
     Ok(())
 }

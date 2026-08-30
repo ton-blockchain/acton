@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use serde::Serialize;
@@ -8,7 +8,7 @@ use crate::{
     storage::Layout,
     storage::{NodeRuntime, RuntimeState},
     storage::{NodeSettings, Settings},
-    ton::toolchain::Toolchain,
+    ton::{toolchain::Toolchain, tools::types::OperationContext},
 };
 
 #[derive(Debug, Serialize)]
@@ -105,15 +105,20 @@ pub async fn execute(command: NodeCommand) -> Result<()> {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             let settings = toolchain.settings()?;
             let node = settings.node(&name)?;
-            print!("{}", toolchain.validator_console(node, "getstats").await?);
-        }
-        NodeCommand::Console { state, name, args } => {
-            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let settings = toolchain.settings()?;
-            let node = settings.node(&name)?;
-            print!(
+            let stats = toolchain
+                .validator_console_tool
+                .health(
+                    &OperationContext::for_node(Duration::from_secs(20), &node.name),
+                    &toolchain.validator_console_endpoint(node),
+                )
+                .await?;
+            println!(
                 "{}",
-                toolchain.validator_console(node, &args.join(" ")).await?
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "connection_ready": stats.connection_ready(),
+                    "unix_time": stats.unix_time()?,
+                    "masterchain_block_time": stats.masterchain_block_time()?,
+                }))?
             );
         }
     }

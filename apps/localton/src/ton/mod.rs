@@ -6,5 +6,7 @@
 //! build on them.
 
 pub(crate) mod accounts;
+pub(crate) mod global_config;
 pub(crate) mod lite;
 pub(crate) mod toolchain;
+pub(crate) mod tools;

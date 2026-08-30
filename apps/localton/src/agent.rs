@@ -8,7 +8,6 @@
 
 use std::{
     collections::BTreeSet,
-    net::Ipv4Addr,
     path::Path,
     time::{Duration, Instant},
 };
@@ -27,8 +26,11 @@ use crate::{
     observability::{ObserverIdentity, SYNC_LAG_TOLERANCE_BLOCKS},
     operations::{validators, wallets},
     runtime::ProcessRegistry,
-    storage::{Layout, RuntimeState, Settings, ipv4_to_i32, write_json_atomic},
-    ton::{lite::LocalLiteClient, toolchain::Toolchain},
+    storage::{Layout, RuntimeState, Settings, write_json_atomic},
+    ton::{
+        global_config::GlobalConfig, lite::LocalLiteClient, toolchain::Toolchain,
+        tools::types::TonPublicKey,
+    },
 };
 
 const MAX_GLOBAL_CONFIG_BYTES: u64 = 1024 * 1024;
@@ -70,14 +72,11 @@ pub async fn run(args: AgentArgs) -> Result<()> {
     let _state_lock = acquire_lock(&layout.lock)?;
     let owned_nodes = prepare_follower_state(&layout, &args).await?;
     let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
-    let toolchain = Toolchain {
-        layout: layout.clone(),
-        binaries: binaries.clone(),
-    };
+    let toolchain = Toolchain::official(layout.clone(), binaries.clone());
     let processes = ProcessRegistry::default();
     let control = LauncherControl::new(
         layout.clone(),
-        binaries,
+        toolchain.clone(),
         Duration::from_secs(args.startup_timeout),
         processes.clone(),
     );
@@ -390,7 +389,7 @@ async fn discover_observability_peer(join: &str) -> Result<Option<String>> {
         .map(str::to_owned))
 }
 
-async fn fetch_global_config(source: &str) -> Result<serde_json::Value> {
+async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
     let url = http_url(source, "global config")?;
     let response = reqwest::Client::new()
         .get(url.clone())
@@ -415,41 +414,19 @@ async fn fetch_global_config(source: &str) -> Result<serde_json::Value> {
         );
         bytes.extend_from_slice(&chunk);
     }
-    let config: serde_json::Value =
-        serde_json::from_slice(&bytes).context("global config is invalid JSON")?;
-    ensure!(
-        config.pointer("/validator/zero_state").is_some(),
-        "global config has no validator zerostate"
-    );
-    ensure!(
-        config
-            .pointer("/dht/static_nodes/nodes")
-            .and_then(serde_json::Value::as_array)
-            .is_some_and(|nodes| !nodes.is_empty()),
-        "global config has no DHT entry points"
-    );
+    let config = GlobalConfig::from_json_bytes(&bytes).context("global config is invalid")?;
+    config.validate_for_node_join()?;
     Ok(config)
 }
 
 fn prefer_local_liteserver(path: &Path, port: u16, public_key: &str) -> Result<()> {
     let bytes = std::fs::read(path)
         .with_context(|| format!("failed to read global config {}", path.display()))?;
-    let mut config: serde_json::Value = serde_json::from_slice(&bytes)
+    let mut config = GlobalConfig::from_json_bytes(&bytes)
         .with_context(|| format!("invalid global config {}", path.display()))?;
-    config
-        .as_object_mut()
-        .context("global config root must be a JSON object")?
-        .insert(
-            "liteservers".to_owned(),
-            serde_json::json!([{
-                "id": {
-                    "@type": "pub.ed25519",
-                    "key": public_key,
-                },
-                "ip": ipv4_to_i32(Ipv4Addr::LOCALHOST),
-                "port": port,
-            }]),
-        );
+    let public_key =
+        TonPublicKey::from_base64(public_key).context("local liteserver public key is invalid")?;
+    config.use_local_liteserver(port, public_key);
     write_json_atomic(path, &config)
 }
 
@@ -576,11 +553,68 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use axum::{Json, Router, routing::get};
+    use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
     use expect_test::expect;
     use tokio::net::TcpListener;
 
     use super::*;
     use crate::cli::StateArgs;
+
+    fn global_config_fixture() -> serde_json::Value {
+        let block = serde_json::json!({
+            "@type": "ton.blockIdExt",
+            "workchain": -1,
+            "shard": i64::MIN,
+            "seqno": 0,
+            "root_hash": BASE64.encode([3_u8; 32]),
+            "file_hash": BASE64.encode([4_u8; 32]),
+        });
+        serde_json::json!({
+            "@type": "config.global",
+            "dht": {
+                "@type": "dht.config.global",
+                "k": 3,
+                "a": 3,
+                "static_nodes": {
+                    "@type": "dht.nodes",
+                    "nodes": [{
+                        "@type": "dht.node",
+                        "id": {
+                            "@type": "pub.ed25519",
+                            "key": BASE64.encode([1_u8; 32]),
+                        },
+                        "addr_list": {
+                            "@type": "adnl.addressList",
+                            "addrs": [{
+                                "@type": "adnl.address.udp",
+                                "ip": 2_130_706_433_i32,
+                                "port": 6302,
+                            }],
+                            "version": 0,
+                            "reinit_date": 0,
+                            "priority": 0,
+                            "expire_at": 0,
+                        },
+                        "version": 0,
+                        "signature": BASE64.encode([2_u8; 64]),
+                    }],
+                },
+            },
+            "liteservers": [{
+                "id": {
+                    "@type": "pub.ed25519",
+                    "key": BASE64.encode([5_u8; 32]),
+                },
+                "ip": 1,
+                "port": 2,
+            }],
+            "validator": {
+                "@type": "validator.config.global",
+                "zero_state": block.clone(),
+                "init_block": block,
+            },
+        })
+    }
 
     #[test]
     fn validator_wallet_is_masterchain_scoped() {
@@ -619,56 +653,28 @@ mod tests {
     fn local_liteserver_replaces_only_liteserver_entries() {
         let root = tempfile::tempdir_in("/tmp").unwrap();
         let path = root.path().join("global.config.json");
-        write_json_atomic(
-            &path,
-            &serde_json::json!({
-                "dht": {"static_nodes": {"nodes": [{"id": "seed"}]}},
-                "liteservers": [{"ip": 1, "port": 2, "id": {"key": "seed-key"}}],
-                "validator": {"zero_state": {"file_hash": "network"}},
-            }),
-        )
-        .unwrap();
+        let mut expected = global_config_fixture();
+        write_json_atomic(&path, &expected).unwrap();
 
-        prefer_local_liteserver(&path, 38_007, "agent-key").unwrap();
+        let local_key = BASE64.encode([6_u8; 32]);
+        prefer_local_liteserver(&path, 38_007, &local_key).unwrap();
 
         let actual: serde_json::Value =
             serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-        expect![[r#"
-            {
-              "dht": {
-                "static_nodes": {
-                  "nodes": [
-                    {
-                      "id": "seed"
-                    }
-                  ]
-                }
-              },
-              "liteservers": [
-                {
-                  "id": {
-                    "@type": "pub.ed25519",
-                    "key": "agent-key"
-                  },
-                  "ip": 2130706433,
-                  "port": 38007
-                }
-              ],
-              "validator": {
-                "zero_state": {
-                  "file_hash": "network"
-                }
-              }
-            }"#]]
-        .assert_eq(&serde_json::to_string_pretty(&actual).unwrap());
+        expected["liteservers"] = serde_json::json!([{
+            "id": {
+                "@type": "pub.ed25519",
+                "key": local_key,
+            },
+            "ip": 2_130_706_433_i32,
+            "port": 38_007,
+        }]);
+        assert_eq!(actual, expected);
     }
 
     #[tokio::test]
     async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
-        let global_config = serde_json::json!({
-            "validator": {"zero_state": {"file_hash": "network"}},
-            "dht": {"static_nodes": {"nodes": [{"id": "seed"}]}}
-        });
+        let global_config = global_config_fixture();
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
@@ -715,9 +721,9 @@ mod tests {
             "validator": node.validator,
             "participate_in_elections": node.participate_in_elections,
             "advertise_ip": node.public_ip,
-            "global_config": serde_json::from_slice::<serde_json::Value>(
+            "global_config_is_valid": GlobalConfig::from_json_bytes(
                 &std::fs::read(&layout.global_config).unwrap()
-            ).unwrap(),
+            ).is_ok(),
             "zerostate_bundle_downloaded": layout.validator_db.join("static").exists(),
             "private_keys_downloaded": layout.validator_keyring.read_dir().unwrap().next().is_some(),
         });
@@ -725,22 +731,7 @@ mod tests {
             {
               "advertise_ip": "10.0.0.2",
               "enabled": true,
-              "global_config": {
-                "dht": {
-                  "static_nodes": {
-                    "nodes": [
-                      {
-                        "id": "seed"
-                      }
-                    ]
-                  }
-                },
-                "validator": {
-                  "zero_state": {
-                    "file_hash": "network"
-                  }
-                }
-              },
+              "global_config_is_valid": true,
               "owned_nodes": [
                 "node2"
               ],

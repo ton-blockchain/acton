@@ -17,7 +17,6 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tokio::sync::{Mutex, watch};
 use tracing::info;
 use utoipa::{OpenApi, ToSchema};
@@ -26,6 +25,7 @@ use crate::{
     bootstrap::LauncherControl,
     operations::wallets,
     storage::{RuntimeState, Settings},
+    ton::global_config::GlobalConfig,
 };
 
 use super::{
@@ -240,13 +240,13 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
     path = "/localhost.global.config.json",
     tag = "configuration",
     responses(
-        (status = 200, description = "Generated TON global configuration", body = Value),
+        (status = 200, description = "Generated TON global configuration", body = GlobalConfig),
         (status = 400, description = "Global configuration could not be read", body = ErrorResponse)
     )
 )]
 async fn localhost_global_config_handler(
     State(state): State<ConfigState>,
-) -> Result<Json<Value>, HttpError> {
+) -> Result<Json<GlobalConfig>, HttpError> {
     read_global_config(&state).await
 }
 
@@ -258,21 +258,21 @@ async fn localhost_global_config_handler(
     path = "/config",
     tag = "configuration",
     responses(
-        (status = 200, description = "Generated TON global configuration", body = Value),
+        (status = 200, description = "Generated TON global configuration", body = GlobalConfig),
         (status = 400, description = "Global configuration could not be read", body = ErrorResponse)
     )
 )]
-async fn global_config_handler(State(state): State<ConfigState>) -> Result<Json<Value>, HttpError> {
+async fn global_config_handler(
+    State(state): State<ConfigState>,
+) -> Result<Json<GlobalConfig>, HttpError> {
     read_global_config(&state).await
 }
 
-async fn read_global_config(state: &ConfigState) -> Result<Json<Value>, HttpError> {
+async fn read_global_config(state: &ConfigState) -> Result<Json<GlobalConfig>, HttpError> {
     let bytes = tokio::fs::read(&state.control.layout().global_config)
         .await
         .context("failed to read global config")?;
-    Ok(Json(
-        serde_json::from_slice(&bytes).context("global config is invalid JSON")?,
-    ))
+    Ok(Json(GlobalConfig::from_json_bytes(&bytes)?))
 }
 
 /// Fund a node-owned wallet from the development faucet

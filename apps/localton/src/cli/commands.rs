@@ -1,15 +1,25 @@
-use std::fs;
+use std::{fs, time::Duration};
 
 use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::{
     cli::{ConfigCommand, LiteCommand, StateArgs},
     storage::Layout,
     storage::Settings,
-    ton::lite::{LocalLiteClient, require_existing_config},
-    ton::toolchain::Toolchain,
+    ton::{
+        lite::{parse_shard, require_existing_config},
+        toolchain::Toolchain,
+        tools::{
+            lite_client::{
+                AccountStateRequest, BlockTransactionsRequest, Boc, LiteTarget, LookupBlock,
+                RunMethodRequest,
+            },
+            types::OperationContext,
+        },
+    },
 };
 
 pub async fn config(command: ConfigCommand) -> Result<()> {
@@ -44,16 +54,27 @@ pub async fn config(command: ConfigCommand) -> Result<()> {
 pub async fn lite(command: LiteCommand) -> Result<()> {
     match command {
         LiteCommand::Last { state } => {
-            let layout = layout(&state)?;
-            require_existing_config(&layout.global_config)?;
-            let mut client = LocalLiteClient::connect(&layout.global_config).await?;
-            print_json(&client.last().await?)?;
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let target = lite_target(&toolchain)?;
+            let info = toolchain
+                .lite_client_tool
+                .masterchain_info(&OperationContext::new(Duration::from_secs(30)), &target)
+                .await?
+                .into_data()?;
+            print_json(&info.last)?;
         }
         LiteCommand::Account { state, address } => {
-            let layout = layout(&state)?;
-            require_existing_config(&layout.global_config)?;
-            let mut client = LocalLiteClient::connect(&layout.global_config).await?;
-            print_json(&client.account(&address).await?)?;
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let account = toolchain
+                .lite_client_tool
+                .account_state(
+                    &OperationContext::new(Duration::from_secs(30)),
+                    &lite_target(&toolchain)?,
+                    AccountStateRequest::new(&address)?,
+                )
+                .await?
+                .into_data()?;
+            print_json(&account)?;
         }
         LiteCommand::RunMethod {
             state,
@@ -62,17 +83,39 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
             params,
         } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let command = format!("runmethod {address} {method} {params}");
-            print!("{}", toolchain.lite_client(command.trim()).await?);
+            let result = toolchain
+                .lite_client_tool
+                .run_method(
+                    &OperationContext::new(Duration::from_secs(30)),
+                    &lite_target(&toolchain)?,
+                    RunMethodRequest::new(
+                        &address,
+                        method,
+                        params
+                            .iter()
+                            .map(|value| parse_stack_integer(value))
+                            .collect::<Result<Vec<_>>>()?,
+                    )?,
+                )
+                .await?
+                .into_data()?;
+            print_json(&result)?;
         }
         LiteCommand::Send { state, boc } => {
-            let layout = layout(&state)?;
-            require_existing_config(&layout.global_config)?;
             let bytes =
                 fs::read(&boc).with_context(|| format!("failed to read {}", boc.display()))?;
-            let mut client = LocalLiteClient::connect(&layout.global_config).await?;
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let result = toolchain
+                .lite_client_tool
+                .send_boc(
+                    &OperationContext::new(Duration::from_secs(30)),
+                    &lite_target(&toolchain)?,
+                    Boc::new(bytes)?,
+                )
+                .await?
+                .into_data()?;
             print_json(&serde_json::json!({
-                "status": client.send_boc(bytes).await?,
+                "status": result.status,
                 "boc": boc,
             }))?;
         }
@@ -82,13 +125,23 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
             shard,
             seqno,
         } => {
-            let layout = layout(&state)?;
-            require_existing_config(&layout.global_config)?;
-            let mut client = LocalLiteClient::connect(&layout.global_config).await?;
-            let (id, boc) = client.block(workchain, &shard, seqno).await?;
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let block = toolchain
+                .lite_client_tool
+                .block(
+                    &OperationContext::new(Duration::from_secs(30)),
+                    &lite_target(&toolchain)?,
+                    LookupBlock {
+                        workchain,
+                        shard: parse_shard(&shard)?,
+                        seqno,
+                    },
+                )
+                .await?
+                .into_data()?;
             print_json(&serde_json::json!({
-                "id": id,
-                "boc_base64": STANDARD.encode(boc),
+                "id": block.id,
+                "boc_base64": STANDARD.encode(block.boc.as_bytes()),
             }))?;
         }
         LiteCommand::Transactions {
@@ -98,15 +151,35 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
             seqno,
             count,
         } => {
-            let layout = layout(&state)?;
-            require_existing_config(&layout.global_config)?;
-            let mut client = LocalLiteClient::connect(&layout.global_config).await?;
-            let (block, transactions, incomplete) =
-                client.transactions(workchain, &shard, seqno, count).await?;
+            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
+            let block = toolchain
+                .lite_client_tool
+                .block_transactions(
+                    &OperationContext::new(Duration::from_secs(30)),
+                    &lite_target(&toolchain)?,
+                    BlockTransactionsRequest::new(
+                        toolchain
+                            .lite_client_tool
+                            .lookup_block(
+                                &OperationContext::new(Duration::from_secs(30)),
+                                &lite_target(&toolchain)?,
+                                LookupBlock {
+                                    workchain,
+                                    shard: parse_shard(&shard)?,
+                                    seqno,
+                                },
+                            )
+                            .await?
+                            .into_data()?,
+                        count,
+                    )?,
+                )
+                .await?
+                .into_data()?;
             print_json(&serde_json::json!({
-                "block": block,
-                "transactions": transactions,
-                "incomplete": incomplete,
+                "block": block.block,
+                "transactions": block.transactions,
+                "incomplete": block.incomplete,
             }))?;
         }
         LiteCommand::Shards { state } => {
@@ -155,9 +228,28 @@ fn layout(state: &StateArgs) -> Result<Layout> {
     Ok(layout)
 }
 
+/// Selects the trusted network config used by typed liteserver operations
+fn lite_target(toolchain: &Toolchain) -> Result<LiteTarget> {
+    require_existing_config(&toolchain.layout.global_config)?;
+    Ok(LiteTarget::new(&toolchain.layout.global_config).with_label("localton"))
+}
+
 fn print_json<T: Serialize>(value: &T) -> Result<()> {
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
+}
+
+/// Parses the integer-only TVM argument subset accepted by the typed CLI.
+fn parse_stack_integer(value: &str) -> Result<BigInt> {
+    let (negative, digits) = value
+        .strip_prefix("-0x")
+        .map(|digits| (true, digits))
+        .or_else(|| value.strip_prefix("0x").map(|digits| (false, digits)))
+        .unwrap_or((false, value));
+    let radix = if value.contains("0x") { 16 } else { 10 };
+    let integer = BigInt::parse_bytes(digits.as_bytes(), radix)
+        .with_context(|| format!("invalid TVM integer `{value}`"))?;
+    Ok(if negative { -integer } else { integer })
 }
 
 fn extract_latest_block_id(output: &str) -> Result<String> {

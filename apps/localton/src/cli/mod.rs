@@ -320,9 +320,8 @@ pub enum LiteCommand {
         state: StateArgs,
         address: String,
         method: String,
-        /// TVM stack in lite-client syntax, for example `0` or `[ 1 2 ]`.
-        #[arg(default_value = "")]
-        params: String,
+        /// Integer TVM stack arguments in decimal or `0x` hexadecimal form.
+        params: Vec<String>,
     },
     /// Send an external message BoC.
     Send {
@@ -507,14 +506,6 @@ pub enum NodeCommand {
         state: StateArgs,
         #[arg(default_value = "genesis")]
         name: String,
-    },
-    /// Execute a raw validator-engine-console command.
-    Console {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 }
 

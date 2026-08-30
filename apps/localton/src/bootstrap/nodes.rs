@@ -8,25 +8,26 @@
 use std::{fs, time::Duration};
 
 use anyhow::{Context, Result};
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use serde_json::Value;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
-    binaries::TonBinaries,
-    runtime::{ManagedProcess, ProcessRegistry, run_checked},
+    runtime::ProcessRegistry,
     storage::Layout,
     storage::{NodeRuntime, RuntimeState},
     storage::{NodeSettings, Settings},
+    ton::{
+        toolchain::Toolchain,
+        tools::{
+            dht_server::DhtStartRequest,
+            random_id::{GenerateKeyRequest, read_public_key},
+            types::{AdnlEndpoint, DhtDatabase, OperationContext},
+            validator_engine::ValidatorInitializeRequest,
+            validator_engine_config::ValidatorEngineConfig,
+        },
+    },
 };
 
-use super::{
-    dht,
-    engine_config::patch_out_port,
-    files::copy_tree,
-    keys::{generate_key, read_key_id_base64},
-    validator,
-};
+use super::{files::copy_tree, validator};
 
 /// Starts the DHT and genesis validator as the core process set.
 ///
@@ -36,7 +37,7 @@ use super::{
 /// as failure of the local network and both are stopped together.
 pub(super) async fn start_core(
     layout: &Layout,
-    binaries: &TonBinaries,
+    tools: &Toolchain,
     settings: &Settings,
 ) -> Result<ProcessRegistry> {
     info!("starting local DHT and validator-engine");
@@ -44,19 +45,26 @@ pub(super) async fn start_core(
         .node("genesis")
         .context("settings contain no genesis node")?;
     let registry = ProcessRegistry::default();
-    let dht = ManagedProcess::spawn(
-        "dht",
-        dht::command(layout, binaries, genesis),
-        &layout.logs.join("dht.stdout.log"),
-        &layout.logs.join("dht.stderr.log"),
-    )?;
+    let context = OperationContext::for_node(Duration::from_secs(30), &genesis.name);
+    let dht = tools
+        .dht_server
+        .start(
+            &context,
+            DhtStartRequest {
+                global_config: layout.global_config.clone(),
+                database: DhtDatabase::open(layout.dht_db.clone())?,
+                log_path: layout.logs.join("dht-engine"),
+                stdout_log: layout.logs.join("dht.stdout.log"),
+                stderr_log: layout.logs.join("dht.stderr.log"),
+                endpoint: AdnlEndpoint::new(genesis.public_ip, genesis.dht_port),
+                threads: usize::from(genesis.threads),
+                verbosity: genesis.verbosity,
+            },
+        )
+        .await?;
     registry.insert(dht).await?;
-    let validator = ManagedProcess::spawn(
-        "genesis",
-        validator::command(layout, binaries, genesis, true),
-        &layout.logs.join("validator.stdout.log"),
-        &layout.logs.join("validator.stderr.log"),
-    )?;
+    let validator =
+        validator::start_persistent(layout, tools.validator_engine.as_ref(), genesis).await?;
     registry.insert(validator).await?;
     Ok(registry)
 }
@@ -68,7 +76,7 @@ pub(super) async fn start_core(
 /// its own database and identities before joining the shared process registry.
 pub(super) async fn start_additional(
     layout: &Layout,
-    binaries: &TonBinaries,
+    tools: &Toolchain,
     settings: &Settings,
     timeout: Duration,
     processes: &ProcessRegistry,
@@ -79,16 +87,18 @@ pub(super) async fn start_additional(
         .iter()
         .filter(|node| node.enabled && node.name != "genesis")
     {
-        let initialized = ensure_initialized(layout, binaries, node, timeout).await?;
-        let node_layout = layout.node(node);
-        let mut process = ManagedProcess::spawn(
-            node.name.clone(),
-            validator::command(layout, binaries, node, true),
-            &node_layout.logs.join("validator.stdout.log"),
-            &node_layout.logs.join("validator.stderr.log"),
-        )?;
-        if let Err(error) =
-            validator::wait_for_console(layout, binaries, node, &mut process, timeout).await
+        let initialized = ensure_initialized(layout, tools, node, timeout).await?;
+        let context = OperationContext::for_node(timeout, &node.name);
+        let mut process =
+            validator::start_persistent(layout, tools.validator_engine.as_ref(), node).await?;
+        if let Err(error) = validator::wait_for_console(
+            layout,
+            tools.validator_console_tool.as_ref(),
+            node,
+            &mut process,
+            &context,
+        )
+        .await
         {
             process.stop().await?;
             return Err(error)
@@ -96,7 +106,7 @@ pub(super) async fn start_additional(
         }
         let mut node_runtime = initialized;
         node_runtime.running = true;
-        node_runtime.pid = process.id();
+        node_runtime.pid = process.pid();
         node_runtime.status = "running".to_owned();
         runtime.nodes.insert(node.name.clone(), node_runtime);
         processes.insert(process).await?;
@@ -114,7 +124,7 @@ pub(super) async fn start_additional(
 /// also copy its local zerostate cache; a joined node obtains it over ADNL.
 pub(super) async fn ensure_initialized(
     layout: &Layout,
-    binaries: &TonBinaries,
+    tools: &Toolchain,
     node: &NodeSettings,
     timeout: Duration,
 ) -> Result<NodeRuntime> {
@@ -145,97 +155,61 @@ pub(super) async fn ensure_initialized(
         copy_tree(&static_states, &node_layout.db.join("static"))?;
     }
 
-    let output = run_checked(
-        &format!("{} validator-engine initialization", node.name),
-        validator::command(layout, binaries, node, false),
-        timeout,
-    )
-    .await?;
-    if !output.stderr.trim().is_empty() {
-        warn!(
-            node = node.name,
-            stderr = output.stderr.trim(),
-            "validator initialization wrote to stderr"
-        );
-    }
-    patch_out_port(&node_layout.config_json(), node.out_port)?;
+    let context = OperationContext::for_node(timeout, &node.name);
+    let validator_database = tools
+        .validator_engine
+        .initialize(&context, ValidatorInitializeRequest::for_node(layout, node))
+        .await?;
 
     // Control server/client and liteserver use separate keys. Reusing one key for
     // all roles would couple administrative access to a public network identity.
-    let server = generate_key(binaries, &node_layout.server_private_key()).await?;
-    fs::copy(
-        &server.private_path,
-        node_layout.keyring.join(&server.id_hex),
+    let server = tools
+        .random_id
+        .generate_key(
+            &context,
+            GenerateKeyRequest::control_server(&node_layout.certs, &node_layout.keyring),
+        )
+        .await?;
+    let client = tools
+        .random_id
+        .generate_key(
+            &context,
+            GenerateKeyRequest::control_client(&node_layout.certs),
+        )
+        .await?;
+    let liteserver = tools
+        .random_id
+        .generate_key(
+            &context,
+            GenerateKeyRequest::liteserver(&node_layout.keyring),
+        )
+        .await?;
+    validator_database.install_control_and_liteserver(
+        node,
+        server.public_key,
+        client.public_key,
+        liteserver.public_key,
     )?;
-    let client = generate_key(binaries, &node_layout.client_private_key()).await?;
-    let liteserver = generate_key(binaries, &node_layout.keyring.join("liteserver")).await?;
-    fs::copy(
-        &liteserver.private_path,
-        node_layout.keyring.join(&liteserver.id_hex),
-    )?;
-    validator::configure_local_services(layout, node, &server, &client, &liteserver)?;
 
-    let full_node_adnl = configure_full_node_identity(layout, binaries, node, timeout).await?;
+    let full_node_adnl = validator::configure_full_node_identity(
+        layout,
+        tools.validator_engine.as_ref(),
+        tools.validator_console_tool.as_ref(),
+        node,
+        &context,
+    )
+    .await?;
     Ok(NodeRuntime {
         initialized: true,
         status: "initialized".to_owned(),
-        console_public_key: Some(server.id_base64),
+        console_public_key: Some(server.public_key.to_base64()),
         liteserver_public_key: node
             .liteserver
-            .then(|| read_key_id_base64(&liteserver.public_path))
+            .then(|| read_public_key(&liteserver.public_path).map(|key| key.to_base64()))
             .transpose()?,
-        validator_adnl: Some(full_node_adnl),
+        validator_adnl: Some(full_node_adnl.to_hex()),
         ..NodeRuntime::default()
     })
-}
-
-/// Creates and activates the node's long-lived full-node ADNL identity.
-///
-/// The identity is stored inside validator-engine's database, so a temporary
-/// process must expose the console while it is created, exported, registered,
-/// and selected as `fullnode`. The process is stopped on both success and error.
-async fn configure_full_node_identity(
-    layout: &Layout,
-    binaries: &TonBinaries,
-    node: &NodeSettings,
-    timeout: Duration,
-) -> Result<String> {
-    let node_layout = layout.node(node);
-    let mut temporary = ManagedProcess::spawn(
-        format!("{} temporary validator-engine", node.name),
-        validator::command(layout, binaries, node, false),
-        &node_layout.logs.join("validator-bootstrap.stdout.log"),
-        &node_layout.logs.join("validator-bootstrap.stderr.log"),
-    )?;
-    let configured = async {
-        validator::wait_for_console(layout, binaries, node, &mut temporary, timeout).await?;
-        let full_node_adnl = validator::console_new_key(layout, binaries, node).await?;
-        validator::console(
-            layout,
-            binaries,
-            node,
-            &format!("exportpub {full_node_adnl}"),
-        )
-        .await?;
-        validator::console_retry(
-            layout,
-            binaries,
-            node,
-            &format!("addadnl {full_node_adnl} 0"),
-        )
-        .await?;
-        validator::console_retry(
-            layout,
-            binaries,
-            node,
-            &format!("changefullnodeaddr {full_node_adnl}"),
-        )
-        .await?;
-        Ok::<String, anyhow::Error>(full_node_adnl)
-    }
-    .await;
-    temporary.stop().await?;
-    configured
 }
 
 /// Reconstructs runtime metadata without changing an initialized engine database.
@@ -254,12 +228,13 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
     runtime.pid = None;
     runtime.status = "initialized".to_owned();
     if runtime.console_public_key.is_none() {
-        runtime.console_public_key = read_key_id_base64(&node_layout.server_public_key()).ok();
+        runtime.console_public_key = read_public_key(&node_layout.server_public_key())
+            .map(|key| key.to_base64())
+            .ok();
     }
     if node.liteserver {
-        runtime.liteserver_public_key = Some(read_key_id_base64(
-            &node_layout.keyring.join("liteserver.pub"),
-        )?);
+        runtime.liteserver_public_key =
+            Some(read_public_key(&node_layout.keyring.join("liteserver.pub"))?.to_base64());
     }
     recover_config_metadata(&node_layout.config_json(), &mut runtime)?;
     Ok(runtime)
@@ -271,34 +246,15 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
 /// come from their config arrays; full-node ADNL is decoded from the engine's
 /// base64 representation into the hexadecimal form exposed by the admin API.
 fn recover_config_metadata(path: &std::path::Path, runtime: &mut NodeRuntime) -> Result<()> {
-    let config: Value = serde_json::from_slice(
-        &fs::read(path).with_context(|| format!("failed to read {}", path.display()))?,
-    )
-    .with_context(|| format!("invalid validator config {}", path.display()))?;
+    let config = ValidatorEngineConfig::load(path)?;
     if runtime.console_public_key.is_none() {
-        runtime.console_public_key = config
-            .get("control")
-            .and_then(Value::as_array)
-            .and_then(|items| items.first())
-            .and_then(|item| item.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_owned);
+        runtime.console_public_key = config.control_public_key().map(|key| key.to_base64());
     }
     if runtime.liteserver_public_key.is_none() {
-        runtime.liteserver_public_key = config
-            .get("liteservers")
-            .and_then(Value::as_array)
-            .and_then(|items| items.first())
-            .and_then(|item| item.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_owned);
+        runtime.liteserver_public_key = config.liteserver_public_key().map(|key| key.to_base64());
     }
     if runtime.validator_adnl.is_none() {
-        runtime.validator_adnl = config
-            .get("fullnode")
-            .and_then(Value::as_str)
-            .and_then(|id| BASE64.decode(id).ok())
-            .map(hex::encode);
+        runtime.validator_adnl = Some(config.fullnode_adnl().to_hex());
     }
     Ok(())
 }

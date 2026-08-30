@@ -8,10 +8,8 @@
 
 mod control;
 mod dht;
-mod engine_config;
 mod files;
 mod genesis;
-mod keys;
 mod nodes;
 mod persistence;
 mod pipeline;

@@ -37,16 +37,13 @@ impl TonBinaries {
                 format!("TON binary directory {} does not exist", path.display())
             })?
         } else if layout.manifest.is_file() {
-            if let Some(path) = Manifest::load(&layout.manifest)?.ton_bin_dir {
-                dunce::canonicalize(&path).with_context(|| {
-                    format!(
-                        "persisted TON binary directory {} does not exist; pass --ton-bin-dir",
-                        path.display()
-                    )
-                })?
-            } else {
-                install::install_pinned_release().await?
-            }
+            let path = Manifest::load(&layout.manifest)?.ton_bin_dir;
+            dunce::canonicalize(&path).with_context(|| {
+                format!(
+                    "persisted TON binary directory {} does not exist; pass --ton-bin-dir",
+                    path.display()
+                )
+            })?
         } else {
             install::install_pinned_release().await?
         };

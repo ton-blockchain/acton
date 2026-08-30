@@ -8,15 +8,25 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use regex::Regex;
-use tokio::{process::Command, signal, time::sleep};
-use tracing::info;
+use tokio::{signal, time::sleep};
+use tracing::{debug, info};
 
 use crate::{
-    binaries::TonBinaries,
-    runtime::{ProcessRegistry, run_checked},
-    storage::{Layout, Manifest},
+    runtime::ProcessRegistry,
+    storage::Layout,
+    ton::tools::{
+        lite_client::{LiteClient, LiteTarget},
+        types::OperationContext,
+    },
 };
+
+const LITE_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+const READINESS_PROGRESS_INTERVAL: Duration = Duration::from_secs(5);
+
+#[cfg(not(test))]
+const READINESS_POLL_INTERVAL: Duration = Duration::from_secs(1);
+#[cfg(test)]
+const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(1);
 
 /// Proves that the liteserver is reachable and the masterchain is advancing.
 ///
@@ -26,53 +36,83 @@ use crate::{
 /// query path and ongoing block production work.
 pub(super) async fn wait_for_blocks(
     layout: &Layout,
-    binaries: &TonBinaries,
-    manifest: &Manifest,
+    lite_client: &dyn LiteClient,
+    target: &LiteTarget,
     processes: &ProcessRegistry,
     timeout: Duration,
 ) -> Result<()> {
     info!("waiting for liteserver and masterchain block production");
-    let deadline = tokio::time::Instant::now() + timeout;
+    let started = tokio::time::Instant::now();
+    let deadline = started + timeout;
+    let mut next_progress = started;
     let mut first_seqno = None;
+    let mut last_seqno = None;
     loop {
         processes.ensure_alive().await?;
-        if let Ok(seqno) = lite_client_seqno(binaries, manifest).await {
-            match first_seqno {
-                None if seqno > 0 => first_seqno = Some(seqno),
-                Some(first) if seqno > first => {
-                    info!(
-                        first_seqno = first,
-                        current_seqno = seqno,
-                        "masterchain advanced"
-                    );
-                    return Ok(());
+        let last_error = match lite_client_seqno(lite_client, target).await {
+            Ok(seqno) => {
+                last_seqno = Some(seqno);
+                match first_seqno {
+                    None if seqno > 0 => first_seqno = Some(seqno),
+                    Some(first) if seqno > first => {
+                        info!(
+                            first_seqno = first,
+                            current_seqno = seqno,
+                            "masterchain advanced"
+                        );
+                        return Ok(());
+                    }
+                    _ => {}
                 }
-                _ => {}
+                None
             }
+            Err(error) => Some(format!("{error:#}")),
+        };
+        let now = tokio::time::Instant::now();
+        if now >= next_progress {
+            debug!(
+                elapsed_ms = now.duration_since(started).as_millis() as u64,
+                first_seqno, last_seqno, last_error, "masterchain readiness progress"
+            );
+            next_progress = now + READINESS_PROGRESS_INTERVAL;
         }
-        if tokio::time::Instant::now() >= deadline {
+        if now >= deadline {
+            let detail = last_error
+                .map(|error| format!("; last liteserver error: {error}"))
+                .unwrap_or_default();
             bail!(
-                "masterchain did not advance within {}s; inspect {}",
+                "masterchain did not advance within {}s{detail}; inspect {}",
                 timeout.as_secs(),
                 layout.logs.display()
             );
         }
-        sleep(Duration::from_secs(1)).await;
+        sleep(READINESS_POLL_INTERVAL).await;
     }
 }
 
 /// Queries the configured liteserver for its latest masterchain block number.
 ///
-/// Using the persisted global config also verifies the liteserver public key and
-/// zerostate identity that external clients will use after startup.
-pub(super) async fn lite_client_seqno(binaries: &TonBinaries, manifest: &Manifest) -> Result<u32> {
-    let mut command = Command::new(binaries.command("lite-client"));
-    command
-        .args(["-t", "10", "-C"])
-        .arg(&manifest.global_config)
-        .args(["-c", "last"]);
-    let output = run_checked("lite-client last", command, Duration::from_secs(10)).await?;
-    parse_masterchain_seqno(&format!("{}\n{}", output.stdout, output.stderr))
+/// [`LiteTarget`] binds the query to the same trusted global configuration and
+/// liteserver identity external clients use. This function requires structured
+/// protocol data: a diagnostic-only official CLI backend cannot accidentally make
+/// readiness depend on release-specific display text.
+pub(super) async fn lite_client_seqno(
+    lite_client: &dyn LiteClient,
+    target: &LiteTarget,
+) -> Result<u32> {
+    let context = OperationContext {
+        timeout: LITE_QUERY_TIMEOUT,
+        node_name: target.label.clone(),
+    };
+    let info = tokio::time::timeout(
+        LITE_QUERY_TIMEOUT,
+        lite_client.masterchain_info(&context, target),
+    )
+    .await
+    .context("masterchain info query timed out")??
+    .into_data()
+    .context("readiness requires structured masterchain info")?;
+    Ok(info.last.seqno)
 }
 
 /// Keeps the launcher alive until one required child process exits.
@@ -117,33 +157,159 @@ pub(crate) async fn shutdown_signal() -> Result<()> {
     Ok(())
 }
 
-/// Accepts the two block-id formats emitted by supported lite-client builds.
-fn parse_masterchain_seqno(output: &str) -> Result<u32> {
-    let patterns = [
-        Regex::new(r"(?i)seqno[=:\s]+(\d+)")?,
-        Regex::new(r"\(-1,[^,\r\n]+,(\d+)\)")?,
-    ];
-    for regex in patterns {
-        if let Some(captures) = regex.captures(output) {
-            return captures[1].parse().context("invalid masterchain seqno");
-        }
-    }
-    bail!("lite-client output contains no masterchain seqno")
-}
-
 #[cfg(test)]
 mod tests {
+    use std::{collections::VecDeque, sync::Mutex};
+
+    use anyhow::anyhow;
+    use async_trait::async_trait;
+
+    use crate::{
+        ton::lite::{AccountInfo, BlockRef},
+        ton::tools::lite_client::{
+            AccountStateRequest, BlockData, BlockTransactions, BlockTransactionsRequest, Boc,
+            ElectionStatus, LiteResponse, LookupBlock, MasterchainInfo, RunMethodRequest,
+            RunMethodResult, SendBocResult,
+        },
+    };
+
     use super::*;
 
-    #[test]
-    fn parses_lite_client_block_ids() {
-        assert_eq!(
-            parse_masterchain_seqno(
-                "latest masterchain block known to server is (-1,8000000000000000,17)"
-            )
-            .unwrap(),
-            17
-        );
-        assert_eq!(parse_masterchain_seqno("seqno: 42").unwrap(), 42);
+    struct ReadinessLiteClient {
+        seqnos: Mutex<VecDeque<u32>>,
+    }
+
+    impl ReadinessLiteClient {
+        fn new(seqnos: impl IntoIterator<Item = u32>) -> Self {
+            Self {
+                seqnos: Mutex::new(seqnos.into_iter().collect()),
+            }
+        }
+
+        fn unexpected<T>() -> Result<T> {
+            Err(anyhow!(
+                "readiness invoked an unrelated liteserver operation"
+            ))
+        }
+    }
+
+    #[async_trait]
+    impl LiteClient for ReadinessLiteClient {
+        async fn masterchain_info(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+        ) -> Result<LiteResponse<MasterchainInfo>> {
+            let seqno = self
+                .seqnos
+                .lock()
+                .unwrap()
+                .pop_front()
+                .context("readiness requested more seqnos than expected")?;
+            Ok(LiteResponse::Data(MasterchainInfo {
+                last: block_ref(seqno),
+            }))
+        }
+
+        async fn account_state(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _request: AccountStateRequest,
+        ) -> Result<LiteResponse<AccountInfo>> {
+            Self::unexpected()
+        }
+
+        async fn lookup_block(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _request: LookupBlock,
+        ) -> Result<LiteResponse<BlockRef>> {
+            Self::unexpected()
+        }
+
+        async fn block(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _request: LookupBlock,
+        ) -> Result<LiteResponse<BlockData>> {
+            Self::unexpected()
+        }
+
+        async fn download_block(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _id: BlockRef,
+        ) -> Result<LiteResponse<BlockData>> {
+            Self::unexpected()
+        }
+
+        async fn block_transactions(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _request: BlockTransactionsRequest,
+        ) -> Result<LiteResponse<BlockTransactions>> {
+            Self::unexpected()
+        }
+
+        async fn send_boc(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _message: Boc,
+        ) -> Result<LiteResponse<SendBocResult>> {
+            Self::unexpected()
+        }
+
+        async fn run_method(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+            _request: RunMethodRequest,
+        ) -> Result<LiteResponse<RunMethodResult>> {
+            Self::unexpected()
+        }
+
+        async fn election_status(
+            &self,
+            _context: &OperationContext,
+            _target: &LiteTarget,
+        ) -> Result<LiteResponse<ElectionStatus>> {
+            Self::unexpected()
+        }
+    }
+
+    fn block_ref(seqno: u32) -> BlockRef {
+        BlockRef {
+            workchain: -1,
+            shard: "8000000000000000".to_owned(),
+            seqno,
+            root_hash: "11".repeat(32),
+            file_hash: "22".repeat(32),
+        }
+    }
+
+    #[tokio::test]
+    async fn waits_for_a_second_distinct_masterchain_seqno() {
+        let state = tempfile::tempdir().unwrap();
+        let layout = Layout::new(state.path().join("state"));
+        let target = LiteTarget::new(layout.global_config.clone()).with_label("genesis");
+        let processes = ProcessRegistry::default();
+        let client = ReadinessLiteClient::new([17, 17, 18]);
+
+        wait_for_blocks(
+            &layout,
+            &client,
+            &target,
+            &processes,
+            Duration::from_secs(1),
+        )
+        .await
+        .unwrap();
+        assert!(client.seqnos.lock().unwrap().is_empty());
     }
 }

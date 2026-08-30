@@ -22,6 +22,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = "1.0"
+async-trait = "0.1.89"
 axum = { version = "0.8", features = ["json", "query", "tokio", "http1"] }
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive", "env"] }
@@ -33,6 +34,7 @@ hex = "0.4"
 include_dir = "0.7"
 indicatif = "0.18.3"
 nix = { version = "0.30", features = ["process", "signal"] }
+num-bigint = "0.4"
 rand = "0.8"
 regex = "1.11"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }

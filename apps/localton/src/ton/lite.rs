@@ -1,6 +1,7 @@
 use std::{fs, net::Ipv4Addr, path::Path};
 
 use anyhow::{Context, Result, anyhow};
+use num_bigint::BigInt;
 use serde::Serialize;
 use serde_json::json;
 use tonutils::{
@@ -13,8 +14,8 @@ use tonutils::{
         common::{BlockId, BlockIdExt},
         response::TransactionId,
     },
-    tlb::Account,
-    tvm::Address,
+    tlb::{Account, ConfigParams},
+    tvm::{Address, TvmStack, TvmStackEntry},
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -139,6 +140,62 @@ impl LocalLiteClient {
             .send_message(body)
             .await
             .context("sendMessage failed")
+    }
+
+    /// Runs one read-only get method against the latest masterchain state.
+    ///
+    /// Inputs are integers because Localton's wallet and elector workflows only
+    /// need integer stack arguments. Keeping the stack typed prevents them from
+    /// constructing release-specific lite-client command strings.
+    pub async fn run_method(
+        &mut self,
+        address: &str,
+        method: &str,
+        arguments: Vec<BigInt>,
+    ) -> Result<Vec<TvmStackEntry>> {
+        let account = Address::from_str(address)
+            .with_context(|| format!("invalid TON address `{address}`"))?;
+        let block = self
+            .inner
+            .get_masterchain_info()
+            .await
+            .context("getMasterchainInfo failed before run method")?
+            .last;
+        self.inner
+            .run_get_method_typed(
+                0,
+                block,
+                account,
+                tonutils::utils::method_name_to_id(method),
+                TvmStack::new(arguments.into_iter().map(TvmStackEntry::Int).collect()),
+            )
+            .await
+            .with_context(|| format!("run get method `{method}` failed for {address}"))
+    }
+
+    /// Reads selected on-chain configuration parameters at the latest block.
+    ///
+    /// The returned config dictionary preserves cells exactly as received. Typed
+    /// Localton adapters decode only the parameters their workflow owns.
+    pub async fn config_params(&mut self, params: Vec<i32>) -> Result<ConfigParams> {
+        let block = self
+            .inner
+            .get_masterchain_info()
+            .await
+            .context("getMasterchainInfo failed before config query")?
+            .last;
+        let decoded = self
+            .inner
+            .get_config_params_typed(
+                block, params, false, false, false, false, false, false, false, false, false,
+                false, false,
+            )
+            .await
+            .context("getConfigParams failed")?;
+        decoded
+            .config_proof
+            .map(|proof| proof.config)
+            .context("getConfigParams response has no config proof")
     }
 
     async fn lookup(&mut self, workchain: i32, shard: &str, seqno: u32) -> Result<BlockIdExt> {

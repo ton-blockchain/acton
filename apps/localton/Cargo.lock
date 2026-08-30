@@ -1892,6 +1892,7 @@ name = "localton"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "base64",
  "clap",
@@ -1904,6 +1905,7 @@ dependencies = [
  "include_dir",
  "indicatif",
  "nix",
+ "num-bigint",
  "rand 0.8.7",
  "regex",
  "reqwest",

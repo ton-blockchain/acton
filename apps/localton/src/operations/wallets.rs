@@ -10,7 +10,6 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use ed25519_dalek::SigningKey;
 use rand::{RngCore, rngs::OsRng};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use ton::{
     ton_core::{cell::TonCell, traits::tlb::TLB, types::TonAddress},
@@ -32,10 +31,13 @@ use utoipa::ToSchema;
 
 use crate::{
     cli::{WalletCommand, WalletVersion},
-    runtime::CommandOutput,
     storage::Layout,
     ton::lite::LocalLiteClient,
     ton::toolchain::Toolchain,
+    ton::tools::{
+        lite_client::{LiteTarget, RunMethodRequest},
+        types::OperationContext,
+    },
 };
 
 const REGISTRY_SCHEMA: u32 = 1;
@@ -870,19 +872,17 @@ async fn wallet_seqno(toolchain: &Toolchain, address: &str) -> Result<u32> {
     if account.state == "nonexist" || account.state == "uninit" {
         return Ok(0);
     }
-    let output = toolchain
-        .lite_client(&format!("runmethod {address} seqno"))
-        .await?;
-    parse_seqno(&output)
-}
-
-fn parse_seqno(output: &str) -> Result<u32> {
-    let expression = Regex::new(r"(?i)result:\s*\[\s*(?:num\s*)?([0-9]+)")?;
-    let value = expression
-        .captures(output)
-        .and_then(|captures| captures.get(1))
-        .context("lite-client runmethod output does not contain seqno")?;
-    value.as_str().parse().context("wallet seqno exceeds u32")
+    let seqno = toolchain
+        .lite_client_tool
+        .run_method(
+            &OperationContext::new(Duration::from_secs(30)),
+            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+            RunMethodRequest::new(address, "seqno", vec![])?,
+        )
+        .await?
+        .into_data()?
+        .first_u64()?;
+    u32::try_from(seqno).context("wallet seqno exceeds u32")
 }
 
 async fn wait_for_balance(global_config: &Path, address: &str) -> Result<()> {
@@ -926,13 +926,15 @@ async fn run_fift(
     current_dir: &Path,
     script: &str,
     args: Vec<String>,
-) -> Result<CommandOutput> {
-    let mut command = vec![
-        "-s".to_owned(),
-        path_text(&toolchain.smartcont_script(script)),
-    ];
-    command.extend(args);
-    toolchain.fift(current_dir, command).await
+) -> Result<crate::ton::tools::fift::FiftOutput> {
+    toolchain
+        .run_fift_script(
+            current_dir,
+            toolchain.smartcont_script(script),
+            args.into_iter().map(Into::into).collect(),
+            Duration::from_secs(60),
+        )
+        .await
 }
 
 fn load_registry(layout: &Layout) -> Result<WalletRegistry> {
@@ -1148,7 +1150,7 @@ mod tests {
     use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
     use tycho_types::boc::Boc;
 
-    use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, parse_seqno, ton_wallet};
+    use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, ton_wallet};
 
     #[test]
     fn native_wallet_deploy_bocs_use_canonical_cell_order() {
@@ -1186,11 +1188,5 @@ mod tests {
         let amount = u128::from(u64::MAX) + 1;
         assert_eq!(parse_grams(&format_nano_grams(amount)).unwrap(), amount);
         assert!(parse_grams(&format_nano_grams(MAX_GRAMS_NANO + 1)).is_err());
-    }
-
-    #[test]
-    fn parses_lite_client_seqno() {
-        assert_eq!(parse_seqno("result: [ 17 ]").unwrap(), 17);
-        assert_eq!(parse_seqno("result: [ num 42 ]").unwrap(), 42);
     }
 }

@@ -691,11 +691,9 @@ hidden restore directory: true"#]]
             Manifest {
                 schema_version: SCHEMA_VERSION,
                 ton_release: TON_RELEASE.to_owned(),
-                ton_bin_dir: None,
-                validator_id_hex: "11".repeat(32),
-                validator_id_base64: "validator".to_owned(),
-                validator_public_key: None,
-                liteserver_public_key: "liteserver".to_owned(),
+                ton_bin_dir: root.path().join("ton"),
+                validator_public_key: crate::ton::tools::types::TonPublicKey::from_bytes([1; 32]),
+                liteserver_public_key: crate::ton::tools::types::TonPublicKey::from_bytes([2; 32]),
                 global_config: layout.global_config.clone(),
                 imported_accounts: Vec::new(),
             }

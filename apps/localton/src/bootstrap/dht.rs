@@ -1,158 +1,130 @@
-//! Initialization and process command construction for the local DHT node.
+//! DHT bootstrap workflow for the first node in a Localton network.
 //!
-//! The first validator also owns the network's bootstrap DHT endpoint. This
-//! module asks `dht-server` to create its database, publishes its UDP address,
-//! builds the signed DHT node descriptors for `global.config.json`, and later
-//! constructs the persistent DHT process command.
+//! This module owns the cross-tool lifecycle: initialize a stable DHT database,
+//! then ask `generate-random-id` to sign one descriptor for every generated
+//! identity. Typed adapters own command syntax, process lifecycle, JSON rendering,
+//! parsing, and release-specific validation.
 
-use std::{fs, time::Duration};
-
-use anyhow::{Context, Result, ensure};
-use serde_json::{Value, json};
-use tokio::process::Command;
-use tracing::info;
+use anyhow::Result;
+use tracing::{Instrument, info, info_span, warn};
 
 use crate::{
-    binaries::TonBinaries,
-    runtime::run_checked,
-    storage::NodeSettings,
-    storage::{Layout, ipv4_to_i32, write_json_atomic},
+    storage::{Layout, NodeSettings},
+    ton::tools::{
+        dht_server::{DhtInitializeRequest, DhtServer},
+        random_id::{DhtDescriptorRequest, RandomIdGenerator},
+        types::{AdnlEndpoint, DhtDatabase, DhtNodeDescriptor, OperationContext},
+    },
 };
 
-use super::engine_config::patch_out_port;
+/// Typed output of the cross-tool DHT initialization workflow.
+///
+/// Persistent startup reuses [`Self::database`] so the ADNL identity published by
+/// [`Self::descriptors`] remains stable. JSON conversion is intentionally deferred
+/// until the global-config builder, where release-owned descriptors are serialized.
+#[derive(Debug)]
+pub(super) struct InitializedDht {
+    /// Validated persistent database reopened by normal launcher startup.
+    pub(super) database: DhtDatabase,
+    /// Signed bootstrap descriptors published in final global config.
+    pub(super) descriptors: Vec<DhtNodeDescriptor>,
+}
 
 /// Creates the persistent DHT database and returns signed node descriptors.
 ///
-/// `dht-server` first generates a keyring and config for the configured UDP
-/// endpoint. Each keyring entry is then combined with the advertised address by
-/// `generate-random-id -m dht`, producing the JSON descriptor that peers read
-/// from `global.config.json` to discover this local network.
+/// `DhtServer` first generates and validates its database. Every returned keyring
+/// identity is then combined with the advertised endpoint by `RandomIdGenerator`.
+/// This ordering breaks the preliminary-global-config/DHT-descriptor cycle without
+/// exposing either executable's argv or stdout to the workflow.
 pub(super) async fn initialize_dht(
     layout: &Layout,
-    binaries: &TonBinaries,
+    dht_server: &dyn DhtServer,
+    random_id: &dyn RandomIdGenerator,
     node: &NodeSettings,
-    timeout: Duration,
-) -> Result<Vec<Value>> {
-    info!("initializing local DHT");
-    let mut command = Command::new(binaries.command("dht-server"));
-    command
-        .args([
-            "--verbosity",
-            &node.verbosity.to_string(),
-            "--threads",
-            &node.threads.to_string(),
-            "--global-config",
-        ])
-        .arg(&layout.global_config)
-        .arg("--logname")
-        .arg(layout.logs.join("dht-init"))
-        .arg("--db")
-        .arg(&layout.dht_db)
-        .args(["-I", &format!("{}:{}", node.public_ip, node.dht_port)]);
-    run_checked("dht-server initialization", command, timeout).await?;
-
-    // The binary owns the config schema. Patch only the launcher-controlled
-    // outbound port instead of replacing the generated document.
-    let config_path = layout.dht_db.join("config.json");
-    ensure!(
-        config_path.is_file(),
-        "DHT initialization did not create {}",
-        config_path.display()
+    context: &OperationContext,
+) -> Result<InitializedDht> {
+    let endpoint = AdnlEndpoint::new(node.public_ip, node.dht_port);
+    let workflow_span = info_span!(
+        "dht_bootstrap_workflow",
+        workflow = "dht_bootstrap",
+        node = context.node_name.as_deref().unwrap_or(node.name.as_str()),
+        endpoint = %endpoint,
     );
-    patch_out_port(&config_path, node.out_port)?;
+    let result = async {
+        info!(
+            milestone = "database_initialization_requested",
+            database_path = %layout.dht_db.display(),
+            global_config_path = %layout.global_config.display(),
+            "starting DHT bootstrap"
+        );
+        let database = dht_server
+            .initialize(
+                context,
+                DhtInitializeRequest {
+                    global_config: layout.global_config.clone(),
+                    database: layout.dht_db.clone(),
+                    log_path: layout.logs.join("dht-init"),
+                    endpoint,
+                    out_port: node.out_port,
+                    threads: usize::from(node.threads),
+                    verbosity: node.verbosity,
+                },
+            )
+            .await?;
+        info!(
+            milestone = "database_ready",
+            database_path = %database.path.display(),
+            config_path = %database.config.display(),
+            key_count = database.keyring.len(),
+            "DHT identities are ready for publication"
+        );
 
-    // The descriptor advertises the UDP address on which the local DHT accepts
-    // ADNL datagrams. TON JSON represents IPv4 as one numeric 32-bit value.
-    let address_list_path = layout.dht_db.join("adnl-address-list.json");
-    write_json_atomic(
-        &address_list_path,
-        &json!({
-            "@type": "adnl.addressList",
-            "addrs": [{
-                "@type": "adnl.address.udp",
-                "ip": ipv4_to_i32(node.public_ip),
-                "port": node.dht_port,
-            }],
-            "version": 0,
-            "reinit_date": 0,
-            "priority": 0,
-            "expire_at": 0,
-        }),
-    )?;
-
-    // Publish every canonical 256-bit key created by dht-server instead of
-    // relying on platform-specific directory order.
-    let keyring = layout.dht_db.join("keyring");
-    let mut nodes = Vec::new();
-    for entry in fs::read_dir(&keyring)
-        .with_context(|| format!("failed to read DHT keyring {}", keyring.display()))?
-    {
-        let path = entry?.path();
-        if path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().len() == 64)
-        {
-            let mut command = Command::new(binaries.command("generate-random-id"));
-            command
-                .args(["-m", "dht", "-k"])
-                .arg(&path)
-                .arg("-f")
-                .arg(&address_list_path);
-            let output = run_checked("DHT node descriptor generation", command, timeout).await?;
-            nodes.push(parse_json_output(&output.stdout)?);
+        // The address list is a generator-owned scratch artifact reused for each
+        // stable keyring identity. The adapter rewrites it atomically before signing.
+        let address_list_path = layout.dht_db.join("adnl-address-list.json");
+        let descriptor_count = database.keyring.len();
+        let mut descriptors = Vec::with_capacity(descriptor_count);
+        for (index, private_key) in database.keyring.iter().enumerate() {
+            info!(
+                milestone = "descriptor_generation_requested",
+                descriptor = index + 1,
+                descriptor_count,
+                "signing DHT bootstrap descriptor"
+            );
+            descriptors.push(
+                random_id
+                    .create_dht_descriptor(
+                        context,
+                        DhtDescriptorRequest {
+                            private_key: private_key.clone(),
+                            address: endpoint,
+                            address_list_path: address_list_path.clone(),
+                        },
+                    )
+                    .await?,
+            );
         }
+        info!(
+            milestone = "descriptors_ready",
+            descriptor_count = descriptors.len(),
+            address_list_path = %address_list_path.display(),
+            "DHT bootstrap descriptors are ready for global config"
+        );
+        Ok(InitializedDht {
+            database,
+            descriptors,
+        })
     }
-    ensure!(
-        !nodes.is_empty(),
-        "DHT initialization created no keyring keys"
-    );
-    Ok(nodes)
-}
-
-/// Builds the long-running DHT command for an initialized database.
-///
-/// Unlike [`initialize_dht`], this reopens the persistent keyring and config; it
-/// must not create a new DHT identity on every launcher run.
-pub(super) fn command(layout: &Layout, binaries: &TonBinaries, node: &NodeSettings) -> Command {
-    let mut command = Command::new(binaries.command("dht-server"));
-    command
-        .args([
-            "-v",
-            &node.verbosity.to_string(),
-            "-t",
-            &node.threads.to_string(),
-            "-C",
-        ])
-        .arg(&layout.global_config)
-        .arg("-l")
-        .arg(layout.logs.join("dht-engine"))
-        .arg("-D")
-        .arg(&layout.dht_db)
-        .args(["-I", &format!("{}:{}", node.public_ip, node.dht_port)]);
-    command
-}
-
-/// Extracts a descriptor even when a TON binary surrounds JSON with log lines.
-fn parse_json_output(output: &str) -> Result<Value> {
-    if let Ok(value) = serde_json::from_str(output.trim()) {
-        return Ok(value);
-    }
-    let start = output
-        .find('{')
-        .context("command output contains no JSON object")?;
-    let end = output
-        .rfind('}')
-        .context("command output contains no complete JSON object")?;
-    serde_json::from_str(&output[start..=end]).context("invalid JSON in command output")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extracts_json_from_noisy_output() {
-        let value = parse_json_output("log line\n{\"@type\":\"dht.node\"}\n").unwrap();
-        assert_eq!(value["@type"], "dht.node");
-    }
+    .instrument(workflow_span.clone())
+    .await;
+    workflow_span.in_scope(|| match &result {
+        Ok(initialized) => info!(
+            milestone = "complete",
+            descriptor_count = initialized.descriptors.len(),
+            database_path = %initialized.database.path.display(),
+            "DHT bootstrap completed"
+        ),
+        Err(error) => warn!(milestone = "failed", %error, "DHT bootstrap failed"),
+    });
+    result
 }

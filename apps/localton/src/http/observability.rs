@@ -18,7 +18,6 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, options, post},
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use futures_util::future::join_all;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
@@ -183,17 +182,13 @@ fn remember_genesis_validator_key(layout: &Layout, settings: &Settings) {
     let result = (|| {
         let manifest = Manifest::load(&layout.manifest)?;
         let node = settings.node("genesis")?;
-        let public_key = match manifest.validator_public_key {
-            Some(public_key) => public_key,
-            None => STANDARD.encode(std::fs::read(
-                layout.validator_keyring.join("validator.pub"),
-            )?),
-        };
+        let public_key = manifest.validator_public_key.to_base64();
         RuntimeState::update_atomic(&layout.runtime, |runtime| {
             let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
             node_runtime.remember_validator_public_key(public_key);
             if node_runtime.liteserver_public_key.is_none() {
-                node_runtime.liteserver_public_key = Some(manifest.liteserver_public_key.clone());
+                node_runtime.liteserver_public_key =
+                    Some(manifest.liteserver_public_key.to_base64());
             }
             Ok(())
         })

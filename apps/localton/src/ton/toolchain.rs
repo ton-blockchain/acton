@@ -1,6 +1,9 @@
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsString,
+    fmt,
+    net::Ipv4Addr,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
@@ -10,17 +13,77 @@ use tokio::process::Command;
 use crate::{
     binaries::TonBinaries,
     runtime::{CommandOutput, run_checked},
-    storage::{Layout, Manifest, NodeLayout},
+    storage::{Layout, Manifest},
     storage::{NodeSettings, Settings},
+    ton::tools::{
+        create_state::{CreateState, OfficialCreateState},
+        dht_server::{DhtServer, OfficialDhtServer},
+        fift::{Fift, FiftOutput, FiftScriptRequest, OfficialFift},
+        lite_client::{LiteClient, NativeLiteClient},
+        random_id::{OfficialRandomIdGenerator, RandomIdGenerator},
+        validator_console::{OfficialValidatorConsole, ValidatorConsole, ValidatorConsoleEndpoint},
+        validator_engine::{OfficialValidatorEngine, ValidatorEngine},
+    },
 };
 
-#[derive(Debug, Clone)]
+/// Cloneable dependency bundle for every official TON program used by Localton
+///
+/// Workflows depend on semantic traits from this value and never construct argv
+/// themselves. Every production adapter is built from the same validated release,
+/// which prevents a node lifecycle from accidentally mixing incompatible tools
+/// while still allowing tests to replace one boundary at a time
+#[derive(Clone)]
 pub struct Toolchain {
     pub layout: Layout,
     pub binaries: TonBinaries,
+    pub(crate) create_state: Arc<dyn CreateState>,
+    pub(crate) dht_server: Arc<dyn DhtServer>,
+    pub(crate) fift_tool: Arc<dyn Fift>,
+    pub(crate) lite_client_tool: Arc<dyn LiteClient>,
+    pub(crate) random_id: Arc<dyn RandomIdGenerator>,
+    pub(crate) validator_engine: Arc<dyn ValidatorEngine>,
+    pub(crate) validator_console_tool: Arc<dyn ValidatorConsole>,
+}
+
+impl fmt::Debug for Toolchain {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Toolchain")
+            .field("layout", &self.layout)
+            .field("distribution_root", &self.binaries.root)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Toolchain {
+    /// Builds all production adapters from one already validated TON distribution
+    ///
+    /// The constructor is synchronous because binary installation and validation
+    /// happen before this boundary. Adapters do not spawn processes until a
+    /// semantic method is called
+    #[must_use]
+    pub fn official(layout: Layout, binaries: TonBinaries) -> Self {
+        Self {
+            layout,
+            create_state: Arc::new(OfficialCreateState::new(binaries.clone())),
+            dht_server: Arc::new(OfficialDhtServer::new(binaries.clone())),
+            fift_tool: Arc::new(OfficialFift::new(binaries.clone())),
+            lite_client_tool: Arc::new(NativeLiteClient::new()),
+            random_id: Arc::new(OfficialRandomIdGenerator::new(binaries.clone())),
+            validator_engine: Arc::new(OfficialValidatorEngine::new(
+                binaries.command("validator-engine"),
+            )),
+            validator_console_tool: Arc::new(OfficialValidatorConsole::new(
+                binaries.command("validator-engine-console"),
+            )),
+            binaries,
+        }
+    }
+
+    /// Resolves the pinned distribution and returns its semantic dependency bundle
+    ///
+    /// CLI operations use this entry point when no launcher-owned bundle already
+    /// exists. Explicit release overrides are persisted exactly as before
     pub async fn resolve(state_dir: &Path, override_dir: Option<PathBuf>) -> Result<Self> {
         let root = absolute_path(state_dir)?;
         let layout = Layout::new(root);
@@ -29,12 +92,12 @@ impl Toolchain {
         let binaries = TonBinaries::resolve(&layout, override_dir).await?;
         if explicit_override && layout.manifest.is_file() {
             let mut manifest = Manifest::load(&layout.manifest)?;
-            if manifest.ton_bin_dir.as_ref() != Some(&binaries.root) {
-                manifest.ton_bin_dir = Some(binaries.root.clone());
+            if manifest.ton_bin_dir != binaries.root {
+                manifest.ton_bin_dir = binaries.root.clone();
                 manifest.save_atomic(&layout.manifest)?;
             }
         }
-        Ok(Self { layout, binaries })
+        Ok(Self::official(layout, binaries))
     }
 
     pub fn settings(&self) -> Result<Settings> {
@@ -64,75 +127,46 @@ impl Toolchain {
         Ok(join_output(output))
     }
 
-    pub async fn validator_console(
+    /// Returns the authenticated host-local control endpoint for a managed node
+    ///
+    /// Administrative traffic stays on loopback even when the node advertises a
+    /// LAN address. The console adapter still authenticates both sides with the
+    /// node-specific client private key and server public key
+    pub(crate) fn validator_console_endpoint(
         &self,
         node: &NodeSettings,
-        command_text: &str,
-    ) -> Result<String> {
-        let node_layout = self.layout.node(node);
-        self.validator_console_for_layout(node, &node_layout, command_text)
+    ) -> ValidatorConsoleEndpoint {
+        let layout = self.layout.node(node);
+        ValidatorConsoleEndpoint {
+            address: (Ipv4Addr::LOCALHOST, node.console_port).into(),
+            client_private_key: layout.client_private_key(),
+            server_public_key: layout.server_public_key(),
+        }
+    }
+
+    /// Runs one selected Fift script without exposing interpreter flags to callers
+    ///
+    /// Script arguments remain opaque because individual workflows own their
+    /// meaning. The adapter owns `-s`, `FIFTPATH`, subprocess lifecycle, and safe
+    /// tracing so wallet and election code cannot drift from the pinned release
+    pub async fn run_fift_script(
+        &self,
+        current_dir: &Path,
+        script: PathBuf,
+        arguments: Vec<OsString>,
+        timeout: Duration,
+    ) -> Result<FiftOutput> {
+        self.fift_tool
+            .run_script(
+                &crate::ton::tools::types::OperationContext::new(timeout),
+                FiftScriptRequest {
+                    script,
+                    arguments,
+                    current_dir: current_dir.to_owned(),
+                    include_paths: vec![self.layout.smartcont.clone()],
+                },
+            )
             .await
-    }
-
-    pub async fn validator_console_for_layout(
-        &self,
-        node: &NodeSettings,
-        node_layout: &NodeLayout,
-        command_text: &str,
-    ) -> Result<String> {
-        ensure!(
-            node_layout.client_private_key().is_file(),
-            "node {} has no console client certificate",
-            node.name
-        );
-        ensure!(
-            node_layout.server_public_key().is_file(),
-            "node {} has no console server public key",
-            node.name
-        );
-        let mut command = Command::new(self.binaries.command("validator-engine-console"));
-        command
-            .args(["-t", "10", "-k"])
-            .arg(node_layout.client_private_key())
-            .arg("-p")
-            .arg(node_layout.server_public_key())
-            .args([
-                "-v",
-                "0",
-                "-a",
-                &format!("{}:{}", node.public_ip, node.console_port),
-                "-rc",
-                command_text,
-            ]);
-        let output = run_checked(
-            &format!("validator-engine-console {} {command_text}", node.name),
-            command,
-            Duration::from_secs(20),
-        )
-        .await?;
-        Ok(join_output(output))
-    }
-
-    pub async fn fift<I, S>(&self, current_dir: &Path, args: I) -> Result<CommandOutput>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
-    {
-        let mut command = Command::new(self.binaries.command("fift"));
-        command
-            .args(args)
-            .current_dir(current_dir)
-            .env("FIFTPATH", self.fift_path()?);
-        run_checked("fift", command, Duration::from_secs(60)).await
-    }
-
-    pub fn fift_path(&self) -> Result<OsString> {
-        std::env::join_paths([
-            self.binaries.lib_dir(),
-            self.binaries.smartcont_dir(),
-            self.layout.smartcont.clone(),
-        ])
-        .context("failed to build FIFTPATH")
     }
 
     pub fn smartcont_script(&self, name: &str) -> PathBuf {
@@ -176,7 +210,7 @@ mod tests {
             root: temp.path().join("ton"),
         };
         std::fs::create_dir_all(binaries.smartcont_dir()).unwrap();
-        let toolchain = Toolchain { layout, binaries };
+        let toolchain = Toolchain::official(layout, binaries);
 
         let release_script = toolchain.binaries.smartcont_dir().join("wallet.fif");
         std::fs::write(&release_script, "release").unwrap();

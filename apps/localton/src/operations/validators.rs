@@ -1,8 +1,7 @@
 use std::{fs, path::Path, time::Duration};
 
-use anyhow::{Context, Result, bail, ensure};
-use base64::{Engine, engine::general_purpose::STANDARD};
-use regex::Regex;
+use anyhow::{Context, Result, ensure};
+use num_bigint::{BigInt, Sign};
 use serde::{Deserialize, Serialize};
 use tonutils::tvm::Address;
 
@@ -11,30 +10,21 @@ use crate::{
     operations::wallets,
     storage::RuntimeState,
     storage::{Layout, NodeSettings, Settings},
-    ton::toolchain::Toolchain,
+    ton::{
+        toolchain::Toolchain,
+        tools::{
+            lite_client::{ElectionStatus, LiteTarget, RunMethodRequest},
+            types::OperationContext,
+            validator_console::{
+                AddAdnl, AddPermanentKey, AddTemporaryKey, AddValidatorAddress, SignRequest,
+            },
+            validator_engine_config::{ValidatorElectionKeys, ValidatorEngineConfig},
+        },
+    },
 };
 
 const VALIDATOR_KEY_EXPIRY_MARGIN_SECONDS: u32 = 300;
 const MAX_VALIDATOR_LAG_SECONDS: u64 = 60;
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct ElectionChainStatus {
-    pub validators_elected_for: u32,
-    pub elections_start_before: u32,
-    pub elections_end_before: u32,
-    pub stake_held_for: u32,
-    pub current: ValidatorSetStatus,
-    pub next: Option<ValidatorSetStatus>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct ValidatorSetStatus {
-    pub since: u32,
-    pub until: u32,
-    pub total: u16,
-    pub main: u16,
-    pub public_keys: Vec<String>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ElectionEntry {
@@ -62,32 +52,6 @@ struct ReapResult {
     available_nano: u64,
     sent: bool,
     send_status: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EngineConfig {
-    #[serde(default)]
-    validators: Vec<EngineValidator>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EngineValidator {
-    id: String,
-    election_date: u32,
-    expire_at: u32,
-    #[serde(default)]
-    adnl_addrs: Vec<EngineValidatorAdnl>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EngineValidatorAdnl {
-    id: String,
-}
-
-struct ElectionKeys {
-    signing_key: String,
-    adnl: String,
-    election_end: u32,
 }
 
 pub async fn execute(command: ValidatorCommand) -> Result<()> {
@@ -175,65 +139,15 @@ pub async fn execute(command: ValidatorCommand) -> Result<()> {
     }
 }
 
-pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionChainStatus> {
-    let output = toolchain
-        .lite_client_commands(&["getconfig 15", "getconfig 34", "getconfig 36"])
-        .await?;
-    parse_election_status(&output)
-}
-
-fn parse_election_status(output: &str) -> Result<ElectionChainStatus> {
-    let timing = Regex::new(
-        r"validators_elected_for:(\d+)\s+elections_start_before:(\d+)\s+elections_end_before:(\d+)\s+stake_held_for:(\d+)",
-    )?
-    .captures(output)
-    .context("config parameter 15 does not contain election timing")?;
-    let number = |index: usize| -> Result<u32> {
-        timing[index]
-            .parse()
-            .with_context(|| format!("invalid config parameter 15 field at index {index}"))
-    };
-    Ok(ElectionChainStatus {
-        validators_elected_for: number(1)?,
-        elections_start_before: number(2)?,
-        elections_end_before: number(3)?,
-        stake_held_for: number(4)?,
-        current: parse_validator_set_status(output, 34)?
-            .context("config parameter 34 has no current validator set")?,
-        next: parse_validator_set_status(output, 36)?,
-    })
-}
-
-fn parse_validator_set_status(output: &str, parameter: u8) -> Result<Option<ValidatorSetStatus>> {
-    let marker = format!("ConfigParam({parameter})");
-    let section = output
-        .split_once(&marker)
-        .map(|(_, section)| section)
-        .with_context(|| format!("config parameter {parameter} is missing"))?;
-    let section = section.split("ConfigParam(").next().unwrap_or(section);
-    if section.contains("(null)") {
-        return Ok(None);
-    }
-    let values = Regex::new(r"utime_since:(\d+)\s+utime_until:(\d+)\s+total:(\d+)\s+main:(\d+)")?
-        .captures(section)
-        .with_context(|| format!("config parameter {parameter} has an invalid validator set"))?;
-    let total = values[3].parse()?;
-    let public_keys = Regex::new(r"ed25519_pubkey\s+pubkey:x([0-9A-Fa-f]{64})")?
-        .captures_iter(section)
-        .map(|captures| captures[1].to_ascii_lowercase())
-        .collect::<Vec<_>>();
-    ensure!(
-        public_keys.len() == usize::from(total),
-        "config parameter {parameter} reports {total} validators but contains {} public keys",
-        public_keys.len()
-    );
-    Ok(Some(ValidatorSetStatus {
-        since: values[1].parse()?,
-        until: values[2].parse()?,
-        total,
-        main: values[4].parse()?,
-        public_keys,
-    }))
+pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionStatus> {
+    toolchain
+        .lite_client_tool
+        .election_status(
+            &OperationContext::new(Duration::from_secs(30)),
+            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+        )
+        .await?
+        .into_data()
 }
 
 fn resolve_managed_node(state: &StateArgs, requested: Option<&str>) -> Result<String> {
@@ -368,23 +282,16 @@ async fn print_status(toolchain: &Toolchain) -> Result<()> {
     let active = active_election_id(toolchain, &elector)
         .await
         .unwrap_or_default();
+    let election = election_status(toolchain).await?;
     println!(
         "{}",
         serde_json::to_string_pretty(&serde_json::json!({
             "elector": elector,
             "active_election_id": active,
+            "election": election,
             "nodes": runtime.nodes,
         }))?
     );
-    for parameter in [15, 17, 32, 34, 36] {
-        println!("config {parameter}");
-        print!(
-            "{}",
-            toolchain
-                .lite_client(&format!("getconfig {parameter}"))
-                .await?
-        );
-    }
     for node in settings
         .nodes
         .iter()
@@ -392,7 +299,21 @@ async fn print_status(toolchain: &Toolchain) -> Result<()> {
         .filter(|node| runtime.nodes.contains_key(&node.name))
     {
         println!("validator {} stats", node.name);
-        print!("{}", toolchain.validator_console(node, "getstats").await?);
+        let stats = toolchain
+            .validator_console_tool
+            .health(
+                &validator_console_context(node),
+                &toolchain.validator_console_endpoint(node),
+            )
+            .await?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "connection_ready": stats.connection_ready(),
+                "unix_time": stats.unix_time()?,
+                "masterchain_block_time": stats.masterchain_block_time()?,
+            }))?
+        );
     }
     Ok(())
 }
@@ -467,39 +388,81 @@ async fn prepare_election_entry(
     let keys = if let Some(keys) = existing_election_keys(&node_layout, election_id)? {
         keys
     } else {
-        let signing_key = console_new_key(toolchain, node).await?;
-        console_expect(
-            toolchain,
-            node,
-            &format!("addpermkey {signing_key} {election_id} {election_end}"),
-        )
-        .await?;
-        console_expect(
-            toolchain,
-            node,
-            &format!("addtempkey {signing_key} {signing_key} {election_end}"),
-        )
-        .await?;
+        let context = validator_console_context(node);
+        let endpoint = toolchain.validator_console_endpoint(node);
+        let signing_key = toolchain
+            .validator_console_tool
+            .new_key(&context, &endpoint)
+            .await?;
+        toolchain
+            .validator_console_tool
+            .add_permanent_key(
+                &context,
+                &endpoint,
+                AddPermanentKey {
+                    key: signing_key,
+                    election_id,
+                    expire_at: election_end,
+                },
+            )
+            .await?;
+        toolchain
+            .validator_console_tool
+            .add_temporary_key(
+                &context,
+                &endpoint,
+                AddTemporaryKey {
+                    permanent_key: signing_key,
+                    temporary_key: signing_key,
+                    expire_at: election_end,
+                },
+            )
+            .await?;
 
-        let adnl = console_new_key(toolchain, node).await?;
-        console_expect(toolchain, node, &format!("addadnl {adnl} 0")).await?;
-        console_expect(
-            toolchain,
-            node,
-            &format!("addvalidatoraddr {signing_key} {adnl} {election_end}"),
-        )
-        .await?;
-        ElectionKeys {
+        let adnl = toolchain
+            .validator_console_tool
+            .new_key(&context, &endpoint)
+            .await?;
+        toolchain
+            .validator_console_tool
+            .add_adnl(
+                &context,
+                &endpoint,
+                AddAdnl {
+                    key: adnl,
+                    category: 0,
+                },
+            )
+            .await?;
+        toolchain
+            .validator_console_tool
+            .add_validator_address(
+                &context,
+                &endpoint,
+                AddValidatorAddress {
+                    validator_key: signing_key,
+                    adnl_key: adnl,
+                    expire_at: election_end,
+                },
+            )
+            .await?;
+        ValidatorElectionKeys {
             signing_key,
             adnl,
             election_end,
         }
     };
-    let signing_public_key = console_export_public(toolchain, node, &keys.signing_key).await?;
+    let context = validator_console_context(node);
+    let endpoint = toolchain.validator_console_endpoint(node);
+    let signing_public_key = toolchain
+        .validator_console_tool
+        .export_public(&context, &endpoint, &keys.signing_key)
+        .await?
+        .into_base64();
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
         let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
         node_runtime.set_validator_public_key(signing_public_key.clone());
-        node_runtime.validator_adnl = Some(keys.adnl.clone());
+        node_runtime.validator_adnl = Some(keys.adnl.to_hex());
         node_runtime.election_id = Some(election_id);
         node_runtime.election_end = Some(keys.election_end);
         Ok(())
@@ -519,20 +482,30 @@ async fn prepare_election_entry(
             wallet_address.to_owned(),
             election_id.to_string(),
             max_factor.to_string(),
-            keys.adnl.clone(),
+            keys.adnl.to_hex(),
             unsigned.to_string_lossy().into_owned(),
         ],
     )
     .await?;
-    let signing_payload = hex::encode(
-        fs::read(&unsigned).with_context(|| format!("failed to read {}", unsigned.display()))?,
-    );
-    let signature = console_sign(toolchain, node, &keys.signing_key, &signing_payload).await?;
+    let signing_payload =
+        fs::read(&unsigned).with_context(|| format!("failed to read {}", unsigned.display()))?;
+    let signature = toolchain
+        .validator_console_tool
+        .sign(
+            &context,
+            &endpoint,
+            SignRequest {
+                key: keys.signing_key,
+                payload: signing_payload,
+            },
+        )
+        .await?
+        .into_base64();
     let entry = ElectionEntry {
         election_id,
         election_end: keys.election_end,
         validator_public_key: signing_public_key,
-        validator_adnl: keys.adnl,
+        validator_adnl: keys.adnl.to_hex(),
         signature,
     };
     fs::write(
@@ -646,59 +619,27 @@ fn election_key_expiry(settings: &Settings, election_id: u32) -> u32 {
 }
 
 async fn node_is_synchronized(toolchain: &Toolchain, node: &NodeSettings) -> Result<bool> {
-    let output = toolchain.validator_console(node, "getstats").await?;
-    let now = parse_validator_stat(&output, "unixtime")?;
-    let masterchain_time = parse_validator_stat(&output, "masterchainblocktime")?;
+    let stats = toolchain
+        .validator_console_tool
+        .health(
+            &validator_console_context(node),
+            &toolchain.validator_console_endpoint(node),
+        )
+        .await?;
+    let now = stats.unix_time()?;
+    let masterchain_time = stats.masterchain_block_time()?;
     Ok(masterchain_time > 0 && now.saturating_sub(masterchain_time) <= MAX_VALIDATOR_LAG_SECONDS)
-}
-
-fn parse_validator_stat(output: &str, name: &str) -> Result<u64> {
-    output
-        .lines()
-        .find_map(|line| {
-            let mut fields = line.split_whitespace();
-            (fields.next() == Some(name)).then(|| fields.next())
-        })
-        .flatten()
-        .with_context(|| format!("validator stats do not contain `{name}`"))?
-        .parse()
-        .with_context(|| format!("validator stat `{name}` is not a u64"))
 }
 
 fn existing_election_keys(
     node_layout: &crate::storage::NodeLayout,
     election_id: u32,
-) -> Result<Option<ElectionKeys>> {
+) -> Result<Option<ValidatorElectionKeys>> {
     let config_path = node_layout.config_json();
     if !config_path.is_file() {
         return Ok(None);
     }
-    let config: EngineConfig = serde_json::from_slice(&fs::read(&config_path)?)
-        .with_context(|| format!("failed to parse validator config {}", config_path.display()))?;
-    config
-        .validators
-        .into_iter()
-        .find(|validator| validator.election_date == election_id)
-        .map(|validator| {
-            let adnl = validator
-                .adnl_addrs
-                .first()
-                .context("existing election validator has no ADNL address")?;
-            Ok(ElectionKeys {
-                signing_key: decode_key_id(&validator.id, "validator key")?,
-                adnl: decode_key_id(&adnl.id, "validator ADNL")?,
-                election_end: validator.expire_at,
-            })
-        })
-        .transpose()
-}
-
-fn decode_key_id(value: &str, label: &str) -> Result<String> {
-    let bytes = STANDARD
-        .decode(value)
-        .with_context(|| format!("{label} is not valid base64"))?;
-    ensure!(bytes.len() == 32, "{label} must contain 32 bytes");
-    Ok(hex::encode(bytes))
+    ValidatorEngineConfig::load(&config_path)?.election_keys(election_id)
 }
 
 async fn reap(toolchain: &Toolchain, node_name: &str) -> Result<ReapResult> {
@@ -718,13 +659,14 @@ async fn reap_node(
 ) -> Result<ReapResult> {
     let wallet = wallets::wallet(&toolchain.layout, wallet_name)?;
     let wallet_address = Address::from_str(&wallet.address)?;
-    let output = toolchain
-        .lite_client(&format!(
-            "runmethod {elector} compute_returned_stake 0x{}",
-            hex::encode(wallet_address.hash_part)
-        ))
-        .await?;
-    let available_nano = parse_first_result_number(&output)?;
+    let wallet_hash = BigInt::from_bytes_be(Sign::Plus, &wallet_address.hash_part);
+    let available_nano = run_method_u64(
+        toolchain,
+        elector,
+        "compute_returned_stake",
+        vec![wallet_hash],
+    )
+    .await?;
     if available_nano == 0 {
         return Ok(ReapResult {
             node: node.name.clone(),
@@ -791,96 +733,36 @@ fn controlling_wallet_name(settings: &Settings, node: &NodeSettings) -> Result<S
 }
 
 async fn elector_address(toolchain: &Toolchain) -> Result<String> {
-    parse_elector_address(&toolchain.lite_client("getconfig 1").await?)
-}
-
-fn parse_elector_address(output: &str) -> Result<String> {
-    let expression = Regex::new(r"(?i)elector_addr:x([0-9a-f]{64})")?;
-    let hash = expression
-        .captures(output)
-        .and_then(|captures| captures.get(1))
-        .context("config parameter 1 does not contain the Elector address")?;
-    Ok(format!("-1:{}", hash.as_str().to_uppercase()))
+    Ok(election_status(toolchain).await?.elector_address)
 }
 
 async fn active_election_id(toolchain: &Toolchain, elector: &str) -> Result<u32> {
-    let output = toolchain
-        .lite_client(&format!("runmethod {elector} active_election_id"))
-        .await?;
-    u32::try_from(parse_first_result_number(&output)?).context("active election id exceeds u32")
+    u32::try_from(run_method_u64(toolchain, elector, "active_election_id", vec![]).await?)
+        .context("active election id exceeds u32")
 }
 
-fn parse_first_result_number(output: &str) -> Result<u64> {
-    let expression = Regex::new(r"(?i)result:\s*\[\s*(?:num\s*)?([0-9]+)")?;
-    let value = expression
-        .captures(output)
-        .and_then(|captures| captures.get(1))
-        .context("lite-client output does not contain a numeric result")?;
-    value.as_str().parse().context("numeric result exceeds u64")
-}
-
-async fn console_new_key(toolchain: &Toolchain, node: &NodeSettings) -> Result<String> {
-    let output = toolchain.validator_console(node, "newkey").await?;
-    let expression = Regex::new(r"(?i)created new key\s+([0-9a-f]{64})")?;
-    expression
-        .captures(&output)
-        .and_then(|captures| captures.get(1))
-        .map(|value| value.as_str().to_lowercase())
-        .context("validator-engine-console did not return a new key id")
-}
-
-async fn console_export_public(
+/// Runs one integer-only get method through the typed native liteserver adapter.
+async fn run_method_u64(
     toolchain: &Toolchain,
-    node: &NodeSettings,
-    key: &str,
-) -> Result<String> {
-    let output = toolchain
-        .validator_console(node, &format!("exportpub {key}"))
-        .await?;
-    let marker = "got public key:";
-    let position = output
-        .find(marker)
-        .context("validator-engine-console did not return a public key")?;
-    let value = output[position + marker.len()..]
-        .split_whitespace()
-        .next()
-        .context("public key value is empty")?;
-    STANDARD
-        .decode(value)
-        .context("validator public key is not valid base64")?;
-    Ok(value.to_owned())
+    address: &str,
+    method: &str,
+    arguments: Vec<BigInt>,
+) -> Result<u64> {
+    toolchain
+        .lite_client_tool
+        .run_method(
+            &OperationContext::new(Duration::from_secs(30)),
+            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+            RunMethodRequest::new(address, method, arguments)?,
+        )
+        .await?
+        .into_data()?
+        .first_u64()
 }
 
-async fn console_sign(
-    toolchain: &Toolchain,
-    node: &NodeSettings,
-    key: &str,
-    payload_hex: &str,
-) -> Result<String> {
-    let output = toolchain
-        .validator_console(node, &format!("sign {key} {payload_hex}"))
-        .await?;
-    let expression = Regex::new(r"(?i)signature\s+([A-Za-z0-9_+/=-]+)")?;
-    let signature = expression
-        .captures(&output)
-        .and_then(|captures| captures.get(1))
-        .map(|value| value.as_str())
-        .context("validator-engine-console did not return a signature")?;
-    ensure!(
-        STANDARD.decode(signature)?.len() == 64,
-        "validator signature must contain 64 bytes"
-    );
-    Ok(signature.to_owned())
-}
-
-async fn console_expect(toolchain: &Toolchain, node: &NodeSettings, command: &str) -> Result<()> {
-    let output = toolchain.validator_console(node, command).await?;
-    if output.to_ascii_lowercase().contains("failed")
-        || output.to_ascii_lowercase().contains("error")
-    {
-        bail!("validator-engine-console `{command}` failed: {output}")
-    }
-    Ok(())
+/// Applies the ordinary bound and tracing identity to one console operation
+fn validator_console_context(node: &NodeSettings) -> OperationContext {
+    OperationContext::for_node(Duration::from_secs(20), &node.name)
 }
 
 async fn run_fift(
@@ -889,20 +771,15 @@ async fn run_fift(
     script: &str,
     args: Vec<String>,
 ) -> Result<()> {
-    let mut command = vec![
-        "-s".to_owned(),
-        toolchain
-            .smartcont_script(script)
-            .to_string_lossy()
-            .into_owned(),
-    ];
-    command.extend(args);
-    let output = tokio::time::timeout(
-        Duration::from_secs(60),
-        toolchain.fift(current_dir, command),
-    )
-    .await
-    .context("Fift election command timed out")??;
+    let output = toolchain
+        .run_fift_script(
+            current_dir,
+            toolchain.smartcont_script(script),
+            args.into_iter().map(Into::into).collect(),
+            Duration::from_secs(60),
+        )
+        .await
+        .context("Fift election command failed")?;
     if !output.stdout.is_empty() {
         tracing::debug!("{}", output.stdout.trim());
     }
@@ -930,9 +807,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        election_key_expiry, existing_election_keys, nano_to_grams, parse_election_status,
-        parse_elector_address, parse_first_result_number, parse_validator_stat,
-        resolve_managed_node_in_layout, set_election_mode,
+        election_key_expiry, existing_election_keys, nano_to_grams, resolve_managed_node_in_layout,
+        set_election_mode,
     };
     use crate::cli::StateArgs;
     use crate::storage::{Layout, NodeRuntime, NodeSettings, RuntimeState, Settings};
@@ -956,30 +832,6 @@ mod tests {
             "node2"
         );
         assert!(resolve_managed_node_in_layout(&layout, &settings, Some("genesis")).is_err());
-    }
-
-    #[test]
-    fn parses_batched_election_config() {
-        let output = r#"
-ConfigParam(15) = ( validators_elected_for:120 elections_start_before:90 elections_end_before:30 stake_held_for:30)
-ConfigParam(34) = (cur_validators:(validators_ext utime_since:1000 utime_until:1120 total:2 main:2 total_weight:10
-  public_key:(ed25519_pubkey pubkey:xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)
-  public_key:(ed25519_pubkey pubkey:xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)))
-ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:1240 total:3 main:2 total_weight:20
-  public_key:(ed25519_pubkey pubkey:xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC)
-  public_key:(ed25519_pubkey pubkey:xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD)
-  public_key:(ed25519_pubkey pubkey:xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE)))
-"#;
-        let status = parse_election_status(output).unwrap();
-        assert_eq!(status.validators_elected_for, 120);
-        assert_eq!(status.elections_start_before, 90);
-        assert_eq!(status.elections_end_before, 30);
-        assert_eq!(status.stake_held_for, 30);
-        assert_eq!(status.current.since, 1000);
-        assert_eq!(status.current.until, 1120);
-        assert_eq!(status.current.total, 2);
-        assert_eq!(status.current.public_keys[0], "a".repeat(64));
-        assert_eq!(status.next.unwrap().total, 3);
     }
 
     #[test]
@@ -1013,37 +865,6 @@ ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:
     }
 
     #[test]
-    fn parses_elector_result() {
-        assert_eq!(
-            parse_first_result_number("result: [ num 10001000000000 ]").unwrap(),
-            10_001_000_000_000
-        );
-    }
-
-    #[test]
-    fn parses_elector_address_from_on_chain_config() {
-        let output = "ConfigParam(1) = ( elector_addr:x3333333333333333333333333333333333333333333333333333333333333333)";
-        assert_eq!(
-            parse_elector_address(output).unwrap(),
-            "-1:3333333333333333333333333333333333333333333333333333333333333333"
-        );
-    }
-
-    #[test]
-    fn parses_validator_sync_times() {
-        let stats = "unixtime\t\t1787976776\nmasterchainblocktime\t\t1787976774\n";
-        assert_eq!(
-            parse_validator_stat(stats, "unixtime").unwrap(),
-            1_787_976_776
-        );
-        assert_eq!(
-            parse_validator_stat(stats, "masterchainblocktime").unwrap(),
-            1_787_976_774
-        );
-        assert!(parse_validator_stat(stats, "missing").is_err());
-    }
-
-    #[test]
     fn formats_nano_without_precision_loss() {
         assert_eq!(nano_to_grams(10_001_000_000_000), "10001");
         assert_eq!(nano_to_grams(1_250_000_001), "1.250000001");
@@ -1065,20 +886,39 @@ ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:
         fs::write(
             node_layout.config_json(),
             serde_json::to_vec(&json!({
+                "@type": "engine.validator.config",
+                "out_port": 3272,
+                "addrs": [],
+                "adnl": [],
+                "dht": [],
                 "validators": [{
+                    "@type": "engine.validator",
                     "id": STANDARD.encode([0x11; 32]),
+                    "temp_keys": [],
                     "election_date": 1234,
                     "expire_at": 1834,
-                    "adnl_addrs": [{ "id": STANDARD.encode([0x22; 32]) }]
-                }]
+                    "adnl_addrs": [{
+                        "@type": "engine.validatorAdnlAddress",
+                        "id": STANDARD.encode([0x22; 32]),
+                        "expire_at": 1834,
+                    }]
+                }],
+                "collators": [],
+                "fullnode": STANDARD.encode([0x33; 32]),
+                "fullnodeslaves": [],
+                "fullnodemasters": [],
+                "liteservers": [],
+                "control": [],
+                "shards_to_monitor": [],
+                "gc": { "@type": "engine.gc", "ids": [] },
             }))
             .unwrap(),
         )
         .unwrap();
 
         let keys = existing_election_keys(&node_layout, 1234).unwrap().unwrap();
-        assert_eq!(keys.signing_key, "11".repeat(32));
-        assert_eq!(keys.adnl, "22".repeat(32));
+        assert_eq!(keys.signing_key.to_hex(), "11".repeat(32));
+        assert_eq!(keys.adnl.to_hex(), "22".repeat(32));
         assert_eq!(keys.election_end, 1834);
     }
 }
