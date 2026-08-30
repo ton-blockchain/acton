@@ -10,21 +10,21 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub const RUNTIME_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_SCHEMA_VERSION: u32 = 2;
 const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
 
-/// Current launcher, node, and service state
+/// Current Localton instance, node, and service state
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct RuntimeState {
     /// Version of this runtime state format
     pub schema_version: u32,
-    /// Process ID of the Localton launcher
-    pub launcher_pid: Option<u32>,
-    /// Unix time when the launcher started
+    /// Process ID of this Localton instance
+    pub instance_pid: Option<u32>,
+    /// Unix time when this Localton instance started
     pub started_at: Option<u64>,
     /// `true` when the network can process requests
     pub ready: bool,
-    /// Latest masterchain block number that the launcher observed
+    /// Latest masterchain block number that this instance observed
     pub masterchain_seqno: Option<u32>,
     /// Unix time when the observed masterchain seqno last advanced
     pub last_block_at: Option<u64>,
@@ -38,7 +38,7 @@ impl RuntimeState {
     pub fn new() -> Self {
         Self {
             schema_version: RUNTIME_SCHEMA_VERSION,
-            launcher_pid: None,
+            instance_pid: None,
             started_at: None,
             ready: false,
             masterchain_seqno: None,
@@ -108,14 +108,14 @@ impl RuntimeState {
         }
     }
 
-    pub fn mark_launcher_started(&mut self) {
-        self.launcher_pid = Some(std::process::id());
+    pub fn mark_instance_started(&mut self) {
+        self.instance_pid = Some(std::process::id());
         self.started_at = Some(unix_time());
         self.ready = false;
     }
 
-    pub fn mark_launcher_stopped(&mut self) {
-        self.launcher_pid = None;
+    pub fn mark_instance_stopped(&mut self) {
+        self.instance_pid = None;
         self.ready = false;
         for node in self.nodes.values_mut() {
             node.running = false;
@@ -241,7 +241,7 @@ mod tests {
                 ..ServiceRuntime::default()
             },
         );
-        state.mark_launcher_stopped();
+        state.mark_instance_stopped();
         assert!(!state.nodes["genesis"].running);
         assert!(!state.services["ton_http_api"].running);
     }

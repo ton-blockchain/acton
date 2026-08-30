@@ -31,6 +31,17 @@ It also covers:
 
 It does not replace TON protocols or reimplement consensus. `validator-engine`, ADNL, DHT, overlays, liteserver, Elector, and validator elections remain ordinary TON components.
 
+## Public workflows
+
+Localton exposes two explicit lifecycle commands:
+
+```text
+localton bootstrap [OPTIONS]
+localton join <GLOBAL_CONFIG_URL> [OPTIONS]
+```
+
+`bootstrap` creates or resumes the genesis node and network-owned services. `join` creates or resumes independent full nodes that synchronize through TON protocols. Validator and liteserver are node roles selected within those workflows, not separate node types. Running `localton` without a subcommand shows help. Historical `run`, `agent`, and `--join` spellings are intentionally unsupported.
+
 ## Goals
 
 - Bootstrap code describes network operations instead of command-line syntax
@@ -177,7 +188,7 @@ apps/localton/src/
 │   ├── dht.rs                 # DHT/global-config workflow
 │   ├── validator.rs           # Validator identity workflow
 │   ├── nodes.rs               # Genesis startup and follower initialization
-│   └── pipeline.rs            # Launcher lifecycle
+│   └── pipeline.rs            # Bootstrap lifecycle
 └── runtime/
     ├── command.rs             # One-shot subprocess execution
     ├── process.rs             # ManagedProcess
@@ -250,7 +261,7 @@ impl TonToolchain {
 
 CLI commands that also need a `Layout` receive it separately. Layout is Localton state, not a property of the TON distribution.
 
-Traits use object-safe async methods so one dependency bundle can be cloned into launcher services. The implementation can use `async-trait`; adding that workspace dependency is preferable to spreading boxed-future signatures through every interface.
+Traits use object-safe async methods so one dependency bundle can be cloned into Localton services. The implementation can use `async-trait`; adding that workspace dependency is preferable to spreading boxed-future signatures through every interface.
 
 ## Shared value types
 
@@ -293,7 +304,7 @@ Newtypes should be introduced where they prevent a real mix-up. Paths with ident
 
 ## Execution context
 
-Every one-shot operation receives a consistent execution policy without embedding launcher settings into tool contracts.
+Every one-shot operation receives a consistent execution policy without embedding workflow settings into tool contracts.
 
 ```rust
 #[derive(Debug, Clone)]
@@ -657,7 +668,7 @@ pub trait LiteClient: Send + Sync {
 }
 ```
 
-`LiteTarget` identifies the network configuration and selected liteserver. This keeps the toolchain reusable while each launcher or agent chooses its own local endpoint.
+`LiteTarget` identifies the network configuration and selected liteserver. This keeps the toolchain reusable while each Localton instance chooses its own local endpoint.
 
 Two implementations are useful:
 
@@ -710,7 +721,7 @@ The console adapter owns only individual console operations and their parsing.
 
 ## Node startup workflow
 
-The launcher owns only genesis startup:
+`localton bootstrap` owns only genesis startup:
 
 ```text
 resolve state and distribution
@@ -724,7 +735,7 @@ resolve state and distribution
     -> supervise services until shutdown or failure
 ```
 
-Every follower starts through an agent, even when it runs on the launcher host:
+Every follower starts through `localton join <GLOBAL_CONFIG_URL>`, even when it runs on the bootstrap host:
 
 ```text
 fetch or reuse the global config
@@ -736,9 +747,9 @@ fetch or reuse the global config
     -> supervise services until shutdown or failure
 ```
 
-An agent uses the same `ValidatorEngine` and `ValidatorConsole` contracts as the genesis launcher. Joining a network changes workflow inputs, not the subprocess abstraction.
+A joining instance uses the same `ValidatorEngine` and `ValidatorConsole` contracts as the bootstrap instance. Joining a network changes workflow inputs, not the subprocess abstraction.
 
-Signal handling covers the complete agent workflow, including initialization and
+Signal handling covers the complete join workflow, including initialization and
 ADNL catch-up. `Ctrl+C`, a child failure, and a normal steady-state shutdown all
 converge on `ProcessRegistry::stop_all` and the same atomic runtime-state cleanup.
 This boundary must be installed before the first TON subprocess starts: handling
@@ -881,7 +892,7 @@ Required workflow scenarios include:
 - full-node ADNL transition that disconnects the console
 - validator-key import requiring a bounded restart
 - failure after service start followed by guaranteed cleanup
-- agent initialization and subsequent reuse of its database
+- join initialization and subsequent reuse of its database
 
 ### Real TON integration tests
 
@@ -892,7 +903,7 @@ A smaller suite runs the pinned official release and proves:
 - console identity registration survives a persistent restart
 - a node reaches a local liteserver
 - masterchain seqno advances
-- an agent synchronizes through the network rather than copied block state
+- a joined node synchronizes through the network rather than copied block state
 
 These tests validate the external contract. Recording tests validate Localton orchestration.
 
@@ -921,7 +932,7 @@ Migration stays incremental and keeps behavior stable at each step.
 - Add `OperationContext`, `ManagedService`, and `ServiceHandle`
 - Make `ManagedProcess` implement `ManagedService`
 - Change `ProcessRegistry` to own service handles
-- Keep the current launcher behavior unchanged
+- Keep the current bootstrap behavior unchanged
 
 ### Move DHT and random identity operations
 

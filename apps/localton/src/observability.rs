@@ -112,7 +112,7 @@ pub struct NodeObservation {
 pub struct ObservationPayload {
     pub endpoint: String,
     pub software: String,
-    pub launcher_started_at: Option<u64>,
+    pub instance_started_at: Option<u64>,
     pub nodes: Vec<NodeObservation>,
     pub chain: Option<ChainObservation>,
 }
@@ -764,7 +764,7 @@ mod tests {
         ObservationPayload {
             endpoint: endpoint.to_owned(),
             software: "localton/test".to_owned(),
-            launcher_started_at: Some(10),
+            instance_started_at: Some(10),
             nodes: vec![NodeObservation {
                 name: "node".to_owned(),
                 public_ip: "127.0.0.1".to_owned(),

@@ -10,8 +10,8 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
-- The launcher owns genesis; each agent owns only its host-local nodes and private keys.
-- A host agent joins the network from public bootstrap data and can enter elections independently.
+- The bootstrap instance owns genesis; each joining instance owns only its host-local nodes and private keys.
+- A node joins the network from public bootstrap data and can enter elections independently.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
 - A new zerostate can include active basechain accounts from another network.
@@ -121,22 +121,22 @@ docker compose down --volumes
 
 The automatic TON installation supports macOS and Linux on `arm64` and `x86_64`. The build requires a stable Rust toolchain.
 
-Install the launcher from this repository:
+Install localton from this repository:
 
 ```bash
 cargo install --locked --path .
 ```
 
-Make sure that `$HOME/.cargo/bin` is in `PATH`. Then start the network:
+Make sure that `$HOME/.cargo/bin` is in `PATH`. Then bootstrap the network:
 
 ```bash
-localton run
+localton bootstrap
 ```
 
 The default state directory is `.localton`. Use `--state-dir` to keep multiple independent networks:
 
 ```bash
-localton run --state-dir ./networks/demo
+localton bootstrap --state-dir ./networks/demo
 ```
 
 The first run performs these operations:
@@ -157,7 +157,7 @@ Liteserver public key: <base64 ed25519 public key>
 Global config: /absolute/path/to/.localton/global.config.json
 ```
 
-Keep the launcher process active while you use the network. Press `Ctrl-C` to stop the network.
+Keep the bootstrap instance active while you use the network. Press `Ctrl-C` to stop the network.
 
 The next run uses the same state and continues the same chain. It does not create a new zerostate.
 
@@ -166,16 +166,16 @@ The next run uses the same state and continues the same chain. It does not creat
 Pass a directory that contains the required official TON binaries:
 
 ```bash
-localton run --ton-bin-dir /path/to/ton
+localton bootstrap --ton-bin-dir /path/to/ton
 ```
 
 You can set the same path through the environment:
 
 ```bash
-TON_BIN_DIR=/path/to/ton localton run
+TON_BIN_DIR=/path/to/ton localton bootstrap
 ```
 
-The launcher stores this path in `manifest.json`. Later commands use the stored path.
+The bootstrap workflow stores this path in `manifest.json`. Later commands use the stored path.
 
 ### Shared TON binary cache
 
@@ -188,48 +188,46 @@ reuses it across all state directories. The default cache is:
 Set `LOCALTON_CACHE_DIR` to replace the `localton` cache root. An explicit
 `--ton-bin-dir` or `TON_BIN_DIR` still has the highest priority.
 
-## Run a node agent
+## Join a full node
 
-The distributed topology starts with one genesis validator and an independent node on another host. Like mytonctrl, the agent needs a standard TON global config URL. The first launcher exposes that file and a development faucet for convenience, but neither service participates in consensus. The agent can keep its node as a full node or enter it into validator elections.
+The distributed topology starts with one genesis validator and an independent node on another host. Like mytonctrl, the join workflow needs a standard TON global config URL. The bootstrap instance exposes that file and a development faucet for convenience, but neither service participates in consensus. The joined node can remain a full node or enter validator elections.
 
 On the first host, advertise an address reachable by the second host and expose the global config to the private network:
 
 ```bash
-localton run \
+localton bootstrap \
   --state-dir .localton-bootstrap \
   --advertise-ip 10.0.0.1 \
   --config-http-bind 0.0.0.0
 ```
 
-On the second host, start the agent with its own empty state directory:
+On the second host, join with its own empty state directory:
 
 ```bash
-localton agent \
+localton join http://10.0.0.1:18000/config \
   --state-dir .localton-node2 \
-  --join http://10.0.0.1:18000/config \
   --advertise-ip 10.0.0.2
 ```
 
-On first start, the agent downloads only `global.config.json`. The file contains the network identity, zerostate hashes, DHT entry points, and public liteserver data. The agent then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. `validator-engine` obtains blockchain state through the TON network, just as a regular node does. After the local liteserver starts, the agent points its own CLI and election operations at `127.0.0.1`; it no longer uses the first host's liteserver. The agent starts `node2` automatically and reuses its local state on later starts.
+On first start, `join` downloads only `global.config.json`. The file contains the network identity, zerostate hashes, DHT entry points, and public liteserver data. The workflow then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. `validator-engine` obtains blockchain state through the TON network, just as a regular node does. After the local liteserver starts, local CLI and election operations use `127.0.0.1`; they no longer depend on the first host's liteserver. Localton gives the node a stable `node-<observer-id>` name unless `--node` sets one explicitly, and reuses its local state on later starts.
 
-`--join` can point to the launcher's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
+`GLOBAL_CONFIG_URL` can point to the bootstrap instance's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
 
 Add `--validator` to make the remote node enter elections:
 
 ```bash
-localton agent \
+localton join http://10.0.0.1:18000/config \
   --validator \
   --state-dir .localton-node2 \
-  --join http://10.0.0.1:18000/config \
   --faucet http://10.0.0.1:18000/faucet \
   --advertise-ip 10.0.0.2
 ```
 
-The validator agent creates a V4R2 wallet plus permanent, temporary, and validator ADNL keys on the second host. It requests test coins for the wallet from the seed faucet, deploys the wallet, reads election state through the ordinary liteserver protocol, and sends its own stake and signed election message directly to Elector. It also recovers its own stake after the round. The seed never receives the validator wallet key, validator keys, election signature, or election task.
+The validator workflow creates a V4R2 wallet plus permanent, temporary, and validator ADNL keys on the second host. It requests test coins for the wallet from the seed faucet, deploys the wallet, reads election state through the ordinary liteserver protocol, and sends its own stake and signed election message directly to Elector. It also recovers its own stake after the round. The bootstrap instance never receives the validator wallet key, validator keys, election signature, or election task.
 
-The faucet is optional. Without `--faucet`, the agent prints its wallet address and waits for the operator to fund it. After the initial grant, validator participation uses only normal TON protocols and contracts. The HTTP API has no endpoint for registering a validator or submitting an election entry.
+The faucet is optional. Without `--faucet`, `join` prints its wallet address and waits for the operator to fund it. After the initial grant, validator participation uses only normal TON protocols and contracts. The HTTP API has no endpoint for registering a validator or submitting an election entry.
 
-New networks use two-minute validator rounds. Elections are open from 90 to 30 seconds before the next round, and agents poll every five seconds. These values are embedded in the zerostate, so changing them requires creating a new state directory on every host.
+New networks use two-minute validator rounds. Elections are open from 90 to 30 seconds before the next round, and joining instances poll every five seconds. These values are embedded in the zerostate, so changing them requires creating a new state directory on every host.
 
 Two equal-stake validators are not failure tolerant. If either validator stops, the remaining 50% cannot form the greater-than-two-thirds consensus quorum, so block production pauses until quorum returns. Use at least four equal-stake validators to keep producing blocks after one validator stops. For cold-start resilience, publish more than one DHT entry point as well; a local liteserver removes a client dependency but does not replace consensus quorum or peer discovery.
 
@@ -239,10 +237,10 @@ Inspect the follower state from the second host:
 
 ```bash
 localton node list --state-dir .localton-node2
-localton node stats --state-dir .localton-node2 node2
+localton node stats --state-dir .localton-node2 node-abc123
 ```
 
-Keep the agent process active while the follower runs. `Ctrl-C` or `SIGTERM` stops every validator-engine process owned by the agent. A process supervisor such as systemd can restart the agent with the same command and state directory.
+Keep the joining instance active while the follower runs. `Ctrl-C` or `SIGTERM` stops every validator-engine process owned by that instance. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
 
 ## Native ports
 
@@ -281,7 +279,7 @@ xtask build-ton-http-api-v2 --state-dir .localton --jobs 8
 Then start the network with API V2:
 
 ```bash
-localton run --ton-http-api
+localton bootstrap --ton-http-api
 ```
 
 Make sure that the API returns the current masterchain block:
@@ -318,34 +316,32 @@ Make sure that the persistent configuration is valid:
 localton config validate
 ```
 
-The launcher creates only the genesis validator. Join every additional full node
-or validator through the agent command so nodes on the same host and remote hosts
+The bootstrap workflow creates only the genesis validator. Join every additional full node
+or validator through the `join` command so nodes on the same host and remote hosts
 follow the same initialization and synchronization path:
 
 ```bash
-localton agent \
+localton join http://127.0.0.1:18000/config \
   --state-dir .localton-validator-a \
-  --join http://127.0.0.1:18000/config \
   --advertise-ip 127.0.0.1 \
   --node validator-a \
   --validator
 ```
 
-On its first run, an agent reserves one contiguous range containing its
+On its first run, a joining instance reserves one contiguous range containing its
 observability port and five ports per node. It starts at port `19000` and advances
 one port at a time until the complete range is available. Use `--port-base` to
 choose the first candidate:
 
 ```bash
-localton agent \
+localton join http://127.0.0.1:18000/config \
   --state-dir .localton-validator-b \
-  --join http://127.0.0.1:18000/config \
   --advertise-ip 127.0.0.1 \
   --port-base 20000 \
   --validator
 ```
 
-The allocation is saved in the agent's `settings.json`. Restarts reuse those exact
+The allocation is saved in the joining instance's `settings.json`. Restarts reuse those exact
 ports and never move a node because another process temporarily occupies one.
 
 ## Import accounts into the zerostate
@@ -355,13 +351,13 @@ ports and never move a node because another process temporarily occupies one.
 Repeat the option to add more accounts:
 
 ```bash
-localton run \
+localton bootstrap \
   --state-dir .localton-imported \
   --add-account <SHARD_ACCOUNT_HEX> \
   --add-account <ANOTHER_SHARD_ACCOUNT_HEX>
 ```
 
-The launcher reads the address, TON balance, code, data, and private libraries from each `ShardAccount`.
+The bootstrap workflow reads the address, TON balance, code, data, and private libraries from each `ShardAccount`.
 
 The import accepts only active accounts from workchain `0`. It rejects duplicate addresses and unsupported account features.
 
@@ -372,7 +368,7 @@ Unsupported features include these items:
 - Anycast addresses and split depth.
 - Public basechain libraries.
 
-The launcher resets historical transaction fields and storage statistics for the new chain. A `ShardAccount` does not include external global libraries.
+The bootstrap workflow resets historical transaction fields and storage statistics for the new chain. A `ShardAccount` does not include external global libraries.
 
 The option applies only to a new state directory. Use a new state directory to change the zerostate account set.
 
@@ -453,20 +449,19 @@ The request returns after API V2 finds the transfer transaction. Therefore, the 
 
 ## Nodes and validators
 
-List or inspect nodes owned by one launcher or agent state directory:
+List or inspect nodes owned by one Localton state directory:
 
 ```bash
 localton node list
 localton node stats node-abc123 --state-dir .localton-validator-a
 ```
 
-Create every additional full node through an agent. Add `--validator` when the
+Create every additional full node through `join`. Add `--validator` when the
 node must participate in elections:
 
 ```bash
-localton agent \
+localton join http://127.0.0.1:18000/config \
   --state-dir .localton-validator-a \
-  --join http://127.0.0.1:18000/config \
   --advertise-ip 127.0.0.1 \
   --validator
 ```
@@ -500,7 +495,7 @@ localton validator participate-all
 localton validator reap-all
 ```
 
-Validators with election participation enabled automatically create election keys and submit stakes. The launcher and agent reload this mode from `settings.json` on every poll, so mode changes do not require a restart. They also recover available stakes and rewards.
+Validators with election participation enabled automatically create election keys and submit stakes. Every Localton instance reloads this mode from `settings.json` on every poll, so mode changes do not require a restart. They also recover available stakes and rewards.
 
 ## Hardfork configuration
 
@@ -523,7 +518,7 @@ The command prints the output path and the block identifier that anchors the for
 
 ## HTTP services
 
-The native launcher starts the configuration API and administrative API by default. Both services bind to `127.0.0.1` by default.
+The bootstrap instance starts the configuration API and administrative API by default. Both services bind to `127.0.0.1` by default.
 
 The configuration API on port `18000` provides these routes:
 
@@ -546,8 +541,8 @@ The administrative API on port `18001` provides these routes:
 Disable either service for one run:
 
 ```bash
-localton run --no-config-http
-localton run --no-admin-http
+localton bootstrap --no-config-http
+localton bootstrap --no-admin-http
 ```
 
 The API V2 proxy preserves methods, paths, queries, bodies, statuses, and end-to-end headers. It also adds browser CORS and PNA headers.
@@ -570,7 +565,7 @@ The important state files are:
 | `logs/` | Standard output and error logs for managed processes. |
 | `tools/` | Native API V2 source and build artifacts. |
 
-The launcher locks the state directory while it runs. A second launcher cannot use the same state directory at the same time.
+Each Localton instance locks its state directory while it runs. A second instance cannot use the same state directory at the same time.
 
 All long-lived child processes belong to one process registry. Normal exit, signals, startup errors, and child failures use the same cleanup path.
 
@@ -595,7 +590,7 @@ docker build -t localton:dev .
 LOCALTON_IMAGE=localton:dev docker compose up -d
 ```
 
-For launcher development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
+For Localton development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
 
 ```bash
 just build-localton-dev-image

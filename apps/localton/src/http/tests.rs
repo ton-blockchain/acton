@@ -212,7 +212,7 @@ fn openapi_documents_config_and_admin_routes() {
         validator keys locally and submits election messages to Elector itself
 
         ADMIN /v1/status
-        summary: Get the current launcher and network state
+        summary: Get the current instance and network state
         description: The response shows readiness, the latest masterchain block, node states, and service states
 
         ADMIN /acton_fundAccount

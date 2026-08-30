@@ -12,7 +12,7 @@ COPY packages ./packages
 RUN bun ci \
     && bun --filter @acton/localton-ui build
 
-FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
+FROM rust:${RUST_VERSION}-bookworm AS localton-builder
 WORKDIR /src/apps/localton
 
 COPY apps/localton/Cargo.toml apps/localton/Cargo.lock ./
@@ -34,10 +34,10 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
     && install -Dm755 target/release/xtask /out/xtask
 
 # Development target: reuse the native TON and indexer layers from the published
-# image and replace only the localton launcher built from this checkout.
+# image and replace only the localton binary built from this checkout.
 FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
 USER root
-COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
+COPY --from=localton-builder --chmod=0755 /out/localton /usr/local/bin/localton
 COPY --chmod=0755 apps/localton/docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
 RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
@@ -191,8 +191,8 @@ ENV CCACHE_COMPRESS=true
 ENV CCACHE_MAXSIZE=4G
 ENV USERVER_FEATURE_STACK_USAGE_MONITOR=0
 
-COPY --from=launcher-builder /out/localton /usr/local/bin/localton
-COPY --from=launcher-builder /out/xtask /usr/local/bin/xtask
+COPY --from=localton-builder /out/localton /usr/local/bin/localton
+COPY --from=localton-builder /out/xtask /usr/local/bin/xtask
 
 RUN --mount=type=cache,id=ton-http-api-v2-ccache,target=/tmp/http-api-build/tools/ton-http-api-v2/ccache \
     xtask build-ton-http-api-v2 \
@@ -369,7 +369,7 @@ RUN apt-get update \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan \
     && install -d -m 0755 /usr/share/doc/localton
 
-COPY --from=launcher-builder /out/localton /usr/local/bin/localton
+COPY --from=localton-builder /out/localton /usr/local/bin/localton
 COPY --from=ton-binaries /opt/ton /opt/ton
 COPY --from=http-api-builder /opt/ton-http-api-v2 /opt/ton-http-api-v2
 COPY --from=ton-indexer-builder \
@@ -414,4 +414,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=240s --retries=12 \
         http://127.0.0.1:18002/api/v2/getMasterchainInfo >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/localton-container-entrypoint"]
-CMD ["run", "--state-dir", "/var/lib/localton", "--ton-http-api"]
+CMD ["bootstrap", "--state-dir", "/var/lib/localton", "--ton-http-api"]

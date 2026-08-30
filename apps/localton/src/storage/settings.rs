@@ -50,11 +50,11 @@ impl Default for Settings {
 impl Settings {
     /// Creates settings for a joining host before its first node is allocated.
     ///
-    /// Agent state does not own genesis or launcher HTTP services. Keeping those
+    /// Join state does not own genesis or bootstrap HTTP services. Keeping those
     /// synthetic entries out of the file prevents commands from accidentally
     /// treating a remote genesis validator as a host-local process.
     #[must_use]
-    pub fn for_agent() -> Self {
+    pub fn for_join() -> Self {
         let mut settings = Self::default();
         settings.nodes.clear();
         settings.services.config_http.enabled = false;
@@ -381,7 +381,7 @@ pub struct NodeSettings {
 
 /// Ports assigned together to one validator-engine process.
 ///
-/// The agent allocator deals in this complete type so initialization cannot
+/// The host allocator deals in this complete type so initialization cannot
 /// accidentally mix ports from different candidate ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodePorts {
@@ -399,7 +399,7 @@ impl Default for NodeSettings {
 }
 
 impl NodeSettings {
-    /// Creates the one validator owned by the network launcher.
+    /// Creates the genesis validator owned by the bootstrap workflow.
     #[must_use]
     pub fn genesis() -> Self {
         Self {
@@ -426,7 +426,7 @@ impl NodeSettings {
         }
     }
 
-    /// Creates an agent-owned follower with one already allocated port set.
+    /// Creates a joined follower with one already allocated port set.
     #[must_use]
     pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
         Self {
@@ -771,7 +771,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn launcher_defaults_contain_only_genesis() {
+    fn bootstrap_defaults_contain_only_genesis() {
         let settings = Settings::default();
         settings.validate().unwrap();
         assert_eq!(settings.network.global_id, -3);

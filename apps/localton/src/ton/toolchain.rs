@@ -82,7 +82,7 @@ impl Toolchain {
 
     /// Resolves the pinned distribution and returns its semantic dependency bundle
     ///
-    /// CLI operations use this entry point when no launcher-owned bundle already
+    /// CLI operations use this entry point when no workflow-owned bundle already
     /// exists. Explicit release overrides are persisted exactly as before
     pub async fn resolve(state_dir: &Path, override_dir: Option<PathBuf>) -> Result<Self> {
         let root = absolute_path(state_dir)?;

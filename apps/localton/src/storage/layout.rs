@@ -57,7 +57,7 @@ impl Layout {
             wallets: root.join("wallets"),
             observability: root.join("observability"),
             nodes: root.join("nodes"),
-            lock: root.join("launcher.lock"),
+            lock: root.join("instance.lock"),
             logs: root.join("logs"),
             validator_db,
             resources,
@@ -179,7 +179,7 @@ impl Manifest {
         }
         if manifest.ton_release != TON_RELEASE {
             bail!(
-                "state was created with TON {}, launcher expects {}; use another --state-dir",
+                "state was created with TON {}, instance expects {}; use another --state-dir",
                 manifest.ton_release,
                 TON_RELEASE
             );

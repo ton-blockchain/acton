@@ -187,7 +187,7 @@ impl AdnlEndpoint {
 
     /// Proves that a new TON process can bind this host-local UDP endpoint.
     ///
-    /// Abrupt launcher termination can leave `validator-engine` alive after the
+    /// Abrupt instance termination can leave `validator-engine` alive after the
     /// state-directory lock is released. Detecting the occupied ADNL socket before
     /// spawn avoids an opaque console timeout and identifies the usual stale-child
     /// failure directly. The socket is released immediately; the official process

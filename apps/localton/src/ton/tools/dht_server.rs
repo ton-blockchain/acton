@@ -37,7 +37,7 @@ pub struct DhtInitializeRequest {
     pub log_path: PathBuf,
     /// IPv4/UDP endpoint assigned to the DHT ADNL identity.
     pub endpoint: AdnlEndpoint,
-    /// Launcher-selected outbound UDP port stored in binary-owned config.
+    /// Instance-selected outbound UDP port stored in binary-owned config.
     pub out_port: u16,
     /// Worker thread count passed to the pinned `dht-server` release.
     pub threads: usize,

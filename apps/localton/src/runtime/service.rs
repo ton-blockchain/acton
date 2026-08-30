@@ -2,7 +2,7 @@
 //!
 //! TON tool adapters may start an operating-system process today and an
 //! in-process or controlled test implementation tomorrow. This module keeps the
-//! launcher supervisor independent from that choice while retaining the small
+//! Localton supervisor independent from that choice while retaining the small
 //! set of lifecycle operations it actually needs.
 
 use std::{fmt, process::ExitStatus};
@@ -12,7 +12,7 @@ use async_trait::async_trait;
 
 /// Stable description of a service that has finished running.
 ///
-/// The launcher must be able to report exits from both operating-system
+/// The instance must be able to report exits from both operating-system
 /// processes and non-process implementations. Keeping the rendered description
 /// preserves useful platform-specific diagnostics, while `success` and `code`
 /// provide structured fields for status APIs and tests. Implementations must not
@@ -74,7 +74,7 @@ impl fmt::Display for ServiceExit {
 /// inspection with shutdown and matches process APIs such as `try_wait`.
 #[async_trait]
 pub trait ManagedService: Send {
-    /// Returns the stable launcher name used for uniqueness and diagnostics.
+    /// Returns the stable service name used for uniqueness and diagnostics.
     fn name(&self) -> &str;
 
     /// Returns an operating-system PID when this implementation has one.
@@ -92,7 +92,7 @@ pub trait ManagedService: Send {
 
     /// Requests graceful shutdown and completes any required forced cleanup.
     ///
-    /// Implementations must make this operation safe during launcher teardown.
+    /// Implementations must make this operation safe during instance teardown.
     /// In particular, subprocess implementations are responsible for descendants
     /// and must not leave orphan process groups behind when graceful stop fails.
     async fn stop(&mut self) -> Result<()>;
@@ -117,7 +117,7 @@ impl ServiceHandle {
         }
     }
 
-    /// Returns the stable launcher name delegated to the underlying service.
+    /// Returns the stable service name delegated to the underlying service.
     pub fn name(&self) -> &str {
         self.service.name()
     }

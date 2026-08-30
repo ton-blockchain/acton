@@ -1,4 +1,4 @@
-//! Starts and stops the launcher's HTTP services.
+//! Starts and stops the instance's HTTP services.
 //!
 //! [`start`] creates the config, admin, and public V2 listeners enabled in
 //! [`Settings`]. [`ServiceSet`] stores their task handles, published endpoints,
@@ -15,7 +15,7 @@ use tokio::{sync::watch, task::JoinHandle};
 use tracing::warn;
 
 use crate::{
-    bootstrap::LauncherControl,
+    bootstrap::NodeController,
     storage::{Layout, Settings},
 };
 
@@ -58,7 +58,7 @@ impl ServiceSet {
 
 impl Drop for ServiceSet {
     fn drop(&mut self) {
-        // Startup futures are cancellation-safe: if Ctrl+C wins while an agent is
+        // Startup futures are cancellation-safe: if Ctrl+C wins while a joining instance is
         // still synchronizing, no detached HTTP or observation task survives the
         // cleanup boundary.
         let _ = self.shutdown.send(true);
@@ -69,7 +69,7 @@ impl Drop for ServiceSet {
 }
 
 pub async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: &Settings,
     ton_http_api_bind: Ipv4Addr,
 ) -> Result<ServiceSet> {

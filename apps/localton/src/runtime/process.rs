@@ -120,7 +120,7 @@ impl ManagedProcess {
         })
     }
 
-    /// Returns the stable launcher name used in the process registry and logs.
+    /// Returns the stable service name used in the process registry and logs.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -162,7 +162,7 @@ impl ManagedProcess {
     ///
     /// The direct child receives up to five seconds for graceful termination.
     /// Descendants are cleaned up even after the leader exits, preventing helper
-    /// processes from surviving launcher shutdown. Cleanup is best-effort after
+    /// processes from surviving instance shutdown. Cleanup is best-effort after
     /// SIGKILL so teardown is not permanently blocked by an uninterruptible child.
     pub async fn stop(&mut self) -> Result<()> {
         let stop_started = Instant::now();

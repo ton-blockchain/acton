@@ -3,7 +3,7 @@
 //! The block monitor records the latest masterchain seqno and observation time
 //! in `runtime.json`. Validator maintenance periodically participates in
 //! elections and reclaims stakes according to validation settings. All tasks
-//! share one shutdown channel and are aborted when the launcher stops.
+//! share one shutdown channel and are aborted when the instance stops.
 
 use std::time::Duration;
 

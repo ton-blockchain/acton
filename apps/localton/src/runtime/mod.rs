@@ -1,4 +1,4 @@
-//! Process and background-task runtime used by the launcher.
+//! Process and background-task runtime used by the instance.
 //!
 //! This module provides execution of bounded one-shot commands, lifecycle
 //! management for long-running child process groups, a shared process registry,

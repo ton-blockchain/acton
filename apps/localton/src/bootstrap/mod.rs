@@ -21,13 +21,13 @@ mod readiness;
 mod validator;
 mod zerostate;
 
-pub use control::LauncherControl;
+pub use control::NodeController;
 pub use pipeline::{run, status};
 pub(crate) use readiness::{shutdown_signal, supervise};
 
-/// Locks a state directory for the lifetime of one launcher process.
+/// Locks a state directory for the lifetime of one Localton instance.
 ///
-/// Two launchers sharing databases and fixed ports would corrupt runtime state
+/// Two instances sharing databases and fixed ports would corrupt runtime state
 /// and compete for the same sockets. The returned open file owns the advisory
 /// lock; dropping it releases the directory for the next invocation.
 pub(crate) fn acquire_lock(path: &Path) -> Result<File> {

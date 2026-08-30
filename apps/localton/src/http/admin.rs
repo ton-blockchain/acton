@@ -17,7 +17,7 @@ use tracing::info;
 use utoipa::OpenApi;
 
 use crate::{
-    bootstrap::LauncherControl,
+    bootstrap::NodeController,
     operations::wallets,
     runtime::ProcessInfo,
     storage::{RuntimeState, Settings},
@@ -58,7 +58,7 @@ struct ApiDoc;
 
 #[derive(Clone)]
 struct AdminState {
-    control: LauncherControl,
+    control: NodeController,
     faucet: faucet::State,
 }
 
@@ -69,7 +69,7 @@ impl FromRef<AdminState> for faucet::State {
 }
 
 pub(super) async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: &Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -119,7 +119,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     ApiDoc::openapi()
 }
 
-/// Get the current launcher and network state
+/// Get the current instance and network state
 ///
 /// The response shows readiness, the latest masterchain block, node states, and service states
 #[utoipa::path(
@@ -127,7 +127,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     path = "/v1/status",
     tag = "administration",
     responses(
-        (status = 200, description = "Current launcher and network state", body = RuntimeState),
+        (status = 200, description = "Current instance and network state", body = RuntimeState),
         (status = 400, description = "Runtime state could not be read", body = ErrorResponse)
     )
 )]
@@ -175,7 +175,7 @@ async fn wallets_handler(
     Ok(Json(wallets::load_public(state.control.layout())?))
 }
 
-/// List the child processes that the launcher supervises
+/// List the child processes that the instance supervises
 ///
 /// Each item contains a stable process name and the current process ID
 #[utoipa::path(

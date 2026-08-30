@@ -393,7 +393,7 @@ async fn chain_collection_loop(
 
 /// Publishes host-local process state without waiting for any liteserver query.
 ///
-/// Agents call this before starting gossip so peers can see nodes that are still
+/// Joining instances call this before starting gossip so peers can see nodes that are still
 /// bootstrapping. Later publications enrich the same report with chain heads,
 /// validator membership, and production data as those queries become available.
 async fn publish_runtime_observation(
@@ -459,7 +459,7 @@ async fn publish_runtime_observation(
     let payload = ObservationPayload {
         endpoint: publication.endpoint.to_owned(),
         software: format!("localton/{}", env!("CARGO_PKG_VERSION")),
-        launcher_started_at: runtime.started_at,
+        instance_started_at: runtime.started_at,
         nodes,
         chain: chain.observation.clone(),
     };

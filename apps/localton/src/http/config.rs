@@ -1,10 +1,10 @@
-//! Serves network discovery, global config, and launcher health endpoints.
+//! Serves network discovery, global config, and instance health endpoints.
 //!
 //! `/` returns the current readiness state and URLs of enabled services.
 //! `/openapi.json` returns a generated OpenAPI description of this service.
 //! `/localhost.global.config.json` and `/config` return the generated TON global
 //! config. `/faucet` gives a new node an on-chain development balance. `/live`
-//! and `/healthz` report launcher readiness.
+//! and `/healthz` report instance readiness.
 
 use std::sync::Arc;
 
@@ -22,7 +22,7 @@ use tracing::info;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    bootstrap::LauncherControl,
+    bootstrap::NodeController,
     operations::wallets,
     storage::{RuntimeState, Settings},
     ton::global_config::GlobalConfig,
@@ -65,7 +65,7 @@ pub(super) struct ConfigDocument {
     pub service: String,
     /// `true` when the local network can process requests
     pub ready: bool,
-    /// Latest masterchain block number that the launcher observed
+    /// Latest masterchain block number that the instance observed
     pub masterchain_seqno: Option<u32>,
     /// URLs of the services that Localton enabled
     pub endpoints: ConfigEndpoints,
@@ -113,13 +113,13 @@ struct DevelopmentFaucetResponse {
 
 #[derive(Clone)]
 struct ConfigState {
-    control: LauncherControl,
+    control: NodeController,
     settings: Settings,
     faucet_lock: Arc<Mutex<()>>,
 }
 
 pub(super) async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -325,14 +325,14 @@ async fn development_faucet_handler(
 
 /// Get the network readiness state
 ///
-/// The endpoint returns `200` only when the launcher and the network are ready
+/// The endpoint returns `200` only when the instance and the network are ready
 #[utoipa::path(
     get,
     path = "/live",
     tag = "configuration",
     responses(
-        (status = 200, description = "Launcher and network are ready", body = String),
-        (status = 503, description = "Launcher is still starting", body = String),
+        (status = 200, description = "Instance and network are ready", body = String),
+        (status = 503, description = "Instance is still starting", body = String),
         (status = 500, description = "Runtime state could not be read", body = String)
     )
 )]
@@ -348,8 +348,8 @@ async fn live_handler(State(state): State<ConfigState>) -> Response {
     path = "/healthz",
     tag = "configuration",
     responses(
-        (status = 200, description = "Launcher and network are ready", body = String),
-        (status = 503, description = "Launcher is still starting", body = String),
+        (status = 200, description = "Instance and network are ready", body = String),
+        (status = 503, description = "Instance is still starting", body = String),
         (status = 500, description = "Runtime state could not be read", body = String)
     )
 )]
@@ -359,7 +359,7 @@ async fn healthz_handler(State(state): State<ConfigState>) -> Response {
 
 async fn live_response(state: &ConfigState) -> Response {
     match RuntimeState::load(&state.control.layout().runtime) {
-        Ok(runtime) if runtime.ready && runtime.launcher_pid.is_some() => {
+        Ok(runtime) if runtime.ready && runtime.instance_pid.is_some() => {
             (StatusCode::OK, "OK").into_response()
         }
         Ok(_) => (StatusCode::SERVICE_UNAVAILABLE, "STARTING").into_response(),

@@ -1,8 +1,8 @@
-mod agent;
 mod binaries;
 mod bootstrap;
 mod cli;
 mod http;
+mod join;
 mod observability;
 mod operations;
 mod runtime;
@@ -26,17 +26,16 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Some(Command::Agent(args)) => agent::run(args).await,
-        Some(Command::Run(args)) => bootstrap::run(args).await,
-        Some(Command::Status(args)) => bootstrap::status(args).await,
-        Some(Command::Config { command }) => cli::commands::config(command).await,
-        Some(Command::Lite { command }) => cli::commands::lite(command).await,
-        Some(Command::Wallet { command }) => operations::wallets::execute(command).await,
-        Some(Command::Indexer { command }) => operations::indexer::execute(command).await,
-        Some(Command::Node { command }) => operations::nodes::execute(command).await,
-        Some(Command::Snapshot { command }) => operations::snapshots::execute(command),
-        Some(Command::Validator { command }) => operations::validators::execute(command).await,
-        Some(Command::Hardfork(args)) => operations::hardfork::execute(args).await,
-        None => bootstrap::run(cli.run).await,
+        Command::Bootstrap(args) => bootstrap::run(args).await,
+        Command::Join(args) => join::run(args).await,
+        Command::Status(args) => bootstrap::status(args).await,
+        Command::Config { command } => cli::commands::config(command).await,
+        Command::Lite { command } => cli::commands::lite(command).await,
+        Command::Wallet { command } => operations::wallets::execute(command).await,
+        Command::Indexer { command } => operations::indexer::execute(command).await,
+        Command::Node { command } => operations::nodes::execute(command).await,
+        Command::Snapshot { command } => operations::snapshots::execute(command),
+        Command::Validator { command } => operations::validators::execute(command).await,
+        Command::Hardfork(args) => operations::hardfork::execute(args).await,
     }
 }

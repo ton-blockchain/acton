@@ -1,4 +1,4 @@
-//! Command-line interface and dispatch helpers for the launcher executable.
+//! Command-line interface and dispatch helpers for the Localton executable.
 //!
 //! This module defines the Clap command tree and keeps command handlers in the
 //! adjacent [`commands`] module. Blockchain operations themselves live in their
@@ -14,23 +14,21 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[command(
     name = "localton",
     version,
-    about = "Run and operate a complete headless local TON development network"
+    about = "Bootstrap, join, and operate a complete headless local TON development network",
+    subcommand_required = true,
+    arg_required_else_help = true
 )]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Option<Command>,
-
-    /// Options for the default `run` command.
-    #[command(flatten)]
-    pub run: RunArgs,
+    pub command: Command,
 }
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
-    /// Join and supervise full nodes on this host.
-    Agent(AgentArgs),
-    /// Start genesis and the enabled network services.
-    Run(RunArgs),
+    /// Create or resume a network and run its genesis node
+    Bootstrap(BootstrapArgs),
+    /// Join and supervise independent full nodes on this host
+    Join(JoinArgs),
     /// Inspect persisted and live network status.
     Status(StatusArgs),
     /// Read or update persistent network configuration.
@@ -80,29 +78,29 @@ pub struct StateArgs {
 }
 
 #[derive(Debug, Clone, Args)]
-pub struct AgentArgs {
+pub struct JoinArgs {
     #[command(flatten)]
     pub state: StateArgs,
 
-    /// Full-node aliases owned by this agent
+    /// Full-node aliases owned by this Localton instance
     ///
-    /// When omitted, the first run creates a stable alias from the agent identity
+    /// When omitted, the first join creates a stable alias from the instance identity
     #[arg(long = "node")]
     pub nodes: Vec<String>,
 
-    /// URL of a standard TON global configuration used to join the network.
-    #[arg(long, env = "LOCALTON_AGENT_JOIN")]
-    pub join: String,
+    /// URL of a standard TON global configuration used to join the network
+    #[arg(value_name = "GLOBAL_CONFIG_URL", env = "LOCALTON_JOIN_CONFIG_URL")]
+    pub global_config_url: String,
 
     /// Optional development faucet URL used to fund a validator wallet.
-    #[arg(long, env = "LOCALTON_AGENT_FAUCET")]
+    #[arg(long, env = "LOCALTON_JOIN_FAUCET")]
     pub faucet: Option<String>,
 
     /// IPv4 address advertised by full nodes on this host.
-    #[arg(long, env = "LOCALTON_AGENT_ADVERTISE_IP")]
+    #[arg(long, env = "LOCALTON_JOIN_ADVERTISE_IP")]
     pub advertise_ip: Ipv4Addr,
 
-    /// Enable validator mode when initializing a new agent node.
+    /// Enable validator mode when initializing a joining node.
     ///
     /// Later starts reuse the persisted mode. Use `validator enable` or
     /// `validator disable` to change participation in future elections.
@@ -117,11 +115,11 @@ pub struct AgentArgs {
     )]
     pub observability_bind: Ipv4Addr,
 
-    /// First port considered for this agent's contiguous persistent allocation
+    /// First port considered for this instance's contiguous persistent allocation
     ///
     /// Defaults to 19000 and is used only when the state directory has no
     /// initialized nodes. Restarts always reuse the ports saved in settings.json
-    #[arg(long, env = "LOCALTON_AGENT_PORT_BASE")]
+    #[arg(long, env = "LOCALTON_JOIN_PORT_BASE")]
     pub port_base: Option<u16>,
 
     /// Do not publish signed observations or serve the observability UI
@@ -177,7 +175,7 @@ pub enum SnapshotCommand {
 }
 
 #[derive(Debug, Clone, Args)]
-pub struct RunArgs {
+pub struct BootstrapArgs {
     /// Persistent network state. It is created on the first run and reused.
     #[arg(long, default_value = ".localton")]
     pub state_dir: PathBuf,
@@ -254,7 +252,7 @@ pub struct RunArgs {
     pub no_observability: bool,
 }
 
-impl Default for RunArgs {
+impl Default for BootstrapArgs {
     fn default() -> Self {
         Self {
             state_dir: PathBuf::from(".localton"),
@@ -543,14 +541,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn block_time_accepts_human_readable_durations_for_both_run_forms() {
-        let default_run = Cli::try_parse_from(["localton", "--block-time", "750ms"]).unwrap();
-        assert_eq!(default_run.run.block_time, Some(Duration::from_millis(750)));
-
-        let explicit_run = Cli::try_parse_from(["localton", "run", "--block-time", "1s"]).unwrap();
-        let Some(Command::Run(args)) = explicit_run.command else {
-            panic!("expected explicit run command");
+    fn bootstrap_accepts_human_readable_block_time() {
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750ms"])
+            .unwrap();
+        let Command::Bootstrap(args) = cli.command else {
+            panic!("expected bootstrap command");
         };
-        assert_eq!(args.block_time, Some(Duration::from_secs(1)));
+        assert_eq!(args.block_time, Some(Duration::from_millis(750)));
+    }
+
+    #[test]
+    fn join_uses_a_positional_global_config_url() {
+        let cli = Cli::try_parse_from([
+            "localton",
+            "join",
+            "http://192.168.27.4:18000/config",
+            "--advertise-ip",
+            "192.168.27.8",
+        ])
+        .unwrap();
+        let Command::Join(args) = cli.command else {
+            panic!("expected join command");
+        };
+        assert_eq!(
+            args.global_config_url,
+            "http://192.168.27.4:18000/config"
+        );
+    }
+
+    #[test]
+    fn lifecycle_command_is_explicit_without_legacy_aliases() {
+        assert_eq!(
+            Cli::try_parse_from(["localton"]).unwrap_err().kind(),
+            clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+        );
+
+        for legacy_command in ["run", "agent"] {
+            assert_eq!(
+                Cli::try_parse_from(["localton", legacy_command])
+                    .unwrap_err()
+                    .kind(),
+                clap::error::ErrorKind::InvalidSubcommand
+            );
+        }
     }
 }

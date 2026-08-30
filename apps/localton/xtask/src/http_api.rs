@@ -76,7 +76,7 @@ pub async fn build(state_dir: &Path, jobs: usize) -> Result<()> {
     println!("binary: {}", paths.executable.display());
     println!("config: {}", paths.static_config.display());
     println!(
-        "run: localton run --state-dir {} --ton-http-api",
+        "run: localton bootstrap --state-dir {} --ton-http-api",
         state_dir.display()
     );
     Ok(())

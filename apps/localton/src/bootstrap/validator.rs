@@ -252,7 +252,7 @@ pub(super) async fn configure_full_node_identity(
 /// Starts one initialized node with its persisted synchronization and retention
 /// policy.
 ///
-/// Success means only that the service was spawned. The launcher remains
+/// Success means only that the service was spawned. The bootstrap workflow remains
 /// responsible for registry ownership, console readiness, synchronization, and
 /// shutdown.
 pub(super) async fn start_persistent(

@@ -1,6 +1,6 @@
 //! Readiness checks and termination signals for a running local network.
 //!
-//! Process creation alone does not mean that TON is usable. The launcher polls
+//! Process creation alone does not mean that TON is usable. The instance polls
 //! the liteserver until the requested level of chain readiness is observed while
 //! also checking that every managed process remains alive. After startup, the
 //! same registry is supervised until Ctrl-C, SIGTERM, or a child failure occurs.
@@ -28,7 +28,7 @@ const READINESS_POLL_INTERVAL: Duration = Duration::from_secs(1);
 #[cfg(test)]
 const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(1);
 
-/// Selects how much chain evidence a launcher invocation must collect.
+/// Selects how much chain evidence an instance invocation must collect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MasterchainReadiness {
     /// A persisted network only needs to restore its trusted liteserver head.
@@ -124,7 +124,7 @@ pub(super) async fn lite_client_seqno(
     Ok(info.last.seqno)
 }
 
-/// Keeps the launcher alive until one required child process exits.
+/// Keeps the instance alive until one required child process exits.
 ///
 /// The registry reports the process name and exit status as an error; the outer
 /// pipeline then performs coordinated shutdown instead of leaving a partially

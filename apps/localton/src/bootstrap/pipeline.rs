@@ -13,7 +13,7 @@ use tracing::info;
 
 use crate::{
     binaries::TonBinaries,
-    cli::{RunArgs, StatusArgs},
+    cli::{BootstrapArgs, StatusArgs},
     http,
     runtime::{self, ProcessRegistry},
     storage::Settings,
@@ -27,14 +27,14 @@ use crate::{
     },
 };
 
-use super::{LauncherControl, acquire_lock, files::absolute_path, genesis, nodes, readiness};
+use super::{NodeController, acquire_lock, files::absolute_path, genesis, nodes, readiness};
 
-/// Owns the complete lifecycle of one launcher invocation.
+/// Owns the complete lifecycle of one bootstrap invocation.
 ///
 /// No persistent process starts until disk state is complete. Once DHT and the
 /// genesis validator exist, the local async block captures every remaining exit
 /// path so child shutdown and runtime-state cleanup always run afterward.
-pub async fn run(args: RunArgs) -> Result<()> {
+pub async fn run(args: BootstrapArgs) -> Result<()> {
     let state_root = absolute_path(&args.state_dir)?;
     let layout = Layout::new(state_root);
     layout.create_dirs()?;
@@ -71,7 +71,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
     // Publish ownership before starting child processes. `ready` remains false
     // until the chain and every requested listener have passed readiness checks.
     let mut runtime = RuntimeState::load(&layout.runtime)?;
-    runtime.mark_launcher_started();
+    runtime.mark_instance_started();
     runtime.save_atomic(&layout.runtime)?;
 
     let processes = ProcessRegistry::default();
@@ -113,7 +113,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
         .await?;
 
         let control =
-            LauncherControl::new(layout.clone(), tools.clone(), timeout, processes.clone());
+            NodeController::new(layout.clone(), tools.clone(), timeout, processes.clone());
         let services = http::start(control, &settings, args.ton_http_api_bind).await?;
 
         if let Err(error) = mark_network_ready(&layout, &mut runtime, &services, masterchain_seqno)
@@ -142,7 +142,7 @@ pub async fn run(args: RunArgs) -> Result<()> {
     .await;
 
     let stop_result = processes.stop_all().await;
-    let state_result = mark_launcher_stopped(&layout);
+    let state_result = mark_instance_stopped(&layout);
 
     result.and(stop_result).and(state_result)
 }
@@ -152,15 +152,15 @@ pub async fn run(args: RunArgs) -> Result<()> {
 /// Network parameters and enabled services are persisted. Bind and executable
 /// overrides are applied after that save because they are operational choices
 /// for this run, not properties of the blockchain itself.
-fn prepare_settings(layout: &Layout, args: &RunArgs) -> Result<Settings> {
+fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     let mut settings = Settings::load_or_create(&layout.settings)?;
     let genesis = settings
         .nodes
         .first()
-        .context("launcher settings contain no genesis node")?;
+        .context("bootstrap settings contain no genesis node")?;
     ensure!(
         genesis.name == "genesis" && genesis.enabled && genesis.validator,
-        "launcher settings must start with an enabled genesis validator"
+        "bootstrap settings must start with an enabled genesis validator"
     );
 
     if let Some(block_time) = args.block_time {
@@ -203,7 +203,7 @@ fn prepare_settings(layout: &Layout, args: &RunArgs) -> Result<Settings> {
     settings.validate()?;
     settings.save_atomic(&layout.settings)?;
 
-    // These CLI values affect only this launcher run and are not persisted.
+    // These CLI values affect only this bootstrap invocation and are not persisted.
     if let Some(bind) = args.config_http_bind {
         settings.services.config_http.bind = bind;
         settings.validate()?;
@@ -291,10 +291,10 @@ async fn record_core_processes(
     }
 }
 
-/// Atomically clears launcher and child readiness after every exit path.
-fn mark_launcher_stopped(layout: &Layout) -> Result<()> {
+/// Atomically clears instance and child readiness after every exit path.
+fn mark_instance_stopped(layout: &Layout) -> Result<()> {
     RuntimeState::update_atomic(&layout.runtime, |runtime| {
-        runtime.mark_launcher_stopped();
+        runtime.mark_instance_stopped();
         Ok(())
     })?;
     Ok(())

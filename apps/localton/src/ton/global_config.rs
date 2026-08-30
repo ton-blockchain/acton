@@ -1,4 +1,4 @@
-//! Typed TON global configuration used by launchers, agents, and HTTP discovery.
+//! Typed TON global configuration used by bootstrap, join, and HTTP discovery.
 //!
 //! This module owns the JSON protocol shape instead of letting workflows assemble
 //! arbitrary `serde_json::Value` trees. Constructor names, byte lengths, and required
@@ -95,7 +95,7 @@ impl GlobalConfig {
         serde_json::from_slice(bytes).context("global config does not match the TON JSON schema")
     }
 
-    /// Checks the discovery data required before an agent starts validator-engine.
+    /// Checks the discovery data required before a joining node starts validator-engine.
     pub(crate) fn validate_for_node_join(&self) -> Result<()> {
         ensure!(
             !self.dht.static_nodes.nodes.is_empty(),

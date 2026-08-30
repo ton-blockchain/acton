@@ -2,7 +2,7 @@
 //!
 //! The genesis node starts together with DHT because it is required for the
 //! network to produce its first blocks. Followers are initialized through the
-//! agent path so local and remote nodes join the network in exactly the same way.
+//! join workflow so local and remote nodes enter the network in exactly the same way.
 
 use std::{fs, time::Duration};
 
@@ -92,7 +92,7 @@ pub(super) async fn ensure_initialized(
     timeout: Duration,
 ) -> Result<NodeRuntime> {
     let node_layout = layout.node(node);
-    // Reuse the database and identities across launcher runs. Metadata can be
+    // Reuse the database and identities across instance runs. Metadata can be
     // reconstructed from public key files and engine config if runtime.json was
     // removed or written by an older interrupted invocation.
     if node_layout.config_json().is_file() {

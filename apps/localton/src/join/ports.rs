@@ -1,4 +1,4 @@
-//! Stable host-local port allocation for agent-owned TON nodes.
+//! Stable host-local port allocation for joined TON nodes.
 //!
 //! A follower advertises several ports in persistent validator-engine state.
 //! Therefore automatic discovery is safe only during the first initialization.
@@ -13,22 +13,22 @@ use anyhow::{Result, bail, ensure};
 
 use crate::storage::NodePorts;
 
-pub(super) const DEFAULT_AGENT_PORT_BASE: u16 = 19_000;
+pub(super) const DEFAULT_JOIN_PORT_BASE: u16 = 19_000;
 const PORTS_PER_NODE: u16 = 5;
 
 /// One contiguous host-local allocation shared by an observer and its nodes.
 ///
-/// Keeping the ports adjacent makes multi-agent local networks predictable while
+/// Keeping the ports adjacent makes multi-host local networks predictable while
 /// still allowing the allocator to skip a range occupied by unrelated software.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct AgentPortAllocation {
+pub(super) struct HostPortAllocation {
     pub observability: u16,
     pub nodes: Vec<NodePorts>,
     pub start: u16,
     pub end: u16,
 }
 
-impl AgentPortAllocation {
+impl HostPortAllocation {
     /// Finds the first range at or above `first_candidate` that is free for both
     /// TCP and UDP. Both protocols are checked so numeric ranges do not overlap
     /// even though TON currently uses each individual port for only one protocol.
@@ -41,18 +41,18 @@ impl AgentPortAllocation {
         node_count: usize,
         mut available: impl FnMut(RangeInclusive<u16>) -> bool,
     ) -> Result<Self> {
-        ensure!(first_candidate > 0, "agent port base must be positive");
-        ensure!(node_count > 0, "agent must allocate ports for at least one node");
+        ensure!(first_candidate > 0, "join port base must be positive");
+        ensure!(node_count > 0, "join must allocate ports for at least one node");
         let node_count = u16::try_from(node_count).map_err(|_| {
-            anyhow::anyhow!("agent node count does not fit the TCP/UDP port space")
+            anyhow::anyhow!("joined node count does not fit the TCP/UDP port space")
         })?;
         let width = node_count
             .checked_mul(PORTS_PER_NODE)
             .and_then(|ports| ports.checked_add(1))
-            .ok_or_else(|| anyhow::anyhow!("agent port range is too large"))?;
+            .ok_or_else(|| anyhow::anyhow!("join port range is too large"))?;
         let last_candidate = u16::MAX
             .checked_sub(width - 1)
-            .ok_or_else(|| anyhow::anyhow!("agent port range is too large"))?;
+            .ok_or_else(|| anyhow::anyhow!("join port range is too large"))?;
 
         for start in first_candidate..=last_candidate {
             let end = start + width - 1;
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn allocation_skips_to_the_first_contiguous_range() {
-        let allocation = AgentPortAllocation::find_with(19_000, 2, |range| {
+        let allocation = HostPortAllocation::find_with(19_000, 2, |range| {
             *range.start() >= 19_003
         })
         .unwrap();
@@ -144,6 +144,6 @@ mod tests {
 
     #[test]
     fn allocation_rejects_a_range_past_the_port_limit() {
-        assert!(AgentPortAllocation::find_with(u16::MAX, 1, |_| true).is_err());
+        assert!(HostPortAllocation::find_with(u16::MAX, 1, |_| true).is_err());
     }
 }

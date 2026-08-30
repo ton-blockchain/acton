@@ -24,7 +24,7 @@ use crate::{
 /// until the global-config builder, where release-owned descriptors are serialized.
 #[derive(Debug)]
 pub(super) struct InitializedDht {
-    /// Validated persistent database reopened by normal launcher startup.
+    /// Validated persistent database reopened by normal bootstrap startup.
     pub(super) database: DhtDatabase,
     /// Signed bootstrap descriptors published in final global config.
     pub(super) descriptors: Vec<DhtNodeDescriptor>,

@@ -1,6 +1,6 @@
 //! Host-local joiner and supervisor for follower full nodes.
 //!
-//! On its first run, the agent downloads a standard TON global config. It
+//! On its first run, the join workflow downloads a standard TON global config. It
 //! creates independent databases and keys, starts independent nodes, and keeps
 //! private material on this host. With `--validator`, it can fund a host-local
 //! wallet from a development faucet and enters elections directly through the
@@ -22,8 +22,8 @@ use tracing::{info, warn};
 
 use crate::{
     binaries::TonBinaries,
-    bootstrap::{LauncherControl, acquire_lock, shutdown_signal, supervise},
-    cli::{AgentArgs, WalletVersion},
+    bootstrap::{NodeController, acquire_lock, shutdown_signal, supervise},
+    cli::{JoinArgs, WalletVersion},
     http,
     observability::{ObserverIdentity, SYNC_LAG_TOLERANCE_BLOCKS},
     operations::{validators, wallets},
@@ -35,7 +35,7 @@ use crate::{
     },
 };
 
-use self::ports::{AgentPortAllocation, DEFAULT_AGENT_PORT_BASE};
+use self::ports::{HostPortAllocation, DEFAULT_JOIN_PORT_BASE};
 
 const MAX_GLOBAL_CONFIG_BYTES: u64 = 1024 * 1024;
 const VALIDATOR_WALLET_WORKCHAIN: i32 = -1;
@@ -58,16 +58,16 @@ struct LocalLiteserver {
     public_key: String,
 }
 
-pub async fn run(args: AgentArgs) -> Result<()> {
+pub async fn run(args: JoinArgs) -> Result<()> {
     std::fs::create_dir_all(&args.state.state_dir).with_context(|| {
         format!(
-            "failed to create agent state directory {}",
+            "failed to create join state directory {}",
             args.state.state_dir.display()
         )
     })?;
     let state_root = dunce::canonicalize(&args.state.state_dir).with_context(|| {
         format!(
-            "failed to resolve agent state directory {}",
+            "failed to resolve join state directory {}",
             args.state.state_dir.display()
         )
     })?;
@@ -76,14 +76,14 @@ pub async fn run(args: AgentArgs) -> Result<()> {
     let _state_lock = acquire_lock(&layout.lock)?;
     let processes = ProcessRegistry::default();
     // Install signal handling before any TON process starts. Otherwise Ctrl+C
-    // during initial synchronization terminates only the agent process and skips
+    // during initial synchronization terminates only the Localton instance and skips
     // the managed-process cleanup below.
     let run_result = select! {
         result = async {
             let owned_nodes = prepare_follower_state(&layout, &args).await?;
             let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
             let toolchain = Toolchain::official(layout.clone(), binaries.clone());
-            let control = LauncherControl::new(
+            let control = NodeController::new(
                 layout.clone(),
                 toolchain.clone(),
                 Duration::from_secs(args.startup_timeout),
@@ -107,9 +107,9 @@ pub async fn run(args: AgentArgs) -> Result<()> {
             let primary_liteserver = local_liteservers
                 .first()
                 .cloned()
-                .context("agent has no running node with a local liteserver")?;
+                .context("join has no running node with a local liteserver")?;
             RuntimeState::update_atomic(&layout.runtime, |runtime| {
-                runtime.mark_launcher_started();
+                runtime.mark_instance_started();
                 for name in &owned_nodes {
                     if let Some(node) = runtime.nodes.get_mut(name) {
                         node.status = "synchronizing".to_owned();
@@ -117,7 +117,7 @@ pub async fn run(args: AgentArgs) -> Result<()> {
                 }
                 Ok(())
             })?;
-            let observability_peers = match discover_observability_peer(&args.join).await {
+            let observability_peers = match discover_observability_peer(&args.global_config_url).await {
                 Ok(Some(peer)) => vec![peer],
                 Ok(None) => Vec::new(),
                 Err(error) => {
@@ -155,7 +155,7 @@ pub async fn run(args: AgentArgs) -> Result<()> {
             )?;
             info!(
                 endpoint = %format!("127.0.0.1:{}", primary_liteserver.port),
-                "agent chain operations now use its synchronized local liteserver"
+                "join operations now use the synchronized local liteserver"
             );
             let validator_nodes: Vec<_> = settings
                 .nodes
@@ -163,7 +163,7 @@ pub async fn run(args: AgentArgs) -> Result<()> {
                 .filter(|node| owned_nodes.contains(&node.name) && node.validator)
                 .map(|node| node.name.as_str())
                 .collect();
-            info!(nodes = ?owned_nodes, global_config = %args.join, validators = ?validator_nodes, "localton agent nodes are running");
+            info!(nodes = ?owned_nodes, global_config = %args.global_config_url, validators = ?validator_nodes, "joined Localton nodes are running");
             let validation_interval = toolchain.settings()?.validation.poll_interval_seconds;
             let validation = validation_loop(
                 toolchain,
@@ -183,7 +183,7 @@ pub async fn run(args: AgentArgs) -> Result<()> {
     };
     let stop_result = processes.stop_all().await;
     let state_result = RuntimeState::update_atomic(&layout.runtime, |runtime| {
-        runtime.mark_launcher_stopped();
+        runtime.mark_instance_stopped();
         Ok(())
     });
     run_result.and(stop_result).and(state_result.map(|_| ()))
@@ -262,17 +262,17 @@ async fn wait_for_network_sync(
     })
 }
 
-async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTreeSet<String>> {
+async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTreeSet<String>> {
     ensure!(
         !layout.manifest.is_file(),
-        "agent requires a separate follower state directory, not a launcher state directory"
+        "join requires a follower state directory, not a bootstrap state directory"
     );
     let mut settings = if layout.settings.is_file() {
         Settings::load(&layout.settings)?
     } else {
-        Settings::for_agent()
+        Settings::for_join()
     };
-    let requested = resolve_agent_nodes(
+    let requested = resolve_join_nodes(
         layout,
         &mut settings,
         &args.nodes,
@@ -287,12 +287,12 @@ async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTr
             let node = settings.node(name)?;
             ensure!(
                 !layout.node(node).config_json().is_file(),
-                "agent node `{name}` database exists without a global config"
+                "joining node `{name}` database exists without a global config"
             );
         }
-        let global_config = fetch_global_config(&args.join).await?;
+        let global_config = fetch_global_config(&args.global_config_url).await?;
         write_json_atomic(&layout.global_config, &global_config)?;
-        info!(url = %args.join, "installed TON global config");
+        info!(url = %args.global_config_url, "installed TON global config");
     }
 
     for name in &requested {
@@ -321,7 +321,7 @@ async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTr
     Ok(requested)
 }
 
-fn resolve_agent_nodes(
+fn resolve_join_nodes(
     layout: &Layout,
     settings: &mut Settings,
     requested: &[String],
@@ -338,7 +338,7 @@ fn resolve_agent_nodes(
     if !persisted.is_empty() {
         ensure!(
             !persisted.contains("genesis"),
-            "agent settings cannot contain the launcher-owned genesis node; use a new --state-dir"
+            "join state cannot contain the bootstrap genesis node; use a new --state-dir"
         );
         if requested.is_empty() {
             return Ok(persisted);
@@ -346,7 +346,7 @@ fn resolve_agent_nodes(
         let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
         ensure!(
             requested == persisted,
-            "agent node names are persisted; restart with --node {} or omit --node",
+            "joined node names are persisted; restart with --node {} or omit --node",
             persisted.iter().cloned().collect::<Vec<_>>().join(" --node ")
         );
         return Ok(persisted);
@@ -360,14 +360,14 @@ fn resolve_agent_nodes(
     } else {
         let mut names = BTreeSet::new();
         for name in requested {
-            ensure!(name != "genesis", "the agent cannot own the genesis node");
-            ensure!(names.insert(name.clone()), "duplicate agent node `{name}`");
+            ensure!(name != "genesis", "join cannot own the genesis node");
+            ensure!(names.insert(name.clone()), "duplicate joining node `{name}`");
         }
         names
     };
 
-    let allocation = AgentPortAllocation::find(
-        port_base.unwrap_or(DEFAULT_AGENT_PORT_BASE),
+    let allocation = HostPortAllocation::find(
+        port_base.unwrap_or(DEFAULT_JOIN_PORT_BASE),
         names.len(),
     )?;
     settings.services.observability.port = allocation.observability;
@@ -387,7 +387,7 @@ fn resolve_agent_nodes(
         port_range_end = allocation.end,
         observability_port = allocation.observability,
         nodes = names.len(),
-        "allocated persistent agent port range"
+        "allocated persistent join port range"
     );
     for node in &settings.nodes {
         info!(
@@ -403,8 +403,8 @@ fn resolve_agent_nodes(
     Ok(names)
 }
 
-async fn discover_observability_peer(join: &str) -> Result<Option<String>> {
-    let mut root = http_url(join, "global config")?;
+async fn discover_observability_peer(config_url: &str) -> Result<Option<String>> {
+    let mut root = http_url(config_url, "global config")?;
     root.set_path("/");
     root.set_query(None);
     root.set_fragment(None);
@@ -545,7 +545,7 @@ async fn validation_tick(
         }
         wallets::ensure_wallet_deployed(toolchain, &wallet_name).await?;
     }
-    validators::agent_auto_tick(toolchain, node, &wallet_name).await
+    validators::join_auto_tick(toolchain, node, &wallet_name).await
 }
 
 fn validator_wallet_name(node: &str) -> String {
@@ -640,13 +640,13 @@ mod tests {
     }
 
     #[test]
-    fn default_agent_alias_is_stable_in_its_state_directory() {
+    fn default_joined_node_alias_is_stable_in_its_state_directory() {
         let root = tempfile::tempdir_in("/tmp").unwrap();
-        let layout = Layout::new(root.path().join("agent"));
+        let layout = Layout::new(root.path().join("join"));
         layout.create_dirs().unwrap();
-        let mut settings = Settings::for_agent();
+        let mut settings = Settings::for_join();
 
-        let first = resolve_agent_nodes(
+        let first = resolve_join_nodes(
             &layout,
             &mut settings,
             &[],
@@ -658,7 +658,7 @@ mod tests {
             .into_iter()
             .next()
             .unwrap();
-        let second = resolve_agent_nodes(
+        let second = resolve_join_nodes(
             &layout,
             &mut settings,
             &[],
@@ -719,14 +719,14 @@ mod tests {
             .unwrap();
         });
         let root = tempfile::tempdir_in("/tmp").unwrap();
-        let layout = Layout::new(root.path().join("agent"));
+        let layout = Layout::new(root.path().join("join"));
         layout.create_dirs().unwrap();
-        let args = AgentArgs {
+        let args = JoinArgs {
             state: StateArgs {
                 state_dir: layout.root.clone(),
             },
             nodes: vec!["node2".to_owned()],
-            join: format!("http://{address}/global.config.json"),
+            global_config_url: format!("http://{address}/global.config.json"),
             faucet: None,
             advertise_ip: Ipv4Addr::new(10, 0, 0, 2),
             validator: false,

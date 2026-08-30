@@ -1,9 +1,9 @@
 //! Shared registry of long-running child processes.
 //!
-//! Processes are keyed by their stable launcher name. The registry prevents
+//! Processes are keyed by their stable service name. The registry prevents
 //! duplicate names, reports current PIDs, detects early exits during readiness
 //! polling, stops individual processes, and drains every managed process during
-//! launcher shutdown.
+//! instance shutdown.
 
 use std::{collections::BTreeMap, sync::Arc, time::Instant};
 
@@ -15,7 +15,7 @@ use utoipa::ToSchema;
 
 use super::ServiceHandle;
 
-/// One process that the Localton launcher supervises
+/// One process that a Localton instance supervises
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ProcessInfo {
     /// Stable process name
@@ -24,12 +24,12 @@ pub struct ProcessInfo {
     pub pid: Option<u32>,
 }
 
-/// Shared owner and supervisor of all launcher-managed long-running services.
+/// Shared owner and supervisor of all instance-managed long-running services.
 ///
 /// The registry serializes name registration and health inspection, but removes
 /// handles before awaiting shutdown so a slow service cannot block unrelated
 /// registry access. Clones refer to the same ownership map and are safe to pass
-/// to readiness checks, HTTP control handlers, and launcher teardown.
+/// to readiness checks, HTTP control handlers, and instance teardown.
 #[derive(Clone, Default)]
 pub struct ProcessRegistry {
     inner: Arc<Mutex<BTreeMap<String, ServiceHandle>>>,
@@ -41,7 +41,7 @@ impl ProcessRegistry {
     /// Accepting `Into<ServiceHandle>` keeps existing `ManagedProcess` call sites
     /// source-compatible while allowing adapters and tests to provide other
     /// implementations. Duplicate rejection happens before ownership is changed,
-    /// so one launcher name can never ambiguously refer to two live services.
+    /// so one service name can never ambiguously refer to two live services.
     pub async fn insert(&self, service: impl Into<ServiceHandle>) -> Result<()> {
         let service = service.into();
         let name = service.name().to_owned();
@@ -77,7 +77,7 @@ impl ProcessRegistry {
     /// Verifies that every required service remains alive without waiting.
     ///
     /// Any exit, including exit code zero, is an early failure because registered
-    /// services are expected to outlive launcher supervision. The structured log
+    /// services are expected to outlive instance supervision. The structured log
     /// intentionally contains only the stable name, PID, and log-safe exit value.
     pub async fn ensure_alive(&self) -> Result<()> {
         let mut processes = self.inner.lock().await;

@@ -1,14 +1,14 @@
 # Third-party notice
 
 `assets/gen-zerostate.fif` is adapted from the MyLocalTon genesis script and
-TON smart-contract tooling. It was modified for this launcher to generate
+TON smart-contract tooling. It was modified for Localton to generate
 runtime-only keys and to omit unused highload-wallet bootstrap accounts.
 
 - MyLocalTon: https://github.com/neodix42/MyLocalTon (GPL-3.0)
 - TON: https://github.com/ton-blockchain/ton
 
 Official TON executable archives are not distributed in this repository. The
-launcher downloads the pinned upstream release directly and verifies its
+Localton downloads the pinned upstream release directly and verifies its
 SHA-256 digest.
 
 The container build compiles TON Center Indexer from the pinned upstream

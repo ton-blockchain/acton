@@ -16,14 +16,14 @@ use crate::{
 use super::{nodes, validator};
 
 #[derive(Clone)]
-pub struct LauncherControl {
+pub struct NodeController {
     layout: Layout,
     tools: Toolchain,
     timeout: Duration,
     processes: ProcessRegistry,
 }
 
-impl LauncherControl {
+impl NodeController {
     pub(crate) fn new(
         layout: Layout,
         tools: Toolchain,

@@ -1,6 +1,6 @@
 //! Construction and installation of TON masterchain and basechain zerostates.
 //!
-//! The launcher renders the bundled Fift templates from network settings,
+//! The bootstrap workflow renders the bundled Fift templates from network settings,
 //! optionally inserts user-supplied `ShardAccount` values into the basechain,
 //! delegates state creation to the typed TON tool boundary, and installs the
 //! resulting static states where validator-engine expects to find them.
@@ -267,7 +267,7 @@ fn write_genesis_script(
         ),
     ];
     // Values are substituted into a versioned template bundled with the
-    // launcher. The generated file remains available in state for inspection.
+    // bootstrap workflow. The generated file remains available in state for inspection.
     for (placeholder, value) in replacements {
         script = script.replace(placeholder, &value);
     }

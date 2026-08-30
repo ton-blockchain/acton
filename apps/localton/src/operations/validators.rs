@@ -235,7 +235,7 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn agent_auto_tick(
+pub(crate) async fn join_auto_tick(
     toolchain: &Toolchain,
     node_name: &str,
     wallet_name: &str,
@@ -814,7 +814,7 @@ mod tests {
     };
 
     fn follower_settings() -> Settings {
-        let mut settings = Settings::for_agent();
+        let mut settings = Settings::for_join();
         settings.nodes.push(NodeSettings::follower(
             "node2".to_owned(),
             Ipv4Addr::LOCALHOST,
