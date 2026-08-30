@@ -1904,6 +1904,7 @@ dependencies = [
  "fs2",
  "futures-util",
  "hex",
+ "humantime",
  "include_dir",
  "indicatif",
  "nix",

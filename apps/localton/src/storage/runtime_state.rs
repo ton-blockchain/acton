@@ -26,7 +26,7 @@ pub struct RuntimeState {
     pub ready: bool,
     /// Latest masterchain block number that the launcher observed
     pub masterchain_seqno: Option<u32>,
-    /// Unix time when the launcher observed the latest block
+    /// Unix time when the observed masterchain seqno last advanced
     pub last_block_at: Option<u64>,
     /// Runtime state for each configured node
     pub nodes: BTreeMap<String, NodeRuntime>,
@@ -126,6 +126,19 @@ impl RuntimeState {
             service.running = false;
             service.pid = None;
         }
+    }
+
+    /// Records a trusted masterchain head without hiding a production stall.
+    ///
+    /// Re-reading the same head proves that the liteserver still answers, but it
+    /// is not a new block. Keeping the previous timestamp lets status and
+    /// observability distinguish a responsive yet stalled chain from one that is
+    /// continuing to produce blocks.
+    pub fn observe_masterchain_head(&mut self, seqno: u32, observed_at: u64) {
+        if self.masterchain_seqno.is_none_or(|current| seqno > current) {
+            self.last_block_at = Some(observed_at);
+        }
+        self.masterchain_seqno = Some(seqno);
     }
 }
 
@@ -231,6 +244,37 @@ mod tests {
         state.mark_launcher_stopped();
         assert!(!state.nodes["genesis"].running);
         assert!(!state.services["ton_http_api"].running);
+    }
+
+    #[test]
+    fn repeated_masterchain_head_does_not_look_like_new_production() {
+        let mut state = RuntimeState::new();
+        state.observe_masterchain_head(17, 100);
+        state.observe_masterchain_head(17, 200);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    17,
+                ),
+                Some(
+                    100,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(state.masterchain_seqno, state.last_block_at));
+
+        state.observe_masterchain_head(18, 300);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    18,
+                ),
+                Some(
+                    300,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(state.masterchain_seqno, state.last_block_at));
     }
 
     #[test]

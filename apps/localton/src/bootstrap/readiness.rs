@@ -1,9 +1,9 @@
 //! Readiness checks and termination signals for a running local network.
 //!
 //! Process creation alone does not mean that TON is usable. The launcher polls
-//! the liteserver until two distinct masterchain seqnos are observed while also
-//! checking that every managed process remains alive. After startup, the same
-//! registry is supervised until Ctrl-C, SIGTERM, or a child failure occurs.
+//! the liteserver until the requested level of chain readiness is observed while
+//! also checking that every managed process remains alive. After startup, the
+//! same registry is supervised until Ctrl-C, SIGTERM, or a child failure occurs.
 
 use std::time::Duration;
 
@@ -28,20 +28,33 @@ const READINESS_POLL_INTERVAL: Duration = Duration::from_secs(1);
 #[cfg(test)]
 const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(1);
 
-/// Proves that the liteserver is reachable and the masterchain is advancing.
+/// Selects how much chain evidence a launcher invocation must collect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MasterchainReadiness {
+    /// A persisted network only needs to restore its trusted liteserver head.
+    /// Continuous observation reports a later stall without delaying every
+    /// routine restart by one complete block interval.
+    HeadAvailable,
+    /// A new genesis must produce two distinct heads before it is published.
+    /// This catches invalid validator keys or zerostate configuration immediately.
+    ProductionObserved,
+}
+
+/// Waits until the configured liteserver satisfies the requested startup proof.
 ///
-/// A single positive seqno could be stale state from an earlier run. The launcher
-/// therefore waits for a later seqno greater than the first observation while
-/// checking required child processes on every iteration. Success means both the
-/// query path and ongoing block production work.
-pub(super) async fn wait_for_blocks(
+/// New state requires a later seqno greater than the first observation because
+/// that proves genesis production. Persisted state can reuse its existing head:
+/// startup then proves the trusted query path, while continuous observation owns
+/// detecting a subsequent production stall.
+pub(super) async fn wait_for_masterchain(
     layout: &Layout,
     lite_client: &dyn LiteClient,
     target: &LiteTarget,
     processes: &ProcessRegistry,
     timeout: Duration,
-) -> Result<()> {
-    info!("waiting for liteserver and masterchain block production");
+    readiness: MasterchainReadiness,
+) -> Result<u32> {
+    info!(?readiness, "waiting for masterchain readiness");
     let started = tokio::time::Instant::now();
     let deadline = started + timeout;
     let mut next_progress = started;
@@ -52,6 +65,10 @@ pub(super) async fn wait_for_blocks(
         let last_error = match lite_client_seqno(lite_client, target).await {
             Ok(seqno) => {
                 last_seqno = Some(seqno);
+                if seqno > 0 && readiness == MasterchainReadiness::HeadAvailable {
+                    info!(current_seqno = seqno, "masterchain head restored");
+                    return Ok(seqno);
+                }
                 match first_seqno {
                     None if seqno > 0 => first_seqno = Some(seqno),
                     Some(first) if seqno > first => {
@@ -60,7 +77,7 @@ pub(super) async fn wait_for_blocks(
                             current_seqno = seqno,
                             "masterchain advanced"
                         );
-                        return Ok(());
+                        return Ok(seqno);
                     }
                     _ => {}
                 }
@@ -81,7 +98,7 @@ pub(super) async fn wait_for_blocks(
                 .map(|error| format!("; last liteserver error: {error}"))
                 .unwrap_or_default();
             bail!(
-                "masterchain did not advance within {}s{detail}; inspect {}",
+                "masterchain readiness was not reached within {}s{detail}; inspect {}",
                 timeout.as_secs(),
                 layout.logs.display()
             );
@@ -284,15 +301,49 @@ mod tests {
         let processes = ProcessRegistry::default();
         let client = ReadinessLiteClient::new([17, 17, 18]);
 
-        wait_for_blocks(
+        let seqno = wait_for_masterchain(
             &layout,
             &client,
             &target,
             &processes,
             Duration::from_secs(1),
+            MasterchainReadiness::ProductionObserved,
         )
         .await
         .unwrap();
+        assert_eq!(seqno, 18);
         assert!(client.seqnos.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn persisted_network_accepts_the_first_available_masterchain_head() {
+        let state = tempfile::tempdir().unwrap();
+        let layout = Layout::new(state.path().join("state"));
+        let target = LiteTarget::new(layout.global_config.clone()).with_label("genesis");
+        let processes = ProcessRegistry::default();
+        let client = ReadinessLiteClient::new([17, 18]);
+
+        let seqno = wait_for_masterchain(
+            &layout,
+            &client,
+            &target,
+            &processes,
+            Duration::from_secs(1),
+            MasterchainReadiness::HeadAvailable,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(seqno, 17);
+        assert_eq!(
+            client
+                .seqnos
+                .lock()
+                .unwrap()
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
+            [18]
+        );
     }
 }

@@ -3,6 +3,7 @@ use std::{
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -227,14 +228,14 @@ pub struct NetworkSettings {
     pub stakes_frozen_for_seconds: u32,
     /// Original validator-set lifetime in seconds
     pub original_validator_set_valid_for_seconds: u32,
-    /// Target Simplex block rate in milliseconds
+    /// Target Simplex block interval stored as noncritical config 30 key 0
     pub simplex_target_rate_ms: u32,
     /// Number of slots in one Simplex leader window
     pub simplex_slots_per_leader_window: u32,
     /// Timeout for the first block in milliseconds
     pub simplex_first_block_timeout_ms: u32,
-    /// Maximum Simplex leader-window desynchronization in milliseconds
-    pub simplex_max_leader_window_desync_ms: u32,
+    /// Maximum number of future Simplex leader windows accepted from peers
+    pub simplex_max_leader_window_desync: u32,
 }
 
 impl Default for NetworkSettings {
@@ -259,15 +260,46 @@ impl Default for NetworkSettings {
             election_end_before_seconds: 30,
             stakes_frozen_for_seconds: 30,
             original_validator_set_valid_for_seconds: 90,
-            simplex_target_rate_ms: 300,
+            // Localton intentionally runs slower than the current 400ms TON
+            // mainnet target so block-by-block debugging remains practical
+            simplex_target_rate_ms: 1_000,
+            // Keep the remaining consensus shape aligned with masterchain:
+            // four slots per leader, a 700ms first-block timeout, and TON's
+            // default allowance of 250 future leader windows
             simplex_slots_per_leader_window: 4,
-            simplex_first_block_timeout_ms: 400,
-            simplex_max_leader_window_desync_ms: 700,
+            simplex_first_block_timeout_ms: 700,
+            simplex_max_leader_window_desync: 250,
         }
     }
 }
 
 impl NetworkSettings {
+    /// Returns the target interval applied by Simplex block production
+    ///
+    /// Config 30 stores the value with millisecond resolution. It is a pacing
+    /// target rather than a liveness promise: a stalled validator set can still
+    /// miss slots
+    pub fn block_time(&self) -> Duration {
+        Duration::from_millis(u64::from(self.simplex_target_rate_ms))
+    }
+
+    /// Changes the target block interval before zerostate creation.
+    ///
+    /// TON stores this value as an unsigned 32-bit millisecond count in config
+    /// parameter 30. Rejecting finer or wider durations here prevents a CLI
+    /// value from being silently rounded while rendering the genesis script.
+    pub fn set_block_time(&mut self, block_time: Duration) -> Result<()> {
+        let milliseconds = u32::try_from(block_time.as_millis())
+            .context("block time exceeds TON's uint32 millisecond range")?;
+        ensure!(milliseconds > 0, "block time must be at least 1ms");
+        ensure!(
+            Duration::from_millis(u64::from(milliseconds)) == block_time,
+            "block time must use whole milliseconds"
+        );
+        self.simplex_target_rate_ms = milliseconds;
+        Ok(())
+    }
+
     fn validate(&self) -> Result<()> {
         ensure!(
             self.global_id < 0,
@@ -738,6 +770,16 @@ mod tests {
             90
         );
         assert_eq!(settings.validation.poll_interval_seconds, 5);
+    }
+
+    #[test]
+    fn block_time_is_one_second_and_keeps_ton_millisecond_precision() {
+        let mut network = NetworkSettings::default();
+        assert_eq!(network.block_time(), Duration::from_secs(1));
+
+        network.set_block_time(Duration::from_millis(750)).unwrap();
+        assert_eq!(network.simplex_target_rate_ms, 750);
+        assert!(network.set_block_time(Duration::from_micros(1)).is_err());
     }
 
     #[test]

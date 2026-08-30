@@ -361,8 +361,20 @@ GR$100 1 500 config.complaint_prices!
 // newkeypair nip dup ."Validator #2 public key = " Bx. cr
 // 239 add-validator
 
-SIMPLEX_TARGET_RATE_MS SIMPLEX_SLOTS_PER_LEADER_WINDOW SIMPLEX_FIRST_BLOCK_TIMEOUT_MS SIMPLEX_MAX_LEADER_WINDOW_DESYNC make-simplex-params // masterchain
-SIMPLEX_TARGET_RATE_MS SIMPLEX_SLOTS_PER_LEADER_WINDOW SIMPLEX_FIRST_BLOCK_TIMEOUT_MS SIMPLEX_MAX_LEADER_WINDOW_DESYNC make-simplex-params // basechain
+// TON v2026.06 can display the legacy simplex_config#21 value, but
+// validator-engine only applies simplex_config_v2#22 to consensus
+// dict key value -- dict
+{ <b swap 32 u, b> <s -rot swap 8 udict! not abort"cannot add simplex parameter" } : simplex-param!
+{ dictnew
+  0 SIMPLEX_TARGET_RATE_MS simplex-param!
+  1 SIMPLEX_FIRST_BLOCK_TIMEOUT_MS simplex-param!
+  10 SIMPLEX_MAX_LEADER_WINDOW_DESYNC simplex-param!
+  SIMPLEX_SLOTS_PER_LEADER_WINDOW
+  <b x{22} s, 1 8 u, swap 32 u, swap dict, b>
+} : make-localton-simplex-params
+
+make-localton-simplex-params // masterchain
+make-localton-simplex-params // basechain
 config.new_consensus_params_all!
 
 ORIGINAL_VSET_VALID_FOR =: orig_vset_valid_for  // original validator set valid 2000 seconds

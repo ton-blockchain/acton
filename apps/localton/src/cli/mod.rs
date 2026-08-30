@@ -6,7 +6,7 @@
 
 pub(crate) mod commands;
 
-use std::{net::Ipv4Addr, path::PathBuf};
+use std::{net::Ipv4Addr, path::PathBuf, time::Duration};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
@@ -191,6 +191,13 @@ pub struct RunArgs {
     #[arg(long, value_parser = clap::value_parser!(usize))]
     pub validators: Option<usize>,
 
+    /// Simplex target interval between blocks in a new network. Defaults to 1s.
+    ///
+    /// This pacing parameter cannot guarantee progress when consensus stalls. It is
+    /// written to genesis and cannot change after network creation.
+    #[arg(long, value_name = "DURATION", value_parser = humantime::parse_duration)]
+    pub block_time: Option<Duration>,
+
     /// IPv4 address advertised by the genesis DHT and liteserver.
     ///
     /// Set this before first bootstrap when nodes on other hosts must join.
@@ -255,6 +262,7 @@ impl Default for RunArgs {
             ton_bin_dir: None,
             startup_timeout: 180,
             validators: None,
+            block_time: None,
             advertise_ip: None,
             add_account: Vec::new(),
             ton_http_api: false,
@@ -567,4 +575,21 @@ pub struct HardforkArgs {
     /// Output global configuration. Defaults under the state directory.
     #[arg(long)]
     pub output: Option<PathBuf>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn block_time_accepts_human_readable_durations_for_both_run_forms() {
+        let default_run = Cli::try_parse_from(["localton", "--block-time", "750ms"]).unwrap();
+        assert_eq!(default_run.run.block_time, Some(Duration::from_millis(750)));
+
+        let explicit_run = Cli::try_parse_from(["localton", "run", "--block-time", "1s"]).unwrap();
+        let Some(Command::Run(args)) = explicit_run.command else {
+            panic!("expected explicit run command");
+        };
+        assert_eq!(args.block_time, Some(Duration::from_secs(1)));
+    }
 }

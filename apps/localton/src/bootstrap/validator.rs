@@ -13,7 +13,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use tokio::time::sleep;
+use tokio::{net::TcpStream, time::sleep};
 use tracing::{info, warn};
 
 use crate::{
@@ -35,6 +35,8 @@ use crate::{
 
 const YEAR_SECONDS: u64 = 365 * 24 * 60 * 60;
 const CONSOLE_OPERATION_TIMEOUT: Duration = Duration::from_secs(15);
+const CONSOLE_READINESS_TIMEOUT: Duration = Duration::from_secs(2);
+const CONSOLE_ENDPOINT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const CONSOLE_RETRY_LIMIT: usize = 5;
 const IMPORT_RETRY_LIMIT: usize = 3;
 const RETRY_DELAY: Duration = Duration::from_millis(500);
@@ -360,10 +362,12 @@ async fn import_validator_key(
 
 /// Waits until a live service answers a typed, authenticated health request.
 ///
-/// Process liveness and console readiness are checked together. Each probe is
-/// bounded by the smaller of the remaining workflow deadline and the ordinary
-/// console operation timeout; the loop itself owns retry cadence and never asks
-/// the adapter to retry a semantic operation implicitly.
+/// A TCP listener check precedes the official console executable because that
+/// executable waits for its complete transport timeout after an initial
+/// connection refusal; it does not reconnect when validator-engine opens the
+/// port moments later. The cheap poll prevents each normal engine start from
+/// adding ten seconds while the authenticated health request still proves that
+/// the expected control key, not merely an unrelated listener, is available.
 pub(super) async fn wait_for_console(
     layout: &Layout,
     console: &dyn ValidatorConsole,
@@ -375,6 +379,61 @@ pub(super) async fn wait_for_console(
     let deadline = tokio::time::Instant::now() + context.timeout;
     let mut next_progress_log = tokio::time::Instant::now();
     let mut last_probe_error = None;
+    let mut endpoint_attempt = 0_usize;
+
+    loop {
+        endpoint_attempt += 1;
+        if let Some(status) = process.try_status()? {
+            bail!("temporary validator-engine exited early with {status}");
+        }
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            let message = format!(
+                "validator-engine console endpoint was not ready within {}s",
+                context.timeout.as_secs()
+            );
+            return match last_probe_error {
+                Some(error) => Err(error).context(message),
+                None => Err(anyhow::anyhow!(message)),
+            };
+        }
+        if endpoint_attempt == 1 || now >= next_progress_log {
+            workflow_retry(
+                node,
+                "console_endpoint",
+                endpoint_attempt,
+                0,
+                "waiting",
+                "pending",
+                false,
+            );
+            next_progress_log = now + READINESS_LOG_INTERVAL;
+        }
+        match tokio::time::timeout(
+            CONSOLE_ENDPOINT_POLL_INTERVAL,
+            TcpStream::connect(endpoint.address),
+        )
+        .await
+        {
+            Ok(Ok(stream)) => {
+                drop(stream);
+                workflow_retry(
+                    node,
+                    "console_endpoint",
+                    endpoint_attempt,
+                    0,
+                    "ready",
+                    "success",
+                    false,
+                );
+                break;
+            }
+            Ok(Err(error)) => last_probe_error = Some(error.into()),
+            Err(error) => last_probe_error = Some(error.into()),
+        }
+        sleep(CONSOLE_ENDPOINT_POLL_INTERVAL.min(deadline - now)).await;
+    }
+
     let mut attempt = 0_usize;
     loop {
         attempt += 1;
@@ -395,7 +454,7 @@ pub(super) async fn wait_for_console(
         let probe_context = operation_context(
             context,
             node,
-            (deadline - now).min(CONSOLE_OPERATION_TIMEOUT),
+            (deadline - now).min(CONSOLE_READINESS_TIMEOUT),
         );
         if attempt == 1 || now >= next_progress_log {
             workflow_retry(

@@ -91,8 +91,7 @@ async fn monitor_once(layout: &Layout) -> Result<()> {
     let seen_at = unix_time();
 
     RuntimeState::update_atomic(&layout.runtime, |runtime| {
-        runtime.masterchain_seqno = Some(last.seqno);
-        runtime.last_block_at = Some(seen_at);
+        runtime.observe_masterchain_head(last.seqno, seen_at);
         Ok(())
     })?;
     Ok(())

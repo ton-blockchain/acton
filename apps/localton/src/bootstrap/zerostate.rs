@@ -263,7 +263,7 @@ fn write_genesis_script(
         ),
         (
             "SIMPLEX_MAX_LEADER_WINDOW_DESYNC",
-            network.simplex_max_leader_window_desync_ms.to_string(),
+            network.simplex_max_leader_window_desync.to_string(),
         ),
     ];
     // Values are substituted into a versioned template bundled with the
@@ -561,8 +561,10 @@ mod tests {
 
         let requests = create_state.requests.lock().unwrap();
         let request = &requests[0];
+        let rendered_genesis =
+            fs::read_to_string(layout.smartcont.join("gen-zerostate.fif")).unwrap();
         let summary = format!(
-            "calls={}\nkind={:?}\nscript={}\noutput={}\ninclude={}\nmasterchain={}\nbasechain={}",
+            "calls={}\nkind={:?}\nscript={}\noutput={}\ninclude={}\nsimplex_v2={}\nmasterchain={}\nbasechain={}",
             requests.len(),
             request.kind,
             request.script.file_name().unwrap().to_string_lossy(),
@@ -571,6 +573,10 @@ mod tests {
                 .file_name()
                 .unwrap()
                 .to_string_lossy(),
+            rendered_genesis.contains("0 1000 simplex-param!")
+                && rendered_genesis.contains("1 700 simplex-param!")
+                && rendered_genesis.contains("10 250 simplex-param!")
+                && rendered_genesis.contains("4\n  <b x{22}"),
             states.masterchain.id().file_hash(),
             states.basechain.id().file_hash(),
         );
@@ -581,6 +587,7 @@ mod tests {
             script=gen-zerostate.fif
             output=zerostate
             include=smartcont
+            simplex_v2=true
             masterchain=2222222222222222222222222222222222222222222222222222222222222222
             basechain=3333333333333333333333333333333333333333333333333333333333333333"#]]
         .assert_eq(&summary);

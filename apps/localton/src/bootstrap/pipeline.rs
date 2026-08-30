@@ -6,11 +6,7 @@
 //! supervise everything until shutdown. Technical details live in sibling
 //! modules and do not obscure this sequence.
 
-use std::{
-    fs::File,
-    net::Ipv4Addr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{fs::File, net::Ipv4Addr, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use tracing::info;
@@ -46,6 +42,7 @@ struct PreparedLaunch {
     global_config: GlobalConfigFile,
     dht_database: DhtDatabase,
     validator_database: ValidatorDatabase,
+    masterchain_readiness: readiness::MasterchainReadiness,
     ton_http_api_bind: Ipv4Addr,
     _state_lock: File,
 }
@@ -159,6 +156,11 @@ async fn prepare(args: RunArgs) -> Result<PreparedLaunch> {
         global_config,
         dht_database,
         validator_database,
+        masterchain_readiness: if state_exists {
+            readiness::MasterchainReadiness::HeadAvailable
+        } else {
+            readiness::MasterchainReadiness::ProductionObserved
+        },
         ton_http_api_bind: args.ton_http_api_bind,
         _state_lock: state_lock,
     })
@@ -177,6 +179,17 @@ fn prepare_settings(
     let mut settings = Settings::load_or_create(&layout.settings)?;
     if let Some(validators) = args.validators {
         settings.enable_validator_count(validators)?;
+    }
+    if let Some(block_time) = args.block_time {
+        if layout.manifest.is_file() {
+            ensure!(
+                settings.network.block_time() == block_time,
+                "network block time is {}; --block-time cannot change after network creation",
+                humantime::format_duration(settings.network.block_time())
+            );
+        } else {
+            settings.network.set_block_time(block_time)?;
+        }
     }
     if let Some(advertise_ip) = args.advertise_ip {
         let genesis = settings.node_mut("genesis")?;
@@ -242,15 +255,16 @@ async fn run_managed_network(
     record_core_processes(runtime, processes, &launch.manifest).await;
     runtime.save_atomic(&launch.layout.runtime)?;
 
-    // Step 4: prove actual block production through the liteserver.
-    // A listening process is insufficient: observing two increasing seqnos
-    // proves that validator consensus advances the masterchain over time.
-    readiness::wait_for_blocks(
+    // Step 4: prove the chain condition appropriate for this launch. A new
+    // genesis must advance, while persisted state only needs to restore its
+    // trusted head; the background observer then detects any later stall.
+    let masterchain_seqno = readiness::wait_for_masterchain(
         &launch.layout,
         launch.tools.lite_client_tool.as_ref(),
         &LiteTarget::new(launch.global_config.path()).with_label("genesis"),
         processes,
         launch.timeout,
+        launch.masterchain_readiness,
     )
     .await?;
 
@@ -294,7 +308,7 @@ async fn run_managed_network(
     // Step 8: atomically publish endpoints and observed chain state as ready.
     // External status readers see readiness only after both blockchain and HTTP
     // dependencies have passed their startup checks.
-    if let Err(error) = mark_network_ready(launch, runtime, &services).await {
+    if let Err(error) = mark_network_ready(launch, runtime, &services, masterchain_seqno) {
         services.shutdown().await;
         return Err(error);
     }
@@ -310,7 +324,7 @@ async fn run_managed_network(
     }
 
     let background = runtime::background::start(launch.layout.clone(), &launch.settings);
-    info!("local TON is producing masterchain blocks; press Ctrl-C to stop");
+    info!("local TON services are ready; press Ctrl-C to stop");
 
     let supervision = tokio::select! {
         result = readiness::supervise(processes) => result,
@@ -326,13 +340,14 @@ async fn run_managed_network(
 
 /// Publishes the externally useful runtime state after startup succeeds.
 ///
-/// `ready` means more than "processes exist": the masterchain has advanced and
-/// every requested listener has started. Endpoints and the latest observable
-/// seqno are saved together so readers do not observe a partially ready network.
-async fn mark_network_ready(
+/// `ready` means more than "processes exist": a trusted masterchain head and
+/// every requested listener are available. Endpoints and that verified seqno are
+/// saved together so readers do not observe a partially ready network.
+fn mark_network_ready(
     launch: &PreparedLaunch,
     runtime: &mut RuntimeState,
     services: &http::ServiceSet,
+    masterchain_seqno: u32,
 ) -> Result<()> {
     for (name, endpoint) in services.endpoints() {
         runtime.services.insert(
@@ -346,18 +361,7 @@ async fn mark_network_ready(
         );
     }
     runtime.ready = true;
-    runtime.masterchain_seqno = readiness::lite_client_seqno(
-        launch.tools.lite_client_tool.as_ref(),
-        &LiteTarget::new(launch.global_config.path()).with_label("genesis"),
-    )
-    .await
-    .ok();
-    runtime.last_block_at = Some(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs(),
-    );
+    runtime.observe_masterchain_head(masterchain_seqno, crate::storage::unix_time());
     runtime.save_atomic(&launch.layout.runtime)
 }
 

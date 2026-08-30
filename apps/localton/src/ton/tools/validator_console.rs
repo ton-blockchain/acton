@@ -360,7 +360,7 @@ impl OfficialValidatorConsole {
                 endpoint.server_public_key.display()
             );
             let rendered = remote.render();
-            let command = self.command(endpoint, &rendered);
+            let command = self.command(endpoint, &rendered, context.timeout);
             trace_progress(context.node_name.as_deref(), operation, "executing");
             let output = if remote.contains_signature_payload() {
                 run_redacted_checked(operation, command, context.timeout).await?
@@ -395,8 +395,21 @@ impl OfficialValidatorConsole {
 
     /// Renders the fixed transport/authentication argv shared by every semantic
     /// operation. Only this private boundary can inject a raw `-rc` string.
-    fn command(&self, endpoint: &ValidatorConsoleEndpoint, remote_command: &str) -> Command {
-        let connect_timeout = self.connect_timeout.as_secs().max(1).to_string();
+    fn command(
+        &self,
+        endpoint: &ValidatorConsoleEndpoint,
+        remote_command: &str,
+        operation_timeout: Duration,
+    ) -> Command {
+        // The child command must never keep its transport handshake alive longer
+        // than the typed operation that owns it. Readiness probes can therefore
+        // fail quickly without weakening the ordinary administrative commands.
+        let connect_timeout = self
+            .connect_timeout
+            .min(operation_timeout)
+            .as_secs()
+            .max(1)
+            .to_string();
         let mut command = Command::new(&self.executable);
         command
             .args(["-t", &connect_timeout, "-k"])
@@ -904,7 +917,7 @@ mod tests {
             client_private_key: PathBuf::from("/state/client"),
             server_public_key: PathBuf::from("/state/server.pub"),
         };
-        let command = adapter.command(&endpoint, "getstats");
+        let command = adapter.command(&endpoint, "getstats", Duration::from_secs(15));
         let args = command
             .as_std()
             .get_args()
@@ -929,6 +942,15 @@ mod tests {
                 "getstats",
             ]
         );
+
+        let readiness = adapter.command(&endpoint, "getstats", Duration::from_secs(2));
+        let readiness_args = readiness
+            .as_std()
+            .get_args()
+            .map(OsStr::to_string_lossy)
+            .map(|value| value.into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(readiness_args[0..2], ["-t", "2"]);
     }
 
     #[test]
