@@ -7,12 +7,10 @@
 pub(crate) mod background;
 mod command;
 mod process;
-mod progress;
 mod registry;
 mod service;
 
 pub use command::{CommandOutput, run_checked};
 pub use process::ManagedProcess;
-pub use progress::run_stage;
 pub use registry::{ProcessInfo, ProcessRegistry};
 pub use service::{ManagedService, ServiceExit, ServiceHandle};

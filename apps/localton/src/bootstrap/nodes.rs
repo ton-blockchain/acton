@@ -41,13 +41,15 @@ pub(super) async fn start_core(
     settings: &Settings,
     dht_database: DhtDatabase,
     validator_database: ValidatorDatabase,
-) -> Result<ProcessRegistry> {
+    processes: &ProcessRegistry,
+) -> Result<()> {
     info!("starting local DHT and validator-engine");
     let genesis = settings
         .node("genesis")
         .context("settings contain no genesis node")?;
-    let registry = ProcessRegistry::default();
+
     let context = OperationContext::for_node(Duration::from_secs(30), &genesis.name);
+
     let dht = tools
         .dht_server
         .start(
@@ -64,7 +66,9 @@ pub(super) async fn start_core(
             },
         )
         .await?;
-    registry.insert(dht).await?;
+
+    processes.insert(dht).await?;
+
     let validator = validator::start_persistent(
         layout,
         tools.validator_engine.as_ref(),
@@ -72,8 +76,7 @@ pub(super) async fn start_core(
         validator_database,
     )
     .await?;
-    registry.insert(validator).await?;
-    Ok(registry)
+    processes.insert(validator).await
 }
 
 /// Initializes and starts every enabled node except the genesis validator.
@@ -97,6 +100,7 @@ pub(super) async fn start_additional(
         let initialized = ensure_initialized(layout, tools, node, timeout).await?;
         let context = OperationContext::for_node(timeout, &node.name);
         let node_layout = layout.node(node);
+
         let mut process = validator::start_persistent(
             layout,
             tools.validator_engine.as_ref(),
@@ -104,6 +108,7 @@ pub(super) async fn start_additional(
             ValidatorDatabase::open(node_layout.db)?,
         )
         .await?;
+
         if let Err(error) = validator::wait_for_console(
             layout,
             tools.validator_console_tool.as_ref(),
@@ -117,6 +122,7 @@ pub(super) async fn start_additional(
             return Err(error)
                 .context(format!("node `{}` console did not become ready", node.name));
         }
+
         let mut node_runtime = initialized;
         node_runtime.running = true;
         node_runtime.pid = process.pid();
@@ -124,6 +130,7 @@ pub(super) async fn start_additional(
         runtime.nodes.insert(node.name.clone(), node_runtime);
         processes.insert(process).await?;
     }
+
     runtime.save_atomic(&layout.runtime)?;
     Ok(())
 }
