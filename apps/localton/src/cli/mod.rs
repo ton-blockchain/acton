@@ -29,7 +29,7 @@ pub struct Cli {
 pub enum Command {
     /// Join and supervise full nodes on this host.
     Agent(AgentArgs),
-    /// Start the network and all enabled headless services.
+    /// Start genesis and the enabled network services.
     Run(RunArgs),
     /// Inspect persisted and live network status.
     Status(StatusArgs),
@@ -53,7 +53,7 @@ pub enum Command {
         #[command(subcommand)]
         command: IndexerCommand,
     },
-    /// Manage full nodes and validators.
+    /// Inspect full nodes owned by one local state directory.
     Node {
         #[command(subcommand)]
         command: NodeCommand,
@@ -117,9 +117,12 @@ pub struct AgentArgs {
     )]
     pub observability_bind: Ipv4Addr,
 
-    /// Public observability API and UI port
-    #[arg(long, env = "LOCALTON_OBSERVABILITY_PORT")]
-    pub observability_port: Option<u16>,
+    /// First port considered for this agent's contiguous persistent allocation
+    ///
+    /// Defaults to 19000 and is used only when the state directory has no
+    /// initialized nodes. Restarts always reuse the ports saved in settings.json
+    #[arg(long, env = "LOCALTON_AGENT_PORT_BASE")]
+    pub port_base: Option<u16>,
 
     /// Do not publish signed observations or serve the observability UI
     #[arg(long)]
@@ -186,10 +189,6 @@ pub struct RunArgs {
     /// Maximum bootstrap/readiness wait in seconds.
     #[arg(long, default_value_t = 180)]
     pub startup_timeout: u64,
-
-    /// Total number of validators to enable, including genesis.
-    #[arg(long, value_parser = clap::value_parser!(usize))]
-    pub validators: Option<usize>,
 
     /// Simplex target interval between blocks in a new network. Defaults to 1s.
     ///
@@ -261,7 +260,6 @@ impl Default for RunArgs {
             state_dir: PathBuf::from(".localton"),
             ton_bin_dir: None,
             startup_timeout: 180,
-            validators: None,
             block_time: None,
             advertise_ip: None,
             add_account: Vec::new(),
@@ -300,13 +298,6 @@ pub enum ConfigCommand {
     },
     /// Validate settings.json without starting the network.
     Validate(StateArgs),
-    /// Enable a total number of validators in settings.json.
-    Validators {
-        #[command(flatten)]
-        state: StateArgs,
-        #[arg(value_parser = clap::value_parser!(usize))]
-        count: usize,
-    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -473,40 +464,10 @@ pub enum IndexerCommand {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum NodeCommand {
-    /// List configured nodes and their live status.
+    /// List host-local nodes and their live status.
     List {
         #[command(flatten)]
         state: StateArgs,
-    },
-    /// Enable and start a predefined node.
-    Add {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(long)]
-        fullnode_only: bool,
-        #[arg(long, default_value_t = true)]
-        liteserver: bool,
-    },
-    /// Start an enabled node.
-    Start {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-    },
-    /// Stop a node while leaving its state intact.
-    Stop {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-    },
-    /// Disable a node and optionally delete only that node's generated state.
-    Remove {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(long)]
-        delete_state: bool,
     },
     /// Print validator-engine-console getstats output.
     Stats {

@@ -40,13 +40,6 @@ pub async fn config(command: ConfigCommand) -> Result<()> {
             Settings::load_or_create(&layout.settings)?.validate()?;
             println!("valid: {}", layout.settings.display());
         }
-        ConfigCommand::Validators { state, count } => {
-            let layout = layout(&state)?;
-            let mut settings = Settings::load_or_create(&layout.settings)?;
-            settings.enable_validator_count(count)?;
-            settings.save_atomic(&layout.settings)?;
-            println!("validators={count}");
-        }
     }
     Ok(())
 }

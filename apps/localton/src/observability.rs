@@ -535,7 +535,7 @@ impl ObservationStore {
                 node.sync_lag_blocks = network_head
                     .zip(node.head_seqno)
                     .map(|(network, node)| network.saturating_sub(node));
-                let sync_status = sync_status(online, node.sync_lag_blocks);
+                let sync_status = sync_status(online, node.sync_lag_blocks, &node.status);
                 let validator_status = validator_status(
                     node.roles.iter().any(|role| role == "validator"),
                     node.participate_in_elections,
@@ -697,9 +697,12 @@ fn validate_endpoint(endpoint: &str) -> Result<()> {
     Ok(())
 }
 
-fn sync_status(online: bool, lag: Option<u32>) -> SyncStatus {
+fn sync_status(online: bool, lag: Option<u32>, runtime_status: &str) -> SyncStatus {
     if !online {
         return SyncStatus::Offline;
+    }
+    if runtime_status == "synchronizing" {
+        return SyncStatus::CatchingUp;
     }
     match lag {
         Some(lag) if lag <= SYNC_LAG_TOLERANCE_BLOCKS => SyncStatus::Synced,
@@ -795,6 +798,14 @@ mod tests {
         let peer_identity = ObserverIdentity::from_secret([8; 32]);
         let mut peer = ObservationStore::new("network".to_owned(), peer_identity, 600);
         assert!(peer.ingest(vec![observation], 101).is_err());
+    }
+
+    #[test]
+    fn synchronizing_runtime_is_catching_up_before_the_first_head() {
+        assert_eq!(
+            sync_status(true, None, "synchronizing"),
+            SyncStatus::CatchingUp
+        );
     }
 
     #[test]

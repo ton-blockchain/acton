@@ -101,20 +101,6 @@ impl ProcessRegistry {
         Ok(())
     }
 
-    /// Removes and stops one service without holding the registry lock during
-    /// asynchronous shutdown.
-    ///
-    /// Removing first prevents concurrent supervision from reporting an expected
-    /// exit and allows other registry operations to proceed during a slow stop.
-    pub async fn stop(&self, name: &str) -> Result<bool> {
-        let process = self.inner.lock().await.remove(name);
-        if let Some(mut process) = process {
-            process.stop().await?;
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
     /// Drains and stops every registered service in stable name order.
     ///
     /// Shutdown continues after individual failures so one broken implementation
@@ -237,7 +223,7 @@ mod tests {
         assert_eq!(info.len(), 1);
         assert_eq!(info[0].name, "validator");
         assert_eq!(info[0].pid, Some(42));
-        assert!(registry.stop("validator").await.unwrap());
+        registry.stop_all().await.unwrap();
         assert!(!registry.contains("validator").await);
         assert_eq!(*stopped.lock().unwrap(), ["validator"]);
     }

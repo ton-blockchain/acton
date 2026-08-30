@@ -1,9 +1,8 @@
 //! Startup and one-time initialization of local validator-engine nodes.
 //!
 //! The genesis node starts together with DHT because it is required for the
-//! network to produce its first blocks. Additional configured nodes are cloned
-//! from the genesis static state, receive independent identities and databases,
-//! and start only after the genesis liteserver proves that the chain advances.
+//! network to produce its first blocks. Followers are initialized through the
+//! agent path so local and remote nodes join the network in exactly the same way.
 
 use std::{fs, time::Duration};
 
@@ -27,7 +26,7 @@ use crate::{
     },
 };
 
-use super::{files::copy_tree, validator};
+use super::validator;
 
 /// Starts the DHT and genesis validator as the core process set.
 ///
@@ -79,69 +78,13 @@ pub(super) async fn start_core(
     processes.insert(validator).await
 }
 
-/// Initializes and starts every enabled node except the genesis validator.
-///
-/// This runs only after genesis block production has been observed. Consequently
-/// each new node copies a known-good static state and global config, then receives
-/// its own database and identities before joining the shared process registry.
-pub(super) async fn start_additional(
-    layout: &Layout,
-    tools: &Toolchain,
-    settings: &Settings,
-    timeout: Duration,
-    processes: &ProcessRegistry,
-    runtime: &mut RuntimeState,
-) -> Result<()> {
-    for node in settings
-        .nodes
-        .iter()
-        .filter(|node| node.enabled && node.name != "genesis")
-    {
-        let initialized = ensure_initialized(layout, tools, node, timeout).await?;
-        let context = OperationContext::for_node(timeout, &node.name);
-        let node_layout = layout.node(node);
-
-        let mut process = validator::start_persistent(
-            layout,
-            tools.validator_engine.as_ref(),
-            node,
-            ValidatorDatabase::open(node_layout.db)?,
-        )
-        .await?;
-
-        if let Err(error) = validator::wait_for_console(
-            layout,
-            tools.validator_console_tool.as_ref(),
-            node,
-            &mut process,
-            &context,
-        )
-        .await
-        {
-            process.stop().await?;
-            return Err(error)
-                .context(format!("node `{}` console did not become ready", node.name));
-        }
-
-        let mut node_runtime = initialized;
-        node_runtime.running = true;
-        node_runtime.pid = process.pid();
-        node_runtime.status = "running".to_owned();
-        runtime.nodes.insert(node.name.clone(), node_runtime);
-        processes.insert(process).await?;
-    }
-
-    runtime.save_atomic(&layout.runtime)?;
-    Ok(())
-}
-
 /// Returns reusable metadata for a node, creating its persistent state if needed.
 ///
 /// An existing engine config is the node-level initialization marker. Otherwise
 /// the function installs the global config, asks validator-engine to create a
 /// fresh database, generates independent control/liteserver keys, and registers
-/// a full-node ADNL identity through a temporary engine process. A launcher can
-/// also copy its local zerostate cache; a joined node obtains it over ADNL.
+/// a full-node ADNL identity through a temporary engine process. Every new node,
+/// whether local or remote, obtains the network state from its peers over ADNL.
 pub(super) async fn ensure_initialized(
     layout: &Layout,
     tools: &Toolchain,
@@ -158,8 +101,7 @@ pub(super) async fn ensure_initialized(
 
     info!(node = node.name, "initializing validator-engine node");
     node_layout.create_dirs()?;
-    // Static zerostates are shared by content, but each node gets its own copy
-    // under an independent database so later engine writes never overlap.
+
     fs::copy(&layout.global_config, &node_layout.global_config).with_context(|| {
         format!(
             "failed to copy global config to {}",
@@ -170,10 +112,6 @@ pub(super) async fn ensure_initialized(
         &layout.global_config,
         node_layout.db.join("global.config.json"),
     )?;
-    let static_states = layout.validator_db.join("static");
-    if static_states.is_dir() {
-        copy_tree(&static_states, &node_layout.db.join("static"))?;
-    }
 
     let context = OperationContext::for_node(timeout, &node.name);
     let validator_database = tools

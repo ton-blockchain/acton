@@ -42,12 +42,28 @@ impl ServiceSet {
         &self.endpoints
     }
 
-    pub async fn shutdown(self) {
+    pub async fn shutdown(mut self) {
         let _ = self.shutdown.send(true);
-        for task in self.tasks {
+        // Await by mutable reference so cancellation leaves every handle owned by
+        // `self`; Drop can then abort all unfinished tasks instead of detaching
+        // handles already moved into this future.
+        for task in &mut self.tasks {
             if let Err(error) = task.await {
                 warn!(%error, "HTTP service task failed during shutdown");
             }
+        }
+        self.tasks.clear();
+    }
+}
+
+impl Drop for ServiceSet {
+    fn drop(&mut self) {
+        // Startup futures are cancellation-safe: if Ctrl+C wins while an agent is
+        // still synchronizing, no detached HTTP or observation task survives the
+        // cleanup boundary.
+        let _ = self.shutdown.send(true);
+        for task in &self.tasks {
+            task.abort();
         }
     }
 }
@@ -82,12 +98,7 @@ pub async fn start(
     }
 
     if settings.services.observability.enabled {
-        let owned_nodes = settings
-            .nodes
-            .iter()
-            .filter(|node| node.enabled)
-            .map(|node| node.name.clone())
-            .collect();
+        let owned_nodes = BTreeSet::from(["genesis".to_owned()]);
         let advertised_ip = settings.node("genesis")?.public_ip;
         let running = observability::start(
             layout,

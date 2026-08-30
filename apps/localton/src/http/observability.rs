@@ -111,6 +111,18 @@ pub(super) async fn start(
         identity,
         observability.block_window_seconds,
     )));
+    let initial_chain = ChainSnapshot::default();
+    publish_runtime_observation(
+        &layout,
+        &owned_nodes,
+        &PublicationConfig {
+            endpoint: &endpoint,
+            ttl_seconds: observability.observation_ttl_seconds,
+        },
+        &initial_chain,
+        &store,
+    )
+    .await?;
     let state = ObservabilityState {
         store: Arc::clone(&store),
     };
@@ -151,13 +163,23 @@ pub(super) async fn start(
     peers.extend(extra_peers);
     peers.sort();
     peers.dedup();
-    let collector = tokio::spawn(collector_loop(
-        layout,
-        toolchain,
+    let (chain_updates, chain_snapshot) = watch::channel(initial_chain);
+    let publisher = tokio::spawn(publication_loop(
+        layout.clone(),
         settings.clone(),
-        owned_nodes,
+        owned_nodes.clone(),
         endpoint.clone(),
         Arc::clone(&store),
+        chain_snapshot,
+        shutdown.clone(),
+    ));
+    let collector = tokio::spawn(chain_collection_loop(
+        layout,
+        toolchain,
+        owned_nodes,
+        settings.services.observability.publish_interval_seconds,
+        settings.services.observability.block_window_seconds,
+        chain_updates,
         shutdown.clone(),
     ));
     let gossip = tokio::spawn(gossip_loop(
@@ -171,7 +193,7 @@ pub(super) async fn start(
     info!(%endpoint, "observability API and UI started");
     Ok(RunningObservability {
         service,
-        tasks: vec![collector, gossip],
+        tasks: vec![publisher, collector, gossip],
     })
 }
 
@@ -268,39 +290,97 @@ async fn health_handler(State(state): State<ObservabilityState>) -> Response {
     }
 }
 
-async fn collector_loop(
+/// Publishes signed process heartbeats independently of chain collection.
+///
+/// A liteserver query may take longer than the observation TTL while a follower
+/// is bootstrapping. Reading only the latest completed chain snapshot keeps the
+/// node online in peer views throughout that work.
+async fn publication_loop(
     layout: Layout,
-    toolchain: Toolchain,
     settings: Settings,
     owned_nodes: BTreeSet<String>,
     endpoint: String,
     store: SharedStore,
+    mut chain: watch::Receiver<ChainSnapshot>,
     mut shutdown: watch::Receiver<bool>,
 ) {
     let interval_seconds = settings.services.observability.publish_interval_seconds;
     let ttl_seconds = settings.services.observability.observation_ttl_seconds;
-    let block_window_seconds = settings.services.observability.block_window_seconds;
-    let mut chain = ChainCollector::default();
     let mut interval = tokio::time::interval(Duration::from_secs(interval_seconds));
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let publication = PublicationConfig {
         endpoint: &endpoint,
         ttl_seconds,
-        block_window_seconds,
     };
+    loop {
+        let publish = tokio::select! {
+            _ = interval.tick() => true,
+            changed = chain.changed() => {
+                if changed.is_err() {
+                    break;
+                }
+                true
+            }
+            changed = shutdown.changed() => {
+                if changed.is_err() || *shutdown.borrow() {
+                    break;
+                }
+                false
+            }
+        };
+        if publish {
+            let snapshot = chain.borrow().clone();
+            if let Err(error) = publish_runtime_observation(
+                &layout,
+                &owned_nodes,
+                &publication,
+                &snapshot,
+                &store,
+            )
+            .await
+            {
+                warn!(%error, "observability publication failed");
+            }
+        }
+    }
+}
+
+struct PublicationConfig<'a> {
+    endpoint: &'a str,
+    ttl_seconds: u64,
+}
+
+/// Updates chain data in a task that cannot delay signed process heartbeats.
+async fn chain_collection_loop(
+    layout: Layout,
+    toolchain: Toolchain,
+    owned_nodes: BTreeSet<String>,
+    interval_seconds: u64,
+    block_window_seconds: u64,
+    chain_updates: watch::Sender<ChainSnapshot>,
+    mut shutdown: watch::Receiver<bool>,
+) {
+    let mut collector = ChainCollector::default();
+    let mut interval = tokio::time::interval(Duration::from_secs(interval_seconds));
+    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                if let Err(error) = collect_and_publish(
-                    &layout,
-                    &toolchain,
-                    &owned_nodes,
-                    &publication,
-                    &mut chain,
-                    &store,
-                ).await {
-                    warn!(%error, "observability collection failed");
+                let now = unix_time();
+                if let Err(error) = collector
+                    .update(&toolchain, now, block_window_seconds)
+                    .await
+                {
+                    warn!(%error, "chain observation update failed");
                 }
+                let mut snapshot = collector.snapshot();
+                if snapshot.observation.is_some() {
+                    match collect_node_heads(&layout, &owned_nodes).await {
+                        Ok(heads) => snapshot.node_heads = heads,
+                        Err(error) => warn!(%error, "node head observation update failed"),
+                    }
+                }
+                chain_updates.send_replace(snapshot);
             }
             changed = shutdown.changed() => {
                 if changed.is_err() || *shutdown.borrow() {
@@ -311,35 +391,26 @@ async fn collector_loop(
     }
 }
 
-struct PublicationConfig<'a> {
-    endpoint: &'a str,
-    ttl_seconds: u64,
-    block_window_seconds: u64,
-}
-
-async fn collect_and_publish(
+/// Publishes host-local process state without waiting for any liteserver query.
+///
+/// Agents call this before starting gossip so peers can see nodes that are still
+/// bootstrapping. Later publications enrich the same report with chain heads,
+/// validator membership, and production data as those queries become available.
+async fn publish_runtime_observation(
     layout: &Layout,
-    toolchain: &Toolchain,
     owned_nodes: &BTreeSet<String>,
     publication: &PublicationConfig<'_>,
-    chain: &mut ChainCollector,
+    chain: &ChainSnapshot,
     store: &SharedStore,
 ) -> Result<()> {
     let now = unix_time();
-    if let Err(error) = chain
-        .update(toolchain, now, publication.block_window_seconds)
-        .await
-    {
-        warn!(%error, "chain observation update failed");
-    }
     let settings = Settings::load(&layout.settings)?;
     let runtime = RuntimeState::load(&layout.runtime)?;
     let network_head = chain.observation.as_ref().map(|chain| chain.head.seqno);
-    let reports = owned_nodes
+    let nodes = owned_nodes
         .iter()
         .filter_map(|name| settings.node(name).ok().cloned())
         .map(|node| {
-            let global_config = layout.global_config.clone();
             let runtime = runtime.nodes.get(&node.name).cloned().unwrap_or_default();
             let validator_keys = runtime
                 .validator_public_keys
@@ -356,55 +427,35 @@ async fn collect_and_publish(
             };
             let current_validator = membership(chain.current_validator_keys.as_ref());
             let next_validator = membership(chain.next_validator_keys.as_ref());
-            async move {
-                let head_seqno = if runtime.running {
-                    match runtime.liteserver_public_key.as_deref() {
-                        Some(public_key) => {
-                            match LocalLiteClient::connect_node(
-                                &global_config,
-                                node.liteserver_port,
-                                public_key,
-                            )
-                            .await
-                            {
-                                Ok(mut client) => client.last().await.ok().map(|head| head.seqno),
-                                Err(_) => None,
-                            }
-                        }
-                        None => None,
-                    }
-                } else {
-                    None
-                };
-                let mut roles = vec!["full_node".to_owned()];
-                if node.validator {
-                    roles.push("validator".to_owned());
-                }
-                if node.liteserver {
-                    roles.push("liteserver".to_owned());
-                }
-                NodeObservation {
-                    name: node.name,
-                    public_ip: node.public_ip.to_string(),
-                    roles,
-                    running: runtime.running,
-                    process_id: runtime.pid,
-                    status: runtime.status,
-                    last_error: runtime.last_error,
-                    head_seqno,
-                    sync_lag_blocks: network_head
-                        .zip(head_seqno)
-                        .map(|(network, node)| network.saturating_sub(node)),
-                    participate_in_elections: node.participate_in_elections,
-                    current_validator,
-                    next_validator,
-                    validator_public_key: runtime.validator_public_key.clone(),
-                    validator_public_keys: runtime.validator_public_keys,
-                    validator_adnl: runtime.validator_adnl,
-                }
+            let head_seqno = chain.node_heads.get(&node.name).copied();
+            let mut roles = vec!["full_node".to_owned()];
+            if node.validator {
+                roles.push("validator".to_owned());
             }
-        });
-    let nodes = join_all(reports).await;
+            if node.liteserver {
+                roles.push("liteserver".to_owned());
+            }
+            NodeObservation {
+                name: node.name,
+                public_ip: node.public_ip.to_string(),
+                roles,
+                running: runtime.running,
+                process_id: runtime.pid,
+                status: runtime.status,
+                last_error: runtime.last_error,
+                head_seqno,
+                sync_lag_blocks: network_head
+                    .zip(head_seqno)
+                    .map(|(network, node)| network.saturating_sub(node)),
+                participate_in_elections: node.participate_in_elections,
+                current_validator,
+                next_validator,
+                validator_public_key: runtime.validator_public_key.clone(),
+                validator_public_keys: runtime.validator_public_keys,
+                validator_adnl: runtime.validator_adnl,
+            }
+        })
+        .collect();
     let payload = ObservationPayload {
         endpoint: publication.endpoint.to_owned(),
         software: format!("localton/{}", env!("CARGO_PKG_VERSION")),
@@ -419,6 +470,53 @@ async fn collect_and_publish(
     Ok(())
 }
 
+/// Samples local liteserver heads for the next completed chain snapshot.
+///
+/// These queries may be slow or unavailable while a node catches up, so they run
+/// only in the chain task and never on the heartbeat publication path.
+async fn collect_node_heads(
+    layout: &Layout,
+    owned_nodes: &BTreeSet<String>,
+) -> Result<BTreeMap<String, u32>> {
+    let settings = Settings::load(&layout.settings)?;
+    let runtime = RuntimeState::load(&layout.runtime)?;
+    let samples = owned_nodes
+        .iter()
+        .filter_map(|name| settings.node(name).ok().cloned())
+        .filter_map(|node| {
+            let runtime = runtime.nodes.get(&node.name)?;
+            if !runtime.running {
+                return None;
+            }
+            let public_key = runtime.liteserver_public_key.clone()?;
+            Some((node, public_key))
+        })
+        .map(|(node, public_key)| {
+            let global_config = layout.global_config.clone();
+            async move {
+                let mut client = LocalLiteClient::connect_node(
+                    &global_config,
+                    node.liteserver_port,
+                    &public_key,
+                )
+                .await
+                .ok()?;
+                let head = client.last().await.ok()?;
+                Some((node.name, head.seqno))
+            }
+        });
+    Ok(join_all(samples).await.into_iter().flatten().collect())
+}
+
+/// Latest completed chain work consumed by the non-blocking heartbeat publisher.
+#[derive(Clone, Default)]
+struct ChainSnapshot {
+    observation: Option<ChainObservation>,
+    current_validator_keys: Option<BTreeSet<String>>,
+    next_validator_keys: Option<BTreeSet<String>>,
+    node_heads: BTreeMap<String, u32>,
+}
+
 #[derive(Default)]
 struct ChainCollector {
     last_scanned_seqno: Option<u32>,
@@ -431,6 +529,17 @@ struct ChainCollector {
 }
 
 impl ChainCollector {
+    /// Copies only completed data that heartbeat publication can consume without
+    /// sharing or locking the mutable block-scanning state.
+    fn snapshot(&self) -> ChainSnapshot {
+        ChainSnapshot {
+            observation: self.observation.clone(),
+            current_validator_keys: self.current_validator_keys.clone(),
+            next_validator_keys: self.next_validator_keys.clone(),
+            node_heads: BTreeMap::new(),
+        }
+    }
+
     async fn update(&mut self, toolchain: &Toolchain, now: u64, window_seconds: u64) -> Result<()> {
         let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
         let network_head = client.last().await?;
@@ -875,5 +984,70 @@ mod tests {
         expect_test::expect!["retrying"].assert_eq(election_stage(121, 30, 90, 120, false));
         expect_test::expect!["activation_overdue"]
             .assert_eq(election_stage(121, 30, 90, 120, true));
+    }
+
+    #[tokio::test]
+    async fn heartbeat_keeps_publishing_without_chain_updates() {
+        let directory = tempfile::tempdir_in("/tmp").unwrap();
+        let layout = Layout::new(directory.path().join("observer"));
+        layout.create_dirs().unwrap();
+        let mut settings = Settings::default();
+        settings.services.observability.publish_interval_seconds = 1;
+        settings.save_atomic(&layout.settings).unwrap();
+        let mut runtime = RuntimeState::new();
+        runtime.nodes.insert(
+            "genesis".to_owned(),
+            crate::storage::NodeRuntime {
+                initialized: true,
+                running: true,
+                status: "synchronizing".to_owned(),
+                ..crate::storage::NodeRuntime::default()
+            },
+        );
+        runtime.save_atomic(&layout.runtime).unwrap();
+
+        let identity = ObserverIdentity::load_or_create(
+            &layout.observability.join("heartbeat-test-identity.json"),
+        )
+        .unwrap();
+        let store = Arc::new(RwLock::new(ObservationStore::new(
+            "network".to_owned(),
+            identity,
+            60,
+        )));
+        let (_chain_updates, chain) = watch::channel(ChainSnapshot::default());
+        let (shutdown, shutdown_receiver) = watch::channel(false);
+        let task = tokio::spawn(publication_loop(
+            layout,
+            settings,
+            BTreeSet::from(["genesis".to_owned()]),
+            "http://127.0.0.1:18003".to_owned(),
+            Arc::clone(&store),
+            chain,
+            shutdown_receiver,
+        ));
+
+        let first_sequence = loop {
+            if let Some(observation) = store.read().await.local() {
+                break observation.sequence;
+            }
+            tokio::task::yield_now().await;
+        };
+        let second_sequence = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                if let Some(observation) = store.read().await.local()
+                    && observation.sequence > first_sequence
+                {
+                    break observation.sequence;
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        assert!(second_sequence > first_sequence);
+        shutdown.send(true).unwrap();
+        task.await.unwrap();
     }
 }

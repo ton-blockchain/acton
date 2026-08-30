@@ -1,9 +1,4 @@
-//! Runtime control operations exposed by the launcher's admin HTTP service.
-//!
-//! Once the core network is running, the admin service can start or stop a
-//! configured validator and enable the next available validator slot. These
-//! operations reuse the same initialization and process registry as the startup
-//! pipeline, so runtime state always describes the managed processes.
+//! Starts configured validator-engine nodes through the shared process registry.
 
 use std::time::Duration;
 
@@ -102,27 +97,6 @@ impl LauncherControl {
             Ok(())
         })?;
         Ok(node_runtime)
-    }
-
-    /// Stops a managed node if present and records the result atomically.
-    ///
-    /// The operation is safe to repeat: an absent process becomes `not running`
-    /// instead of turning an administrative retry into an error.
-    pub async fn stop_node(&self, name: &str) -> Result<NodeRuntime> {
-        Settings::load_or_create(&self.layout.settings)?.node(name)?;
-        let stopped = self.processes.stop(name).await?;
-        let updated = RuntimeState::update_atomic(&self.layout.runtime, |runtime| {
-            let node = runtime.nodes.entry(name.to_owned()).or_default();
-            node.running = false;
-            node.pid = None;
-            node.status = if stopped {
-                "stopped".to_owned()
-            } else {
-                "not running".to_owned()
-            };
-            Ok(())
-        })?;
-        Ok(updated.nodes.get(name).cloned().unwrap_or_default())
     }
 
     pub async fn process_info(&self) -> Vec<ProcessInfo> {

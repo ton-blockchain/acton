@@ -798,7 +798,7 @@ fn nano_to_grams(nano: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::{fs, net::Ipv4Addr};
 
     use base64::{Engine, engine::general_purpose::STANDARD};
     use serde_json::json;
@@ -809,15 +809,32 @@ mod tests {
         set_election_mode,
     };
     use crate::cli::StateArgs;
-    use crate::storage::{Layout, NodeRuntime, NodeSettings, RuntimeState, Settings};
+    use crate::storage::{
+        Layout, NodePorts, NodeRuntime, NodeSettings, RuntimeState, Settings,
+    };
+
+    fn follower_settings() -> Settings {
+        let mut settings = Settings::for_agent();
+        settings.nodes.push(NodeSettings::follower(
+            "node2".to_owned(),
+            Ipv4Addr::LOCALHOST,
+            NodePorts {
+                console: 20_000,
+                adnl: 20_001,
+                liteserver: 20_002,
+                out: 20_003,
+                dht: 20_004,
+            },
+        ));
+        settings
+    }
 
     #[test]
     fn validator_command_defaults_to_the_locally_managed_node() {
         let root = tempdir().unwrap();
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
-        let mut settings = Settings::default();
-        settings.node_mut("node2").unwrap().enabled = true;
+        let settings = follower_settings();
         settings.save_atomic(&layout.settings).unwrap();
         let mut runtime = RuntimeState::new();
         runtime
@@ -837,7 +854,7 @@ mod tests {
         let root = tempdir().unwrap();
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
-        let mut settings = Settings::default();
+        let mut settings = follower_settings();
         let node = settings.node_mut("node2").unwrap();
         node.enabled = true;
         node.validator = false;
@@ -878,7 +895,7 @@ mod tests {
     fn recovers_partially_configured_election_keys() {
         let directory = tempdir().unwrap();
         let layout = Layout::new(directory.path().to_owned());
-        let node = NodeSettings::for_index(1);
+        let node = follower_settings().nodes.remove(0);
         let node_layout = layout.node(&node);
         node_layout.create_dirs().unwrap();
         fs::write(

@@ -6,6 +6,8 @@
 //! wallet from a development faucet and enters elections directly through the
 //! TON Elector contract.
 
+mod ports;
+
 use std::{
     collections::BTreeSet,
     path::Path,
@@ -26,12 +28,14 @@ use crate::{
     observability::{ObserverIdentity, SYNC_LAG_TOLERANCE_BLOCKS},
     operations::{validators, wallets},
     runtime::ProcessRegistry,
-    storage::{Layout, RuntimeState, Settings, write_json_atomic},
+    storage::{Layout, NodeSettings, RuntimeState, Settings, write_json_atomic},
     ton::{
         global_config::GlobalConfig, lite::LocalLiteClient, toolchain::Toolchain,
         tools::types::TonPublicKey,
     },
 };
+
+use self::ports::{AgentPortAllocation, DEFAULT_AGENT_PORT_BASE};
 
 const MAX_GLOBAL_CONFIG_BYTES: u64 = 1024 * 1024;
 const VALIDATOR_WALLET_WORKCHAIN: i32 = -1;
@@ -70,21 +74,28 @@ pub async fn run(args: AgentArgs) -> Result<()> {
     let layout = Layout::new(state_root);
     layout.create_dirs()?;
     let _state_lock = acquire_lock(&layout.lock)?;
-    let owned_nodes = prepare_follower_state(&layout, &args).await?;
-    let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
-    let toolchain = Toolchain::official(layout.clone(), binaries.clone());
     let processes = ProcessRegistry::default();
-    let control = LauncherControl::new(
-        layout.clone(),
-        toolchain.clone(),
-        Duration::from_secs(args.startup_timeout),
-        processes.clone(),
-    );
-    let settings = Settings::load(&layout.settings)?;
-    let mut local_liteservers = Vec::new();
-    for name in &owned_nodes {
-        match control.start_node(name).await {
-            Ok(runtime) => {
+    // Install signal handling before any TON process starts. Otherwise Ctrl+C
+    // during initial synchronization terminates only the agent process and skips
+    // the managed-process cleanup below.
+    let run_result = select! {
+        result = async {
+            let owned_nodes = prepare_follower_state(&layout, &args).await?;
+            let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
+            let toolchain = Toolchain::official(layout.clone(), binaries.clone());
+            let control = LauncherControl::new(
+                layout.clone(),
+                toolchain.clone(),
+                Duration::from_secs(args.startup_timeout),
+                processes.clone(),
+            );
+            let settings = Settings::load(&layout.settings)?;
+            let mut local_liteservers = Vec::new();
+            for name in &owned_nodes {
+                let runtime = control
+                    .start_node(name)
+                    .await
+                    .with_context(|| format!("failed to start follower full node `{name}`"))?;
                 if let Some(public_key) = runtime.liteserver_public_key {
                     local_liteservers.push(LocalLiteserver {
                         node: name.clone(),
@@ -93,112 +104,84 @@ pub async fn run(args: AgentArgs) -> Result<()> {
                     });
                 }
             }
-            Err(error) => {
-                if let Err(stop_error) = stop_managed_nodes(&control).await {
-                    warn!(%stop_error, "failed to stop already started follower nodes");
+            let primary_liteserver = local_liteservers
+                .first()
+                .cloned()
+                .context("agent has no running node with a local liteserver")?;
+            RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                runtime.mark_launcher_started();
+                for name in &owned_nodes {
+                    if let Some(node) = runtime.nodes.get_mut(name) {
+                        node.status = "synchronizing".to_owned();
+                    }
                 }
-                return Err(error).context(format!("failed to start follower full node `{name}`"));
-            }
-        }
-    }
-    let primary_liteserver = local_liteservers
-        .first()
-        .cloned()
-        .context("agent has no running node with a local liteserver")?;
-    RuntimeState::update_atomic(&layout.runtime, |runtime| {
-        runtime.mark_launcher_started();
-        Ok(())
-    })?;
-    let observability_peers = match discover_observability_peer(&args.join).await {
-        Ok(Some(peer)) => vec![peer],
-        Ok(None) => Vec::new(),
-        Err(error) => {
-            warn!(%error, "could not discover a bootstrap observability peer");
-            Vec::new()
-        }
-    };
-    let services = match http::start_observability(
-        layout.clone(),
-        toolchain.clone(),
-        &settings,
-        owned_nodes.clone(),
-        args.advertise_ip,
-        observability_peers,
-    )
-    .await
-    {
-        Ok(services) => services,
-        Err(error) => {
-            if let Err(stop_error) = stop_managed_nodes(&control).await {
-                warn!(%stop_error, "failed to stop follower nodes after observability startup failed");
-            }
-            RuntimeState::update_atomic(&layout.runtime, |runtime| {
-                runtime.mark_launcher_stopped();
                 Ok(())
             })?;
-            return Err(error);
-        }
-    };
-    for liteserver in &local_liteservers {
-        if let Err(error) = wait_for_network_sync(
-            &layout.global_config,
-            liteserver,
-            Duration::from_secs(args.startup_timeout),
-        )
-        .await
-        {
+            let observability_peers = match discover_observability_peer(&args.join).await {
+                Ok(Some(peer)) => vec![peer],
+                Ok(None) => Vec::new(),
+                Err(error) => {
+                    warn!(%error, "could not discover a bootstrap observability peer");
+                    Vec::new()
+                }
+            };
+            let services = http::start_observability(
+                layout.clone(),
+                toolchain.clone(),
+                &settings,
+                owned_nodes.clone(),
+                args.advertise_ip,
+                observability_peers,
+            )
+            .await?;
+            for liteserver in &local_liteservers {
+                wait_for_network_sync(
+                    &layout.global_config,
+                    liteserver,
+                    Duration::from_secs(args.startup_timeout),
+                )
+                .await?;
+                RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                    if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
+                        node.status = "running".to_owned();
+                    }
+                    Ok(())
+                })?;
+            }
+            prefer_local_liteserver(
+                &layout.global_config,
+                primary_liteserver.port,
+                &primary_liteserver.public_key,
+            )?;
+            info!(
+                endpoint = %format!("127.0.0.1:{}", primary_liteserver.port),
+                "agent chain operations now use its synchronized local liteserver"
+            );
+            let validator_nodes: Vec<_> = settings
+                .nodes
+                .iter()
+                .filter(|node| owned_nodes.contains(&node.name) && node.validator)
+                .map(|node| node.name.as_str())
+                .collect();
+            info!(nodes = ?owned_nodes, global_config = %args.join, validators = ?validator_nodes, "localton agent nodes are running");
+            let validation_interval = toolchain.settings()?.validation.poll_interval_seconds;
+            let validation = validation_loop(
+                toolchain,
+                args.faucet.clone(),
+                owned_nodes,
+                validation_interval,
+            );
+            tokio::pin!(validation);
+            let result = select! {
+                result = supervise(&processes) => result,
+                result = &mut validation => result,
+            };
             services.shutdown().await;
-            if let Err(stop_error) = stop_managed_nodes(&control).await {
-                warn!(%stop_error, "failed to stop follower nodes after synchronization failed");
-            }
-            RuntimeState::update_atomic(&layout.runtime, |runtime| {
-                runtime.mark_launcher_stopped();
-                Ok(())
-            })?;
-            return Err(error);
-        }
-    }
-    if let Err(error) = prefer_local_liteserver(
-        &layout.global_config,
-        primary_liteserver.port,
-        &primary_liteserver.public_key,
-    ) {
-        services.shutdown().await;
-        if let Err(stop_error) = stop_managed_nodes(&control).await {
-            warn!(%stop_error, "failed to stop follower nodes after liteserver setup failed");
-        }
-        RuntimeState::update_atomic(&layout.runtime, |runtime| {
-            runtime.mark_launcher_stopped();
-            Ok(())
-        })?;
-        return Err(error);
-    }
-    info!(
-        endpoint = %format!("127.0.0.1:{}", primary_liteserver.port),
-        "agent chain operations now use its synchronized local liteserver"
-    );
-    let validator_nodes: Vec<_> = settings
-        .nodes
-        .iter()
-        .filter(|node| owned_nodes.contains(&node.name) && node.validator)
-        .map(|node| node.name.as_str())
-        .collect();
-    info!(nodes = ?owned_nodes, global_config = %args.join, validators = ?validator_nodes, "localton agent nodes are running");
-    let validation_interval = toolchain.settings()?.validation.poll_interval_seconds;
-    let validation = validation_loop(
-        toolchain,
-        args.faucet.clone(),
-        owned_nodes.clone(),
-        validation_interval,
-    );
-    tokio::pin!(validation);
-    let run_result = select! {
-        result = supervise(&processes) => result,
-        result = shutdown_signal() => result,
-        result = &mut validation => result,
+            result
+        } => result,
+        signal_result = shutdown_signal() => signal_result,
     };
-    services.shutdown().await;
-    let stop_result = stop_managed_nodes(&control).await;
+    let stop_result = processes.stop_all().await;
     let state_result = RuntimeState::update_atomic(&layout.runtime, |runtime| {
         runtime.mark_launcher_stopped();
         Ok(())
@@ -284,9 +267,19 @@ async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTr
         !layout.manifest.is_file(),
         "agent requires a separate follower state directory, not a launcher state directory"
     );
-    let settings_existed = layout.settings.is_file();
-    let mut settings = Settings::load_or_create(&layout.settings)?;
-    let requested = resolve_agent_nodes(layout, &mut settings, &args.nodes)?;
+    let mut settings = if layout.settings.is_file() {
+        Settings::load(&layout.settings)?
+    } else {
+        Settings::for_agent()
+    };
+    let requested = resolve_agent_nodes(
+        layout,
+        &mut settings,
+        &args.nodes,
+        args.port_base,
+        args.advertise_ip,
+        args.validator,
+    )?;
     if layout.global_config.is_file() {
         info!("reusing persisted TON global config");
     } else {
@@ -305,7 +298,7 @@ async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTr
     for name in &requested {
         let node = settings.node_mut(name)?;
         let node_initialized = layout.node(node).config_json().is_file();
-        if settings_existed && node_initialized {
+        if node_initialized {
             ensure!(
                 node.public_ip == args.advertise_ip,
                 "node `{name}` advertises {}; use the original --advertise-ip {}",
@@ -320,9 +313,6 @@ async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTr
         node.enabled = true;
     }
     settings.services.observability.bind = args.observability_bind;
-    if let Some(port) = args.observability_port {
-        settings.services.observability.port = port;
-    }
     if args.no_observability {
         settings.services.observability.enabled = false;
     }
@@ -335,35 +325,80 @@ fn resolve_agent_nodes(
     layout: &Layout,
     settings: &mut Settings,
     requested: &[String],
+    port_base: Option<u16>,
+    advertise_ip: std::net::Ipv4Addr,
+    validator: bool,
 ) -> Result<BTreeSet<String>> {
-    if requested.is_empty() {
-        let persisted = settings
-            .nodes
-            .iter()
-            .filter(|node| node.name != "genesis" && node.enabled)
-            .map(|node| node.name.clone())
-            .collect::<BTreeSet<_>>();
-        if !persisted.is_empty() {
+    let persisted = settings
+        .nodes
+        .iter()
+        .filter(|node| node.enabled)
+        .map(|node| node.name.clone())
+        .collect::<BTreeSet<_>>();
+    if !persisted.is_empty() {
+        ensure!(
+            !persisted.contains("genesis"),
+            "agent settings cannot contain the launcher-owned genesis node; use a new --state-dir"
+        );
+        if requested.is_empty() {
             return Ok(persisted);
         }
+        let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
+        ensure!(
+            requested == persisted,
+            "agent node names are persisted; restart with --node {} or omit --node",
+            persisted.iter().cloned().collect::<Vec<_>>().join(" --node ")
+        );
+        return Ok(persisted);
+    }
 
+    let names = if requested.is_empty() {
         let identity =
             ObserverIdentity::load_or_create(&layout.observability.join("identity.json"))?;
         let name = format!("node-{}", &identity.observer_id()[..12]);
-        let slot = settings
-            .nodes
-            .iter_mut()
-            .find(|node| node.name != "genesis" && !node.enabled)
-            .context("agent settings have no free full-node slot")?;
-        slot.name = name.clone();
-        return Ok(BTreeSet::from([name]));
-    }
+        BTreeSet::from([name])
+    } else {
+        let mut names = BTreeSet::new();
+        for name in requested {
+            ensure!(name != "genesis", "the agent cannot own the genesis node");
+            ensure!(names.insert(name.clone()), "duplicate agent node `{name}`");
+        }
+        names
+    };
 
-    let mut names = BTreeSet::new();
-    for name in requested {
-        ensure!(name != "genesis", "the agent cannot own the genesis node");
-        settings.node(name)?;
-        ensure!(names.insert(name.clone()), "duplicate agent node `{name}`");
+    let allocation = AgentPortAllocation::find(
+        port_base.unwrap_or(DEFAULT_AGENT_PORT_BASE),
+        names.len(),
+    )?;
+    settings.services.observability.port = allocation.observability;
+    settings.nodes = names
+        .iter()
+        .cloned()
+        .zip(allocation.nodes.iter().copied())
+        .map(|(name, ports)| {
+            let mut node = NodeSettings::follower(name, advertise_ip, ports);
+            node.validator = validator;
+            node.participate_in_elections = validator;
+            node
+        })
+        .collect();
+    info!(
+        port_range_start = allocation.start,
+        port_range_end = allocation.end,
+        observability_port = allocation.observability,
+        nodes = names.len(),
+        "allocated persistent agent port range"
+    );
+    for node in &settings.nodes {
+        info!(
+            node = node.name,
+            console_port = node.console_port,
+            adnl_port = node.adnl_port,
+            liteserver_port = node.liteserver_port,
+            out_port = node.out_port,
+            dht_port = node.dht_port,
+            "allocated persistent node ports"
+        );
     }
     Ok(names)
 }
@@ -527,27 +562,6 @@ fn http_url(source: &str, label: &str) -> Result<reqwest::Url> {
     Ok(url)
 }
 
-async fn stop_managed_nodes(control: &LauncherControl) -> Result<()> {
-    let names: Vec<_> = control
-        .process_info()
-        .await
-        .into_iter()
-        .map(|process| process.name)
-        .collect();
-    let mut first_error = None;
-    for name in names {
-        if let Err(error) = control.stop_node(&name).await
-            && first_error.is_none()
-        {
-            first_error = Some(error);
-        }
-    }
-    if let Some(error) = first_error {
-        return Err(error);
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -630,15 +644,28 @@ mod tests {
         let root = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(root.path().join("agent"));
         layout.create_dirs().unwrap();
-        let mut settings = Settings::default();
+        let mut settings = Settings::for_agent();
 
-        let first = resolve_agent_nodes(&layout, &mut settings, &[])
+        let first = resolve_agent_nodes(
+            &layout,
+            &mut settings,
+            &[],
+            Some(40_000),
+            Ipv4Addr::LOCALHOST,
+            false,
+        )
             .unwrap()
             .into_iter()
             .next()
             .unwrap();
-        settings.node_mut(&first).unwrap().enabled = true;
-        let second = resolve_agent_nodes(&layout, &mut settings, &[])
+        let second = resolve_agent_nodes(
+            &layout,
+            &mut settings,
+            &[],
+            None,
+            Ipv4Addr::LOCALHOST,
+            false,
+        )
             .unwrap()
             .into_iter()
             .next()
@@ -704,7 +731,7 @@ mod tests {
             advertise_ip: Ipv4Addr::new(10, 0, 0, 2),
             validator: false,
             observability_bind: Ipv4Addr::UNSPECIFIED,
-            observability_port: None,
+            port_base: Some(41_000),
             no_observability: false,
             ton_bin_dir: None,
             startup_timeout: 1,
@@ -715,8 +742,25 @@ mod tests {
 
         let settings = Settings::load(&layout.settings).unwrap();
         let node = settings.node("node2").unwrap();
+        let observability_port = settings.services.observability.port;
+        let node_ports_follow_observability = [
+            node.console_port,
+            node.adnl_port,
+            node.liteserver_port,
+            node.out_port,
+            node.dht_port,
+        ] == [
+            observability_port + 1,
+            observability_port + 2,
+            observability_port + 3,
+            observability_port + 4,
+            observability_port + 5,
+        ];
         let actual = serde_json::json!({
             "owned_nodes": owned_nodes,
+            "only_requested_node_is_persisted": settings.nodes.len() == 1,
+            "allocation_starts_at_requested_base": observability_port >= 41_000,
+            "node_ports_follow_observability": node_ports_follow_observability,
             "enabled": node.enabled,
             "validator": node.validator,
             "participate_in_elections": node.participate_in_elections,
@@ -730,8 +774,11 @@ mod tests {
         expect![[r#"
             {
               "advertise_ip": "10.0.0.2",
+              "allocation_starts_at_requested_base": true,
               "enabled": true,
               "global_config_is_valid": true,
+              "node_ports_follow_observability": true,
+              "only_requested_node_is_persisted": true,
               "owned_nodes": [
                 "node2"
               ],
@@ -744,10 +791,12 @@ mod tests {
 
         let mut validator_args = args;
         validator_args.validator = true;
+        validator_args.port_base = Some(50_000);
         prepare_follower_state(&layout, &validator_args)
             .await
             .unwrap();
         let promoted = Settings::load(&layout.settings).unwrap();
+        assert_eq!(promoted.services.observability.port, observability_port);
         let promoted = promoted.node("node2").unwrap();
         assert!(promoted.validator);
         assert!(promoted.participate_in_elections);

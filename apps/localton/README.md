@@ -1,6 +1,6 @@
 # localton
 
-localton runs an isolated TON development network on one computer.
+localton runs an isolated TON development network across one or more computers.
 
 One command starts a genesis validator, a local DHT server, and a liteserver. The masterchain produces blocks after the network is ready.
 
@@ -10,7 +10,7 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
-- Each launcher manages only the full nodes, validators, and private keys on its own host.
+- The launcher owns genesis; each agent owns only its host-local nodes and private keys.
 - A host agent joins the network from public bootstrap data and can enter elections independently.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
@@ -318,19 +318,35 @@ Make sure that the persistent configuration is valid:
 localton config validate
 ```
 
-Create a new network with three validators:
+The launcher creates only the genesis validator. Join every additional full node
+or validator through the agent command so nodes on the same host and remote hosts
+follow the same initialization and synchronization path:
 
 ```bash
-localton run --state-dir .localton-three --validators 3
+localton agent \
+  --state-dir .localton-validator-a \
+  --join http://127.0.0.1:18000/config \
+  --advertise-ip 127.0.0.1 \
+  --node validator-a \
+  --validator
 ```
 
-Change the enabled validator count in an existing state directory:
+On its first run, an agent reserves one contiguous range containing its
+observability port and five ports per node. It starts at port `19000` and advances
+one port at a time until the complete range is available. Use `--port-base` to
+choose the first candidate:
 
 ```bash
-localton config validators 3 --state-dir .localton
+localton agent \
+  --state-dir .localton-validator-b \
+  --join http://127.0.0.1:18000/config \
+  --advertise-ip 127.0.0.1 \
+  --port-base 20000 \
+  --validator
 ```
 
-The configuration contains seven predefined node slots. The first slot is always the genesis validator.
+The allocation is saved in the agent's `settings.json`. Restarts reuse those exact
+ports and never move a node because another process temporarily occupies one.
 
 ## Import accounts into the zerostate
 
@@ -437,43 +453,22 @@ The request returns after API V2 finds the transfer transaction. Therefore, the 
 
 ## Nodes and validators
 
-List the configured nodes:
+List or inspect nodes owned by one launcher or agent state directory:
 
 ```bash
 localton node list
+localton node stats node-abc123 --state-dir .localton-validator-a
 ```
 
-Enable and start another validator:
+Create every additional full node through an agent. Add `--validator` when the
+node must participate in elections:
 
 ```bash
-localton node add node2
-```
-
-Add a full node without validator participation:
-
-```bash
-localton node add node2 --fullnode-only
-```
-
-Start, stop, and inspect a node:
-
-```bash
-localton node start node2
-localton node stop node2
-localton node stats node2
-localton node console node2 getstats
-```
-
-Disable a node and keep its state:
-
-```bash
-localton node remove node2
-```
-
-CAUTION: The next command deletes the generated state for `node2`.
-
-```bash
-localton node remove node2 --delete-state
+localton agent \
+  --state-dir .localton-validator-a \
+  --join http://127.0.0.1:18000/config \
+  --advertise-ip 127.0.0.1 \
+  --validator
 ```
 
 Show elections and validator sets:
@@ -485,8 +480,8 @@ localton validator status
 Enable or disable participation in future elections without stopping the full node:
 
 ```bash
-localton validator enable node2
-localton validator disable node2
+localton validator enable --state-dir .localton-validator-a
+localton validator disable --state-dir .localton-validator-a
 ```
 
 Disabling validator mode does not remove the node from the active validator set. It finishes the current round, stops submitting entries for later rounds, remains synchronized as a full node, and continues recovering unfrozen stakes.
@@ -546,8 +541,6 @@ The administrative API on port `18001` provides these routes:
 - `GET /v1/settings` returns the persistent configuration.
 - `GET /v1/wallets` returns public wallet data.
 - `GET /v1/processes` returns managed process data.
-- `POST /v1/nodes/{name}/start` starts a node.
-- `POST /v1/nodes/{name}/stop` stops a node.
 - `POST /acton_fundAccount` funds an account from the genesis wallet.
 
 Disable either service for one run:

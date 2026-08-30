@@ -15,7 +15,6 @@ use crate::storage::{
 };
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
-pub const MAX_LOCAL_NODES: usize = 7;
 
 /// Persistent settings for one Full localnet
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -49,6 +48,21 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// Creates settings for a joining host before its first node is allocated.
+    ///
+    /// Agent state does not own genesis or launcher HTTP services. Keeping those
+    /// synthetic entries out of the file prevents commands from accidentally
+    /// treating a remote genesis validator as a host-local process.
+    #[must_use]
+    pub fn for_agent() -> Self {
+        let mut settings = Self::default();
+        settings.nodes.clear();
+        settings.services.config_http.enabled = false;
+        settings.services.admin_http.enabled = false;
+        settings.services.ton_http_api.enabled = false;
+        settings
+    }
+
     pub fn load_or_create(path: &Path) -> Result<Self> {
         if path.is_file() {
             return Self::load(path);
@@ -87,22 +101,7 @@ impl Settings {
             self.schema_version,
             SETTINGS_SCHEMA_VERSION
         );
-        ensure!(
-            !self.nodes.is_empty(),
-            "settings must contain a genesis node"
-        );
-        ensure!(
-            self.nodes.len() <= MAX_LOCAL_NODES,
-            "at most {MAX_LOCAL_NODES} local nodes are supported"
-        );
-        ensure!(
-            self.nodes[0].name == "genesis",
-            "the first node must be named genesis"
-        );
-        ensure!(
-            self.nodes[0].enabled && self.nodes[0].validator,
-            "genesis must be an enabled validator"
-        );
+        ensure!(!self.nodes.is_empty(), "settings must contain at least one node");
         self.network.validate()?;
         self.services.validate()?;
         self.validation.validate()?;
@@ -127,7 +126,11 @@ impl Settings {
                     bail!("duplicate TCP port {port}");
                 }
             }
-            for (kind, port) in [("ADNL", node.adnl_port), ("DHT", node.dht_port)] {
+            for (kind, port) in [
+                ("ADNL", node.adnl_port),
+                ("out", node.out_port),
+                ("DHT", node.dht_port),
+            ] {
                 if udp_ports
                     .insert(port, format!("{} {kind}", node.name))
                     .is_some()
@@ -136,20 +139,29 @@ impl Settings {
                 }
             }
         }
-        let service_ports = vec![
-            ("config HTTP", self.services.config_http.port),
-            ("admin HTTP", self.services.admin_http.port),
-            ("observability HTTP", self.services.observability.port),
-            ("TON HTTP API public proxy", self.services.ton_http_api.port),
-            (
-                "TON HTTP API backend",
-                self.services.ton_http_api.backend_port,
-            ),
-            (
-                "TON HTTP API monitor",
-                self.services.ton_http_api.monitor_port,
-            ),
-        ];
+        let mut service_ports = Vec::new();
+        if self.services.config_http.enabled {
+            service_ports.push(("config HTTP", self.services.config_http.port));
+        }
+        if self.services.admin_http.enabled {
+            service_ports.push(("admin HTTP", self.services.admin_http.port));
+        }
+        if self.services.observability.enabled {
+            service_ports.push(("observability HTTP", self.services.observability.port));
+        }
+        if self.services.ton_http_api.enabled {
+            service_ports.extend([
+                ("TON HTTP API public proxy", self.services.ton_http_api.port),
+                (
+                    "TON HTTP API backend",
+                    self.services.ton_http_api.backend_port,
+                ),
+                (
+                    "TON HTTP API monitor",
+                    self.services.ton_http_api.monitor_port,
+                ),
+            ]);
+        }
         for (kind, port) in service_ports {
             if tcp_ports.insert(port, kind.to_owned()).is_some() {
                 bail!("duplicate TCP port {port}");
@@ -170,19 +182,6 @@ impl Settings {
             .iter_mut()
             .find(|node| node.name == name)
             .with_context(|| format!("unknown node {name}"))
-    }
-
-    pub fn enable_validator_count(&mut self, count: usize) -> Result<()> {
-        ensure!(
-            (1..=MAX_LOCAL_NODES).contains(&count),
-            "validator count must be in 1..={MAX_LOCAL_NODES}"
-        );
-        for (index, node) in self.nodes.iter_mut().enumerate() {
-            node.enabled = index < count;
-            node.validator = index < count;
-            node.participate_in_elections = index < count;
-        }
-        Ok(())
     }
 }
 
@@ -380,33 +379,42 @@ pub struct NodeSettings {
     pub participate_in_elections: bool,
 }
 
+/// Ports assigned together to one validator-engine process.
+///
+/// The agent allocator deals in this complete type so initialization cannot
+/// accidentally mix ports from different candidate ranges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodePorts {
+    pub console: u16,
+    pub adnl: u16,
+    pub liteserver: u16,
+    pub out: u16,
+    pub dht: u16,
+}
+
 impl Default for NodeSettings {
     fn default() -> Self {
-        Self::for_index(0)
+        Self::genesis()
     }
 }
 
 impl NodeSettings {
-    pub fn for_index(index: usize) -> Self {
-        let index_u16 = u16::try_from(index).expect("local node index fits u16");
-        let is_genesis = index == 0;
+    /// Creates the one validator owned by the network launcher.
+    #[must_use]
+    pub fn genesis() -> Self {
         Self {
-            name: if is_genesis {
-                "genesis".to_owned()
-            } else {
-                format!("node{}", index + 1)
-            },
-            enabled: is_genesis,
-            validator: is_genesis,
+            name: "genesis".to_owned(),
+            enabled: true,
+            validator: true,
             liteserver: true,
             public_ip: Ipv4Addr::LOCALHOST,
-            console_port: VALIDATOR_CONSOLE_PORT + index_u16 * 3,
-            adnl_port: VALIDATOR_ADNL_PORT + index_u16 * 3,
-            liteserver_port: LITESERVER_PORT + index_u16 * 3,
-            out_port: OUT_PORT + index_u16,
-            dht_port: DHT_PORT + index_u16,
+            console_port: VALIDATOR_CONSOLE_PORT,
+            adnl_port: VALIDATOR_ADNL_PORT,
+            liteserver_port: LITESERVER_PORT,
+            out_port: OUT_PORT,
+            dht_port: DHT_PORT,
             threads: 4,
-            verbosity: if is_genesis { 2 } else { 1 },
+            verbosity: 2,
             sync_before_seconds: 3_600,
             state_ttl_seconds: 365 * 86_400,
             block_ttl_seconds: 365 * 86_400,
@@ -415,6 +423,25 @@ impl NodeSettings {
             initial_wallet_amount_nano: 50_005_000_000_000,
             validator_stake_nano: 10_001_000_000_000,
             participate_in_elections: true,
+        }
+    }
+
+    /// Creates an agent-owned follower with one already allocated port set.
+    #[must_use]
+    pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
+        Self {
+            name,
+            enabled: true,
+            validator: false,
+            public_ip,
+            console_port: ports.console,
+            adnl_port: ports.adnl,
+            liteserver_port: ports.liteserver,
+            out_port: ports.out,
+            dht_port: ports.dht,
+            verbosity: 1,
+            participate_in_elections: false,
+            ..Self::genesis()
         }
     }
 
@@ -448,7 +475,7 @@ impl NodeSettings {
 }
 
 fn default_nodes() -> Vec<NodeSettings> {
-    (0..MAX_LOCAL_NODES).map(NodeSettings::for_index).collect()
+    vec![NodeSettings::genesis()]
 }
 
 /// Settings for Localton HTTP services
@@ -744,13 +771,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_cover_all_local_node_slots() {
+    fn launcher_defaults_contain_only_genesis() {
         let settings = Settings::default();
         settings.validate().unwrap();
         assert_eq!(settings.network.global_id, -3);
-        assert_eq!(settings.nodes.len(), 7);
+        assert_eq!(settings.nodes.len(), 1);
+        assert_eq!(settings.nodes[0].name, "genesis");
         assert!(settings.nodes[0].participate_in_elections);
-        assert_eq!(settings.nodes[6].name, "node7");
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
@@ -791,21 +818,21 @@ mod tests {
     }
 
     #[test]
-    fn enabling_validator_count_updates_topology() {
-        let mut settings = Settings::default();
-        settings.enable_validator_count(3).unwrap();
-        assert!(settings.nodes[0].enabled);
-        assert!(settings.nodes[0].participate_in_elections);
-        assert!(settings.nodes[1].validator);
-        assert!(settings.nodes[2].participate_in_elections);
-        assert!(!settings.nodes[3].enabled);
-    }
-
-    #[test]
     fn duplicate_ports_are_rejected() {
         let mut settings = Settings::default();
-        settings.nodes[1].enabled = true;
-        settings.nodes[1].console_port = settings.nodes[0].console_port;
+        let mut follower = NodeSettings::follower(
+            "follower".to_owned(),
+            Ipv4Addr::LOCALHOST,
+            NodePorts {
+                console: 20_000,
+                adnl: 20_001,
+                liteserver: 20_002,
+                out: 20_003,
+                dht: 20_004,
+            },
+        );
+        follower.console_port = settings.nodes[0].console_port;
+        settings.nodes.push(follower);
         assert!(settings.validate().is_err());
     }
 }

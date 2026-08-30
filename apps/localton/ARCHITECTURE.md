@@ -176,7 +176,7 @@ apps/localton/src/
 │   ├── genesis.rs             # Genesis workflow
 │   ├── dht.rs                 # DHT/global-config workflow
 │   ├── validator.rs           # Validator identity workflow
-│   ├── nodes.rs               # Persistent node startup workflow
+│   ├── nodes.rs               # Genesis startup and follower initialization
 │   └── pipeline.rs            # Launcher lifecycle
 └── runtime/
     ├── command.rs             # One-shot subprocess execution
@@ -710,7 +710,7 @@ The console adapter owns only individual console operations and their parsing.
 
 ## Node startup workflow
 
-Persistent startup remains launcher-owned:
+The launcher owns only genesis startup:
 
 ```text
 resolve state and distribution
@@ -719,13 +719,31 @@ resolve state and distribution
     -> start DHT service
     -> start genesis validator-engine service
     -> prove increasing masterchain seqnos
-    -> start additional nodes
     -> start optional HTTP services
     -> publish ready state
     -> supervise services until shutdown or failure
 ```
 
+Every follower starts through an agent, even when it runs on the launcher host:
+
+```text
+fetch or reuse the global config
+    -> allocate and persist one contiguous host port range
+    -> initialize independent node databases and identities
+    -> start signed observability with synchronizing status
+    -> synchronize each node over ADNL
+    -> enable local chain operations and validator automation
+    -> supervise services until shutdown or failure
+```
+
 An agent uses the same `ValidatorEngine` and `ValidatorConsole` contracts as the genesis launcher. Joining a network changes workflow inputs, not the subprocess abstraction.
+
+Signal handling covers the complete agent workflow, including initialization and
+ADNL catch-up. `Ctrl+C`, a child failure, and a normal steady-state shutdown all
+converge on `ProcessRegistry::stop_all` and the same atomic runtime-state cleanup.
+This boundary must be installed before the first TON subprocess starts: handling
+signals only after synchronization can orphan validator-engine when startup is
+interrupted. Dropping partially started HTTP services also cancels their tasks.
 
 ## Configuration ownership
 
@@ -784,6 +802,11 @@ Error messages should answer:
 Command rendering must not print private key bytes, wallet seed material, or signed payload contents. Key identifiers and paths can be logged when they are operationally necessary.
 
 ## Observability
+
+Signed node heartbeats and chain inspection run in separate tasks. Heartbeats
+publish the latest completed chain snapshot and must never await liteserver,
+block-scanning, election, or node-head queries. This keeps a live observer online
+while its node synchronizes or a chain query exceeds the observation TTL.
 
 Every production adapter emits one span per semantic operation.
 

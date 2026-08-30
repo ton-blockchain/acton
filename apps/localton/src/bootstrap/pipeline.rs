@@ -2,7 +2,7 @@
 //!
 //! [`run`] is intentionally expressed as ordered lifecycle stages: prepare the
 //! request, create or validate persistent state, start the core processes, prove
-//! masterchain progress, add optional nodes and APIs, publish readiness, then
+//! masterchain progress, add optional APIs, publish readiness, then
 //! supervise everything until shutdown. Technical details live in sibling
 //! modules and do not obscure this sequence.
 
@@ -102,16 +102,6 @@ pub async fn run(args: RunArgs) -> Result<()> {
         )
         .await?;
 
-        nodes::start_additional(
-            &layout,
-            &tools,
-            &settings,
-            timeout,
-            &processes,
-            &mut runtime,
-        )
-        .await?;
-
         http::v2::start(
             &layout,
             &tools.binaries,
@@ -159,14 +149,19 @@ pub async fn run(args: RunArgs) -> Result<()> {
 
 /// Builds the effective settings for this invocation.
 ///
-/// Topology changes such as validator count and enabled services are persisted.
-/// Bind and executable overrides are applied after that save because they are
-/// operational choices for this run, not properties of the blockchain itself.
+/// Network parameters and enabled services are persisted. Bind and executable
+/// overrides are applied after that save because they are operational choices
+/// for this run, not properties of the blockchain itself.
 fn prepare_settings(layout: &Layout, args: &RunArgs) -> Result<Settings> {
     let mut settings = Settings::load_or_create(&layout.settings)?;
-    if let Some(validators) = args.validators {
-        settings.enable_validator_count(validators)?;
-    }
+    let genesis = settings
+        .nodes
+        .first()
+        .context("launcher settings contain no genesis node")?;
+    ensure!(
+        genesis.name == "genesis" && genesis.enabled && genesis.validator,
+        "launcher settings must start with an enabled genesis validator"
+    );
 
     if let Some(block_time) = args.block_time {
         if layout.manifest.is_file() {
