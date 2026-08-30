@@ -33,6 +33,7 @@ pub(crate) struct ValidatorSetStatus {
     pub until: u32,
     pub total: u16,
     pub main: u16,
+    pub public_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,11 +217,22 @@ fn parse_validator_set_status(output: &str, parameter: u8) -> Result<Option<Vali
     let values = Regex::new(r"utime_since:(\d+)\s+utime_until:(\d+)\s+total:(\d+)\s+main:(\d+)")?
         .captures(section)
         .with_context(|| format!("config parameter {parameter} has an invalid validator set"))?;
+    let total = values[3].parse()?;
+    let public_keys = Regex::new(r"ed25519_pubkey\s+pubkey:x([0-9A-Fa-f]{64})")?
+        .captures_iter(section)
+        .map(|captures| captures[1].to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    ensure!(
+        public_keys.len() == usize::from(total),
+        "config parameter {parameter} reports {total} validators but contains {} public keys",
+        public_keys.len()
+    );
     Ok(Some(ValidatorSetStatus {
         since: values[1].parse()?,
         until: values[2].parse()?,
-        total: values[3].parse()?,
+        total,
         main: values[4].parse()?,
+        public_keys,
     }))
 }
 
@@ -950,8 +962,13 @@ mod tests {
     fn parses_batched_election_config() {
         let output = r#"
 ConfigParam(15) = ( validators_elected_for:120 elections_start_before:90 elections_end_before:30 stake_held_for:30)
-ConfigParam(34) = (cur_validators:(validators_ext utime_since:1000 utime_until:1120 total:2 main:2 total_weight:10))
-ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:1240 total:3 main:2 total_weight:20))
+ConfigParam(34) = (cur_validators:(validators_ext utime_since:1000 utime_until:1120 total:2 main:2 total_weight:10
+  public_key:(ed25519_pubkey pubkey:xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)
+  public_key:(ed25519_pubkey pubkey:xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)))
+ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:1240 total:3 main:2 total_weight:20
+  public_key:(ed25519_pubkey pubkey:xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC)
+  public_key:(ed25519_pubkey pubkey:xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD)
+  public_key:(ed25519_pubkey pubkey:xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE)))
 "#;
         let status = parse_election_status(output).unwrap();
         assert_eq!(status.validators_elected_for, 120);
@@ -961,6 +978,7 @@ ConfigParam(36) = (next_validators:(validators_ext utime_since:1120 utime_until:
         assert_eq!(status.current.since, 1000);
         assert_eq!(status.current.until, 1120);
         assert_eq!(status.current.total, 2);
+        assert_eq!(status.current.public_keys[0], "a".repeat(64));
         assert_eq!(status.next.unwrap().total, 3);
     }
 

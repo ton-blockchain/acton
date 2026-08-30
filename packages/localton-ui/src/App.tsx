@@ -77,11 +77,18 @@ export function App() {
         .some(value => value?.toLowerCase().includes(normalized)),
     )
   }, [network, query])
+  const catchingUpNodes = useMemo(
+    () => network?.nodes.filter(node => node.sync_status === "catching_up") ?? [],
+    [network],
+  )
 
   if (!network && !error) {
     return (
       <main className="boot-state">
-        <InlineLoader message="Reading network state" subtext="Waiting for the first signed observation" />
+        <InlineLoader
+          message="Reading network state"
+          subtext="Waiting for the first signed observation"
+        />
       </main>
     )
   }
@@ -134,18 +141,64 @@ export function App() {
                   <ChainTrust source={network.chain_source} />
                 </div>
                 <div className="metric-strip">
-                  <Metric label="Online nodes" value={`${network.totals.online_nodes} / ${network.totals.nodes}`} tone={network.totals.online_nodes === network.totals.nodes ? "good" : "warning"} />
-                  <Metric label="Active validators" value={`${network.totals.active_validators} / ${network.totals.configured_validators}`} tone={network.totals.active_validators === network.totals.configured_validators ? "good" : "warning"} />
-                  <Metric label="Masterchain" value={network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Unavailable"} />
+                  <Metric
+                    label="Online nodes"
+                    value={`${network.totals.online_nodes} / ${network.totals.nodes}`}
+                    tone={network.totals.online_nodes === network.totals.nodes ? "good" : "warning"}
+                  />
+                  <Metric
+                    label="Synchronized"
+                    value={`${network.totals.synchronized_nodes} / ${network.totals.nodes}`}
+                    tone={
+                      network.totals.synchronized_nodes === network.totals.nodes
+                        ? "good"
+                        : "warning"
+                    }
+                  />
+                  <Metric
+                    label="Active validators"
+                    value={`${network.totals.active_validators} / ${network.totals.configured_validators}`}
+                    tone={
+                      network.totals.active_validators === network.totals.configured_validators
+                        ? "good"
+                        : "warning"
+                    }
+                  />
+                  <Metric
+                    label="Masterchain"
+                    value={
+                      network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Unavailable"
+                    }
+                  />
                   <Metric label="Current shards" value={String(network.chain?.shard_count ?? 0)} />
-                  <Metric label="Observed blocks" value={(network.totals.masterchain_blocks + network.totals.shard_blocks).toLocaleString()} />
                 </div>
+                {catchingUpNodes.length > 0 ? (
+                  <div className="notice notice-warning" role="status">
+                    <CircleAlert size={16} aria-hidden="true" />
+                    <span>
+                      {catchingUpNodes.length === 1
+                        ? `${catchingUpNodes[0].name} is catching up`
+                        : `${catchingUpNodes.length} nodes are catching up`}
+                    </span>
+                    <span className="notice-detail">
+                      Maximum lag{" "}
+                      {Math.max(
+                        ...catchingUpNodes.map(node => node.sync_lag_blocks ?? 0),
+                      ).toLocaleString()}{" "}
+                      blocks
+                    </span>
+                  </div>
+                ) : null}
                 {network.chain ? (
                   <div className="chain-line">
                     <span>Latest masterchain block</span>
                     <TechnicalValue value={network.chain.root_hash} copyLabel="block root hash" />
                     <span className="chain-age">
-                      <Duration value={Math.max(0, now - network.chain.gen_utime)} display="elapsed" /> old
+                      <Duration
+                        value={Math.max(0, now - network.chain.gen_utime)}
+                        display="elapsed"
+                      />{" "}
+                      old
                     </span>
                   </div>
                 ) : (
@@ -176,7 +229,11 @@ export function App() {
                   <h2 id="nodes-title">Nodes and synchronization</h2>
                   <label className="search-field">
                     <span className="visually-hidden">Filter nodes</span>
-                    <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filter nodes" />
+                    <input
+                      value={query}
+                      onChange={event => setQuery(event.target.value)}
+                      placeholder="Filter nodes"
+                    />
                   </label>
                 </div>
                 <NodesTable nodes={visibleNodes} />
@@ -187,7 +244,9 @@ export function App() {
                   <h2 id="validators-title">Validator production</h2>
                   <span className="section-meta">Rolling observation window</span>
                 </div>
-                <ValidatorsTable nodes={network.nodes.filter(node => node.roles.includes("validator"))} />
+                <ValidatorsTable
+                  nodes={network.nodes.filter(node => node.roles.includes("validator"))}
+                />
               </section>
 
               <section id="shards" className="section-stack" aria-labelledby="shards-title">
@@ -217,11 +276,21 @@ export function App() {
                     <DataTableBody>
                       {network.observers.map(observer => (
                         <DataTableRow key={observer.observer_id}>
-                          <DataTableCell><StatusPill online={observer.online} /></DataTableCell>
-                          <DataTableCell><TechnicalValue value={observer.observer_id} copyLabel="observer ID" /></DataTableCell>
-                          <DataTableCell mono truncate>{observer.endpoint}</DataTableCell>
-                          <DataTableCell align="right"><span className="tabular">{observer.node_count.toLocaleString()}</span></DataTableCell>
-                          <DataTableCell><RelativeTime value={observer.generated_at} now={now} unit="seconds" /></DataTableCell>
+                          <DataTableCell>
+                            <StatusPill online={observer.online} />
+                          </DataTableCell>
+                          <DataTableCell>
+                            <TechnicalValue value={observer.observer_id} copyLabel="observer ID" />
+                          </DataTableCell>
+                          <DataTableCell mono truncate>
+                            {observer.endpoint}
+                          </DataTableCell>
+                          <DataTableCell align="right">
+                            <span className="tabular">{observer.node_count.toLocaleString()}</span>
+                          </DataTableCell>
+                          <DataTableCell>
+                            <RelativeTime value={observer.generated_at} now={now} unit="seconds" />
+                          </DataTableCell>
                         </DataTableRow>
                       ))}
                     </DataTableBody>
@@ -236,17 +305,53 @@ export function App() {
   )
 }
 
-function NavigationLink({href, icon, label}: {readonly href: string; readonly icon: React.ReactNode; readonly label: string}) {
-  return <a href={href}>{icon}<span>{label}</span></a>
+function NavigationLink({
+  href,
+  icon,
+  label,
+}: {
+  readonly href: string
+  readonly icon: React.ReactNode
+  readonly label: string
+}) {
+  return (
+    <a href={href}>
+      {icon}
+      <span>{label}</span>
+    </a>
+  )
 }
 
-function Metric({label, value, tone = "default"}: {readonly label: string; readonly value: string; readonly tone?: "default" | "good" | "warning"}) {
-  return <div className="metric"><span>{label}</span><strong data-tone={tone}>{value}</strong></div>
+function Metric({
+  label,
+  value,
+  tone = "default",
+}: {
+  readonly label: string
+  readonly value: string
+  readonly tone?: "default" | "good" | "warning"
+}) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong data-tone={tone}>{value}</strong>
+    </div>
+  )
 }
 
 function ChainTrust({source}: {readonly source: NetworkView["chain_source"]}) {
-  const label = source === "local_verification" ? "Verified locally" : source === "peer_attestation" ? "Peer attestation" : "Unavailable"
-  return <span className="trust" data-source={source}><ShieldCheck size={13} aria-hidden="true" />{label}</span>
+  const label =
+    source === "local_verification"
+      ? "Verified locally"
+      : source === "peer_attestation"
+        ? "Peer attestation"
+        : "Unavailable"
+  return (
+    <span className="trust" data-source={source}>
+      <ShieldCheck size={13} aria-hidden="true" />
+      {label}
+    </span>
+  )
 }
 
 const ELECTION_STAGE_LABELS: Record<ElectionObservation["stage"], string> = {
@@ -259,33 +364,52 @@ const ELECTION_STAGE_LABELS: Record<ElectionObservation["stage"], string> = {
 }
 
 function ElectionStage({stage}: {readonly stage: ElectionObservation["stage"]}) {
-  return <span className="election-stage" data-stage={stage}>{ELECTION_STAGE_LABELS[stage]}</span>
+  return (
+    <span className="election-stage" data-stage={stage}>
+      {ELECTION_STAGE_LABELS[stage]}
+    </span>
+  )
 }
 
-function ElectionDiagram({election, now}: {readonly election: ElectionObservation; readonly now: number}) {
+function ElectionDiagram({
+  election,
+  now,
+}: {
+  readonly election: ElectionObservation
+  readonly now: number
+}) {
   const start = election.validation_started_at
   const end = Math.max(start + 1, election.next_set_activation_at)
   const retrying = election.stage === "retrying"
   const chartEnd = retrying ? Math.max(end + 30, now + 30) : end
   const chartStart = 48
   const chartWidth = 904
-  const x = (value: number) => chartStart + ((Math.min(chartEnd, Math.max(start, value)) - start) / (chartEnd - start)) * chartWidth
+  const x = (value: number) =>
+    chartStart +
+    ((Math.min(chartEnd, Math.max(start, value)) - start) / (chartEnd - start)) * chartWidth
   const openX = x(election.elections_open_at)
   const closeX = x(election.elections_close_at)
   const endX = x(end)
   const chartEndX = x(chartEnd)
   const nowX = x(now)
   const boundaries = [...new Set([chartStart, openX, closeX, endX])]
-  const timeMarkers = [...new Set([start, election.elections_open_at, election.elections_close_at, end])]
-  const formatTime = (value: number) => new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(value * 1000)
+  const timeMarkers = [
+    ...new Set([start, election.elections_open_at, election.elections_close_at, end]),
+  ]
+  const formatTime = (value: number) =>
+    new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(value * 1000)
   const stages = [
     {label: "Current set", start, end: election.elections_open_at},
     {label: "Entry window", start: election.elections_open_at, end: election.elections_close_at},
-    {label: election.next_validators === null ? "Selection" : "Next set ready", start: election.elections_close_at, end},
+    {
+      label: election.next_validators === null ? "Selection" : "Next set ready",
+      start: election.elections_close_at,
+      end,
+    },
   ].filter(stage => stage.end > stage.start)
 
   return (
@@ -294,24 +418,93 @@ function ElectionDiagram({election, now}: {readonly election: ElectionObservatio
         <Metric label="Round ID" value={election.round_id.toLocaleString()} />
         <Metric label="Current set" value={formatValidators(election.current_validators)} />
         <Metric label="Main subset" value={formatValidators(election.current_main_validators)} />
-        <Metric label="Next set" value={election.next_validators === null ? "Pending" : formatValidators(election.next_validators)} />
+        <Metric
+          label="Next set"
+          value={
+            election.next_validators === null
+              ? "Pending"
+              : formatValidators(election.next_validators)
+          }
+        />
         <Metric label="Stake hold" value={`${election.stake_held_for}s`} />
       </div>
       <div className="election-chart" data-stage={election.stage}>
-        <svg viewBox="0 0 1000 126" role="img" aria-labelledby="election-chart-title election-chart-description">
+        <svg
+          viewBox="0 0 1000 126"
+          role="img"
+          aria-labelledby="election-chart-title election-chart-description"
+        >
           <title id="election-chart-title">Validator election timeline</title>
-          <desc id="election-chart-description">Current validation, entry window, next validator selection, and activation</desc>
-          <rect className="timeline-segment timeline-validation" x={chartStart} y="48" width={Math.max(0, openX - chartStart)} height="16" rx="8" />
-          <rect className="timeline-segment timeline-entry" x={openX} y="48" width={Math.max(0, closeX - openX)} height="16" />
-          <rect className="timeline-segment timeline-selection" x={closeX} y="48" width={Math.max(0, endX - closeX)} height="16" rx="8" />
-          {retrying && <rect className="timeline-segment timeline-retry" x={endX} y="48" width={Math.max(0, chartEndX - endX)} height="16" rx="8" />}
-          {boundaries.map(position => <circle key={position} className="timeline-boundary" cx={position} cy="56" r={position === endX ? 6 : 4} />)}
+          <desc id="election-chart-description">
+            Current validation, entry window, next validator selection, and activation
+          </desc>
+          <rect
+            className="timeline-segment timeline-validation"
+            x={chartStart}
+            y="48"
+            width={Math.max(0, openX - chartStart)}
+            height="16"
+            rx="8"
+          />
+          <rect
+            className="timeline-segment timeline-entry"
+            x={openX}
+            y="48"
+            width={Math.max(0, closeX - openX)}
+            height="16"
+          />
+          <rect
+            className="timeline-segment timeline-selection"
+            x={closeX}
+            y="48"
+            width={Math.max(0, endX - closeX)}
+            height="16"
+            rx="8"
+          />
+          {retrying && (
+            <rect
+              className="timeline-segment timeline-retry"
+              x={endX}
+              y="48"
+              width={Math.max(0, chartEndX - endX)}
+              height="16"
+              rx="8"
+            />
+          )}
+          {boundaries.map(position => (
+            <circle
+              key={position}
+              className="timeline-boundary"
+              cx={position}
+              cy="56"
+              r={position === endX ? 6 : 4}
+            />
+          ))}
           <line className="timeline-now-line" x1={nowX} x2={nowX} y1="25" y2="87" />
           <circle className="timeline-now-dot" cx={nowX} cy="56" r="6" />
-          <text className="timeline-now-label" x={nowX} y="17" textAnchor={nowX > 900 ? "end" : nowX < 100 ? "start" : "middle"}>NOW</text>
+          <text
+            className="timeline-now-label"
+            x={nowX}
+            y="17"
+            textAnchor={nowX > 900 ? "end" : nowX < 100 ? "start" : "middle"}
+          >
+            NOW
+          </text>
           {timeMarkers.map(value => {
             const position = x(value)
-            return <text className="timeline-time" key={value} x={position} y="105" textAnchor={position === chartStart ? "start" : position === endX ? "end" : "middle"}>{formatTime(value)}</text>
+            return (
+              <text
+                className="timeline-time"
+                key={value}
+                x={position}
+                y="105"
+                textAnchor={
+                  position === chartStart ? "start" : position === endX ? "end" : "middle"
+                }
+              >
+                {formatTime(value)}
+              </text>
+            )
           })}
         </svg>
       </div>
@@ -321,15 +514,35 @@ function ElectionDiagram({election, now}: {readonly election: ElectionObservatio
           return (
             <div className="election-step" data-state={state} key={stage.label}>
               <span className="election-step-marker" aria-hidden="true" />
-              <div><strong>{stage.label}</strong><span>{formatTime(stage.start)}–{formatTime(stage.end)}</span></div>
+              <div>
+                <strong>{stage.label}</strong>
+                <span>
+                  {formatTime(stage.start)}–{formatTime(stage.end)}
+                </span>
+              </div>
             </div>
           )
         })}
-        <div className="election-step" data-state={retrying ? "waiting" : now >= end ? election.next_validators === null ? "waiting" : "overdue" : "upcoming"}>
+        <div
+          className="election-step"
+          data-state={
+            retrying
+              ? "waiting"
+              : now >= end
+                ? election.next_validators === null
+                  ? "waiting"
+                  : "overdue"
+                : "upcoming"
+          }
+        >
           <span className="election-step-marker" aria-hidden="true" />
           <div>
             <strong>{retrying ? "Automatic election retry" : "Next set activation"}</strong>
-            <span>{retrying ? `${Math.max(0, now - end).toLocaleString()}s since scheduled activation` : formatTime(end)}</span>
+            <span>
+              {retrying
+                ? `${Math.max(0, now - end).toLocaleString()}s since scheduled activation`
+                : formatTime(end)}
+            </span>
           </div>
         </div>
       </div>
@@ -342,29 +555,125 @@ function formatValidators(count: number) {
 }
 
 function StatusPill({online}: {readonly online: boolean}) {
-  return <span className="status-pill" data-online={online ? "true" : "false"}><span aria-hidden="true" />{online ? "Online" : "Offline"}</span>
+  return (
+    <span className="status-pill" data-online={online ? "true" : "false"}>
+      <span aria-hidden="true" />
+      {online ? "Online" : "Offline"}
+    </span>
+  )
+}
+
+const SYNC_LABELS: Record<NodeView["sync_status"], string> = {
+  synced: "Synced",
+  catching_up: "Catching up",
+  unknown: "Unknown",
+  offline: "Offline",
+}
+
+function SyncState({state}: {readonly state: NodeView["sync_status"]}) {
+  return (
+    <span className="sync-state" data-state={state}>
+      <span aria-hidden="true" />
+      {SYNC_LABELS[state]}
+    </span>
+  )
+}
+
+const VALIDATOR_LABELS: Record<NodeView["validator_status"], string> = {
+  not_configured: "Not configured",
+  validating: "Validating",
+  leaving: "Leaving after round",
+  joining: "Joining next set",
+  waiting: "Waiting for election",
+  inactive: "Not participating",
+  unknown: "Set unavailable",
+}
+
+function ValidatorLifecycle({state}: {readonly state: NodeView["validator_status"]}) {
+  return (
+    <span className="validator-state" data-state={state}>
+      <span aria-hidden="true" />
+      {VALIDATOR_LABELS[state]}
+    </span>
+  )
+}
+
+function ProductionState({node}: {readonly node: NodeView}) {
+  const produced = node.produced_masterchain_blocks + node.produced_shard_blocks
+  const state = produced > 0 ? "producing" : node.active_validator ? "silent" : "inactive"
+  const label =
+    state === "producing" ? "Producing" : state === "silent" ? "No blocks observed" : "Not active"
+  return (
+    <span className="production-state" data-state={state}>
+      {label}
+    </span>
+  )
 }
 
 function NodesTable({nodes}: {readonly nodes: readonly NodeView[]}) {
   return (
-    <DataTable minWidth="68rem" meta={`${nodes.length} visible`}>
+    <DataTable minWidth="72rem" meta={`${nodes.length} visible`}>
       <DataTableTable>
-        <DataTableHead><DataTableRow>
-          <DataTableHeaderCell>Status</DataTableHeaderCell><DataTableHeaderCell>Node</DataTableHeaderCell><DataTableHeaderCell>Roles</DataTableHeaderCell><DataTableHeaderCell align="right">Head</DataTableHeaderCell><DataTableHeaderCell align="right">Lag</DataTableHeaderCell><DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell><DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell><DataTableHeaderCell>Observer</DataTableHeaderCell>
-        </DataTableRow></DataTableHead>
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell>Status</DataTableHeaderCell>
+            <DataTableHeaderCell>Node</DataTableHeaderCell>
+            <DataTableHeaderCell>Sync</DataTableHeaderCell>
+            <DataTableHeaderCell>Roles</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Head</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Lag</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell>
+            <DataTableHeaderCell>Observer</DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
         <DataTableBody>
-          {nodes.length === 0 ? <DataTableEmpty colSpan={8}>No nodes match this filter</DataTableEmpty> : nodes.map(node => (
-            <DataTableRow key={`${node.observer_id}:${node.name}`}>
-              <DataTableCell><StatusPill online={node.online} /></DataTableCell>
-              <DataTableCell><div className="node-name"><strong>{node.name}</strong><span>{node.public_ip}</span></div></DataTableCell>
-              <DataTableCell><div className="role-list">{node.roles.map(role => <span key={role}>{role.replaceAll("_", " ")}</span>)}</div></DataTableCell>
-              <DataTableCell align="right"><span className="tabular">{node.head_seqno?.toLocaleString() ?? "—"}</span></DataTableCell>
-              <DataTableCell align="right"><span data-lag={(node.sync_lag_blocks ?? 0) > 3 ? "high" : "normal"}>{node.sync_lag_blocks ?? "—"}</span></DataTableCell>
-              <DataTableCell align="right"><span className="tabular">{node.produced_masterchain_blocks.toLocaleString()}</span></DataTableCell>
-              <DataTableCell align="right"><span className="tabular">{node.produced_shard_blocks.toLocaleString()}</span></DataTableCell>
-              <DataTableCell><TechnicalValue value={node.observer_id} copyLabel="observer ID" /></DataTableCell>
-            </DataTableRow>
-          ))}
+          {nodes.length === 0 ? (
+            <DataTableEmpty colSpan={9}>No nodes match this filter</DataTableEmpty>
+          ) : (
+            nodes.map(node => (
+              <DataTableRow key={`${node.observer_id}:${node.name}`}>
+                <DataTableCell>
+                  <StatusPill online={node.online} />
+                </DataTableCell>
+                <DataTableCell>
+                  <div className="node-name">
+                    <strong>{node.name}</strong>
+                    <span>{node.public_ip}</span>
+                  </div>
+                </DataTableCell>
+                <DataTableCell>
+                  <SyncState state={node.sync_status} />
+                </DataTableCell>
+                <DataTableCell>
+                  <div className="role-list">
+                    {node.roles.map(role => (
+                      <span key={role}>{role.replaceAll("_", " ")}</span>
+                    ))}
+                  </div>
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">{node.head_seqno?.toLocaleString() ?? "—"}</span>
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span data-lag={(node.sync_lag_blocks ?? 0) > 3 ? "high" : "normal"}>
+                    {node.sync_lag_blocks ?? "—"}
+                  </span>
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">
+                    {node.produced_masterchain_blocks.toLocaleString()}
+                  </span>
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">{node.produced_shard_blocks.toLocaleString()}</span>
+                </DataTableCell>
+                <DataTableCell>
+                  <TechnicalValue value={node.observer_id} copyLabel="observer ID" />
+                </DataTableCell>
+              </DataTableRow>
+            ))
+          )}
         </DataTableBody>
       </DataTableTable>
     </DataTable>
@@ -373,21 +682,56 @@ function NodesTable({nodes}: {readonly nodes: readonly NodeView[]}) {
 
 function ValidatorsTable({nodes}: {readonly nodes: readonly NodeView[]}) {
   return (
-    <DataTable minWidth="58rem">
-      <DataTableTable><DataTableHead><DataTableRow>
-        <DataTableHeaderCell>Validator</DataTableHeaderCell><DataTableHeaderCell>Activity</DataTableHeaderCell><DataTableHeaderCell>Public key</DataTableHeaderCell><DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell><DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell><DataTableHeaderCell>ADNL</DataTableHeaderCell>
-      </DataTableRow></DataTableHead><DataTableBody>
-        {nodes.length === 0 ? <DataTableEmpty colSpan={6}>No validators have reported yet</DataTableEmpty> : nodes.map(node => (
-          <DataTableRow key={`${node.observer_id}:${node.name}`}>
-            <DataTableCell><strong>{node.name}</strong></DataTableCell>
-            <DataTableCell><span className="validator-state" data-active={node.active_validator ? "true" : "false"}>{node.active_validator ? "Producing" : "Not observed"}</span></DataTableCell>
-            <DataTableCell><TechnicalValue value={node.validator_public_key} copyLabel="validator public key" /></DataTableCell>
-            <DataTableCell align="right"><span className="tabular">{node.produced_masterchain_blocks.toLocaleString()}</span></DataTableCell>
-            <DataTableCell align="right"><span className="tabular">{node.produced_shard_blocks.toLocaleString()}</span></DataTableCell>
-            <DataTableCell><TechnicalValue value={node.validator_adnl} copyLabel="validator ADNL" /></DataTableCell>
+    <DataTable minWidth="68rem">
+      <DataTableTable>
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell>Validator</DataTableHeaderCell>
+            <DataTableHeaderCell>Participation</DataTableHeaderCell>
+            <DataTableHeaderCell>Production</DataTableHeaderCell>
+            <DataTableHeaderCell>Public key</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">MC blocks</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Shard blocks</DataTableHeaderCell>
+            <DataTableHeaderCell>ADNL</DataTableHeaderCell>
           </DataTableRow>
-        ))}
-      </DataTableBody></DataTableTable>
+        </DataTableHead>
+        <DataTableBody>
+          {nodes.length === 0 ? (
+            <DataTableEmpty colSpan={7}>No validators have reported yet</DataTableEmpty>
+          ) : (
+            nodes.map(node => (
+              <DataTableRow key={`${node.observer_id}:${node.name}`}>
+                <DataTableCell>
+                  <strong>{node.name}</strong>
+                </DataTableCell>
+                <DataTableCell>
+                  <ValidatorLifecycle state={node.validator_status} />
+                </DataTableCell>
+                <DataTableCell>
+                  <ProductionState node={node} />
+                </DataTableCell>
+                <DataTableCell>
+                  <TechnicalValue
+                    value={node.validator_public_key}
+                    copyLabel="validator public key"
+                  />
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">
+                    {node.produced_masterchain_blocks.toLocaleString()}
+                  </span>
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">{node.produced_shard_blocks.toLocaleString()}</span>
+                </DataTableCell>
+                <DataTableCell>
+                  <TechnicalValue value={node.validator_adnl} copyLabel="validator ADNL" />
+                </DataTableCell>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTableTable>
     </DataTable>
   )
 }
@@ -395,20 +739,50 @@ function ValidatorsTable({nodes}: {readonly nodes: readonly NodeView[]}) {
 function ShardsTable({shards, now}: {readonly shards: readonly ShardHead[]; readonly now: number}) {
   return (
     <DataTable minWidth="62rem">
-      <DataTableTable><DataTableHead><DataTableRow>
-        <DataTableHeaderCell>Workchain</DataTableHeaderCell><DataTableHeaderCell>Shard</DataTableHeaderCell><DataTableHeaderCell align="right">Seqno</DataTableHeaderCell><DataTableHeaderCell>Block age</DataTableHeaderCell><DataTableHeaderCell>Split or merge</DataTableHeaderCell><DataTableHeaderCell>Root hash</DataTableHeaderCell>
-      </DataTableRow></DataTableHead><DataTableBody>
-        {shards.length === 0 ? <DataTableEmpty colSpan={6}>No shard frontier is available</DataTableEmpty> : shards.map(shard => (
-          <DataTableRow key={`${shard.workchain}:${shard.shard}`}>
-            <DataTableCell><span className="tabular">{shard.workchain}</span></DataTableCell>
-            <DataTableCell mono>{shard.shard}</DataTableCell>
-            <DataTableCell align="right"><span className="tabular">{shard.seqno.toLocaleString()}</span></DataTableCell>
-            <DataTableCell><Duration value={Math.max(0, now - shard.gen_utime)} display="elapsed" /></DataTableCell>
-            <DataTableCell>{shard.want_split || shard.before_split ? <span className="topology-change">Split pending</span> : shard.want_merge || shard.before_merge ? <span className="topology-change">Merge pending</span> : <span className="muted">Stable</span>}</DataTableCell>
-            <DataTableCell><TechnicalValue value={shard.root_hash} copyLabel="shard block root hash" /></DataTableCell>
+      <DataTableTable>
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell>Workchain</DataTableHeaderCell>
+            <DataTableHeaderCell>Shard</DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Seqno</DataTableHeaderCell>
+            <DataTableHeaderCell>Block age</DataTableHeaderCell>
+            <DataTableHeaderCell>Split or merge</DataTableHeaderCell>
+            <DataTableHeaderCell>Root hash</DataTableHeaderCell>
           </DataTableRow>
-        ))}
-      </DataTableBody></DataTableTable>
+        </DataTableHead>
+        <DataTableBody>
+          {shards.length === 0 ? (
+            <DataTableEmpty colSpan={6}>No shard frontier is available</DataTableEmpty>
+          ) : (
+            shards.map(shard => (
+              <DataTableRow key={`${shard.workchain}:${shard.shard}`}>
+                <DataTableCell>
+                  <span className="tabular">{shard.workchain}</span>
+                </DataTableCell>
+                <DataTableCell mono>{shard.shard}</DataTableCell>
+                <DataTableCell align="right">
+                  <span className="tabular">{shard.seqno.toLocaleString()}</span>
+                </DataTableCell>
+                <DataTableCell>
+                  <Duration value={Math.max(0, now - shard.gen_utime)} display="elapsed" />
+                </DataTableCell>
+                <DataTableCell>
+                  {shard.want_split || shard.before_split ? (
+                    <span className="topology-change">Split pending</span>
+                  ) : shard.want_merge || shard.before_merge ? (
+                    <span className="topology-change">Merge pending</span>
+                  ) : (
+                    <span className="muted">Stable</span>
+                  )}
+                </DataTableCell>
+                <DataTableCell>
+                  <TechnicalValue value={shard.root_hash} copyLabel="shard block root hash" />
+                </DataTableCell>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTableTable>
     </DataTable>
   )
 }

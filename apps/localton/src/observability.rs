@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 pub const MAX_OBSERVERS: usize = 1_024;
 pub const MAX_EXCHANGE_OBSERVATIONS: usize = 128;
+pub const SYNC_LAG_TOLERANCE_BLOCKS: u32 = 2;
 const MAX_CLOCK_SKEW_SECONDS: u64 = 30;
 const MAX_OBSERVATION_TTL_SECONDS: u64 = 5 * 60;
 
@@ -98,6 +99,9 @@ pub struct NodeObservation {
     pub last_error: Option<String>,
     pub head_seqno: Option<u32>,
     pub sync_lag_blocks: Option<u32>,
+    pub participate_in_elections: bool,
+    pub current_validator: Option<bool>,
+    pub next_validator: Option<bool>,
     pub validator_public_key: Option<String>,
     #[serde(default)]
     pub validator_public_keys: Vec<String>,
@@ -181,11 +185,34 @@ pub struct NodeView {
     pub generated_at: u64,
     pub expires_at: u64,
     pub online: bool,
+    pub sync_status: SyncStatus,
     pub active_validator: bool,
+    pub validator_status: ValidatorStatus,
     pub produced_masterchain_blocks: u64,
     pub produced_shard_blocks: u64,
     #[serde(flatten)]
     pub node: NodeObservation,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SyncStatus {
+    Synced,
+    CatchingUp,
+    Unknown,
+    Offline,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ValidatorStatus {
+    NotConfigured,
+    Validating,
+    Leaving,
+    Joining,
+    Waiting,
+    Inactive,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
@@ -202,6 +229,8 @@ pub struct NetworkTotals {
     pub online_observers: usize,
     pub nodes: usize,
     pub online_nodes: usize,
+    pub synchronized_nodes: usize,
+    pub catching_up_nodes: usize,
     pub configured_validators: usize,
     pub active_validators: usize,
     pub full_nodes: usize,
@@ -427,22 +456,29 @@ impl ObservationStore {
 
     pub fn aggregate(&mut self, now: u64) -> NetworkView {
         self.prune(now);
-        let local_chain = self
-            .observations
-            .get(self.identity.observer_id())
-            .and_then(|observation| observation.payload.chain.as_ref());
-        let peer_chain = self
+        let selected = self
             .observations
             .values()
-            .filter_map(|observation| observation.payload.chain.as_ref())
-            .max_by_key(|chain| (chain.head.seqno, chain.head.observed_at));
-        let (selected_chain, chain_source) = if let Some(chain) = local_chain {
-            (Some(chain), "local_verification".to_owned())
-        } else if let Some(chain) = peer_chain {
-            (Some(chain), "peer_attestation".to_owned())
-        } else {
-            (None, "unavailable".to_owned())
-        };
+            .filter_map(|observation| {
+                observation
+                    .payload
+                    .chain
+                    .as_ref()
+                    .map(|chain| (observation, chain))
+            })
+            .max_by_key(|(_, chain)| (chain.head.seqno, chain.head.observed_at));
+        let selected_chain = selected.map(|(_, chain)| chain);
+        let chain_source = selected.map_or_else(
+            || "unavailable".to_owned(),
+            |(observation, _)| {
+                if observation.observer_id == self.identity.observer_id() {
+                    "local_verification".to_owned()
+                } else {
+                    "peer_attestation".to_owned()
+                }
+            },
+        );
+        let network_head = selected_chain.map(|chain| chain.head.seqno);
         let mut production = selected_chain
             .map(|chain| chain.production.clone())
             .unwrap_or_default();
@@ -471,6 +507,7 @@ impl ObservationStore {
                 node_count: observation.payload.nodes.len(),
             });
             for node in &observation.payload.nodes {
+                let online = observer_online && node.running;
                 let validator_keys = node
                     .validator_public_keys
                     .iter()
@@ -491,15 +528,31 @@ impl ObservationStore {
                             .map_or(0, |counts| counts.shard_blocks),
                     )
                 });
+                let current_membership = node.current_validator;
+                let next_membership = node.next_validator;
+                let active_validator = current_membership.unwrap_or(masterchain > 0 || shard > 0);
+                let mut node = node.clone();
+                node.sync_lag_blocks = network_head
+                    .zip(node.head_seqno)
+                    .map(|(network, node)| network.saturating_sub(node));
+                let sync_status = sync_status(online, node.sync_lag_blocks);
+                let validator_status = validator_status(
+                    node.roles.iter().any(|role| role == "validator"),
+                    node.participate_in_elections,
+                    current_membership,
+                    next_membership,
+                );
                 nodes.push(NodeView {
                     observer_id: observation.observer_id.clone(),
                     generated_at: observation.generated_at,
                     expires_at: observation.expires_at,
-                    online: observer_online && node.running,
-                    active_validator: masterchain > 0 || shard > 0,
+                    online,
+                    sync_status,
+                    active_validator,
+                    validator_status,
                     produced_masterchain_blocks: masterchain,
                     produced_shard_blocks: shard,
-                    node: node.clone(),
+                    node,
                 });
             }
         }
@@ -521,6 +574,14 @@ impl ObservationStore {
             online_observers: observers.iter().filter(|observer| observer.online).count(),
             nodes: nodes.len(),
             online_nodes: nodes.iter().filter(|node| node.online).count(),
+            synchronized_nodes: nodes
+                .iter()
+                .filter(|node| node.sync_status == SyncStatus::Synced)
+                .count(),
+            catching_up_nodes: nodes
+                .iter()
+                .filter(|node| node.sync_status == SyncStatus::CatchingUp)
+                .count(),
             configured_validators: nodes
                 .iter()
                 .filter(|node| node.node.roles.iter().any(|role| role == "validator"))
@@ -636,9 +697,43 @@ fn validate_endpoint(endpoint: &str) -> Result<()> {
     Ok(())
 }
 
+fn sync_status(online: bool, lag: Option<u32>) -> SyncStatus {
+    if !online {
+        return SyncStatus::Offline;
+    }
+    match lag {
+        Some(lag) if lag <= SYNC_LAG_TOLERANCE_BLOCKS => SyncStatus::Synced,
+        Some(_) => SyncStatus::CatchingUp,
+        None => SyncStatus::Unknown,
+    }
+}
+
+fn validator_status(
+    configured: bool,
+    participate_in_elections: bool,
+    current_membership: Option<bool>,
+    next_membership: Option<bool>,
+) -> ValidatorStatus {
+    if !configured {
+        return ValidatorStatus::NotConfigured;
+    }
+    match (
+        current_membership,
+        participate_in_elections,
+        next_membership,
+    ) {
+        (Some(true), false, _) | (Some(true), true, Some(false)) => ValidatorStatus::Leaving,
+        (Some(true), true, _) => ValidatorStatus::Validating,
+        (Some(false), _, Some(true)) => ValidatorStatus::Joining,
+        (Some(false), true, _) => ValidatorStatus::Waiting,
+        (Some(false), false, _) | (None, false, _) => ValidatorStatus::Inactive,
+        (None, true, _) => ValidatorStatus::Unknown,
+    }
+}
+
 const ED25519_PUBLIC_KEY_TAG: [u8; 4] = [0xc6, 0xb4, 0x13, 0x48];
 
-fn public_key_hex(value: &str) -> Option<String> {
+pub(crate) fn public_key_hex(value: &str) -> Option<String> {
     let bytes = STANDARD.decode(value).ok()?;
     match bytes.as_slice() {
         raw if raw.len() == 32 => Some(hex::encode(raw)),
@@ -677,6 +772,9 @@ mod tests {
                 last_error: None,
                 head_seqno: Some(7),
                 sync_lag_blocks: Some(0),
+                participate_in_elections: true,
+                current_validator: None,
+                next_validator: None,
                 validator_public_key: creator_key,
                 validator_public_keys: Vec::new(),
                 validator_adnl: None,
@@ -791,5 +889,89 @@ mod tests {
         let view = store.aggregate(102);
         assert_eq!(view.totals.shard_blocks, 1);
         assert_eq!(view.chain_source, "peer_attestation");
+    }
+
+    #[test]
+    fn highest_peer_head_recomputes_node_lag() {
+        let local_identity = ObserverIdentity::from_secret([11; 32]);
+        let local_id = local_identity.observer_id().to_owned();
+        let mut store = ObservationStore::new("network".to_owned(), local_identity, 600);
+        let mut local_report = payload("http://127.0.0.1:18003", None);
+        local_report.chain = Some(chain_observation(7, None));
+        store.publish(local_report, 100, 20).unwrap();
+
+        let mut peer = ObservationStore::new(
+            "network".to_owned(),
+            ObserverIdentity::from_secret([12; 32]),
+            600,
+        );
+        let mut peer_report = payload("http://192.0.2.1:18003", None);
+        peer_report.nodes[0].head_seqno = Some(12);
+        peer_report.chain = Some(chain_observation(12, None));
+        let signed = peer.publish(peer_report, 101, 20).unwrap();
+        store.ingest(vec![signed], 101).unwrap();
+
+        let view = store.aggregate(101);
+        let local_node = view
+            .nodes
+            .iter()
+            .find(|node| node.observer_id == local_id)
+            .unwrap();
+        assert_eq!(view.chain.unwrap().seqno, 12);
+        assert_eq!(view.chain_source, "peer_attestation");
+        assert_eq!(local_node.node.sync_lag_blocks, Some(5));
+        assert_eq!(local_node.sync_status, SyncStatus::CatchingUp);
+        assert_eq!(view.totals.synchronized_nodes, 1);
+        assert_eq!(view.totals.catching_up_nodes, 1);
+    }
+
+    #[test]
+    fn disabled_active_validator_is_leaving_after_the_round() {
+        let identity = ObserverIdentity::from_secret([13; 32]);
+        let validator_key = STANDARD.encode([ED25519_PUBLIC_KEY_TAG.as_slice(), &[5; 32]].concat());
+        let mut store = ObservationStore::new("network".to_owned(), identity, 600);
+        let mut report = payload("http://127.0.0.1:18003", Some(validator_key));
+        report.nodes[0].participate_in_elections = false;
+        report.nodes[0].current_validator = Some(true);
+        report.chain = Some(chain_observation(
+            7,
+            Some(ElectionObservation {
+                round_id: 120,
+                stage: "validation".to_owned(),
+                validation_started_at: 0,
+                elections_open_at: 30,
+                elections_close_at: 90,
+                next_set_activation_at: 120,
+                validators_elected_for: 120,
+                stake_held_for: 30,
+                current_validators: 1,
+                current_main_validators: 1,
+                next_validators: None,
+            }),
+        ));
+        store.publish(report, 100, 20).unwrap();
+
+        let view = store.aggregate(101);
+        assert!(view.nodes[0].active_validator);
+        assert_eq!(view.nodes[0].validator_status, ValidatorStatus::Leaving);
+        assert_eq!(view.totals.active_validators, 1);
+    }
+
+    fn chain_observation(seqno: u32, election: Option<ElectionObservation>) -> ChainObservation {
+        ChainObservation {
+            head: ChainHead {
+                seqno,
+                root_hash: format!("root-{seqno}"),
+                file_hash: format!("file-{seqno}"),
+                gen_utime: 99,
+                observed_at: 100,
+                shard_count: 1,
+            },
+            window_started_at: 90,
+            shards: Vec::new(),
+            election,
+            production: Vec::new(),
+            blocks: Vec::new(),
+        }
     }
 }

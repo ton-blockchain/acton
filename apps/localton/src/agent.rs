@@ -6,7 +6,12 @@
 //! wallet from a development faucet and enters elections directly through the
 //! TON Elector contract.
 
-use std::{collections::BTreeSet, net::Ipv4Addr, path::Path, time::Duration};
+use std::{
+    collections::BTreeSet,
+    net::Ipv4Addr,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, ensure};
 use futures_util::StreamExt;
@@ -19,7 +24,7 @@ use crate::{
     bootstrap::{LauncherControl, acquire_lock, shutdown_signal, supervise},
     cli::{AgentArgs, WalletVersion},
     http,
-    observability::ObserverIdentity,
+    observability::{ObserverIdentity, SYNC_LAG_TOLERANCE_BLOCKS},
     operations::{validators, wallets},
     runtime::ProcessRegistry,
     storage::{Layout, RuntimeState, Settings, ipv4_to_i32, write_json_atomic},
@@ -30,11 +35,21 @@ const MAX_GLOBAL_CONFIG_BYTES: u64 = 1024 * 1024;
 const VALIDATOR_WALLET_WORKCHAIN: i32 = -1;
 const VALIDATOR_WALLET_ID: u32 = 42;
 const VALIDATOR_FEE_RESERVE_NANO: u64 = 5_000_000_000;
+const SYNC_READY_CONFIRMATIONS: usize = 3;
+const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(500);
+const SYNC_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize)]
 struct FaucetGrant {
     address: String,
     amount_nano: u64,
+}
+
+#[derive(Clone)]
+struct LocalLiteserver {
+    node: String,
+    port: u16,
+    public_key: String,
 }
 
 pub async fn run(args: AgentArgs) -> Result<()> {
@@ -67,14 +82,16 @@ pub async fn run(args: AgentArgs) -> Result<()> {
         processes.clone(),
     );
     let settings = Settings::load(&layout.settings)?;
-    let mut local_liteserver = None;
+    let mut local_liteservers = Vec::new();
     for name in &owned_nodes {
         match control.start_node(name).await {
             Ok(runtime) => {
-                if local_liteserver.is_none()
-                    && let Some(public_key) = runtime.liteserver_public_key
-                {
-                    local_liteserver = Some((settings.node(name)?.liteserver_port, public_key));
+                if let Some(public_key) = runtime.liteserver_public_key {
+                    local_liteservers.push(LocalLiteserver {
+                        node: name.clone(),
+                        port: settings.node(name)?.liteserver_port,
+                        public_key,
+                    });
                 }
             }
             Err(error) => {
@@ -85,24 +102,10 @@ pub async fn run(args: AgentArgs) -> Result<()> {
             }
         }
     }
-    let (liteserver_port, liteserver_public_key) =
-        local_liteserver.context("agent has no running node with a local liteserver")?;
-    prefer_local_liteserver(
-        &layout.global_config,
-        liteserver_port,
-        &liteserver_public_key,
-    )?;
-    wait_for_local_liteserver(
-        &layout.global_config,
-        liteserver_port,
-        &liteserver_public_key,
-        Duration::from_secs(args.startup_timeout),
-    )
-    .await?;
-    info!(
-        endpoint = %format!("127.0.0.1:{liteserver_port}"),
-        "agent chain operations now use its local liteserver"
-    );
+    let primary_liteserver = local_liteservers
+        .first()
+        .cloned()
+        .context("agent has no running node with a local liteserver")?;
     RuntimeState::update_atomic(&layout.runtime, |runtime| {
         runtime.mark_launcher_started();
         Ok(())
@@ -137,6 +140,44 @@ pub async fn run(args: AgentArgs) -> Result<()> {
             return Err(error);
         }
     };
+    for liteserver in &local_liteservers {
+        if let Err(error) = wait_for_network_sync(
+            &layout.global_config,
+            liteserver,
+            Duration::from_secs(args.startup_timeout),
+        )
+        .await
+        {
+            services.shutdown().await;
+            if let Err(stop_error) = stop_managed_nodes(&control).await {
+                warn!(%stop_error, "failed to stop follower nodes after synchronization failed");
+            }
+            RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                runtime.mark_launcher_stopped();
+                Ok(())
+            })?;
+            return Err(error);
+        }
+    }
+    if let Err(error) = prefer_local_liteserver(
+        &layout.global_config,
+        primary_liteserver.port,
+        &primary_liteserver.public_key,
+    ) {
+        services.shutdown().await;
+        if let Err(stop_error) = stop_managed_nodes(&control).await {
+            warn!(%stop_error, "failed to stop follower nodes after liteserver setup failed");
+        }
+        RuntimeState::update_atomic(&layout.runtime, |runtime| {
+            runtime.mark_launcher_stopped();
+            Ok(())
+        })?;
+        return Err(error);
+    }
+    info!(
+        endpoint = %format!("127.0.0.1:{}", primary_liteserver.port),
+        "agent chain operations now use its synchronized local liteserver"
+    );
     let validator_nodes: Vec<_> = settings
         .nodes
         .iter()
@@ -166,26 +207,77 @@ pub async fn run(args: AgentArgs) -> Result<()> {
     run_result.and(stop_result).and(state_result.map(|_| ()))
 }
 
-async fn wait_for_local_liteserver(
+async fn wait_for_network_sync(
     global_config: &Path,
-    port: u16,
-    public_key: &str,
+    liteserver: &LocalLiteserver,
     timeout: Duration,
 ) -> Result<()> {
     tokio::time::timeout(timeout, async {
+        let mut confirmations = 0;
+        let mut last_log = Instant::now()
+            .checked_sub(SYNC_LOG_INTERVAL)
+            .unwrap_or_else(Instant::now);
         loop {
-            if let Ok(mut client) =
-                LocalLiteClient::connect_node(global_config, port, public_key).await
-                && let Ok(head) = client.last().await
-                && head.seqno > 0
-            {
-                return;
+            let sample: Result<(u32, u32)> = async {
+                let mut network = LocalLiteClient::connect(global_config).await?;
+                let network_head = network.last().await?.seqno;
+                let mut local = LocalLiteClient::connect_node(
+                    global_config,
+                    liteserver.port,
+                    &liteserver.public_key,
+                )
+                .await?;
+                let local_head = local.last().await?.seqno;
+                Ok((network_head, local_head))
             }
-            tokio::time::sleep(Duration::from_millis(250)).await;
+            .await;
+            match sample {
+                Ok((network_head, local_head)) => {
+                    let lag = network_head.saturating_sub(local_head);
+                    if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+                        info!(
+                            node = liteserver.node,
+                            local_head,
+                            network_head,
+                            lag_blocks = lag,
+                            "follower node synchronization progress"
+                        );
+                        last_log = Instant::now();
+                    }
+                    if lag <= SYNC_LAG_TOLERANCE_BLOCKS {
+                        confirmations += 1;
+                        if confirmations >= SYNC_READY_CONFIRMATIONS {
+                            info!(
+                                node = liteserver.node,
+                                local_head,
+                                network_head,
+                                lag_blocks = lag,
+                                "follower node synchronized"
+                            );
+                            return;
+                        }
+                    } else {
+                        confirmations = 0;
+                    }
+                }
+                Err(error) => {
+                    confirmations = 0;
+                    if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+                        warn!(node = liteserver.node, %error, "could not measure follower synchronization");
+                        last_log = Instant::now();
+                    }
+                }
+            }
+            tokio::time::sleep(SYNC_POLL_INTERVAL).await;
         }
     })
     .await
-    .context("local liteserver did not become ready before the startup timeout")
+    .with_context(|| {
+        format!(
+            "node `{}` did not synchronize before the startup timeout",
+            liteserver.node
+        )
+    })
 }
 
 async fn prepare_follower_state(layout: &Layout, args: &AgentArgs) -> Result<BTreeSet<String>> {

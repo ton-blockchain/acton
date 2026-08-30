@@ -9,7 +9,11 @@ import {themeBootstrap} from "../ui/vite/themeBootstrap.ts"
 const outputDirectory = path.resolve(import.meta.dirname, "dist")
 
 export default defineConfig({
-  plugins: [themeBootstrap({storageKey: "localton-observability-theme"}), react(), gzipEmbeddedAssets(outputDirectory)],
+  plugins: [
+    themeBootstrap({storageKey: "localton-observability-theme"}),
+    react(),
+    gzipEmbeddedAssets(outputDirectory),
+  ],
   build: {
     outDir: outputDirectory,
     emptyOutDir: true,

@@ -36,7 +36,7 @@ use crate::{
     observability::{
         BlockObservation, ChainHead, ChainObservation, ElectionObservation, ExchangeRequest,
         ExchangeResponse, NetworkView, NodeObservation, ObservationPayload, ObservationStore,
-        ObserverIdentity, ProductionView, ShardHead, SignedObservation, network_id,
+        ObserverIdentity, ProductionView, ShardHead, SignedObservation, network_id, public_key_hex,
     },
     operations::validators,
     storage::{Layout, Manifest, RuntimeState, Settings, unix_time},
@@ -299,7 +299,6 @@ async fn collector_loop(
                 if let Err(error) = collect_and_publish(
                     &layout,
                     &toolchain,
-                    &settings,
                     &owned_nodes,
                     &publication,
                     &mut chain,
@@ -326,7 +325,6 @@ struct PublicationConfig<'a> {
 async fn collect_and_publish(
     layout: &Layout,
     toolchain: &Toolchain,
-    settings: &Settings,
     owned_nodes: &BTreeSet<String>,
     publication: &PublicationConfig<'_>,
     chain: &mut ChainCollector,
@@ -339,6 +337,7 @@ async fn collect_and_publish(
     {
         warn!(%error, "chain observation update failed");
     }
+    let settings = Settings::load(&layout.settings)?;
     let runtime = RuntimeState::load(&layout.runtime)?;
     let network_head = chain.observation.as_ref().map(|chain| chain.head.seqno);
     let reports = owned_nodes
@@ -347,6 +346,21 @@ async fn collect_and_publish(
         .map(|node| {
             let global_config = layout.global_config.clone();
             let runtime = runtime.nodes.get(&node.name).cloned().unwrap_or_default();
+            let validator_keys = runtime
+                .validator_public_keys
+                .iter()
+                .chain(runtime.validator_public_key.iter())
+                .filter_map(|key| public_key_hex(key))
+                .collect::<BTreeSet<_>>();
+            let membership = |set: Option<&BTreeSet<String>>| {
+                if validator_keys.is_empty() {
+                    None
+                } else {
+                    set.map(|set| validator_keys.iter().any(|key| set.contains(key.as_str())))
+                }
+            };
+            let current_validator = membership(chain.current_validator_keys.as_ref());
+            let next_validator = membership(chain.next_validator_keys.as_ref());
             async move {
                 let head_seqno = if runtime.running {
                     match runtime.liteserver_public_key.as_deref() {
@@ -386,6 +400,9 @@ async fn collect_and_publish(
                     sync_lag_blocks: network_head
                         .zip(head_seqno)
                         .map(|(network, node)| network.saturating_sub(node)),
+                    participate_in_elections: node.participate_in_elections,
+                    current_validator,
+                    next_validator,
                     validator_public_key: runtime.validator_public_key.clone(),
                     validator_public_keys: runtime.validator_public_keys,
                     validator_adnl: runtime.validator_adnl,
@@ -413,6 +430,8 @@ struct ChainCollector {
     last_election_update: Option<u64>,
     blocks: BTreeMap<String, BlockObservation>,
     election: Option<ElectionObservation>,
+    current_validator_keys: Option<BTreeSet<String>>,
+    next_validator_keys: Option<BTreeSet<String>>,
     observation: Option<ChainObservation>,
 }
 
@@ -427,6 +446,17 @@ impl ChainCollector {
             self.last_election_update = Some(now);
             match validators::election_status(toolchain).await {
                 Ok(info) => {
+                    self.current_validator_keys = Some(
+                        info.current
+                            .public_keys
+                            .iter()
+                            .cloned()
+                            .collect::<BTreeSet<_>>(),
+                    );
+                    self.next_validator_keys = info
+                        .next
+                        .as_ref()
+                        .map(|set| set.public_keys.iter().cloned().collect::<BTreeSet<_>>());
                     let elections_open_at = info
                         .current
                         .until

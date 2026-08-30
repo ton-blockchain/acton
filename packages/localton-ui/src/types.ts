@@ -25,6 +25,8 @@ export interface NetworkTotals {
   readonly online_observers: number
   readonly nodes: number
   readonly online_nodes: number
+  readonly synchronized_nodes: number
+  readonly catching_up_nodes: number
   readonly configured_validators: number
   readonly active_validators: number
   readonly full_nodes: number
@@ -46,7 +48,16 @@ export interface NodeView {
   readonly generated_at: number
   readonly expires_at: number
   readonly online: boolean
+  readonly sync_status: "synced" | "catching_up" | "unknown" | "offline"
   readonly active_validator: boolean
+  readonly validator_status:
+    | "not_configured"
+    | "validating"
+    | "leaving"
+    | "joining"
+    | "waiting"
+    | "inactive"
+    | "unknown"
   readonly produced_masterchain_blocks: number
   readonly produced_shard_blocks: number
   readonly name: string
@@ -58,6 +69,9 @@ export interface NodeView {
   readonly last_error?: string
   readonly head_seqno?: number
   readonly sync_lag_blocks?: number
+  readonly participate_in_elections: boolean
+  readonly current_validator: boolean | null
+  readonly next_validator: boolean | null
   readonly validator_public_key?: string
   readonly validator_adnl?: string
 }
