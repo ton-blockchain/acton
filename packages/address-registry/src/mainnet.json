@@ -1748,10 +1748,6 @@
     "name": "Notcoin Voucher Swap 4"
   },
   {
-    "address": "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
-    "name": "Bybit 10"
-  },
-  {
     "address": "0:4a1f3ebcc66bdcefa90245bdf541a50ada1c688a487534b1587abffd93038834",
     "name": "Bybit 2"
   },
@@ -2274,10 +2270,6 @@
   {
     "address": "0:8ad98e3091a89ec021aca7197e20d569afba861937d21e93240dcb09f9c00e95",
     "name": "TON Grants Multisig"
-  },
-  {
-    "address": "0:8b070edb01a700f3f6a4624c7e086e036da86060ebb04f19908ee61a3537335f",
-    "name": "Changelly"
   },
   {
     "address": "0:8bc991cfe177bc7e9721433efa3befd199485a55cffd040a06c89af026b71bcf",
@@ -2882,6 +2874,10 @@
   {
     "address": "0:cb75aef5e46a1c3f5b180e409e70f84eede14db0dbc0443e29ba66c649a9fdeb",
     "name": "Surge Boards"
+  },
+  {
+    "address": "0:cb83fd2b928d656c7e746b6e31440ddb0afae80721df42f2b3b85ceba9b78c78",
+    "name": "Heleket Payment Comission"
   },
   {
     "address": "0:cbec731b71ad05b9fae31c5711a222e4122397917a0efef1f681550df09369e2",

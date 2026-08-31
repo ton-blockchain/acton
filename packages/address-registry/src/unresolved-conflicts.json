@@ -1,0 +1,28 @@
+[
+  {
+    "address": "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "Bybit 10"
+      },
+      {
+        "source": "address-book",
+        "name": "ByBit 11"
+      }
+    ]
+  },
+  {
+    "address": "0:8b070edb01a700f3f6a4624c7e086e036da86060ebb04f19908ee61a3537335f",
+    "candidates": [
+      {
+        "source": "ton-assets",
+        "name": "Changelly"
+      },
+      {
+        "source": "address-book",
+        "name": "Changelly 1"
+      }
+    ]
+  }
+]
