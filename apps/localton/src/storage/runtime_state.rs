@@ -17,10 +17,15 @@ const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum InitialSyncStage {
+    /// Engine startup has selected an init block but has not discovered state yet
     Starting,
+    /// The engine is walking key blocks to select a persistent state
     DiscoveringKeyBlocks,
+    /// The selected masterchain persistent state is downloading
     DownloadingMasterchainState,
+    /// Required shard states are downloading after the masterchain state
     DownloadingShardStates,
+    /// Download is complete and the engine is preparing the first local head
     Preparing,
 }
 
@@ -31,9 +36,13 @@ pub enum InitialSyncStage {
 /// Speed and ETA are short rolling estimates emitted by the engine itself.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct StateDownloadProgress {
+    /// Bytes received for the currently selected persistent state
     pub downloaded_bytes: u64,
+    /// Expected size of that persistent state
     pub total_bytes: u64,
+    /// Engine-reported rolling transfer rate
     pub bytes_per_second: u64,
+    /// Engine-reported estimated time until transfer completion
     pub remaining_seconds: u64,
 }
 
@@ -45,10 +54,15 @@ pub struct StateDownloadProgress {
 /// transfer metrics are present only after validator-engine learns its total size.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct InitialSyncProgress {
+    /// Current high-level validator-engine initialization stage
     pub stage: InitialSyncStage,
+    /// Masterchain seqno of the state selected by the engine, when known
     pub masterchain_seqno: Option<u32>,
+    /// Current persistent-state part, when the state is split
     pub current_part: Option<u32>,
+    /// Total number of persistent-state parts, when known
     pub total_parts: Option<u32>,
+    /// Byte-level transfer estimates, once the downloader exposes them
     pub state_download: Option<StateDownloadProgress>,
 }
 
@@ -64,6 +78,7 @@ impl InitialSyncProgress {
         {
             return true;
         }
+
         match (&self.state_download, &previous.state_download) {
             (Some(current), Some(previous)) => current.downloaded_bytes > previous.downloaded_bytes,
             (Some(_), None) => true,
@@ -274,9 +289,11 @@ impl NodeRuntime {
     /// progress never exceeds 100 percent without hiding the exact local head.
     pub fn observe_sync_progress(&mut self, local_head: u32, network_head: u32) {
         let progressed = self.head_seqno != Some(local_head);
+
         self.head_seqno = Some(local_head);
         self.network_head_seqno = Some(network_head.max(local_head));
         self.initial_sync_progress = None;
+
         if progressed || self.sync_progressed_at.is_none() {
             self.sync_progressed_at = Some(unix_time());
         }
@@ -288,10 +305,12 @@ impl NodeRuntime {
             .initial_sync_progress
             .as_ref()
             .is_none_or(|previous| progress.has_advanced_since(previous));
+
         self.sync_initial_masterchain_block_time = None;
         self.sync_masterchain_block_time = None;
         self.sync_target_time = None;
         self.initial_sync_progress = Some(progress);
+
         if progressed || self.sync_progressed_at.is_none() {
             self.sync_progressed_at = Some(unix_time());
         }
@@ -306,12 +325,15 @@ impl NodeRuntime {
         if block_time == 0 {
             return;
         }
+
         let progressed = self.sync_masterchain_block_time != Some(block_time);
+
         self.sync_initial_masterchain_block_time
             .get_or_insert(block_time);
         self.sync_masterchain_block_time = Some(block_time);
         self.sync_target_time = Some(target_time.max(block_time));
         self.initial_sync_progress = None;
+
         if progressed || self.sync_progressed_at.is_none() {
             self.sync_progressed_at = Some(unix_time());
         }

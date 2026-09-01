@@ -55,10 +55,13 @@ impl Settings {
     #[must_use]
     pub fn for_join() -> Self {
         let mut settings = Self::default();
+
+        // Join state owns nodes but none of the bootstrap host's HTTP services.
         settings.nodes.clear();
         settings.services.config_http.enabled = false;
         settings.services.admin_http.enabled = false;
         settings.services.ton_http_api.enabled = false;
+
         settings
     }
 
@@ -382,10 +385,15 @@ pub struct NodeSettings {
 /// accidentally mix ports from different candidate ranges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodePorts {
+    /// Authenticated validator-console TCP port
     pub console: u16,
+    /// Public ADNL UDP port
     pub adnl: u16,
+    /// Local liteserver TCP port
     pub liteserver: u16,
+    /// Validator-engine outbound UDP port
     pub out: u16,
+    /// DHT UDP port
     pub dht: u16,
 }
 
@@ -423,7 +431,10 @@ impl NodeSettings {
         }
     }
 
-    /// Creates a joined follower with one already allocated port set.
+    /// Creates a joined follower with one complete, already validated port set.
+    ///
+    /// Protocol retention and wallet defaults remain aligned with genesis, while
+    /// validator participation is opt-in and configured by the join workflow.
     #[must_use]
     pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
         Self {

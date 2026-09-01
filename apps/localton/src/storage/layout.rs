@@ -113,6 +113,7 @@ impl Layout {
 pub struct NodeLayout {
     pub root: PathBuf,
     pub db: PathBuf,
+    /// Engine-owned private-key directory for this node only
     pub keyring: PathBuf,
     pub certs: PathBuf,
     pub logs: PathBuf,
@@ -120,11 +121,13 @@ pub struct NodeLayout {
 }
 
 impl NodeLayout {
+    /// Creates the complete per-node directory tree before keys or engine state are written.
     pub fn create_dirs(&self) -> Result<()> {
         for path in [&self.root, &self.db, &self.keyring, &self.certs, &self.logs] {
             fs::create_dir_all(path)
                 .with_context(|| format!("failed to create {}", path.display()))?;
         }
+
         Ok(())
     }
 

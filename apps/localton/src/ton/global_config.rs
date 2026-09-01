@@ -38,6 +38,7 @@ impl GlobalConfigFile {
         let path = path.into();
         let bytes = fs::read(&path)
             .with_context(|| format!("failed to read global config {}", path.display()))?;
+
         GlobalConfig::from_json_bytes(&bytes)?.validate_for_node_join()?;
         Ok(Self { path })
     }
@@ -116,6 +117,7 @@ impl GlobalConfig {
             .nodes
             .iter()
             .any(DhtNodeDescriptor::advertises_public_ipv4);
+
         if public_network {
             ensure!(
                 is_public_ipv4(advertise_ip),
@@ -124,6 +126,7 @@ impl GlobalConfig {
                  ADNL UDP port to a static public IPv4 address"
             );
         }
+
         Ok(())
     }
 

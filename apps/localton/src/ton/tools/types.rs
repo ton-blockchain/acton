@@ -226,6 +226,7 @@ pub(crate) fn is_public_ipv4(ip: Ipv4Addr) -> bool {
     let octets = ip.octets();
     let shared_address_space = octets[0] == 100 && (64..=127).contains(&octets[1]);
     let benchmarking = octets[0] == 198 && matches!(octets[1], 18 | 19);
+
     !ip.is_unspecified()
         && !ip.is_loopback()
         && !ip.is_private()

@@ -22,8 +22,11 @@ const PORTS_PER_NODE: u16 = 5;
 /// still allowing the allocator to skip a range occupied by unrelated software.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct HostPortAllocation {
+    /// Complete protocol port set for each node in stable name order
     pub nodes: Vec<NodePorts>,
+    /// First reserved port in the contiguous range
     pub start: u16,
+    /// Last reserved port in the contiguous range
     pub end: u16,
 }
 
@@ -45,9 +48,11 @@ impl HostPortAllocation {
             node_count > 0,
             "join must allocate ports for at least one node"
         );
+
         let node_count = u16::try_from(node_count).map_err(|_| {
             anyhow::anyhow!("joined node count does not fit the TCP/UDP port space")
         })?;
+
         let width = node_count
             .checked_mul(PORTS_PER_NODE)
             .ok_or_else(|| anyhow::anyhow!("join port range is too large"))?;
@@ -55,12 +60,15 @@ impl HostPortAllocation {
             .checked_sub(width - 1)
             .ok_or_else(|| anyhow::anyhow!("join port range is too large"))?;
 
+        // Shift by one port until the whole range is simultaneously available;
+        // accepting separate per-node probes could persist overlapping ranges.
         for start in first_candidate..=last_candidate {
             let end = start + width - 1;
             if available(start..=end) {
                 return Ok(Self::at(start, node_count));
             }
         }
+
         bail!("no contiguous range of {width} TCP/UDP ports is available from {first_candidate}")
     }
 
@@ -77,6 +85,7 @@ impl HostPortAllocation {
                 }
             })
             .collect();
+
         Self {
             nodes,
             start,
@@ -91,17 +100,21 @@ impl HostPortAllocation {
 fn range_is_available(range: RangeInclusive<u16>) -> bool {
     let mut tcp = Vec::new();
     let mut udp = Vec::new();
+
     for port in range {
         let address = (Ipv4Addr::UNSPECIFIED, port);
+
         let Ok(listener) = TcpListener::bind(address) else {
             return false;
         };
         let Ok(socket) = UdpSocket::bind(address) else {
             return false;
         };
+
         tcp.push(listener);
         udp.push(socket);
     }
+
     true
 }
 

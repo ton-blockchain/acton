@@ -235,6 +235,11 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
     Ok(())
 }
 
+/// Advances election participation and stake recovery for one joined validator.
+///
+/// Submission and reaping are intentionally mutually exclusive in one tick: after
+/// an election entry is sent, the next poll can observe its on-chain state before
+/// attempting to recover any previously frozen stake.
 pub(crate) async fn join_auto_tick(
     toolchain: &Toolchain,
     node_name: &str,
@@ -244,10 +249,13 @@ pub(crate) async fn join_auto_tick(
     let node = settings.node(node_name)?.clone();
     ensure!(node.enabled, "node `{node_name}` is disabled");
     ensure!(node.validator, "node `{node_name}` is not a validator");
+
     let elector = elector_address(toolchain).await?;
     let mut submitted = false;
+
     if settings.validation.auto_participate {
         let election_id = active_election_id(toolchain, &elector).await?;
+
         if election_id > 0 && node.participate_in_elections {
             let result = participate_with_wallet(
                 toolchain,
@@ -258,6 +266,7 @@ pub(crate) async fn join_auto_tick(
                 Some(election_id),
             )
             .await?;
+
             if result.send_status.is_some() {
                 submitted = true;
                 tracing::info!(
@@ -268,9 +277,11 @@ pub(crate) async fn join_auto_tick(
             }
         }
     }
+
     if settings.validation.auto_reap && !submitted {
         reap_node(toolchain, &node, wallet_name, &elector).await?;
     }
+
     Ok(())
 }
 

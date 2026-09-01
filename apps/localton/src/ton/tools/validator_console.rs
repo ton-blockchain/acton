@@ -62,8 +62,11 @@ pub struct ValidatorStats {
 /// transition here prevents orchestration code from combining raw stat names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidatorSynchronization {
+    /// The engine has a masterchain block and reports timestamp-based progress
     BlockTime { block_time: u64, target_time: u64 },
+    /// The engine is still downloading or preparing its initial persistent state
     Initial(InitialSyncProgress),
+    /// The console is ready but has not exposed a more specific sync signal yet
     WaitingForMasterchain,
 }
 
@@ -135,6 +138,9 @@ impl ValidatorStats {
         } else {
             (InitialSyncStage::Preparing, None)
         };
+
+        // Part counters and network transfer estimates are separate stats and may
+        // appear later than the high-level initial-sync stage.
         let (current_part, total_parts) = self
             .value("process.download_state")
             .and_then(state_part_progress)
@@ -144,6 +150,7 @@ impl ValidatorStats {
         let state_download = self
             .value("process.download_state_net")
             .and_then(state_download_progress);
+
         Some(InitialSyncProgress {
             stage,
             masterchain_seqno,
@@ -156,12 +163,14 @@ impl ValidatorStats {
     /// Selects the most precise synchronization signal currently available.
     pub fn synchronization(&self) -> Result<ValidatorSynchronization> {
         let target_time = self.unix_time()?;
+
         if let Some(block_time) = self.masterchain_block_time()?.filter(|time| *time > 0) {
             return Ok(ValidatorSynchronization::BlockTime {
                 block_time,
                 target_time,
             });
         }
+
         Ok(self.initial_sync_progress().map_or(
             ValidatorSynchronization::WaitingForMasterchain,
             ValidatorSynchronization::Initial,
@@ -754,6 +763,7 @@ fn parse_stats(output: &str) -> Result<ValidatorStats> {
     })
 }
 
+/// Extracts a leading unsigned sequence number from a descriptive engine status.
 fn leading_u32(value: &str) -> Option<u32> {
     value
         .bytes()
@@ -764,11 +774,13 @@ fn leading_u32(value: &str) -> Option<u32> {
         .ok()
 }
 
+/// Extracts a validated `(current, total)` pair from a state-part status line.
 fn state_part_progress(value: &str) -> Option<(u32, u32)> {
     let (_, parts) = value.rsplit_once("(part ")?;
     let (current, total) = parts.strip_suffix(')')?.split_once(" out of ")?;
     let current = current.parse().ok()?;
     let total = total.parse().ok()?;
+
     (total > 0 && current <= total).then_some((current, total))
 }
 
@@ -781,6 +793,7 @@ fn state_download_progress(value: &str) -> Option<StateDownloadProgress> {
     let (_, progress) = value.rsplit_once(" : ")?;
     let (sizes, estimates) = progress.split_once(" (")?;
     let (downloaded, total) = sizes.split_once('/')?;
+
     let mut estimates = estimates.strip_suffix(')')?.split(", ");
     let speed = estimates.next()?.strip_suffix("/s")?;
     estimates.next()?.strip_suffix('%')?;
@@ -789,12 +802,15 @@ fn state_download_progress(value: &str) -> Option<StateDownloadProgress> {
         .strip_suffix("s remaining")?
         .parse()
         .ok()?;
+
     if estimates.next().is_some() {
         return None;
     }
+
     let downloaded_bytes = binary_size_bytes(downloaded)?;
     let total_bytes = binary_size_bytes(total)?;
     let bytes_per_second = binary_size_bytes(speed)?;
+
     (total_bytes > 0 && downloaded_bytes <= total_bytes).then_some(StateDownloadProgress {
         downloaded_bytes,
         total_bytes,

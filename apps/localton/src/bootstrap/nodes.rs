@@ -102,6 +102,8 @@ pub(super) async fn ensure_initialized(
     info!(node = node.name, "initializing validator-engine node");
     node_layout.create_dirs()?;
 
+    // validator-engine expects the network config both beside its node state and
+    // inside the database it creates during first-run initialization.
     fs::copy(&layout.global_config, &node_layout.global_config).with_context(|| {
         format!(
             "failed to copy global config to {}",
@@ -113,6 +115,8 @@ pub(super) async fn ensure_initialized(
         node_layout.db.join("global.config.json"),
     )?;
 
+    // Database creation precedes key installation because the generated private
+    // keys are written directly into the engine-owned keyring.
     let context = OperationContext::for_node(timeout, &node.name);
     let validator_database = tools
         .validator_engine
@@ -128,6 +132,7 @@ pub(super) async fn ensure_initialized(
             GenerateKeyRequest::control_server(&node_layout.certs, &node_layout.keyring),
         )
         .await?;
+
     let client = tools
         .random_id
         .generate_key(
@@ -135,6 +140,7 @@ pub(super) async fn ensure_initialized(
             GenerateKeyRequest::control_client(&node_layout.certs),
         )
         .await?;
+
     let liteserver = tools
         .random_id
         .generate_key(
@@ -142,8 +148,11 @@ pub(super) async fn ensure_initialized(
             GenerateKeyRequest::liteserver(&node_layout.keyring),
         )
         .await?;
+
     validator_database.install_control_and_liteserver(node, server.id, client.id, liteserver.id)?;
 
+    // Full-node ADNL is created through the authenticated console and becomes the
+    // identity validator-engine advertises to the network.
     let full_node_adnl = validator::configure_full_node_identity(
         layout,
         tools.validator_engine.as_ref(),
@@ -152,6 +161,7 @@ pub(super) async fn ensure_initialized(
         &context,
     )
     .await?;
+
     Ok(NodeRuntime {
         initialized: true,
         status: "initialized".to_owned(),
@@ -176,16 +186,21 @@ fn recover_initialized_node(layout: &Layout, node: &NodeSettings) -> Result<Node
         .get(&node.name)
         .cloned()
         .unwrap_or_default();
+
+    // Process fields describe only the current invocation; durable identities are
+    // reconstructed below from engine-owned files.
     runtime.initialized = true;
     runtime.running = false;
     runtime.pid = None;
     runtime.status = "initialized".to_owned();
+
     runtime.console_public_key =
         Some(read_public_key(&node_layout.server_public_key())?.to_base64());
     if node.liteserver {
         runtime.liteserver_public_key =
             Some(read_public_key(&node_layout.keyring.join("liteserver.pub"))?.to_base64());
     }
+
     recover_config_metadata(&node_layout.config_json(), &mut runtime)?;
     Ok(runtime)
 }

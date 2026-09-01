@@ -52,12 +52,14 @@ const SYNC_LOG_INTERVAL: Duration = Duration::from_secs(5);
 const SYNC_STATS_TIMEOUT: Duration = Duration::from_secs(3);
 const SYNC_LAG_TOLERANCE_BLOCKS: u32 = 2;
 
+/// Development faucet response used only to verify the requested wallet and amount.
 #[derive(Deserialize)]
 struct FaucetGrant {
     address: String,
     amount_nano: u64,
 }
 
+/// Authenticated endpoint of one liteserver owned by this join invocation.
 #[derive(Clone)]
 struct LocalLiteserver {
     node: String,
@@ -65,6 +67,11 @@ struct LocalLiteserver {
     public_key: String,
 }
 
+/// Joins an existing TON network and owns every follower process for this state directory.
+///
+/// The workflow prepares durable node state before process startup, waits until each
+/// local liteserver follows the network head, and only then enables validator automation.
+/// Every exit path converges on process shutdown and runtime-state cleanup.
 pub async fn run(args: JoinArgs) -> Result<()> {
     std::fs::create_dir_all(&args.state.state_dir).with_context(|| {
         format!(
@@ -72,21 +79,26 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             args.state.state_dir.display()
         )
     })?;
+
     let state_root = dunce::canonicalize(&args.state.state_dir).with_context(|| {
         format!(
             "failed to resolve join state directory {}",
             args.state.state_dir.display()
         )
     })?;
+
     let layout = Layout::new(state_root);
     layout.create_dirs()?;
+
     let _state_lock = acquire_lock(&layout.lock)?;
     let processes = ProcessRegistry::default();
+
     // Install signal handling before any TON process starts. Otherwise Ctrl+C
     // during initial synchronization terminates only the Localton instance and skips
     // the managed-process cleanup below.
     let run_result = select! {
         result = async {
+            // Commit network identity and node settings before starting processes.
             let owned_nodes = prepare_follower_state(&layout, &args).await?;
             let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
             let toolchain = Toolchain::official(layout.clone(), binaries.clone());
@@ -97,6 +109,9 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 processes.clone(),
             );
             let settings = Settings::load(&layout.settings)?;
+
+            // Start every host-local node and retain the liteserver identity needed
+            // to query it without trusting the remote global-config liteserver list.
             let mut local_liteservers = Vec::new();
             for name in &owned_nodes {
                 let runtime = control
@@ -111,10 +126,13 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                     });
                 }
             }
+
             let primary_liteserver = local_liteservers
                 .first()
                 .cloned()
                 .context("join has no running node with a local liteserver")?;
+
+            // Publish instance ownership before the potentially long initial sync.
             RuntimeState::update_atomic(&layout.runtime, |runtime| {
                 runtime.mark_instance_started();
                 for name in &owned_nodes {
@@ -124,6 +142,8 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 }
                 Ok(())
             })?;
+
+            // A node is usable only after several consecutive near-head samples.
             for liteserver in &local_liteservers {
                 select! {
                     result = wait_for_network_sync(
@@ -141,6 +161,9 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                     Ok(())
                 })?;
             }
+
+            // Once synchronized, all wallet and election work must use a node on
+            // this host instead of depending on the bootstrap host's liteserver.
             prefer_local_liteserver(
                 &layout.global_config,
                 primary_liteserver.port,
@@ -150,6 +173,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 endpoint = %format!("127.0.0.1:{}", primary_liteserver.port),
                 "join operations now use the synchronized local liteserver"
             );
+
             let validator_nodes: Vec<_> = settings
                 .nodes
                 .iter()
@@ -157,6 +181,9 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 .map(|node| node.name.as_str())
                 .collect();
             info!(nodes = ?owned_nodes, global_config = %args.global_config_url, validators = ?validator_nodes, "joined Localton nodes are running");
+
+            // Election automation is long-lived and supervised alongside the TON
+            // processes so either failure tears down the whole owned instance.
             let validation_interval = toolchain.settings()?.validation.poll_interval_seconds;
             let validation = validation_loop(
                 toolchain,
@@ -169,18 +196,28 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 result = supervise(&processes) => result,
                 result = &mut validation => result,
             };
+
             result
         } => result,
         signal_result = shutdown_signal() => signal_result,
     };
+
+    // Cleanup runs even when preparation, synchronization, supervision, or signal
+    // handling fails. Preserve all errors by combining the independent results.
     let stop_result = processes.stop_all().await;
     let state_result = RuntimeState::update_atomic(&layout.runtime, |runtime| {
         runtime.mark_instance_stopped();
         Ok(())
     });
+
     run_result.and(stop_result).and(state_result.map(|_| ()))
 }
 
+/// Waits until one local liteserver remains close to the public network head.
+///
+/// Consecutive confirmations prevent a transient near-head response from marking the
+/// node ready. Before the liteserver answers, validator-console statistics provide
+/// protocol-specific initial-sync progress for logs and runtime state.
 async fn wait_for_network_sync(
     layout: &Layout,
     toolchain: &Toolchain,
@@ -191,10 +228,15 @@ async fn wait_for_network_sync(
     let mut last_log = Instant::now()
         .checked_sub(SYNC_LOG_INTERVAL)
         .unwrap_or_else(Instant::now);
+
     loop {
+        // Compare the remote network head with the same node through its private
+        // local liteserver endpoint. Both clients are recreated because an endpoint
+        // may become available while validator-engine is still initializing.
         let sample: Result<(u32, u32)> = async {
             let mut network = LocalLiteClient::connect(&layout.global_config).await?;
             let network_head = network.last().await?.seqno;
+
             let mut local = LocalLiteClient::connect_node(
                 &layout.global_config,
                 liteserver.port,
@@ -205,9 +247,11 @@ async fn wait_for_network_sync(
             Ok((network_head, local_head))
         }
         .await;
+
         match sample {
             Ok((network_head, local_head)) => {
                 let lag = network_head.saturating_sub(local_head);
+
                 if last_log.elapsed() >= SYNC_LOG_INTERVAL {
                     if let Err(error) = RuntimeState::update_atomic(&layout.runtime, |runtime| {
                         if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
@@ -217,6 +261,7 @@ async fn wait_for_network_sync(
                     }) {
                         warn!(node = liteserver.node, %error, "could not publish follower synchronization progress");
                     }
+
                     info!(
                         node = liteserver.node,
                         local_head,
@@ -226,8 +271,10 @@ async fn wait_for_network_sync(
                     );
                     last_log = Instant::now();
                 }
+
                 if lag <= SYNC_LAG_TOLERANCE_BLOCKS {
                     confirmations += 1;
+
                     if confirmations >= SYNC_READY_CONFIRMATIONS {
                         if let Err(error) =
                             RuntimeState::update_atomic(&layout.runtime, |runtime| {
@@ -239,6 +286,7 @@ async fn wait_for_network_sync(
                         {
                             warn!(node = liteserver.node, %error, "could not publish final follower synchronization progress");
                         }
+
                         info!(
                             node = liteserver.node,
                             local_head,
@@ -246,6 +294,7 @@ async fn wait_for_network_sync(
                             lag_blocks = lag,
                             "follower node synchronized"
                         );
+
                         return Ok(());
                     }
                 } else {
@@ -254,7 +303,10 @@ async fn wait_for_network_sync(
             }
             Err(error) => {
                 confirmations = 0;
+
                 if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+                    // The local liteserver normally rejects queries during initial
+                    // state download, so fall back to validator-console statistics.
                     let stats = toolchain
                         .validator_console_tool
                         .health(
@@ -262,6 +314,7 @@ async fn wait_for_network_sync(
                             &toolchain.validator_console_endpoint(node),
                         )
                         .await;
+
                     match stats.and_then(|stats| stats.synchronization()) {
                         Ok(ValidatorSynchronization::BlockTime {
                             block_time,
@@ -277,6 +330,7 @@ async fn wait_for_network_sync(
                             {
                                 warn!(node = liteserver.node, %publish_error, "could not publish time-based follower synchronization progress");
                             }
+
                             info!(
                                 node = liteserver.node,
                                 masterchain_block_time = block_time,
@@ -297,6 +351,7 @@ async fn wait_for_network_sync(
                             {
                                 warn!(node = liteserver.node, %publish_error, "could not publish initial follower synchronization progress");
                             }
+
                             if let Some(download) = state_download {
                                 info!(
                                     node = liteserver.node,
@@ -338,15 +393,22 @@ async fn wait_for_network_sync(
                 }
             }
         }
+
         tokio::time::sleep(SYNC_POLL_INTERVAL).await;
     }
 }
 
+/// Prepares persistent follower configuration without starting external processes.
+///
+/// A saved global config is the network-identity commit marker for join state. An
+/// existing node database without it is rejected because rebuilding against another
+/// network could mix durable validator-engine state and keys.
 async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTreeSet<String>> {
     ensure!(
         !layout.manifest.is_file(),
         "join requires a follower state directory, not a bootstrap state directory"
     );
+
     let mut settings = if layout.settings.is_file() {
         Settings::load(&layout.settings)?
     } else {
@@ -360,6 +422,9 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
         args.advertise_ip,
         args.validator,
     )?;
+
+    // Once downloaded, the global config pins this state directory to one TON
+    // network. A restart reuses it even if the source URL later changes.
     let global_config_exists = layout.global_config.is_file();
     let global_config = if global_config_exists {
         info!("reusing persisted TON global config");
@@ -381,12 +446,17 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
         }
         fetch_global_config(&args.global_config_url).await?
     };
+
     global_config.validate_advertise_ip(args.advertise_ip)?;
+
     if !global_config_exists {
         write_json_atomic(&layout.global_config, &global_config)?;
         info!(url = %args.global_config_url, "installed TON global config");
     }
 
+    // Initialization-time identity fields become immutable once validator-engine
+    // has created its database. Validator participation remains independently
+    // mutable through the validator commands.
     for name in &requested {
         let node = settings.node_mut(name)?;
         let node_initialized = layout.node(node).config_json().is_file();
@@ -404,11 +474,20 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
         }
         node.enabled = true;
     }
+
+    // settings.json is written last so it never advertises a network configuration
+    // that failed validation or could not be persisted.
     settings.validate()?;
     settings.save_atomic(&layout.settings)?;
+
     Ok(requested)
 }
 
+/// Resolves the node set owned by this join state and assigns first-run ports.
+///
+/// Node names and ports are persistent validator-engine identity inputs. Existing
+/// settings therefore win on restart, and conflicting CLI names are rejected
+/// instead of silently creating or renaming nodes.
 fn resolve_join_nodes(
     layout: &Layout,
     settings: &mut Settings,
@@ -431,6 +510,7 @@ fn resolve_join_nodes(
         if requested.is_empty() {
             return Ok(persisted);
         }
+
         let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
         ensure!(
             requested == persisted,
@@ -462,6 +542,8 @@ fn resolve_join_nodes(
         names
     };
 
+    // Probe one complete range before assigning any node so partial allocation
+    // cannot leave settings with overlapping or half-selected ports.
     let allocation =
         HostPortAllocation::find(port_base.unwrap_or(DEFAULT_JOIN_PORT_BASE), names.len())?;
     settings.nodes = names
@@ -475,12 +557,14 @@ fn resolve_join_nodes(
             node
         })
         .collect();
+
     info!(
         port_range_start = allocation.start,
         port_range_end = allocation.end,
         nodes = names.len(),
         "allocated persistent join port range"
     );
+
     for node in &settings.nodes {
         info!(
             node = node.name,
@@ -492,9 +576,14 @@ fn resolve_join_nodes(
             "allocated persistent node ports"
         );
     }
+
     Ok(names)
 }
 
+/// Downloads and validates a bounded standard TON global configuration.
+///
+/// The streaming size check does not trust `Content-Length`; chunked responses are
+/// subject to the same limit before any data is parsed or written to durable state.
 async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
     let url = http_url(source, "global config")?;
     let response = reqwest::Client::new()
@@ -504,14 +593,17 @@ async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
         .with_context(|| format!("failed to request {url}"))?
         .error_for_status()
         .with_context(|| format!("global config request was rejected by {url}"))?;
+
     if let Some(length) = response.content_length() {
         ensure!(
             length <= MAX_GLOBAL_CONFIG_BYTES,
             "global config is too large: {length} bytes"
         );
     }
+
     let mut bytes = Vec::new();
     let mut stream = response.bytes_stream();
+
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("failed to download global config")?;
         ensure!(
@@ -520,11 +612,17 @@ async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
         );
         bytes.extend_from_slice(&chunk);
     }
+
     let config = GlobalConfig::from_json_bytes(&bytes).context("global config is invalid")?;
     config.validate_for_node_join()?;
+
     Ok(config)
 }
 
+/// Replaces remote liteserver entries with the synchronized host-local endpoint.
+///
+/// DHT and validator network identity stay unchanged; only subsequent Localton
+/// client operations are redirected through the node whose key was verified at startup.
 fn prefer_local_liteserver(path: &Path, port: u16, public_key: &str) -> Result<()> {
     let bytes = std::fs::read(path)
         .with_context(|| format!("failed to read global config {}", path.display()))?;
@@ -532,10 +630,15 @@ fn prefer_local_liteserver(path: &Path, port: u16, public_key: &str) -> Result<(
         .with_context(|| format!("invalid global config {}", path.display()))?;
     let public_key =
         TonPublicKey::from_base64(public_key).context("local liteserver public key is invalid")?;
+
     config.use_local_liteserver(port, public_key);
     write_json_atomic(path, &config)
 }
 
+/// Runs election maintenance for every node owned by this join instance.
+///
+/// A failed tick is isolated to its node and logged; the loop remains alive so a
+/// temporary faucet, liteserver, or election-contract failure can recover later.
 async fn validation_loop(
     toolchain: Toolchain,
     faucet: Option<String>,
@@ -547,10 +650,13 @@ async fn validation_loop(
         .map(|url| http_url(url, "development faucet"))
         .transpose()?;
     let client = reqwest::Client::new();
+
     let mut interval = tokio::time::interval(Duration::from_secs(interval_seconds.max(1)));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
     loop {
         interval.tick().await;
+
         for node in &nodes {
             if let Err(error) = validation_tick(&toolchain, &client, faucet.as_ref(), node).await {
                 warn!(node, %error, "validator election tick failed");
@@ -559,6 +665,11 @@ async fn validation_loop(
     }
 }
 
+/// Ensures one validator has funding and delegates election state transitions.
+///
+/// Wallet creation is idempotent. Faucet use is limited to bringing the wallet up
+/// to the configured stake plus fee reserve; normal election participation then
+/// proceeds entirely through TON contracts and validator-console operations.
 async fn validation_tick(
     toolchain: &Toolchain,
     client: &reqwest::Client,
@@ -570,6 +681,7 @@ async fn validation_tick(
     if !node_settings.validator {
         return Ok(());
     }
+
     let wallet_name = validator_wallet_name(node);
     let wallet = wallets::ensure_wallet_for_toolchain(
         toolchain,
@@ -579,11 +691,15 @@ async fn validation_tick(
         VALIDATOR_WALLET_ID,
     )
     .await?;
+
     if settings.validation.auto_participate && node_settings.participate_in_elections {
         let minimum_balance = node_settings
             .validator_stake_nano
             .saturating_add(VALIDATOR_FEE_RESERVE_NANO);
         let balance = wallets::wallet_balance_nano(toolchain, &wallet_name).await?;
+
+        // The faucet is a bootstrap convenience only and is contacted when the
+        // persisted wallet cannot cover the configured stake plus fee reserve.
         if balance < u128::from(minimum_balance) {
             let faucet_url = faucet.with_context(|| {
                 format!(
@@ -591,6 +707,7 @@ async fn validation_tick(
                     wallet.address
                 )
             })?;
+
             let grant = client
                 .post(faucet_url.clone())
                 .json(&serde_json::json!({"address": &wallet.address}))
@@ -602,10 +719,12 @@ async fn validation_tick(
                 .json::<FaucetGrant>()
                 .await
                 .context("development faucet returned an invalid grant")?;
+
             ensure!(
                 grant.address == wallet.address,
                 "development faucet funded a different address"
             );
+
             wallets::wait_for_wallet_balance(
                 toolchain,
                 &wallet.address,
@@ -614,8 +733,10 @@ async fn validation_tick(
             .await?;
             info!(node, wallet = %wallet.address, amount_nano = grant.amount_nano, "validator wallet funded");
         }
+
         wallets::ensure_wallet_deployed(toolchain, &wallet_name).await?;
     }
+
     validators::join_auto_tick(toolchain, node, &wallet_name).await
 }
 
@@ -623,6 +744,7 @@ fn validator_wallet_name(node: &str) -> String {
     format!("{node}-validator-masterchain")
 }
 
+/// Parses a user-supplied HTTP endpoint without accepting local file or custom schemes.
 fn http_url(source: &str, label: &str) -> Result<reqwest::Url> {
     let url =
         reqwest::Url::parse(source).with_context(|| format!("invalid {label} URL `{source}`"))?;
@@ -630,6 +752,7 @@ fn http_url(source: &str, label: &str) -> Result<reqwest::Url> {
         matches!(url.scheme(), "http" | "https"),
         "{label} URL must use http or https"
     );
+
     Ok(url)
 }
 

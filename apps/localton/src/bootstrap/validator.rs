@@ -214,12 +214,17 @@ pub(super) async fn configure_full_node_identity(
     let endpoint = console_endpoint(layout, node);
     let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
     let mut temporary = start_bootstrap(layout, engine, node).await?;
+
     let result = async {
         wait_for_console(layout, console, node, &mut temporary, context).await?;
+
+        // Key creation is deliberately outside the retry helpers because `new_key`
+        // is not idempotent and a retry would silently select another identity.
         let full_node_adnl = console.new_key(&console_context, &endpoint).await?;
         let _public = console
             .export_public(&console_context, &endpoint, &full_node_adnl)
             .await?;
+
         retry_console_mutation(node, "add_full_node_adnl", || {
             console.add_adnl(
                 &console_context,
@@ -231,6 +236,7 @@ pub(super) async fn configure_full_node_identity(
             )
         })
         .await?;
+
         retry_console_mutation(node, "change_full_node_address", || {
             console.change_full_node_address(
                 &console_context,
@@ -241,11 +247,14 @@ pub(super) async fn configure_full_node_identity(
             )
         })
         .await?;
+
         Ok(full_node_adnl)
     }
     .await;
+
     temporary.stop().await?;
     workflow_result(node, "configure_full_node_identity", started, &result);
+
     result
 }
 

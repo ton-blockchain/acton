@@ -300,6 +300,7 @@ impl RandomIdGenerator for OfficialRandomIdGenerator {
 /// base64, so this function validates the complete 36-byte artifact before slicing.
 pub fn read_public_key(path: &Path) -> Result<TonPublicKey> {
     let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+
     TonPublicKey::from_tl_bytes(&bytes)
         .with_context(|| format!("invalid TON public key file {}", path.display()))
 }
