@@ -33,6 +33,8 @@ pub struct Layout {
     pub settings: PathBuf,
     pub runtime: PathBuf,
     pub wallets: PathBuf,
+    /// Stable observer identity and other state owned by the observability service
+    pub observability: PathBuf,
     pub lock: PathBuf,
     pub logs: PathBuf,
 }
@@ -63,6 +65,7 @@ impl Layout {
             settings: root.join("settings.json"),
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
+            observability: root.join("observability"),
             lock: root.join("instance.lock"),
             logs,
             resources,
@@ -76,7 +79,7 @@ impl Layout {
     /// The common layout contains one validator-engine node, shared logs, and
     /// wallets. Bootstrap-specific network artifacts have a separate lifecycle.
     pub fn create_dirs(&self) -> Result<()> {
-        for path in [&self.root, &self.logs, &self.wallets] {
+        for path in [&self.root, &self.logs, &self.wallets, &self.observability] {
             fs::create_dir_all(path)
                 .with_context(|| format!("failed to create {}", path.display()))?;
         }

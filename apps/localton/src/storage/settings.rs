@@ -147,6 +147,9 @@ impl Settings {
         if self.services.admin_http.enabled {
             service_ports.push(("admin HTTP", self.services.admin_http.port));
         }
+        if self.services.observability.enabled {
+            service_ports.push(("observability HTTP", self.services.observability.port));
+        }
         if self.services.ton_http_api.enabled {
             service_ports.extend([
                 ("TON HTTP API public proxy", self.services.ton_http_api.port),
@@ -499,6 +502,8 @@ pub struct ServiceSettings {
     pub admin_http: HttpServiceSettings,
     /// TON HTTP API v2 settings
     pub ton_http_api: TonHttpApiSettings,
+    /// Signed network observations and dashboard settings
+    pub observability: ObservabilitySettings,
 }
 
 impl Default for ServiceSettings {
@@ -522,6 +527,7 @@ impl Default for ServiceSettings {
                 command: None,
                 static_config: None,
             },
+            observability: ObservabilitySettings::default(),
         }
     }
 }
@@ -531,6 +537,103 @@ impl ServiceSettings {
         self.config_http.validate("config HTTP")?;
         self.admin_http.validate("admin HTTP")?;
         self.ton_http_api.validate("TON HTTP API")?;
+        self.observability.validate()?;
+        Ok(())
+    }
+}
+
+/// Controls the public API that exchanges signed node observations and serves the dashboard.
+///
+/// Each Localton state directory owns one observer identity. Peers use the configured
+/// endpoints only as discovery seeds; all received observations are authenticated before
+/// they affect the aggregated network view.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(default)]
+pub struct ObservabilitySettings {
+    /// `true` when Localton publishes observations and serves the dashboard
+    pub enabled: bool,
+    /// IPv4 address that accepts API, peer exchange, and dashboard connections
+    #[schema(value_type = String, format = "ipv4")]
+    pub bind: Ipv4Addr,
+    /// TCP port shared by the observability API and dashboard
+    pub port: u16,
+    /// Signed observation publication interval in seconds
+    pub publish_interval_seconds: u64,
+    /// Time after which peers stop treating an observation as live
+    pub observation_ttl_seconds: u64,
+    /// Rolling block-production window in seconds
+    pub block_window_seconds: u64,
+    /// Maximum peers contacted during one exchange round
+    pub gossip_fanout: usize,
+    /// Stable peer endpoints used to discover other observers
+    pub peers: Vec<String>,
+}
+
+impl Default for ObservabilitySettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            bind: Ipv4Addr::UNSPECIFIED,
+            port: 18_007,
+            publish_interval_seconds: 5,
+            observation_ttl_seconds: 20,
+            block_window_seconds: 10 * 60,
+            gossip_fanout: 3,
+            peers: Vec::new(),
+        }
+    }
+}
+
+impl ObservabilitySettings {
+    /// Returns the listener address without changing the endpoint advertised to peers.
+    pub fn socket_addr(&self) -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(self.bind), self.port)
+    }
+
+    /// Validates the URL shape required by peer exchange while allowing private
+    /// hosts used by local and self-managed networks.
+    pub(crate) fn validate_endpoint(endpoint: &str) -> Result<()> {
+        let url = reqwest::Url::parse(endpoint)
+            .with_context(|| format!("invalid observability peer URL `{endpoint}`"))?;
+        ensure!(
+            matches!(url.scheme(), "http" | "https"),
+            "observability peer URL must use http or https"
+        );
+        ensure!(
+            url.host_str().is_some(),
+            "observability peer URL has no host"
+        );
+        ensure!(
+            url.username().is_empty() && url.password().is_none(),
+            "observability peer URL must not contain credentials"
+        );
+
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<()> {
+        ensure!(self.port > 0, "observability port must be positive");
+        ensure!(
+            self.publish_interval_seconds > 0,
+            "observability publish interval must be positive"
+        );
+        ensure!(
+            self.observation_ttl_seconds >= self.publish_interval_seconds.saturating_mul(2),
+            "observability TTL must cover at least two publication intervals"
+        );
+        ensure!(
+            self.block_window_seconds >= self.observation_ttl_seconds,
+            "observability block window must not be shorter than its TTL"
+        );
+        ensure!(
+            (1..=16).contains(&self.gossip_fanout),
+            "observability gossip fanout must be in 1..=16"
+        );
+
+        for peer in &self.peers {
+            Self::validate_endpoint(peer)?;
+        }
+
         Ok(())
     }
 }
@@ -710,6 +813,7 @@ mod tests {
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
+        assert_eq!(settings.services.observability.port, 18_007);
         assert_eq!(settings.services.ton_http_api.backend_port, 18_005);
         assert_eq!(settings.services.ton_http_api.monitor_port, 18_006);
     }

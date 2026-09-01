@@ -5,20 +5,28 @@ ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
 ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
 
-FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
-WORKDIR /src
+FROM oven/bun:1.4.0 AS ui-builder
+WORKDIR /repo
+COPY package.json bun.lock bunfig.toml ./
+COPY packages ./packages
+RUN bun ci \
+    && bun --filter @acton/localton-ui build
 
-COPY Cargo.toml Cargo.lock ./
-COPY src/main.rs ./src/main.rs
-COPY xtask/Cargo.toml ./xtask/Cargo.toml
-COPY xtask/src/main.rs ./xtask/src/main.rs
+FROM rust:${RUST_VERSION}-bookworm AS localton-builder
+WORKDIR /src/apps/localton
+
+COPY apps/localton/Cargo.toml apps/localton/Cargo.lock ./
+COPY apps/localton/src/main.rs ./src/main.rs
+COPY apps/localton/xtask/Cargo.toml ./xtask/Cargo.toml
+COPY apps/localton/xtask/src/main.rs ./xtask/src/main.rs
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     cargo fetch --locked
 
-COPY src ./src
-COPY xtask ./xtask
-COPY assets ./assets
-COPY NOTICE.md README.md ./
+COPY apps/localton/src ./src
+COPY apps/localton/xtask ./xtask
+COPY apps/localton/assets ./assets
+COPY apps/localton/NOTICE.md apps/localton/README.md ./
+COPY --from=ui-builder /repo/packages/localton-ui/dist /src/packages/localton-ui/dist
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=localton-cargo-target,target=/src/target \
     cargo build --locked --release --workspace \
@@ -26,11 +34,11 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
     && install -Dm755 target/release/xtask /out/xtask
 
 # Development target: reuse the native TON and indexer layers from the published
-# image and replace only the localton launcher built from this checkout.
+# image and replace only the localton binary built from this checkout.
 FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
 USER root
-COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
-COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
+COPY --from=localton-builder --chmod=0755 /out/localton /usr/local/bin/localton
+COPY --chmod=0755 apps/localton/docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
 RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
 USER localton
@@ -183,8 +191,8 @@ ENV CCACHE_COMPRESS=true
 ENV CCACHE_MAXSIZE=4G
 ENV USERVER_FEATURE_STACK_USAGE_MONITOR=0
 
-COPY --from=launcher-builder /out/localton /usr/local/bin/localton
-COPY --from=launcher-builder /out/xtask /usr/local/bin/xtask
+COPY --from=localton-builder /out/localton /usr/local/bin/localton
+COPY --from=localton-builder /out/xtask /usr/local/bin/xtask
 
 RUN --mount=type=cache,id=ton-http-api-v2-ccache,target=/tmp/http-api-build/tools/ton-http-api-v2/ccache \
     xtask build-ton-http-api-v2 \
@@ -244,10 +252,10 @@ ENV CC=clang \
     CCACHE_DIR=/ccache \
     CCACHE_MAXSIZE=8G
 
-COPY docker/ton-indexer-cors.patch /tmp/ton-indexer-cors.patch
-COPY docker/ton-indexer-classifier-cpu.patch /tmp/ton-indexer-classifier-cpu.patch
-COPY docker/ton-indexer-v3-catchup.patch /tmp/ton-indexer-v3-catchup.patch
-COPY docker/ton-indexer-localton-scanner.patch /tmp/ton-indexer-localton-scanner.patch
+COPY apps/localton/docker/ton-indexer-cors.patch /tmp/ton-indexer-cors.patch
+COPY apps/localton/docker/ton-indexer-classifier-cpu.patch /tmp/ton-indexer-classifier-cpu.patch
+COPY apps/localton/docker/ton-indexer-v3-catchup.patch /tmp/ton-indexer-v3-catchup.patch
+COPY apps/localton/docker/ton-indexer-localton-scanner.patch /tmp/ton-indexer-localton-scanner.patch
 
 RUN git init -q /src/ton-indexer \
     && git -C /src/ton-indexer remote add origin "${TON_INDEXER_REPOSITORY}" \
@@ -361,7 +369,7 @@ RUN apt-get update \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan \
     && install -d -m 0755 /usr/share/doc/localton
 
-COPY --from=launcher-builder /out/localton /usr/local/bin/localton
+COPY --from=localton-builder /out/localton /usr/local/bin/localton
 COPY --from=ton-binaries /opt/ton /opt/ton
 COPY --from=http-api-builder /opt/ton-http-api-v2 /opt/ton-http-api-v2
 COPY --from=ton-indexer-builder \
@@ -380,8 +388,8 @@ COPY --from=ton-index-classifier-builder \
     /out/ton-indexer/classifier \
     /opt/ton-indexer/classifier
 COPY --from=ton-indexer-builder /src/ton-indexer/LICENSE /usr/share/doc/localton/TON-INDEXER-LICENSE
-COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
-COPY NOTICE.md /usr/share/doc/localton/
+COPY --chmod=0755 apps/localton/docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
+COPY apps/localton/NOTICE.md /usr/share/doc/localton/
 
 ENV HOME=/var/lib/localton \
     APPIMAGE_EXTRACT_AND_RUN=1 \
@@ -398,7 +406,7 @@ WORKDIR /var/lib/localton
 USER localton
 
 VOLUME ["/var/lib/localton"]
-EXPOSE 18000/tcp 18001/tcp 18002/tcp 18003/tcp 18004/tcp
+EXPOSE 18000/tcp 18001/tcp 18002/tcp 18003/tcp 18004/tcp 18007/tcp
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=240s --retries=12 \

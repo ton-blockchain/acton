@@ -148,7 +148,9 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
         faucet: None,
         advertise_ip: Ipv4Addr::new(10, 0, 0, 2),
         validator: true,
+        observability_bind: Ipv4Addr::UNSPECIFIED,
         port_base: Some(41_000),
+        no_observability: false,
         ton_bin_dir: None,
         startup_timeout: 1,
     };
@@ -159,6 +161,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
     let settings = Settings::load(&layout.settings).unwrap();
     assert_eq!(prepared, settings);
     let node = &settings.node;
+    let observability_port = settings.services.observability.port;
     let node_ports_are_contiguous = [
         node.console_port,
         node.adnl_port,
@@ -174,7 +177,8 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
     ];
     let actual = serde_json::json!({
         "node": node.name,
-        "allocation_starts_at_requested_base": node.console_port >= 41_000,
+        "allocation_starts_at_requested_base": observability_port >= 41_000,
+        "node_ports_follow_observability": node.console_port == observability_port + 1,
         "node_ports_are_contiguous": node_ports_are_contiguous,
         "enabled": node.enabled,
         "validator": node.validator,
@@ -194,6 +198,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
           "global_config_is_valid": true,
           "node": "node2",
           "node_ports_are_contiguous": true,
+          "node_ports_follow_observability": true,
           "participate_in_elections": true,
           "private_keys_downloaded": false,
           "validator": true,
@@ -206,6 +211,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
     retry_args.port_base = Some(50_000);
     prepare_join_state(&layout, &retry_args).await.unwrap();
     let retried = Settings::load(&layout.settings).unwrap();
+    assert_eq!(retried.services.observability.port, observability_port);
     let retried = &retried.node;
     assert!(retried.validator);
     assert!(retried.participate_in_elections);

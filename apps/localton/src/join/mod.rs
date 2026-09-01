@@ -17,16 +17,17 @@ mod tests;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use tokio::select;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     binaries::TonBinaries,
     bootstrap::{acquire_lock, shutdown_signal, supervise},
     cli::JoinArgs,
-    node,
+    http, node,
     runtime::ProcessRegistry,
-    storage::{Layout, RuntimeState},
+    storage::{Layout, RuntimeState, ServiceRuntime},
     ton::{global_config::GlobalConfig, toolchain::Toolchain},
 };
 
@@ -35,6 +36,17 @@ use self::{
     sync::{LocalLiteserver, wait_for_network_sync},
     validator::{apply_network_validator_config, validation_loop},
 };
+
+#[derive(Deserialize)]
+struct ConfigurationService {
+    service: String,
+    endpoints: ConfigurationEndpoints,
+}
+
+#[derive(Deserialize)]
+struct ConfigurationEndpoints {
+    observability: Option<String>,
+}
 
 /// Joins an existing TON network and owns one node for this state directory.
 ///
@@ -120,6 +132,41 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 Ok(())
             })?;
 
+            let observability_peers = if settings.services.observability.enabled {
+                match discover_observability_peer(&args.global_config_url).await {
+                    Ok(Some(peer)) => vec![peer],
+                    Ok(None) => Vec::new(),
+                    Err(error) => {
+                        warn!(%error, "could not discover a bootstrap observability peer");
+                        Vec::new()
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            let services = http::start_observability(
+                layout.clone(),
+                toolchain.clone(),
+                &settings,
+                node_settings.public_ip,
+                observability_peers,
+            )
+            .await?;
+            RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                for (name, endpoint) in services.endpoints() {
+                    runtime.services.insert(
+                        name.clone(),
+                        ServiceRuntime {
+                            running: true,
+                            pid: Some(std::process::id()),
+                            endpoint: Some(endpoint.clone()),
+                            last_error: None,
+                        },
+                    );
+                }
+                Ok(())
+            })?;
+
             // A node is usable only after several consecutive near-head samples.
             let masterchain_seqno = select! {
                 result = wait_for_network_sync(
@@ -172,6 +219,8 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 result = &mut validation => result,
             };
 
+            services.shutdown().await;
+
             result
         } => result,
         signal_result = shutdown_signal() => signal_result,
@@ -186,4 +235,40 @@ pub async fn run(args: JoinArgs) -> Result<()> {
     });
 
     run_result.and(stop_result).and(state_result.map(|_| ()))
+}
+
+/// Discovers the bootstrap observer when the global config is served by Localton.
+///
+/// Standard TON config hosts are valid join sources and need not provide this
+/// metadata, so a non-Localton document produces no peer instead of an error.
+async fn discover_observability_peer(config_url: &str) -> Result<Option<String>> {
+    let mut root = reqwest::Url::parse(config_url)
+        .with_context(|| format!("invalid global config URL `{config_url}`"))?;
+    root.set_path("/");
+    root.set_query(None);
+    root.set_fragment(None);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .context("failed to build observability discovery client")?;
+    let response = client.get(root.clone()).send().await.with_context(|| {
+        format!("failed to request optional configuration metadata from {root}")
+    })?;
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+
+    let Ok(document) = response.json::<ConfigurationService>().await else {
+        return Ok(None);
+    };
+
+    let endpoint = (document.service == "localton")
+        .then_some(document.endpoints.observability)
+        .flatten();
+    if let Some(endpoint) = &endpoint {
+        crate::storage::ObservabilitySettings::validate_endpoint(endpoint)?;
+    }
+
+    Ok(endpoint)
 }

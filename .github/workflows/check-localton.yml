@@ -50,6 +50,13 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install UI dependencies
+        working-directory: ${{ github.workspace }}
+        run: bun ci
+
       - name: Install just
         uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:

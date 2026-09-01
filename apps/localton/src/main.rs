@@ -4,6 +4,7 @@ mod cli;
 mod http;
 mod join;
 mod node;
+mod observability;
 mod operations;
 mod runtime;
 mod storage;

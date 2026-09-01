@@ -65,6 +65,7 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
             node = node.name,
             port_range_start = allocation.start,
             port_range_end = allocation.end,
+            observability_port = allocation.observability,
             console_port = node.console_port,
             adnl_port = node.adnl_port,
             liteserver_port = node.liteserver_port,
@@ -73,7 +74,10 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
             "allocated persistent join node ports"
         );
 
-        Settings::for_join(node)
+        let mut settings = Settings::for_join(node);
+        settings.services.observability.port = allocation.observability;
+
+        settings
     };
     let node_name = settings.node.name.clone();
 
@@ -101,6 +105,10 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
     // The first persisted settings own initialization-time identity. Retries can
     // restart the node but cannot reinterpret an existing state directory.
     settings.node.enabled = true;
+    settings.services.observability.bind = args.observability_bind;
+    if args.no_observability {
+        settings.services.observability.enabled = false;
+    }
 
     // settings.json is written last so it never advertises a network configuration
     // that failed validation or could not be persisted.
