@@ -231,15 +231,15 @@ New networks use two-minute validator rounds. Elections are open from 90 to 30 s
 
 Two equal-stake validators are not failure tolerant. If either validator stops, the remaining 50% cannot form the greater-than-two-thirds consensus quorum, so block production pauses until quorum returns. Use at least four equal-stake validators to keep producing blocks after one validator stops. For cold-start resilience, publish more than one DHT entry point as well; a local liteserver removes a client dependency but does not replace consensus quorum or peer discovery.
 
-Allow TCP port `18000` while the second host downloads the config or uses the development faucet. Allow UDP port `6302` to the first DHT node and the follower's configured ADNL UDP port, `4445` by default, when the hosts are separated by a firewall or NAT.
+Allow TCP port `18000` while the second host downloads the config or uses the development faucet. Allow UDP port `6302` to the first DHT node and the joined node's configured ADNL UDP port, `4445` by default, when the hosts are separated by a firewall or NAT.
 
-Inspect the follower state from the second host:
+Inspect the joined node from the second host:
 
 ```bash
 localton node stats --state-dir .localton-node2
 ```
 
-Keep the joining instance active while the follower runs. `Ctrl-C` or `SIGTERM` stops its validator-engine process. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
+Keep the joining instance active while the node runs. `Ctrl-C` or `SIGTERM` stops its validator-engine process. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
 
 ## Native ports
 

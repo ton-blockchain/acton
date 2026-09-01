@@ -134,12 +134,12 @@ pub(crate) async fn initialize_database(
     Ok(database)
 }
 
-/// Initializes or reopens a follower node without starting its persistent process.
+/// Initializes or reopens a joined node without starting its persistent process.
 ///
 /// A valid manifest makes the operation idempotent. If no manifest exists, all
 /// node-owned partial state is removed before a fresh attempt. The manifest is
 /// saved last, so an interruption can never make an incomplete database reusable.
-pub(crate) async fn initialize_follower(
+pub(crate) async fn initialize_joined_node(
     layout: &Layout,
     node_layout: &NodeLayout,
     tools: &Toolchain,
@@ -148,7 +148,7 @@ pub(crate) async fn initialize_follower(
 ) -> Result<NodeManifest> {
     ensure!(
         node.role == NodeRole::Joined,
-        "follower initialization cannot own genesis"
+        "join initialization requires a node with the joined role"
     );
     if node_layout.manifest.is_file() {
         return NodeManifest::load(&node_layout.manifest, &node.name);
@@ -159,7 +159,7 @@ pub(crate) async fn initialize_follower(
         operation = "initialize_node",
         node = node.name,
         outcome = "pending",
-        "initializing follower validator-engine state"
+        "initializing validator-engine state for joined node"
     );
 
     let result = async {
@@ -199,7 +199,7 @@ pub(crate) async fn initialize_follower(
             node = node.name,
             duration_ms = started.elapsed().as_millis(),
             outcome = "success",
-            "follower node initialization completed"
+            "joined node initialization completed"
         ),
         Err(error) => warn!(
             operation = "initialize_node",
@@ -207,7 +207,7 @@ pub(crate) async fn initialize_follower(
             duration_ms = started.elapsed().as_millis(),
             outcome = "failure",
             %error,
-            "follower node initialization failed"
+            "joined node initialization failed"
         ),
     }
 
@@ -296,7 +296,7 @@ pub(crate) async fn start(
     Ok(runtime)
 }
 
-/// Removes only one follower's incomplete state before a manifest-backed retry.
+/// Removes incomplete node state before a manifest-backed retry.
 fn clean_partial_node(path: &std::path::Path) -> Result<()> {
     match fs::remove_dir_all(path) {
         Ok(()) => Ok(()),

@@ -737,8 +737,8 @@ mod tests {
     use crate::cli::StateArgs;
     use crate::storage::{Layout, NodePorts, NodeSettings, RuntimeState, Settings};
 
-    fn follower_settings() -> Settings {
-        Settings::for_join(NodeSettings::follower(
+    fn joined_settings() -> Settings {
+        Settings::for_join(NodeSettings::joined(
             "node2".to_owned(),
             Ipv4Addr::LOCALHOST,
             NodePorts {
@@ -756,7 +756,7 @@ mod tests {
         let root = tempdir().unwrap();
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
-        let mut settings = follower_settings();
+        let mut settings = joined_settings();
         let node = &mut settings.node;
         node.enabled = true;
         node.validator = false;

@@ -422,12 +422,12 @@ impl NodeSettings {
         }
     }
 
-    /// Creates a joined follower with one complete, already validated port set.
+    /// Creates a joined node with one complete, already validated port set.
     ///
     /// Protocol retention and wallet defaults remain aligned with genesis, while
     /// validator participation is opt-in and configured by the join workflow.
     #[must_use]
-    pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
+    pub fn joined(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
         Self {
             role: NodeRole::Joined,
             name,

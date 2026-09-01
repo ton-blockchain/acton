@@ -74,6 +74,19 @@ impl GlobalConfig {
             .with_context(|| format!("failed to save global config {}", path.display()))
     }
 
+    /// Returns authenticated liteserver endpoints in their configured priority order.
+    pub(crate) fn liteserver_endpoints(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Ipv4Addr, u16, TonPublicKey)> + '_ {
+        self.liteservers.iter().map(|liteserver| {
+            (
+                Ipv4Addr::from(liteserver.ip as u32),
+                liteserver.port,
+                liteserver.id.public_key(),
+            )
+        })
+    }
+
     /// Builds the single-liteserver config that defines a fresh Localton network.
     ///
     /// The zerostate is also the initial block until validator-engine produces the

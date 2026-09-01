@@ -133,7 +133,7 @@ impl ValidatorInitializeRequest {
     /// Derives every release-level initialization input from one managed node.
     ///
     /// Centralizing path conventions here keeps bootstrap focused on operation
-    /// order and prevents genesis and follower nodes from constructing different
+    /// order and prevents genesis and joined nodes from constructing different
     /// validator-engine command inputs.
     pub fn for_node(node_layout: &NodeLayout, node: &NodeSettings) -> Self {
         Self {

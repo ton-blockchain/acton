@@ -604,6 +604,11 @@ impl Ed25519PublicKey {
             key,
         }
     }
+
+    /// Returns the validated raw key for typed protocol adapters.
+    pub(crate) const fn public_key(&self) -> TonPublicKey {
+        self.key
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

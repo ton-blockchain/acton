@@ -79,7 +79,7 @@ pub(super) async fn initialize(
     .await?;
 
     // Step 3: create independent control and liteserver authentication roles
-    // through the same node lifecycle used by followers.
+    // through the same node lifecycle used by joined nodes.
     let service_keys = node::generate_service_keys(&node_layout, tools, genesis, &context).await?;
     let liteserver = service_keys
         .liteserver

@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{net::Ipv4Addr, path::Path};
 
 use anyhow::{Context, Result, anyhow};
 use crc::{CRC_16_XMODEM, Crc};
@@ -11,7 +11,7 @@ use tonutils::{
         boc::{SimpleAccount, SimpleAccountState},
         client::LiteClient,
     },
-    network_config::ConfigGlobal,
+    network_config::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey},
     tl::{
         common::{BlockId, BlockIdExt},
         response::TransactionId,
@@ -80,32 +80,26 @@ pub struct LocalLiteClient {
 
 impl LocalLiteClient {
     pub async fn connect(global_config: &Path) -> Result<Self> {
-        let source = fs::read_to_string(global_config)
-            .with_context(|| format!("failed to read global config {}", global_config.display()))?;
-        Self::connect_source(&source, global_config).await
+        let config = GlobalConfig::load(global_config)?;
+        Self::connect_config(tonutils_config(&config)).await
     }
 
-    /// Connects directly to one host-local liteserver without rewriting durable config.
+    /// Connects directly to one host-local liteserver from its typed endpoint identity.
     ///
-    /// Only the in-memory liteserver list is replaced. Network identity, DHT nodes,
-    /// zerostate, init block, and hardforks remain exactly as persisted on disk.
-    pub async fn connect_node(
-        global_config: &Path,
-        port: u16,
-        public_key: TonPublicKey,
-    ) -> Result<Self> {
-        let config = GlobalConfig::load(global_config)?.with_local_liteserver(port, public_key);
+    /// The liteserver client only needs an address and authentication key, so this
+    /// path neither reads nor rewrites the durable network configuration.
+    pub async fn connect_node(port: u16, public_key: TonPublicKey) -> Result<Self> {
+        let config = ConfigGlobal {
+            liteservers: vec![tonutils_liteserver(Ipv4Addr::LOCALHOST, port, public_key)],
+        };
 
-        Self::connect_source(&serde_json::to_string(&config)?, global_config).await
+        Self::connect_config(config).await
     }
 
-    async fn connect_source(source: &str, global_config: &Path) -> Result<Self> {
-        let config: ConfigGlobal = source
-            .parse()
-            .with_context(|| format!("invalid global config {}", global_config.display()))?;
+    async fn connect_config(config: ConfigGlobal) -> Result<Self> {
         let inner = LiteClient::connect_first(&config)
             .await
-            .context("failed to connect to local liteserver")?;
+            .context("failed to connect to configured liteserver")?;
         Ok(Self { inner })
     }
 
@@ -300,6 +294,26 @@ impl LocalLiteClient {
     }
 }
 
+/// Converts Localton's complete network config to the subset consumed by tonutils.
+fn tonutils_config(config: &GlobalConfig) -> ConfigGlobal {
+    ConfigGlobal {
+        liteservers: config
+            .liteserver_endpoints()
+            .map(|(ip, port, public_key)| tonutils_liteserver(ip, port, public_key))
+            .collect(),
+    }
+}
+
+fn tonutils_liteserver(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> ConfigLiteServer {
+    ConfigLiteServer {
+        ip: i32::from_be_bytes(ip.octets()).into(),
+        port,
+        id: ConfigPublicKey::Ed25519 {
+            key: *public_key.as_bytes(),
+        },
+    }
+}
+
 pub fn parse_shard(value: &str) -> Result<i64> {
     let value = value.trim();
     if let Some(hex) = value
@@ -381,7 +395,10 @@ pub fn require_existing_config(path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_shard, ton_method_id};
+    use std::net::{Ipv4Addr, SocketAddrV4};
+
+    use super::{parse_shard, ton_method_id, tonutils_liteserver};
+    use crate::ton::tools::types::TonPublicKey;
 
     #[test]
     fn parses_signed_and_hex_shards() {
@@ -394,5 +411,20 @@ mod tests {
     fn get_method_ids_match_official_ton_crc16() {
         assert_eq!(ton_method_id("seqno"), 85_143);
         assert_eq!(ton_method_id("active_election_id"), 86_535);
+    }
+
+    #[test]
+    fn tonutils_liteserver_preserves_typed_endpoint() {
+        let config = tonutils_liteserver(
+            Ipv4Addr::new(192, 168, 27, 4),
+            18_004,
+            TonPublicKey::from_bytes([7; 32]),
+        );
+
+        assert_eq!(
+            config.socket_addr(),
+            SocketAddrV4::new(Ipv4Addr::new(192, 168, 27, 4), 18_004)
+        );
+        assert_eq!(config.public_key(), [7; 32]);
     }
 }

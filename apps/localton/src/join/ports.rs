@@ -1,6 +1,6 @@
 //! Stable host-local port allocation for one joined TON node.
 //!
-//! A follower advertises several ports in persistent validator-engine state.
+//! A joined node advertises several ports in persistent validator-engine state.
 //! Therefore automatic discovery is safe only during the first initialization.
 //! The chosen ports are then stored in `settings.json` and reused verbatim.
 
