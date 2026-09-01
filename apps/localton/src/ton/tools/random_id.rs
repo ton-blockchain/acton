@@ -293,17 +293,6 @@ impl RandomIdGenerator for OfficialRandomIdGenerator {
     }
 }
 
-/// Reads the public identity payload stored by an official TON key generator.
-///
-/// Official `.pub` files contain a four-byte TL constructor followed by the
-/// 32-byte Ed25519 public key. TON JSON configuration expects only that payload in
-/// base64, so this function validates the complete 36-byte artifact before slicing.
-pub fn read_public_key(path: &Path) -> Result<TonPublicKey> {
-    let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
-    TonPublicKey::from_tl_bytes(&bytes)
-        .with_context(|| format!("invalid TON public key file {}", path.display()))
-}
-
 /// Converts a generator invocation into a complete, validated artifact set.
 ///
 /// The executable emits one key ID in hexadecimal and base64 while writing the
@@ -411,7 +400,6 @@ fn finish_operation<T>(span: &Span, started: Instant, result: &Result<T>) {
 mod tests {
     use std::{ffi::OsStr, net::Ipv4Addr};
 
-    use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
     use tempfile::tempdir;
 
     use super::*;
@@ -435,22 +423,6 @@ mod tests {
         assert_eq!(generated.id, id);
         assert_eq!(generated.public_key, public_key);
         assert_eq!(generated.public_path, public_path);
-    }
-
-    #[test]
-    fn strips_tl_constructor_from_persisted_public_key() {
-        let directory = tempdir().unwrap();
-        let public_path = directory.path().join("validator.pub");
-        fs::write(
-            &public_path,
-            TonPublicKey::from_bytes([9_u8; 32]).to_tl_bytes(),
-        )
-        .unwrap();
-
-        assert_eq!(
-            read_public_key(&public_path).unwrap().to_base64(),
-            BASE64.encode([9_u8; 32])
-        );
     }
 
     #[test]

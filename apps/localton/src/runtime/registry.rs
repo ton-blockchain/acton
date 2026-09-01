@@ -53,11 +53,6 @@ impl ProcessRegistry {
         Ok(())
     }
 
-    /// Returns whether the registry currently owns a service with this name.
-    pub async fn contains(&self, name: &str) -> bool {
-        self.inner.lock().await.contains_key(name)
-    }
-
     /// Returns a stable name-sorted snapshot without probing service liveness.
     ///
     /// Status probing is kept separate because some implementations require
@@ -224,7 +219,7 @@ mod tests {
         assert_eq!(info[0].name, "validator");
         assert_eq!(info[0].pid, Some(42));
         registry.stop_all().await.unwrap();
-        assert!(!registry.contains("validator").await);
+        assert!(registry.info().await.is_empty());
         assert_eq!(*stopped.lock().unwrap(), ["validator"]);
     }
 
@@ -277,7 +272,6 @@ mod tests {
         let error = registry.stop_all().await.unwrap_err();
         assert_eq!(error.to_string(), "stop failed");
         assert_eq!(*stopped.lock().unwrap(), ["a-failing", "b-healthy"]);
-        assert!(!registry.contains("a-failing").await);
-        assert!(!registry.contains("b-healthy").await);
+        assert!(registry.info().await.is_empty());
     }
 }

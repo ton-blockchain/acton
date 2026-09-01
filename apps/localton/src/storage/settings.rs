@@ -47,21 +47,6 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Creates settings for a joining host before its first node is allocated.
-    ///
-    /// Join state does not own genesis or bootstrap HTTP services. Keeping those
-    /// synthetic entries out of the file prevents commands from accidentally
-    /// treating a remote genesis validator as a host-local process.
-    #[must_use]
-    pub fn for_join() -> Self {
-        let mut settings = Self::default();
-        settings.nodes.clear();
-        settings.services.config_http.enabled = false;
-        settings.services.admin_http.enabled = false;
-        settings.services.ton_http_api.enabled = false;
-        settings
-    }
-
     pub fn load_or_create(path: &Path) -> Result<Self> {
         if path.is_file() {
             return Self::load(path);
@@ -147,9 +132,6 @@ impl Settings {
         }
         if self.services.admin_http.enabled {
             service_ports.push(("admin HTTP", self.services.admin_http.port));
-        }
-        if self.services.observability.enabled {
-            service_ports.push(("observability HTTP", self.services.observability.port));
         }
         if self.services.ton_http_api.enabled {
             service_ports.extend([
@@ -379,19 +361,6 @@ pub struct NodeSettings {
     pub participate_in_elections: bool,
 }
 
-/// Ports assigned together to one validator-engine process.
-///
-/// The host allocator deals in this complete type so initialization cannot
-/// accidentally mix ports from different candidate ranges.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodePorts {
-    pub console: u16,
-    pub adnl: u16,
-    pub liteserver: u16,
-    pub out: u16,
-    pub dht: u16,
-}
-
 impl Default for NodeSettings {
     fn default() -> Self {
         Self::genesis()
@@ -423,25 +392,6 @@ impl NodeSettings {
             initial_wallet_amount_nano: 50_005_000_000_000,
             validator_stake_nano: 10_001_000_000_000,
             participate_in_elections: true,
-        }
-    }
-
-    /// Creates a joined follower with one already allocated port set.
-    #[must_use]
-    pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
-        Self {
-            name,
-            enabled: true,
-            validator: false,
-            public_ip,
-            console_port: ports.console,
-            adnl_port: ports.adnl,
-            liteserver_port: ports.liteserver,
-            out_port: ports.out,
-            dht_port: ports.dht,
-            verbosity: 1,
-            participate_in_elections: false,
-            ..Self::genesis()
         }
     }
 
@@ -488,8 +438,6 @@ pub struct ServiceSettings {
     pub admin_http: HttpServiceSettings,
     /// TON HTTP API v2 settings
     pub ton_http_api: TonHttpApiSettings,
-    /// Public decentralized network observability and UI service
-    pub observability: ObservabilitySettings,
 }
 
 impl Default for ServiceSettings {
@@ -513,7 +461,6 @@ impl Default for ServiceSettings {
                 command: None,
                 static_config: None,
             },
-            observability: ObservabilitySettings::default(),
         }
     }
 }
@@ -523,84 +470,6 @@ impl ServiceSettings {
         self.config_http.validate("config HTTP")?;
         self.admin_http.validate("admin HTTP")?;
         self.ton_http_api.validate("TON HTTP API")?;
-        self.observability.validate()?;
-        Ok(())
-    }
-}
-
-/// Public decentralized observability service settings
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(default)]
-pub struct ObservabilitySettings {
-    /// `true` when Localton publishes signed node observations and the UI
-    pub enabled: bool,
-    /// IPv4 address that accepts observability API and UI connections
-    #[schema(value_type = String, format = "ipv4")]
-    pub bind: Ipv4Addr,
-    /// TCP port for the observability API and UI
-    pub port: u16,
-    /// Signed observation publication interval in seconds
-    pub publish_interval_seconds: u64,
-    /// Time after which a signed observation is no longer live
-    pub observation_ttl_seconds: u64,
-    /// Rolling block-production window in seconds
-    pub block_window_seconds: u64,
-    /// Maximum peers contacted during one gossip round
-    pub gossip_fanout: usize,
-    /// Stable bootstrap observability endpoints
-    pub peers: Vec<String>,
-}
-
-impl Default for ObservabilitySettings {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            bind: Ipv4Addr::UNSPECIFIED,
-            port: 18_003,
-            publish_interval_seconds: 5,
-            observation_ttl_seconds: 20,
-            block_window_seconds: 10 * 60,
-            gossip_fanout: 3,
-            peers: Vec::new(),
-        }
-    }
-}
-
-impl ObservabilitySettings {
-    pub fn socket_addr(&self) -> SocketAddr {
-        SocketAddr::new(IpAddr::V4(self.bind), self.port)
-    }
-
-    fn validate(&self) -> Result<()> {
-        ensure!(self.port > 0, "observability port must be positive");
-        ensure!(
-            self.publish_interval_seconds > 0,
-            "observability publish interval must be positive"
-        );
-        ensure!(
-            self.observation_ttl_seconds >= self.publish_interval_seconds * 2,
-            "observability TTL must cover at least two publication intervals"
-        );
-        ensure!(
-            self.block_window_seconds >= self.observation_ttl_seconds,
-            "observability block window must not be shorter than its TTL"
-        );
-        ensure!(
-            (1..=16).contains(&self.gossip_fanout),
-            "observability gossip fanout must be in 1..=16"
-        );
-        for peer in &self.peers {
-            let url = reqwest::Url::parse(peer)
-                .with_context(|| format!("invalid observability peer URL `{peer}`"))?;
-            ensure!(
-                matches!(url.scheme(), "http" | "https"),
-                "observability peer URL must use http or https"
-            );
-            ensure!(
-                url.host_str().is_some(),
-                "observability peer URL has no host"
-            );
-        }
         Ok(())
     }
 }
@@ -781,7 +650,6 @@ mod tests {
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
-        assert_eq!(settings.services.observability.port, 18_003);
         assert_eq!(settings.services.ton_http_api.backend_port, 18_005);
         assert_eq!(settings.services.ton_http_api.monitor_port, 18_006);
     }
@@ -824,19 +692,14 @@ mod tests {
     #[test]
     fn duplicate_ports_are_rejected() {
         let mut settings = Settings::default();
-        let mut follower = NodeSettings::follower(
-            "follower".to_owned(),
-            Ipv4Addr::LOCALHOST,
-            NodePorts {
-                console: 20_000,
-                adnl: 20_001,
-                liteserver: 20_002,
-                out: 20_003,
-                dht: 20_004,
-            },
-        );
-        follower.console_port = settings.nodes[0].console_port;
-        settings.nodes.push(follower);
+        let mut secondary = NodeSettings::genesis();
+        secondary.name = "secondary".to_owned();
+        secondary.console_port = settings.nodes[0].console_port;
+        secondary.adnl_port = 20_001;
+        secondary.liteserver_port = 20_002;
+        secondary.out_port = 20_003;
+        secondary.dht_port = 20_004;
+        settings.nodes.push(secondary);
         assert!(settings.validate().is_err());
     }
 }

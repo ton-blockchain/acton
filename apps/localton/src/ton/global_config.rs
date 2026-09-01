@@ -1,4 +1,4 @@
-//! Typed TON global configuration used by bootstrap, join, and HTTP discovery.
+//! Typed TON global configuration used by bootstrap and HTTP discovery.
 //!
 //! This module owns the JSON protocol shape instead of letting workflows assemble
 //! arbitrary `serde_json::Value` trees. Constructor names, byte lengths, and required
@@ -16,13 +16,13 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::tools::types::{
-    DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId, is_public_ipv4,
+    DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId,
 };
 
 const MASTERCHAIN_ID: i32 = -1;
 const MASTERCHAIN_SHARD: i64 = i64::MIN;
 
-/// An on-disk global config that was parsed and accepted for joining a TON node.
+/// An on-disk global config validated before it is passed to TON processes.
 ///
 /// Official binaries consume a filename, not a Rust value. This type keeps that
 /// filename while proving once, before any child starts, that the file matches
@@ -38,7 +38,7 @@ impl GlobalConfigFile {
         let path = path.into();
         let bytes = fs::read(&path)
             .with_context(|| format!("failed to read global config {}", path.display()))?;
-        GlobalConfig::from_json_bytes(&bytes)?.validate_for_node_join()?;
+        GlobalConfig::from_json_bytes(&bytes)?.validate_network_entry_points()?;
         Ok(Self { path })
     }
 
@@ -90,49 +90,18 @@ impl GlobalConfig {
         }
     }
 
-    /// Parses and fully validates a downloaded global config.
+    /// Parses and validates a global config before Localton persists or serves it.
     pub(crate) fn from_json_bytes(bytes: &[u8]) -> Result<Self> {
         serde_json::from_slice(bytes).context("global config does not match the TON JSON schema")
     }
 
-    /// Checks the discovery data required before a joining node starts validator-engine.
-    pub(crate) fn validate_for_node_join(&self) -> Result<()> {
+    /// Checks that the final config contains discovery data required by TON clients.
+    pub(crate) fn validate_network_entry_points(&self) -> Result<()> {
         ensure!(
             !self.dht.static_nodes.nodes.is_empty(),
             "global config has no DHT entry points"
         );
         Ok(())
-    }
-
-    /// Rejects a host address that public TON overlay peers cannot reach.
-    ///
-    /// DHT queries may succeed from behind NAT even when full-node replies are sent
-    /// to an advertised loopback or private address. Failing before validator-engine
-    /// starts avoids an indefinite `process.initial_sync` proof-download loop.
-    pub(crate) fn validate_advertise_ip(&self, advertise_ip: Ipv4Addr) -> Result<()> {
-        let public_network = self
-            .dht
-            .static_nodes
-            .nodes
-            .iter()
-            .any(DhtNodeDescriptor::advertises_public_ipv4);
-        if public_network {
-            ensure!(
-                is_public_ipv4(advertise_ip),
-                "joining a public TON network requires a publicly reachable \
-                 --advertise-ip, but {advertise_ip} is not public; forward the node's \
-                 ADNL UDP port to a static public IPv4 address"
-            );
-        }
-        Ok(())
-    }
-
-    /// Routes this host's chain operations through its own liteserver identity.
-    ///
-    /// DHT and validator sections remain untouched, so the node still joins the
-    /// exact network described by the downloaded config.
-    pub(crate) fn use_local_liteserver(&mut self, port: u16, public_key: TonPublicKey) {
-        self.liteservers = vec![LiteserverConfig::new(Ipv4Addr::LOCALHOST, port, public_key)];
     }
 }
 
@@ -273,22 +242,5 @@ mod tests {
         let decoded = GlobalConfig::from_json_bytes(&json).unwrap();
 
         assert_eq!(decoded, config);
-        decoded
-            .validate_advertise_ip(Ipv4Addr::new(192, 168, 27, 4))
-            .unwrap();
-    }
-
-    #[test]
-    fn parses_the_repository_mainnet_fixture() {
-        let config = GlobalConfig::from_json_bytes(include_bytes!(
-            "../../../../crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json"
-        ))
-        .unwrap();
-
-        config.validate_for_node_join().unwrap();
-        assert!(config.validate_advertise_ip(Ipv4Addr::LOCALHOST).is_err());
-        config
-            .validate_advertise_ip(Ipv4Addr::new(203, 12, 34, 56))
-            .unwrap();
     }
 }

@@ -14,7 +14,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[command(
     name = "localton",
     version,
-    about = "Bootstrap, join, and operate a complete headless local TON development network"
+    about = "Bootstrap and operate a complete headless local TON development network"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -25,8 +25,6 @@ pub struct Cli {
 pub enum Command {
     /// Create or resume a network and run its genesis node
     Bootstrap(BootstrapArgs),
-    /// Join and supervise independent full nodes on this host
-    Join(JoinArgs),
     /// Inspect persisted and live network status.
     Status(StatusArgs),
     /// Read or update persistent network configuration.
@@ -73,67 +71,6 @@ pub struct StateArgs {
     /// Persistent network state.
     #[arg(long, default_value = ".localton", global = true)]
     pub state_dir: PathBuf,
-}
-
-#[derive(Debug, Clone, Args)]
-pub struct JoinArgs {
-    #[command(flatten)]
-    pub state: StateArgs,
-
-    /// Full-node aliases owned by this Localton instance
-    ///
-    /// When omitted, the first join creates a stable alias from the instance identity
-    #[arg(long = "node")]
-    pub nodes: Vec<String>,
-
-    /// URL of a standard TON global configuration used to join the network
-    #[arg(value_name = "GLOBAL_CONFIG_URL", env = "LOCALTON_JOIN_CONFIG_URL")]
-    pub global_config_url: String,
-
-    /// Optional development faucet URL used to fund a validator wallet.
-    #[arg(long, env = "LOCALTON_JOIN_FAUCET")]
-    pub faucet: Option<String>,
-
-    /// IPv4 address advertised by full nodes on this host.
-    ///
-    /// Public TON networks require a static public address with the node's ADNL
-    /// UDP port forwarded to this host.
-    #[arg(long, env = "LOCALTON_JOIN_ADVERTISE_IP")]
-    pub advertise_ip: Ipv4Addr,
-
-    /// Enable validator mode when initializing a joining node.
-    ///
-    /// Later starts reuse the persisted mode. Use `validator enable` or
-    /// `validator disable` to change participation in future elections.
-    #[arg(long)]
-    pub validator: bool,
-
-    /// IPv4 address for the public observability API and UI
-    #[arg(
-        long,
-        env = "LOCALTON_OBSERVABILITY_BIND",
-        default_value_t = Ipv4Addr::UNSPECIFIED
-    )]
-    pub observability_bind: Ipv4Addr,
-
-    /// First port considered for this instance's contiguous persistent allocation
-    ///
-    /// Defaults to 19000 and is used only when the state directory has no
-    /// initialized nodes. Restarts always reuse the ports saved in settings.json
-    #[arg(long, env = "LOCALTON_JOIN_PORT_BASE")]
-    pub port_base: Option<u16>,
-
-    /// Do not publish signed observations or serve the observability UI
-    #[arg(long)]
-    pub no_observability: bool,
-
-    /// Use an existing directory with official TON binaries.
-    #[arg(long, env = "TON_BIN_DIR")]
-    pub ton_bin_dir: Option<PathBuf>,
-
-    /// Maximum node initialization and console readiness wait in seconds.
-    #[arg(long, default_value_t = 180)]
-    pub startup_timeout: u64,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -251,10 +188,6 @@ pub struct BootstrapArgs {
     #[arg(long, env = "LOCALTON_ADMIN_HTTP_BIND")]
     pub admin_http_bind: Option<Ipv4Addr>,
 
-    /// Runtime-only bind address for the observability API and UI
-    #[arg(long, env = "LOCALTON_OBSERVABILITY_BIND")]
-    pub observability_bind: Option<Ipv4Addr>,
-
     /// Runtime-only TON HTTP API V2 executable override.
     #[arg(long, env = "LOCALTON_HTTP_API_COMMAND")]
     pub ton_http_api_command: Option<PathBuf>,
@@ -270,10 +203,6 @@ pub struct BootstrapArgs {
     /// Do not start the local administrative HTTP API.
     #[arg(long)]
     pub no_admin_http: bool,
-
-    /// Do not publish signed observations or serve the observability UI
-    #[arg(long)]
-    pub no_observability: bool,
 }
 
 impl Default for BootstrapArgs {
@@ -290,12 +219,10 @@ impl Default for BootstrapArgs {
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
             config_http_bind: None,
             admin_http_bind: None,
-            observability_bind: None,
             ton_http_api_command: None,
             ton_http_api_static_config: None,
             no_config_http: false,
             no_admin_http: false,
-            no_observability: false,
         }
     }
 }
@@ -593,22 +520,6 @@ mod tests {
                 .kind(),
             clap::error::ErrorKind::ValueValidation
         );
-    }
-
-    #[test]
-    fn join_uses_a_positional_global_config_url() {
-        let cli = Cli::try_parse_from([
-            "localton",
-            "join",
-            "http://192.168.27.4:18000/config",
-            "--advertise-ip",
-            "192.168.27.8",
-        ])
-        .unwrap();
-        let Command::Join(args) = cli.command else {
-            panic!("expected join command");
-        };
-        assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
     }
 
     #[test]

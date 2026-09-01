@@ -2,8 +2,6 @@ mod binaries;
 mod bootstrap;
 mod cli;
 mod http;
-mod join;
-mod observability;
 mod operations;
 mod runtime;
 mod storage;
@@ -27,7 +25,6 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Bootstrap(args) => bootstrap::run(args).await,
-        Command::Join(args) => join::run(args).await,
         Command::Status(args) => bootstrap::status(args).await,
         Command::Config { command } => cli::commands::config(command).await,
         Command::Lite { command } => cli::commands::lite(command).await,

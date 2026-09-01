@@ -91,8 +91,6 @@ pub(super) struct ConfigEndpoints {
     pub ton_http_api: Option<String>,
     /// TON HTTP API monitor URL, if the service is enabled
     pub ton_http_api_monitor: Option<String>,
-    /// Public signed network observability API and UI, if enabled
-    pub observability: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -206,13 +204,6 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
             settings.services.ton_http_api.monitor_port
         )
     });
-    let observability = settings.services.observability.enabled.then(|| {
-        format!(
-            "http://{}:{}",
-            settings.nodes[0].public_ip, settings.services.observability.port
-        )
-    });
-
     ConfigDocument {
         service: "localton".to_owned(),
         ready: runtime.ready,
@@ -227,7 +218,6 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
             fund_account: fund_account_endpoint,
             ton_http_api: ton_http_api_endpoint,
             ton_http_api_monitor,
-            observability,
         },
     }
 }

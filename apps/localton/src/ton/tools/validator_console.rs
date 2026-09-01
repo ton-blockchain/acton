@@ -20,10 +20,7 @@ use regex::Regex;
 use tokio::{process::Command, time::timeout};
 use tracing::{info, warn};
 
-use crate::{
-    runtime::run_checked,
-    storage::{InitialSyncProgress, InitialSyncStage, StateDownloadProgress},
-};
+use crate::runtime::run_checked;
 
 use super::types::{KeyId, OperationContext};
 
@@ -53,18 +50,6 @@ pub struct ValidatorConsoleEndpoint {
 pub struct ValidatorStats {
     connection_ready: bool,
     values: BTreeMap<String, String>,
-}
-
-/// Best synchronization signal exposed by one validator-engine `getstats` call.
-///
-/// The engine reports native initial-sync stages before it has a masterchain
-/// handle, then switches to a block timestamp. Keeping that release-specific
-/// transition here prevents orchestration code from combining raw stat names.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ValidatorSynchronization {
-    BlockTime { block_time: u64, target_time: u64 },
-    Initial(InitialSyncProgress),
-    WaitingForMasterchain,
 }
 
 impl ValidatorStats {
@@ -113,59 +98,6 @@ impl ValidatorStats {
                     .context("validator stat `masterchainblocktime` is not a u64")
             })
             .transpose()
-    }
-
-    /// Parses validator-engine's native progress before a masterchain head exists.
-    #[must_use]
-    pub fn initial_sync_progress(&self) -> Option<InitialSyncProgress> {
-        let status = self.value("process.initial_sync")?;
-        let (stage, masterchain_seqno) = if let Some(value) =
-            status.strip_prefix("starting, init block seqno ")
-        {
-            (InitialSyncStage::Starting, leading_u32(value))
-        } else if let Some(value) = status.strip_prefix("last key block is ") {
-            (InitialSyncStage::DiscoveringKeyBlocks, leading_u32(value))
-        } else if let Some(value) = status.strip_prefix("downloading masterchain state ") {
-            (
-                InitialSyncStage::DownloadingMasterchainState,
-                leading_u32(value),
-            )
-        } else if let Some(value) = status.strip_prefix("downloading all shard states, mc seqno ") {
-            (InitialSyncStage::DownloadingShardStates, leading_u32(value))
-        } else {
-            (InitialSyncStage::Preparing, None)
-        };
-        let (current_part, total_parts) = self
-            .value("process.download_state")
-            .and_then(state_part_progress)
-            .map_or((None, None), |(current, total)| {
-                (Some(current), Some(total))
-            });
-        let state_download = self
-            .value("process.download_state_net")
-            .and_then(state_download_progress);
-        Some(InitialSyncProgress {
-            stage,
-            masterchain_seqno,
-            current_part,
-            total_parts,
-            state_download,
-        })
-    }
-
-    /// Selects the most precise synchronization signal currently available.
-    pub fn synchronization(&self) -> Result<ValidatorSynchronization> {
-        let target_time = self.unix_time()?;
-        if let Some(block_time) = self.masterchain_block_time()?.filter(|time| *time > 0) {
-            return Ok(ValidatorSynchronization::BlockTime {
-                block_time,
-                target_time,
-            });
-        }
-        Ok(self.initial_sync_progress().map_or(
-            ValidatorSynchronization::WaitingForMasterchain,
-            ValidatorSynchronization::Initial,
-        ))
     }
 }
 
@@ -754,73 +686,6 @@ fn parse_stats(output: &str) -> Result<ValidatorStats> {
     })
 }
 
-fn leading_u32(value: &str) -> Option<u32> {
-    value
-        .bytes()
-        .take_while(|byte| byte.is_ascii_digit())
-        .map(char::from)
-        .collect::<String>()
-        .parse()
-        .ok()
-}
-
-fn state_part_progress(value: &str) -> Option<(u32, u32)> {
-    let (_, parts) = value.rsplit_once("(part ")?;
-    let (current, total) = parts.strip_suffix(')')?.split_once(" out of ")?;
-    let current = current.parse().ok()?;
-    let total = total.parse().ok()?;
-    (total > 0 && current <= total).then_some((current, total))
-}
-
-/// Parses the human-readable transfer line emitted by TON's state downloader.
-///
-/// `td::format::as_size` uses binary units and truncates each displayed value to
-/// a whole unit. Converting it at this adapter boundary gives the rest of Localton
-/// one stable byte-based representation without exposing release-specific text.
-fn state_download_progress(value: &str) -> Option<StateDownloadProgress> {
-    let (_, progress) = value.rsplit_once(" : ")?;
-    let (sizes, estimates) = progress.split_once(" (")?;
-    let (downloaded, total) = sizes.split_once('/')?;
-    let mut estimates = estimates.strip_suffix(')')?.split(", ");
-    let speed = estimates.next()?.strip_suffix("/s")?;
-    estimates.next()?.strip_suffix('%')?;
-    let remaining_seconds = estimates
-        .next()?
-        .strip_suffix("s remaining")?
-        .parse()
-        .ok()?;
-    if estimates.next().is_some() {
-        return None;
-    }
-    let downloaded_bytes = binary_size_bytes(downloaded)?;
-    let total_bytes = binary_size_bytes(total)?;
-    let bytes_per_second = binary_size_bytes(speed)?;
-    (total_bytes > 0 && downloaded_bytes <= total_bytes).then_some(StateDownloadProgress {
-        downloaded_bytes,
-        total_bytes,
-        bytes_per_second,
-        remaining_seconds,
-    })
-}
-
-/// Reconstructs a byte count from `td::format::as_size`'s B through GB output.
-fn binary_size_bytes(value: &str) -> Option<u64> {
-    [
-        ("GB", 1_u64 << 30),
-        ("MB", 1_u64 << 20),
-        ("KB", 1_u64 << 10),
-        ("B", 1),
-    ]
-    .into_iter()
-    .find_map(|(suffix, multiplier)| {
-        value
-            .strip_suffix(suffix)?
-            .parse::<u64>()
-            .ok()?
-            .checked_mul(multiplier)
-    })
-}
-
 /// Extracts the last canonical 256-bit key identifier from noisy console output.
 ///
 /// Some official builds print `created new key`, while others only include the
@@ -1117,32 +982,6 @@ mod tests {
         assert!(stats.connection_ready());
         assert_eq!(stats.unix_time().unwrap(), 1_787_985_862);
         assert_eq!(stats.masterchain_block_time().unwrap(), Some(1_787_985_860));
-        expect_test::expect![[r#"
-            Some(
-                InitialSyncProgress {
-                    stage: DownloadingMasterchainState,
-                    masterchain_seqno: Some(
-                        49152000,
-                    ),
-                    current_part: Some(
-                        3,
-                    ),
-                    total_parts: Some(
-                        8,
-                    ),
-                    state_download: Some(
-                        StateDownloadProgress {
-                            downloaded_bytes: 5133828096,
-                            total_bytes: 10578034688,
-                            bytes_per_second: 6111232,
-                            remaining_seconds: 890,
-                        },
-                    ),
-                },
-            )
-        "#]]
-        .assert_debug_eq(&stats.initial_sync_progress());
-
         let early =
             parse_stats("unixtime 1787985862\nprocess.initial_sync starting, init block seqno 0\n")
                 .unwrap();

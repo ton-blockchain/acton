@@ -293,7 +293,7 @@ fn read_hash(path: &Path) -> Result<TonBlockHash> {
     Ok(TonBlockHash::from_bytes(bytes))
 }
 
-// A stable span schema lets observability aggregate all official tool calls by
+// A stable span schema lets diagnostics aggregate all official tool calls by
 // tool, operation, and node without inferring semantics from subprocess labels.
 fn operation_span(context: &OperationContext) -> Span {
     info_span!(

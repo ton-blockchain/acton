@@ -21,7 +21,7 @@ use crate::{
     storage::Layout,
     storage::NodeSettings,
     ton::tools::{
-        types::{AdnlEndpoint, GeneratedKey, KeyId, OperationContext},
+        types::{AdnlEndpoint, GeneratedKey, OperationContext},
         validator_console::{
             AddAdnl, AddPermanentKey, AddTemporaryKey, AddValidatorAddress, ChangeFullNodeAddress,
             ImportPrivateKey, ValidatorConsole, ValidatorConsoleEndpoint,
@@ -194,58 +194,6 @@ pub(super) async fn configure_genesis_identity(
     .await;
     temporary.stop().await?;
     workflow_result(node, "configure_genesis_identity", started, &result);
-    result
-}
-
-/// Creates and selects the independent full-node identity for a non-genesis node.
-///
-/// The temporary service is always stopped before return. The adapter recognizes
-/// the release-specific successful disconnect caused by selecting the identity;
-/// this workflow retains bounded mutation retries without retrying key creation.
-pub(super) async fn configure_full_node_identity(
-    layout: &Layout,
-    engine: &dyn ValidatorEngine,
-    console: &dyn ValidatorConsole,
-    node: &NodeSettings,
-    context: &OperationContext,
-) -> Result<KeyId> {
-    let started = std::time::Instant::now();
-    workflow_stage(node, "configure_full_node_identity", "starting", "pending");
-    let endpoint = console_endpoint(layout, node);
-    let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
-    let mut temporary = start_bootstrap(layout, engine, node).await?;
-    let result = async {
-        wait_for_console(layout, console, node, &mut temporary, context).await?;
-        let full_node_adnl = console.new_key(&console_context, &endpoint).await?;
-        let _public = console
-            .export_public(&console_context, &endpoint, &full_node_adnl)
-            .await?;
-        retry_console_mutation(node, "add_full_node_adnl", || {
-            console.add_adnl(
-                &console_context,
-                &endpoint,
-                AddAdnl {
-                    key: full_node_adnl,
-                    category: 0,
-                },
-            )
-        })
-        .await?;
-        retry_console_mutation(node, "change_full_node_address", || {
-            console.change_full_node_address(
-                &console_context,
-                &endpoint,
-                ChangeFullNodeAddress {
-                    adnl_key: full_node_adnl,
-                },
-            )
-        })
-        .await?;
-        Ok(full_node_adnl)
-    }
-    .await;
-    temporary.stop().await?;
-    workflow_result(node, "configure_full_node_identity", started, &result);
     result
 }
 

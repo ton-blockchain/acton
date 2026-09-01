@@ -33,7 +33,6 @@ pub struct Layout {
     pub settings: PathBuf,
     pub runtime: PathBuf,
     pub wallets: PathBuf,
-    pub observability: PathBuf,
     pub nodes: PathBuf,
     pub lock: PathBuf,
     pub logs: PathBuf,
@@ -55,7 +54,6 @@ impl Layout {
             settings: root.join("settings.json"),
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
-            observability: root.join("observability"),
             nodes: root.join("nodes"),
             lock: root.join("instance.lock"),
             logs: root.join("logs"),
@@ -79,7 +77,6 @@ impl Layout {
             &self.zerostate,
             &self.logs,
             &self.wallets,
-            &self.observability,
             &self.nodes,
         ] {
             fs::create_dir_all(path)
@@ -93,7 +90,6 @@ impl Layout {
             NodeLayout {
                 root: self.genesis.clone(),
                 db: self.validator_db.clone(),
-                keyring: self.validator_keyring.clone(),
                 certs: self.certs.clone(),
                 logs: self.logs.clone(),
                 global_config: self.global_config.clone(),
@@ -102,7 +98,6 @@ impl Layout {
             let root = self.nodes.join(&settings.name);
             NodeLayout {
                 db: root.join("db"),
-                keyring: root.join("db/keyring"),
                 certs: root.join("certs"),
                 logs: self.logs.join(&settings.name),
                 global_config: root.join("global.config.json"),
@@ -116,21 +111,12 @@ impl Layout {
 pub struct NodeLayout {
     pub root: PathBuf,
     pub db: PathBuf,
-    pub keyring: PathBuf,
     pub certs: PathBuf,
     pub logs: PathBuf,
     pub global_config: PathBuf,
 }
 
 impl NodeLayout {
-    pub fn create_dirs(&self) -> Result<()> {
-        for path in [&self.root, &self.db, &self.keyring, &self.certs, &self.logs] {
-            fs::create_dir_all(path)
-                .with_context(|| format!("failed to create {}", path.display()))?;
-        }
-        Ok(())
-    }
-
     pub fn config_json(&self) -> PathBuf {
         self.db.join("config.json")
     }

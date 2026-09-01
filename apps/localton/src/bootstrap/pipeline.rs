@@ -112,8 +112,7 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         )
         .await?;
 
-        let control =
-            NodeController::new(layout.clone(), tools.clone(), timeout, processes.clone());
+        let control = NodeController::new(layout.clone(), tools.clone(), processes.clone());
         let services = http::start(control, &settings, args.ton_http_api_bind).await?;
 
         if let Err(error) = mark_network_ready(&layout, &mut runtime, &services, masterchain_seqno)
@@ -210,10 +209,6 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     if args.no_admin_http {
         settings.services.admin_http.enabled = false;
     }
-    if args.no_observability {
-        settings.services.observability.enabled = false;
-    }
-
     settings.validate()?;
     settings.save_atomic(&layout.settings)?;
 
@@ -224,10 +219,6 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     }
     if let Some(bind) = args.admin_http_bind {
         settings.services.admin_http.bind = bind;
-        settings.validate()?;
-    }
-    if let Some(bind) = args.observability_bind {
-        settings.services.observability.bind = bind;
         settings.validate()?;
     }
     if let Some(command) = args.ton_http_api_command.clone() {

@@ -1,11 +1,10 @@
-use std::{fs, net::Ipv4Addr, path::Path};
+use std::{fs, path::Path};
 
 use anyhow::{Context, Result, anyhow};
 use crc::{CRC_16_XMODEM, Crc};
 use fastnum::I512;
 use num_bigint::BigInt;
 use serde::Serialize;
-use serde_json::json;
 use ton::{block_tlb::TVMStack, ton_core::traits::tlb::TLB};
 use tonutils::{
     liteclient::{
@@ -82,25 +81,6 @@ impl LocalLiteClient {
         let source = fs::read_to_string(global_config)
             .with_context(|| format!("failed to read global config {}", global_config.display()))?;
         Self::connect_source(&source, global_config).await
-    }
-
-    pub async fn connect_node(global_config: &Path, port: u16, public_key: &str) -> Result<Self> {
-        let source = fs::read_to_string(global_config)
-            .with_context(|| format!("failed to read global config {}", global_config.display()))?;
-        let mut config: serde_json::Value = serde_json::from_str(&source)
-            .with_context(|| format!("invalid global config {}", global_config.display()))?;
-        config
-            .as_object_mut()
-            .context("global config root must be a JSON object")?
-            .insert(
-                "liteservers".to_owned(),
-                json!([{
-                    "id": {"@type": "pub.ed25519", "key": public_key},
-                    "ip": i32::from_be_bytes(Ipv4Addr::LOCALHOST.octets()),
-                    "port": port,
-                }]),
-            );
-        Self::connect_source(&serde_json::to_string(&config)?, global_config).await
     }
 
     async fn connect_source(source: &str, global_config: &Path) -> Result<Self> {

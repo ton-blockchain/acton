@@ -217,26 +217,6 @@ impl fmt::Display for AdnlEndpoint {
     }
 }
 
-/// Returns whether an IPv4 address can be advertised to peers on a public TON network.
-///
-/// Besides the standard private and special-use ranges, carrier-grade NAT and
-/// benchmarking networks are excluded because neither can accept unsolicited ADNL
-/// traffic from Internet peers.
-pub(crate) fn is_public_ipv4(ip: Ipv4Addr) -> bool {
-    let octets = ip.octets();
-    let shared_address_space = octets[0] == 100 && (64..=127).contains(&octets[1]);
-    let benchmarking = octets[0] == 198 && matches!(octets[1], 18 | 19);
-    !ip.is_unspecified()
-        && !ip.is_loopback()
-        && !ip.is_private()
-        && !ip.is_link_local()
-        && !ip.is_multicast()
-        && !ip.is_broadcast()
-        && !ip.is_documentation()
-        && !shared_address_space
-        && !benchmarking
-}
-
 /// JSON address list accepted by official TON ADNL tools.
 ///
 /// All timing and priority fields are explicit because omitting one changes the
@@ -551,20 +531,6 @@ impl DhtNodeDescriptor {
     /// Parses a descriptor printed by `generate-random-id -m dht`.
     pub fn from_json_str(value: &str) -> Result<Self> {
         serde_json::from_str(value).context("invalid TON dht.node descriptor")
-    }
-
-    /// Reports whether this bootstrap node is reachable through a public IPv4 address.
-    ///
-    /// A config whose discovery nodes are public describes a network outside the
-    /// operator's private LAN. Joining it with a private advertised address leaves
-    /// overlay peers unable to return block proofs, although DHT probes can still
-    /// appear healthy.
-    pub(crate) fn advertises_public_ipv4(&self) -> bool {
-        self.addr_list
-            .addrs
-            .iter()
-            .map(|address| Ipv4Addr::from(address.ip.to_be_bytes()))
-            .any(is_public_ipv4)
     }
 }
 

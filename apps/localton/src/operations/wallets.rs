@@ -252,67 +252,6 @@ pub(crate) async fn ensure_wallet_for_toolchain(
     Ok(PublicWallet::from(&wallet))
 }
 
-pub(crate) async fn wallet_balance_nano(toolchain: &Toolchain, name: &str) -> Result<u128> {
-    let wallet = wallet(&toolchain.layout, name)?;
-    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
-    client
-        .account(&wallet.address)
-        .await?
-        .balance_nano
-        .parse()
-        .context("wallet balance exceeds u128")
-}
-
-pub(crate) async fn ensure_wallet_deployed(toolchain: &Toolchain, name: &str) -> Result<()> {
-    let wallet = wallet(&toolchain.layout, name)?;
-    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
-    let account = client.account(&wallet.address).await?;
-    if account.state == "active" {
-        return Ok(());
-    }
-    ensure!(
-        account.balance_nano.parse::<u128>().unwrap_or_default() > 0,
-        "wallet `{name}` must be funded before deployment"
-    );
-    let deploy = match wallet.version {
-        StoredWalletVersion::V4r2 | StoredWalletVersion::V5r1 => build_native_deploy(&wallet)?,
-        _ => {
-            let path = wallet
-                .deploy_boc
-                .as_ref()
-                .with_context(|| format!("wallet `{name}` has no deployment message"))?;
-            fs::read(path)
-                .with_context(|| format!("failed to read deployment BoC {}", path.display()))?
-        }
-    };
-    client.send_boc(deploy).await?;
-    wait_for_wallet_state(toolchain, &wallet.address, "active").await
-}
-
-pub(crate) async fn wait_for_wallet_balance(
-    toolchain: &Toolchain,
-    address: &str,
-    minimum_nano: u128,
-) -> Result<()> {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-    loop {
-        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
-        let balance = client
-            .account(address)
-            .await?
-            .balance_nano
-            .parse::<u128>()
-            .unwrap_or_default();
-        if balance >= minimum_nano {
-            return Ok(());
-        }
-        if tokio::time::Instant::now() >= deadline {
-            bail!("wallet funding did not become visible within 30 seconds")
-        }
-        tokio::time::sleep(Duration::from_millis(500)).await;
-    }
-}
-
 pub struct FundWalletResult {
     pub address: String,
     pub status: u32,
@@ -795,20 +734,6 @@ fn build_native_transfer(source: &WalletRecord, transfer: &TransferBuild<'_>) ->
         .map_err(Into::into)
 }
 
-fn build_native_deploy(source: &WalletRecord) -> Result<Vec<u8>> {
-    let seed = read_private_key(&source.key_base.with_extension("pk"))?;
-    let signing_key = SigningKey::from_bytes(&seed);
-    let version = match source.version {
-        StoredWalletVersion::V4r2 => TonWalletVersion::V4R2,
-        StoredWalletVersion::V5r1 => TonWalletVersion::V5R1,
-        _ => bail!("wallet version does not use the native deployment path"),
-    };
-    ton_wallet(version, &signing_key, source.workchain, source.wallet_id)?
-        .create_ext_in_msg(Vec::new(), 0, unix_time_u32()?.saturating_add(60), true)?
-        .to_boc()
-        .map_err(Into::into)
-}
-
 fn ton_wallet(
     version: TonWalletVersion,
     signing_key: &SigningKey,
@@ -900,21 +825,6 @@ async fn wait_for_balance(global_config: &Path, address: &str) -> Result<()> {
         }
         if tokio::time::Instant::now() >= deadline {
             bail!("wallet funding did not become visible within 30 seconds")
-        }
-        tokio::time::sleep(Duration::from_millis(500)).await;
-    }
-}
-
-async fn wait_for_wallet_state(toolchain: &Toolchain, address: &str, expected: &str) -> Result<()> {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-    loop {
-        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
-        let state = client.account(address).await?.state;
-        if state == expected {
-            return Ok(());
-        }
-        if tokio::time::Instant::now() >= deadline {
-            bail!("wallet did not become `{expected}` within 30 seconds")
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }

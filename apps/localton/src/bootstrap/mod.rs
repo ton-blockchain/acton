@@ -23,7 +23,6 @@ mod zerostate;
 
 pub use control::NodeController;
 pub use pipeline::{run, status};
-pub(crate) use readiness::{shutdown_signal, supervise};
 
 /// Locks a state directory for the lifetime of one Localton instance.
 ///

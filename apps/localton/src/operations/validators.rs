@@ -235,45 +235,6 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn join_auto_tick(
-    toolchain: &Toolchain,
-    node_name: &str,
-    wallet_name: &str,
-) -> Result<()> {
-    let settings = toolchain.settings()?;
-    let node = settings.node(node_name)?.clone();
-    ensure!(node.enabled, "node `{node_name}` is disabled");
-    ensure!(node.validator, "node `{node_name}` is not a validator");
-    let elector = elector_address(toolchain).await?;
-    let mut submitted = false;
-    if settings.validation.auto_participate {
-        let election_id = active_election_id(toolchain, &elector).await?;
-        if election_id > 0 && node.participate_in_elections {
-            let result = participate_with_wallet(
-                toolchain,
-                &settings,
-                &node,
-                wallet_name,
-                &elector,
-                Some(election_id),
-            )
-            .await?;
-            if result.send_status.is_some() {
-                submitted = true;
-                tracing::info!(
-                    node = result.node,
-                    election_id = result.election_id,
-                    "validator election entry submitted directly to Elector"
-                );
-            }
-        }
-    }
-    if settings.validation.auto_reap && !submitted {
-        reap_node(toolchain, &node, wallet_name, &elector).await?;
-    }
-    Ok(())
-}
-
 async fn print_status(toolchain: &Toolchain) -> Result<()> {
     let settings = toolchain.settings()?;
     let runtime = RuntimeState::load(&toolchain.layout.runtime)?;
@@ -800,7 +761,7 @@ fn nano_to_grams(nano: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, net::Ipv4Addr};
+    use std::fs;
 
     use base64::{Engine, engine::general_purpose::STANDARD};
     use serde_json::json;
@@ -811,22 +772,10 @@ mod tests {
         set_election_mode,
     };
     use crate::cli::StateArgs;
-    use crate::storage::{Layout, NodePorts, NodeRuntime, NodeSettings, RuntimeState, Settings};
+    use crate::storage::{Layout, NodeRuntime, RuntimeState, Settings};
 
-    fn follower_settings() -> Settings {
-        let mut settings = Settings::for_join();
-        settings.nodes.push(NodeSettings::follower(
-            "node2".to_owned(),
-            Ipv4Addr::LOCALHOST,
-            NodePorts {
-                console: 20_000,
-                adnl: 20_001,
-                liteserver: 20_002,
-                out: 20_003,
-                dht: 20_004,
-            },
-        ));
-        settings
+    fn genesis_settings() -> Settings {
+        Settings::default()
     }
 
     #[test]
@@ -834,19 +783,19 @@ mod tests {
         let root = tempdir().unwrap();
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
-        let settings = follower_settings();
+        let settings = genesis_settings();
         settings.save_atomic(&layout.settings).unwrap();
         let mut runtime = RuntimeState::new();
         runtime
             .nodes
-            .insert("node2".to_owned(), NodeRuntime::default());
+            .insert("genesis".to_owned(), NodeRuntime::default());
         runtime.save_atomic(&layout.runtime).unwrap();
 
         assert_eq!(
             resolve_managed_node_in_layout(&layout, &settings, None).unwrap(),
-            "node2"
+            "genesis"
         );
-        assert!(resolve_managed_node_in_layout(&layout, &settings, Some("genesis")).is_err());
+        assert!(resolve_managed_node_in_layout(&layout, &settings, Some("other")).is_err());
     }
 
     #[test]
@@ -854,8 +803,8 @@ mod tests {
         let root = tempdir().unwrap();
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
-        let mut settings = follower_settings();
-        let node = settings.node_mut("node2").unwrap();
+        let mut settings = genesis_settings();
+        let node = settings.node_mut("genesis").unwrap();
         node.enabled = true;
         node.validator = false;
         node.participate_in_elections = false;
@@ -864,16 +813,16 @@ mod tests {
             state_dir: layout.root.clone(),
         };
 
-        set_election_mode(&state, "node2", true).unwrap();
+        set_election_mode(&state, "genesis", true).unwrap();
         let enabled = Settings::load(&layout.settings).unwrap();
-        let enabled = enabled.node("node2").unwrap();
+        let enabled = enabled.node("genesis").unwrap();
         assert!(enabled.enabled);
         assert!(enabled.validator);
         assert!(enabled.participate_in_elections);
 
-        set_election_mode(&state, "node2", false).unwrap();
+        set_election_mode(&state, "genesis", false).unwrap();
         let disabled = Settings::load(&layout.settings).unwrap();
-        let disabled = disabled.node("node2").unwrap();
+        let disabled = disabled.node("genesis").unwrap();
         assert!(disabled.enabled);
         assert!(disabled.validator);
         assert!(!disabled.participate_in_elections);
@@ -895,9 +844,9 @@ mod tests {
     fn recovers_partially_configured_election_keys() {
         let directory = tempdir().unwrap();
         let layout = Layout::new(directory.path().to_owned());
-        let node = follower_settings().nodes.remove(0);
+        layout.create_dirs().unwrap();
+        let node = genesis_settings().nodes.remove(0);
         let node_layout = layout.node(&node);
-        node_layout.create_dirs().unwrap();
         fs::write(
             node_layout.config_json(),
             serde_json::to_vec(&json!({
