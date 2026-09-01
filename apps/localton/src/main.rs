@@ -3,7 +3,6 @@ mod bootstrap;
 mod cli;
 mod http;
 mod join;
-mod observability;
 mod operations;
 mod runtime;
 mod storage;

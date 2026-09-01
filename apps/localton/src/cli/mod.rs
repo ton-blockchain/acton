@@ -82,7 +82,7 @@ pub struct JoinArgs {
 
     /// Full-node aliases owned by this Localton instance
     ///
-    /// When omitted, the first join creates a stable alias from the instance identity
+    /// When omitted, the first join creates a stable alias from the state directory
     #[arg(long = "node")]
     pub nodes: Vec<String>,
 
@@ -108,24 +108,12 @@ pub struct JoinArgs {
     #[arg(long)]
     pub validator: bool,
 
-    /// IPv4 address for the public observability API and UI
-    #[arg(
-        long,
-        env = "LOCALTON_OBSERVABILITY_BIND",
-        default_value_t = Ipv4Addr::UNSPECIFIED
-    )]
-    pub observability_bind: Ipv4Addr,
-
     /// First port considered for this instance's contiguous persistent allocation
     ///
     /// Defaults to 19000 and is used only when the state directory has no
     /// initialized nodes. Restarts always reuse the ports saved in settings.json
     #[arg(long, env = "LOCALTON_JOIN_PORT_BASE")]
     pub port_base: Option<u16>,
-
-    /// Do not publish signed observations or serve the observability UI
-    #[arg(long)]
-    pub no_observability: bool,
 
     /// Use an existing directory with official TON binaries.
     #[arg(long, env = "TON_BIN_DIR")]
@@ -251,10 +239,6 @@ pub struct BootstrapArgs {
     #[arg(long, env = "LOCALTON_ADMIN_HTTP_BIND")]
     pub admin_http_bind: Option<Ipv4Addr>,
 
-    /// Runtime-only bind address for the observability API and UI
-    #[arg(long, env = "LOCALTON_OBSERVABILITY_BIND")]
-    pub observability_bind: Option<Ipv4Addr>,
-
     /// Runtime-only TON HTTP API V2 executable override.
     #[arg(long, env = "LOCALTON_HTTP_API_COMMAND")]
     pub ton_http_api_command: Option<PathBuf>,
@@ -270,10 +254,6 @@ pub struct BootstrapArgs {
     /// Do not start the local administrative HTTP API.
     #[arg(long)]
     pub no_admin_http: bool,
-
-    /// Do not publish signed observations or serve the observability UI
-    #[arg(long)]
-    pub no_observability: bool,
 }
 
 impl Default for BootstrapArgs {
@@ -290,12 +270,10 @@ impl Default for BootstrapArgs {
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
             config_http_bind: None,
             admin_http_bind: None,
-            observability_bind: None,
             ton_http_api_command: None,
             ton_http_api_static_config: None,
             no_config_http: false,
             no_admin_http: false,
-            no_observability: false,
         }
     }
 }

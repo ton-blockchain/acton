@@ -190,9 +190,8 @@ impl RuntimeState {
     /// Records a trusted masterchain head without hiding a production stall.
     ///
     /// Re-reading the same head proves that the liteserver still answers, but it
-    /// is not a new block. Keeping the previous timestamp lets status and
-    /// observability distinguish a responsive yet stalled chain from one that is
-    /// continuing to produce blocks.
+    /// is not a new block. Keeping the previous timestamp lets status distinguish
+    /// a responsive yet stalled chain from one that is continuing to produce blocks.
     pub fn observe_masterchain_head(&mut self, seqno: u32, observed_at: u64) {
         if self.masterchain_seqno.is_none_or(|current| seqno > current) {
             self.last_block_at = Some(observed_at);

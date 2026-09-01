@@ -63,7 +63,7 @@ impl LiteTarget {
 /// Semantic liteserver operations supported by Localton.
 ///
 /// These names are intentionally independent of official CLI spelling such as
-/// `byseqno`; observability and workflow errors therefore remain stable when a
+/// `byseqno`; diagnostics and workflow errors therefore remain stable when a
 /// pinned TON release changes its command vocabulary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LiteOperation {
@@ -233,7 +233,7 @@ impl RunMethodResult {
     }
 }
 
-/// On-chain validator set needed by election automation and observability.
+/// On-chain validator set needed by election automation and status reporting.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorSetInfo {
     /// Unix timestamp at which the set becomes active.

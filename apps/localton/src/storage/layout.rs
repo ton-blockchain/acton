@@ -33,7 +33,6 @@ pub struct Layout {
     pub settings: PathBuf,
     pub runtime: PathBuf,
     pub wallets: PathBuf,
-    pub observability: PathBuf,
     pub nodes: PathBuf,
     pub lock: PathBuf,
     pub logs: PathBuf,
@@ -55,7 +54,6 @@ impl Layout {
             settings: root.join("settings.json"),
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
-            observability: root.join("observability"),
             nodes: root.join("nodes"),
             lock: root.join("instance.lock"),
             logs: root.join("logs"),
@@ -79,7 +77,6 @@ impl Layout {
             &self.zerostate,
             &self.logs,
             &self.wallets,
-            &self.observability,
             &self.nodes,
         ] {
             fs::create_dir_all(path)

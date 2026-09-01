@@ -1,13 +1,10 @@
 all: precommit
 
-build: build-ui
+build:
     cargo build --release --workspace --locked
 
 build-dev:
     cargo build --workspace --locked
-
-build-ui:
-    cd ../.. && bun --filter @acton/localton-ui build
 
 build-ci: build
 

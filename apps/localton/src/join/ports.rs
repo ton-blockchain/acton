@@ -16,13 +16,12 @@ use crate::storage::NodePorts;
 pub(super) const DEFAULT_JOIN_PORT_BASE: u16 = 19_000;
 const PORTS_PER_NODE: u16 = 5;
 
-/// One contiguous host-local allocation shared by an observer and its nodes.
+/// One contiguous host-local allocation for joined nodes.
 ///
 /// Keeping the ports adjacent makes multi-host local networks predictable while
 /// still allowing the allocator to skip a range occupied by unrelated software.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct HostPortAllocation {
-    pub observability: u16,
     pub nodes: Vec<NodePorts>,
     pub start: u16,
     pub end: u16,
@@ -51,7 +50,6 @@ impl HostPortAllocation {
         })?;
         let width = node_count
             .checked_mul(PORTS_PER_NODE)
-            .and_then(|ports| ports.checked_add(1))
             .ok_or_else(|| anyhow::anyhow!("join port range is too large"))?;
         let last_candidate = u16::MAX
             .checked_sub(width - 1)
@@ -69,7 +67,7 @@ impl HostPortAllocation {
     fn at(start: u16, node_count: u16) -> Self {
         let nodes = (0..node_count)
             .map(|index| {
-                let start = start + 1 + index * PORTS_PER_NODE;
+                let start = start + index * PORTS_PER_NODE;
                 NodePorts {
                     console: start,
                     adnl: start + 1,
@@ -80,10 +78,9 @@ impl HostPortAllocation {
             })
             .collect();
         Self {
-            observability: start,
             nodes,
             start,
-            end: start + 1 + node_count * PORTS_PER_NODE - 1,
+            end: start + node_count * PORTS_PER_NODE - 1,
         }
     }
 }
@@ -118,24 +115,23 @@ mod tests {
             HostPortAllocation::find_with(19_000, 2, |range| *range.start() >= 19_003).unwrap();
 
         assert_eq!(allocation.start, 19_003);
-        assert_eq!(allocation.end, 19_013);
-        assert_eq!(allocation.observability, 19_003);
+        assert_eq!(allocation.end, 19_012);
         assert_eq!(
             allocation.nodes,
             vec![
                 NodePorts {
-                    console: 19_004,
-                    adnl: 19_005,
-                    liteserver: 19_006,
-                    out: 19_007,
-                    dht: 19_008,
+                    console: 19_003,
+                    adnl: 19_004,
+                    liteserver: 19_005,
+                    out: 19_006,
+                    dht: 19_007,
                 },
                 NodePorts {
-                    console: 19_009,
-                    adnl: 19_010,
-                    liteserver: 19_011,
-                    out: 19_012,
-                    dht: 19_013,
+                    console: 19_008,
+                    adnl: 19_009,
+                    liteserver: 19_010,
+                    out: 19_011,
+                    dht: 19_012,
                 },
             ]
         );

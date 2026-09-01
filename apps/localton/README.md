@@ -209,7 +209,7 @@ localton join http://10.0.0.1:18000/config \
   --advertise-ip 10.0.0.2
 ```
 
-On first start, `join` downloads only `global.config.json`. The file contains the network identity, zerostate hashes, DHT entry points, and public liteserver data. The workflow then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. `validator-engine` obtains blockchain state through the TON network, just as a regular node does. After the local liteserver starts, local CLI and election operations use `127.0.0.1`; they no longer depend on the first host's liteserver. Localton gives the node a stable `node-<observer-id>` name unless `--node` sets one explicitly, and reuses its local state on later starts.
+On first start, `join` downloads only `global.config.json`. The file contains the network identity, zerostate hashes, DHT entry points, and public liteserver data. The workflow then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. `validator-engine` obtains blockchain state through the TON network, just as a regular node does. After the local liteserver starts, local CLI and election operations use `127.0.0.1`; they no longer depend on the first host's liteserver. Unless `--node` sets an explicit alias, Localton derives a stable `node-<id>` name from the state directory and reuses its local state on later starts.
 
 `GLOBAL_CONFIG_URL` can point to the bootstrap instance's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
 
@@ -326,10 +326,9 @@ localton join http://127.0.0.1:18000/config \
   --validator
 ```
 
-On its first run, a joining instance reserves one contiguous range containing its
-observability port and five ports per node. It starts at port `19000` and advances
-one port at a time until the complete range is available. Use `--port-base` to
-choose the first candidate:
+On its first run, a joining instance reserves one contiguous range containing five
+ports per node. It starts at port `19000` and advances one port at a time until the
+complete range is available. Use `--port-base` to choose the first candidate:
 
 ```bash
 localton join http://127.0.0.1:18000/config \

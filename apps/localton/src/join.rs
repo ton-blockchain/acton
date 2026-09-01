@@ -18,6 +18,7 @@ use anyhow::{Context, Result, ensure};
 use futures_util::StreamExt;
 use indicatif::BinaryBytes;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use tokio::select;
 use tracing::{info, warn};
 
@@ -25,8 +26,6 @@ use crate::{
     binaries::TonBinaries,
     bootstrap::{NodeController, acquire_lock, shutdown_signal, supervise},
     cli::{JoinArgs, WalletVersion},
-    http,
-    observability::{ObserverIdentity, SYNC_LAG_TOLERANCE_BLOCKS},
     operations::{validators, wallets},
     runtime::ProcessRegistry,
     storage::{Layout, NodeSettings, RuntimeState, Settings, write_json_atomic},
@@ -51,22 +50,12 @@ const SYNC_READY_CONFIRMATIONS: usize = 3;
 const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const SYNC_LOG_INTERVAL: Duration = Duration::from_secs(5);
 const SYNC_STATS_TIMEOUT: Duration = Duration::from_secs(3);
+const SYNC_LAG_TOLERANCE_BLOCKS: u32 = 2;
 
 #[derive(Deserialize)]
 struct FaucetGrant {
     address: String,
     amount_nano: u64,
-}
-
-#[derive(Deserialize)]
-struct ConfigurationService {
-    service: String,
-    endpoints: ConfigurationEndpoints,
-}
-
-#[derive(Deserialize)]
-struct ConfigurationEndpoints {
-    observability: Option<String>,
 }
 
 #[derive(Clone)]
@@ -135,23 +124,6 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 }
                 Ok(())
             })?;
-            let observability_peers = match discover_observability_peer(&args.global_config_url).await {
-                Ok(Some(peer)) => vec![peer],
-                Ok(None) => Vec::new(),
-                Err(error) => {
-                    warn!(%error, "could not discover a bootstrap observability peer");
-                    Vec::new()
-                }
-            };
-            let services = http::start_observability(
-                layout.clone(),
-                toolchain.clone(),
-                &settings,
-                owned_nodes.clone(),
-                args.advertise_ip,
-                observability_peers,
-            )
-            .await?;
             for liteserver in &local_liteservers {
                 select! {
                     result = wait_for_network_sync(
@@ -197,7 +169,6 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 result = supervise(&processes) => result,
                 result = &mut validation => result,
             };
-            services.shutdown().await;
             result
         } => result,
         signal_result = shutdown_signal() => signal_result,
@@ -433,10 +404,6 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
         }
         node.enabled = true;
     }
-    settings.services.observability.bind = args.observability_bind;
-    if args.no_observability {
-        settings.services.observability.enabled = false;
-    }
     settings.validate()?;
     settings.save_atomic(&layout.settings)?;
     Ok(requested)
@@ -478,9 +445,10 @@ fn resolve_join_nodes(
     }
 
     let names = if requested.is_empty() {
-        let identity =
-            ObserverIdentity::load_or_create(&layout.observability.join("identity.json"))?;
-        let name = format!("node-{}", &identity.observer_id()[..12]);
+        // The state path gives a joining instance a deterministic name without
+        // introducing another persisted identity solely for display purposes.
+        let digest = Sha256::digest(layout.root.to_string_lossy().as_bytes());
+        let name = format!("node-{}", hex::encode(&digest[..6]));
         BTreeSet::from([name])
     } else {
         let mut names = BTreeSet::new();
@@ -496,7 +464,6 @@ fn resolve_join_nodes(
 
     let allocation =
         HostPortAllocation::find(port_base.unwrap_or(DEFAULT_JOIN_PORT_BASE), names.len())?;
-    settings.services.observability.port = allocation.observability;
     settings.nodes = names
         .iter()
         .cloned()
@@ -511,7 +478,6 @@ fn resolve_join_nodes(
     info!(
         port_range_start = allocation.start,
         port_range_end = allocation.end,
-        observability_port = allocation.observability,
         nodes = names.len(),
         "allocated persistent join port range"
     );
@@ -527,30 +493,6 @@ fn resolve_join_nodes(
         );
     }
     Ok(names)
-}
-
-async fn discover_observability_peer(config_url: &str) -> Result<Option<String>> {
-    let mut root = http_url(config_url, "global config")?;
-    root.set_path("/");
-    root.set_query(None);
-    root.set_fragment(None);
-    let response = reqwest::Client::new()
-        .get(root.clone())
-        .send()
-        .await
-        .with_context(|| {
-            format!("failed to request optional configuration metadata from {root}")
-        })?;
-    if !response.status().is_success() {
-        return Ok(None);
-    }
-    let Ok(document) = response.json::<ConfigurationService>().await else {
-        // A standard TON config host is not required to expose Localton metadata.
-        return Ok(None);
-    };
-    Ok((document.service == "localton")
-        .then_some(document.endpoints.observability)
-        .flatten())
 }
 
 async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
@@ -859,9 +801,7 @@ mod tests {
             faucet: None,
             advertise_ip: Ipv4Addr::new(10, 0, 0, 2),
             validator: false,
-            observability_bind: Ipv4Addr::UNSPECIFIED,
             port_base: Some(41_000),
-            no_observability: false,
             ton_bin_dir: None,
             startup_timeout: 1,
         };
@@ -871,25 +811,24 @@ mod tests {
 
         let settings = Settings::load(&layout.settings).unwrap();
         let node = settings.node("node2").unwrap();
-        let observability_port = settings.services.observability.port;
-        let node_ports_follow_observability = [
+        let node_ports_are_contiguous = [
             node.console_port,
             node.adnl_port,
             node.liteserver_port,
             node.out_port,
             node.dht_port,
         ] == [
-            observability_port + 1,
-            observability_port + 2,
-            observability_port + 3,
-            observability_port + 4,
-            observability_port + 5,
+            node.console_port,
+            node.console_port + 1,
+            node.console_port + 2,
+            node.console_port + 3,
+            node.console_port + 4,
         ];
         let actual = serde_json::json!({
             "owned_nodes": owned_nodes,
             "only_requested_node_is_persisted": settings.nodes.len() == 1,
-            "allocation_starts_at_requested_base": observability_port >= 41_000,
-            "node_ports_follow_observability": node_ports_follow_observability,
+            "allocation_starts_at_requested_base": node.console_port >= 41_000,
+            "node_ports_are_contiguous": node_ports_are_contiguous,
             "enabled": node.enabled,
             "validator": node.validator,
             "participate_in_elections": node.participate_in_elections,
@@ -906,7 +845,7 @@ mod tests {
               "allocation_starts_at_requested_base": true,
               "enabled": true,
               "global_config_is_valid": true,
-              "node_ports_follow_observability": true,
+              "node_ports_are_contiguous": true,
               "only_requested_node_is_persisted": true,
               "owned_nodes": [
                 "node2"
@@ -925,7 +864,6 @@ mod tests {
             .await
             .unwrap();
         let promoted = Settings::load(&layout.settings).unwrap();
-        assert_eq!(promoted.services.observability.port, observability_port);
         let promoted = promoted.node("node2").unwrap();
         assert!(promoted.validator);
         assert!(promoted.participate_in_elections);
