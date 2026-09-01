@@ -258,8 +258,6 @@ The native network uses these ports by default:
 | `http://127.0.0.1:18005/api/v2` | Optional internal API V2 backend. |
 | `http://127.0.0.1:18006` | Optional API V2 monitor. |
 
-Additional nodes use separate port ranges from `settings.json`.
-
 ## TON HTTP API V2
 
 The Docker image already contains API V2. A native installation requires one separate build.
@@ -484,8 +482,8 @@ Disabling validator mode does not remove the node from the active validator set.
 Submit an election request or recover an unfrozen stake:
 
 ```bash
-localton validator participate node2
-localton validator reap node2
+localton validator participate genesis
+localton validator reap genesis
 ```
 
 Process all enabled validators:
@@ -560,7 +558,6 @@ The important state files are:
 | `runtime.json` | Current process identifiers, service endpoints, and the latest observed block. |
 | `global.config.json` | Connection data for the local DHT and liteserver. |
 | `genesis/` | Validator database, keys, certificates, and node data. |
-| `nodes/` | Data for additional nodes. |
 | `wallets/` | Managed wallet keys and deployment messages. |
 | `logs/` | Standard output and error logs for managed processes. |
 | `tools/` | Native API V2 source and build artifacts. |
