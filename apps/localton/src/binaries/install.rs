@@ -32,11 +32,19 @@ use super::{
 
 const CACHE_DIR_ENV: &str = "LOCALTON_CACHE_DIR";
 
+/// Resolves the pinned release from the shared cache or installs it once.
+///
+/// A release is reusable only when its marker matches the expected checksum and
+/// every required binary and resource directory is present. Installation is
+/// serialized per release and platform, then published from a staging directory.
 pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     let asset = current_asset()?;
     let platform = platform_id();
+
     let release_dir = global_cache_root()?.join("ton").join(TON_RELEASE);
     let install_dir = release_dir.join(&platform);
+
+    // The common case must not create or lock anything after the first install.
     if installation_is_complete(&install_dir, asset.sha256) {
         info!(cache = %install_dir.display(), "using cached official TON {TON_RELEASE} binaries");
         return Ok(install_dir);
@@ -44,17 +52,22 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
 
     fs::create_dir_all(&release_dir)
         .with_context(|| format!("failed to create {}", release_dir.display()))?;
+
     let lock_path = release_dir.join(format!("{platform}.lock"));
     let _install_lock = acquire_install_lock(&lock_path).await?;
+
+    // Another process can finish the same installation while this one waits.
     if installation_is_complete(&install_dir, asset.sha256) {
         info!(cache = %install_dir.display(), "using cached official TON {TON_RELEASE} binaries");
         return Ok(install_dir);
     }
 
+    // Stable transient names let the next lock holder recover after interruption.
     let archive_path = release_dir.join(format!(".{platform}.zip.part"));
     let staging_dir = release_dir.join(format!(".{platform}.installing"));
     remove_path_if_exists(&archive_path)?;
     remove_path_if_exists(&staging_dir)?;
+
     let url = format!(
         "https://github.com/ton-blockchain/ton/releases/download/{TON_RELEASE}/{}",
         asset.file_name
@@ -63,6 +76,7 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
 
     let install_result: Result<()> = async {
         download(&url, &archive_path).await?;
+
         let actual_hash = sha256_file(&archive_path)?;
         if actual_hash != asset.sha256 {
             bail!(
@@ -72,13 +86,19 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
             );
         }
 
+        // ZIP extraction is blocking and must never occupy an async runtime worker.
         let archive = archive_path.clone();
         let destination = staging_dir.clone();
         tokio::task::spawn_blocking(move || extract_zip(&archive, &destination))
             .await
             .context("TON archive extraction task failed")??;
+
         validate_installation_contents(&staging_dir)?;
+
+        // The marker is the commit record. It becomes visible together with the
+        // validated directory when the staging rename succeeds.
         fs::write(staging_dir.join(".complete"), marker_contents(asset.sha256))?;
+
         remove_path_if_exists(&install_dir)?;
         fs::rename(&staging_dir, &install_dir).with_context(|| {
             format!(
@@ -90,8 +110,10 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     }
     .await;
 
+    // Best-effort cleanup preserves the original installation error for diagnosis.
     let _ = fs::remove_file(&archive_path);
     let _ = remove_path_if_exists(&staging_dir);
+
     install_result?;
     Ok(install_dir)
 }
@@ -144,6 +166,8 @@ fn non_empty_path(value: Option<OsString>) -> Option<PathBuf> {
 
 async fn acquire_install_lock(path: &Path) -> Result<File> {
     let path = path.to_owned();
+
+    // File locking can wait indefinitely, so keep it outside async worker threads.
     tokio::task::spawn_blocking(move || {
         let file = File::options()
             .read(true)
@@ -165,8 +189,10 @@ fn marker_contents(sha256: &str) -> String {
 }
 
 fn installation_is_complete(path: &Path, sha256: &str) -> bool {
-    fs::read_to_string(path.join(".complete")).is_ok_and(|marker| marker == marker_contents(sha256))
-        && validate_installation_contents(path).is_ok()
+    let marker_matches = fs::read_to_string(path.join(".complete"))
+        .is_ok_and(|marker| marker == marker_contents(sha256));
+
+    marker_matches && validate_installation_contents(path).is_ok()
 }
 
 fn validate_installation_contents(path: &Path) -> Result<()> {
@@ -176,6 +202,7 @@ fn validate_installation_contents(path: &Path) -> Result<()> {
             bail!("required TON binary is missing: {}", binary.display());
         }
     }
+
     for directory in [path.join("lib"), path.join("smartcont")] {
         if !directory.is_dir() {
             bail!(
@@ -188,9 +215,11 @@ fn validate_installation_contents(path: &Path) -> Result<()> {
 }
 
 fn remove_path_if_exists(path: &Path) -> Result<()> {
+    // Inspect the link itself so cleanup cannot follow a stale symlink elsewhere.
     let Ok(metadata) = fs::symlink_metadata(path) else {
         return Ok(());
     };
+
     if metadata.file_type().is_dir() {
         fs::remove_dir_all(path)
     } else {
@@ -205,26 +234,33 @@ async fn download(url: &str, path: &Path) -> Result<()> {
         .with_context(|| format!("failed to download {url}"))?
         .error_for_status()
         .with_context(|| format!("download failed for {url}"))?;
+
     let progress = download_progress(response.content_length())?;
+
     let mut file = tokio::fs::File::create(path)
         .await
         .with_context(|| format!("failed to create {}", path.display()))?;
     let mut stream = response.bytes_stream();
+
     let result = async {
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.context("TON binary download stream failed")?;
             file.write_all(&chunk).await?;
             progress.inc(chunk.len() as u64);
         }
+
+        // Complete the file before synchronous checksum validation reads it.
         file.flush().await?;
         file.sync_all().await?;
         Ok(())
     }
     .await;
+
     match &result {
         Ok(()) => progress.finish_and_clear(),
         Err(_) => progress.abandon_with_message("TON binary download failed"),
     }
+
     result
 }
 
@@ -233,7 +269,7 @@ fn download_progress(total: Option<u64>) -> Result<ProgressBar> {
         let progress = ProgressBar::new(total);
         progress.set_style(
             ProgressStyle::with_template(
-                "{spinner:.blue} Downloading TON [{bar:36.cyan/blue}] {percent:>3}% \
+                " {prefix:.green} [{bar:40.}] {percent:>3}% \
                  {bytes}/{total_bytes} {bytes_per_sec} ETA {eta}",
             )?
             .progress_chars("=>-"),
@@ -242,10 +278,11 @@ fn download_progress(total: Option<u64>) -> Result<ProgressBar> {
     } else {
         let progress = ProgressBar::new_spinner();
         progress.set_style(ProgressStyle::with_template(
-            "{spinner:.blue} Downloading TON {bytes} {bytes_per_sec} elapsed {elapsed_precise}",
+            " {prefix:.green} {spinner} {bytes} {bytes_per_sec} elapsed {elapsed_precise}",
         )?);
         progress
     };
+    progress.set_prefix("Downloading");
     progress.enable_steady_tick(Duration::from_millis(100));
     Ok(progress)
 }
@@ -266,24 +303,32 @@ fn sha256_file(path: &Path) -> Result<String> {
 
 fn extract_zip(archive_path: &Path, destination: &Path) -> Result<()> {
     fs::create_dir_all(destination)?;
+
     let file = File::open(archive_path)?;
     let mut archive = ZipArchive::new(file)?;
+
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index)?;
+
+        // Reject absolute paths and `..` components before joining the target.
         let relative = entry
             .enclosed_name()
             .context("TON archive contains an unsafe path")?
             .to_owned();
         let target = destination.join(relative);
+
         if entry.is_dir() {
             fs::create_dir_all(&target)?;
             continue;
         }
+
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
+
         let mut output = File::create(&target)?;
         io::copy(&mut entry, &mut output)?;
+
         #[cfg(unix)]
         if REQUIRED_BINARIES
             .iter()

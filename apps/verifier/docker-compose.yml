@@ -1,6 +1,6 @@
 services:
   verifier:
-    image: ${VERIFIER_IMAGE:-ghcr.io/i582/verifier:latest}
+    image: ${VERIFIER_IMAGE:-ghcr.io/ton-blockchain/verifier:latest}
     deploy:
       resources:
         limits:

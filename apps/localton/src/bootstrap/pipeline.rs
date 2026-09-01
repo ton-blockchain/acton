@@ -163,15 +163,29 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
         "bootstrap settings must start with an enabled genesis validator"
     );
 
-    if let Some(block_time) = args.block_time {
+    if let Some(block_time_ms) = args.block_time {
         if layout.manifest.is_file() {
             ensure!(
-                settings.network.block_time() == block_time,
-                "network block time is {}; --block-time cannot change after network creation",
-                humantime::format_duration(settings.network.block_time())
+                settings.network.simplex_target_rate_ms == block_time_ms,
+                "network block time is {}ms; --block-time cannot change after network creation",
+                settings.network.simplex_target_rate_ms
             );
         } else {
-            settings.network.set_block_time(block_time)?;
+            settings.network.simplex_target_rate_ms = block_time_ms;
+        }
+    }
+
+    if let Some(election_time_seconds) = args.election_time {
+        if layout.manifest.is_file() {
+            ensure!(
+                settings.network.elected_for_seconds == election_time_seconds,
+                "network election time is {}s; --election-time cannot change after network creation",
+                settings.network.elected_for_seconds
+            );
+        } else {
+            settings
+                .network
+                .set_election_time_seconds(election_time_seconds)?;
         }
     }
 

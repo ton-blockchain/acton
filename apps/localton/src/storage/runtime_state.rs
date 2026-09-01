@@ -65,9 +65,7 @@ impl InitialSyncProgress {
             return true;
         }
         match (&self.state_download, &previous.state_download) {
-            (Some(current), Some(previous)) => {
-                current.downloaded_bytes > previous.downloaded_bytes
-            }
+            (Some(current), Some(previous)) => current.downloaded_bytes > previous.downloaded_bytes,
             (Some(_), None) => true,
             _ => false,
         }
@@ -537,10 +535,7 @@ mod tests {
                 ),
             )
         "#]]
-        .assert_debug_eq(&(
-            node.sync_progressed_at,
-            node.initial_sync_progress.as_ref(),
-        ));
+        .assert_debug_eq(&(node.sync_progressed_at, node.initial_sync_progress.as_ref()));
 
         let mut advanced = node.initial_sync_progress.clone().unwrap();
         advanced.state_download.as_mut().unwrap().downloaded_bytes = 2_048;

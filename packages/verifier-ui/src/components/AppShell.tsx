@@ -106,7 +106,7 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
               </span>
               <a
                 className={`${styles.githubButton} ${styles.desktopHeaderAction}`}
-                href="https://github.com/i582/verifier"
+                href="https://github.com/ton-blockchain/acton"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Open GitHub"
@@ -140,7 +140,11 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                         {item.label}
                       </a>
                     ))}
-                    <a href="https://github.com/i582/verifier" target="_blank" rel="noreferrer">
+                    <a
+                      href="https://github.com/ton-blockchain/acton"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       <span>GitHub</span>
                       <Github size={17} aria-hidden="true" />
                     </a>

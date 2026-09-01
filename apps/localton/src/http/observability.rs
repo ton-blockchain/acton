@@ -445,8 +445,7 @@ async fn publish_runtime_observation(
                 last_error: runtime.last_error,
                 head_seqno,
                 network_head_seqno,
-                sync_initial_masterchain_block_time: runtime
-                    .sync_initial_masterchain_block_time,
+                sync_initial_masterchain_block_time: runtime.sync_initial_masterchain_block_time,
                 sync_masterchain_block_time: runtime.sync_masterchain_block_time,
                 sync_target_time: runtime.sync_target_time,
                 initial_sync_progress: runtime.initial_sync_progress,

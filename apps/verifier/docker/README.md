@@ -3,7 +3,7 @@
 Production deployments should pull the CI-built image:
 
 ```bash
-docker pull ghcr.io/i582/verifier:latest
+docker pull ghcr.io/ton-blockchain/verifier:latest
 ```
 
 Local development can build the image:
@@ -49,7 +49,7 @@ docker run --rm -p 3000:3000 \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
   -v verifier-registry-index:/var/lib/verifier/registry-index \
   -v verifier-payment-ledger:/var/lib/verifier/payment-ledger \
-  ghcr.io/i582/verifier:latest
+  ghcr.io/ton-blockchain/verifier:latest
 ```
 
 The verifier accepts payments only on TON testnet. The payment address must
@@ -66,7 +66,7 @@ docker run --rm -p 3000:3000 \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
   -v verifier-registry-index:/var/lib/verifier/registry-index \
   -v verifier-payment-ledger:/var/lib/verifier/payment-ledger \
-  ghcr.io/i582/verifier:latest
+  ghcr.io/ton-blockchain/verifier:latest
 ```
 
 For SSH Git remotes, mount a deploy key and pass:

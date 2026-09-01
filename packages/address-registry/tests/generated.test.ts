@@ -2,6 +2,7 @@ import {expect, test} from "bun:test"
 
 import mainnetJson from "../src/mainnet.json" with {type: "json"}
 import testnetJson from "../src/testnet.json" with {type: "json"}
+import unresolvedConflictsJson from "../src/unresolved-conflicts.json" with {type: "json"}
 import {addresses, getMainnetAddresses, getTestnetAddresses} from "../src/addresses.ts"
 
 const RAW_ADDRESS_PATTERN = /^-?\d+:[0-9a-f]{64}$/
@@ -31,6 +32,23 @@ test("generated addresses are unique within each network", () => {
     expect(registry.map(({address}) => address)).toEqual(
       registry.map(({address}) => address).toSorted(),
     )
+  }
+})
+
+test("unresolved conflicts match the generated conflict schema", () => {
+  for (const conflict of unresolvedConflictsJson as readonly Record<string, unknown>[]) {
+    expect(Object.keys(conflict).toSorted()).toEqual(["address", "candidates"])
+    expect(conflict.address).toMatch(RAW_ADDRESS_PATTERN)
+    expect(Array.isArray(conflict.candidates)).toBe(true)
+
+    const candidates = conflict.candidates as readonly Record<string, unknown>[]
+    expect(candidates.length).toBeGreaterThan(1)
+
+    for (const candidate of candidates) {
+      expect(Object.keys(candidate).toSorted()).toEqual(["name", "source"])
+      expect(typeof candidate.source).toBe("string")
+      expect(typeof candidate.name).toBe("string")
+    }
   }
 })
 

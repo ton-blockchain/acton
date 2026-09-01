@@ -130,13 +130,8 @@ impl ValidatorStats {
                 InitialSyncStage::DownloadingMasterchainState,
                 leading_u32(value),
             )
-        } else if let Some(value) =
-            status.strip_prefix("downloading all shard states, mc seqno ")
-        {
-            (
-                InitialSyncStage::DownloadingShardStates,
-                leading_u32(value),
-            )
+        } else if let Some(value) = status.strip_prefix("downloading all shard states, mc seqno ") {
+            (InitialSyncStage::DownloadingShardStates, leading_u32(value))
         } else {
             (InitialSyncStage::Preparing, None)
         };
@@ -810,15 +805,20 @@ fn state_download_progress(value: &str) -> Option<StateDownloadProgress> {
 
 /// Reconstructs a byte count from `td::format::as_size`'s B through GB output.
 fn binary_size_bytes(value: &str) -> Option<u64> {
-    [("GB", 1_u64 << 30), ("MB", 1_u64 << 20), ("KB", 1_u64 << 10), ("B", 1)]
-        .into_iter()
-        .find_map(|(suffix, multiplier)| {
-            value
-                .strip_suffix(suffix)?
-                .parse::<u64>()
-                .ok()?
-                .checked_mul(multiplier)
-        })
+    [
+        ("GB", 1_u64 << 30),
+        ("MB", 1_u64 << 20),
+        ("KB", 1_u64 << 10),
+        ("B", 1),
+    ]
+    .into_iter()
+    .find_map(|(suffix, multiplier)| {
+        value
+            .strip_suffix(suffix)?
+            .parse::<u64>()
+            .ok()?
+            .checked_mul(multiplier)
+    })
 }
 
 /// Extracts the last canonical 256-bit key identifier from noisy console output.
@@ -1116,10 +1116,7 @@ mod tests {
         .unwrap();
         assert!(stats.connection_ready());
         assert_eq!(stats.unix_time().unwrap(), 1_787_985_862);
-        assert_eq!(
-            stats.masterchain_block_time().unwrap(),
-            Some(1_787_985_860)
-        );
+        assert_eq!(stats.masterchain_block_time().unwrap(), Some(1_787_985_860));
         expect_test::expect![[r#"
             Some(
                 InitialSyncProgress {
@@ -1146,8 +1143,9 @@ mod tests {
         "#]]
         .assert_debug_eq(&stats.initial_sync_progress());
 
-        let early = parse_stats("unixtime 1787985862\nprocess.initial_sync starting, init block seqno 0\n")
-            .unwrap();
+        let early =
+            parse_stats("unixtime 1787985862\nprocess.initial_sync starting, init block seqno 0\n")
+                .unwrap();
         assert_eq!(early.masterchain_block_time().unwrap(), None);
     }
 

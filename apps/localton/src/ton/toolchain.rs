@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn smartcont_script_prefers_state_override_and_falls_back_to_release() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(temp.path().join("state"));
         layout.create_dirs().unwrap();
         let binaries = TonBinaries {

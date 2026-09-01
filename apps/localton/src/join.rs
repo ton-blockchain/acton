@@ -336,7 +336,7 @@ async fn wait_for_network_sync(
                                     downloaded = %BinaryBytes(download.downloaded_bytes),
                                     total = %BinaryBytes(download.total_bytes),
                                     speed = %format!("{}/s", BinaryBytes(download.bytes_per_second)),
-                                    eta = %humantime::format_duration(Duration::from_secs(download.remaining_seconds)),
+                                    eta_seconds = download.remaining_seconds,
                                     "follower node initial synchronization progress"
                                 );
                             } else {

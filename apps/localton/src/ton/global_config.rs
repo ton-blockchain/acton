@@ -16,8 +16,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::tools::types::{
-    DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId,
-    is_public_ipv4,
+    DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId, is_public_ipv4,
 };
 
 const MASTERCHAIN_ID: i32 = -1;

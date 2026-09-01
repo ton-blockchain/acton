@@ -88,7 +88,7 @@ type ChallengeResult =
         (status = 403, description = "Request blocked by antifraud policy", body = auth::ErrorResponse),
         (status = 429, description = "Too many active challenges", body = auth::ErrorResponse),
         (status = 500, description = "Failed to create a challenge", body = auth::ErrorResponse),
-        (status = 503, description = "PoW is disabled or a dependency is unavailable", body = auth::ErrorResponse)
+        (status = 503, description = "Faucet is read-only, PoW is disabled, or a dependency is unavailable", body = auth::ErrorResponse)
     ),
     tag = "faucet"
 )]

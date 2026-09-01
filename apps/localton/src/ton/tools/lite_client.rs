@@ -657,11 +657,9 @@ fn stack_value(value: &TVMStackValue) -> Result<StackValue> {
         TVMStackValue::Tuple(values) => StackValue::Tuple {
             values: values.iter().map(stack_value).collect::<Result<Vec<_>>>()?,
         },
-        TVMStackValue::Nan(_) | TVMStackValue::Builder(_) | TVMStackValue::Cont(_) => {
-            StackValue::Unsupported {
-                bytes_hex: hex::encode(value.to_boc()?),
-            }
-        }
+        _ => StackValue::Unsupported {
+            bytes_hex: hex::encode(value.to_boc()?),
+        },
     })
 }
 

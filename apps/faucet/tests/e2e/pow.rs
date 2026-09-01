@@ -63,7 +63,7 @@ async fn request_with_pow(
     .unwrap()
 }
 
-fn config(pow_enabled: bool) -> Config {
+pub(super) fn config(pow_enabled: bool) -> Config {
     Config {
         database: DatabaseConfig {
             url: "sqlite::memory:".to_string(),
@@ -103,6 +103,7 @@ fn config(pow_enabled: bool) -> Config {
             mnemonic: "unused".to_string(),
             amount: 1_000_000,
             message: "Testnet faucet".to_string(),
+            read_only: false,
         },
         pow: PowConfig {
             enabled: pow_enabled,

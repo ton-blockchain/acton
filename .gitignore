@@ -30,6 +30,8 @@ test-results/
 # OS files
 .DS_Store
 Thumbs.db
+.node-*
+.localton
 
 .env
 .worktree/

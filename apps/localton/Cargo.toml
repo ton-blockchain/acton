@@ -33,7 +33,6 @@ fastnum = "0.7.5"
 fs2 = "0.4"
 futures-util = "0.3"
 hex = "0.4"
-humantime = "2.3"
 include_dir = "0.7"
 indicatif = "0.18.3"
 nix = { version = "0.30", features = ["process", "signal"] }
@@ -45,7 +44,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 tokio = { version = "1.47", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
-ton = "0.1.2"
+ton = "0.4.1"
 tonutils = { version = "1.1.0", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs"] }
 tracing = "0.1"

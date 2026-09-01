@@ -8,7 +8,8 @@ use axum::{
     routing::{get, post},
 };
 use faucet::middlewares::{
-    ACTON_CLIENT_HEADER, DEVICE_UID_HEADER, require_airdrop_headers, require_pow_enabled,
+    ACTON_CLIENT_HEADER, DEVICE_UID_HEADER, require_airdrop_headers, require_faucet_writable,
+    require_pow_enabled,
 };
 use reqwest::Url;
 use tower_http::cors::CorsLayer;
@@ -29,6 +30,10 @@ pub(crate) fn router(state: AppState) -> Router {
     let airdrop_routes = Router::new()
         .route("/challenge", post(challenge::create_challenge))
         .route("/claim", post(claim::create_claim))
+        .route_layer(from_fn_with_state(
+            state.config.clone(),
+            require_faucet_writable,
+        ))
         .route_layer(from_fn_with_state(
             state.config.clone(),
             require_pow_enabled,

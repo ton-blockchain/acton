@@ -1749,11 +1749,11 @@
   },
   {
     "address": "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
-    "name": "Bybit 10"
+    "name": "ByBit 11"
   },
   {
     "address": "0:4a1f3ebcc66bdcefa90245bdf541a50ada1c688a487534b1587abffd93038834",
-    "name": "Bybit 2"
+    "name": "ByBit 2"
   },
   {
     "address": "0:4a9df5a2a628a865e81559ef1cff8903233a5d5448c726e7b339adb2f2bac6b1",
@@ -2165,7 +2165,7 @@
   },
   {
     "address": "0:7d133d4e425c8e00de015513a44e66e6d163b21e71720aec7579965e5de28c55",
-    "name": "Bybit 8"
+    "name": "ByBit"
   },
   {
     "address": "0:7e30fc2b7751ba58a3642f3fd59d5e96a810ddd78d8a310bfe8353bef10500df",
@@ -2181,7 +2181,7 @@
   },
   {
     "address": "0:7f97f36dda3f7dedc9e12f8c09c4f89e7fbc17527ab3f67de4c3b155297a56e4",
-    "name": "Bybit 7"
+    "name": "ByBit 7"
   },
   {
     "address": "0:80d4123841167ca989ac912443cc99a4b9c1a87584536427ff6fd85c92395ae9",
@@ -2277,7 +2277,7 @@
   },
   {
     "address": "0:8b070edb01a700f3f6a4624c7e086e036da86060ebb04f19908ee61a3537335f",
-    "name": "Changelly"
+    "name": "Changelly 1"
   },
   {
     "address": "0:8bc991cfe177bc7e9721433efa3befd199485a55cffd040a06c89af026b71bcf",
@@ -2561,7 +2561,7 @@
   },
   {
     "address": "0:ae62a192da96e266161a702cc9f6de91c0c3441f17ceba51bc442dfb2031a30a",
-    "name": "Bybit 4"
+    "name": "ByBit 4"
   },
   {
     "address": "0:ae8d2c366caef744c50282061a06b3fbadc190a85e5d482344731a19f96f8266",
@@ -2797,7 +2797,7 @@
   },
   {
     "address": "0:c3f1da8ecda8f8cd42bace224ea3f1b6971eaa7f54c492d4d190527b4f573f7c",
-    "name": "Bybit 1"
+    "name": "ByBit 1"
   },
   {
     "address": "0:c3f99ec4f68ef9a820dc029bd797d21603e087db5ad2d88d4285b6aa041e37fa",
@@ -2884,6 +2884,10 @@
     "name": "Surge Boards"
   },
   {
+    "address": "0:cb83fd2b928d656c7e746b6e31440ddb0afae80721df42f2b3b85ceba9b78c78",
+    "name": "Heleket Payment Comission"
+  },
+  {
     "address": "0:cbec731b71ad05b9fae31c5711a222e4122397917a0efef1f681550df09369e2",
     "name": "Ion Gems"
   },
@@ -2897,7 +2901,7 @@
   },
   {
     "address": "0:cd525c15904d7b4027eae08b318624260f371ce8c9f4fcca0cdb7b583854107c",
-    "name": "Bybit 3"
+    "name": "ByBit 3"
   },
   {
     "address": "0:cd872fa7c5816052acdf5332260443faec9aacc8c21cca4d92e7f47034d11892",
@@ -3093,7 +3097,7 @@
   },
   {
     "address": "0:e33ef85d174eb457c072d1ee10215b69ab9b64192f7421302ab1c8e26b7ad4bd",
-    "name": "Bybit 6"
+    "name": "ByBit 6"
   },
   {
     "address": "0:e3b375a5f71ea17bec125d3a88f6483575ee909b16010eefed9b64fe9b0d64e5",
@@ -3101,7 +3105,7 @@
   },
   {
     "address": "0:e3ce05c4da977132c24a3b102da8b5fbf2ea9173337b49de346e4a4b057f7579",
-    "name": "Bybit 5"
+    "name": "ByBit 5"
   },
   {
     "address": "0:e49dcb89dbaecfcb71262f65c037b62c48d40c52ef2ef861ec5bd8d5963707f1",
@@ -3273,7 +3277,7 @@
   },
   {
     "address": "0:f2dc1860686cd658987e2bed8216532d8c004460dadea907cc7d4ad7236c496b",
-    "name": "Bybit 9"
+    "name": "ByBit 10"
   },
   {
     "address": "0:f33f5a1e309236c21fd412b9d522e24a6a6ef3745c01f7ec7d731bc0f844c334",

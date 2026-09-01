@@ -77,6 +77,7 @@ pub struct FaucetConfig {
     pub mnemonic: String,
     pub amount: u64,
     pub message: String,
+    pub read_only: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -209,6 +210,7 @@ impl Config {
                 amount: parse_env_grams("FAUCET_AMOUNT_NANOCOINS", 1_000_000),
                 message: std::env::var("FAUCET_MESSAGE")
                     .unwrap_or_else(|_| "Testnet faucet".to_string()),
+                read_only: parse_env_bool("FAUCET_READ_ONLY", false),
             },
             pow: PowConfig {
                 enabled: parse_env_bool("POW_ENABLED", true),
@@ -551,6 +553,7 @@ mod tests {
                 mnemonic: "test mnemonic".to_string(),
                 amount: 1_000_000,
                 message: "Testnet faucet".to_string(),
+                read_only: false,
             },
             pow: PowConfig {
                 enabled: true,

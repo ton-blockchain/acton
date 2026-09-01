@@ -453,7 +453,7 @@ async fn create_wallet(
                 _ => unreachable!(),
             };
             let wallet = ton_wallet(ton_version, &signing_key, workchain, wallet_id)?;
-            let address = wallet.address.clone();
+            let address = wallet.address;
             let deploy = wallet
                 .create_ext_in_msg(Vec::new(), 0, valid_until, true)?
                 .to_boc()?;

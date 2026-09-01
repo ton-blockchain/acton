@@ -29,7 +29,7 @@ export function HomePage() {
             </a>
           </span>
           <a href="https://ton-blockchain.github.io/acton/docs/verify">Documentation</a>
-          <a href="https://github.com/i582/verifier" target="_blank" rel="noreferrer">
+          <a href="https://github.com/ton-blockchain/acton" target="_blank" rel="noreferrer">
             GitHub
           </a>
         </footer>

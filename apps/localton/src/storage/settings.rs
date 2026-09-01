@@ -3,7 +3,6 @@ use std::{
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -276,29 +275,26 @@ impl Default for NetworkSettings {
 }
 
 impl NetworkSettings {
-    /// Returns the target interval applied by Simplex block production
+    /// Configures a validator round and its dependent genesis timings
     ///
-    /// Config 30 stores the value with millisecond resolution. It is a pacing
-    /// target rather than a liveness promise: a stalled validator set can still
-    /// miss slots
-    pub fn block_time(&self) -> Duration {
-        Duration::from_millis(u64::from(self.simplex_target_rate_ms))
-    }
-
-    /// Changes the target block interval before zerostate creation.
-    ///
-    /// TON stores this value as an unsigned 32-bit millisecond count in config
-    /// parameter 30. Rejecting finer or wider durations here prevents a CLI
-    /// value from being silently rounded while rendering the genesis script.
-    pub fn set_block_time(&mut self, block_time: Duration) -> Result<()> {
-        let milliseconds = u32::try_from(block_time.as_millis())
-            .context("block time exceeds TON's uint32 millisecond range")?;
-        ensure!(milliseconds > 0, "block time must be at least 1ms");
+    /// TON config parameter 15 expresses the election window relative to the
+    /// validator-set change. Localton opens the window after one quarter of the
+    /// round has elapsed, closes it one quarter before the change, and uses the
+    /// same quarter for stake freezing. The initial validator-set lifetime equals
+    /// the opening offset, which lets the first election begin immediately
+    pub fn set_election_time_seconds(&mut self, election_time_seconds: u32) -> Result<()> {
         ensure!(
-            Duration::from_millis(u64::from(milliseconds)) == block_time,
-            "block time must use whole milliseconds"
+            election_time_seconds >= 4,
+            "election time must be at least 4 seconds"
         );
-        self.simplex_target_rate_ms = milliseconds;
+
+        let quarter = election_time_seconds / 4;
+        let election_start_before = election_time_seconds - quarter;
+        self.elected_for_seconds = election_time_seconds;
+        self.election_start_before_seconds = election_start_before;
+        self.election_end_before_seconds = quarter;
+        self.stakes_frozen_for_seconds = quarter;
+        self.original_validator_set_valid_for_seconds = election_start_before;
         Ok(())
     }
 
@@ -328,8 +324,9 @@ impl NetworkSettings {
         ensure!(
             self.simplex_target_rate_ms > 0
                 && self.simplex_slots_per_leader_window > 0
-                && self.simplex_first_block_timeout_ms > 0,
-            "simplex timing values must be positive"
+                && self.simplex_first_block_timeout_ms > 0
+                && self.simplex_max_leader_window_desync > 0,
+            "simplex consensus values must be positive"
         );
         Ok(())
     }
@@ -803,13 +800,17 @@ mod tests {
     }
 
     #[test]
-    fn block_time_is_one_second_and_keeps_ton_millisecond_precision() {
+    fn election_time_configures_consistent_genesis_windows() {
         let mut network = NetworkSettings::default();
-        assert_eq!(network.block_time(), Duration::from_secs(1));
+        network.set_election_time_seconds(240).unwrap();
 
-        network.set_block_time(Duration::from_millis(750)).unwrap();
-        assert_eq!(network.simplex_target_rate_ms, 750);
-        assert!(network.set_block_time(Duration::from_micros(1)).is_err());
+        assert_eq!(network.elected_for_seconds, 240);
+        assert_eq!(network.election_start_before_seconds, 180);
+        assert_eq!(network.election_end_before_seconds, 60);
+        assert_eq!(network.stakes_frozen_for_seconds, 60);
+        assert_eq!(network.original_validator_set_valid_for_seconds, 180);
+        assert!(network.set_election_time_seconds(3).is_err());
+        network.validate().unwrap();
     }
 
     #[test]

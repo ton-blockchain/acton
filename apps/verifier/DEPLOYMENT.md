@@ -58,7 +58,7 @@ GitHub Actions builds the same Dockerfile used locally:
 For this repository the published image is:
 
 ```bash
-ghcr.io/i582/verifier
+ghcr.io/ton-blockchain/verifier
 ```
 
 Common tags:
@@ -71,7 +71,7 @@ Common tags:
 Pull the CI-built image on the server:
 
 ```bash
-docker pull ghcr.io/i582/verifier:latest
+docker pull ghcr.io/ton-blockchain/verifier:latest
 ```
 
 If the package is private, authenticate first with a token that has `read:packages`:
@@ -184,7 +184,7 @@ Create `/opt/ton-verifier/docker-compose.yml`:
 ```yaml
 services:
   verifier:
-    image: ghcr.io/i582/verifier:latest
+    image: ghcr.io/ton-blockchain/verifier:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -393,7 +393,7 @@ This does not build Rust, Node.js packages, or compilers on the server. The serv
 Pull the new image:
 
 ```bash
-docker pull ghcr.io/i582/verifier:latest
+docker pull ghcr.io/ton-blockchain/verifier:latest
 ```
 
 Update the image tag in `/opt/ton-verifier/docker-compose.yml`, then restart:

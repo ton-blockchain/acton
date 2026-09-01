@@ -507,7 +507,6 @@ mod tests {
 
     use async_trait::async_trait;
     use expect_test::expect;
-    use tempfile::tempdir;
 
     use super::*;
 
@@ -544,7 +543,7 @@ mod tests {
 
     #[tokio::test]
     async fn combined_genesis_delegates_one_typed_masterchain_operation() {
-        let directory = tempdir().unwrap();
+        let directory = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(directory.path().join("state"));
         layout.create_dirs().unwrap();
         let create_state = RecordingCreateState::default();

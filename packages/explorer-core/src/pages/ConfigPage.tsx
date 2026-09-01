@@ -72,60 +72,21 @@ type ConfigLoadState =
   | {readonly status: "success"; readonly config: NetworkConfig}
   | {readonly status: "error"; readonly message: string}
 
-const TON_CONFIG_DOC_ANCHORS: Readonly<Record<number, string>> = {
-  0: "0",
-  1: "1",
-  2: "2",
-  3: "3",
-  4: "4",
-  5: "5",
-  6: "6",
-  7: "7",
-  8: "8",
-  9: "9",
-  10: "10",
-  11: "11",
-  12: "12",
-  13: "13",
-  14: "14",
-  15: "15",
-  16: "16",
-  17: "17",
-  18: "18",
-  19: "19",
-  20: "20-and-21",
-  21: "20-and-21",
-  22: "22-and-23",
-  23: "22-and-23",
-  24: "24-and-25",
-  25: "24-and-25",
-  28: "28",
-  29: "29",
-  30: "30",
-  31: "31",
-  32: "32-and-34-and-36",
-  33: "33-and-35-and-37",
-  34: "32-and-34-and-36",
-  35: "33-and-35-and-37",
-  36: "32-and-34-and-36",
-  37: "33-and-35-and-37",
-  39: "39",
-  40: "40",
-  43: "43",
-  44: "44",
-  45: "45",
-  46: "46",
-  71: "71-and-72-and-73",
-  72: "71-and-72-and-73",
-  73: "71-and-72-and-73",
-  79: "79-and-81-and-82",
-  81: "79-and-81-and-82",
-  82: "79-and-81-and-82",
-}
+const TON_CONFIG_DOC_PARAMETER_IDS: ReadonlySet<number> = new Set([
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 28,
+  29, 30, 31, 32, 33, 34, 35, 36, 37, 39, 40, 43, 44, 45, 46, 71, 72, 73, 79, 81, 82,
+])
 
 function tonConfigDocsHref(id: number): string {
-  const anchor = id < 0 ? "negative-parameters" : TON_CONFIG_DOC_ANCHORS[id]
-  return anchor === undefined ? TON_CONFIG_DOCS_URL : `${TON_CONFIG_DOCS_URL}#${anchor}`
+  if (id < 0) {
+    return `${TON_CONFIG_DOCS_URL}#negative-parameters`
+  }
+
+  if (TON_CONFIG_DOC_PARAMETER_IDS.has(id)) {
+    return `${TON_CONFIG_DOCS_URL}#${id}`
+  }
+
+  return TON_CONFIG_DOCS_URL
 }
 
 export const ConfigPage: FC<ConfigPageProps> = ({client}) => {

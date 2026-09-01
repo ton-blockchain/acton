@@ -75,7 +75,7 @@ type ClaimLimitResult = Result<(), (StatusCode, Json<ErrorResponse>)>;
         (status = 401, description = "Invalid or expired GitHub session", body = auth::ErrorResponse),
         (status = 429, description = "Faucet request or amount limit exceeded", body = auth::ErrorResponse),
         (status = 500, description = "Failed to validate or queue the claim", body = auth::ErrorResponse),
-        (status = 503, description = "PoW is disabled or a dependency is unavailable", body = auth::ErrorResponse)
+        (status = 503, description = "Faucet is read-only, PoW is disabled, or a dependency is unavailable", body = auth::ErrorResponse)
     ),
     tag = "faucet"
 )]

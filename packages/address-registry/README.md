@@ -30,8 +30,9 @@ export const ACTON_TESTNET_ADDRESSES = [
 The generator downloads the account YAML files from both upstream repositories,
 validates all three sources, splits friendly addresses by network, normalizes
 them to raw form, merges equal entries, and applies manual conflict resolutions.
-Raw addresses, which do not encode a network, default to mainnet. It fails if
-any name conflict does not have a resolution, then writes the intermediate
+Raw addresses, which do not encode a network, default to mainnet. Unresolved name
+conflicts are omitted from the registries and written to
+`src/unresolved-conflicts.json`. The generator also writes the intermediate
 `src/mainnet-base.json` and `src/testnet-base.json`:
 
 ```sh

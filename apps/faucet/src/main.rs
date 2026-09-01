@@ -62,6 +62,9 @@ async fn main() -> anyhow::Result<()> {
         toncenter_url = %config.toncenter.url,
         "Loaded startup config"
     );
+    if config.faucet.read_only {
+        warn!("Faucet read-only mode is enabled; challenges and claims will not be accepted");
+    }
     if config.server.proxy.enabled {
         info!(
             header = %config.server.proxy.header,

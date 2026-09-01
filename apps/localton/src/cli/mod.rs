@@ -6,7 +6,7 @@
 
 pub(crate) mod commands;
 
-use std::{net::Ipv4Addr, path::PathBuf, time::Duration};
+use std::{net::Ipv4Addr, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
@@ -14,9 +14,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[command(
     name = "localton",
     version,
-    about = "Bootstrap, join, and operate a complete headless local TON development network",
-    subcommand_required = true,
-    arg_required_else_help = true
+    about = "Bootstrap, join, and operate a complete headless local TON development network"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -191,12 +189,35 @@ pub struct BootstrapArgs {
     #[arg(long, default_value_t = 180)]
     pub startup_timeout: u64,
 
-    /// Simplex target interval between blocks in a new network. Defaults to 1s.
+    /// Target interval between Simplex blocks, in milliseconds
     ///
-    /// This pacing parameter cannot guarantee progress when consensus stalls. It is
-    /// written to genesis and cannot change after network creation.
-    #[arg(long, value_name = "DURATION", value_parser = humantime::parse_duration)]
-    pub block_time: Option<Duration>,
+    /// Localton writes this value as noncritical key 0 (target_rate) in TON config
+    /// parameter 30 when it creates the network zerostate. It controls the target
+    /// block-production pace, but actual intervals can be longer when a slot is
+    /// skipped or consensus is delayed
+    ///
+    /// The value is part of zerostate. To change it, create a new network state
+    #[arg(long, value_name = "MILLISECONDS", value_parser = clap::value_parser!(u32).range(1..))]
+    pub block_time: Option<u32>,
+
+    /// Validator round duration for a new network, in seconds
+    ///
+    /// Localton writes the duration and its derived election windows to TON config
+    /// parameter 15 when it creates the network zerostate. Elections open three
+    /// quarters of a round before the validator set changes and close one quarter
+    /// before the change
+    ///
+    /// For example, --election-time 120 creates a two-minute round with elections
+    /// open from 90 to 30 seconds before the validator set changes. The stake freeze
+    /// period is also 30 seconds, and the first election can begin immediately
+    ///
+    /// Without this flag the round duration is 120 seconds
+    ///
+    /// Minimum: 4 seconds
+    ///
+    /// To change the value, create a new network state
+    #[arg(long, value_name = "SECONDS", value_parser = clap::value_parser!(u32).range(4..))]
+    pub election_time: Option<u32>,
 
     /// IPv4 address advertised by the genesis DHT and liteserver.
     ///
@@ -262,6 +283,7 @@ impl Default for BootstrapArgs {
             ton_bin_dir: None,
             startup_timeout: 180,
             block_time: None,
+            election_time: None,
             advertise_ip: None,
             add_account: Vec::new(),
             ton_http_api: false,
@@ -544,12 +566,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bootstrap_accepts_human_readable_block_time() {
-        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750ms"]).unwrap();
+    fn bootstrap_accepts_block_time_in_milliseconds() {
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750"]).unwrap();
         let Command::Bootstrap(args) = cli.command else {
             panic!("expected bootstrap command");
         };
-        assert_eq!(args.block_time, Some(Duration::from_millis(750)));
+        assert_eq!(args.block_time, Some(750));
+        assert_eq!(
+            Cli::try_parse_from(["localton", "bootstrap", "--block-time", "0"])
+                .unwrap_err()
+                .kind(),
+            clap::error::ErrorKind::ValueValidation
+        );
+    }
+
+    #[test]
+    fn bootstrap_accepts_election_time_in_seconds() {
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--election-time", "240"]).unwrap();
+        let Command::Bootstrap(args) = cli.command else {
+            panic!("expected bootstrap command");
+        };
+        assert_eq!(args.election_time, Some(240));
+        assert_eq!(
+            Cli::try_parse_from(["localton", "bootstrap", "--election-time", "3"])
+                .unwrap_err()
+                .kind(),
+            clap::error::ErrorKind::ValueValidation
+        );
     }
 
     #[test]
