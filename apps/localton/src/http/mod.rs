@@ -11,7 +11,11 @@ use anyhow::Result;
 use tokio::{sync::watch, task::JoinHandle};
 use tracing::warn;
 
-use crate::{bootstrap::NodeController, storage::Settings};
+use crate::{
+    runtime::ProcessRegistry,
+    storage::{Layout, Settings},
+    ton::toolchain::Toolchain,
+};
 
 mod admin;
 mod config;
@@ -61,7 +65,9 @@ impl Drop for ServiceSet {
 }
 
 pub async fn start(
-    control: NodeController,
+    layout: &Layout,
+    toolchain: &Toolchain,
+    processes: &ProcessRegistry,
     settings: &Settings,
     ton_http_api_bind: Ipv4Addr,
 ) -> Result<ServiceSet> {
@@ -69,13 +75,25 @@ pub async fn start(
     let mut tasks = Vec::new();
     let mut endpoints = BTreeMap::new();
     if settings.services.config_http.enabled {
-        let running = config::start(control.clone(), settings.clone(), receiver.clone()).await?;
+        let running = config::start(
+            layout.clone(),
+            toolchain.clone(),
+            settings.clone(),
+            receiver.clone(),
+        )
+        .await?;
         tasks.push(running.task);
         endpoints.insert("config_http".to_owned(), running.endpoint);
     }
 
     if settings.services.admin_http.enabled {
-        let running = admin::start(control, settings, receiver.clone()).await?;
+        let running = admin::start(
+            layout.clone(),
+            processes.clone(),
+            settings,
+            receiver.clone(),
+        )
+        .await?;
         tasks.push(running.task);
         endpoints.insert("admin_http".to_owned(), running.endpoint);
     }

@@ -1,47 +1,28 @@
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
-use serde::Serialize;
 
 use crate::{
     cli::NodeCommand,
-    storage::Layout,
-    storage::{NodeRuntime, RuntimeState},
-    storage::{NodeSettings, Settings},
+    storage::NodeRole,
     ton::{toolchain::Toolchain, tools::types::OperationContext},
 };
 
-#[derive(Debug, Serialize)]
-struct NodeView {
-    settings: NodeSettings,
-    runtime: Option<NodeRuntime>,
-}
-
 pub async fn execute(command: NodeCommand) -> Result<()> {
     match command {
-        NodeCommand::List { state } => {
-            let layout = layout(&state.state_dir)?;
-            let settings = Settings::load_or_create(&layout.settings)?;
-            let runtime = RuntimeState::load(&layout.runtime)?;
-            let nodes: Vec<_> = settings
-                .nodes
-                .into_iter()
-                .map(|settings| NodeView {
-                    runtime: runtime.nodes.get(&settings.name).cloned(),
-                    settings,
-                })
-                .collect();
-            println!("{}", serde_json::to_string_pretty(&nodes)?);
-        }
-        NodeCommand::Stats { state, name } => {
+        NodeCommand::Stats { state } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             let settings = toolchain.settings()?;
-            let node = settings.node(&name)?;
+            let node = &settings.node;
+            let node_layout = match node.role {
+                NodeRole::Genesis => toolchain.layout.genesis_node(),
+                NodeRole::Joined => toolchain.layout.joined_node(),
+            };
             let stats = toolchain
                 .validator_console_tool
                 .health(
                     &OperationContext::for_node(Duration::from_secs(20), &node.name),
-                    &toolchain.validator_console_endpoint(node),
+                    &toolchain.validator_console_endpoint(&node_layout, node),
                 )
                 .await?;
             println!(
@@ -55,10 +36,4 @@ pub async fn execute(command: NodeCommand) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn layout(state_dir: &Path) -> Result<Layout> {
-    let layout = Layout::new(crate::ton::toolchain::absolute_path(state_dir)?);
-    layout.create_dirs()?;
-    Ok(layout)
 }

@@ -25,7 +25,7 @@ pub struct Cli {
 pub enum Command {
     /// Create or resume a network and run its genesis node
     Bootstrap(BootstrapArgs),
-    /// Join and supervise independent full nodes on this host
+    /// Join and supervise one independent full node in this state directory
     Join(JoinArgs),
     /// Inspect persisted and live network status.
     Status(StatusArgs),
@@ -49,7 +49,7 @@ pub enum Command {
         #[command(subcommand)]
         command: IndexerCommand,
     },
-    /// Inspect full nodes owned by one local state directory.
+    /// Inspect the full node owned by one local state directory.
     Node {
         #[command(subcommand)]
         command: NodeCommand,
@@ -80,11 +80,11 @@ pub struct JoinArgs {
     #[command(flatten)]
     pub state: StateArgs,
 
-    /// Full-node aliases owned by this Localton instance
+    /// Full-node alias owned by this Localton instance
     ///
     /// When omitted, the first join creates a stable alias from the state directory
     #[arg(long = "node")]
-    pub nodes: Vec<String>,
+    pub node: Option<String>,
 
     /// URL of a standard TON global configuration used to join the network
     #[arg(value_name = "GLOBAL_CONFIG_URL", env = "LOCALTON_JOIN_CONFIG_URL")]
@@ -111,7 +111,7 @@ pub struct JoinArgs {
     /// First port considered for this instance's contiguous persistent allocation
     ///
     /// Defaults to 19000 and is used only when the state directory has no
-    /// initialized nodes. Restarts always reuse the ports saved in settings.json
+    /// initialized node. Restarts always reuse the ports saved in settings.json
     #[arg(long, env = "LOCALTON_JOIN_PORT_BASE")]
     pub port_base: Option<u16>,
 
@@ -465,17 +465,10 @@ pub enum IndexerCommand {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum NodeCommand {
-    /// List host-local nodes and their live status.
-    List {
-        #[command(flatten)]
-        state: StateArgs,
-    },
     /// Print validator-engine-console getstats output.
     Stats {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        name: String,
     },
 }
 
@@ -490,35 +483,21 @@ pub enum ValidatorCommand {
     Enable {
         #[command(flatten)]
         state: StateArgs,
-        node: Option<String>,
     },
     /// Stop participating in future elections and remain a full node.
     Disable {
         #[command(flatten)]
         state: StateArgs,
-        node: Option<String>,
     },
     /// Create keys and submit an election participation request.
     Participate {
         #[command(flatten)]
         state: StateArgs,
-        node: Option<String>,
         #[arg(long)]
         election_id: Option<u32>,
     },
     /// Recover an unfrozen stake and rewards.
     Reap {
-        #[command(flatten)]
-        state: StateArgs,
-        node: Option<String>,
-    },
-    /// Run participation for every enabled validator.
-    ParticipateAll {
-        #[command(flatten)]
-        state: StateArgs,
-    },
-    /// Recover stakes for every enabled validator.
-    ReapAll {
         #[command(flatten)]
         state: StateArgs,
     },
@@ -528,9 +507,6 @@ pub enum ValidatorCommand {
 pub struct HardforkArgs {
     #[command(flatten)]
     pub state: StateArgs,
-    /// Source node whose latest block becomes the hardfork anchor.
-    #[arg(long, default_value = "genesis")]
-    pub node: String,
     /// Existing external message BoC to include while creating the fork block.
     #[arg(long)]
     pub external_message: Option<PathBuf>,
@@ -581,12 +557,15 @@ mod tests {
             "http://192.168.27.4:18000/config",
             "--advertise-ip",
             "192.168.27.8",
+            "--node",
+            "node2",
         ])
         .unwrap();
         let Command::Join(args) = cli.command else {
             panic!("expected join command");
         };
         assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
+        assert_eq!(args.node.as_deref(), Some("node2"));
     }
 
     #[test]

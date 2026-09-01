@@ -25,7 +25,7 @@ use crate::{
     storage::{InitialSyncProgress, InitialSyncStage, StateDownloadProgress},
 };
 
-use super::types::{KeyId, OperationContext};
+use super::types::{KeyId, OperationContext, TonPublicKey};
 
 const TOOL_NAME: &str = "validator-engine-console";
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -178,22 +178,6 @@ impl ValidatorStats {
     }
 }
 
-/// Base64-encoded TL public key returned by `exportpub`.
-///
-/// Construction is private to the parser, so a value guarantees valid base64.
-/// It remains encoded because official Fift election scripts consume this exact
-/// representation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidatorPublicKey(String);
-
-impl ValidatorPublicKey {
-    /// Transfers the validated representation to a persisted election record.
-    #[must_use]
-    pub fn into_base64(self) -> String {
-        self.0
-    }
-}
-
 /// Ed25519 signature returned by the engine-owned validator key.
 ///
 /// The encoded value is validated to contain exactly 64 bytes. Its `Debug`
@@ -336,7 +320,7 @@ pub trait ValidatorConsole: Send + Sync {
         context: &OperationContext,
         endpoint: &ValidatorConsoleEndpoint,
         key: &KeyId,
-    ) -> Result<ValidatorPublicKey>;
+    ) -> Result<TonPublicKey>;
 
     /// Registers a permanent validator key interval exactly once.
     async fn add_permanent_key(
@@ -540,7 +524,7 @@ impl ValidatorConsole for OfficialValidatorConsole {
         context: &OperationContext,
         endpoint: &ValidatorConsoleEndpoint,
         key: &KeyId,
-    ) -> Result<ValidatorPublicKey> {
+    ) -> Result<TonPublicKey> {
         self.execute(
             context,
             endpoint,
@@ -856,13 +840,15 @@ fn parse_new_key(output: &str) -> Result<KeyId> {
 }
 
 /// Extracts and validates the base64 TL public key returned by `exportpub`.
-fn parse_public_key(output: &str) -> Result<ValidatorPublicKey> {
+fn parse_public_key(output: &str) -> Result<TonPublicKey> {
     let value = token_after_ascii_marker(output, "got public key:")
         .context("validator-engine-console did not return a public key")?;
-    STANDARD
+    let bytes = STANDARD
         .decode(value)
         .context("validator public key is not valid base64")?;
-    Ok(ValidatorPublicKey(value.to_owned()))
+
+    TonPublicKey::from_tl_bytes(&bytes)
+        .context("validator-engine-console returned an invalid public key")
 }
 
 /// Extracts a base64 signature and enforces the Ed25519 byte length.
@@ -1167,11 +1153,11 @@ mod tests {
 
     #[test]
     fn validates_public_key_and_signature_outputs() {
-        let public_key = STANDARD.encode([7_u8; 36]);
+        let public_key = TonPublicKey::from_bytes([7_u8; 32]).to_tl_base64();
         assert_eq!(
             parse_public_key(&format!("got public key: {public_key}"))
                 .unwrap()
-                .into_base64(),
+                .to_tl_base64(),
             public_key
         );
 

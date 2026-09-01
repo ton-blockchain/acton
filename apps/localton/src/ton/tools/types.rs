@@ -304,7 +304,8 @@ enum AdnlUdpAddressConstructor {
 /// The identifier is public metadata rather than private key material. Keeping the
 /// decoded bytes prevents subtly different lowercase/uppercase representations from
 /// referring to the same key in different parts of the bootstrap workflow.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, ToSchema)]
+#[schema(value_type = String)]
 pub struct KeyId([u8; 32]);
 
 impl KeyId {
@@ -404,7 +405,8 @@ impl FromStr for KeyId {
 /// The value is stored as 32 bytes rather than base64 or a TL-encoded file. This
 /// prevents workflows from repeatedly decoding transport representations and
 /// makes conversions at JSON and filesystem boundaries explicit.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, ToSchema)]
+#[schema(value_type = String)]
 pub struct TonPublicKey([u8; 32]);
 
 impl TonPublicKey {
@@ -440,6 +442,15 @@ impl TonPublicKey {
         encoded[..4].copy_from_slice(&ED25519_PUBLIC_KEY_TL_CONSTRUCTOR);
         encoded[4..].copy_from_slice(&self.0);
         encoded
+    }
+
+    /// Encodes the complete TL artifact for official tools that consume a public-key token.
+    ///
+    /// TON JSON stores the raw 32-byte key, while validator election Fift scripts
+    /// expect the constructor-prefixed 36-byte value. Keeping both encodings on
+    /// this type prevents workflow state from storing either transport representation.
+    pub fn to_tl_base64(self) -> String {
+        BASE64.encode(self.to_tl_bytes())
     }
 
     /// Computes the identifier used by TON keyrings and console commands.

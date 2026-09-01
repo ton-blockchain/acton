@@ -14,11 +14,11 @@ use tracing::info;
 use crate::{
     binaries::TonBinaries,
     cli::{BootstrapArgs, StatusArgs},
-    http,
+    http, node,
     runtime::{self, ProcessRegistry},
-    storage::Settings,
     storage::{Layout, Manifest},
-    storage::{NodeRuntime, RuntimeState, ServiceRuntime},
+    storage::{NodeRole, Settings},
+    storage::{RuntimeState, ServiceRuntime},
     ton::{
         accounts::parse_imported_accounts,
         global_config::GlobalConfigFile,
@@ -27,7 +27,7 @@ use crate::{
     },
 };
 
-use super::{NodeController, acquire_lock, files::absolute_path, genesis, nodes, readiness};
+use super::{acquire_lock, dht, files::absolute_path, genesis, readiness};
 
 /// Owns the complete lifecycle of one bootstrap invocation.
 ///
@@ -60,7 +60,7 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
 
     let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
     let dht_database = DhtDatabase::open(layout.dht_db.clone())?;
-    let validator_database = ValidatorDatabase::open(layout.validator_db.clone())?;
+    let genesis = &settings.node;
 
     let masterchain_readiness = if state_exists {
         readiness::MasterchainReadiness::HeadAvailable
@@ -79,17 +79,29 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
     // Every process-start error, signal, or required-child exit converges on the
     // cleanup below instead of escaping through `?` with live processes.
     let result = async {
-        nodes::start_core(
+        info!("starting local DHT and genesis validator-engine");
+        let dht_runtime = dht::start(
             &layout,
-            &tools,
-            &settings,
+            tools.dht_server.as_ref(),
+            genesis,
             dht_database,
-            validator_database,
+            timeout,
+            &processes,
+        )
+        .await?;
+        let genesis_layout = layout.genesis_node();
+        let genesis_runtime = node::start(
+            &layout,
+            &genesis_layout,
+            &tools,
+            genesis,
+            timeout,
             &processes,
         )
         .await?;
 
-        record_core_processes(&mut runtime, &processes, &manifest).await;
+        runtime.services.insert("dht".to_owned(), dht_runtime);
+        runtime.node = genesis_runtime;
         runtime.save_atomic(&layout.runtime)?;
 
         let masterchain_seqno = readiness::wait_for_masterchain(
@@ -112,9 +124,14 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         )
         .await?;
 
-        let control =
-            NodeController::new(layout.clone(), tools.clone(), timeout, processes.clone());
-        let services = http::start(control, &settings, args.ton_http_api_bind).await?;
+        let services = http::start(
+            &layout,
+            &tools,
+            &processes,
+            &settings,
+            args.ton_http_api_bind,
+        )
+        .await?;
 
         if let Err(error) = mark_network_ready(&layout, &mut runtime, &services, masterchain_seqno)
         {
@@ -154,13 +171,10 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
 /// for this run, not properties of the blockchain itself.
 fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     let mut settings = Settings::load_or_create(&layout.settings)?;
-    let genesis = settings
-        .nodes
-        .first()
-        .context("bootstrap settings contain no genesis node")?;
+    let genesis = &settings.node;
     ensure!(
-        genesis.name == "genesis" && genesis.enabled && genesis.validator,
-        "bootstrap settings must start with an enabled genesis validator"
+        genesis.role == NodeRole::Genesis && genesis.enabled && genesis.validator,
+        "bootstrap settings must contain an enabled genesis validator"
     );
 
     if let Some(block_time_ms) = args.block_time {
@@ -190,7 +204,7 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     }
 
     if let Some(advertise_ip) = args.advertise_ip {
-        let genesis = settings.node_mut("genesis")?;
+        let genesis = &mut settings.node;
         if layout.manifest.is_file() {
             ensure!(
                 genesis.public_ip == advertise_ip,
@@ -259,44 +273,6 @@ fn mark_network_ready(
     runtime.save_atomic(&layout.runtime)
 }
 
-/// Maps core child processes into the public runtime-state model.
-///
-/// DHT is infrastructure and is therefore represented as a service. Each
-/// validator-engine process is a blockchain node. Status and admin APIs rely on
-/// this distinction even though both kinds share the same process registry.
-async fn record_core_processes(
-    runtime: &mut RuntimeState,
-    processes: &ProcessRegistry,
-    manifest: &Manifest,
-) {
-    for process in processes.info().await {
-        if process.name == "dht" {
-            runtime.services.insert(
-                "dht".to_owned(),
-                ServiceRuntime {
-                    running: true,
-                    pid: process.pid,
-                    endpoint: None,
-                    last_error: None,
-                },
-            );
-        } else {
-            let mut node = NodeRuntime {
-                initialized: true,
-                running: true,
-                pid: process.pid,
-                status: "running".to_owned(),
-                ..NodeRuntime::default()
-            };
-            if process.name == "genesis" {
-                node.liteserver_public_key = Some(manifest.liteserver_public_key.to_base64());
-                node.remember_validator_public_key(manifest.validator_public_key.to_base64());
-            }
-            runtime.nodes.insert(process.name, node);
-        }
-    }
-}
-
 /// Atomically clears instance and child readiness after every exit path.
 fn mark_instance_stopped(layout: &Layout) -> Result<()> {
     RuntimeState::update_atomic(&layout.runtime, |runtime| {
@@ -329,7 +305,7 @@ fn print_connection_details(
             global_config.path().display()
         )
     })?;
-    let genesis = settings.node("genesis")?;
+    let genesis = &settings.node;
     println!(
         "Liteserver endpoint: {}:{}",
         genesis.public_ip, genesis.liteserver_port

@@ -1,4 +1,4 @@
-//! Validator-engine initialization, configuration, and console operations.
+//! Validator-engine identity configuration and process operations.
 //!
 //! Each local validator has an engine database, an ADNL identity, a control
 //! console, and optionally a liteserver. This module supplies typed engine and
@@ -18,8 +18,7 @@ use tracing::{info, warn};
 
 use crate::{
     runtime::ServiceHandle,
-    storage::Layout,
-    storage::NodeSettings,
+    storage::{NodeLayout, NodeSettings},
     ton::tools::{
         types::{AdnlEndpoint, GeneratedKey, KeyId, OperationContext},
         validator_console::{
@@ -42,28 +41,34 @@ const IMPORT_RETRY_LIMIT: usize = 3;
 const RETRY_DELAY: Duration = Duration::from_millis(500);
 const READINESS_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
+/// Durable ADNL identities selected while the genesis engine is configured.
+pub(crate) struct GenesisNodeIdentity {
+    pub(crate) full_node_adnl: KeyId,
+    pub(crate) validator_adnl: KeyId,
+}
+
 /// Registers the identities that let the genesis validator produce blocks.
 ///
 /// The workflow owns ordering, bounded retries, and temporary-engine lifecycle.
 /// Each individual key or address mutation crosses the typed console boundary
 /// exactly once per attempt. This avoids retrying non-idempotent `new_key` while
 /// retaining recovery for mutations that can race a keyring reload.
-pub(super) async fn configure_genesis_identity(
-    layout: &Layout,
+pub(crate) async fn configure_genesis_identity(
+    node_layout: &NodeLayout,
     engine: &dyn ValidatorEngine,
     console: &dyn ValidatorConsole,
     node: &NodeSettings,
     validator: &GeneratedKey,
     context: &OperationContext,
-) -> Result<()> {
+) -> Result<GenesisNodeIdentity> {
     let started = std::time::Instant::now();
     workflow_stage(node, "configure_genesis_identity", "starting", "pending");
-    let endpoint = console_endpoint(layout, node);
+    let endpoint = console_endpoint(node_layout, node);
     let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
     let validator_key = validator.id;
-    let mut temporary = start_bootstrap(layout, engine, node).await?;
+    let mut temporary = start_bootstrap(node_layout, engine, node).await?;
     let result = async {
-        wait_for_console(layout, console, node, &mut temporary, context).await?;
+        wait_for_console(node_layout, console, node, &mut temporary, context).await?;
 
         // Key creation is non-idempotent: a failed response must be surfaced rather
         // than hidden by a retry that silently creates a different identity.
@@ -161,7 +166,7 @@ pub(super) async fn configure_genesis_identity(
         // after `changefullnodeaddr`. The process itself may still terminate with
         // the associated ADNL unsubscribe error, so the workflow probes it and
         // owns the required restart before importing the permanent private key.
-        if wait_for_console(layout, console, node, &mut temporary, context)
+        if wait_for_console(node_layout, console, node, &mut temporary, context)
             .await
             .is_err()
         {
@@ -176,12 +181,12 @@ pub(super) async fn configure_genesis_identity(
                 "temporary validator stopped after changing its full-node identity"
             );
             temporary.stop().await?;
-            temporary = start_bootstrap(layout, engine, node).await?;
-            wait_for_console(layout, console, node, &mut temporary, context).await?;
+            temporary = start_bootstrap(node_layout, engine, node).await?;
+            wait_for_console(node_layout, console, node, &mut temporary, context).await?;
         }
 
         import_validator_key(
-            layout,
+            node_layout,
             engine,
             console,
             node,
@@ -189,7 +194,12 @@ pub(super) async fn configure_genesis_identity(
             context,
             &mut temporary,
         )
-        .await
+        .await?;
+
+        Ok(GenesisNodeIdentity {
+            full_node_adnl: node_key,
+            validator_adnl,
+        })
     }
     .await;
     temporary.stop().await?;
@@ -203,7 +213,7 @@ pub(super) async fn configure_genesis_identity(
 /// the release-specific successful disconnect caused by selecting the identity;
 /// this workflow retains bounded mutation retries without retrying key creation.
 pub(super) async fn configure_full_node_identity(
-    layout: &Layout,
+    node_layout: &NodeLayout,
     engine: &dyn ValidatorEngine,
     console: &dyn ValidatorConsole,
     node: &NodeSettings,
@@ -211,12 +221,12 @@ pub(super) async fn configure_full_node_identity(
 ) -> Result<KeyId> {
     let started = std::time::Instant::now();
     workflow_stage(node, "configure_full_node_identity", "starting", "pending");
-    let endpoint = console_endpoint(layout, node);
+    let endpoint = console_endpoint(node_layout, node);
     let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
-    let mut temporary = start_bootstrap(layout, engine, node).await?;
+    let mut temporary = start_bootstrap(node_layout, engine, node).await?;
 
     let result = async {
-        wait_for_console(layout, console, node, &mut temporary, context).await?;
+        wait_for_console(node_layout, console, node, &mut temporary, context).await?;
 
         // Key creation is deliberately outside the retry helpers because `new_key`
         // is not idempotent and a retry would silently select another identity.
@@ -261,20 +271,19 @@ pub(super) async fn configure_full_node_identity(
 /// Starts one initialized node with its persisted synchronization and retention
 /// policy.
 ///
-/// Success means only that the service was spawned. The bootstrap workflow remains
-/// responsible for registry ownership, console readiness, synchronization, and
-/// shutdown.
+/// Success means only that the service was spawned. The shared node lifecycle
+/// remains responsible for registry ownership and console readiness; its caller
+/// owns synchronization state and instance shutdown.
 pub(super) async fn start_persistent(
-    layout: &Layout,
+    node_layout: &NodeLayout,
     engine: &dyn ValidatorEngine,
     node: &NodeSettings,
     database: ValidatorDatabase,
 ) -> Result<ServiceHandle> {
-    let node_layout = layout.node(node);
     engine
         .start_persistent(ValidatorStartRequest {
             node_name: node.name.clone(),
-            global_config: node_layout.global_config,
+            global_config: node_layout.global_config.clone(),
             database,
             logs: ValidatorLogPaths {
                 engine: node_layout.logs.join("validator-engine"),
@@ -303,7 +312,7 @@ pub(super) async fn start_persistent(
 /// waits for authenticated readiness, and then retries the same intended import.
 /// Neither the key path nor any command text is emitted in workflow telemetry.
 async fn import_validator_key(
-    layout: &Layout,
+    node_layout: &NodeLayout,
     engine: &dyn ValidatorEngine,
     console: &dyn ValidatorConsole,
     node: &NodeSettings,
@@ -311,11 +320,9 @@ async fn import_validator_key(
     context: &OperationContext,
     temporary: &mut ServiceHandle,
 ) -> Result<()> {
-    let endpoint = console_endpoint(layout, node);
+    let endpoint = console_endpoint(node_layout, node);
     let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
-    let private_key = layout
-        .validator_keyring
-        .join(validator.id.to_keyring_filename());
+    let private_key = node_layout.keyring.join(validator.id.to_keyring_filename());
     let mut last_error = None;
     for attempt in 1..=IMPORT_RETRY_LIMIT {
         workflow_retry(
@@ -361,8 +368,8 @@ async fn import_validator_key(
                 );
                 last_error = Some(error);
                 temporary.stop().await?;
-                *temporary = start_bootstrap(layout, engine, node).await?;
-                wait_for_console(layout, console, node, temporary, context).await?;
+                *temporary = start_bootstrap(node_layout, engine, node).await?;
+                wait_for_console(node_layout, console, node, temporary, context).await?;
             }
         }
     }
@@ -378,13 +385,13 @@ async fn import_validator_key(
 /// adding ten seconds while the authenticated health request still proves that
 /// the expected control key, not merely an unrelated listener, is available.
 pub(super) async fn wait_for_console(
-    layout: &Layout,
+    node_layout: &NodeLayout,
     console: &dyn ValidatorConsole,
     node: &NodeSettings,
     process: &mut ServiceHandle,
     context: &OperationContext,
 ) -> Result<()> {
-    let endpoint = console_endpoint(layout, node);
+    let endpoint = console_endpoint(node_layout, node);
     let deadline = tokio::time::Instant::now() + context.timeout;
     let mut next_progress_log = tokio::time::Instant::now();
     let mut last_probe_error = None;
@@ -518,16 +525,15 @@ pub(super) async fn wait_for_console(
 /// Starts a temporary engine without taking ownership of its readiness or restart
 /// policy away from this workflow.
 async fn start_bootstrap(
-    layout: &Layout,
+    node_layout: &NodeLayout,
     engine: &dyn ValidatorEngine,
     node: &NodeSettings,
 ) -> Result<ServiceHandle> {
-    let node_layout = layout.node(node);
     engine
         .start_bootstrap(ValidatorBootstrapRequest {
             node_name: node.name.clone(),
-            global_config: node_layout.global_config,
-            database: ValidatorDatabase::at(node_layout.db),
+            global_config: node_layout.global_config.clone(),
+            database: ValidatorDatabase::at(node_layout.db.clone()),
             logs: ValidatorLogPaths {
                 engine: node_layout.logs.join("validator-init"),
                 stdout: node_layout.logs.join("validator-bootstrap.stdout.log"),
@@ -542,11 +548,9 @@ async fn start_bootstrap(
 
 /// Derives the authenticated loopback endpoint from Localton-owned node paths.
 ///
-/// The console never advertises the node's public address: bootstrap control is a
-/// local administrative channel authenticated by the generated client/server key
-/// pair.
-fn console_endpoint(layout: &Layout, node: &NodeSettings) -> ValidatorConsoleEndpoint {
-    let node_layout = layout.node(node);
+/// The console never advertises the node's public address: node control is a local
+/// administrative channel authenticated by the generated client/server key pair.
+fn console_endpoint(node_layout: &NodeLayout, node: &NodeSettings) -> ValidatorConsoleEndpoint {
     ValidatorConsoleEndpoint {
         address: (Ipv4Addr::LOCALHOST, node.console_port).into(),
         client_private_key: node_layout.client_private_key(),

@@ -18,7 +18,7 @@ use tracing::{info, warn};
 
 use crate::{
     runtime::{ManagedProcess, ServiceHandle, run_checked},
-    storage::{Layout, NodeSettings},
+    storage::{NodeLayout, NodeSettings},
 };
 
 use super::{
@@ -80,9 +80,14 @@ impl ValidatorDatabase {
         node: &NodeSettings,
         control_server: KeyId,
         control_client: KeyId,
-        liteserver: KeyId,
+        liteserver: Option<KeyId>,
     ) -> Result<()> {
-        for id in std::iter::once(control_server).chain(node.liteserver.then_some(liteserver)) {
+        ensure!(
+            node.liteserver == liteserver.is_some(),
+            "node `{}` liteserver key does not match its service settings",
+            node.name
+        );
+        for id in std::iter::once(control_server).chain(liteserver) {
             let path = self.private_key_path(id);
             ensure!(
                 path.is_file(),
@@ -95,8 +100,7 @@ impl ValidatorDatabase {
             node.console_port,
             control_server,
             control_client,
-            node.liteserver
-                .then_some((node.liteserver_port, liteserver)),
+            liteserver.map(|id| (node.liteserver_port, id)),
         );
         config.save(&self.config)
     }
@@ -131,11 +135,10 @@ impl ValidatorInitializeRequest {
     /// Centralizing path conventions here keeps bootstrap focused on operation
     /// order and prevents genesis and follower nodes from constructing different
     /// validator-engine command inputs.
-    pub fn for_node(layout: &Layout, node: &NodeSettings) -> Self {
-        let node_layout = layout.node(node);
+    pub fn for_node(node_layout: &NodeLayout, node: &NodeSettings) -> Self {
         Self {
-            global_config: node_layout.global_config,
-            database: node_layout.db,
+            global_config: node_layout.global_config.clone(),
+            database: node_layout.db.clone(),
             log_path: node_layout.logs.join("validator-init"),
             endpoint: AdnlEndpoint::new(node.public_ip, node.adnl_port),
             out_port: node.out_port,

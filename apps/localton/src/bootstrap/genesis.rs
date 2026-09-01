@@ -11,20 +11,18 @@ use anyhow::{Context, Result};
 use tracing::info;
 
 use crate::{
+    node,
     storage::Settings,
-    storage::{Layout, Manifest, SCHEMA_VERSION, TON_RELEASE, write_json_atomic},
+    storage::{Layout, Manifest, NodeManifest, SCHEMA_VERSION, TON_RELEASE},
     ton::accounts::ImportedAccount,
     ton::{
         global_config::GlobalConfig,
         toolchain::Toolchain,
-        tools::{
-            random_id::GenerateKeyRequest, types::OperationContext,
-            validator_engine::ValidatorInitializeRequest,
-        },
+        tools::{random_id::GenerateKeyRequest, types::OperationContext},
     },
 };
 
-use super::{dht, files::copy_tree, validator, zerostate};
+use super::{dht, files::copy_tree, zerostate};
 
 /// Creates every persistent artifact that defines a new local TON network.
 ///
@@ -40,9 +38,8 @@ pub(super) async fn initialize(
     startup_timeout: Duration,
 ) -> Result<Manifest> {
     info!("initializing a new local TON genesis");
-    let genesis = settings
-        .node("genesis")
-        .context("settings contain no genesis node")?;
+    let genesis = &settings.node;
+    let node_layout = layout.genesis_node();
     let context = OperationContext::for_node(startup_timeout, &genesis.name);
 
     // Step 1: discard only output from an interrupted bootstrap, then copy the
@@ -81,28 +78,13 @@ pub(super) async fn initialize(
     )
     .await?;
 
-    // Step 3: create three separate authentication roles.
-    // `server` identifies validator-engine's control endpoint, `client` is
-    // allowed to administer that endpoint, and `liteserver` is the public key
-    // applications use to authenticate lite-protocol responses.
-    let server = tools
-        .random_id
-        .generate_key(
-            &context,
-            GenerateKeyRequest::control_server(&layout.certs, &layout.validator_keyring),
-        )
-        .await?;
-    let client = tools
-        .random_id
-        .generate_key(&context, GenerateKeyRequest::control_client(&layout.certs))
-        .await?;
-    let liteserver = tools
-        .random_id
-        .generate_key(
-            &context,
-            GenerateKeyRequest::liteserver(&layout.validator_keyring),
-        )
-        .await?;
+    // Step 3: create independent control and liteserver authentication roles
+    // through the same node lifecycle used by followers.
+    let service_keys = node::generate_service_keys(&node_layout, tools, genesis, &context).await?;
+    let liteserver = service_keys
+        .liteserver
+        .as_ref()
+        .context("genesis node must expose a liteserver")?;
 
     // Step 4: break the DHT/global-config dependency cycle in two passes.
     // dht-server needs a global config to initialize its database, but the final
@@ -115,7 +97,7 @@ pub(super) async fn initialize(
         genesis.liteserver_port,
         liteserver.public_key,
     );
-    write_json_atomic(&layout.global_config, &preliminary)?;
+    preliminary.save_atomic(&layout.global_config)?;
 
     let initialized_dht = dht::initialize_dht(
         layout,
@@ -133,31 +115,22 @@ pub(super) async fn initialize(
         genesis.liteserver_port,
         liteserver.public_key,
     );
-    write_json_atomic(&layout.global_config, &global)?;
-
-    fs::copy(
-        &layout.global_config,
-        layout.validator_db.join("global.config.json"),
-    )?;
+    global.save_atomic(&layout.global_config)?;
 
     // Step 5: let validator-engine create its database and generated config,
     // patch in local control/liteserver endpoints, then use the live console to
     // register permanent validator and ADNL identities in the engine keyring.
-    let validator_database = tools
-        .validator_engine
-        .initialize(
-            &context,
-            ValidatorInitializeRequest::for_node(layout, genesis),
-        )
-        .await?;
-    validator_database.install_control_and_liteserver(
-        genesis,
-        server.id,
-        client.id,
-        liteserver.id,
-    )?;
-    validator::configure_genesis_identity(
+    node::initialize_database(
         layout,
+        &node_layout,
+        tools,
+        genesis,
+        &service_keys,
+        &context,
+    )
+    .await?;
+    let identity = node::configure_genesis_identity(
+        &node_layout,
         tools.validator_engine.as_ref(),
         tools.validator_console_tool.as_ref(),
         genesis,
@@ -165,6 +138,19 @@ pub(super) async fn initialize(
         &context,
     )
     .await?;
+
+    // The node marker is committed only after every engine-owned identity is
+    // configured. The outer network manifest below remains bootstrap's final
+    // all-or-nothing boundary.
+    NodeManifest::new(
+        &genesis.name,
+        service_keys.server.public_key,
+        Some(liteserver.public_key),
+        identity.full_node_adnl,
+        Some(validator_key.public_key),
+        Some(identity.validator_adnl),
+    )
+    .save_atomic(&node_layout.manifest)?;
 
     // Step 6: commit bootstrap by saving immutable network identity.
     // Future runs use this manifest to reuse exactly the same zerostate, keys,

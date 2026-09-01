@@ -14,7 +14,7 @@ use crate::{
     binaries::TonBinaries,
     runtime::{CommandOutput, run_checked},
     storage::{Layout, Manifest},
-    storage::{NodeSettings, Settings},
+    storage::{NodeLayout, NodeSettings, Settings},
     ton::tools::{
         create_state::{CreateState, OfficialCreateState},
         dht_server::{DhtServer, OfficialDhtServer},
@@ -134,9 +134,9 @@ impl Toolchain {
     /// node-specific client private key and server public key
     pub(crate) fn validator_console_endpoint(
         &self,
+        layout: &NodeLayout,
         node: &NodeSettings,
     ) -> ValidatorConsoleEndpoint {
-        let layout = self.layout.node(node);
         ValidatorConsoleEndpoint {
             address: (Ipv4Addr::LOCALHOST, node.console_port).into(),
             client_private_key: layout.client_private_key(),

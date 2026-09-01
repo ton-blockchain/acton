@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::{storage::NodeSettings, ton::tools::types::TonPublicKey};
+use crate::ton::tools::types::TonPublicKey;
 
 pub const SCHEMA_VERSION: u32 = 3;
 pub const TON_RELEASE: &str = "v2026.06";
@@ -33,7 +33,6 @@ pub struct Layout {
     pub settings: PathBuf,
     pub runtime: PathBuf,
     pub wallets: PathBuf,
-    pub nodes: PathBuf,
     pub lock: PathBuf,
     pub logs: PathBuf,
 }
@@ -54,7 +53,6 @@ impl Layout {
             settings: root.join("settings.json"),
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
-            nodes: root.join("nodes"),
             lock: root.join("instance.lock"),
             logs: root.join("logs"),
             validator_db,
@@ -77,7 +75,6 @@ impl Layout {
             &self.zerostate,
             &self.logs,
             &self.wallets,
-            &self.nodes,
         ] {
             fs::create_dir_all(path)
                 .with_context(|| format!("failed to create {}", path.display()))?;
@@ -85,26 +82,30 @@ impl Layout {
         Ok(())
     }
 
-    pub fn node(&self, settings: &NodeSettings) -> NodeLayout {
-        if settings.name == "genesis" {
-            NodeLayout {
-                root: self.genesis.clone(),
-                db: self.validator_db.clone(),
-                keyring: self.validator_keyring.clone(),
-                certs: self.certs.clone(),
-                logs: self.logs.clone(),
-                global_config: self.global_config.clone(),
-            }
-        } else {
-            let root = self.nodes.join(&settings.name);
-            NodeLayout {
-                db: root.join("db"),
-                keyring: root.join("db/keyring"),
-                certs: root.join("certs"),
-                logs: self.logs.join(&settings.name),
-                global_config: root.join("global.config.json"),
-                root,
-            }
+    /// Returns paths for the validator that creates and anchors a local network.
+    pub fn genesis_node(&self) -> NodeLayout {
+        NodeLayout {
+            root: self.genesis.clone(),
+            db: self.validator_db.clone(),
+            keyring: self.validator_keyring.clone(),
+            certs: self.certs.clone(),
+            logs: self.logs.clone(),
+            global_config: self.global_config.clone(),
+            manifest: self.genesis.join("node-manifest.json"),
+        }
+    }
+
+    /// Returns isolated paths for the one remote-network node owned by a join state.
+    pub fn joined_node(&self) -> NodeLayout {
+        let root = self.root.join("node");
+        NodeLayout {
+            db: root.join("db"),
+            keyring: root.join("db/keyring"),
+            certs: root.join("certs"),
+            logs: self.logs.clone(),
+            global_config: root.join("global.config.json"),
+            manifest: root.join("node-manifest.json"),
+            root,
         }
     }
 }
@@ -118,6 +119,8 @@ pub struct NodeLayout {
     pub certs: PathBuf,
     pub logs: PathBuf,
     pub global_config: PathBuf,
+    /// Commit marker written only after the database and durable identities are complete
+    pub manifest: PathBuf,
 }
 
 impl NodeLayout {

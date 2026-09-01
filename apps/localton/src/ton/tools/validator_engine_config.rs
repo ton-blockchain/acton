@@ -111,11 +111,6 @@ impl ValidatorEngineConfig {
             .transpose()
     }
 
-    /// Returns the ADNL identifier used by the engine's full-node role.
-    pub(crate) const fn fullnode_adnl(&self) -> KeyId {
-        self.fullnode
-    }
-
     /// Lists identities for which this engine must own private keyring files.
     ///
     /// Control clients and remote full nodes are intentionally excluded: their

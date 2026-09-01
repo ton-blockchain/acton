@@ -10,7 +10,7 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
-- The bootstrap instance owns genesis; each joining instance owns only its host-local nodes and private keys.
+- The bootstrap instance owns genesis; each joining instance owns one host-local node and its private keys.
 - A node joins the network from public bootstrap data and can enter elections independently.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
@@ -236,11 +236,10 @@ Allow TCP port `18000` while the second host downloads the config or uses the de
 Inspect the follower state from the second host:
 
 ```bash
-localton node list --state-dir .localton-node2
-localton node stats --state-dir .localton-node2 node-abc123
+localton node stats --state-dir .localton-node2
 ```
 
-Keep the joining instance active while the follower runs. `Ctrl-C` or `SIGTERM` stops every validator-engine process owned by that instance. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
+Keep the joining instance active while the follower runs. `Ctrl-C` or `SIGTERM` stops its validator-engine process. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
 
 ## Native ports
 
@@ -327,7 +326,7 @@ localton join http://127.0.0.1:18000/config \
 ```
 
 On its first run, a joining instance reserves one contiguous range containing five
-ports per node. It starts at port `19000` and advances one port at a time until the
+ports for its node. It starts at port `19000` and advances one port at a time until the
 complete range is available. Use `--port-base` to choose the first candidate:
 
 ```bash
@@ -339,7 +338,7 @@ localton join http://127.0.0.1:18000/config \
 ```
 
 The allocation is saved in the joining instance's `settings.json`. Restarts reuse those exact
-ports and never move a node because another process temporarily occupies one.
+ports and never move the node because another process temporarily occupies one.
 
 ## Import accounts into the zerostate
 
@@ -446,11 +445,10 @@ The request returns after API V2 finds the transfer transaction. Therefore, the 
 
 ## Nodes and validators
 
-List or inspect nodes owned by one Localton state directory:
+Inspect the node owned by the current Localton state directory:
 
 ```bash
-localton node list
-localton node stats node-abc123 --state-dir .localton-validator-a
+localton node stats --state-dir .localton-validator-a
 ```
 
 Create every additional full node through `join`. Add `--validator` when the
@@ -481,15 +479,8 @@ Disabling validator mode does not remove the node from the active validator set.
 Submit an election request or recover an unfrozen stake:
 
 ```bash
-localton validator participate genesis
-localton validator reap genesis
-```
-
-Process all enabled validators:
-
-```bash
-localton validator participate-all
-localton validator reap-all
+localton validator participate
+localton validator reap
 ```
 
 Validators with election participation enabled automatically create election keys and submit stakes. Every Localton instance reloads this mode from `settings.json` on every poll, so mode changes do not require a restart. They also recover available stakes and rewards.
@@ -502,11 +493,10 @@ Create a hardfork configuration from the latest block of the genesis node:
 localton hardfork
 ```
 
-Select another source node or include an external message:
+Include an external message and select the output path:
 
 ```bash
 localton hardfork \
-  --node node2 \
   --external-message ./message.boc \
   --output ./hardfork.global.config.json
 ```

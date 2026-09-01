@@ -22,10 +22,10 @@ use tracing::info;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    bootstrap::NodeController,
     operations::wallets,
-    storage::{RuntimeState, Settings},
+    storage::{Layout, RuntimeState, Settings},
     ton::global_config::GlobalConfig,
+    ton::toolchain::Toolchain,
 };
 
 use super::{
@@ -111,13 +111,15 @@ struct DevelopmentFaucetResponse {
 
 #[derive(Clone)]
 struct ConfigState {
-    control: NodeController,
+    layout: Layout,
+    toolchain: Toolchain,
     settings: Settings,
     faucet_lock: Arc<Mutex<()>>,
 }
 
 pub(super) async fn start(
-    control: NodeController,
+    layout: Layout,
+    toolchain: Toolchain,
     settings: Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -134,7 +136,8 @@ pub(super) async fn start(
         .route("/live", get(live_handler))
         .route("/healthz", get(healthz_handler))
         .with_state(ConfigState {
-            control,
+            layout,
+            toolchain,
             settings,
             faucet_lock: Arc::new(Mutex::new(())),
         });
@@ -172,7 +175,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     )
 )]
 async fn root_handler(State(state): State<ConfigState>) -> Result<Json<ConfigDocument>, HttpError> {
-    let runtime = RuntimeState::load(&state.control.layout().runtime)?;
+    let runtime = RuntimeState::load(&state.layout.runtime)?;
     Ok(Json(root_document(&state.settings, &runtime)))
 }
 
@@ -259,7 +262,7 @@ async fn global_config_handler(
 }
 
 async fn read_global_config(state: &ConfigState) -> Result<Json<GlobalConfig>, HttpError> {
-    let bytes = tokio::fs::read(&state.control.layout().global_config)
+    let bytes = tokio::fs::read(&state.layout.global_config)
         .await
         .context("failed to read global config")?;
     Ok(Json(GlobalConfig::from_json_bytes(&bytes)?))
@@ -284,16 +287,10 @@ async fn development_faucet_handler(
     Json(request): Json<DevelopmentFaucetRequest>,
 ) -> Result<Json<DevelopmentFaucetResponse>, HttpError> {
     let _guard = state.faucet_lock.lock().await;
-    let amount_nano = state
-        .settings
-        .nodes
-        .iter()
-        .map(|node| node.initial_wallet_amount_nano)
-        .max()
-        .context("network has no node wallet grant configured")?;
+    let amount_nano = state.settings.node.initial_wallet_amount_nano;
     let amount = wallets::format_nano_grams(u128::from(amount_nano));
     let status = wallets::send(
-        &state.control.toolchain(),
+        &state.toolchain,
         wallets::SendRequest {
             from: "faucet",
             to: &request.address,
@@ -348,7 +345,7 @@ async fn healthz_handler(State(state): State<ConfigState>) -> Response {
 }
 
 async fn live_response(state: &ConfigState) -> Response {
-    match RuntimeState::load(&state.control.layout().runtime) {
+    match RuntimeState::load(&state.layout.runtime) {
         Ok(runtime) if runtime.ready && runtime.instance_pid.is_some() => {
             (StatusCode::OK, "OK").into_response()
         }

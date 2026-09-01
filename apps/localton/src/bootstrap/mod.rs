@@ -11,17 +11,13 @@ use std::{fs::File, path::Path};
 use anyhow::{Context, Result};
 use fs2::FileExt;
 
-mod control;
 mod dht;
 mod files;
 mod genesis;
-mod nodes;
 mod pipeline;
 mod readiness;
-mod validator;
 mod zerostate;
 
-pub use control::NodeController;
 pub use pipeline::{run, status};
 pub(crate) use readiness::{shutdown_signal, supervise};
 

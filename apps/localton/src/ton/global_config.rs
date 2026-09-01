@@ -15,6 +15,8 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::storage::write_json_atomic;
+
 use super::tools::types::{
     DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId, is_public_ipv4,
 };
@@ -36,10 +38,7 @@ impl GlobalConfigFile {
     /// Opens the final network config used by persistent TON processes.
     pub(crate) fn open(path: impl Into<PathBuf>) -> Result<Self> {
         let path = path.into();
-        let bytes = fs::read(&path)
-            .with_context(|| format!("failed to read global config {}", path.display()))?;
-
-        GlobalConfig::from_json_bytes(&bytes)?.validate_for_node_join()?;
+        GlobalConfig::load(&path)?.validate_for_node_join()?;
         Ok(Self { path })
     }
 
@@ -61,6 +60,20 @@ pub(crate) struct GlobalConfig {
 }
 
 impl GlobalConfig {
+    /// Reads one typed global config while preserving the source path in diagnostics.
+    pub(crate) fn load(path: &Path) -> Result<Self> {
+        let bytes = fs::read(path)
+            .with_context(|| format!("failed to read global config {}", path.display()))?;
+        Self::from_json_bytes(&bytes)
+            .with_context(|| format!("invalid global config {}", path.display()))
+    }
+
+    /// Atomically persists a typed config so readers never observe a partial JSON file.
+    pub(crate) fn save_atomic(&self, path: &Path) -> Result<()> {
+        write_json_atomic(path, self)
+            .with_context(|| format!("failed to save global config {}", path.display()))
+    }
+
     /// Builds the single-liteserver config that defines a fresh Localton network.
     ///
     /// The zerostate is also the initial block until validator-engine produces the
@@ -134,8 +147,9 @@ impl GlobalConfig {
     ///
     /// DHT and validator sections remain untouched, so the node still joins the
     /// exact network described by the downloaded config.
-    pub(crate) fn use_local_liteserver(&mut self, port: u16, public_key: TonPublicKey) {
+    pub(crate) fn with_local_liteserver(mut self, port: u16, public_key: TonPublicKey) -> Self {
         self.liteservers = vec![LiteserverConfig::new(Ipv4Addr::LOCALHOST, port, public_key)];
+        self
     }
 }
 

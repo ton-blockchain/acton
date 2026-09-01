@@ -13,18 +13,18 @@ use crate::storage::{
     DHT_PORT, LITESERVER_PORT, OUT_PORT, VALIDATOR_ADNL_PORT, VALIDATOR_CONSOLE_PORT,
 };
 
-pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
+pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
 
 /// Persistent settings for one Full localnet
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct Settings {
     /// Version of this settings format
     pub schema_version: u32,
     /// TON network parameters
     pub network: NetworkSettings,
-    /// Configured TON nodes
-    pub nodes: Vec<NodeSettings>,
+    /// TON node owned by this state directory
+    pub node: NodeSettings,
     /// Localton HTTP services
     pub services: ServiceSettings,
     /// Validator automation settings
@@ -38,7 +38,7 @@ impl Default for Settings {
         Self {
             schema_version: SETTINGS_SCHEMA_VERSION,
             network: NetworkSettings::default(),
-            nodes: default_nodes(),
+            node: NodeSettings::genesis(),
             services: ServiceSettings::default(),
             validation: ValidationSettings::default(),
             monitoring: MonitoringSettings::default(),
@@ -47,17 +47,18 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Creates settings for a joining host before its first node is allocated.
+    /// Creates settings for a state directory that owns one joined node.
     ///
     /// Join state does not own genesis or bootstrap HTTP services. Keeping those
-    /// synthetic entries out of the file prevents commands from accidentally
-    /// treating a remote genesis validator as a host-local process.
+    /// services disabled prevents commands from treating a remote bootstrap host
+    /// as locally managed infrastructure.
     #[must_use]
-    pub fn for_join() -> Self {
-        let mut settings = Self::default();
+    pub fn for_join(node: NodeSettings) -> Self {
+        let mut settings = Self {
+            node,
+            ..Self::default()
+        };
 
-        // Join state owns nodes but none of the bootstrap host's HTTP services.
-        settings.nodes.clear();
         settings.services.config_http.enabled = false;
         settings.services.admin_http.enabled = false;
         settings.services.ton_http_api.enabled = false;
@@ -103,45 +104,35 @@ impl Settings {
             self.schema_version,
             SETTINGS_SCHEMA_VERSION
         );
-        ensure!(
-            !self.nodes.is_empty(),
-            "settings must contain at least one node"
-        );
         self.network.validate()?;
         self.services.validate()?;
         self.validation.validate()?;
         self.monitoring.validate()?;
+        self.node.validate()?;
 
-        let mut names = BTreeMap::new();
         let mut tcp_ports = BTreeMap::new();
         let mut udp_ports = BTreeMap::new();
-        for node in &self.nodes {
-            node.validate()?;
-            if names.insert(node.name.clone(), ()).is_some() {
-                bail!("duplicate node name {}", node.name);
+        for (kind, port) in [
+            ("console", self.node.console_port),
+            ("liteserver", self.node.liteserver_port),
+        ] {
+            if tcp_ports
+                .insert(port, format!("{} {kind}", self.node.name))
+                .is_some()
+            {
+                bail!("duplicate TCP port {port}");
             }
-            for (kind, port) in [
-                ("console", node.console_port),
-                ("liteserver", node.liteserver_port),
-            ] {
-                if tcp_ports
-                    .insert(port, format!("{} {kind}", node.name))
-                    .is_some()
-                {
-                    bail!("duplicate TCP port {port}");
-                }
-            }
-            for (kind, port) in [
-                ("ADNL", node.adnl_port),
-                ("out", node.out_port),
-                ("DHT", node.dht_port),
-            ] {
-                if udp_ports
-                    .insert(port, format!("{} {kind}", node.name))
-                    .is_some()
-                {
-                    bail!("duplicate UDP port {port}");
-                }
+        }
+        for (kind, port) in [
+            ("ADNL", self.node.adnl_port),
+            ("out", self.node.out_port),
+            ("DHT", self.node.dht_port),
+        ] {
+            if udp_ports
+                .insert(port, format!("{} {kind}", self.node.name))
+                .is_some()
+            {
+                bail!("duplicate UDP port {port}");
             }
         }
         let mut service_ports = Vec::new();
@@ -170,20 +161,6 @@ impl Settings {
             }
         }
         Ok(())
-    }
-
-    pub fn node(&self, name: &str) -> Result<&NodeSettings> {
-        self.nodes
-            .iter()
-            .find(|node| node.name == name)
-            .with_context(|| format!("unknown node {name}"))
-    }
-
-    pub fn node_mut(&mut self, name: &str) -> Result<&mut NodeSettings> {
-        self.nodes
-            .iter_mut()
-            .find(|node| node.name == name)
-            .with_context(|| format!("unknown node {name}"))
     }
 }
 
@@ -336,6 +313,8 @@ impl NetworkSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct NodeSettings {
+    /// Lifecycle that owns this node and determines its filesystem layout
+    pub role: NodeRole,
     /// Stable node name
     pub name: String,
     /// `true` when Localton starts the node
@@ -379,6 +358,17 @@ pub struct NodeSettings {
     pub participate_in_elections: bool,
 }
 
+/// Filesystem and initialization role of the node owned by one state directory.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeRole {
+    /// Validator that creates and anchors a new local network
+    #[default]
+    Genesis,
+    /// Full node that joins an already existing network
+    Joined,
+}
+
 /// Ports assigned together to one validator-engine process.
 ///
 /// The host allocator deals in this complete type so initialization cannot
@@ -408,6 +398,7 @@ impl NodeSettings {
     #[must_use]
     pub fn genesis() -> Self {
         Self {
+            role: NodeRole::Genesis,
             name: "genesis".to_owned(),
             enabled: true,
             validator: true,
@@ -438,6 +429,7 @@ impl NodeSettings {
     #[must_use]
     pub fn follower(name: String, public_ip: Ipv4Addr, ports: NodePorts) -> Self {
         Self {
+            role: NodeRole::Joined,
             name,
             enabled: true,
             validator: false,
@@ -454,6 +446,16 @@ impl NodeSettings {
     }
 
     fn validate(&self) -> Result<()> {
+        match self.role {
+            NodeRole::Genesis => ensure!(
+                self.name == "genesis",
+                "genesis node must be named `genesis`"
+            ),
+            NodeRole::Joined => ensure!(
+                self.name != "genesis",
+                "joined node cannot be named `genesis`"
+            ),
+        }
         ensure!(
             !self.name.is_empty()
                 && self
@@ -480,10 +482,6 @@ impl NodeSettings {
         );
         Ok(())
     }
-}
-
-fn default_nodes() -> Vec<NodeSettings> {
-    vec![NodeSettings::genesis()]
 }
 
 /// Settings for Localton HTTP services
@@ -698,13 +696,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bootstrap_defaults_contain_only_genesis() {
+    fn bootstrap_defaults_contain_genesis() {
         let settings = Settings::default();
         settings.validate().unwrap();
         assert_eq!(settings.network.global_id, -3);
-        assert_eq!(settings.nodes.len(), 1);
-        assert_eq!(settings.nodes[0].name, "genesis");
-        assert!(settings.nodes[0].participate_in_elections);
+        assert_eq!(settings.node.name, "genesis");
+        assert!(settings.node.participate_in_elections);
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
@@ -750,19 +747,7 @@ mod tests {
     #[test]
     fn duplicate_ports_are_rejected() {
         let mut settings = Settings::default();
-        let mut follower = NodeSettings::follower(
-            "follower".to_owned(),
-            Ipv4Addr::LOCALHOST,
-            NodePorts {
-                console: 20_000,
-                adnl: 20_001,
-                liteserver: 20_002,
-                out: 20_003,
-                dht: 20_004,
-            },
-        );
-        follower.console_port = settings.nodes[0].console_port;
-        settings.nodes.push(follower);
+        settings.services.config_http.port = settings.node.console_port;
         assert!(settings.validate().is_err());
     }
 }

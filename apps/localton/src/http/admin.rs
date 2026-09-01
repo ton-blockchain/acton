@@ -17,10 +17,9 @@ use tracing::info;
 use utoipa::OpenApi;
 
 use crate::{
-    bootstrap::NodeController,
     operations::wallets,
-    runtime::ProcessInfo,
-    storage::{RuntimeState, Settings},
+    runtime::{ProcessInfo, ProcessRegistry},
+    storage::{Layout, RuntimeState, Settings},
 };
 
 use super::{
@@ -58,7 +57,8 @@ struct ApiDoc;
 
 #[derive(Clone)]
 struct AdminState {
-    control: NodeController,
+    layout: Layout,
+    processes: ProcessRegistry,
     faucet: faucet::State,
 }
 
@@ -69,7 +69,8 @@ impl FromRef<AdminState> for faucet::State {
 }
 
 pub(super) async fn start(
-    control: NodeController,
+    layout: Layout,
+    processes: ProcessRegistry,
     settings: &Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -78,9 +79,10 @@ pub(super) async fn start(
         "http://127.0.0.1:{}",
         settings.services.ton_http_api.backend_port
     );
-    let state_dir = control.layout().root.clone();
+    let state_dir = layout.root.clone();
     let state = AdminState {
-        control,
+        layout,
+        processes,
         faucet: faucet::State::new(backend, state_dir),
     };
     let mut app = Router::new()
@@ -134,7 +136,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
 async fn status_handler(
     AxumState(state): AxumState<AdminState>,
 ) -> Result<Json<RuntimeState>, HttpError> {
-    Ok(Json(RuntimeState::load(&state.control.layout().runtime)?))
+    Ok(Json(RuntimeState::load(&state.layout.runtime)?))
 }
 
 /// Get the persistent Full localnet settings
@@ -152,9 +154,7 @@ async fn status_handler(
 async fn settings_handler(
     AxumState(state): AxumState<AdminState>,
 ) -> Result<Json<Settings>, HttpError> {
-    Ok(Json(Settings::load_or_create(
-        &state.control.layout().settings,
-    )?))
+    Ok(Json(Settings::load_or_create(&state.layout.settings)?))
 }
 
 /// List the wallets that Localton manages
@@ -172,7 +172,7 @@ async fn settings_handler(
 async fn wallets_handler(
     AxumState(state): AxumState<AdminState>,
 ) -> Result<Json<Vec<wallets::PublicWallet>>, HttpError> {
-    Ok(Json(wallets::load_public(state.control.layout())?))
+    Ok(Json(wallets::load_public(&state.layout)?))
 }
 
 /// List the child processes that the instance supervises
@@ -185,5 +185,5 @@ async fn wallets_handler(
     responses((status = 200, description = "Supervised child processes", body = [ProcessInfo]))
 )]
 async fn processes_handler(AxumState(state): AxumState<AdminState>) -> Json<Vec<ProcessInfo>> {
-    Json(state.control.process_info().await)
+    Json(state.processes.info().await)
 }

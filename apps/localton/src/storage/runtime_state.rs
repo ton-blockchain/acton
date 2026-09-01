@@ -10,7 +10,9 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub const RUNTIME_SCHEMA_VERSION: u32 = 2;
+use crate::ton::tools::types::{KeyId, TonPublicKey};
+
+pub const RUNTIME_SCHEMA_VERSION: u32 = 3;
 const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
 
 /// Coarse validator-engine stage before its masterchain liteserver is queryable.
@@ -102,8 +104,8 @@ pub struct RuntimeState {
     pub masterchain_seqno: Option<u32>,
     /// Unix time when the observed masterchain seqno last advanced
     pub last_block_at: Option<u64>,
-    /// Runtime state for each configured node
-    pub nodes: BTreeMap<String, NodeRuntime>,
+    /// Runtime state for the node owned by this state directory
+    pub node: NodeRuntime,
     /// Runtime state for each HTTP service
     pub services: BTreeMap<String, ServiceRuntime>,
 }
@@ -117,7 +119,7 @@ impl RuntimeState {
             ready: false,
             masterchain_seqno: None,
             last_block_at: None,
-            nodes: BTreeMap::new(),
+            node: NodeRuntime::default(),
             services: BTreeMap::new(),
         }
     }
@@ -191,11 +193,9 @@ impl RuntimeState {
     pub fn mark_instance_stopped(&mut self) {
         self.instance_pid = None;
         self.ready = false;
-        for node in self.nodes.values_mut() {
-            node.running = false;
-            node.pid = None;
-            node.status = "stopped".to_owned();
-        }
+        self.node.running = false;
+        self.node.pid = None;
+        self.node.status = "stopped".to_owned();
         for service in self.services.values_mut() {
             service.running = false;
             service.pid = None;
@@ -243,16 +243,18 @@ pub struct NodeRuntime {
     /// Unix time when this node last made measurable synchronization progress
     pub sync_progressed_at: Option<u64>,
     /// Public key for the validator console
-    pub console_public_key: Option<String>,
+    pub console_public_key: Option<TonPublicKey>,
     /// Public key for the liteserver
-    pub liteserver_public_key: Option<String>,
+    pub liteserver_public_key: Option<TonPublicKey>,
     /// Public validator key
-    pub validator_public_key: Option<String>,
+    pub validator_public_key: Option<TonPublicKey>,
     /// Public validator keys used across election rounds
     #[serde(default)]
-    pub validator_public_keys: Vec<String>,
+    pub validator_public_keys: Vec<TonPublicKey>,
+    /// ADNL address advertised by the node's full-node role
+    pub full_node_adnl: Option<KeyId>,
     /// Validator ADNL address
-    pub validator_adnl: Option<String>,
+    pub validator_adnl: Option<KeyId>,
     /// Current election identifier
     pub election_id: Option<u32>,
     /// Unix time when the current election ends
@@ -339,7 +341,8 @@ impl NodeRuntime {
         }
     }
 
-    pub fn remember_validator_public_key(&mut self, public_key: String) {
+    /// Retains a validator identity so rewards from earlier election rounds stay attributable.
+    pub fn remember_validator_public_key(&mut self, public_key: TonPublicKey) {
         if !self.validator_public_keys.contains(&public_key) {
             self.validator_public_keys.push(public_key);
             if self.validator_public_keys.len() > MAX_RETAINED_VALIDATOR_KEYS {
@@ -348,11 +351,12 @@ impl NodeRuntime {
         }
     }
 
-    pub fn set_validator_public_key(&mut self, public_key: String) {
-        if let Some(current) = self.validator_public_key.clone() {
+    /// Changes the active validator identity without discarding the previous round's key.
+    pub fn set_validator_public_key(&mut self, public_key: TonPublicKey) {
+        if let Some(current) = self.validator_public_key {
             self.remember_validator_public_key(current);
         }
-        self.remember_validator_public_key(public_key.clone());
+        self.remember_validator_public_key(public_key);
         self.validator_public_key = Some(public_key);
     }
 }
@@ -384,14 +388,8 @@ mod tests {
     #[test]
     fn stop_clears_every_runtime_process() {
         let mut state = RuntimeState::new();
-        state.nodes.insert(
-            "genesis".to_owned(),
-            NodeRuntime {
-                running: true,
-                pid: Some(123),
-                ..NodeRuntime::default()
-            },
-        );
+        state.node.running = true;
+        state.node.pid = Some(123);
         state.services.insert(
             "ton_http_api".to_owned(),
             ServiceRuntime {
@@ -401,7 +399,7 @@ mod tests {
             },
         );
         state.mark_instance_stopped();
-        assert!(!state.nodes["genesis"].running);
+        assert!(!state.node.running);
         assert!(!state.services["ton_http_api"].running);
     }
 
@@ -573,11 +571,11 @@ mod tests {
             let path = path.clone();
             threads.push(std::thread::spawn(move || {
                 RuntimeState::update_atomic(&path, |state| {
-                    state.nodes.insert(
-                        format!("node-{index}"),
-                        NodeRuntime {
-                            initialized: true,
-                            ..NodeRuntime::default()
+                    state.services.insert(
+                        format!("service-{index}"),
+                        ServiceRuntime {
+                            running: true,
+                            ..ServiceRuntime::default()
                         },
                     );
                     Ok(())
@@ -588,28 +586,31 @@ mod tests {
         for thread in threads {
             thread.join().unwrap();
         }
-        assert_eq!(RuntimeState::load(&path).unwrap().nodes.len(), 8);
+        assert_eq!(RuntimeState::load(&path).unwrap().services.len(), 8);
     }
 
     #[test]
     fn validator_keys_are_retained_across_rounds() {
         let mut node = NodeRuntime::default();
-        node.remember_validator_public_key("genesis".to_owned());
-        node.set_validator_public_key("round-1".to_owned());
-        node.set_validator_public_key("round-2".to_owned());
+        node.remember_validator_public_key(TonPublicKey::from_bytes([1; 32]));
+        node.set_validator_public_key(TonPublicKey::from_bytes([2; 32]));
+        node.set_validator_public_key(TonPublicKey::from_bytes([3; 32]));
 
         expect_test::expect![[r#"
-            (
-                Some(
-                    "round-2",
-                ),
-                [
-                    "genesis",
-                    "round-1",
-                    "round-2",
-                ],
-            )
-        "#]]
-        .assert_debug_eq(&(node.validator_public_key, node.validator_public_keys));
+            {
+              "current": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+              "history": [
+                "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+                "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+                "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM="
+              ]
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "current": node.validator_public_key,
+                "history": node.validator_public_keys,
+            }))
+            .unwrap(),
+        );
     }
 }

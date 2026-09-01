@@ -5,17 +5,61 @@
 //! identity. Typed adapters own command syntax, process lifecycle, JSON rendering,
 //! parsing, and release-specific validation.
 
+use std::time::Duration;
+
 use anyhow::Result;
 use tracing::{Instrument, info, info_span, warn};
 
 use crate::{
-    storage::{Layout, NodeSettings},
+    runtime::ProcessRegistry,
+    storage::{Layout, NodeSettings, ServiceRuntime},
     ton::tools::{
-        dht_server::{DhtInitializeRequest, DhtServer},
+        dht_server::{DhtInitializeRequest, DhtServer, DhtStartRequest},
         random_id::{DhtDescriptorRequest, RandomIdGenerator},
         types::{AdnlEndpoint, DhtDatabase, DhtNodeDescriptor, OperationContext},
     },
 };
+
+/// Starts the persistent DHT service and transfers ownership to the process registry.
+///
+/// DHT is bootstrap infrastructure rather than a blockchain node. Its lifecycle
+/// therefore remains here, while validator-engine startup is shared through the
+/// top-level node module.
+pub(super) async fn start(
+    layout: &Layout,
+    dht_server: &dyn DhtServer,
+    node: &NodeSettings,
+    database: DhtDatabase,
+    timeout: Duration,
+    processes: &ProcessRegistry,
+) -> Result<ServiceRuntime> {
+    let context = OperationContext::for_node(timeout, &node.name);
+    let process = dht_server
+        .start(
+            &context,
+            DhtStartRequest {
+                global_config: layout.global_config.clone(),
+                database,
+                log_path: layout.logs.join("dht-engine"),
+                stdout_log: layout.logs.join("dht.stdout.log"),
+                stderr_log: layout.logs.join("dht.stderr.log"),
+                endpoint: AdnlEndpoint::new(node.public_ip, node.dht_port),
+                threads: usize::from(node.threads),
+                verbosity: node.verbosity,
+            },
+        )
+        .await?;
+    let runtime = ServiceRuntime {
+        running: true,
+        pid: process.pid(),
+        endpoint: None,
+        last_error: None,
+    };
+
+    processes.insert(process).await?;
+
+    Ok(runtime)
+}
 
 /// Typed output of the cross-tool DHT initialization workflow.
 ///

@@ -9,12 +9,12 @@ use crate::{
     cli::{StateArgs, ValidatorCommand},
     operations::wallets,
     storage::RuntimeState,
-    storage::{Layout, NodeSettings, Settings},
+    storage::{Layout, NodeLayout, NodeRole, NodeSettings, Settings},
     ton::{
         toolchain::Toolchain,
         tools::{
             lite_client::{ElectionStatus, LiteTarget, RunMethodRequest},
-            types::OperationContext,
+            types::{KeyId, OperationContext, TonPublicKey},
             validator_console::{
                 AddAdnl, AddPermanentKey, AddTemporaryKey, AddValidatorAddress, SignRequest,
             },
@@ -30,8 +30,8 @@ const MAX_VALIDATOR_LAG_SECONDS: u64 = 60;
 struct ElectionEntry {
     election_id: u32,
     election_end: u32,
-    validator_public_key: String,
-    validator_adnl: String,
+    validator_public_key: TonPublicKey,
+    validator_adnl: KeyId,
     signature: String,
 }
 
@@ -40,8 +40,8 @@ struct ParticipationResult {
     node: String,
     election_id: u32,
     election_end: u32,
-    validator_public_key: String,
-    validator_adnl: String,
+    validator_public_key: TonPublicKey,
+    validator_adnl: KeyId,
     message: String,
     send_status: Option<u32>,
 }
@@ -60,80 +60,28 @@ pub async fn execute(command: ValidatorCommand) -> Result<()> {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             print_status(&toolchain).await
         }
-        ValidatorCommand::Enable { state, node } => {
-            let node = resolve_managed_node(&state, node.as_deref())?;
-            set_election_mode(&state, &node, true)?;
+        ValidatorCommand::Enable { state } => {
+            let node = set_election_mode(&state, true)?;
             println!("validator mode enabled for `{node}`; it will enter future elections");
             Ok(())
         }
-        ValidatorCommand::Disable { state, node } => {
-            let node = resolve_managed_node(&state, node.as_deref())?;
-            set_election_mode(&state, &node, false)?;
+        ValidatorCommand::Disable { state } => {
+            let node = set_election_mode(&state, false)?;
             println!(
                 "validator mode disabled for `{node}`; it stops entering elections and remains active until a replacement set is elected"
             );
             Ok(())
         }
-        ValidatorCommand::Participate {
-            state,
-            node,
-            election_id,
-        } => {
+        ValidatorCommand::Participate { state, election_id } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let node = resolve_managed_node_in_layout(
-                &toolchain.layout,
-                &toolchain.settings()?,
-                node.as_deref(),
-            )?;
-            let result = participate(&toolchain, &node, election_id).await?;
+            let result = participate(&toolchain, election_id).await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
         }
-        ValidatorCommand::Reap { state, node } => {
+        ValidatorCommand::Reap { state } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let node = resolve_managed_node_in_layout(
-                &toolchain.layout,
-                &toolchain.settings()?,
-                node.as_deref(),
-            )?;
-            let result = reap(&toolchain, &node).await?;
+            let result = reap(&toolchain).await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
-            Ok(())
-        }
-        ValidatorCommand::ParticipateAll { state } => {
-            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let settings = toolchain.settings()?;
-            let runtime = RuntimeState::load(&toolchain.layout.runtime)?;
-            let names: Vec<_> = settings
-                .nodes
-                .iter()
-                .filter(|node| node.enabled && node.validator && node.participate_in_elections)
-                .filter(|node| runtime.nodes.contains_key(&node.name))
-                .map(|node| node.name.clone())
-                .collect();
-            let mut results = Vec::new();
-            for name in names {
-                results.push(participate(&toolchain, &name, None).await?);
-            }
-            println!("{}", serde_json::to_string_pretty(&results)?);
-            Ok(())
-        }
-        ValidatorCommand::ReapAll { state } => {
-            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let settings = toolchain.settings()?;
-            let runtime = RuntimeState::load(&toolchain.layout.runtime)?;
-            let names: Vec<_> = settings
-                .nodes
-                .iter()
-                .filter(|node| node.enabled && node.validator)
-                .filter(|node| runtime.nodes.contains_key(&node.name))
-                .map(|node| node.name.clone())
-                .collect();
-            let mut results = Vec::new();
-            for name in names {
-                results.push(reap(&toolchain, &name).await?);
-            }
-            println!("{}", serde_json::to_string_pretty(&results)?);
             Ok(())
         }
     }
@@ -149,57 +97,28 @@ pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionSta
         .await
 }
 
-fn resolve_managed_node(state: &StateArgs, requested: Option<&str>) -> Result<String> {
-    let layout = Layout::new(crate::ton::toolchain::absolute_path(&state.state_dir)?);
-    layout.create_dirs()?;
-    let settings = Settings::load_or_create(&layout.settings)?;
-    resolve_managed_node_in_layout(&layout, &settings, requested)
-}
-
-fn resolve_managed_node_in_layout(
-    layout: &Layout,
-    settings: &Settings,
-    requested: Option<&str>,
-) -> Result<String> {
-    let runtime = RuntimeState::load(&layout.runtime)?;
-    if let Some(name) = requested {
-        settings.node(name)?;
-        ensure!(
-            runtime.nodes.contains_key(name),
-            "node `{name}` is not managed by this localton instance"
-        );
-        return Ok(name.to_owned());
-    }
-
-    let managed = settings
-        .nodes
-        .iter()
-        .filter(|node| node.enabled && runtime.nodes.contains_key(&node.name))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    match managed.as_slice() {
-        [name] => Ok(name.clone()),
-        [] => anyhow::bail!("this localton instance has no managed nodes"),
-        _ => anyhow::bail!(
-            "this localton instance manages multiple nodes ({}); specify one explicitly",
-            managed.join(", ")
-        ),
-    }
-}
-
-fn set_election_mode(state: &StateArgs, node_name: &str, enabled: bool) -> Result<()> {
+fn set_election_mode(state: &StateArgs, enabled: bool) -> Result<String> {
     let layout = Layout::new(crate::ton::toolchain::absolute_path(&state.state_dir)?);
     layout.create_dirs()?;
     let mut settings = Settings::load_or_create(&layout.settings)?;
-    let node = settings.node_mut(node_name)?;
-    ensure!(node.enabled, "node `{node_name}` is disabled");
+    let runtime = RuntimeState::load(&layout.runtime)?;
+    let node = &mut settings.node;
+    ensure!(node.enabled, "node `{}` is disabled", node.name);
+    ensure!(
+        runtime.node.initialized,
+        "node `{}` is not initialized",
+        node.name
+    );
     if enabled {
         node.validator = true;
     } else {
-        ensure!(node.validator, "node `{node_name}` is not a validator");
+        ensure!(node.validator, "node `{}` is not a validator", node.name);
     }
     node.participate_in_elections = enabled;
-    settings.save_atomic(&layout.settings)
+    let node_name = node.name.clone();
+    settings.save_atomic(&layout.settings)?;
+
+    Ok(node_name)
 }
 
 pub async fn auto_tick(state: StateArgs) -> Result<()> {
@@ -213,24 +132,20 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
         0
     };
 
-    let names: Vec<_> = settings
-        .nodes
-        .iter()
-        .filter(|node| node.enabled && node.validator)
-        .map(|node| node.name.clone())
-        .collect();
-    for name in names {
-        let should_participate = election_id > 0
-            && settings.node(&name)?.participate_in_elections
-            && !runtime.nodes.get(&name).is_some_and(|node| {
-                node.election_id == Some(election_id) && node.participation_message.is_some()
-            });
-        if should_participate {
-            participate(&toolchain, &name, Some(election_id)).await?;
-        }
-        if settings.validation.auto_reap {
-            reap(&toolchain, &name).await?;
-        }
+    let node = &settings.node;
+    if !node.enabled || !node.validator {
+        return Ok(());
+    }
+
+    let should_participate = election_id > 0
+        && node.participate_in_elections
+        && !(runtime.node.election_id == Some(election_id)
+            && runtime.node.participation_message.is_some());
+    if should_participate {
+        participate(&toolchain, Some(election_id)).await?;
+    }
+    if settings.validation.auto_reap {
+        reap(&toolchain).await?;
     }
     Ok(())
 }
@@ -240,15 +155,11 @@ pub async fn auto_tick(state: StateArgs) -> Result<()> {
 /// Submission and reaping are intentionally mutually exclusive in one tick: after
 /// an election entry is sent, the next poll can observe its on-chain state before
 /// attempting to recover any previously frozen stake.
-pub(crate) async fn join_auto_tick(
-    toolchain: &Toolchain,
-    node_name: &str,
-    wallet_name: &str,
-) -> Result<()> {
+pub(crate) async fn join_auto_tick(toolchain: &Toolchain, wallet_name: &str) -> Result<()> {
     let settings = toolchain.settings()?;
-    let node = settings.node(node_name)?.clone();
-    ensure!(node.enabled, "node `{node_name}` is disabled");
-    ensure!(node.validator, "node `{node_name}` is not a validator");
+    let node = settings.node.clone();
+    ensure!(node.enabled, "node `{}` is disabled", node.name);
+    ensure!(node.validator, "node `{}` is not a validator", node.name);
 
     let elector = elector_address(toolchain).await?;
     let mut submitted = false;
@@ -299,21 +210,17 @@ async fn print_status(toolchain: &Toolchain) -> Result<()> {
             "elector": elector,
             "active_election_id": active,
             "election": election,
-            "nodes": runtime.nodes,
+            "node": runtime.node,
         }))?
     );
-    for node in settings
-        .nodes
-        .iter()
-        .filter(|node| node.enabled && node.validator)
-        .filter(|node| runtime.nodes.contains_key(&node.name))
-    {
+    let node = &settings.node;
+    if node.enabled && node.validator && runtime.node.initialized {
         println!("validator {} stats", node.name);
         let stats = toolchain
             .validator_console_tool
             .health(
                 &validator_console_context(node),
-                &toolchain.validator_console_endpoint(node),
+                &validator_console_endpoint(toolchain, node),
             )
             .await?;
         println!(
@@ -330,14 +237,13 @@ async fn print_status(toolchain: &Toolchain) -> Result<()> {
 
 async fn participate(
     toolchain: &Toolchain,
-    node_name: &str,
     requested_election_id: Option<u32>,
 ) -> Result<ParticipationResult> {
     let settings = toolchain.settings()?;
-    let node = settings.node(node_name)?.clone();
-    ensure!(node.enabled, "node `{node_name}` is disabled");
-    ensure!(node.validator, "node `{node_name}` is not a validator");
-    let wallet_name = controlling_wallet_name(&settings, &node)?;
+    let node = settings.node.clone();
+    ensure!(node.enabled, "node `{}` is disabled", node.name);
+    ensure!(node.validator, "node `{}` is not a validator", node.name);
+    let wallet_name = validator_wallet_name(&node);
     let elector = elector_address(toolchain).await?;
     participate_with_wallet(
         toolchain,
@@ -394,12 +300,12 @@ async fn prepare_election_entry(
     wallet_address: &str,
     max_factor: f64,
 ) -> Result<ElectionEntry> {
-    let node_layout = toolchain.layout.node(node);
+    let node_layout = managed_node_layout(&toolchain.layout, node);
     let keys = if let Some(keys) = existing_election_keys(&node_layout, election_id)? {
         keys
     } else {
         let context = validator_console_context(node);
-        let endpoint = toolchain.validator_console_endpoint(node);
+        let endpoint = validator_console_endpoint(toolchain, node);
         let signing_key = toolchain
             .validator_console_tool
             .new_key(&context, &endpoint)
@@ -463,18 +369,16 @@ async fn prepare_election_entry(
         }
     };
     let context = validator_console_context(node);
-    let endpoint = toolchain.validator_console_endpoint(node);
+    let endpoint = validator_console_endpoint(toolchain, node);
     let signing_public_key = toolchain
         .validator_console_tool
         .export_public(&context, &endpoint, &keys.signing_key)
-        .await?
-        .into_base64();
+        .await?;
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
-        let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        node_runtime.set_validator_public_key(signing_public_key.clone());
-        node_runtime.validator_adnl = Some(keys.adnl.to_hex());
-        node_runtime.election_id = Some(election_id);
-        node_runtime.election_end = Some(keys.election_end);
+        runtime.node.set_validator_public_key(signing_public_key);
+        runtime.node.validator_adnl = Some(keys.adnl);
+        runtime.node.election_id = Some(election_id);
+        runtime.node.election_end = Some(keys.election_end);
         Ok(())
     })?;
 
@@ -515,7 +419,7 @@ async fn prepare_election_entry(
         election_id,
         election_end: keys.election_end,
         validator_public_key: signing_public_key,
-        validator_adnl: keys.adnl.to_hex(),
+        validator_adnl: keys.adnl,
         signature,
     };
     fs::write(
@@ -534,9 +438,7 @@ async fn submit_election_entry(
     entry: ElectionEntry,
 ) -> Result<ParticipationResult> {
     let wallet = wallets::wallet(&toolchain.layout, wallet_name)?;
-    let request_dir = toolchain
-        .layout
-        .node(node)
+    let request_dir = managed_node_layout(&toolchain.layout, node)
         .root
         .join("elections")
         .join(entry.election_id.to_string());
@@ -550,8 +452,8 @@ async fn submit_election_entry(
             wallet.address,
             entry.election_id.to_string(),
             settings.validation.max_factor.to_string(),
-            entry.validator_adnl.clone(),
-            entry.validator_public_key.clone(),
+            entry.validator_adnl.to_hex(),
+            entry.validator_public_key.to_tl_base64(),
             entry.signature,
             signed.to_string_lossy().into_owned(),
         ],
@@ -574,12 +476,13 @@ async fn submit_election_entry(
     .await?;
 
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
-        let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        node_runtime.set_validator_public_key(entry.validator_public_key.clone());
-        node_runtime.validator_adnl = Some(entry.validator_adnl.clone());
-        node_runtime.election_id = Some(entry.election_id);
-        node_runtime.election_end = Some(entry.election_end);
-        node_runtime.participation_message = Some(signed.clone());
+        runtime
+            .node
+            .set_validator_public_key(entry.validator_public_key);
+        runtime.node.validator_adnl = Some(entry.validator_adnl);
+        runtime.node.election_id = Some(entry.election_id);
+        runtime.node.election_end = Some(entry.election_end);
+        runtime.node.participation_message = Some(signed.clone());
         Ok(())
     })?;
 
@@ -599,27 +502,28 @@ fn existing_participation(
     node: &NodeSettings,
     election_id: u32,
 ) -> Result<Option<ParticipationResult>> {
-    Ok(RuntimeState::load(&toolchain.layout.runtime)?
-        .nodes
-        .get(&node.name)
-        .filter(|runtime| {
-            runtime.election_id == Some(election_id)
-                && runtime.participation_message.is_some()
-                && runtime.validator_public_key.is_some()
-                && runtime.validator_adnl.is_some()
-        })
-        .map(|runtime| ParticipationResult {
-            node: node.name.clone(),
-            election_id,
-            election_end: runtime.election_end.unwrap_or_default(),
-            validator_public_key: runtime.validator_public_key.clone().unwrap_or_default(),
-            validator_adnl: runtime.validator_adnl.clone().unwrap_or_default(),
-            message: runtime
-                .participation_message
-                .as_ref()
-                .map_or_else(String::new, |path| path.display().to_string()),
-            send_status: None,
-        }))
+    let state = RuntimeState::load(&toolchain.layout.runtime)?;
+    let runtime = &state.node;
+    let (Some(message), Some(validator_public_key), Some(validator_adnl)) = (
+        runtime.participation_message.as_ref(),
+        runtime.validator_public_key,
+        runtime.validator_adnl,
+    ) else {
+        return Ok(None);
+    };
+    if runtime.election_id != Some(election_id) {
+        return Ok(None);
+    }
+
+    Ok(Some(ParticipationResult {
+        node: node.name.clone(),
+        election_id,
+        election_end: runtime.election_end.unwrap_or_default(),
+        validator_public_key,
+        validator_adnl,
+        message: message.display().to_string(),
+        send_status: None,
+    }))
 }
 
 fn election_key_expiry(settings: &Settings, election_id: u32) -> u32 {
@@ -633,7 +537,7 @@ async fn node_is_synchronized(toolchain: &Toolchain, node: &NodeSettings) -> Res
         .validator_console_tool
         .health(
             &validator_console_context(node),
-            &toolchain.validator_console_endpoint(node),
+            &validator_console_endpoint(toolchain, node),
         )
         .await?;
     let now = stats.unix_time()?;
@@ -654,11 +558,11 @@ fn existing_election_keys(
     ValidatorEngineConfig::load(&config_path)?.election_keys(election_id)
 }
 
-async fn reap(toolchain: &Toolchain, node_name: &str) -> Result<ReapResult> {
+async fn reap(toolchain: &Toolchain) -> Result<ReapResult> {
     let settings = toolchain.settings()?;
-    let node = settings.node(node_name)?.clone();
-    ensure!(node.validator, "node `{node_name}` is not a validator");
-    let wallet_name = controlling_wallet_name(&settings, &node)?;
+    let node = settings.node.clone();
+    ensure!(node.validator, "node `{}` is not a validator", node.name);
+    let wallet_name = validator_wallet_name(&node);
     let elector = elector_address(toolchain).await?;
     reap_node(toolchain, &node, &wallet_name, &elector).await
 }
@@ -688,7 +592,9 @@ async fn reap_node(
         });
     }
 
-    let reap_dir = toolchain.layout.node(node).root.join("rewards");
+    let reap_dir = managed_node_layout(&toolchain.layout, node)
+        .root
+        .join("rewards");
     fs::create_dir_all(&reap_dir)?;
     let message = reap_dir.join(format!("recover-{}.boc", crate::storage::unix_time()));
     run_fift(
@@ -713,14 +619,14 @@ async fn reap_node(
     )
     .await?;
     RuntimeState::update_atomic(&toolchain.layout.runtime, |runtime| {
-        let node_runtime = runtime.nodes.entry(node.name.clone()).or_default();
-        let total = node_runtime
+        let total = runtime
+            .node
             .total_rewards_nano
             .parse::<u128>()
             .unwrap_or_default()
             .saturating_add(u128::from(available_nano));
-        node_runtime.last_reward_nano = available_nano.to_string();
-        node_runtime.total_rewards_nano = total.to_string();
+        runtime.node.last_reward_nano = available_nano.to_string();
+        runtime.node.total_rewards_nano = total.to_string();
         Ok(())
     })?;
     Ok(ReapResult {
@@ -731,17 +637,12 @@ async fn reap_node(
     })
 }
 
-fn controlling_wallet_name(settings: &Settings, node: &NodeSettings) -> Result<String> {
-    let index = settings
-        .nodes
-        .iter()
-        .position(|candidate| candidate.name == node.name)
-        .with_context(|| format!("node `{}` is not in settings", node.name))?;
-    Ok(if index == 0 {
-        "validator".to_owned()
-    } else {
-        format!("validator-{index}")
-    })
+/// Returns the wallet name reserved for the one validator owned by a state directory.
+pub(crate) fn validator_wallet_name(node: &NodeSettings) -> String {
+    match node.role {
+        NodeRole::Genesis => "validator".to_owned(),
+        NodeRole::Joined => format!("{}-validator-masterchain", node.name),
+    }
 }
 
 async fn elector_address(toolchain: &Toolchain) -> Result<String> {
@@ -774,6 +675,21 @@ async fn run_method_u64(
 /// Applies the ordinary bound and tracing identity to one console operation
 fn validator_console_context(node: &NodeSettings) -> OperationContext {
     OperationContext::for_node(Duration::from_secs(20), &node.name)
+}
+
+fn validator_console_endpoint(
+    toolchain: &Toolchain,
+    node: &NodeSettings,
+) -> crate::ton::tools::validator_console::ValidatorConsoleEndpoint {
+    let layout = managed_node_layout(&toolchain.layout, node);
+    toolchain.validator_console_endpoint(&layout, node)
+}
+
+fn managed_node_layout(layout: &Layout, node: &NodeSettings) -> NodeLayout {
+    match node.role {
+        NodeRole::Genesis => layout.genesis_node(),
+        NodeRole::Joined => layout.joined_node(),
+    }
 }
 
 async fn run_fift(
@@ -817,16 +733,12 @@ mod tests {
     use serde_json::json;
     use tempfile::tempdir;
 
-    use super::{
-        election_key_expiry, existing_election_keys, nano_to_grams, resolve_managed_node_in_layout,
-        set_election_mode,
-    };
+    use super::{election_key_expiry, existing_election_keys, nano_to_grams, set_election_mode};
     use crate::cli::StateArgs;
-    use crate::storage::{Layout, NodePorts, NodeRuntime, NodeSettings, RuntimeState, Settings};
+    use crate::storage::{Layout, NodePorts, NodeSettings, RuntimeState, Settings};
 
     fn follower_settings() -> Settings {
-        let mut settings = Settings::for_join();
-        settings.nodes.push(NodeSettings::follower(
+        Settings::for_join(NodeSettings::follower(
             "node2".to_owned(),
             Ipv4Addr::LOCALHOST,
             NodePorts {
@@ -836,28 +748,7 @@ mod tests {
                 out: 20_003,
                 dht: 20_004,
             },
-        ));
-        settings
-    }
-
-    #[test]
-    fn validator_command_defaults_to_the_locally_managed_node() {
-        let root = tempdir().unwrap();
-        let layout = Layout::new(root.path().join("state"));
-        layout.create_dirs().unwrap();
-        let settings = follower_settings();
-        settings.save_atomic(&layout.settings).unwrap();
-        let mut runtime = RuntimeState::new();
-        runtime
-            .nodes
-            .insert("node2".to_owned(), NodeRuntime::default());
-        runtime.save_atomic(&layout.runtime).unwrap();
-
-        assert_eq!(
-            resolve_managed_node_in_layout(&layout, &settings, None).unwrap(),
-            "node2"
-        );
-        assert!(resolve_managed_node_in_layout(&layout, &settings, Some("genesis")).is_err());
+        ))
     }
 
     #[test]
@@ -866,25 +757,28 @@ mod tests {
         let layout = Layout::new(root.path().join("state"));
         layout.create_dirs().unwrap();
         let mut settings = follower_settings();
-        let node = settings.node_mut("node2").unwrap();
+        let node = &mut settings.node;
         node.enabled = true;
         node.validator = false;
         node.participate_in_elections = false;
         settings.save_atomic(&layout.settings).unwrap();
+        let mut runtime = RuntimeState::new();
+        runtime.node.initialized = true;
+        runtime.save_atomic(&layout.runtime).unwrap();
         let state = StateArgs {
             state_dir: layout.root.clone(),
         };
 
-        set_election_mode(&state, "node2", true).unwrap();
+        set_election_mode(&state, true).unwrap();
         let enabled = Settings::load(&layout.settings).unwrap();
-        let enabled = enabled.node("node2").unwrap();
+        let enabled = &enabled.node;
         assert!(enabled.enabled);
         assert!(enabled.validator);
         assert!(enabled.participate_in_elections);
 
-        set_election_mode(&state, "node2", false).unwrap();
+        set_election_mode(&state, false).unwrap();
         let disabled = Settings::load(&layout.settings).unwrap();
-        let disabled = disabled.node("node2").unwrap();
+        let disabled = &disabled.node;
         assert!(disabled.enabled);
         assert!(disabled.validator);
         assert!(!disabled.participate_in_elections);
@@ -906,8 +800,7 @@ mod tests {
     fn recovers_partially_configured_election_keys() {
         let directory = tempdir().unwrap();
         let layout = Layout::new(directory.path().to_owned());
-        let node = follower_settings().nodes.remove(0);
-        let node_layout = layout.node(&node);
+        let node_layout = layout.joined_node();
         node_layout.create_dirs().unwrap();
         fs::write(
             node_layout.config_json(),
