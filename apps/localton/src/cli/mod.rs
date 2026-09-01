@@ -97,6 +97,9 @@ pub struct JoinArgs {
     pub faucet: Option<String>,
 
     /// IPv4 address advertised by full nodes on this host.
+    ///
+    /// Public TON networks require a static public address with the node's ADNL
+    /// UDP port forwarded to this host.
     #[arg(long, env = "LOCALTON_JOIN_ADVERTISE_IP")]
     pub advertise_ip: Ipv4Addr,
 
@@ -542,8 +545,7 @@ mod tests {
 
     #[test]
     fn bootstrap_accepts_human_readable_block_time() {
-        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750ms"])
-            .unwrap();
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750ms"]).unwrap();
         let Command::Bootstrap(args) = cli.command else {
             panic!("expected bootstrap command");
         };
@@ -563,10 +565,7 @@ mod tests {
         let Command::Join(args) = cli.command else {
             panic!("expected join command");
         };
-        assert_eq!(
-            args.global_config_url,
-            "http://192.168.27.4:18000/config"
-        );
+        assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
     }
 
     #[test]

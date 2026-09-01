@@ -16,6 +16,7 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use futures_util::StreamExt;
+use indicatif::BinaryBytes;
 use serde::Deserialize;
 use tokio::select;
 use tracing::{info, warn};
@@ -30,12 +31,17 @@ use crate::{
     runtime::ProcessRegistry,
     storage::{Layout, NodeSettings, RuntimeState, Settings, write_json_atomic},
     ton::{
-        global_config::GlobalConfig, lite::LocalLiteClient, toolchain::Toolchain,
-        tools::types::TonPublicKey,
+        global_config::GlobalConfig,
+        lite::LocalLiteClient,
+        toolchain::Toolchain,
+        tools::{
+            types::{OperationContext, TonPublicKey},
+            validator_console::ValidatorSynchronization,
+        },
     },
 };
 
-use self::ports::{HostPortAllocation, DEFAULT_JOIN_PORT_BASE};
+use self::ports::{DEFAULT_JOIN_PORT_BASE, HostPortAllocation};
 
 const MAX_GLOBAL_CONFIG_BYTES: u64 = 1024 * 1024;
 const VALIDATOR_WALLET_WORKCHAIN: i32 = -1;
@@ -44,11 +50,23 @@ const VALIDATOR_FEE_RESERVE_NANO: u64 = 5_000_000_000;
 const SYNC_READY_CONFIRMATIONS: usize = 3;
 const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(500);
 const SYNC_LOG_INTERVAL: Duration = Duration::from_secs(5);
+const SYNC_STATS_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Deserialize)]
 struct FaucetGrant {
     address: String,
     amount_nano: u64,
+}
+
+#[derive(Deserialize)]
+struct ConfigurationService {
+    service: String,
+    endpoints: ConfigurationEndpoints,
+}
+
+#[derive(Deserialize)]
+struct ConfigurationEndpoints {
+    observability: Option<String>,
 }
 
 #[derive(Clone)]
@@ -112,7 +130,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 runtime.mark_instance_started();
                 for name in &owned_nodes {
                     if let Some(node) = runtime.nodes.get_mut(name) {
-                        node.status = "synchronizing".to_owned();
+                        node.begin_synchronization();
                     }
                 }
                 Ok(())
@@ -135,12 +153,15 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             )
             .await?;
             for liteserver in &local_liteservers {
-                wait_for_network_sync(
-                    &layout.global_config,
-                    liteserver,
-                    Duration::from_secs(args.startup_timeout),
-                )
-                .await?;
+                select! {
+                    result = wait_for_network_sync(
+                        &layout,
+                        &toolchain,
+                        settings.node(&liteserver.node)?,
+                        liteserver,
+                    ) => result?,
+                    result = supervise(&processes) => return result,
+                }
                 RuntimeState::update_atomic(&layout.runtime, |runtime| {
                     if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
                         node.status = "running".to_owned();
@@ -190,76 +211,164 @@ pub async fn run(args: JoinArgs) -> Result<()> {
 }
 
 async fn wait_for_network_sync(
-    global_config: &Path,
+    layout: &Layout,
+    toolchain: &Toolchain,
+    node: &NodeSettings,
     liteserver: &LocalLiteserver,
-    timeout: Duration,
 ) -> Result<()> {
-    tokio::time::timeout(timeout, async {
-        let mut confirmations = 0;
-        let mut last_log = Instant::now()
-            .checked_sub(SYNC_LOG_INTERVAL)
-            .unwrap_or_else(Instant::now);
-        loop {
-            let sample: Result<(u32, u32)> = async {
-                let mut network = LocalLiteClient::connect(global_config).await?;
-                let network_head = network.last().await?.seqno;
-                let mut local = LocalLiteClient::connect_node(
-                    global_config,
-                    liteserver.port,
-                    &liteserver.public_key,
-                )
-                .await?;
-                let local_head = local.last().await?.seqno;
-                Ok((network_head, local_head))
-            }
-            .await;
-            match sample {
-                Ok((network_head, local_head)) => {
-                    let lag = network_head.saturating_sub(local_head);
-                    if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+    let mut confirmations = 0;
+    let mut last_log = Instant::now()
+        .checked_sub(SYNC_LOG_INTERVAL)
+        .unwrap_or_else(Instant::now);
+    loop {
+        let sample: Result<(u32, u32)> = async {
+            let mut network = LocalLiteClient::connect(&layout.global_config).await?;
+            let network_head = network.last().await?.seqno;
+            let mut local = LocalLiteClient::connect_node(
+                &layout.global_config,
+                liteserver.port,
+                &liteserver.public_key,
+            )
+            .await?;
+            let local_head = local.last().await?.seqno;
+            Ok((network_head, local_head))
+        }
+        .await;
+        match sample {
+            Ok((network_head, local_head)) => {
+                let lag = network_head.saturating_sub(local_head);
+                if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+                    if let Err(error) = RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                        if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
+                            node.observe_sync_progress(local_head, network_head);
+                        }
+                        Ok(())
+                    }) {
+                        warn!(node = liteserver.node, %error, "could not publish follower synchronization progress");
+                    }
+                    info!(
+                        node = liteserver.node,
+                        local_head,
+                        network_head,
+                        lag_blocks = lag,
+                        "follower node synchronization progress"
+                    );
+                    last_log = Instant::now();
+                }
+                if lag <= SYNC_LAG_TOLERANCE_BLOCKS {
+                    confirmations += 1;
+                    if confirmations >= SYNC_READY_CONFIRMATIONS {
+                        if let Err(error) =
+                            RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                                if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
+                                    node.observe_sync_progress(local_head, network_head);
+                                }
+                                Ok(())
+                            })
+                        {
+                            warn!(node = liteserver.node, %error, "could not publish final follower synchronization progress");
+                        }
                         info!(
                             node = liteserver.node,
                             local_head,
                             network_head,
                             lag_blocks = lag,
-                            "follower node synchronization progress"
+                            "follower node synchronized"
                         );
-                        last_log = Instant::now();
+                        return Ok(());
                     }
-                    if lag <= SYNC_LAG_TOLERANCE_BLOCKS {
-                        confirmations += 1;
-                        if confirmations >= SYNC_READY_CONFIRMATIONS {
-                            info!(
-                                node = liteserver.node,
-                                local_head,
-                                network_head,
-                                lag_blocks = lag,
-                                "follower node synchronized"
-                            );
-                            return;
-                        }
-                    } else {
-                        confirmations = 0;
-                    }
-                }
-                Err(error) => {
+                } else {
                     confirmations = 0;
-                    if last_log.elapsed() >= SYNC_LOG_INTERVAL {
-                        warn!(node = liteserver.node, %error, "could not measure follower synchronization");
-                        last_log = Instant::now();
-                    }
                 }
             }
-            tokio::time::sleep(SYNC_POLL_INTERVAL).await;
+            Err(error) => {
+                confirmations = 0;
+                if last_log.elapsed() >= SYNC_LOG_INTERVAL {
+                    let stats = toolchain
+                        .validator_console_tool
+                        .health(
+                            &OperationContext::for_node(SYNC_STATS_TIMEOUT, &node.name),
+                            &toolchain.validator_console_endpoint(node),
+                        )
+                        .await;
+                    match stats.and_then(|stats| stats.synchronization()) {
+                        Ok(ValidatorSynchronization::BlockTime {
+                            block_time,
+                            target_time,
+                        }) => {
+                            if let Err(publish_error) =
+                                RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                                    if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
+                                        node.observe_sync_time_progress(block_time, target_time);
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                warn!(node = liteserver.node, %publish_error, "could not publish time-based follower synchronization progress");
+                            }
+                            info!(
+                                node = liteserver.node,
+                                masterchain_block_time = block_time,
+                                target_time,
+                                lag_seconds = target_time.saturating_sub(block_time),
+                                "follower node synchronization progress"
+                            );
+                        }
+                        Ok(ValidatorSynchronization::Initial(progress)) => {
+                            let state_download = progress.state_download.as_ref();
+                            if let Err(publish_error) =
+                                RuntimeState::update_atomic(&layout.runtime, |runtime| {
+                                    if let Some(node) = runtime.nodes.get_mut(&liteserver.node) {
+                                        node.observe_initial_sync_progress(progress.clone());
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                warn!(node = liteserver.node, %publish_error, "could not publish initial follower synchronization progress");
+                            }
+                            if let Some(download) = state_download {
+                                info!(
+                                    node = liteserver.node,
+                                    stage = ?progress.stage,
+                                    masterchain_seqno = ?progress.masterchain_seqno,
+                                    current_part = ?progress.current_part,
+                                    total_parts = ?progress.total_parts,
+                                    downloaded = %BinaryBytes(download.downloaded_bytes),
+                                    total = %BinaryBytes(download.total_bytes),
+                                    speed = %format!("{}/s", BinaryBytes(download.bytes_per_second)),
+                                    eta = %humantime::format_duration(Duration::from_secs(download.remaining_seconds)),
+                                    "follower node initial synchronization progress"
+                                );
+                            } else {
+                                info!(
+                                    node = liteserver.node,
+                                    stage = ?progress.stage,
+                                    masterchain_seqno = ?progress.masterchain_seqno,
+                                    current_part = ?progress.current_part,
+                                    total_parts = ?progress.total_parts,
+                                    "follower node initial synchronization progress"
+                                );
+                            }
+                        }
+                        Ok(ValidatorSynchronization::WaitingForMasterchain) => info!(
+                            node = liteserver.node,
+                            "follower node is preparing its first masterchain block"
+                        ),
+                        Err(stats_error) => {
+                            warn!(
+                                node = liteserver.node,
+                                liteserver_error = %format!("{error:#}"),
+                                validator_stats_error = %format!("{stats_error:#}"),
+                                "could not measure follower synchronization"
+                            );
+                        }
+                    }
+                    last_log = Instant::now();
+                }
+            }
         }
-    })
-    .await
-    .with_context(|| {
-        format!(
-            "node `{}` did not synchronize before the startup timeout",
-            liteserver.node
-        )
-    })
+        tokio::time::sleep(SYNC_POLL_INTERVAL).await;
+    }
 }
 
 async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTreeSet<String>> {
@@ -280,8 +389,17 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
         args.advertise_ip,
         args.validator,
     )?;
-    if layout.global_config.is_file() {
+    let global_config_exists = layout.global_config.is_file();
+    let global_config = if global_config_exists {
         info!("reusing persisted TON global config");
+        GlobalConfig::from_json_bytes(&std::fs::read(&layout.global_config).with_context(
+            || {
+                format!(
+                    "failed to read persisted global config {}",
+                    layout.global_config.display()
+                )
+            },
+        )?)?
     } else {
         for name in &requested {
             let node = settings.node(name)?;
@@ -290,7 +408,10 @@ async fn prepare_follower_state(layout: &Layout, args: &JoinArgs) -> Result<BTre
                 "joining node `{name}` database exists without a global config"
             );
         }
-        let global_config = fetch_global_config(&args.global_config_url).await?;
+        fetch_global_config(&args.global_config_url).await?
+    };
+    global_config.validate_advertise_ip(args.advertise_ip)?;
+    if !global_config_exists {
         write_json_atomic(&layout.global_config, &global_config)?;
         info!(url = %args.global_config_url, "installed TON global config");
     }
@@ -347,7 +468,11 @@ fn resolve_join_nodes(
         ensure!(
             requested == persisted,
             "joined node names are persisted; restart with --node {} or omit --node",
-            persisted.iter().cloned().collect::<Vec<_>>().join(" --node ")
+            persisted
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" --node ")
         );
         return Ok(persisted);
     }
@@ -361,15 +486,16 @@ fn resolve_join_nodes(
         let mut names = BTreeSet::new();
         for name in requested {
             ensure!(name != "genesis", "join cannot own the genesis node");
-            ensure!(names.insert(name.clone()), "duplicate joining node `{name}`");
+            ensure!(
+                names.insert(name.clone()),
+                "duplicate joining node `{name}`"
+            );
         }
         names
     };
 
-    let allocation = HostPortAllocation::find(
-        port_base.unwrap_or(DEFAULT_JOIN_PORT_BASE),
-        names.len(),
-    )?;
+    let allocation =
+        HostPortAllocation::find(port_base.unwrap_or(DEFAULT_JOIN_PORT_BASE), names.len())?;
     settings.services.observability.port = allocation.observability;
     settings.nodes = names
         .iter()
@@ -408,20 +534,23 @@ async fn discover_observability_peer(config_url: &str) -> Result<Option<String>>
     root.set_path("/");
     root.set_query(None);
     root.set_fragment(None);
-    let document = reqwest::Client::new()
+    let response = reqwest::Client::new()
         .get(root.clone())
         .send()
         .await
-        .with_context(|| format!("failed to request {root}"))?
-        .error_for_status()
-        .with_context(|| format!("configuration service rejected {root}"))?
-        .json::<serde_json::Value>()
-        .await
-        .context("configuration service returned invalid JSON")?;
-    Ok(document
-        .pointer("/endpoints/observability")
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_owned))
+        .with_context(|| {
+            format!("failed to request optional configuration metadata from {root}")
+        })?;
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+    let Ok(document) = response.json::<ConfigurationService>().await else {
+        // A standard TON config host is not required to expose Localton metadata.
+        return Ok(None);
+    };
+    Ok((document.service == "localton")
+        .then_some(document.endpoints.observability)
+        .flatten())
 }
 
 async fn fetch_global_config(source: &str) -> Result<GlobalConfig> {
@@ -654,10 +783,10 @@ mod tests {
             Ipv4Addr::LOCALHOST,
             false,
         )
-            .unwrap()
-            .into_iter()
-            .next()
-            .unwrap();
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
         let second = resolve_join_nodes(
             &layout,
             &mut settings,
@@ -666,10 +795,10 @@ mod tests {
             Ipv4Addr::LOCALHOST,
             false,
         )
-            .unwrap()
-            .into_iter()
-            .next()
-            .unwrap();
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
 
         assert!(first.starts_with("node-"));
         assert_eq!(first.len(), 17);

@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
+use crate::storage::InitialSyncProgress;
+
 pub const PROTOCOL_VERSION: u16 = 2;
 pub const MAX_OBSERVERS: usize = 1_024;
 pub const MAX_EXCHANGE_OBSERVATIONS: usize = 128;
@@ -97,7 +99,20 @@ pub struct NodeObservation {
     pub process_id: Option<u32>,
     pub status: String,
     pub last_error: Option<String>,
+    /// Latest masterchain block reported by the node's own liteserver
     pub head_seqno: Option<u32>,
+    /// Masterchain block used as the target for the synchronization sample
+    pub network_head_seqno: Option<u32>,
+    /// First masterchain block time observed during the current synchronization
+    pub sync_initial_masterchain_block_time: Option<u64>,
+    /// Latest masterchain block time reported directly by validator-engine
+    pub sync_masterchain_block_time: Option<u64>,
+    /// Validator-engine wall-clock time used as the target for the time-based sample
+    pub sync_target_time: Option<u64>,
+    /// Native initial-sync stage before block-time samples become available
+    pub initial_sync_progress: Option<InitialSyncProgress>,
+    /// Unix time when this node last made measurable synchronization progress
+    pub sync_progressed_at: Option<u64>,
     pub sync_lag_blocks: Option<u32>,
     pub participate_in_elections: bool,
     pub current_validator: Option<bool>,
@@ -532,7 +547,9 @@ impl ObservationStore {
                 let next_membership = node.next_validator;
                 let active_validator = current_membership.unwrap_or(masterchain > 0 || shard > 0);
                 let mut node = node.clone();
-                node.sync_lag_blocks = network_head
+                let node_network_head = network_head.max(node.network_head_seqno);
+                node.network_head_seqno = node_network_head;
+                node.sync_lag_blocks = node_network_head
                     .zip(node.head_seqno)
                     .map(|(network, node)| network.saturating_sub(node));
                 let sync_status = sync_status(online, node.sync_lag_blocks, &node.status);
@@ -774,6 +791,12 @@ mod tests {
                 status: "running".to_owned(),
                 last_error: None,
                 head_seqno: Some(7),
+                network_head_seqno: Some(7),
+                sync_initial_masterchain_block_time: None,
+                sync_masterchain_block_time: None,
+                sync_target_time: None,
+                initial_sync_progress: None,
+                sync_progressed_at: Some(100),
                 sync_lag_blocks: Some(0),
                 participate_in_elections: true,
                 current_validator: None,
@@ -806,6 +829,40 @@ mod tests {
             sync_status(true, None, "synchronizing"),
             SyncStatus::CatchingUp
         );
+    }
+
+    #[test]
+    fn node_report_keeps_sync_progress_without_a_chain_observation() {
+        let identity = ObserverIdentity::from_secret([6; 32]);
+        let mut store = ObservationStore::new("network".to_owned(), identity, 600);
+        let mut report = payload("http://127.0.0.1:18003", None);
+        report.nodes[0].status = "synchronizing".to_owned();
+        report.nodes[0].head_seqno = Some(40);
+        report.nodes[0].network_head_seqno = Some(100);
+        report.nodes[0].sync_lag_blocks = Some(60);
+        store.publish(report, 100, 20).unwrap();
+
+        let view = store.aggregate(101);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    40,
+                ),
+                Some(
+                    100,
+                ),
+                Some(
+                    60,
+                ),
+                CatchingUp,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            view.nodes[0].node.head_seqno,
+            view.nodes[0].node.network_head_seqno,
+            view.nodes[0].node.sync_lag_blocks,
+            view.nodes[0].sync_status,
+        ));
     }
 
     #[test]
@@ -930,6 +987,7 @@ mod tests {
             .unwrap();
         assert_eq!(view.chain.unwrap().seqno, 12);
         assert_eq!(view.chain_source, "peer_attestation");
+        assert_eq!(local_node.node.network_head_seqno, Some(12));
         assert_eq!(local_node.node.sync_lag_blocks, Some(5));
         assert_eq!(local_node.sync_status, SyncStatus::CatchingUp);
         assert_eq!(view.totals.synchronized_nodes, 1);

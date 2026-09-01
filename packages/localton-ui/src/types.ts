@@ -43,6 +43,26 @@ export interface ObserverView {
   readonly node_count: number
 }
 
+export interface StateDownloadProgress {
+  readonly downloaded_bytes: number
+  readonly total_bytes: number
+  readonly bytes_per_second: number
+  readonly remaining_seconds: number
+}
+
+export interface InitialSyncProgress {
+  readonly stage:
+    | "starting"
+    | "discovering_key_blocks"
+    | "downloading_masterchain_state"
+    | "downloading_shard_states"
+    | "preparing"
+  readonly masterchain_seqno: number | null
+  readonly current_part: number | null
+  readonly total_parts: number | null
+  readonly state_download: StateDownloadProgress | null
+}
+
 export interface NodeView {
   readonly observer_id: string
   readonly generated_at: number
@@ -64,16 +84,23 @@ export interface NodeView {
   readonly public_ip: string
   readonly roles: readonly string[]
   readonly running: boolean
-  readonly process_id?: number
+  readonly process_id: number | null
   readonly status: string
-  readonly last_error?: string
-  readonly head_seqno?: number
-  readonly sync_lag_blocks?: number
+  readonly last_error: string | null
+  readonly head_seqno: number | null
+  readonly network_head_seqno: number | null
+  readonly sync_initial_masterchain_block_time: number | null
+  readonly sync_masterchain_block_time: number | null
+  readonly sync_target_time: number | null
+  readonly initial_sync_progress: InitialSyncProgress | null
+  readonly sync_progressed_at: number | null
+  readonly sync_lag_blocks: number | null
   readonly participate_in_elections: boolean
   readonly current_validator: boolean | null
   readonly next_validator: boolean | null
-  readonly validator_public_key?: string
-  readonly validator_adnl?: string
+  readonly validator_public_key: string | null
+  readonly validator_public_keys: readonly string[]
+  readonly validator_adnl: string | null
 }
 
 export interface ProductionView {
@@ -107,10 +134,10 @@ export interface NetworkView {
   readonly protocol_version: number
   readonly network_id: string
   readonly generated_at: number
-  readonly chain?: ChainHead
+  readonly chain: ChainHead | null
   readonly chain_source: "local_verification" | "peer_attestation" | "unavailable"
   readonly shards: readonly ShardHead[]
-  readonly election?: ElectionObservation
+  readonly election: ElectionObservation | null
   readonly totals: NetworkTotals
   readonly observers: readonly ObserverView[]
   readonly nodes: readonly NodeView[]

@@ -42,7 +42,10 @@ impl HostPortAllocation {
         mut available: impl FnMut(RangeInclusive<u16>) -> bool,
     ) -> Result<Self> {
         ensure!(first_candidate > 0, "join port base must be positive");
-        ensure!(node_count > 0, "join must allocate ports for at least one node");
+        ensure!(
+            node_count > 0,
+            "join must allocate ports for at least one node"
+        );
         let node_count = u16::try_from(node_count).map_err(|_| {
             anyhow::anyhow!("joined node count does not fit the TCP/UDP port space")
         })?;
@@ -60,9 +63,7 @@ impl HostPortAllocation {
                 return Ok(Self::at(start, node_count));
             }
         }
-        bail!(
-            "no contiguous range of {width} TCP/UDP ports is available from {first_candidate}"
-        )
+        bail!("no contiguous range of {width} TCP/UDP ports is available from {first_candidate}")
     }
 
     fn at(start: u16, node_count: u16) -> Self {
@@ -113,10 +114,8 @@ mod tests {
 
     #[test]
     fn allocation_skips_to_the_first_contiguous_range() {
-        let allocation = HostPortAllocation::find_with(19_000, 2, |range| {
-            *range.start() >= 19_003
-        })
-        .unwrap();
+        let allocation =
+            HostPortAllocation::find_with(19_000, 2, |range| *range.start() >= 19_003).unwrap();
 
         assert_eq!(allocation.start, 19_003);
         assert_eq!(allocation.end, 19_013);

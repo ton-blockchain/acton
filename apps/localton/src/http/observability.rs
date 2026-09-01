@@ -330,14 +330,9 @@ async fn publication_loop(
         };
         if publish {
             let snapshot = chain.borrow().clone();
-            if let Err(error) = publish_runtime_observation(
-                &layout,
-                &owned_nodes,
-                &publication,
-                &snapshot,
-                &store,
-            )
-            .await
+            if let Err(error) =
+                publish_runtime_observation(&layout, &owned_nodes, &publication, &snapshot, &store)
+                    .await
             {
                 warn!(%error, "observability publication failed");
             }
@@ -406,7 +401,7 @@ async fn publish_runtime_observation(
     let now = unix_time();
     let settings = Settings::load(&layout.settings)?;
     let runtime = RuntimeState::load(&layout.runtime)?;
-    let network_head = chain.observation.as_ref().map(|chain| chain.head.seqno);
+    let chain_head = chain.observation.as_ref().map(|chain| &chain.head);
     let nodes = owned_nodes
         .iter()
         .filter_map(|name| settings.node(name).ok().cloned())
@@ -427,7 +422,12 @@ async fn publish_runtime_observation(
             };
             let current_validator = membership(chain.current_validator_keys.as_ref());
             let next_validator = membership(chain.next_validator_keys.as_ref());
-            let head_seqno = chain.node_heads.get(&node.name).copied();
+            let sampled_head = chain.node_heads.get(&node.name).copied();
+            let head_seqno = sampled_head.or(runtime.head_seqno);
+            let network_head_seqno = chain_head
+                .map(|head| head.seqno)
+                .or(runtime.network_head_seqno)
+                .map(|network| head_seqno.map_or(network, |local| network.max(local)));
             let mut roles = vec!["full_node".to_owned()];
             if node.validator {
                 roles.push("validator".to_owned());
@@ -444,7 +444,14 @@ async fn publish_runtime_observation(
                 status: runtime.status,
                 last_error: runtime.last_error,
                 head_seqno,
-                sync_lag_blocks: network_head
+                network_head_seqno,
+                sync_initial_masterchain_block_time: runtime
+                    .sync_initial_masterchain_block_time,
+                sync_masterchain_block_time: runtime.sync_masterchain_block_time,
+                sync_target_time: runtime.sync_target_time,
+                initial_sync_progress: runtime.initial_sync_progress,
+                sync_progressed_at: runtime.sync_progressed_at,
+                sync_lag_blocks: network_head_seqno
                     .zip(head_seqno)
                     .map(|(network, node)| network.saturating_sub(node)),
                 participate_in_elections: node.participate_in_elections,
@@ -1001,6 +1008,12 @@ mod tests {
                 initialized: true,
                 running: true,
                 status: "synchronizing".to_owned(),
+                head_seqno: Some(40),
+                network_head_seqno: Some(100),
+                sync_initial_masterchain_block_time: Some(1_000),
+                sync_masterchain_block_time: Some(1_020),
+                sync_target_time: Some(1_040),
+                sync_progressed_at: Some(50),
                 ..crate::storage::NodeRuntime::default()
             },
         );
@@ -1047,6 +1060,41 @@ mod tests {
         .unwrap();
 
         assert!(second_sequence > first_sequence);
+        let observation = store.read().await.local().unwrap();
+        expect_test::expect![[r#"
+            (
+                Some(
+                    40,
+                ),
+                Some(
+                    100,
+                ),
+                Some(
+                    60,
+                ),
+                Some(
+                    1000,
+                ),
+                Some(
+                    1020,
+                ),
+                Some(
+                    1040,
+                ),
+                Some(
+                    50,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(
+            observation.payload.nodes[0].head_seqno,
+            observation.payload.nodes[0].network_head_seqno,
+            observation.payload.nodes[0].sync_lag_blocks,
+            observation.payload.nodes[0].sync_initial_masterchain_block_time,
+            observation.payload.nodes[0].sync_masterchain_block_time,
+            observation.payload.nodes[0].sync_target_time,
+            observation.payload.nodes[0].sync_progressed_at,
+        ));
         shutdown.send(true).unwrap();
         task.await.unwrap();
     }

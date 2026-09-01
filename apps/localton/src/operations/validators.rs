@@ -626,7 +626,9 @@ async fn node_is_synchronized(toolchain: &Toolchain, node: &NodeSettings) -> Res
         )
         .await?;
     let now = stats.unix_time()?;
-    let masterchain_time = stats.masterchain_block_time()?;
+    let Some(masterchain_time) = stats.masterchain_block_time()? else {
+        return Ok(false);
+    };
     Ok(masterchain_time > 0 && now.saturating_sub(masterchain_time) <= MAX_VALIDATOR_LAG_SECONDS)
 }
 
@@ -809,9 +811,7 @@ mod tests {
         set_election_mode,
     };
     use crate::cli::StateArgs;
-    use crate::storage::{
-        Layout, NodePorts, NodeRuntime, NodeSettings, RuntimeState, Settings,
-    };
+    use crate::storage::{Layout, NodePorts, NodeRuntime, NodeSettings, RuntimeState, Settings};
 
     fn follower_settings() -> Settings {
         let mut settings = Settings::for_join();

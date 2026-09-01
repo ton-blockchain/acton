@@ -17,6 +17,7 @@ use utoipa::ToSchema;
 
 use super::tools::types::{
     DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId,
+    is_public_ipv4,
 };
 
 const MASTERCHAIN_ID: i32 = -1;
@@ -101,6 +102,29 @@ impl GlobalConfig {
             !self.dht.static_nodes.nodes.is_empty(),
             "global config has no DHT entry points"
         );
+        Ok(())
+    }
+
+    /// Rejects a host address that public TON overlay peers cannot reach.
+    ///
+    /// DHT queries may succeed from behind NAT even when full-node replies are sent
+    /// to an advertised loopback or private address. Failing before validator-engine
+    /// starts avoids an indefinite `process.initial_sync` proof-download loop.
+    pub(crate) fn validate_advertise_ip(&self, advertise_ip: Ipv4Addr) -> Result<()> {
+        let public_network = self
+            .dht
+            .static_nodes
+            .nodes
+            .iter()
+            .any(DhtNodeDescriptor::advertises_public_ipv4);
+        if public_network {
+            ensure!(
+                is_public_ipv4(advertise_ip),
+                "joining a public TON network requires a publicly reachable \
+                 --advertise-ip, but {advertise_ip} is not public; forward the node's \
+                 ADNL UDP port to a static public IPv4 address"
+            );
+        }
         Ok(())
     }
 
@@ -250,6 +274,9 @@ mod tests {
         let decoded = GlobalConfig::from_json_bytes(&json).unwrap();
 
         assert_eq!(decoded, config);
+        decoded
+            .validate_advertise_ip(Ipv4Addr::new(192, 168, 27, 4))
+            .unwrap();
     }
 
     #[test]
@@ -260,5 +287,9 @@ mod tests {
         .unwrap();
 
         config.validate_for_node_join().unwrap();
+        assert!(config.validate_advertise_ip(Ipv4Addr::LOCALHOST).is_err());
+        config
+            .validate_advertise_ip(Ipv4Addr::new(203, 12, 34, 56))
+            .unwrap();
     }
 }

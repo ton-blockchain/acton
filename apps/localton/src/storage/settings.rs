@@ -101,7 +101,10 @@ impl Settings {
             self.schema_version,
             SETTINGS_SCHEMA_VERSION
         );
-        ensure!(!self.nodes.is_empty(), "settings must contain at least one node");
+        ensure!(
+            !self.nodes.is_empty(),
+            "settings must contain at least one node"
+        );
         self.network.validate()?;
         self.services.validate()?;
         self.validation.validate()?;

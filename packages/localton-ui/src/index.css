@@ -443,6 +443,27 @@ a {
   border-color: var(--acton-color-focus-ring);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-focus-ring) 18%, transparent);
 }
+.nodes-table th:nth-child(1) {
+  width: 11%;
+}
+.nodes-table th:nth-child(2) {
+  width: 16%;
+}
+.nodes-table th:nth-child(3) {
+  width: 24%;
+}
+.nodes-table th:nth-child(4) {
+  width: 18%;
+}
+.nodes-table th:nth-child(5) {
+  width: 9%;
+}
+.nodes-table th:nth-child(6) {
+  width: 10%;
+}
+.nodes-table th:nth-child(7) {
+  width: 12%;
+}
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -488,10 +509,6 @@ a {
   color: var(--acton-color-text-subtle);
   content: "·";
 }
-[data-lag="high"] {
-  color: var(--acton-color-warning);
-  font-weight: var(--acton-font-weight-semibold);
-}
 .sync-state,
 .validator-state {
   display: inline-flex;
@@ -532,6 +549,56 @@ a {
 }
 .sync-state[data-state="offline"] > span {
   background: var(--acton-color-danger);
+}
+.sync-progress {
+  display: grid;
+  gap: 0.38rem;
+}
+.sync-progress-heading,
+.sync-progress-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.sync-progress-percent,
+.sync-progress-detail {
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sync-progress-percent {
+  font-weight: var(--acton-font-weight-medium);
+}
+.sync-progress-track {
+  height: 0.3rem;
+  overflow: hidden;
+  border-radius: var(--acton-radius-control-sm);
+  background: color-mix(in srgb, var(--acton-color-text-subtle) 18%, transparent);
+}
+.sync-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--acton-color-warning);
+  transition: width 240ms ease-out;
+}
+.sync-progress[data-state="synced"] .sync-progress-track > span {
+  background: var(--acton-color-success);
+}
+.sync-progress[data-state="offline"] .sync-progress-track > span,
+.sync-progress[data-state="unknown"] .sync-progress-track > span {
+  background: var(--acton-color-text-subtle);
+}
+.sync-progress-pending {
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
+}
+.sync-progress-sample {
+  color: var(--acton-color-warning);
+  font-size: var(--acton-font-size-xs);
+  font-variant-numeric: tabular-nums;
 }
 .production-state {
   white-space: nowrap;
