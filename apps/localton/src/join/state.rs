@@ -34,6 +34,17 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
                 settings.node.name
             );
         }
+        ensure!(
+            settings.node.public_ip == args.advertise_ip,
+            "node `{}` advertises {}; use the original --advertise-ip {}",
+            settings.node.name,
+            settings.node.public_ip,
+            settings.node.public_ip
+        );
+        ensure!(
+            !args.validator || settings.node.validator,
+            "validator mode is fixed by the first join attempt; recreate the state directory or enable validation after initialization"
+        );
 
         settings
     } else {
@@ -87,24 +98,9 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
         info!(url = %args.global_config_url, "installed TON global config");
     }
 
-    // Initialization-time identity fields become immutable once validator-engine
-    // has created its database. Validator participation remains independently
-    // mutable through the validator commands.
-    let node = &mut settings.node;
-    let node_initialized = layout.joined_node().manifest.is_file();
-    if node_initialized {
-        ensure!(
-            node.public_ip == args.advertise_ip,
-            "node `{node_name}` advertises {}; use the original --advertise-ip {}",
-            node.public_ip,
-            node.public_ip
-        );
-    } else {
-        node.public_ip = args.advertise_ip;
-        node.validator = args.validator;
-        node.participate_in_elections = args.validator;
-    }
-    node.enabled = true;
+    // The first persisted settings own initialization-time identity. Retries can
+    // restart the node but cannot reinterpret an existing state directory.
+    settings.node.enabled = true;
 
     // settings.json is written last so it never advertises a network configuration
     // that failed validation or could not be persisted.

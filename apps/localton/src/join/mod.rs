@@ -33,7 +33,7 @@ use crate::{
 use self::{
     state::prepare_join_state,
     sync::{LocalLiteserver, wait_for_network_sync},
-    validator::validation_loop,
+    validator::{apply_network_validator_config, validation_loop},
 };
 
 /// Joins an existing TON network and owns one node for this state directory.
@@ -140,7 +140,10 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             // this host instead of depending on the bootstrap host's liteserver.
             GlobalConfig::load(&layout.global_config)?
                 .with_local_liteserver(local_liteserver.port, local_liteserver.public_key)
-                .save_atomic(&layout.global_config)?;
+                .save_atomic(&node_layout.global_config)?;
+
+            let toolchain = toolchain.with_node_config(&node_layout);
+            apply_network_validator_config(&toolchain).await?;
 
             info!(
                 endpoint = %format!("127.0.0.1:{}", local_liteserver.port),

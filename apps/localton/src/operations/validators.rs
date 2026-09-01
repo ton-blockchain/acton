@@ -92,7 +92,7 @@ pub(crate) async fn election_status(toolchain: &Toolchain) -> Result<ElectionSta
         .lite_client_tool
         .election_status(
             &OperationContext::new(Duration::from_secs(30)),
-            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+            &LiteTarget::new(toolchain.lite_config()).with_label("localton"),
         )
         .await
 }
@@ -665,7 +665,7 @@ async fn run_method_u64(
         .lite_client_tool
         .run_method(
             &OperationContext::new(Duration::from_secs(30)),
-            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+            &LiteTarget::new(toolchain.lite_config()).with_label("localton"),
             RunMethodRequest::new(address, method, arguments)?,
         )
         .await?

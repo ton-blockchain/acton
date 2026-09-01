@@ -21,6 +21,51 @@ struct FaucetGrant {
     amount_nano: u64,
 }
 
+/// Applies the joined network's election timing and stake limits to validator automation.
+///
+/// The caller must select the synchronized node's liteserver config before invoking
+/// this function. Persisted values are refreshed on every join start so later manual
+/// validator commands use the same limits as the running network.
+pub(super) async fn apply_network_validator_config(toolchain: &Toolchain) -> Result<()> {
+    let network = validators::election_status(toolchain).await?;
+    ensure!(
+        network.min_stake_nano <= network.max_stake_nano,
+        "network validator stake limits are inconsistent"
+    );
+    ensure!(
+        network.max_stake_factor_q16 >= 1 << 16,
+        "network maximum stake factor is below 1"
+    );
+
+    let mut settings = toolchain.settings()?;
+    settings.network.elected_for_seconds = network.validators_elected_for;
+    settings.network.election_start_before_seconds = network.elections_start_before;
+    settings.network.election_end_before_seconds = network.elections_end_before;
+    settings.network.stakes_frozen_for_seconds = network.stake_held_for;
+    settings.node.validator_stake_nano = settings
+        .node
+        .validator_stake_nano
+        .clamp(network.min_stake_nano, network.max_stake_nano);
+    settings.validation.max_factor = settings
+        .validation
+        .max_factor
+        .min(f64::from(network.max_stake_factor_q16) / f64::from(1_u32 << 16));
+
+    settings.validate()?;
+    settings.save_atomic(&toolchain.layout.settings)?;
+    info!(
+        operation = "configure_join_validator",
+        node = settings.node.name,
+        elected_for_seconds = settings.network.elected_for_seconds,
+        validator_stake_nano = settings.node.validator_stake_nano,
+        max_factor = settings.validation.max_factor,
+        outcome = "success",
+        "joined network validator configuration applied"
+    );
+
+    Ok(())
+}
+
 /// Runs election maintenance for the node owned by this join instance.
 ///
 /// A failed tick is logged and the loop remains alive so a temporary faucet,

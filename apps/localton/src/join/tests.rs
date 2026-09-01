@@ -85,20 +85,27 @@ fn validator_wallet_is_masterchain_scoped() {
 }
 
 #[test]
-fn local_liteserver_replaces_only_liteserver_entries() {
+fn local_liteserver_config_preserves_upstream_network_endpoints() {
     let root = tempfile::tempdir_in("/tmp").unwrap();
-    let path = root.path().join("global.config.json");
+    let layout = Layout::new(root.path().join("join"));
+    layout.create_dirs().unwrap();
     let mut expected = global_config_fixture();
-    crate::storage::write_json_atomic(&path, &expected).unwrap();
+    crate::storage::write_json_atomic(&layout.global_config, &expected).unwrap();
+    let upstream = std::fs::read(&layout.global_config).unwrap();
+    let node_layout = layout.joined_node();
+    node_layout.create_dirs().unwrap();
+    let local_config = node_layout.global_config;
 
     let local_key = TonPublicKey::from_bytes([6_u8; 32]);
-    GlobalConfig::load(&path)
+    GlobalConfig::load(&layout.global_config)
         .unwrap()
         .with_local_liteserver(38_007, local_key)
-        .save_atomic(&path)
+        .save_atomic(&local_config)
         .unwrap();
 
-    let actual: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert_eq!(std::fs::read(&layout.global_config).unwrap(), upstream);
+    let actual: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(local_config).unwrap()).unwrap();
     expected["liteservers"] = serde_json::json!([{
         "id": {
             "@type": "pub.ed25519",
@@ -140,7 +147,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
         global_config_url: format!("http://{address}/global.config.json"),
         faucet: None,
         advertise_ip: Ipv4Addr::new(10, 0, 0, 2),
-        validator: false,
+        validator: true,
         port_base: Some(41_000),
         ton_bin_dir: None,
         startup_timeout: 1,
@@ -187,21 +194,21 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
           "global_config_is_valid": true,
           "node": "node2",
           "node_ports_are_contiguous": true,
-          "participate_in_elections": false,
+          "participate_in_elections": true,
           "private_keys_downloaded": false,
-          "validator": false,
+          "validator": true,
           "zerostate_bundle_downloaded": false
         }"#]]
     .assert_eq(&serde_json::to_string_pretty(&actual).unwrap());
 
-    let mut validator_args = args;
-    validator_args.validator = true;
-    validator_args.port_base = Some(50_000);
-    prepare_join_state(&layout, &validator_args).await.unwrap();
-    let promoted = Settings::load(&layout.settings).unwrap();
-    let promoted = &promoted.node;
-    assert!(promoted.validator);
-    assert!(promoted.participate_in_elections);
+    let mut retry_args = args;
+    retry_args.validator = false;
+    retry_args.port_base = Some(50_000);
+    prepare_join_state(&layout, &retry_args).await.unwrap();
+    let retried = Settings::load(&layout.settings).unwrap();
+    let retried = &retried.node;
+    assert!(retried.validator);
+    assert!(retried.participate_in_elections);
 
     let node_manifest = layout.joined_node().manifest;
     std::fs::create_dir_all(node_manifest.parent().unwrap()).unwrap();
@@ -210,7 +217,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
     disabled.node.participate_in_elections = false;
     disabled.save_atomic(&layout.settings).unwrap();
 
-    prepare_join_state(&layout, &validator_args).await.unwrap();
+    prepare_join_state(&layout, &retry_args).await.unwrap();
     let restarted = Settings::load(&layout.settings).unwrap();
     let restarted = &restarted.node;
     assert!(restarted.validator);

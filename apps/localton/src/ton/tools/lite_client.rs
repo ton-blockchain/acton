@@ -261,6 +261,14 @@ pub struct ElectionStatus {
     pub elections_end_before: u32,
     /// How long elected stake remains locked after the round.
     pub stake_held_for: u32,
+    /// Minimum stake accepted by Elector, in nanotons.
+    pub min_stake_nano: u64,
+    /// Maximum stake accepted by Elector, in nanotons.
+    pub max_stake_nano: u64,
+    /// Network-wide stake required for a successful election, in nanotons.
+    pub min_total_stake_nano: u64,
+    /// Maximum effective-stake ratio encoded as a fixed-point Q16 value.
+    pub max_stake_factor_q16: u32,
     /// Validator set currently securing the network.
     pub current: ValidatorSetInfo,
     /// Elected replacement set, when selection has completed.
@@ -611,10 +619,13 @@ impl LiteClient for NativeLiteClient {
     ) -> Result<ElectionStatus> {
         observe_native(context, target, LiteOperation::ElectionStatus, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            let config = client.config_params(vec![1, 15, 34, 36]).await?;
+            let config = client.config_params(vec![1, 15, 17, 34, 36]).await?;
             let timing = config
                 .get_election_timings()
                 .context("config parameter 15 has invalid election timing")?;
+            let stakes = config
+                .get_validator_stake_params()
+                .context("config parameter 17 has invalid validator stake limits")?;
             let elector = config
                 .get_elector_address()
                 .context("config parameter 1 has no valid Elector address")?;
@@ -630,6 +641,13 @@ impl LiteClient for NativeLiteClient {
                 elections_start_before: timing.elections_start_before,
                 elections_end_before: timing.elections_end_before,
                 stake_held_for: timing.stake_held_for,
+                min_stake_nano: u64::try_from(stakes.min_stake.into_inner())
+                    .context("config parameter 17 min_stake exceeds u64")?,
+                max_stake_nano: u64::try_from(stakes.max_stake.into_inner())
+                    .context("config parameter 17 max_stake exceeds u64")?,
+                min_total_stake_nano: u64::try_from(stakes.min_total_stake.into_inner())
+                    .context("config parameter 17 min_total_stake exceeds u64")?,
+                max_stake_factor_q16: stakes.max_stake_factor,
                 current: validator_set_info(current)?,
                 next: next.map(validator_set_info).transpose()?,
             })
