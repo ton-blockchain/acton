@@ -192,10 +192,7 @@ pub(super) async fn start(
 
     info!(%endpoint, "observability API and UI started");
 
-    Ok(RunningObservability {
-        service,
-        tasks,
-    })
+    Ok(RunningObservability { service, tasks })
 }
 
 async fn openapi_handler() -> Json<utoipa::openapi::OpenApi> {
@@ -210,17 +207,11 @@ async fn openapi_handler() -> Json<utoipa::openapi::OpenApi> {
 )]
 async fn network_handler(State(state): State<ObservabilityState>) -> Json<NetworkView> {
     let network = state.network.borrow().clone();
-    Json(
-        state
-            .store
-            .write()
-            .await
-            .aggregate(
-                unix_time(),
-                network.as_ref(),
-                state.local_node_is_network_source,
-            ),
-    )
+    Json(state.store.write().await.aggregate(
+        unix_time(),
+        network.as_ref(),
+        state.local_node_is_network_source,
+    ))
 }
 
 #[utoipa::path(
@@ -311,14 +302,7 @@ async fn publication_loop(
         }
 
         let node_head = *node_head.borrow();
-        match publish_runtime_observation(
-            &layout,
-            ttl_seconds,
-            node_head,
-            &endpoint,
-            &store,
-        )
-        .await
+        match publish_runtime_observation(&layout, ttl_seconds, node_head, &endpoint, &store).await
         {
             Ok(observation) => {
                 if let Some(collector) = &collector {
@@ -364,10 +348,7 @@ struct CollectorClient {
 
 impl CollectorClient {
     fn new(endpoint: String) -> Self {
-        let url = format!(
-            "{}/api/v1/observations",
-            endpoint.trim_end_matches('/')
-        );
+        let url = format!("{}/api/v1/observations", endpoint.trim_end_matches('/'));
 
         Self {
             url,
@@ -406,7 +387,9 @@ async fn publish_runtime_observation(
     let runtime = RuntimeState::load(&layout.runtime)?;
     let node = settings.node;
     let node_runtime = runtime.node;
-    let head_seqno = node_head.map(|sample| sample.seqno).or(node_runtime.head_seqno);
+    let head_seqno = node_head
+        .map(|sample| sample.seqno)
+        .or(node_runtime.head_seqno);
     let head_observed_at = node_head.map(|sample| sample.observed_at);
     let mut roles = vec![NodeCapability::FullNode];
     if node.validator {
@@ -444,10 +427,7 @@ async fn publish_runtime_observation(
             .collect(),
         validator_adnl: node_runtime.validator_adnl.map(|key| key.to_hex()),
     };
-    let observation = store
-        .write()
-        .await
-        .publish(telemetry, now, ttl_seconds)?;
+    let observation = store.write().await.publish(telemetry, now, ttl_seconds)?;
     Ok(observation)
 }
 

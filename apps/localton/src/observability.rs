@@ -580,16 +580,15 @@ impl ObservationStore {
                     set.map(|set| validator_keys.iter().any(|key| set.contains(key)))
                 }
             };
-            let current_membership = membership(
-                network.and_then(|network| network.current_validator_keys.as_ref()),
-            );
+            let current_membership =
+                membership(network.and_then(|network| network.current_validator_keys.as_ref()));
             let next_membership =
                 membership(network.and_then(|network| network.next_validator_keys.as_ref()));
             let active_validator = current_membership.unwrap_or(masterchain > 0 || shard > 0);
             let network_head = local_network.map(|network| network.head.seqno).or_else(|| {
-                telemetry
-                    .head_observed_at
-                    .and_then(|observed_at| network.and_then(|network| network.head_at(observed_at)))
+                telemetry.head_observed_at.and_then(|observed_at| {
+                    network.and_then(|network| network.head_at(observed_at))
+                })
             });
             let sync_lag_blocks = network_head
                 .zip(telemetry.head_seqno)
@@ -827,10 +826,7 @@ mod tests {
         }
     }
 
-    fn network_state(
-        seqno: u32,
-        election: Option<ElectionObservation>,
-    ) -> VerifiedNetworkState {
+    fn network_state(seqno: u32, election: Option<ElectionObservation>) -> VerifiedNetworkState {
         VerifiedNetworkState {
             head: ChainHead {
                 seqno,
@@ -856,14 +852,11 @@ mod tests {
     fn signed_observation_rejects_tampering() {
         let identity = ObserverIdentity::from_secret([7; 32]);
         let mut store = ObservationStore::new("network".to_owned(), identity, 600);
-        let mut observation = store
-            .publish(telemetry(None), 100, 20)
-            .unwrap();
+        let mut observation = store.publish(telemetry(None), 100, 20).unwrap();
         observation.payload.software = "tampered".to_owned();
 
         let collector_identity = ObserverIdentity::from_secret([8; 32]);
-        let mut collector =
-            ObservationStore::new("network".to_owned(), collector_identity, 600);
+        let mut collector = ObservationStore::new("network".to_owned(), collector_identity, 600);
         assert!(collector.ingest(observation, 101).is_err());
     }
 
@@ -997,11 +990,11 @@ mod tests {
 
         let mut network = network_state(7, None);
         network.production = vec![ProductionView {
-                creator: hex::encode([3; 32]),
-                masterchain_blocks: 1,
-                shard_blocks: 0,
-                last_block_at: 99,
-            }];
+            creator: hex::encode([3; 32]),
+            masterchain_blocks: 1,
+            shard_blocks: 0,
+            last_block_at: 99,
+        }];
 
         let view = store.aggregate(101, Some(&network), false);
         assert!(view.nodes[0].active_validator);

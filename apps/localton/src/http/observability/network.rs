@@ -12,8 +12,8 @@ use tracing::warn;
 
 use crate::{
     observability::{
-        ChainHead, ElectionObservation, ElectionStage, MasterchainBlock, ProductionView,
-        ShardHead, ValidatorObservation, ValidatorSetObservation, VerifiedNetworkState,
+        ChainHead, ElectionObservation, ElectionStage, MasterchainBlock, ProductionView, ShardHead,
+        ValidatorObservation, ValidatorSetObservation, VerifiedNetworkState,
     },
     operations::validators,
     storage::{Layout, RuntimeState, Settings, unix_time},
@@ -190,9 +190,9 @@ impl NetworkReader {
             .as_ref()
             .is_some_and(|election| now >= u64::from(election.current.validation_ended_at));
         if validator_round_ended
-            || self.last_election_update.is_none_or(|updated| {
-                now.saturating_sub(updated) >= ELECTION_POLL_INTERVAL_SECONDS
-            })
+            || self
+                .last_election_update
+                .is_none_or(|updated| now.saturating_sub(updated) >= ELECTION_POLL_INTERVAL_SECONDS)
         {
             self.last_election_update = Some(now);
             match validators::election_status(toolchain).await {
@@ -204,15 +204,12 @@ impl NetworkReader {
                             .map(|validator| validator.public_key.clone())
                             .collect::<BTreeSet<_>>(),
                     );
-                    self.next_validator_keys = info
-                        .next
-                        .as_ref()
-                        .map(|set| {
-                            set.validators
-                                .iter()
-                                .map(|validator| validator.public_key.clone())
-                                .collect::<BTreeSet<_>>()
-                        });
+                    self.next_validator_keys = info.next.as_ref().map(|set| {
+                        set.validators
+                            .iter()
+                            .map(|validator| validator.public_key.clone())
+                            .collect::<BTreeSet<_>>()
+                    });
 
                     let elections_open_at = info
                         .current

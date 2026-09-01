@@ -189,10 +189,7 @@ impl Toolchain {
 
         self.fift_tool
             .run_script(
-                &crate::ton::tools::types::OperationContext::for_node(
-                    timeout,
-                    &settings.node.name,
-                ),
+                &crate::ton::tools::types::OperationContext::for_node(timeout, &settings.node.name),
                 FiftScriptRequest {
                     script,
                     arguments,
@@ -239,7 +236,12 @@ mod tests {
 
     #[derive(Default)]
     struct RecordingFift {
-        request: Mutex<Option<(crate::ton::tools::types::OperationContext, FiftScriptRequest)>>,
+        request: Mutex<
+            Option<(
+                crate::ton::tools::types::OperationContext,
+                FiftScriptRequest,
+            )>,
+        >,
     }
 
     #[async_trait::async_trait]
@@ -297,12 +299,7 @@ mod tests {
         );
         toolchain.fift_tool = recorder.clone();
         toolchain
-            .run_fift_script(
-                &working_dir,
-                script,
-                Vec::new(),
-                Duration::from_secs(1),
-            )
+            .run_fift_script(&working_dir, script, Vec::new(), Duration::from_secs(1))
             .await
             .unwrap();
 
