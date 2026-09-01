@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::{
     cli::{ConfigCommand, LiteCommand, StateArgs},
+    operations,
     storage::Layout,
     storage::Settings,
     ton::{
@@ -181,7 +182,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
         }
         LiteCommand::Elections { state } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            print_json(&crate::operations::validators::election_status(&toolchain).await?)?;
+            print_json(&operations::validators::election_status(&toolchain).await?)?;
         }
         LiteCommand::Config { state, params } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;

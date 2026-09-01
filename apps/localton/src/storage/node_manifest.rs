@@ -77,6 +77,14 @@ impl NodeManifest {
             .with_context(|| format!("failed to save node manifest {}", path.display()))
     }
 
+    /// Returns the durable liteserver identity advertised by this node.
+    ///
+    /// Nodes may omit the identity when liteserver mode is disabled, so callers
+    /// that publish a connection endpoint must handle the absent key explicitly.
+    pub(crate) fn liteserver_public_key(&self) -> Option<TonPublicKey> {
+        self.liteserver_public_key
+    }
+
     /// Applies durable identity to operational state from an earlier invocation.
     ///
     /// Election history and synchronization observations are not node initialization

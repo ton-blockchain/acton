@@ -4,7 +4,6 @@ use anyhow::Result;
 
 use crate::{
     cli::NodeCommand,
-    storage::NodeRole,
     ton::{toolchain::Toolchain, tools::types::OperationContext},
 };
 
@@ -14,15 +13,12 @@ pub async fn execute(command: NodeCommand) -> Result<()> {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             let settings = toolchain.settings()?;
             let node = &settings.node;
-            let node_layout = match node.role {
-                NodeRole::Genesis => toolchain.layout.genesis_node(),
-                NodeRole::Joined => toolchain.layout.joined_node(),
-            };
+            let node_layout = &toolchain.layout.node;
             let stats = toolchain
                 .validator_console_tool
                 .health(
                     &OperationContext::for_node(Duration::from_secs(20), &node.name),
-                    &toolchain.validator_console_endpoint(&node_layout, node),
+                    &toolchain.validator_console_endpoint(node_layout, node),
                 )
                 .await?;
             println!(

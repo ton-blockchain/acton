@@ -21,7 +21,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 use crate::{
     bootstrap::acquire_lock,
     cli::{SnapshotArgs, SnapshotCommand},
-    storage::{Layout, Manifest, RuntimeState},
+    storage::{Layout, Manifest, NodeManifest, NodeRole, RuntimeState, Settings, TON_RELEASE},
     ton::{
         global_config::GlobalConfigFile,
         toolchain::absolute_path,
@@ -29,16 +29,19 @@ use crate::{
     },
 };
 
-const SNAPSHOT_FORMAT_VERSION: u32 = 1;
-const SNAPSHOT_ENTRIES: &[&str] = &[
+const SNAPSHOT_FORMAT_VERSION: u32 = 2;
+const GENESIS_SNAPSHOT_ENTRIES: &[&str] = &[
     "dht",
     "genesis",
     "global.config.json",
     "manifest.json",
-    "nodes",
+    "node",
     "settings.json",
     "wallets",
 ];
+const JOINED_SNAPSHOT_ENTRIES: &[&str] =
+    &["global.config.json", "node", "settings.json", "wallets"];
+const ALL_STATE_ENTRIES: &[&str] = GENESIS_SNAPSHOT_ENTRIES;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,8 +55,15 @@ pub(crate) struct SnapshotInfo {
     pub state_size_bytes: u64,
     pub state_schema_version: u32,
     pub ton_release: String,
+    pub node_role: NodeRole,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub masterchain_seqno: Option<u32>,
+}
+
+struct SnapshotState {
+    node_role: NodeRole,
+    state_schema_version: u32,
+    ton_release: String,
 }
 
 pub(crate) fn execute(command: SnapshotCommand) -> Result<()> {
@@ -83,17 +93,18 @@ fn create(paths: &SnapshotArgs, name: Option<String>) -> Result<SnapshotInfo> {
     let snapshot_dir = snapshot_dir(paths, &state_dir, true)?;
     let layout = Layout::new(state_dir.clone());
     let _lock = acquire_lock(&layout.lock)?;
-    let manifest = Manifest::load(&layout.manifest)?;
-    GlobalConfigFile::open(layout.global_config.clone())?;
-    DhtDatabase::open(layout.dht_db.clone())?;
-    ValidatorDatabase::open(layout.validator_db.clone())?;
+    let state = validate_snapshot_state(&layout)?;
 
     let name = normalize_name(name)?;
     let created_at = unix_time();
     let id = allocate_id(&snapshot_dir)?;
     let archive_path = archive_path(&snapshot_dir, &id);
     let temporary_archive = archive_path.with_extension("zip.tmp");
-    let state_size_bytes = write_archive(&state_dir, &temporary_archive)?;
+    let state_size_bytes = write_archive(
+        &state_dir,
+        &temporary_archive,
+        snapshot_entries(state.node_role),
+    )?;
     fs::rename(&temporary_archive, &archive_path).with_context(|| {
         format!(
             "failed to commit snapshot archive {}",
@@ -109,8 +120,9 @@ fn create(paths: &SnapshotArgs, name: Option<String>) -> Result<SnapshotInfo> {
         created_at,
         archive_size_bytes,
         state_size_bytes,
-        state_schema_version: manifest.schema_version,
-        ton_release: manifest.ton_release,
+        state_schema_version: state.state_schema_version,
+        ton_release: state.ton_release,
+        node_role: state.node_role,
         masterchain_seqno,
     };
     if let Err(error) = write_info(&snapshot_dir, &info) {
@@ -173,26 +185,14 @@ fn restore(paths: &SnapshotArgs, id: &str) -> Result<SnapshotInfo> {
     fs::create_dir(&staging).with_context(|| format!("failed to create {}", staging.display()))?;
 
     let result = (|| {
-        extract_archive(&archive_path, &staging, info.state_size_bytes)?;
+        let entries = snapshot_entries(info.node_role);
+        extract_archive(&archive_path, &staging, info.state_size_bytes, entries)?;
         let staged_layout = Layout::new(staging.clone());
-        let manifest = Manifest::load(&staged_layout.manifest)?;
-        ensure!(
-            manifest.schema_version == info.state_schema_version
-                && manifest.ton_release == info.ton_release,
-            "snapshot state does not match its metadata"
-        );
-        GlobalConfigFile::open(staged_layout.global_config.clone())?;
-        DhtDatabase::open(staged_layout.dht_db.clone())?;
-        ValidatorDatabase::open(staged_layout.validator_db.clone())?;
+        ensure_snapshot_matches(&info, &validate_snapshot_state(&staged_layout)?)?;
 
         replace_state_entries(&state_dir, &staging, &backup)?;
-        let restored_state = (|| {
-            Manifest::load(&layout.manifest)?;
-            GlobalConfigFile::open(layout.global_config.clone())?;
-            DhtDatabase::open(layout.dht_db.clone())?;
-            ValidatorDatabase::open(layout.validator_db.clone())?;
-            Ok::<_, anyhow::Error>(())
-        })();
+        let restored_state = validate_snapshot_state(&layout)
+            .and_then(|state| ensure_snapshot_matches(&info, &state));
         if let Err(error) = restored_state {
             rollback_state_entries(&state_dir, &staging, &backup)?;
             return Err(error).context("restored snapshot is incomplete");
@@ -226,12 +226,57 @@ fn delete(paths: &SnapshotArgs, id: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_archive(state_dir: &Path, destination: &Path) -> Result<u64> {
+fn snapshot_entries(role: NodeRole) -> &'static [&'static str] {
+    match role {
+        NodeRole::Genesis => GENESIS_SNAPSHOT_ENTRIES,
+        NodeRole::Joined => JOINED_SNAPSHOT_ENTRIES,
+    }
+}
+
+/// Opens every durable artifact needed to restart the node represented by `layout`.
+///
+/// Both roles own the same node tree. Genesis additionally owns the network's DHT,
+/// zerostate inputs, and immutable bootstrap manifest, while joined state relies on
+/// the upstream network identity persisted in its global config.
+fn validate_snapshot_state(layout: &Layout) -> Result<SnapshotState> {
+    let settings = Settings::load(&layout.settings)?;
+    GlobalConfigFile::open(layout.global_config.clone())?;
+    GlobalConfigFile::open(layout.node.global_config.clone())?;
+    NodeManifest::load(&layout.node.manifest, &settings.node.name)?;
+    ValidatorDatabase::open(layout.node.db.clone())?;
+
+    let (state_schema_version, ton_release) = match settings.node.role {
+        NodeRole::Genesis => {
+            let manifest = Manifest::load(&layout.manifest)?;
+            DhtDatabase::open(layout.dht_db.clone())?;
+            (manifest.schema_version, manifest.ton_release)
+        }
+        NodeRole::Joined => (settings.schema_version, TON_RELEASE.to_owned()),
+    };
+
+    Ok(SnapshotState {
+        node_role: settings.node.role,
+        state_schema_version,
+        ton_release,
+    })
+}
+
+fn ensure_snapshot_matches(info: &SnapshotInfo, state: &SnapshotState) -> Result<()> {
+    ensure!(
+        state.node_role == info.node_role
+            && state.state_schema_version == info.state_schema_version
+            && state.ton_release == info.ton_release,
+        "snapshot state does not match its metadata"
+    );
+    Ok(())
+}
+
+fn write_archive(state_dir: &Path, destination: &Path, allowed_entries: &[&str]) -> Result<u64> {
     let output = File::create(destination)
         .with_context(|| format!("failed to create {}", destination.display()))?;
     let mut writer = ZipWriter::new(BufWriter::new(output));
     let mut entries = Vec::new();
-    for name in SNAPSHOT_ENTRIES {
+    for name in allowed_entries {
         let path = state_dir.join(name);
         if path.exists() {
             collect_entries(state_dir, &path, &mut entries)?;
@@ -299,7 +344,12 @@ fn collect_entries(root: &Path, path: &Path, entries: &mut Vec<PathBuf>) -> Resu
     Ok(())
 }
 
-fn extract_archive(archive_path: &Path, destination: &Path, expected_size: u64) -> Result<()> {
+fn extract_archive(
+    archive_path: &Path,
+    destination: &Path,
+    expected_size: u64,
+    allowed_entries: &[&str],
+) -> Result<()> {
     let mut archive = ZipArchive::new(BufReader::new(
         File::open(archive_path)
             .with_context(|| format!("failed to open {}", archive_path.display()))?,
@@ -312,7 +362,7 @@ fn extract_archive(archive_path: &Path, destination: &Path, expected_size: u64) 
             .enclosed_name()
             .context("snapshot archive contains an unsafe path")?;
         ensure!(
-            is_snapshot_entry(&relative),
+            is_snapshot_entry(&relative, allowed_entries),
             "snapshot archive contains an unexpected path: {}",
             relative.display()
         );
@@ -344,7 +394,7 @@ fn extract_archive(archive_path: &Path, destination: &Path, expected_size: u64) 
 fn replace_state_entries(state_dir: &Path, staging: &Path, backup: &Path) -> Result<()> {
     fs::create_dir(backup).with_context(|| format!("failed to create {}", backup.display()))?;
     let mut moved = Vec::new();
-    for name in SNAPSHOT_ENTRIES {
+    for name in ALL_STATE_ENTRIES {
         let current = state_dir.join(name);
         if current.exists() {
             if let Err(error) = fs::rename(&current, backup.join(name)) {
@@ -358,7 +408,7 @@ fn replace_state_entries(state_dir: &Path, staging: &Path, backup: &Path) -> Res
             moved.push(*name);
         }
     }
-    for name in SNAPSHOT_ENTRIES {
+    for name in ALL_STATE_ENTRIES {
         let current = state_dir.join(name);
         let restored = staging.join(name);
         if restored.exists()
@@ -373,7 +423,7 @@ fn replace_state_entries(state_dir: &Path, staging: &Path, backup: &Path) -> Res
 }
 
 fn rollback_state_entries(state_dir: &Path, staging: &Path, backup: &Path) -> Result<()> {
-    for name in SNAPSHOT_ENTRIES.iter().rev() {
+    for name in ALL_STATE_ENTRIES.iter().rev() {
         let current = state_dir.join(name);
         if current.exists() {
             fs::rename(&current, staging.join(name)).with_context(|| {
@@ -547,11 +597,11 @@ fn archive_name(root: &Path, path: &Path) -> Result<String> {
     Ok(parts.join("/"))
 }
 
-fn is_snapshot_entry(path: &Path) -> bool {
+fn is_snapshot_entry(path: &Path, allowed_entries: &[&str]) -> bool {
     let Some(Component::Normal(first)) = path.components().next() else {
         return false;
     };
-    SNAPSHOT_ENTRIES
+    allowed_entries
         .iter()
         .any(|allowed| first == OsStr::new(allowed))
 }
@@ -608,17 +658,17 @@ mod tests {
             vec![b'x'; 2 * 1024 * 1024],
         )
         .unwrap();
-        fs::write(fixture.layout.validator_db.join("marker"), b"before").unwrap();
+        fs::write(fixture.layout.node.db.join("marker"), b"before").unwrap();
 
         let created = create(&fixture.paths, Some("Before upgrade".to_owned())).unwrap();
-        fs::write(fixture.layout.validator_db.join("marker"), b"after").unwrap();
+        fs::write(fixture.layout.node.db.join("marker"), b"after").unwrap();
         let restored = restore(&fixture.paths, &created.id).unwrap();
         let listed = list(&fixture.paths).unwrap();
         let actual = format!(
             "name: {:?}\narchive smaller than excluded log: {}\nrestored marker: {}\nlisted snapshots: {}\nruntime seqno after restore: {:?}\nrestored same snapshot: {}",
             created.name,
             created.archive_size_bytes < 2 * 1024 * 1024,
-            fs::read_to_string(fixture.layout.validator_db.join("marker")).unwrap(),
+            fs::read_to_string(fixture.layout.node.db.join("marker")).unwrap(),
             listed.len(),
             RuntimeState::load(&fixture.layout.runtime)
                 .unwrap()
@@ -633,6 +683,33 @@ listed snapshots: 1
 runtime seqno after restore: None
 restored same snapshot: true"#]]
         .assert_eq(&actual);
+    }
+
+    #[test]
+    fn joined_snapshot_restores_the_common_node_tree_only() {
+        let fixture = Fixture::joined();
+        fs::write(fixture.layout.node.db.join("marker"), b"before").unwrap();
+        fs::create_dir(&fixture.layout.dht_db).unwrap();
+        fs::write(fixture.layout.dht_db.join("unexpected"), b"not owned").unwrap();
+
+        let created = create(&fixture.paths, None).unwrap();
+        fs::write(fixture.layout.node.db.join("marker"), b"after").unwrap();
+        restore(&fixture.paths, &created.id).unwrap();
+
+        let actual = serde_json::json!({
+            "node_role": created.node_role,
+            "restored_marker": fs::read_to_string(fixture.layout.node.db.join("marker")).unwrap(),
+            "bootstrap_dht_restored": fixture.layout.dht_db.exists(),
+            "bootstrap_manifest_restored": fixture.layout.manifest.exists(),
+        });
+        expect![[r#"
+            {
+              "bootstrap_dht_restored": false,
+              "bootstrap_manifest_restored": false,
+              "node_role": "joined",
+              "restored_marker": "before"
+            }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&actual).unwrap());
     }
 
     #[test]
@@ -685,12 +762,36 @@ hidden restore directory: true"#]]
     }
 
     impl Fixture {
+        fn joined() -> Self {
+            let fixture = Self::new();
+            fs::remove_file(&fixture.layout.manifest).unwrap();
+            fs::remove_dir_all(&fixture.layout.dht_db).unwrap();
+            fs::remove_dir_all(&fixture.layout.genesis).unwrap();
+
+            let mut settings = Settings::load(&fixture.layout.settings).unwrap();
+            settings.node.name = "node2".to_owned();
+            settings.node.role = NodeRole::Joined;
+            settings.save_atomic(&fixture.layout.settings).unwrap();
+            NodeManifest::new(
+                "node2",
+                TonPublicKey::from_bytes([6; 32]),
+                Some(TonPublicKey::from_bytes([2; 32])),
+                KeyId::from_bytes([3; 32]),
+                None,
+                None,
+            )
+            .save_atomic(&fixture.layout.node.manifest)
+            .unwrap();
+
+            fixture
+        }
+
         fn new() -> Self {
             let root = tempfile::tempdir_in("/tmp").unwrap();
             let state_dir = root.path().join("localton");
             let snapshot_dir = root.path().join("snapshots");
             let layout = Layout::new(state_dir.clone());
-            layout.create_dirs().unwrap();
+            layout.create_bootstrap_dirs().unwrap();
             fs::write(
                 &layout.global_config,
                 include_bytes!(
@@ -698,8 +799,9 @@ hidden restore directory: true"#]]
                 ),
             )
             .unwrap();
+            fs::copy(&layout.global_config, &layout.node.global_config).unwrap();
             fs::write(
-                layout.validator_db.join("config.json"),
+                layout.node.db.join("config.json"),
                 serde_json::to_vec_pretty(&serde_json::json!({
                     "@type": "engine.validator.config",
                     "out_port": 3272,
@@ -727,7 +829,8 @@ hidden restore directory: true"#]]
             .unwrap();
             fs::write(
                 layout
-                    .validator_keyring
+                    .node
+                    .keyring
                     .join(KeyId::from_bytes([3; 32]).to_keyring_filename()),
                 b"key",
             )
@@ -736,9 +839,19 @@ hidden restore directory: true"#]]
             let dht_keyring = layout.dht_db.join("keyring");
             fs::create_dir(&dht_keyring).unwrap();
             fs::write(dht_keyring.join("11".repeat(32)), b"key").unwrap();
-            fs::write(layout.certs.join("client"), b"client").unwrap();
-            fs::write(layout.certs.join("server.pub"), b"server").unwrap();
+            fs::write(layout.node.certs.join("client"), b"client").unwrap();
+            fs::write(layout.node.certs.join("server.pub"), b"server").unwrap();
             fs::write(&layout.settings, "{}\n").unwrap();
+            NodeManifest::new(
+                "genesis",
+                TonPublicKey::from_bytes([6; 32]),
+                Some(TonPublicKey::from_bytes([2; 32])),
+                KeyId::from_bytes([3; 32]),
+                Some(TonPublicKey::from_bytes([1; 32])),
+                Some(KeyId::from_bytes([5; 32])),
+            )
+            .save_atomic(&layout.node.manifest)
+            .unwrap();
             Manifest {
                 schema_version: SCHEMA_VERSION,
                 ton_release: TON_RELEASE.to_owned(),

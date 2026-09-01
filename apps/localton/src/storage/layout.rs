@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ton::tools::types::TonPublicKey;
 
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 pub const TON_RELEASE: &str = "v2026.06";
 
 pub const VALIDATOR_CONSOLE_PORT: u16 = 4441;
@@ -20,11 +20,11 @@ pub const OUT_PORT: u16 = 3272;
 #[derive(Debug, Clone)]
 pub struct Layout {
     pub root: PathBuf,
+    /// The only validator-engine node owned by this state directory
+    pub node: NodeLayout,
+    /// Bootstrap-only resources used to create the network zerostate
     pub genesis: PathBuf,
-    pub validator_db: PathBuf,
-    pub validator_keyring: PathBuf,
     pub dht_db: PathBuf,
-    pub certs: PathBuf,
     pub resources: PathBuf,
     pub smartcont: PathBuf,
     pub zerostate: PathBuf,
@@ -40,12 +40,22 @@ pub struct Layout {
 impl Layout {
     pub fn new(root: PathBuf) -> Self {
         let genesis = root.join("genesis");
-        let validator_db = genesis.join("db");
         let resources = genesis.join("resources");
+        let logs = root.join("logs");
+        let node_root = root.join("node");
+        let node = NodeLayout {
+            db: node_root.join("db"),
+            keyring: node_root.join("db/keyring"),
+            certs: node_root.join("certs"),
+            logs: logs.clone(),
+            global_config: node_root.join("global.config.json"),
+            manifest: node_root.join("node-manifest.json"),
+            root: node_root,
+        };
+
         Self {
-            validator_keyring: validator_db.join("keyring"),
+            node,
             dht_db: root.join("dht"),
-            certs: genesis.join("certs"),
             smartcont: resources.join("smartcont"),
             zerostate: genesis.join("zerostate"),
             global_config: root.join("global.config.json"),
@@ -54,59 +64,45 @@ impl Layout {
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
             lock: root.join("instance.lock"),
-            logs: root.join("logs"),
-            validator_db,
+            logs,
             resources,
             genesis,
             root,
         }
     }
 
+    /// Creates the role-independent directories owned by every state directory.
+    ///
+    /// The common layout contains one validator-engine node, shared logs, and
+    /// wallets. Bootstrap-specific network artifacts have a separate lifecycle.
     pub fn create_dirs(&self) -> Result<()> {
+        for path in [&self.root, &self.logs, &self.wallets] {
+            fs::create_dir_all(path)
+                .with_context(|| format!("failed to create {}", path.display()))?;
+        }
+
+        self.node.create_dirs()
+    }
+
+    /// Creates the network-construction directories owned only by bootstrap state.
+    ///
+    /// These paths contain the durable DHT identity, zerostates, and build
+    /// resources needed to create and restart a network from its genesis.
+    pub fn create_bootstrap_dirs(&self) -> Result<()> {
+        self.create_dirs()?;
+
         for path in [
-            &self.root,
             &self.genesis,
-            &self.validator_db,
-            &self.validator_keyring,
             &self.dht_db,
-            &self.certs,
             &self.resources,
             &self.smartcont,
             &self.zerostate,
-            &self.logs,
-            &self.wallets,
         ] {
             fs::create_dir_all(path)
                 .with_context(|| format!("failed to create {}", path.display()))?;
         }
+
         Ok(())
-    }
-
-    /// Returns paths for the validator that creates and anchors a local network.
-    pub fn genesis_node(&self) -> NodeLayout {
-        NodeLayout {
-            root: self.genesis.clone(),
-            db: self.validator_db.clone(),
-            keyring: self.validator_keyring.clone(),
-            certs: self.certs.clone(),
-            logs: self.logs.clone(),
-            global_config: self.global_config.clone(),
-            manifest: self.genesis.join("node-manifest.json"),
-        }
-    }
-
-    /// Returns isolated paths for the one remote-network node owned by a join state.
-    pub fn joined_node(&self) -> NodeLayout {
-        let root = self.root.join("node");
-        NodeLayout {
-            db: root.join("db"),
-            keyring: root.join("db/keyring"),
-            certs: root.join("certs"),
-            logs: self.logs.clone(),
-            global_config: root.join("global.config.json"),
-            manifest: root.join("node-manifest.json"),
-            root,
-        }
     }
 }
 

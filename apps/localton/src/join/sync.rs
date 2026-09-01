@@ -43,8 +43,7 @@ pub(super) async fn wait_for_network_sync(
     let mut last_log = Instant::now()
         .checked_sub(LOG_INTERVAL)
         .unwrap_or_else(Instant::now);
-    let node_layout = layout.joined_node();
-    let console_endpoint = toolchain.validator_console_endpoint(&node_layout, node);
+    let console_endpoint = toolchain.validator_console_endpoint(&layout.node, node);
 
     loop {
         // Compare the remote network head with the same node through its private

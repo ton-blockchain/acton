@@ -21,6 +21,10 @@ pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
 pub struct Settings {
     /// Version of this settings format
     pub schema_version: u32,
+    /// Validated TON installation used to initialize and operate a joined node
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
+    pub ton_bin_dir: Option<PathBuf>,
     /// TON network parameters
     pub network: NetworkSettings,
     /// TON node owned by this state directory
@@ -37,6 +41,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema_version: SETTINGS_SCHEMA_VERSION,
+            ton_bin_dir: None,
             network: NetworkSettings::default(),
             node: NodeSettings::genesis(),
             services: ServiceSettings::default(),
@@ -313,7 +318,7 @@ impl NetworkSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct NodeSettings {
-    /// Lifecycle that owns this node and determines its filesystem layout
+    /// Lifecycle role that determines whether this state owns network bootstrap artifacts
     pub role: NodeRole,
     /// Stable node name
     pub name: String,

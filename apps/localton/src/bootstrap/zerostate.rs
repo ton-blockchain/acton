@@ -157,8 +157,8 @@ pub(super) async fn create_genesis_states(
             None => ZeroStateArtifacts::load(ZeroStateKind::Basechain, &layout.zerostate)?,
         };
 
-        masterchain.install_for_validator_engine(&layout.validator_db)?;
-        basechain.install_for_validator_engine(&layout.validator_db)?;
+        masterchain.install_for_validator_engine(&layout.node.db)?;
+        basechain.install_for_validator_engine(&layout.node.db)?;
         Ok(GenesisStates {
             masterchain,
             basechain,
@@ -545,7 +545,7 @@ mod tests {
     async fn combined_genesis_delegates_one_typed_masterchain_operation() {
         let directory = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(directory.path().join("state"));
-        layout.create_dirs().unwrap();
+        layout.create_bootstrap_dirs().unwrap();
         let create_state = RecordingCreateState::default();
 
         let states = create_genesis_states(

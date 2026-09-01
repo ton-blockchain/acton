@@ -84,7 +84,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
 
             // Start the host-local node and retain the liteserver identity needed
             // to query it without trusting the remote global-config liteserver list.
-            let node_layout = layout.joined_node();
+            let node_layout = layout.node.clone();
             node::initialize_joined_node(
                 &layout,
                 &node_layout,

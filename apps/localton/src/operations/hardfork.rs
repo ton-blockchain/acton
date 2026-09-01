@@ -9,19 +9,13 @@ use tokio::process::Command;
 use crate::{
     cli::HardforkArgs,
     runtime::run_checked,
-    storage::NodeRole,
     ton::lite::{BlockRef, LocalLiteClient},
     ton::toolchain::Toolchain,
 };
 
 pub async fn execute(args: HardforkArgs) -> Result<()> {
     let toolchain = Toolchain::resolve(&args.state.state_dir, None).await?;
-    let settings = toolchain.settings()?;
-    let node = &settings.node;
-    let node_layout = match node.role {
-        NodeRole::Genesis => toolchain.layout.genesis_node(),
-        NodeRole::Joined => toolchain.layout.joined_node(),
-    };
+    let node_layout = &toolchain.layout.node;
     let binary = toolchain
         .binaries
         .optional_command("create-hardfork")

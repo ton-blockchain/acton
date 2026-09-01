@@ -8,13 +8,14 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use tracing::info;
 
 use crate::{
     binaries::TonBinaries,
-    cli::{BootstrapArgs, StatusArgs},
+    cli::BootstrapArgs,
     http, node,
+    operations::status::print_connection_details,
     runtime::{self, ProcessRegistry},
     storage::{Layout, Manifest},
     storage::{NodeRole, Settings},
@@ -23,7 +24,7 @@ use crate::{
         accounts::parse_imported_accounts,
         global_config::GlobalConfigFile,
         toolchain::Toolchain,
-        tools::{lite_client::LiteTarget, types::DhtDatabase, validator_engine::ValidatorDatabase},
+        tools::{lite_client::LiteTarget, types::DhtDatabase},
     },
 };
 
@@ -43,11 +44,12 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
     let _state_lock = acquire_lock(&layout.lock)?;
 
     let state_exists = layout.manifest.is_file();
+    let settings = prepare_settings(&layout, &args)?;
+    layout.create_bootstrap_dirs()?;
 
     let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
     let tools = Toolchain::official(layout.clone(), binaries);
     let timeout = Duration::from_secs(args.startup_timeout);
-    let settings = prepare_settings(&layout, &args)?;
 
     // The manifest is bootstrap's commit marker. Existing state is reused only
     // after a complete bootstrap; otherwise genesis recreates partial artifacts.
@@ -89,16 +91,8 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             &processes,
         )
         .await?;
-        let genesis_layout = layout.genesis_node();
-        let genesis_runtime = node::start(
-            &layout,
-            &genesis_layout,
-            &tools,
-            genesis,
-            timeout,
-            &processes,
-        )
-        .await?;
+        let genesis_runtime =
+            node::start(&layout, &layout.node, &tools, genesis, timeout, &processes).await?;
 
         runtime.services.insert("dht".to_owned(), dht_runtime);
         runtime.node = genesis_runtime;
@@ -139,7 +133,12 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             return Err(error);
         }
 
-        if let Err(error) = print_connection_details(&manifest, &settings, &global_config) {
+        let node_global_config = GlobalConfigFile::open(layout.node.global_config.clone())?;
+        if let Err(error) = print_connection_details(
+            &settings,
+            &manifest.liteserver_public_key,
+            &node_global_config,
+        ) {
             services.shutdown().await;
             return Err(error);
         }
@@ -278,41 +277,5 @@ fn mark_instance_stopped(layout: &Layout) -> Result<()> {
         runtime.mark_instance_stopped();
         Ok(())
     })?;
-    Ok(())
-}
-
-/// Prints connection data for a complete persisted network without starting it.
-pub async fn status(args: StatusArgs) -> Result<()> {
-    let state_root = absolute_path(&args.state.state_dir)?;
-    let layout = Layout::new(state_root);
-    let manifest = Manifest::load(&layout.manifest)?;
-    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
-    DhtDatabase::open(layout.dht_db.clone())?;
-    ValidatorDatabase::open(layout.validator_db.clone())?;
-    let settings = Settings::load_or_create(&layout.settings)?;
-    print_connection_details(&manifest, &settings, &global_config)
-}
-
-fn print_connection_details(
-    manifest: &Manifest,
-    settings: &Settings,
-    global_config: &GlobalConfigFile,
-) -> Result<()> {
-    let global = dunce::canonicalize(global_config.path()).with_context(|| {
-        format!(
-            "global config is missing: {}",
-            global_config.path().display()
-        )
-    })?;
-    let genesis = &settings.node;
-    println!(
-        "Liteserver endpoint: {}:{}",
-        genesis.public_ip, genesis.liteserver_port
-    );
-    println!(
-        "Liteserver public key: {}",
-        manifest.liteserver_public_key.to_base64()
-    );
-    println!("Global config: {}", global.display());
     Ok(())
 }

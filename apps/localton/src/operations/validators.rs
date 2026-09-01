@@ -9,7 +9,7 @@ use crate::{
     cli::{StateArgs, ValidatorCommand},
     operations::wallets,
     storage::RuntimeState,
-    storage::{Layout, NodeLayout, NodeRole, NodeSettings, Settings},
+    storage::{Layout, NodeRole, NodeSettings, Settings},
     ton::{
         toolchain::Toolchain,
         tools::{
@@ -300,8 +300,8 @@ async fn prepare_election_entry(
     wallet_address: &str,
     max_factor: f64,
 ) -> Result<ElectionEntry> {
-    let node_layout = managed_node_layout(&toolchain.layout, node);
-    let keys = if let Some(keys) = existing_election_keys(&node_layout, election_id)? {
+    let node_layout = &toolchain.layout.node;
+    let keys = if let Some(keys) = existing_election_keys(node_layout, election_id)? {
         keys
     } else {
         let context = validator_console_context(node);
@@ -438,7 +438,9 @@ async fn submit_election_entry(
     entry: ElectionEntry,
 ) -> Result<ParticipationResult> {
     let wallet = wallets::wallet(&toolchain.layout, wallet_name)?;
-    let request_dir = managed_node_layout(&toolchain.layout, node)
+    let request_dir = toolchain
+        .layout
+        .node
         .root
         .join("elections")
         .join(entry.election_id.to_string());
@@ -592,9 +594,7 @@ async fn reap_node(
         });
     }
 
-    let reap_dir = managed_node_layout(&toolchain.layout, node)
-        .root
-        .join("rewards");
+    let reap_dir = toolchain.layout.node.root.join("rewards");
     fs::create_dir_all(&reap_dir)?;
     let message = reap_dir.join(format!("recover-{}.boc", crate::storage::unix_time()));
     run_fift(
@@ -681,15 +681,7 @@ fn validator_console_endpoint(
     toolchain: &Toolchain,
     node: &NodeSettings,
 ) -> crate::ton::tools::validator_console::ValidatorConsoleEndpoint {
-    let layout = managed_node_layout(&toolchain.layout, node);
-    toolchain.validator_console_endpoint(&layout, node)
-}
-
-fn managed_node_layout(layout: &Layout, node: &NodeSettings) -> NodeLayout {
-    match node.role {
-        NodeRole::Genesis => layout.genesis_node(),
-        NodeRole::Joined => layout.joined_node(),
-    }
+    toolchain.validator_console_endpoint(&toolchain.layout.node, node)
 }
 
 async fn run_fift(
@@ -800,7 +792,7 @@ mod tests {
     fn recovers_partially_configured_election_keys() {
         let directory = tempdir().unwrap();
         let layout = Layout::new(directory.path().to_owned());
-        let node_layout = layout.joined_node();
+        let node_layout = layout.node.clone();
         node_layout.create_dirs().unwrap();
         fs::write(
             node_layout.config_json(),

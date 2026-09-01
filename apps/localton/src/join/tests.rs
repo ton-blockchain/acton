@@ -92,7 +92,7 @@ fn local_liteserver_config_preserves_upstream_network_endpoints() {
     let mut expected = global_config_fixture();
     crate::storage::write_json_atomic(&layout.global_config, &expected).unwrap();
     let upstream = std::fs::read(&layout.global_config).unwrap();
-    let node_layout = layout.joined_node();
+    let node_layout = layout.node.clone();
     node_layout.create_dirs().unwrap();
     let local_config = node_layout.global_config;
 
@@ -183,8 +183,8 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
         "global_config_is_valid": GlobalConfig::from_json_bytes(
             &std::fs::read(&layout.global_config).unwrap()
         ).is_ok(),
-        "zerostate_bundle_downloaded": layout.validator_db.join("static").exists(),
-        "private_keys_downloaded": layout.validator_keyring.read_dir().unwrap().next().is_some(),
+        "zerostate_bundle_downloaded": layout.node.db.join("static").exists(),
+        "private_keys_downloaded": layout.node.keyring.read_dir().unwrap().next().is_some(),
     });
     expect![[r#"
         {
@@ -210,7 +210,7 @@ async fn first_run_fetches_standard_global_config_and_configures_a_full_node() {
     assert!(retried.validator);
     assert!(retried.participate_in_elections);
 
-    let node_manifest = layout.joined_node().manifest;
+    let node_manifest = layout.node.manifest.clone();
     std::fs::create_dir_all(node_manifest.parent().unwrap()).unwrap();
     std::fs::write(&node_manifest, "{}").unwrap();
     let mut disabled = Settings::load(&layout.settings).unwrap();

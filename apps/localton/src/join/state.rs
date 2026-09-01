@@ -85,7 +85,7 @@ pub(super) async fn prepare_join_state(layout: &Layout, args: &JoinArgs) -> Resu
         GlobalConfig::load(&layout.global_config)?
     } else {
         ensure!(
-            !layout.joined_node().manifest.is_file(),
+            !layout.node.manifest.is_file(),
             "joining node `{node_name}` is initialized without a global config"
         );
         fetch_global_config(&args.global_config_url).await?

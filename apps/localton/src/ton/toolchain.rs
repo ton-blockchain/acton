@@ -14,7 +14,7 @@ use crate::{
     binaries::TonBinaries,
     runtime::{CommandOutput, run_checked},
     storage::{Layout, Manifest},
-    storage::{NodeLayout, NodeRole, NodeSettings, Settings},
+    storage::{NodeLayout, NodeSettings, Settings},
     ton::tools::{
         create_state::{CreateState, OfficialCreateState},
         dht_server::{DhtServer, OfficialDhtServer},
@@ -101,10 +101,8 @@ impl Toolchain {
             }
         }
         let toolchain = Self::official(layout, binaries);
-        if toolchain.layout.settings.is_file()
-            && Settings::load(&toolchain.layout.settings)?.node.role == NodeRole::Joined
-        {
-            let node_layout = toolchain.layout.joined_node();
+        if toolchain.layout.settings.is_file() {
+            let node_layout = toolchain.layout.node.clone();
             return Ok(toolchain.with_node_config(&node_layout));
         }
 
@@ -229,7 +227,7 @@ mod tests {
     fn smartcont_script_prefers_state_override_and_falls_back_to_release() {
         let temp = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(temp.path().join("state"));
-        layout.create_dirs().unwrap();
+        layout.create_bootstrap_dirs().unwrap();
         let binaries = TonBinaries {
             root: temp.path().join("ton"),
         };

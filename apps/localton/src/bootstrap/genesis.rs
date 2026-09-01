@@ -39,14 +39,14 @@ pub(super) async fn initialize(
 ) -> Result<Manifest> {
     info!("initializing a new local TON genesis");
     let genesis = &settings.node;
-    let node_layout = layout.genesis_node();
+    let node_layout = &layout.node;
     let context = OperationContext::for_node(startup_timeout, &genesis.name);
 
     // Step 1: discard only output from an interrupted bootstrap, then copy the
     // official smart-contract and Fift support files used by `create-state`.
     // This branch is entered only when no completed manifest exists.
     clean_partial_bootstrap(layout)?;
-    layout.create_dirs()?;
+    layout.create_bootstrap_dirs()?;
     copy_tree(&tools.binaries.smartcont_dir(), &layout.smartcont)?;
 
     // Step 2: create the permanent validator key before rendering zerostate.
@@ -56,7 +56,7 @@ pub(super) async fn initialize(
         .random_id
         .generate_key(
             &context,
-            GenerateKeyRequest::validator(&layout.validator_keyring),
+            GenerateKeyRequest::validator(&node_layout.keyring),
         )
         .await?;
 
@@ -80,7 +80,7 @@ pub(super) async fn initialize(
 
     // Step 3: create independent control and liteserver authentication roles
     // through the same node lifecycle used by joined nodes.
-    let service_keys = node::generate_service_keys(&node_layout, tools, genesis, &context).await?;
+    let service_keys = node::generate_service_keys(node_layout, tools, genesis, &context).await?;
     let liteserver = service_keys
         .liteserver
         .as_ref()
@@ -120,17 +120,9 @@ pub(super) async fn initialize(
     // Step 5: let validator-engine create its database and generated config,
     // patch in local control/liteserver endpoints, then use the live console to
     // register permanent validator and ADNL identities in the engine keyring.
-    node::initialize_database(
-        layout,
-        &node_layout,
-        tools,
-        genesis,
-        &service_keys,
-        &context,
-    )
-    .await?;
+    node::initialize_database(layout, node_layout, tools, genesis, &service_keys, &context).await?;
     let identity = node::configure_genesis_identity(
-        &node_layout,
+        node_layout,
         tools.validator_engine.as_ref(),
         tools.validator_console_tool.as_ref(),
         genesis,
@@ -177,7 +169,12 @@ pub(super) async fn initialize(
 /// binaries remain intact, while genesis, DHT, and global-config output are
 /// recreated as one coherent set.
 fn clean_partial_bootstrap(layout: &Layout) -> Result<()> {
-    for path in [&layout.genesis, &layout.dht_db, &layout.global_config] {
+    for path in [
+        &layout.node.root,
+        &layout.genesis,
+        &layout.dht_db,
+        &layout.global_config,
+    ] {
         match if path.is_dir() {
             fs::remove_dir_all(path)
         } else {
