@@ -91,7 +91,7 @@ pub(super) struct ConfigEndpoints {
     pub ton_http_api: Option<String>,
     /// TON HTTP API monitor URL, if the service is enabled
     pub ton_http_api_monitor: Option<String>,
-    /// Public signed network observability API and UI, if enabled
+    /// Public network dashboard and signed host-telemetry API, if enabled
     pub observability: Option<String>,
 }
 

@@ -108,7 +108,7 @@ pub struct JoinArgs {
     #[arg(long)]
     pub validator: bool,
 
-    /// IPv4 address that accepts observability API, peer, and dashboard connections
+    /// IPv4 address that accepts the observability API, telemetry, and dashboard connections
     #[arg(
         long,
         env = "LOCALTON_OBSERVABILITY_BIND",
@@ -123,7 +123,7 @@ pub struct JoinArgs {
     #[arg(long, env = "LOCALTON_JOIN_PORT_BASE")]
     pub port_base: Option<u16>,
 
-    /// Do not publish signed observations or serve the observability dashboard
+    /// Do not read network state, publish telemetry, or serve observability HTTP endpoints
     #[arg(long)]
     pub no_observability: bool,
 
@@ -271,7 +271,7 @@ pub struct BootstrapArgs {
     #[arg(long)]
     pub no_admin_http: bool,
 
-    /// Do not publish signed observations or serve the observability dashboard
+    /// Do not read network state, publish telemetry, or serve observability HTTP endpoints
     #[arg(long)]
     pub no_observability: bool,
 }

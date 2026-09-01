@@ -1,9 +1,9 @@
-//! Signed, peer-replicated observations for a Localton network.
+//! Signed host telemetry combined with independently read TON network state.
 //!
-//! Process health is a self-report authenticated by a stable observer key.
-//! Block production is kept separate: every observer derives block creators
-//! from downloaded block data, and the aggregate prefers its own verified view
-//! over a signed peer attestation.
+//! A stable observer key authenticates process health reported by one Localton
+//! state directory. Chain heads, elections, validator membership, and production
+//! never enter that signed payload; every dashboard derives them through its own
+//! liteserver connection.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -20,14 +20,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-use crate::storage::{InitialSyncProgress, ObservabilitySettings};
+use crate::storage::InitialSyncProgress;
 
-/// Wire format accepted by signed observation exchange endpoints.
-pub const PROTOCOL_VERSION: u16 = 1;
+/// Wire format accepted by the signed telemetry collector endpoint.
+pub const PROTOCOL_VERSION: u16 = 2;
 /// Maximum live observer reports retained for one network view.
 pub const MAX_OBSERVERS: usize = 1_024;
-/// Maximum reports transferred in one bounded peer exchange.
-pub const MAX_EXCHANGE_OBSERVATIONS: usize = 128;
 /// Maximum head difference that still counts as synchronized.
 pub const SYNC_LAG_TOLERANCE_BLOCKS: u32 = 2;
 const MAX_CLOCK_SKEW_SECONDS: u64 = 30;
@@ -42,30 +40,6 @@ pub struct ChainHead {
     pub gen_utime: u32,
     pub observed_at: u64,
     pub shard_count: usize,
-}
-
-/// Block identity and creator retained for production accounting.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct BlockObservation {
-    pub id: String,
-    pub workchain: i32,
-    pub shard: String,
-    pub seqno: u32,
-    pub root_hash: String,
-    pub file_hash: String,
-    pub gen_utime: u32,
-    pub creator: String,
-}
-
-/// Observer-owned chain snapshot distributed with a signed node heartbeat.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ChainObservation {
-    pub head: ChainHead,
-    pub window_started_at: u64,
-    pub shards: Vec<ShardHead>,
-    pub election: Option<ElectionObservation>,
-    pub production: Vec<ProductionView>,
-    pub blocks: Vec<BlockObservation>,
 }
 
 /// Latest block observed for one shard at the reported masterchain head.
@@ -83,20 +57,44 @@ pub struct ShardHead {
     pub want_merge: bool,
 }
 
-/// Election timing and validator-set counts decoded from on-chain configuration.
+/// One validator set and the exact interval in which it secures the network.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ValidatorSetObservation {
+    pub round_id: u32,
+    pub validation_started_at: u32,
+    pub validation_ended_at: u32,
+    pub validators: usize,
+    pub main_validators: u16,
+    /// Exact decimal representation avoids losing `u64` weight precision in JSON clients.
+    pub total_weight: String,
+    pub members: Vec<ValidatorObservation>,
+}
+
+/// Public validator identity and weight for one election cycle.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct ValidatorObservation {
+    /// Canonical lowercase Ed25519 public key.
+    pub public_key: String,
+    /// Canonical lowercase ADNL address when config provides one.
+    pub adnl_address: Option<String>,
+    /// Exact decimal representation of the validator weight.
+    pub weight: String,
+}
+
+/// Election timing and adjacent validator sets decoded from on-chain configuration.
+///
+/// TON keeps the previous, current, and elected next sets in configuration
+/// parameters 32, 34, and 36. The next set is absent until its election completes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct ElectionObservation {
-    pub round_id: u32,
     pub stage: ElectionStage,
-    pub validation_started_at: u32,
     pub elections_open_at: u32,
     pub elections_close_at: u32,
-    pub next_set_activation_at: u32,
     pub validators_elected_for: u32,
     pub stake_held_for: u32,
-    pub current_validators: u16,
-    pub current_main_validators: u16,
-    pub next_validators: Option<u16>,
+    pub previous: Option<ValidatorSetObservation>,
+    pub current: ValidatorSetObservation,
+    pub next: Option<ValidatorSetObservation>,
 }
 
 /// Election phase derived from on-chain timing and next-set availability.
@@ -111,23 +109,74 @@ pub enum ElectionStage {
     ActivationOverdue,
 }
 
-/// Process, synchronization, and validator state self-reported by one owned node.
+/// TON state independently read by the dashboard through a liteserver.
 ///
-/// Process fields are authenticated self-reports. Chain membership and block
-/// production are recomputed by every observer and are not trusted from this value.
+/// Validator keys are kept beside the chain snapshot so membership and block
+/// production can be derived locally instead of trusted from host telemetry.
+#[derive(Debug, Clone)]
+pub(crate) struct VerifiedNetworkState {
+    pub head: ChainHead,
+    pub masterchain_history: Vec<MasterchainBlock>,
+    pub shards: Vec<ShardHead>,
+    pub election: Option<ElectionObservation>,
+    pub production: Vec<ProductionView>,
+    pub current_validator_keys: Option<BTreeSet<String>>,
+    pub next_validator_keys: Option<BTreeSet<String>>,
+}
+
+impl VerifiedNetworkState {
+    /// Returns the last masterchain head that existed when a node head was sampled.
+    ///
+    /// Collector delivery and network reads run independently. Matching by block time
+    /// prevents delivery latency from appearing as node synchronization lag.
+    fn head_at(&self, observed_at: u64) -> Option<u32> {
+        self.masterchain_history
+            .iter()
+            .filter(|block| u64::from(block.gen_utime) <= observed_at)
+            .map(|block| block.seqno)
+            .max()
+    }
+}
+
+/// Masterchain position retained for time-aligned synchronization comparisons.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MasterchainBlock {
+    pub seqno: u32,
+    pub gen_utime: u32,
+}
+
+/// Network capability configured for one validator-engine process.
+///
+/// Liveness and active validator membership are reported separately; these values
+/// describe what the process is configured to provide when it is online.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeCapability {
+    FullNode,
+    Validator,
+    Liteserver,
+}
+
+/// Process and synchronization state self-reported by one owned node.
+///
+/// This payload contains only facts owned by the host. Network-wide facts are
+/// joined later from [`VerifiedNetworkState`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct NodeObservation {
+pub struct NodeTelemetry {
+    pub software: String,
+    pub observability_endpoint: String,
+    pub instance_started_at: Option<u64>,
     pub name: String,
     pub public_ip: String,
-    pub roles: Vec<String>,
+    pub roles: Vec<NodeCapability>,
     pub running: bool,
     pub process_id: Option<u32>,
     pub status: String,
     pub last_error: Option<String>,
     /// Latest masterchain block reported by the node's own liteserver
     pub head_seqno: Option<u32>,
-    /// Masterchain block used as the target for the synchronization sample
-    pub network_head_seqno: Option<u32>,
+    /// Unix time when the node's own liteserver returned `head_seqno`
+    pub head_observed_at: Option<u64>,
     /// First masterchain block time observed during the current synchronization
     pub sync_initial_masterchain_block_time: Option<u64>,
     /// Latest masterchain block time reported directly by validator-engine
@@ -138,23 +187,10 @@ pub struct NodeObservation {
     pub initial_sync_progress: Option<InitialSyncProgress>,
     /// Unix time when this node last made measurable synchronization progress
     pub sync_progressed_at: Option<u64>,
-    pub sync_lag_blocks: Option<u32>,
     pub participate_in_elections: bool,
-    pub current_validator: Option<bool>,
-    pub next_validator: Option<bool>,
     pub validator_public_key: Option<String>,
     pub validator_public_keys: Vec<String>,
     pub validator_adnl: Option<String>,
-}
-
-/// Complete unsigned report bound to one observer signature.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ObservationPayload {
-    pub endpoint: String,
-    pub software: String,
-    pub instance_started_at: Option<u64>,
-    pub node: NodeObservation,
-    pub chain: Option<ChainObservation>,
 }
 
 /// Versioned observation authenticated by the state directory's stable Ed25519 key.
@@ -167,7 +203,7 @@ pub struct SignedObservation {
     pub sequence: u64,
     pub generated_at: u64,
     pub expires_at: u64,
-    pub payload: ObservationPayload,
+    pub payload: NodeTelemetry,
     pub signature: String,
 }
 
@@ -180,7 +216,7 @@ struct SignableObservation<'a> {
     sequence: u64,
     generated_at: u64,
     expires_at: u64,
-    payload: &'a ObservationPayload,
+    payload: &'a NodeTelemetry,
 }
 
 impl SignedObservation {
@@ -198,25 +234,12 @@ impl SignedObservation {
     }
 }
 
-/// Versions known by a peer and the bounded delta offered with the request.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ExchangeRequest {
-    pub known: BTreeMap<String, u64>,
-    pub observations: Vec<SignedObservation>,
-}
-
-/// Receiver versions and observations missing from the requesting peer.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-pub struct ExchangeResponse {
-    pub known: BTreeMap<String, u64>,
-    pub observations: Vec<SignedObservation>,
-}
-
 /// Public liveness summary for one observer identity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct ObserverView {
     pub observer_id: String,
     pub endpoint: String,
+    pub software: String,
     pub generated_at: u64,
     pub expires_at: u64,
     pub online: bool,
@@ -234,8 +257,12 @@ pub struct NodeView {
     pub validator_status: ValidatorStatus,
     pub produced_masterchain_blocks: u64,
     pub produced_shard_blocks: u64,
+    pub network_head_seqno: Option<u32>,
+    pub sync_lag_blocks: Option<u32>,
+    pub current_validator: Option<bool>,
+    pub next_validator: Option<bool>,
     #[serde(flatten)]
-    pub node: NodeObservation,
+    pub telemetry: NodeTelemetry,
 }
 
 /// Synchronization classification derived from node and network head samples.
@@ -286,26 +313,13 @@ pub struct NetworkTotals {
     pub shard_blocks: usize,
 }
 
-/// Trust boundary for the chain snapshot selected by one observer.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ChainSource {
-    LocalVerification,
-    PeerAttestation,
-    Unavailable,
-}
-
-/// Observer-local aggregate returned by the public network endpoint.
-///
-/// Local chain data wins over peer attestations. The selected source remains in
-/// the response so clients can distinguish independently verified and relayed data.
+/// Aggregate returned by combining signed host telemetry with local TON reads.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct NetworkView {
     pub protocol_version: u16,
     pub network_id: String,
     pub generated_at: u64,
     pub chain: Option<ChainHead>,
-    pub chain_source: ChainSource,
     pub shards: Vec<ShardHead>,
     pub election: Option<ElectionObservation>,
     pub totals: NetworkTotals,
@@ -404,10 +418,10 @@ fn set_private_permissions(_path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// In-memory anti-replay store for local and peer observations.
+/// In-memory anti-replay store for locally published and collected telemetry.
 ///
-/// The store accepts only current signatures for one network ID, retains the newest
-/// sequence per observer, and bounds both memory use and exchange payload size.
+/// The store accepts only current signatures for one network ID and retains the
+/// newest sequence per observer. Chain state is supplied separately at read time.
 pub struct ObservationStore {
     network_id: String,
     identity: ObserverIdentity,
@@ -431,7 +445,7 @@ impl ObservationStore {
     /// Signs and installs the next local observation sequence.
     pub fn publish(
         &mut self,
-        payload: ObservationPayload,
+        payload: NodeTelemetry,
         now: u64,
         ttl_seconds: u64,
     ) -> Result<SignedObservation> {
@@ -459,50 +473,26 @@ impl ObservationStore {
         Ok(observation)
     }
 
-    /// Verifies a peer batch and retains only newer, unexpired observations.
-    ///
-    /// Validation completes before mutation, so an invalid signature cannot leave
-    /// a partially applied exchange.
-    pub fn ingest(&mut self, incoming: Vec<SignedObservation>, now: u64) -> Result<usize> {
+    /// Verifies one pushed heartbeat and retains it when its sequence is newer.
+    pub fn ingest(&mut self, observation: SignedObservation, now: u64) -> Result<bool> {
+        verify_observation(&observation, &self.network_id, now)?;
         ensure!(
-            incoming.len() <= MAX_EXCHANGE_OBSERVATIONS,
-            "exchange contains too many observations"
-        );
-        for observation in &incoming {
-            verify_observation(observation, &self.network_id, now)?;
-        }
-        let new_observers = incoming
-            .iter()
-            .map(|observation| &observation.observer_id)
-            .filter(|observer_id| !self.observations.contains_key(*observer_id))
-            .collect::<BTreeSet<_>>()
-            .len();
-        ensure!(
-            self.observations.len().saturating_add(new_observers) <= MAX_OBSERVERS,
+            self.observations.contains_key(&observation.observer_id)
+                || self.observations.len() < MAX_OBSERVERS,
             "observer store capacity exceeded"
         );
-        let mut accepted = 0;
-        for observation in incoming {
-            let replace = self
-                .observations
-                .get(&observation.observer_id)
-                .is_none_or(|current| observation.sequence > current.sequence);
-            if replace {
-                self.observations
-                    .insert(observation.observer_id.clone(), observation);
-                accepted += 1;
-            }
-        }
-        self.prune(now);
-        Ok(accepted)
-    }
 
-    /// Returns the highest sequence retained for each observer.
-    pub fn known(&self) -> BTreeMap<String, u64> {
-        self.observations
-            .iter()
-            .map(|(id, observation)| (id.clone(), observation.sequence))
-            .collect()
+        let replace = self
+            .observations
+            .get(&observation.observer_id)
+            .is_none_or(|current| observation.sequence > current.sequence);
+        if replace {
+            self.observations
+                .insert(observation.observer_id.clone(), observation);
+        }
+
+        self.prune(now);
+        Ok(replace)
     }
 
     /// Returns the most recent locally signed report, if publication has started.
@@ -510,67 +500,19 @@ impl ObservationStore {
         self.observations.get(self.identity.observer_id()).cloned()
     }
 
-    /// Selects a bounded set of live reports newer than the peer's version vector.
-    pub fn delta(&self, known: &BTreeMap<String, u64>, now: u64) -> Vec<SignedObservation> {
-        self.observations
-            .values()
-            .filter(|observation| {
-                observation.expires_at > now
-                    && known
-                        .get(&observation.observer_id)
-                        .is_none_or(|sequence| observation.sequence > *sequence)
-            })
-            .take(MAX_EXCHANGE_OBSERVATIONS)
-            .cloned()
-            .collect()
-    }
-
-    /// Lists live advertised endpoints that can extend peer discovery.
-    pub fn endpoints(&self, now: u64) -> Vec<String> {
-        let own_id = self.identity.observer_id();
-        self.observations
-            .values()
-            .filter(|observation| observation.observer_id != own_id && observation.expires_at > now)
-            .map(|observation| observation.payload.endpoint.clone())
-            .collect()
-    }
-
-    /// Builds the dashboard view and evicts reports outside retention limits.
-    pub fn aggregate(&mut self, now: u64) -> NetworkView {
+    /// Builds a dashboard view from host reports and one locally read network state.
+    ///
+    /// When the local node is also the source of the network snapshot, its row uses
+    /// that canonical head instead of comparing two independent liteserver requests.
+    pub fn aggregate(
+        &mut self,
+        now: u64,
+        network: Option<&VerifiedNetworkState>,
+        local_node_is_network_source: bool,
+    ) -> NetworkView {
         self.prune(now);
-        let local_chain =
-            self.observations
-                .get(self.identity.observer_id())
-                .and_then(|observation| {
-                    observation
-                        .payload
-                        .chain
-                        .as_ref()
-                        .map(|chain| (observation, chain))
-                });
-        let selected = local_chain.or_else(|| {
-            self.observations
-                .values()
-                .filter_map(|observation| {
-                    observation
-                        .payload
-                        .chain
-                        .as_ref()
-                        .map(|chain| (observation, chain))
-                })
-                .max_by_key(|(_, chain)| (chain.head.seqno, chain.head.observed_at))
-        });
-        let selected_chain = selected.map(|(_, chain)| chain);
-        let chain_source = selected.map_or(ChainSource::Unavailable, |(observation, _)| {
-            if observation.observer_id == self.identity.observer_id() {
-                ChainSource::LocalVerification
-            } else {
-                ChainSource::PeerAttestation
-            }
-        });
-        let network_head = selected_chain.map(|chain| chain.head.seqno);
-        let mut production = selected_chain
-            .map(|chain| chain.production.clone())
+        let mut production = network
+            .map(|network| network.production.clone())
             .unwrap_or_default();
         production.sort_by(|left, right| {
             right
@@ -590,18 +532,31 @@ impl ObservationStore {
             let observer_online = observation.expires_at > now;
             observers.push(ObserverView {
                 observer_id: observation.observer_id.clone(),
-                endpoint: observation.payload.endpoint.clone(),
+                endpoint: observation.payload.observability_endpoint.clone(),
+                software: observation.payload.software.clone(),
                 generated_at: observation.generated_at,
                 expires_at: observation.expires_at,
                 online: observer_online,
             });
 
-            let node = &observation.payload.node;
-            let online = observer_online && node.running;
-            let validator_keys = node
+            let local_network = network.filter(|_| {
+                local_node_is_network_source
+                    && observation.observer_id == self.identity.observer_id()
+            });
+            let mut telemetry = observation.payload.clone();
+            if let Some(network) = local_network {
+                if telemetry.head_seqno != Some(network.head.seqno) {
+                    telemetry.sync_progressed_at = Some(network.head.observed_at);
+                }
+                telemetry.head_seqno = Some(network.head.seqno);
+                telemetry.head_observed_at = Some(network.head.observed_at);
+            }
+            let telemetry = &telemetry;
+            let online = observer_online && telemetry.running;
+            let validator_keys = telemetry
                 .validator_public_keys
                 .iter()
-                .chain(node.validator_public_key.iter())
+                .chain(telemetry.validator_public_key.iter())
                 .filter_map(|key| public_key_hex(key))
                 .collect::<BTreeSet<_>>();
             let masterchain = validator_keys.iter().fold(0_u64, |total, key| {
@@ -618,19 +573,31 @@ impl ObservationStore {
                         .map_or(0, |counts| counts.shard_blocks),
                 )
             });
-            let current_membership = node.current_validator;
-            let next_membership = node.next_validator;
+            let membership = |set: Option<&BTreeSet<String>>| {
+                if validator_keys.is_empty() {
+                    None
+                } else {
+                    set.map(|set| validator_keys.iter().any(|key| set.contains(key)))
+                }
+            };
+            let current_membership = membership(
+                network.and_then(|network| network.current_validator_keys.as_ref()),
+            );
+            let next_membership =
+                membership(network.and_then(|network| network.next_validator_keys.as_ref()));
             let active_validator = current_membership.unwrap_or(masterchain > 0 || shard > 0);
-            let mut node = node.clone();
-            let node_network_head = network_head.max(node.network_head_seqno);
-            node.network_head_seqno = node_network_head;
-            node.sync_lag_blocks = node_network_head
-                .zip(node.head_seqno)
+            let network_head = local_network.map(|network| network.head.seqno).or_else(|| {
+                telemetry
+                    .head_observed_at
+                    .and_then(|observed_at| network.and_then(|network| network.head_at(observed_at)))
+            });
+            let sync_lag_blocks = network_head
+                .zip(telemetry.head_seqno)
                 .map(|(network, node)| network.saturating_sub(node));
-            let sync_status = sync_status(online, node.sync_lag_blocks, &node.status);
+            let sync_status = sync_status(online, sync_lag_blocks, &telemetry.status);
             let validator_status = validator_status(
-                node.roles.iter().any(|role| role == "validator"),
-                node.participate_in_elections,
+                telemetry.roles.contains(&NodeCapability::Validator),
+                telemetry.participate_in_elections,
                 current_membership,
                 next_membership,
             );
@@ -644,22 +611,26 @@ impl ObservationStore {
                 validator_status,
                 produced_masterchain_blocks: masterchain,
                 produced_shard_blocks: shard,
-                node,
+                network_head_seqno: network_head,
+                sync_lag_blocks,
+                current_validator: current_membership,
+                next_validator: next_membership,
+                telemetry: telemetry.clone(),
             });
         }
         observers.sort_by(|left, right| left.observer_id.cmp(&right.observer_id));
         nodes.sort_by(|left, right| {
-            left.node
+            left.telemetry
                 .name
-                .cmp(&right.node.name)
+                .cmp(&right.telemetry.name)
                 .then_with(|| left.observer_id.cmp(&right.observer_id))
         });
 
-        let chain = selected_chain.map(|chain| chain.head.clone());
-        let shards = selected_chain
-            .map(|chain| chain.shards.clone())
+        let chain = network.map(|network| network.head.clone());
+        let shards = network
+            .map(|network| network.shards.clone())
             .unwrap_or_default();
-        let election = selected_chain.and_then(|chain| chain.election.clone());
+        let election = network.and_then(|network| network.election.clone());
         let totals = NetworkTotals {
             observers: observers.len(),
             online_observers: observers.iter().filter(|observer| observer.online).count(),
@@ -675,12 +646,12 @@ impl ObservationStore {
                 .count(),
             configured_validators: nodes
                 .iter()
-                .filter(|node| node.node.roles.iter().any(|role| role == "validator"))
+                .filter(|node| node.telemetry.roles.contains(&NodeCapability::Validator))
                 .count(),
             active_validators: nodes.iter().filter(|node| node.active_validator).count(),
             full_nodes: nodes
                 .iter()
-                .filter(|node| node.node.roles.iter().any(|role| role == "full_node"))
+                .filter(|node| node.telemetry.roles.contains(&NodeCapability::FullNode))
                 .count(),
             masterchain_blocks: production.iter().fold(0, |total, entry| {
                 total
@@ -695,7 +666,6 @@ impl ObservationStore {
             network_id: self.network_id.clone(),
             generated_at: now,
             chain,
-            chain_source,
             shards,
             election,
             totals,
@@ -714,8 +684,7 @@ impl ObservationStore {
 
 /// Derives the observation network ID from the immutable TON genesis reference.
 ///
-/// Observers with different endpoint lists but the same zerostate share a network;
-/// reports from another chain are rejected before entering the store.
+/// Reports from another chain are rejected before entering the collector store.
 pub fn network_id(global_config: &Path) -> Result<String> {
     let bytes = fs::read(global_config)
         .with_context(|| format!("failed to read global config {}", global_config.display()))?;
@@ -757,7 +726,6 @@ fn verify_observation(
             <= MAX_OBSERVATION_TTL_SECONDS,
         "observation expiry is too far in the future"
     );
-    ObservabilitySettings::validate_endpoint(&observation.payload.endpoint)?;
     let public_key = STANDARD
         .decode(&observation.public_key)
         .context("observation public key is not valid base64")?;
@@ -815,17 +783,9 @@ fn validator_status(
     }
 }
 
-const ED25519_PUBLIC_KEY_TAG: [u8; 4] = [0xc6, 0xb4, 0x13, 0x48];
-
 pub(crate) fn public_key_hex(value: &str) -> Option<String> {
-    let bytes = STANDARD.decode(value).ok()?;
-    match bytes.as_slice() {
-        raw if raw.len() == 32 => Some(hex::encode(raw)),
-        tagged if tagged.len() == 36 && tagged.starts_with(&ED25519_PUBLIC_KEY_TAG) => {
-            Some(hex::encode(&tagged[ED25519_PUBLIC_KEY_TAG.len()..]))
-        }
-        _ => None,
-    }
+    let bytes = hex::decode(value).ok()?;
+    (bytes.len() == 32).then(|| hex::encode(bytes))
 }
 
 fn unix_time_millis() -> u64 {
@@ -841,35 +801,54 @@ fn unix_time_millis() -> u64 {
 mod tests {
     use super::*;
 
-    fn payload(endpoint: &str, creator_key: Option<String>) -> ObservationPayload {
-        ObservationPayload {
-            endpoint: endpoint.to_owned(),
+    fn telemetry(validator_key: Option<String>) -> NodeTelemetry {
+        NodeTelemetry {
             software: "localton/test".to_owned(),
+            observability_endpoint: "http://127.0.0.1:18007".to_owned(),
             instance_started_at: Some(10),
-            node: NodeObservation {
-                name: "node".to_owned(),
-                public_ip: "127.0.0.1".to_owned(),
-                roles: vec!["full_node".to_owned(), "validator".to_owned()],
-                running: true,
-                process_id: Some(1),
-                status: "running".to_owned(),
-                last_error: None,
-                head_seqno: Some(7),
-                network_head_seqno: Some(7),
-                sync_initial_masterchain_block_time: None,
-                sync_masterchain_block_time: None,
-                sync_target_time: None,
-                initial_sync_progress: None,
-                sync_progressed_at: Some(100),
-                sync_lag_blocks: Some(0),
-                participate_in_elections: true,
-                current_validator: None,
-                next_validator: None,
-                validator_public_key: creator_key,
-                validator_public_keys: Vec::new(),
-                validator_adnl: None,
+            name: "node".to_owned(),
+            public_ip: "127.0.0.1".to_owned(),
+            roles: vec![NodeCapability::FullNode, NodeCapability::Validator],
+            running: true,
+            process_id: Some(1),
+            status: "running".to_owned(),
+            last_error: None,
+            head_seqno: Some(7),
+            head_observed_at: Some(100),
+            sync_initial_masterchain_block_time: None,
+            sync_masterchain_block_time: None,
+            sync_target_time: None,
+            initial_sync_progress: None,
+            sync_progressed_at: Some(100),
+            participate_in_elections: true,
+            validator_public_key: validator_key,
+            validator_public_keys: Vec::new(),
+            validator_adnl: None,
+        }
+    }
+
+    fn network_state(
+        seqno: u32,
+        election: Option<ElectionObservation>,
+    ) -> VerifiedNetworkState {
+        VerifiedNetworkState {
+            head: ChainHead {
+                seqno,
+                root_hash: format!("root-{seqno}"),
+                file_hash: format!("file-{seqno}"),
+                gen_utime: 99,
+                observed_at: 100,
+                shard_count: 1,
             },
-            chain: None,
+            masterchain_history: vec![MasterchainBlock {
+                seqno,
+                gen_utime: 99,
+            }],
+            shards: Vec::new(),
+            election,
+            production: Vec::new(),
+            current_validator_keys: None,
+            next_validator_keys: None,
         }
     }
 
@@ -878,13 +857,14 @@ mod tests {
         let identity = ObserverIdentity::from_secret([7; 32]);
         let mut store = ObservationStore::new("network".to_owned(), identity, 600);
         let mut observation = store
-            .publish(payload("http://127.0.0.1:18003", None), 100, 20)
+            .publish(telemetry(None), 100, 20)
             .unwrap();
         observation.payload.software = "tampered".to_owned();
 
-        let peer_identity = ObserverIdentity::from_secret([8; 32]);
-        let mut peer = ObservationStore::new("network".to_owned(), peer_identity, 600);
-        assert!(peer.ingest(vec![observation], 101).is_err());
+        let collector_identity = ObserverIdentity::from_secret([8; 32]);
+        let mut collector =
+            ObservationStore::new("network".to_owned(), collector_identity, 600);
+        assert!(collector.ingest(observation, 101).is_err());
     }
 
     #[test]
@@ -896,17 +876,16 @@ mod tests {
     }
 
     #[test]
-    fn node_report_keeps_sync_progress_without_a_chain_observation() {
+    fn host_telemetry_is_combined_with_the_local_network_head() {
         let identity = ObserverIdentity::from_secret([6; 32]);
         let mut store = ObservationStore::new("network".to_owned(), identity, 600);
-        let mut report = payload("http://127.0.0.1:18003", None);
-        report.node.status = "synchronizing".to_owned();
-        report.node.head_seqno = Some(40);
-        report.node.network_head_seqno = Some(100);
-        report.node.sync_lag_blocks = Some(60);
+        let mut report = telemetry(None);
+        report.status = "synchronizing".to_owned();
+        report.head_seqno = Some(40);
         store.publish(report, 100, 20).unwrap();
 
-        let view = store.aggregate(101);
+        let network = network_state(100, None);
+        let view = store.aggregate(101, Some(&network), false);
         expect_test::expect![[r#"
             (
                 Some(
@@ -922,190 +901,178 @@ mod tests {
             )
         "#]]
         .assert_debug_eq(&(
-            view.nodes[0].node.head_seqno,
-            view.nodes[0].node.network_head_seqno,
-            view.nodes[0].node.sync_lag_blocks,
+            view.nodes[0].telemetry.head_seqno,
+            view.nodes[0].network_head_seqno,
+            view.nodes[0].sync_lag_blocks,
             view.nodes[0].sync_status,
         ));
     }
 
     #[test]
-    fn historical_tagged_validator_key_matches_raw_block_creator() {
-        let identity = ObserverIdentity::from_secret([9; 32]);
-        let producing_key = STANDARD.encode([ED25519_PUBLIC_KEY_TAG.as_slice(), &[3; 32]].concat());
-        let next_round_key =
-            STANDARD.encode([ED25519_PUBLIC_KEY_TAG.as_slice(), &[4; 32]].concat());
+    fn synchronization_uses_the_network_head_from_the_node_sample_time() {
+        let identity = ObserverIdentity::from_secret([5; 32]);
         let mut store = ObservationStore::new("network".to_owned(), identity, 600);
-        let mut report = payload("http://127.0.0.1:18003", Some(next_round_key));
-        report.node.validator_public_keys = vec![producing_key];
-        report.chain = Some(ChainObservation {
-            head: ChainHead {
-                seqno: 7,
-                root_hash: "root".to_owned(),
-                file_hash: "file".to_owned(),
-                gen_utime: 99,
-                observed_at: 100,
-                shard_count: 1,
+        let mut report = telemetry(None);
+        report.head_seqno = Some(100);
+        report.head_observed_at = Some(100);
+        store.publish(report, 105, 20).unwrap();
+
+        let mut network = network_state(110, None);
+        network.masterchain_history = vec![
+            MasterchainBlock {
+                seqno: 100,
+                gen_utime: 100,
             },
-            window_started_at: 90,
-            shards: Vec::new(),
-            election: None,
-            production: vec![ProductionView {
+            MasterchainBlock {
+                seqno: 110,
+                gen_utime: 110,
+            },
+        ];
+
+        let view = store.aggregate(105, Some(&network), false);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    100,
+                ),
+                Some(
+                    0,
+                ),
+                Synced,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            view.nodes[0].network_head_seqno,
+            view.nodes[0].sync_lag_blocks,
+            view.nodes[0].sync_status,
+        ));
+    }
+
+    #[test]
+    fn local_network_source_uses_one_canonical_head_sample() {
+        let identity = ObserverIdentity::from_secret([15; 32]);
+        let mut store = ObservationStore::new("network".to_owned(), identity, 600);
+        let mut report = telemetry(None);
+        report.head_seqno = Some(55);
+        report.head_observed_at = Some(100);
+        store.publish(report, 100, 20).unwrap();
+
+        let network = network_state(56, None);
+        let view = store.aggregate(101, Some(&network), true);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    55,
+                ),
+                Some(
+                    56,
+                ),
+                Some(
+                    56,
+                ),
+                Some(
+                    0,
+                ),
+                Synced,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            store.local().unwrap().payload.head_seqno,
+            view.nodes[0].telemetry.head_seqno,
+            view.nodes[0].network_head_seqno,
+            view.nodes[0].sync_lag_blocks,
+            view.nodes[0].sync_status,
+        ));
+    }
+
+    #[test]
+    fn historical_validator_key_matches_raw_block_creator() {
+        let identity = ObserverIdentity::from_secret([9; 32]);
+        let producing_key = hex::encode([3; 32]);
+        let next_round_key = hex::encode([4; 32]);
+        let mut store = ObservationStore::new("network".to_owned(), identity, 600);
+        let mut report = telemetry(Some(next_round_key));
+        report.validator_public_keys = vec![producing_key];
+        store.publish(report, 100, 20).unwrap();
+
+        let mut network = network_state(7, None);
+        network.production = vec![ProductionView {
                 creator: hex::encode([3; 32]),
                 masterchain_blocks: 1,
                 shard_blocks: 0,
                 last_block_at: 99,
-            }],
-            blocks: vec![BlockObservation {
-                id: "-1:8000000000000000:7".to_owned(),
-                workchain: -1,
-                shard: "8000000000000000".to_owned(),
-                seqno: 7,
-                root_hash: "root".to_owned(),
-                file_hash: "file".to_owned(),
-                gen_utime: 99,
-                creator: hex::encode([3; 32]),
-            }],
-        });
-        store.publish(report, 100, 20).unwrap();
+            }];
 
-        let view = store.aggregate(101);
+        let view = store.aggregate(101, Some(&network), false);
         assert!(view.nodes[0].active_validator);
         assert_eq!(view.nodes[0].produced_masterchain_blocks, 1);
-        assert_eq!(view.chain_source, ChainSource::LocalVerification);
     }
 
     #[test]
-    fn peer_chain_is_marked_as_an_attestation() {
+    fn collector_combines_remote_telemetry_with_its_own_network_state() {
         let local = ObserverIdentity::from_secret([1; 32]);
         let mut store = ObservationStore::new("network".to_owned(), local, 600);
-        let block = BlockObservation {
-            id: "0:8000000000000000:8".to_owned(),
-            workchain: 0,
-            shard: "8000000000000000".to_owned(),
-            seqno: 8,
-            root_hash: "root".to_owned(),
-            file_hash: "file".to_owned(),
-            gen_utime: 100,
-            creator: hex::encode([3; 32]),
-        };
-        let mut peer = ObservationStore::new(
+        let mut remote = ObservationStore::new(
             "network".to_owned(),
             ObserverIdentity::from_secret([2; 32]),
             600,
         );
-        let mut report = payload("http://192.0.2.1:18003", None);
-        report.chain = Some(ChainObservation {
-            head: ChainHead {
-                seqno: 8,
-                root_hash: "root".to_owned(),
-                file_hash: "file".to_owned(),
-                gen_utime: 100,
-                observed_at: 101,
-                shard_count: 1,
-            },
-            window_started_at: 90,
-            shards: Vec::new(),
-            election: None,
-            production: vec![ProductionView {
-                creator: block.creator.clone(),
-                masterchain_blocks: 0,
-                shard_blocks: 1,
-                last_block_at: block.gen_utime,
-            }],
-            blocks: vec![block],
-        });
-        let signed = peer.publish(report, 101, 20).unwrap();
-        store.ingest(vec![signed], 102).unwrap();
+        let mut report = telemetry(None);
+        report.name = "remote".to_owned();
+        report.head_seqno = Some(5);
+        let signed = remote.publish(report, 101, 20).unwrap();
+        assert!(store.ingest(signed, 102).unwrap());
 
-        let view = store.aggregate(102);
-        assert_eq!(view.totals.shard_blocks, 1);
-        assert_eq!(view.chain_source, ChainSource::PeerAttestation);
-    }
-
-    #[test]
-    fn local_chain_remains_authoritative_when_peer_reports_a_higher_head() {
-        let local_identity = ObserverIdentity::from_secret([11; 32]);
-        let local_id = local_identity.observer_id().to_owned();
-        let mut store = ObservationStore::new("network".to_owned(), local_identity, 600);
-        let mut local_report = payload("http://127.0.0.1:18003", None);
-        local_report.chain = Some(chain_observation(7, None));
-        store.publish(local_report, 100, 20).unwrap();
-
-        let mut peer = ObservationStore::new(
-            "network".to_owned(),
-            ObserverIdentity::from_secret([12; 32]),
-            600,
-        );
-        let mut peer_report = payload("http://192.0.2.1:18003", None);
-        peer_report.node.head_seqno = Some(12);
-        peer_report.node.network_head_seqno = Some(12);
-        peer_report.chain = Some(chain_observation(12, None));
-        let signed = peer.publish(peer_report, 101, 20).unwrap();
-        store.ingest(vec![signed], 101).unwrap();
-
-        let view = store.aggregate(101);
-        let local_node = view
-            .nodes
-            .iter()
-            .find(|node| node.observer_id == local_id)
-            .unwrap();
+        let network = network_state(7, None);
+        let view = store.aggregate(102, Some(&network), false);
+        let remote = &view.nodes[0];
         assert_eq!(view.chain.unwrap().seqno, 7);
-        assert_eq!(view.chain_source, ChainSource::LocalVerification);
-        assert_eq!(local_node.node.network_head_seqno, Some(7));
-        assert_eq!(local_node.node.sync_lag_blocks, Some(0));
-        assert_eq!(local_node.sync_status, SyncStatus::Synced);
-        assert_eq!(view.totals.synchronized_nodes, 2);
+        assert_eq!(remote.network_head_seqno, Some(7));
+        assert_eq!(remote.sync_lag_blocks, Some(2));
+        assert_eq!(remote.sync_status, SyncStatus::Synced);
+        assert_eq!(view.totals.synchronized_nodes, 1);
         assert_eq!(view.totals.catching_up_nodes, 0);
     }
 
     #[test]
     fn disabled_active_validator_is_leaving_after_the_round() {
         let identity = ObserverIdentity::from_secret([13; 32]);
-        let validator_key = STANDARD.encode([ED25519_PUBLIC_KEY_TAG.as_slice(), &[5; 32]].concat());
+        let validator_key = hex::encode([5; 32]);
         let mut store = ObservationStore::new("network".to_owned(), identity, 600);
-        let mut report = payload("http://127.0.0.1:18003", Some(validator_key));
-        report.node.participate_in_elections = false;
-        report.node.current_validator = Some(true);
-        report.chain = Some(chain_observation(
-            7,
-            Some(ElectionObservation {
-                round_id: 120,
-                stage: ElectionStage::Validation,
-                validation_started_at: 0,
-                elections_open_at: 30,
-                elections_close_at: 90,
-                next_set_activation_at: 120,
-                validators_elected_for: 120,
-                stake_held_for: 30,
-                current_validators: 1,
-                current_main_validators: 1,
-                next_validators: None,
-            }),
-        ));
+        let mut report = telemetry(Some(validator_key));
+        report.participate_in_elections = false;
         store.publish(report, 100, 20).unwrap();
 
-        let view = store.aggregate(101);
+        let mut network = network_state(
+            7,
+            Some(ElectionObservation {
+                stage: ElectionStage::Validation,
+                elections_open_at: 30,
+                elections_close_at: 90,
+                validators_elected_for: 120,
+                stake_held_for: 30,
+                previous: None,
+                current: ValidatorSetObservation {
+                    round_id: 0,
+                    validation_started_at: 0,
+                    validation_ended_at: 120,
+                    validators: 1,
+                    main_validators: 1,
+                    total_weight: "1".to_owned(),
+                    members: vec![ValidatorObservation {
+                        public_key: hex::encode([5; 32]),
+                        adnl_address: None,
+                        weight: "1".to_owned(),
+                    }],
+                },
+                next: None,
+            }),
+        );
+        network.current_validator_keys = Some(BTreeSet::from([hex::encode([5; 32])]));
+
+        let view = store.aggregate(101, Some(&network), false);
         assert!(view.nodes[0].active_validator);
         assert_eq!(view.nodes[0].validator_status, ValidatorStatus::Leaving);
         assert_eq!(view.totals.active_validators, 1);
-    }
-
-    fn chain_observation(seqno: u32, election: Option<ElectionObservation>) -> ChainObservation {
-        ChainObservation {
-            head: ChainHead {
-                seqno,
-                root_hash: format!("root-{seqno}"),
-                file_hash: format!("file-{seqno}"),
-                gen_utime: 99,
-                observed_at: 100,
-                shard_count: 1,
-            },
-            window_started_at: 90,
-            shards: Vec::new(),
-            election,
-            production: Vec::new(),
-            blocks: Vec::new(),
-        }
     }
 }

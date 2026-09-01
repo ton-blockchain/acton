@@ -12,6 +12,7 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 - Later runs continue the same blockchain from the stored state.
 - The bootstrap instance owns genesis; each joining instance owns one host-local node and its private keys.
 - A node joins the network from public bootstrap data and can enter elections independently.
+- Each instance reads TON state through a liteserver and signs only host-local node telemetry.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
 - A new zerostate can include active basechain accounts from another network.
@@ -54,7 +55,7 @@ curl 'http://127.0.0.1:18003/api/v3/blocks?workchain=-1&limit=8&sort=desc'
 
 | Service | Purpose |
 | --- | --- |
-| `localton` | Runs the local TON network and API V2. |
+| `localton` | Runs the local TON network, API V2, and the network dashboard. |
 | `postgres` | Stores the indexed blockchain data. |
 | `redis` | Stores data for API V3 and the event classifier. |
 | `v3-migrations` | Creates the PostgreSQL schema. |
@@ -75,6 +76,7 @@ Compose publishes only these ports on the host:
 | `http://127.0.0.1:18001` | Administrative HTTP API and faucet. |
 | `http://127.0.0.1:18002/api/v2` | TON Center API V2. |
 | `http://127.0.0.1:18003/api/v3` | TON Center API V3. |
+| `http://127.0.0.1:18007` | Network dashboard and signed host-telemetry API. |
 | `127.0.0.1:18004/tcp` | Primary liteserver. |
 
 PostgreSQL, Redis, and DHT stay inside the Compose network. API V2 and API V3 include browser CORS and PNA headers.
@@ -93,6 +95,7 @@ LOCALTON_CONFIG_API_PORT=28000 \
 LOCALTON_ADMIN_API_PORT=28001 \
 LOCALTON_V2_API_PORT=28002 \
 LOCALTON_V3_API_PORT=28003 \
+LOCALTON_OBSERVABILITY_PORT=28007 \
 docker compose up -d
 ```
 
@@ -241,6 +244,37 @@ localton node stats --state-dir .localton-node2
 
 Keep the joining instance active while the node runs. `Ctrl-C` or `SIGTERM` stops its validator-engine process. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
 
+## Observe network health across nodes
+
+Every bootstrap or join instance reads chain heads, shard state, elections, validator
+sets, and block production directly through a TON liteserver. Signed observations
+contain only host-owned state such as process health, synchronization progress, and
+validator intent; network facts are never copied into the signed payload.
+
+The bootstrap instance collects host telemetry pushed by joined Localton instances
+and combines it with its own TON reads. Collection is best effort: an unavailable
+dashboard does not stop a joined node or its validator-engine process.
+
+Open the bootstrap dashboard at `http://127.0.0.1:18007`. Its API is available at:
+
+```text
+http://127.0.0.1:18007/api/v1/openapi.json
+http://127.0.0.1:18007/api/v1/network
+http://127.0.0.1:18007/api/v1/observation
+```
+
+When `join` downloads its global config from a Localton configuration service, it
+also discovers that instance as its telemetry collector. A standard TON global config
+host does not provide a Localton collector. The local dashboard still reads the network
+and shows its own node.
+
+Joining instances reserve the observability port together with the five persistent
+node ports. The first join starts at `19000` by default, then reuses the saved range.
+Use `--port-base` to select a different first candidate.
+
+Use `--observability-bind` to choose the listener address. Disable network reads,
+telemetry publication, collection, and the dashboard with `--no-observability`.
+
 ## Native ports
 
 The native network uses these ports by default:
@@ -256,6 +290,7 @@ The native network uses these ports by default:
 | `http://127.0.0.1:18002/api/v2` | Optional public API V2 proxy. |
 | `http://127.0.0.1:18005/api/v2` | Optional internal API V2 backend. |
 | `http://127.0.0.1:18006` | Optional API V2 monitor. |
+| `http://127.0.0.1:18007` | Network dashboard and signed host-telemetry API. |
 
 ## TON HTTP API V2
 
@@ -505,7 +540,8 @@ The command prints the output path and the block identifier that anchors the for
 
 ## HTTP services
 
-The bootstrap instance starts the configuration API and administrative API by default. Both services bind to `127.0.0.1` by default.
+The bootstrap instance starts the configuration API, administrative API, and network dashboard by default.
+Configuration and administration bind to `127.0.0.1`. The dashboard accepts host telemetry on all IPv4 interfaces.
 
 The configuration API on port `18000` provides these routes:
 
@@ -530,6 +566,7 @@ Disable either service for one run:
 ```bash
 localton bootstrap --no-config-http
 localton bootstrap --no-admin-http
+localton bootstrap --no-observability
 ```
 
 The API V2 proxy preserves methods, paths, queries, bodies, statuses, and end-to-end headers. It also adds browser CORS and PNA headers.

@@ -233,6 +233,17 @@ impl RunMethodResult {
     }
 }
 
+/// One validator entry decoded from an on-chain validator set.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ValidatorSetMemberInfo {
+    /// Canonical lowercase Ed25519 public key.
+    pub public_key: String,
+    /// Canonical lowercase ADNL address when the set entry provides one.
+    pub adnl_address: Option<String>,
+    /// Voting weight assigned by the validator set.
+    pub weight: u64,
+}
+
 /// On-chain validator set needed by election automation and status reporting.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ValidatorSetInfo {
@@ -240,15 +251,15 @@ pub struct ValidatorSetInfo {
     pub since: u32,
     /// Unix timestamp at which the set stops being active.
     pub until: u32,
-    /// Number of validators in the set.
-    pub total: u16,
     /// Number of validators assigned to the masterchain subset.
     pub main: u16,
-    /// Canonical lowercase Ed25519 public keys in validator order.
-    pub public_keys: Vec<String>,
+    /// Sum of validator voting weights in this set.
+    pub total_weight: u64,
+    /// Validators in the canonical order used to select the masterchain subset.
+    pub validators: Vec<ValidatorSetMemberInfo>,
 }
 
-/// Election timing and current/next validator sets decoded from chain config.
+/// Election timing and adjacent validator sets decoded from chain config.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ElectionStatus {
     /// Canonical raw masterchain address of the Elector contract.
@@ -271,6 +282,8 @@ pub struct ElectionStatus {
     pub max_stake_factor_q16: u32,
     /// Validator set currently securing the network.
     pub current: ValidatorSetInfo,
+    /// Validator set from the preceding round, when retained by the network.
+    pub previous: Option<ValidatorSetInfo>,
     /// Elected replacement set, when selection has completed.
     pub next: Option<ValidatorSetInfo>,
 }
@@ -619,7 +632,7 @@ impl LiteClient for NativeLiteClient {
     ) -> Result<ElectionStatus> {
         observe_native(context, target, LiteOperation::ElectionStatus, async {
             let mut client = LocalLiteClient::connect(&target.global_config).await?;
-            let config = client.config_params(vec![1, 15, 17, 34, 36]).await?;
+            let config = client.config_params(vec![1, 15, 17, 32, 34, 36]).await?;
             let timing = config
                 .get_election_timings()
                 .context("config parameter 15 has invalid election timing")?;
@@ -632,6 +645,9 @@ impl LiteClient for NativeLiteClient {
             let current = config
                 .get_current_validator_set()
                 .context("config parameter 34 has no valid current validator set")?;
+            let previous = config
+                .get_previous_validator_set()
+                .context("config parameter 32 has an invalid previous validator set")?;
             let next = config
                 .get_next_validator_set()
                 .context("config parameter 36 has an invalid next validator set")?;
@@ -648,8 +664,9 @@ impl LiteClient for NativeLiteClient {
                 min_total_stake_nano: u64::try_from(stakes.min_total_stake.into_inner())
                     .context("config parameter 17 min_total_stake exceeds u64")?,
                 max_stake_factor_q16: stakes.max_stake_factor,
-                current: validator_set_info(current)?,
-                next: next.map(validator_set_info).transpose()?,
+                current: validator_set_info(current),
+                previous: previous.map(validator_set_info),
+                next: next.map(validator_set_info),
             })
         })
         .await
@@ -682,19 +699,22 @@ fn stack_value(value: &TVMStackValue) -> Result<StackValue> {
 }
 
 /// Narrows the canonical config model to fields used by election workflows.
-fn validator_set_info(set: ChainValidatorSet) -> Result<ValidatorSetInfo> {
-    let total = u16::try_from(set.list.len()).context("validator set exceeds u16")?;
-    Ok(ValidatorSetInfo {
+fn validator_set_info(set: ChainValidatorSet) -> ValidatorSetInfo {
+    ValidatorSetInfo {
         since: set.utime_since,
         until: set.utime_until,
-        total,
         main: set.main.get(),
-        public_keys: set
+        total_weight: set.total_weight,
+        validators: set
             .list
             .into_iter()
-            .map(|validator| TonPublicKey::from_bytes(validator.public_key.0).to_hex())
+            .map(|validator| ValidatorSetMemberInfo {
+                public_key: TonPublicKey::from_bytes(validator.public_key.0).to_hex(),
+                adnl_address: validator.adnl_addr.map(|address| hex::encode(address.0)),
+                weight: validator.weight,
+            })
             .collect(),
-    })
+    }
 }
 
 /// Applies the workflow deadline to one in-process liteserver request.

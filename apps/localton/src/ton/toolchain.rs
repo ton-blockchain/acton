@@ -178,14 +178,26 @@ impl Toolchain {
         arguments: Vec<OsString>,
         timeout: Duration,
     ) -> Result<FiftOutput> {
+        let settings = self.settings()?;
+        let include_paths = self
+            .layout
+            .smartcont
+            .is_dir()
+            .then(|| self.layout.smartcont.clone())
+            .into_iter()
+            .collect();
+
         self.fift_tool
             .run_script(
-                &crate::ton::tools::types::OperationContext::new(timeout),
+                &crate::ton::tools::types::OperationContext::for_node(
+                    timeout,
+                    &settings.node.name,
+                ),
                 FiftScriptRequest {
                     script,
                     arguments,
                     current_dir: current_dir.to_owned(),
-                    include_paths: vec![self.layout.smartcont.clone()],
+                    include_paths,
                 },
             )
             .await
@@ -221,7 +233,29 @@ pub fn absolute_path(path: &Path) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
+
+    #[derive(Default)]
+    struct RecordingFift {
+        request: Mutex<Option<(crate::ton::tools::types::OperationContext, FiftScriptRequest)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl Fift for RecordingFift {
+        async fn run_script(
+            &self,
+            context: &crate::ton::tools::types::OperationContext,
+            request: FiftScriptRequest,
+        ) -> Result<FiftOutput> {
+            *self.request.lock().unwrap() = Some((context.clone(), request));
+            Ok(FiftOutput {
+                stdout: String::new(),
+                stderr: String::new(),
+            })
+        }
+    }
 
     #[test]
     fn smartcont_script_prefers_state_override_and_falls_back_to_release() {
@@ -241,5 +275,47 @@ mod tests {
         let state_script = toolchain.layout.smartcont.join("wallet.fif");
         std::fs::write(&state_script, "state").unwrap();
         assert_eq!(toolchain.smartcont_script("wallet.fif"), state_script);
+    }
+
+    #[tokio::test]
+    async fn joined_state_uses_release_fift_includes_without_a_state_override() {
+        let temp = tempfile::tempdir_in("/tmp").unwrap();
+        let layout = Layout::new(temp.path().join("joined"));
+        layout.create_dirs().unwrap();
+        Settings::default().save_atomic(&layout.settings).unwrap();
+        let working_dir = layout.node.root.join("elections");
+        std::fs::create_dir_all(&working_dir).unwrap();
+        let script = temp.path().join("validator-elect-req.fif");
+        std::fs::write(&script, "script").unwrap();
+
+        let recorder = Arc::new(RecordingFift::default());
+        let mut toolchain = Toolchain::official(
+            layout,
+            TonBinaries {
+                root: temp.path().join("ton"),
+            },
+        );
+        toolchain.fift_tool = recorder.clone();
+        toolchain
+            .run_fift_script(
+                &working_dir,
+                script,
+                Vec::new(),
+                Duration::from_secs(1),
+            )
+            .await
+            .unwrap();
+
+        let recorded = recorder.request.lock().unwrap();
+        let (context, request) = recorded.as_ref().unwrap();
+        expect_test::expect![[r#"
+            (
+                Some(
+                    "genesis",
+                ),
+                [],
+            )
+        "#]]
+        .assert_debug_eq(&(context.node_name.as_deref(), &request.include_paths));
     }
 }

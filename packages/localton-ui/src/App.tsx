@@ -1,9 +1,8 @@
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {
   Activity,
   Boxes,
   Clock3,
-  CircleAlert,
   Gauge,
   Network,
   RadioTower,
@@ -11,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import {
+  BooleanValue,
   ByteSize,
   DataTable,
   DataTableBody,
@@ -20,12 +20,15 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  Disclosure,
   Duration,
   InlineLoader,
   Percentage,
   RelativeTime,
   TechnicalValue,
   ThemeSwitch,
+  Tooltip,
+  useToast,
 } from "@acton/ui"
 
 import type {
@@ -34,15 +37,17 @@ import type {
   NetworkView,
   NodeView,
   ShardHead,
+  ValidatorObservation,
+  ValidatorSetObservation,
 } from "./types"
 
 const POLL_INTERVAL_MS = 2000
 
 export function App() {
   const [network, setNetwork] = useState<NetworkView>()
-  const [error, setError] = useState<string>()
-  const [query, setQuery] = useState("")
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
+  const errorToastId = useRef<string | undefined>(undefined)
+  const {dismissToast, showToast} = useToast()
 
   useEffect(() => {
     const timer = globalThis.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000)
@@ -60,10 +65,23 @@ export function App() {
         const next = (await response.json()) as NetworkView
         if (active) {
           setNetwork(next)
-          setError(undefined)
+
+          if (errorToastId.current !== undefined) {
+            dismissToast(errorToastId.current)
+            errorToastId.current = undefined
+          }
         }
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "Network request failed")
+        if (active && errorToastId.current === undefined) {
+          errorToastId.current = showToast({
+            title: "Unable to refresh network data",
+            description:
+              cause instanceof Error
+                ? cause.message
+                : "The observability service could not be reached",
+            variant: "error",
+          })
+        }
       } finally {
         if (active) timer = globalThis.setTimeout(load, POLL_INTERVAL_MS)
       }
@@ -74,28 +92,14 @@ export function App() {
       active = false
       if (timer !== undefined) globalThis.clearTimeout(timer)
     }
-  }, [])
+  }, [dismissToast, showToast])
 
-  const visibleNodes = useMemo(() => {
-    const normalized = query.trim().toLowerCase()
-    if (!normalized) return network?.nodes ?? []
-    return (network?.nodes ?? []).filter(node =>
-      [node.name, node.public_ip, node.observer_id, node.validator_adnl, ...node.roles]
-        .filter(Boolean)
-        .some(value => value?.toLowerCase().includes(normalized)),
-    )
-  }, [network, query])
-  const catchingUpNodes = useMemo(
-    () => network?.nodes.filter(node => node.sync_status === "catching_up") ?? [],
-    [network],
-  )
-
-  if (!network && !error) {
+  if (!network) {
     return (
       <main className="boot-state">
         <InlineLoader
           message="Reading network state"
-          subtext="Waiting for the first signed observation"
+          subtext="Waiting for the local observability service"
         />
       </main>
     )
@@ -126,183 +130,137 @@ export function App() {
         <header className="topbar">
           <div className="network-title">
             <h1>Network health</h1>
-            {network ? <TechnicalValue value={network.network_id} copyLabel="network ID" /> : null}
+            <TechnicalValue value={network.network_id} copyLabel="network ID" />
           </div>
           <div className="refresh-state">
             <RefreshCw size={13} aria-hidden="true" />
-            {network ? `Updated ${Math.max(0, now - network.generated_at)}s ago` : "Waiting"}
+            {`Updated ${Math.max(0, now - network.generated_at)}s ago`}
           </div>
         </header>
 
         <main className="content">
-          {error ? (
-            <div className="notice notice-error" role="alert">
-              <CircleAlert size={16} aria-hidden="true" />
-              <span>{error}</span>
-            </div>
-          ) : null}
-          {network ? (
-            <>
-              <section id="overview" className="section-stack" aria-labelledby="overview-title">
-                <div className="section-heading">
-                  <h2 id="overview-title">Network overview</h2>
-                  <ChainTrust source={network.chain_source} />
-                </div>
-                <div className="metric-strip">
-                  <Metric
-                    label="Online nodes"
-                    value={`${network.totals.online_nodes} / ${network.totals.nodes}`}
-                    tone={network.totals.online_nodes === network.totals.nodes ? "good" : "warning"}
-                  />
-                  <Metric
-                    label="Synchronized"
-                    value={`${network.totals.synchronized_nodes} / ${network.totals.nodes}`}
-                    tone={
-                      network.totals.synchronized_nodes === network.totals.nodes
-                        ? "good"
-                        : "warning"
-                    }
-                  />
-                  <Metric
-                    label="Active validators"
-                    value={`${network.totals.active_validators} / ${network.totals.configured_validators}`}
-                    tone={
-                      network.totals.active_validators === network.totals.configured_validators
-                        ? "good"
-                        : "warning"
-                    }
-                  />
-                  <Metric
-                    label="Masterchain"
-                    value={
-                      network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Unavailable"
-                    }
-                  />
-                  <Metric label="Current shards" value={String(network.chain?.shard_count ?? 0)} />
-                </div>
-                {catchingUpNodes.length > 0 ? (
-                  <div className="notice notice-warning" role="status">
-                    <CircleAlert size={16} aria-hidden="true" />
-                    <span>
-                      {catchingUpNodes.length === 1
-                        ? `${catchingUpNodes[0].name} is catching up`
-                        : `${catchingUpNodes.length} nodes are catching up`}
-                    </span>
-                    <span className="notice-detail">
-                      Maximum lag{" "}
-                      {Math.max(
-                        ...catchingUpNodes.map(node => node.sync_lag_blocks ?? 0),
-                      ).toLocaleString()}{" "}
-                      blocks
-                    </span>
-                  </div>
-                ) : null}
-                {network.chain ? (
-                  <div className="chain-line">
-                    <span>Latest masterchain block</span>
-                    <TechnicalValue value={network.chain.root_hash} copyLabel="block root hash" />
-                    <span className="chain-age">
-                      <Duration
-                        value={Math.max(0, now - network.chain.gen_utime)}
-                        display="elapsed"
-                      />{" "}
-                      old
-                    </span>
-                  </div>
-                ) : (
-                  <div className="notice">
-                    <Activity size={16} aria-hidden="true" />
-                    <span>No observer can currently verify the chain head</span>
-                  </div>
-                )}
-              </section>
-
-              <section id="elections" className="section-stack" aria-labelledby="elections-title">
-                <div className="section-heading">
-                  <h2 id="elections-title">Election round</h2>
-                  {network.election ? <ElectionStage stage={network.election.stage} /> : null}
-                </div>
-                {network.election ? (
-                  <ElectionDiagram election={network.election} now={now} />
-                ) : (
-                  <div className="notice">
-                    <Clock3 size={16} aria-hidden="true" />
-                    <span>Election data is not available from the current chain view</span>
-                  </div>
-                )}
-              </section>
-
-              <section id="nodes" className="section-stack" aria-labelledby="nodes-title">
-                <div className="section-heading">
-                  <h2 id="nodes-title">Nodes and synchronization</h2>
-                  <label className="search-field">
-                    <span className="visually-hidden">Filter nodes</span>
-                    <input
-                      value={query}
-                      onChange={event => setQuery(event.target.value)}
-                      placeholder="Filter nodes"
-                    />
-                  </label>
-                </div>
-                <NodesTable nodes={visibleNodes} now={now} />
-              </section>
-
-              <section id="validators" className="section-stack" aria-labelledby="validators-title">
-                <div className="section-heading">
-                  <h2 id="validators-title">Validator production</h2>
-                  <span className="section-meta">Rolling observation window</span>
-                </div>
-                <ValidatorsTable
-                  nodes={network.nodes.filter(node => node.roles.includes("validator"))}
+          <>
+            <section id="overview" className="section-stack" aria-labelledby="overview-title">
+              <div className="section-heading">
+                <h2 id="overview-title">Network overview</h2>
+              </div>
+              <div className="metric-strip">
+                <Metric
+                  label="Online nodes"
+                  value={`${network.totals.online_nodes} / ${network.totals.nodes}`}
+                  tone={network.totals.online_nodes === network.totals.nodes ? "good" : "warning"}
                 />
-              </section>
-
-              <section id="shards" className="section-stack" aria-labelledby="shards-title">
-                <div className="section-heading">
-                  <h2 id="shards-title">Shard topology</h2>
-                  <span className="section-meta">{network.shards.length} current</span>
+                <Metric
+                  label="Synchronized"
+                  value={`${network.totals.synchronized_nodes} / ${network.totals.nodes}`}
+                  tone={
+                    network.totals.synchronized_nodes === network.totals.nodes ? "good" : "warning"
+                  }
+                />
+                <Metric
+                  label="Active validators"
+                  value={`${network.totals.active_validators} / ${network.totals.configured_validators}`}
+                  tone={
+                    network.totals.active_validators === network.totals.configured_validators
+                      ? "good"
+                      : "warning"
+                  }
+                />
+                <Metric
+                  label="Masterchain"
+                  value={network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Waiting"}
+                />
+                <Metric label="Current shards" value={String(network.chain?.shard_count ?? 0)} />
+              </div>
+              {network.chain ? null : (
+                <div className="notice">
+                  <Activity size={16} aria-hidden="true" />
+                  <span>Waiting for TON network data</span>
                 </div>
-                <ShardsTable shards={network.shards} now={now} />
-              </section>
+              )}
+            </section>
 
-              <section className="section-stack" aria-labelledby="observers-title">
-                <div className="section-heading">
-                  <h2 id="observers-title">Signed observers</h2>
-                  <span className="section-meta">{network.totals.online_observers} online</span>
+            <section id="elections" className="section-stack" aria-labelledby="elections-title">
+              <div className="section-heading">
+                <h2 id="elections-title">Validator elections</h2>
+                {network.election ? <ElectionStage stage={network.election.stage} /> : null}
+              </div>
+              {network.election ? (
+                <ElectionDiagram election={network.election} now={now} />
+              ) : (
+                <div className="notice">
+                  <Clock3 size={16} aria-hidden="true" />
+                  <span>Election data is not available from the current chain view</span>
                 </div>
-                <DataTable minWidth="44rem">
-                  <DataTableTable>
-                    <DataTableHead>
-                      <DataTableRow>
-                        <DataTableHeaderCell>Status</DataTableHeaderCell>
-                        <DataTableHeaderCell>Observer</DataTableHeaderCell>
-                        <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
-                        <DataTableHeaderCell>Last report</DataTableHeaderCell>
+              )}
+            </section>
+
+            <section id="nodes" className="section-stack" aria-labelledby="nodes-title">
+              <div className="section-heading">
+                <h2 id="nodes-title">Nodes and synchronization</h2>
+              </div>
+              <NodesTable nodes={network.nodes} now={now} />
+            </section>
+
+            <section id="validators" className="section-stack" aria-labelledby="validators-title">
+              <div className="section-heading">
+                <h2 id="validators-title">Validator production</h2>
+              </div>
+              <ValidatorsTable
+                nodes={network.nodes.filter(node => node.roles.includes("validator"))}
+              />
+            </section>
+
+            <section id="shards" className="section-stack" aria-labelledby="shards-title">
+              <div className="section-heading">
+                <h2 id="shards-title">Shard topology</h2>
+              </div>
+              <ShardsTable shards={network.shards} now={now} />
+            </section>
+
+            <section className="section-stack" aria-labelledby="observers-title">
+              <div className="section-heading">
+                <h2 id="observers-title">Signed observers</h2>
+              </div>
+              <DataTable minWidth="44rem">
+                <DataTableTable>
+                  <DataTableHead>
+                    <DataTableRow>
+                      <DataTableHeaderCell>Status</DataTableHeaderCell>
+                      <DataTableHeaderCell>Observer</DataTableHeaderCell>
+                      <DataTableHeaderCell>Endpoint</DataTableHeaderCell>
+                      <DataTableHeaderCell>Last report</DataTableHeaderCell>
+                    </DataTableRow>
+                  </DataTableHead>
+                  <DataTableBody>
+                    {network.observers.map(observer => (
+                      <DataTableRow key={observer.observer_id}>
+                        <DataTableCell>
+                          <StatusPill online={observer.online} />
+                        </DataTableCell>
+                        <DataTableCell>
+                          <TechnicalValue value={observer.observer_id} copyLabel="observer ID" />
+                        </DataTableCell>
+                        <DataTableCell>
+                          <div className="observer-endpoint">
+                            <TechnicalValue
+                              value={observer.endpoint}
+                              copyLabel="observability endpoint"
+                              shorten={false}
+                            />
+                            <span>{observer.software}</span>
+                          </div>
+                        </DataTableCell>
+                        <DataTableCell>
+                          <RelativeTime value={observer.generated_at} now={now} unit="seconds" />
+                        </DataTableCell>
                       </DataTableRow>
-                    </DataTableHead>
-                    <DataTableBody>
-                      {network.observers.map(observer => (
-                        <DataTableRow key={observer.observer_id}>
-                          <DataTableCell>
-                            <StatusPill online={observer.online} />
-                          </DataTableCell>
-                          <DataTableCell>
-                            <TechnicalValue value={observer.observer_id} copyLabel="observer ID" />
-                          </DataTableCell>
-                          <DataTableCell mono truncate>
-                            {observer.endpoint}
-                          </DataTableCell>
-                          <DataTableCell>
-                            <RelativeTime value={observer.generated_at} now={now} unit="seconds" />
-                          </DataTableCell>
-                        </DataTableRow>
-                      ))}
-                    </DataTableBody>
-                  </DataTableTable>
-                </DataTable>
-              </section>
-            </>
-          ) : null}
+                    ))}
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
+            </section>
+          </>
         </main>
       </div>
     </div>
@@ -343,21 +301,6 @@ function Metric({
   )
 }
 
-function ChainTrust({source}: {readonly source: NetworkView["chain_source"]}) {
-  const label =
-    source === "local_verification"
-      ? "Verified locally"
-      : source === "peer_attestation"
-        ? "Peer attestation"
-        : "Unavailable"
-  return (
-    <span className="trust" data-source={source}>
-      <ShieldCheck size={13} aria-hidden="true" />
-      {label}
-    </span>
-  )
-}
-
 const ELECTION_STAGE_LABELS: Record<ElectionObservation["stage"], string> = {
   validation: "Validation in progress",
   accepting_entries: "Entries are open",
@@ -382,176 +325,356 @@ function ElectionDiagram({
   readonly election: ElectionObservation
   readonly now: number
 }) {
-  const start = election.validation_started_at
-  const end = Math.max(start + 1, election.next_set_activation_at)
-  const retrying = election.stage === "retrying"
-  const chartEnd = retrying ? Math.max(end + 30, now + 30) : end
-  const chartStart = 48
-  const chartWidth = 904
-  const x = (value: number) =>
-    chartStart +
-    ((Math.min(chartEnd, Math.max(start, value)) - start) / (chartEnd - start)) * chartWidth
-  const openX = x(election.elections_open_at)
-  const closeX = x(election.elections_close_at)
-  const endX = x(end)
-  const chartEndX = x(chartEnd)
-  const nowX = x(now)
-  const boundaries = [...new Set([chartStart, openX, closeX, endX])]
-  const timeMarkers = [
-    ...new Set([start, election.elections_open_at, election.elections_close_at, end]),
-  ]
-  const formatTime = (value: number) =>
-    new Intl.DateTimeFormat(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }).format(value * 1000)
-  const stages = [
-    {label: "Current set", start, end: election.elections_open_at},
-    {label: "Entry window", start: election.elections_open_at, end: election.elections_close_at},
+  const previousCurrentRoundId = useRef(election.current.round_id)
+  const rollingOver = previousCurrentRoundId.current !== election.current.round_id
+
+  useEffect(() => {
+    previousCurrentRoundId.current = election.current.round_id
+  }, [election.current.round_id])
+
+  const duration = Math.max(1, election.validators_elected_for)
+  const previous =
+    election.previous ??
+    inferredValidatorSet(election.current.validation_started_at - duration, duration)
+  const next = election.next ?? inferredValidatorSet(election.current.validation_ended_at, duration)
+  const rounds = [
     {
-      label: election.next_validators === null ? "Selection" : "Next set ready",
-      start: election.elections_close_at,
-      end,
+      kind: "previous",
+      label: "Previous round",
+      set: previous,
+      available: election.previous !== null,
+      unavailableLabel: "Set unavailable",
     },
-  ].filter(stage => stage.end > stage.start)
+    {
+      kind: "current",
+      label: "Current round",
+      set: election.current,
+      available: true,
+      unavailableLabel: "Set unavailable",
+    },
+    {
+      kind: "next",
+      label: "Next round",
+      set: next,
+      available: election.next !== null,
+      unavailableLabel: "Pending",
+    },
+  ]
+  const entryStart = (set: ValidatorSetObservation) =>
+    set.validation_started_at - (election.current.validation_ended_at - election.elections_open_at)
+  const entryEnd = (set: ValidatorSetObservation) =>
+    set.validation_started_at - (election.current.validation_ended_at - election.elections_close_at)
+  const rangeStart = Math.min(...rounds.map(round => entryStart(round.set)), now)
+  const rangeEnd = Math.max(
+    ...rounds.map(round => round.set.validation_ended_at + election.stake_held_for),
+    now + Math.floor(duration / 4),
+  )
+  const range = Math.max(1, rangeEnd - rangeStart)
+  const position = (value: number) =>
+    Math.min(100, Math.max(0, ((value - rangeStart) / range) * 100))
+  const width = (start: number, end: number) => Math.max(0.4, position(end) - position(start))
+  const nowPosition = position(now)
 
   return (
     <div className="election-panel">
       <div className="election-summary">
-        <Metric label="Round ID" value={election.round_id.toLocaleString()} />
-        <Metric label="Current set" value={formatValidators(election.current_validators)} />
-        <Metric label="Main subset" value={formatValidators(election.current_main_validators)} />
+        <Metric label="Round ID" value={election.current.round_id.toLocaleString()} />
+        <Metric label="Current set" value={formatValidators(election.current.validators)} />
+        <Metric label="Main subset" value={formatValidators(election.current.main_validators)} />
         <Metric
           label="Next set"
-          value={
-            election.next_validators === null
-              ? "Pending"
-              : formatValidators(election.next_validators)
-          }
+          value={election.next === null ? "Pending" : formatValidators(election.next.validators)}
         />
         <Metric label="Stake hold" value={`${election.stake_held_for}s`} />
       </div>
       <div className="election-chart" data-stage={election.stage}>
-        <svg
-          viewBox="0 0 1000 126"
+        <div
+          aria-label="Validator election timeline"
+          className="election-timeline"
+          data-rollover={rollingOver}
           role="img"
-          aria-labelledby="election-chart-title election-chart-description"
         >
-          <title id="election-chart-title">Validator election timeline</title>
-          <desc id="election-chart-description">
-            Current validation, entry window, next validator selection, and activation
-          </desc>
-          <rect
-            className="timeline-segment timeline-validation"
-            x={chartStart}
-            y="48"
-            width={Math.max(0, openX - chartStart)}
-            height="16"
-            rx="8"
-          />
-          <rect
-            className="timeline-segment timeline-entry"
-            x={openX}
-            y="48"
-            width={Math.max(0, closeX - openX)}
-            height="16"
-          />
-          <rect
-            className="timeline-segment timeline-selection"
-            x={closeX}
-            y="48"
-            width={Math.max(0, endX - closeX)}
-            height="16"
-            rx="8"
-          />
-          {retrying && (
-            <rect
-              className="timeline-segment timeline-retry"
-              x={endX}
-              y="48"
-              width={Math.max(0, chartEndX - endX)}
-              height="16"
-              rx="8"
-            />
-          )}
-          {boundaries.map(position => (
-            <circle
-              key={position}
-              className="timeline-boundary"
-              cx={position}
-              cy="56"
-              r={position === endX ? 6 : 4}
-            />
-          ))}
-          <line className="timeline-now-line" x1={nowX} x2={nowX} y1="25" y2="87" />
-          <circle className="timeline-now-dot" cx={nowX} cy="56" r="6" />
-          <text
-            className="timeline-now-label"
-            x={nowX}
-            y="17"
-            textAnchor={nowX > 900 ? "end" : nowX < 100 ? "start" : "middle"}
-          >
-            NOW
-          </text>
-          {timeMarkers.map(value => {
-            const position = x(value)
+          <div className="timeline-now" style={{left: `${nowPosition}%`}}>
+            <strong>NOW</strong>
+          </div>
+          {rounds.map(round => {
+            const openedAt = entryStart(round.set)
+            const closedAt = entryEnd(round.set)
+            const validationEndedAt = round.set.validation_ended_at
+            const holdingEndedAt = validationEndedAt + election.stake_held_for
+            const phases = [
+              {name: "Election", className: "timeline-entry", start: openedAt, end: closedAt},
+              {
+                name: "Selection",
+                className: "timeline-selection",
+                start: closedAt,
+                end: round.set.validation_started_at,
+              },
+              {
+                name: "Validation",
+                className: "timeline-validation",
+                start: round.set.validation_started_at,
+                end: validationEndedAt,
+              },
+              {
+                name: "Stake hold",
+                className: "timeline-holding",
+                start: validationEndedAt,
+                end: holdingEndedAt,
+              },
+            ]
+            const activePhase = phases.find(phase => phase.start <= now && now < phase.end)
+
             return (
-              <text
-                className="timeline-time"
-                key={value}
-                x={position}
-                y="105"
-                textAnchor={
-                  position === chartStart ? "start" : position === endX ? "end" : "middle"
-                }
+              <div
+                className="election-round"
+                data-active={activePhase !== undefined}
+                data-current={round.kind === "current"}
+                key={round.set.round_id}
               >
-                {formatTime(value)}
-              </text>
+                <div className="election-round-heading">
+                  <strong>{round.label}</strong>
+                  <span>#{round.set.round_id.toLocaleString()}</span>
+                  <span>
+                    {round.available
+                      ? formatValidators(round.set.validators)
+                      : round.unavailableLabel}
+                  </span>
+                </div>
+                <div className="election-round-track">
+                  {phases.map(phase => {
+                    const tooltip = `${phase.name} · ${formatTimestamp(phase.start)}–${formatTimestamp(phase.end)}`
+
+                    return (
+                      <Tooltip content={tooltip} delay={0} key={phase.name}>
+                        <span
+                          aria-current={phase === activePhase ? "true" : undefined}
+                          aria-label={tooltip}
+                          className={`timeline-segment ${phase.className}`}
+                          data-active={phase === activePhase}
+                          style={{
+                            left: `${position(phase.start)}%`,
+                            width: `${width(phase.start, phase.end)}%`,
+                          }}
+                        />
+                      </Tooltip>
+                    )
+                  })}
+                  {activePhase ? (
+                    <span
+                      className="timeline-now-dot"
+                      style={{left: `${nowPosition}%`}}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </div>
+                <div className="election-round-phases" aria-hidden="true">
+                  <span style={{left: `${position((openedAt + closedAt) / 2)}%`}}>Election</span>
+                  <span
+                    style={{
+                      left: `${position((closedAt + round.set.validation_started_at) / 2)}%`,
+                    }}
+                  >
+                    Selection
+                  </span>
+                  <span
+                    style={{
+                      left: `${position((round.set.validation_started_at + validationEndedAt) / 2)}%`,
+                    }}
+                  >
+                    Validation
+                  </span>
+                  <span style={{left: `${position((validationEndedAt + holdingEndedAt) / 2)}%`}}>
+                    Holding
+                  </span>
+                </div>
+              </div>
             )
           })}
-        </svg>
-      </div>
-      <div className="election-steps">
-        {stages.map(stage => {
-          const state = now >= stage.end ? "complete" : now >= stage.start ? "active" : "upcoming"
-          return (
-            <div className="election-step" data-state={state} key={stage.label}>
-              <span className="election-step-marker" aria-hidden="true" />
-              <div>
-                <strong>{stage.label}</strong>
-                <span>
-                  {formatTime(stage.start)}–{formatTime(stage.end)}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-        <div
-          className="election-step"
-          data-state={
-            retrying
-              ? "waiting"
-              : now >= end
-                ? election.next_validators === null
-                  ? "waiting"
-                  : "overdue"
-                : "upcoming"
-          }
-        >
-          <span className="election-step-marker" aria-hidden="true" />
-          <div>
-            <strong>{retrying ? "Automatic election retry" : "Next set activation"}</strong>
-            <span>
-              {retrying
-                ? `${Math.max(0, now - end).toLocaleString()}s since scheduled activation`
-                : formatTime(end)}
-            </span>
-          </div>
         </div>
       </div>
+      <ValidatorSetTables election={election} />
     </div>
   )
+}
+
+const VALIDATOR_PREVIEW_COUNT = 7
+
+function ValidatorSetTables({election}: {readonly election: ElectionObservation}) {
+  const sets = [
+    {label: "Previous set", set: election.previous, unavailableLabel: "Set unavailable"},
+    {label: "Current set", set: election.current, unavailableLabel: "Set unavailable"},
+    {label: "Next set", set: election.next, unavailableLabel: "Pending"},
+  ]
+
+  return (
+    <div className="validator-set-disclosures">
+      {sets.map(({label, set, unavailableLabel}) => (
+        <Disclosure
+          className="validator-set-disclosure"
+          contentClassName="validator-set-content"
+          key={label}
+          label={
+            <span className="validator-set-summary">
+              <span>{label}</span>
+              <span className="validator-set-summary-meta">
+                {set
+                  ? `${formatValidators(set.validators)} · ${formatTimestamp(set.validation_started_at)}–${formatTimestamp(set.validation_ended_at)}`
+                  : unavailableLabel}
+              </span>
+            </span>
+          }
+        >
+          {set ? (
+            <ValidatorSetTable label={label} set={set} />
+          ) : (
+            <div className="validator-set-unavailable">{unavailableLabel}</div>
+          )}
+        </Disclosure>
+      ))}
+    </div>
+  )
+}
+
+function ValidatorSetTable({
+  label,
+  set,
+}: {
+  readonly label: string
+  readonly set: ValidatorSetObservation
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const validators = set.members ?? []
+  const hasMore = validators.length > VALIDATOR_PREVIEW_COUNT
+  const visibleValidators = expanded
+    ? validators
+    : validators.slice(0, VALIDATOR_PREVIEW_COUNT + (hasMore ? 1 : 0))
+
+  return (
+    <DataTable
+      minWidth="48rem"
+      preview={
+        hasMore
+          ? {
+              expanded,
+              itemLabel: "validators",
+              onExpandedChange: setExpanded,
+            }
+          : undefined
+      }
+      variant="embedded"
+    >
+      <DataTableTable aria-label={`${label} validators`}>
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="3.5rem">#</DataTableHeaderCell>
+            <DataTableHeaderCell>Public key</DataTableHeaderCell>
+            <DataTableHeaderCell>ADNL</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="8rem">Masterchain</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="10rem">Weight share</DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {set.members === undefined ? (
+            <DataTableEmpty colSpan={5}>Validator identities are not available</DataTableEmpty>
+          ) : visibleValidators.length === 0 ? (
+            <DataTableEmpty colSpan={5}>No validators in this set</DataTableEmpty>
+          ) : (
+            visibleValidators.map((validator, index) => (
+              <ValidatorSetRow
+                index={index}
+                key={`${validator.public_key}:${index}`}
+                mainValidatorCount={set.main_validators}
+                totalWeight={set.total_weight ?? "0"}
+                validator={validator}
+              />
+            ))
+          )}
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
+  )
+}
+
+function ValidatorSetRow({
+  index,
+  mainValidatorCount,
+  totalWeight,
+  validator,
+}: {
+  readonly index: number
+  readonly mainValidatorCount: number
+  readonly totalWeight: string
+  readonly validator: ValidatorObservation
+}) {
+  const weightParts = validatorWeightParts(validator.weight, totalWeight)
+
+  return (
+    <DataTableRow hover>
+      <DataTableCell tone="muted">{index + 1}</DataTableCell>
+      <DataTableCell truncate>
+        <TechnicalValue
+          copyLabel="validator public key"
+          endLength={10}
+          startLength={10}
+          value={validator.public_key}
+        />
+      </DataTableCell>
+      <DataTableCell truncate>
+        <TechnicalValue
+          copyLabel="validator ADNL address"
+          endLength={10}
+          fallback="—"
+          startLength={10}
+          value={validator.adnl_address}
+        />
+      </DataTableCell>
+      <DataTableCell>
+        <BooleanValue value={index < mainValidatorCount} />
+      </DataTableCell>
+      <DataTableCell>
+        <Tooltip
+          content={`${BigInt(validator.weight).toLocaleString()} of ${BigInt(totalWeight).toLocaleString()}`}
+        >
+          <span className="validator-weight-share">
+            <Percentage
+              maximumFractionDigits={3}
+              minimumFractionDigits={2}
+              total={1_000_000}
+              value={weightParts}
+            />
+          </span>
+        </Tooltip>
+      </DataTableCell>
+    </DataTableRow>
+  )
+}
+
+function validatorWeightParts(weight: string, totalWeight: string) {
+  const total = BigInt(totalWeight)
+  if (total === 0n) return 0
+
+  return Number((BigInt(weight) * 1_000_000n) / total)
+}
+
+function inferredValidatorSet(start: number, duration: number): ValidatorSetObservation {
+  return {
+    round_id: start,
+    validation_started_at: start,
+    validation_ended_at: start + duration,
+    validators: 0,
+    main_validators: 0,
+    total_weight: "0",
+    members: [],
+  }
+}
+
+function formatTimestamp(value: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(value * 1000)
 }
 
 function formatValidators(count: number) {
@@ -763,13 +886,65 @@ function ValidatorLifecycle({state}: {readonly state: NodeView["validator_status
   )
 }
 
+type NodeRole = NodeView["roles"][number]
+
+const NODE_ROLE_PRESENTATION: Record<
+  NodeRole,
+  {readonly letter: string; readonly label: string; readonly description: string}
+> = {
+  full_node: {
+    letter: "F",
+    label: "Full node",
+    description: "Stores and synchronizes the current blockchain state",
+  },
+  validator: {
+    letter: "V",
+    label: "Validator",
+    description: "Validator mode and validator key management are enabled",
+  },
+  liteserver: {
+    letter: "L",
+    label: "Liteserver",
+    description: "Serves TON data to lite clients over ADNL",
+  },
+}
+
+function NodeRoleBadge({role}: {readonly role: NodeRole}) {
+  const presentation = NODE_ROLE_PRESENTATION[role]
+  const tooltip = `${presentation.label} — ${presentation.description}`
+
+  return (
+    <Tooltip content={tooltip} delay={0} width="wide">
+      <span className="role-badge" data-role={role} aria-label={tooltip}>
+        {presentation.letter}
+      </span>
+    </Tooltip>
+  )
+}
+
 function ProductionState({node}: {readonly node: NodeView}) {
   const produced = node.produced_masterchain_blocks + node.produced_shard_blocks
-  const state = produced > 0 ? "producing" : node.active_validator ? "silent" : "inactive"
+  const state = node.active_validator
+    ? produced > 0
+      ? "producing"
+      : "silent"
+    : produced > 0
+      ? "recent"
+      : "inactive"
   const label =
-    state === "producing" ? "Producing" : state === "silent" ? "No blocks observed" : "Not active"
+    state === "producing"
+      ? "Producing"
+      : state === "silent"
+        ? "No blocks observed"
+        : state === "recent"
+          ? "Produced recently"
+          : "Not active"
   return (
-    <span className="production-state" data-state={state}>
+    <span
+      className="production-state"
+      data-state={state}
+      title={`${node.produced_masterchain_blocks.toLocaleString()} masterchain and ${node.produced_shard_blocks.toLocaleString()} shard blocks in the rolling window`}
+    >
       {label}
     </span>
   )
@@ -777,7 +952,7 @@ function ProductionState({node}: {readonly node: NodeView}) {
 
 function NodesTable({nodes, now}: {readonly nodes: readonly NodeView[]; readonly now: number}) {
   return (
-    <DataTable className="nodes-table" minWidth="80rem" meta={`${nodes.length} visible`}>
+    <DataTable className="nodes-table" minWidth="60rem">
       <DataTableTable>
         <DataTableHead>
           <DataTableRow>
@@ -809,9 +984,9 @@ function NodesTable({nodes, now}: {readonly nodes: readonly NodeView[]; readonly
                   <SynchronizationProgress node={node} now={now} />
                 </DataTableCell>
                 <DataTableCell>
-                  <div className="role-list">
+                  <div className="role-list" aria-label={`${node.name} roles`}>
                     {node.roles.map(role => (
-                      <span key={role}>{role.replaceAll("_", " ")}</span>
+                      <NodeRoleBadge role={role} key={role} />
                     ))}
                   </div>
                 </DataTableCell>

@@ -132,24 +132,23 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 Ok(())
             })?;
 
-            let observability_peers = if settings.services.observability.enabled {
-                match discover_observability_peer(&args.global_config_url).await {
-                    Ok(Some(peer)) => vec![peer],
-                    Ok(None) => Vec::new(),
+            let observability_collector = if settings.services.observability.enabled {
+                match discover_observability_collector(&args.global_config_url).await {
+                    Ok(collector) => collector,
                     Err(error) => {
-                        warn!(%error, "could not discover a bootstrap observability peer");
-                        Vec::new()
+                        warn!(%error, "could not discover the bootstrap telemetry collector");
+                        None
                     }
                 }
             } else {
-                Vec::new()
+                None
             };
             let services = http::start_observability(
                 layout.clone(),
                 toolchain.clone(),
                 &settings,
                 node_settings.public_ip,
-                observability_peers,
+                observability_collector,
             )
             .await?;
             RuntimeState::update_atomic(&layout.runtime, |runtime| {
@@ -237,11 +236,11 @@ pub async fn run(args: JoinArgs) -> Result<()> {
     run_result.and(stop_result).and(state_result.map(|_| ()))
 }
 
-/// Discovers the bootstrap observer when the global config is served by Localton.
+/// Discovers the telemetry collector when the global config is served by Localton.
 ///
 /// Standard TON config hosts are valid join sources and need not provide this
-/// metadata, so a non-Localton document produces no peer instead of an error.
-async fn discover_observability_peer(config_url: &str) -> Result<Option<String>> {
+/// metadata, so a non-Localton document produces no collector instead of an error.
+async fn discover_observability_collector(config_url: &str) -> Result<Option<String>> {
     let mut root = reqwest::Url::parse(config_url)
         .with_context(|| format!("invalid global config URL `{config_url}`"))?;
     root.set_path("/");
@@ -266,9 +265,6 @@ async fn discover_observability_peer(config_url: &str) -> Result<Option<String>>
     let endpoint = (document.service == "localton")
         .then_some(document.endpoints.observability)
         .flatten();
-    if let Some(endpoint) = &endpoint {
-        crate::storage::ObservabilitySettings::validate_endpoint(endpoint)?;
-    }
 
     Ok(endpoint)
 }

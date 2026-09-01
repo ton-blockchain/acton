@@ -1,6 +1,6 @@
 import {StrictMode} from "react"
 import {createRoot} from "react-dom/client"
-import {ThemeProvider} from "@acton/ui"
+import {ThemeProvider, ToastProvider} from "@acton/ui"
 
 import "@acton/ui/styles/tokens.css"
 import {App} from "./App"
@@ -15,7 +15,9 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider storageKey="localton-observability-theme">
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </ThemeProvider>
   </StrictMode>,
 )

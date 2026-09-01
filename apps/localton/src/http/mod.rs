@@ -111,7 +111,7 @@ pub async fn start(
             toolchain.clone(),
             settings,
             settings.node.public_ip,
-            Vec::new(),
+            None,
             receiver,
         )
         .await?;
@@ -127,26 +127,32 @@ pub async fn start(
     })
 }
 
-/// Starts the signed observation service for a joined node.
+/// Starts the network dashboard and host telemetry service for a joined node.
 ///
 /// Joined state does not own bootstrap HTTP services, so its lifecycle uses this
-/// entry point to supervise the dashboard, collector, and peer exchange through
-/// the same shutdown boundary as the node process.
+/// entry point to supervise direct network reads and best-effort telemetry delivery
+/// through the same shutdown boundary as the node process.
 pub async fn start_observability(
     layout: Layout,
     toolchain: Toolchain,
     settings: &Settings,
     advertised_ip: Ipv4Addr,
-    peers: Vec<String>,
+    collector: Option<String>,
 ) -> Result<ServiceSet> {
     let (shutdown, receiver) = watch::channel(false);
     let mut tasks = Vec::new();
     let mut endpoints = BTreeMap::new();
 
     if settings.services.observability.enabled {
-        let running =
-            observability::start(layout, toolchain, settings, advertised_ip, peers, receiver)
-                .await?;
+        let running = observability::start(
+            layout,
+            toolchain,
+            settings,
+            advertised_ip,
+            collector,
+            receiver,
+        )
+        .await?;
         tasks.push(running.service.task);
         tasks.extend(running.tasks);
         endpoints.insert("observability".to_owned(), running.service.endpoint);

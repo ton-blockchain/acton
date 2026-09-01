@@ -542,31 +542,27 @@ impl ServiceSettings {
     }
 }
 
-/// Controls the public API that exchanges signed node observations and serves the dashboard.
+/// Controls direct TON reads, signed host telemetry, and the public dashboard.
 ///
-/// Each Localton state directory owns one observer identity. Peers use the configured
-/// endpoints only as discovery seeds; all received observations are authenticated before
-/// they affect the aggregated network view.
+/// Each Localton state directory owns one observer identity. A bootstrap instance can
+/// collect telemetry pushed by joined instances, while every dashboard reads network
+/// state independently through a liteserver.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct ObservabilitySettings {
     /// `true` when Localton publishes observations and serves the dashboard
     pub enabled: bool,
-    /// IPv4 address that accepts API, peer exchange, and dashboard connections
+    /// IPv4 address that accepts API, telemetry collection, and dashboard connections
     #[schema(value_type = String, format = "ipv4")]
     pub bind: Ipv4Addr,
     /// TCP port shared by the observability API and dashboard
     pub port: u16,
     /// Signed observation publication interval in seconds
     pub publish_interval_seconds: u64,
-    /// Time after which peers stop treating an observation as live
+    /// Time after which the collector stops treating host telemetry as live
     pub observation_ttl_seconds: u64,
     /// Rolling block-production window in seconds
     pub block_window_seconds: u64,
-    /// Maximum peers contacted during one exchange round
-    pub gossip_fanout: usize,
-    /// Stable peer endpoints used to discover other observers
-    pub peers: Vec<String>,
 }
 
 impl Default for ObservabilitySettings {
@@ -578,37 +574,14 @@ impl Default for ObservabilitySettings {
             publish_interval_seconds: 5,
             observation_ttl_seconds: 20,
             block_window_seconds: 10 * 60,
-            gossip_fanout: 3,
-            peers: Vec::new(),
         }
     }
 }
 
 impl ObservabilitySettings {
-    /// Returns the listener address without changing the endpoint advertised to peers.
+    /// Returns the listener address without changing the endpoint advertised to joined nodes.
     pub fn socket_addr(&self) -> SocketAddr {
         SocketAddr::new(IpAddr::V4(self.bind), self.port)
-    }
-
-    /// Validates the URL shape required by peer exchange while allowing private
-    /// hosts used by local and self-managed networks.
-    pub(crate) fn validate_endpoint(endpoint: &str) -> Result<()> {
-        let url = reqwest::Url::parse(endpoint)
-            .with_context(|| format!("invalid observability peer URL `{endpoint}`"))?;
-        ensure!(
-            matches!(url.scheme(), "http" | "https"),
-            "observability peer URL must use http or https"
-        );
-        ensure!(
-            url.host_str().is_some(),
-            "observability peer URL has no host"
-        );
-        ensure!(
-            url.username().is_empty() && url.password().is_none(),
-            "observability peer URL must not contain credentials"
-        );
-
-        Ok(())
     }
 
     fn validate(&self) -> Result<()> {
@@ -625,14 +598,6 @@ impl ObservabilitySettings {
             self.block_window_seconds >= self.observation_ttl_seconds,
             "observability block window must not be shorter than its TTL"
         );
-        ensure!(
-            (1..=16).contains(&self.gossip_fanout),
-            "observability gossip fanout must be in 1..=16"
-        );
-
-        for peer in &self.peers {
-            Self::validate_endpoint(peer)?;
-        }
 
         Ok(())
     }

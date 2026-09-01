@@ -37,6 +37,7 @@ export interface NetworkTotals {
 export interface ObserverView {
   readonly observer_id: string
   readonly endpoint: string
+  readonly software: string
   readonly generated_at: number
   readonly expires_at: number
   readonly online: boolean
@@ -79,14 +80,18 @@ export interface NodeView {
     | "unknown"
   readonly produced_masterchain_blocks: number
   readonly produced_shard_blocks: number
+  readonly software: string
+  readonly observability_endpoint: string
+  readonly instance_started_at: number | null
   readonly name: string
   readonly public_ip: string
-  readonly roles: readonly string[]
+  readonly roles: readonly ("full_node" | "validator" | "liteserver")[]
   readonly running: boolean
   readonly process_id: number | null
   readonly status: string
   readonly last_error: string | null
   readonly head_seqno: number | null
+  readonly head_observed_at: number | null
   readonly network_head_seqno: number | null
   readonly sync_initial_masterchain_block_time: number | null
   readonly sync_masterchain_block_time: number | null
@@ -109,8 +114,23 @@ export interface ProductionView {
   readonly last_block_at: number
 }
 
-export interface ElectionObservation {
+export interface ValidatorObservation {
+  readonly public_key: string
+  readonly adnl_address: string | null
+  readonly weight: string
+}
+
+export interface ValidatorSetObservation {
   readonly round_id: number
+  readonly validation_started_at: number
+  readonly validation_ended_at: number
+  readonly validators: number
+  readonly main_validators: number
+  readonly total_weight?: string
+  readonly members?: readonly ValidatorObservation[]
+}
+
+export interface ElectionObservation {
   readonly stage:
     | "validation"
     | "accepting_entries"
@@ -118,15 +138,13 @@ export interface ElectionObservation {
     | "next_set_ready"
     | "retrying"
     | "activation_overdue"
-  readonly validation_started_at: number
   readonly elections_open_at: number
   readonly elections_close_at: number
-  readonly next_set_activation_at: number
   readonly validators_elected_for: number
   readonly stake_held_for: number
-  readonly current_validators: number
-  readonly current_main_validators: number
-  readonly next_validators: number | null
+  readonly previous: ValidatorSetObservation | null
+  readonly current: ValidatorSetObservation
+  readonly next: ValidatorSetObservation | null
 }
 
 export interface NetworkView {
@@ -134,7 +152,6 @@ export interface NetworkView {
   readonly network_id: string
   readonly generated_at: number
   readonly chain: ChainHead | null
-  readonly chain_source: "local_verification" | "peer_attestation" | "unavailable"
   readonly shards: readonly ShardHead[]
   readonly election: ElectionObservation | null
   readonly totals: NetworkTotals

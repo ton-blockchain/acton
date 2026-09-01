@@ -103,7 +103,7 @@ impl Fift for OfficialFift {
         request: FiftScriptRequest,
     ) -> Result<FiftOutput> {
         let started = Instant::now();
-        let span = operation_span(context);
+        let span = operation_span(context, &request.script);
 
         let result = async {
             validate_request(&request)?;
@@ -163,12 +163,13 @@ fn validate_request(request: &FiftScriptRequest) -> Result<()> {
 // All Fift calls share one semantic span schema. The script path is safe
 // operational context, while arguments and captured output remain deliberately
 // absent because wallet scripts can carry signing payloads through either.
-fn operation_span(context: &OperationContext) -> Span {
+fn operation_span(context: &OperationContext, script: &std::path::Path) -> Span {
     info_span!(
         "ton_tool_operation",
         ton.tool = "fift",
         operation = "run_script",
         node = context.node_name.as_deref().unwrap_or("network"),
+        script = %script.display(),
         outcome = Empty,
         duration_ms = Empty,
     )

@@ -9,6 +9,7 @@ services:
       - "127.0.0.1:${LOCALTON_CONFIG_API_PORT:-18000}:18000"
       - "127.0.0.1:${LOCALTON_ADMIN_API_PORT:-18001}:18001"
       - "127.0.0.1:${LOCALTON_V2_API_PORT:-18002}:18002"
+      - "127.0.0.1:${LOCALTON_OBSERVABILITY_PORT:-18007}:18007"
       - "127.0.0.1:18004:18004"
     volumes:
       - localton-state:/var/lib/localton
