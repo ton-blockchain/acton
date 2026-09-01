@@ -121,7 +121,7 @@ pub async fn run(args: JoinArgs) -> Result<()> {
             })?;
 
             // A node is usable only after several consecutive near-head samples.
-            select! {
+            let masterchain_seqno = select! {
                 result = wait_for_network_sync(
                     &layout,
                     &toolchain,
@@ -129,10 +129,11 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                     &local_liteserver,
                 ) => result?,
                 result = supervise(&processes) => return result,
-            }
+            };
 
             RuntimeState::update_atomic(&layout.runtime, |runtime| {
                 runtime.node.status = "running".to_owned();
+                runtime.mark_network_ready(masterchain_seqno);
                 Ok(())
             })?;
 

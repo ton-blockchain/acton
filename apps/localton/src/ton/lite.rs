@@ -1,4 +1,4 @@
-use std::{net::Ipv4Addr, path::Path};
+use std::{net::Ipv4Addr, path::Path, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
 use crc::{CRC_16_XMODEM, Crc};
@@ -79,6 +79,10 @@ pub struct LocalLiteClient {
 }
 
 impl LocalLiteClient {
+    /// Connects to the first reachable liteserver in configured priority order.
+    ///
+    /// Every endpoint has a bounded connection attempt so one unavailable server
+    /// cannot prevent the remaining authenticated endpoints from being tried.
     pub async fn connect(global_config: &Path) -> Result<Self> {
         let config = GlobalConfig::load(global_config)?;
         Self::connect_config(tonutils_config(&config)).await
@@ -97,10 +101,31 @@ impl LocalLiteClient {
     }
 
     async fn connect_config(config: ConfigGlobal) -> Result<Self> {
-        let inner = LiteClient::connect_first(&config)
+        const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+
+        if config.liteservers.is_empty() {
+            return Err(anyhow!("global config has no liteservers"));
+        }
+
+        let mut failures = Vec::with_capacity(config.liteservers.len());
+        for liteserver in &config.liteservers {
+            let endpoint = liteserver.socket_addr();
+            match LiteClient::connect_with_timeout(
+                endpoint,
+                liteserver.public_key(),
+                CONNECT_TIMEOUT,
+            )
             .await
-            .context("failed to connect to configured liteserver")?;
-        Ok(Self { inner })
+            {
+                Ok(inner) => return Ok(Self { inner }),
+                Err(error) => failures.push(format!("{endpoint}: {error}")),
+            }
+        }
+
+        Err(anyhow!(
+            "failed to connect to any configured liteserver: {}",
+            failures.join("; ")
+        ))
     }
 
     pub async fn last(&mut self) -> Result<BlockRef> {
@@ -395,10 +420,44 @@ pub fn require_existing_config(path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{Ipv4Addr, SocketAddrV4};
+    use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
-    use super::{parse_shard, ton_method_id, tonutils_liteserver};
+    use tonutils::network_config::ConfigGlobal;
+
+    use super::{LocalLiteClient, parse_shard, ton_method_id, tonutils_liteserver};
     use crate::ton::tools::types::TonPublicKey;
+
+    #[tokio::test]
+    async fn connection_failover_attempts_every_configured_liteserver() {
+        let first = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let first_port = first.local_addr().unwrap().port();
+        let second = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let second_port = second.local_addr().unwrap().port();
+        drop((first, second));
+
+        let config = ConfigGlobal {
+            liteservers: vec![
+                tonutils_liteserver(
+                    Ipv4Addr::LOCALHOST,
+                    first_port,
+                    TonPublicKey::from_bytes([1; 32]),
+                ),
+                tonutils_liteserver(
+                    Ipv4Addr::LOCALHOST,
+                    second_port,
+                    TonPublicKey::from_bytes([2; 32]),
+                ),
+            ],
+        };
+        let error = LocalLiteClient::connect_config(config)
+            .await
+            .err()
+            .expect("both unavailable liteservers must fail");
+        let message = error.to_string();
+
+        assert!(message.contains(&format!("127.0.0.1:{first_port}")));
+        assert!(message.contains(&format!("127.0.0.1:{second_port}")));
+    }
 
     #[test]
     fn parses_signed_and_hex_shards() {

@@ -122,11 +122,18 @@ impl GlobalConfig {
         serde_json::from_slice(bytes).context("global config does not match the TON JSON schema")
     }
 
-    /// Checks the discovery data required before a joining node starts validator-engine.
+    /// Checks the network entry points required by the complete join workflow.
+    ///
+    /// Validator-engine discovers peers through DHT, while Localton compares its
+    /// node with an authenticated upstream liteserver before publishing readiness.
     pub(crate) fn validate_for_node_join(&self) -> Result<()> {
         ensure!(
             !self.dht.static_nodes.nodes.is_empty(),
             "global config has no DHT entry points"
+        );
+        ensure!(
+            !self.liteservers.is_empty(),
+            "global config has no liteserver endpoints"
         );
         Ok(())
     }
@@ -320,5 +327,19 @@ mod tests {
         config
             .validate_advertise_ip(Ipv4Addr::new(203, 12, 34, 56))
             .unwrap();
+    }
+
+    #[test]
+    fn join_requires_an_upstream_liteserver() {
+        let mut config = GlobalConfig::from_json_bytes(include_bytes!(
+            "../../../../crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json"
+        ))
+        .unwrap();
+        config.liteservers.clear();
+
+        assert_eq!(
+            config.validate_for_node_join().unwrap_err().to_string(),
+            "global config has no liteserver endpoints"
+        );
     }
 }

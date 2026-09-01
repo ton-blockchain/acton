@@ -268,8 +268,7 @@ fn mark_network_ready(
             },
         );
     }
-    runtime.ready = true;
-    runtime.observe_masterchain_head(masterchain_seqno, crate::storage::unix_time());
+    runtime.mark_network_ready(masterchain_seqno);
     runtime.save_atomic(&layout.runtime)
 }
 

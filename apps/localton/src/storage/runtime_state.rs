@@ -190,6 +190,12 @@ impl RuntimeState {
         self.ready = false;
     }
 
+    /// Publishes readiness together with the trusted masterchain head that proves it.
+    pub fn mark_network_ready(&mut self, masterchain_seqno: u32) {
+        self.ready = true;
+        self.observe_masterchain_head(masterchain_seqno, unix_time());
+    }
+
     pub fn mark_instance_stopped(&mut self) {
         self.instance_pid = None;
         self.ready = false;
@@ -384,6 +390,28 @@ pub fn unix_time() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn readiness_is_published_with_its_masterchain_head() {
+        let mut state = RuntimeState::new();
+        state.mark_instance_started();
+        state.mark_network_ready(42);
+
+        expect_test::expect![[r#"
+            (
+                true,
+                Some(
+                    42,
+                ),
+                true,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            state.ready,
+            state.masterchain_seqno,
+            state.last_block_at.is_some(),
+        ));
+    }
 
     #[test]
     fn stop_clears_every_runtime_process() {

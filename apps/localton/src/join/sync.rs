@@ -38,7 +38,7 @@ pub(super) async fn wait_for_network_sync(
     toolchain: &Toolchain,
     node: &NodeSettings,
     liteserver: &LocalLiteserver,
-) -> Result<()> {
+) -> Result<u32> {
     let mut confirmations = 0;
     let mut last_log = Instant::now()
         .checked_sub(LOG_INTERVAL)
@@ -105,7 +105,7 @@ pub(super) async fn wait_for_network_sync(
                             "joined node synchronized"
                         );
 
-                        return Ok(());
+                        return Ok(local_head);
                     }
                 } else {
                     confirmations = 0;
