@@ -23,8 +23,6 @@ import {WalletNamesInput} from "./WalletNamesInput"
 
 import styles from "./CreateEnvironmentDialog.module.css"
 
-const MAX_FULL_TON_VALIDATORS = 7
-
 interface CreateEnvironmentDialogProps {
   readonly environmentCount: number
   readonly importSourceEnvironments: readonly StudioEnvironment[]
@@ -46,7 +44,6 @@ interface EnvironmentFormState {
   readonly blockIntervalMs: string
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
-  readonly validators: string
   readonly importedAccounts: readonly ImportedAccountForm[]
 }
 
@@ -182,11 +179,6 @@ export function CreateEnvironmentDialog({
               }
             : {
                 kind: "fullTonNetwork",
-                validators: optionalPositiveInteger(
-                  form.validators,
-                  "Validators",
-                  MAX_FULL_TON_VALIDATORS,
-                ),
                 importedAccounts,
               },
       }
@@ -236,8 +228,8 @@ export function CreateEnvironmentDialog({
             label="Environment type"
             description={
               form.kind === "actonLocalnet"
-                ? "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
-                : "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+                ? "Uses the Acton emulator, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                : "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
             }
             value={form.kind}
             autoFocus
@@ -350,15 +342,6 @@ export function CreateEnvironmentDialog({
             </>
           ) : (
             <div className={styles.fullTonFields}>
-              <Input
-                label="Validators"
-                description="Validator nodes started for this network. Each additional validator increases the startup time"
-                type="number"
-                min={1}
-                max={MAX_FULL_TON_VALIDATORS}
-                value={form.validators}
-                onChange={event => updateForm("validators", event.target.value)}
-              />
               <AccountImportEditor
                 accounts={form.importedAccounts}
                 sources={availableImportSources(importSourceEnvironments)}
@@ -406,7 +389,6 @@ function createInitialForm(environmentCount: number): EnvironmentFormState {
     blockIntervalMs: "",
     noMining: false,
     mineEmptyBlocks: false,
-    validators: "1",
     importedAccounts: [],
   }
 }

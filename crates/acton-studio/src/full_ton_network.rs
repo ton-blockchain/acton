@@ -136,7 +136,6 @@ impl FullTonNetworkDriver {
         api_v3_port: u16,
         admin_port: u16,
         config_port: u16,
-        validators: u16,
         imported_accounts: &[FullTonAccountImport],
         resolved_imported_accounts: Option<&[FullTonAccountImport]>,
     ) -> Result<Self, EnvironmentRuntimeError> {
@@ -190,7 +189,6 @@ impl FullTonNetworkDriver {
             api_v3_port,
             admin_port,
             config_port,
-            validators,
             &imported_account_bocs,
         );
         tokio::fs::write(&compose_file, compose)
@@ -848,7 +846,6 @@ fn render_compose(
     api_v3_port: u16,
     admin_port: u16,
     config_port: u16,
-    validators: u16,
     imported_account_bocs: &[String],
 ) -> String {
     COMPOSE_TEMPLATE
@@ -857,7 +854,6 @@ fn render_compose(
         .replace("__LOCALTON_V3_PORT__", &api_v3_port.to_string())
         .replace("__LOCALTON_ADMIN_PORT__", &admin_port.to_string())
         .replace("__LOCALTON_CONFIG_PORT__", &config_port.to_string())
-        .replace("__LOCALTON_VALIDATORS__", &validators.to_string())
         .replace(
             "__LOCALTON_IMPORTED_ACCOUNTS__",
             &render_imported_account_args(imported_account_bocs),
@@ -1050,16 +1046,11 @@ v3-worker (exited, exit code 1)"]]
             18181,
             18182,
             18183,
-            3,
             &[],
         );
         let selected_lines = compose
             .lines()
-            .filter(|line| {
-                line.contains("registry.example")
-                    || line.contains("127.0.0.1:1818")
-                    || line.contains("\"3\"")
-            })
+            .filter(|line| line.contains("registry.example") || line.contains("127.0.0.1:1818"))
             .collect::<Vec<_>>()
             .join("\n");
         let actual = format!(
@@ -1073,7 +1064,6 @@ v3-worker (exited, exit code 1)"]]
 
         expect![[r#"project: acton-studio-<workspace>-environment-7
     image: "registry.example/ton:build-42"
-      - "3"
       - "127.0.0.1:18183:18000"
       - "127.0.0.1:18182:18001"
       - "127.0.0.1:18180:18002"
@@ -1099,7 +1089,6 @@ v3-worker (exited, exit code 1)"]]
             18181,
             18182,
             18183,
-            1,
             &["b5ee9c72".to_owned(), "deadbeef".to_owned()],
         );
         let actual = compose
@@ -1125,7 +1114,6 @@ v3-worker (exited, exit code 1)"]]
             18181,
             18182,
             18183,
-            1,
             &[],
         );
         let bootstrap = compose
@@ -1344,7 +1332,6 @@ API DEPENDENCIES
             19181,
             19182,
             19183,
-            5,
             &[],
             None,
         )
@@ -1397,7 +1384,6 @@ API DEPENDENCIES
 
             COMPOSE
                 image: "registry.example/persisted/ton:build-17"
-                  - "5"
                   - "127.0.0.1:19183:18000"
                   - "127.0.0.1:19182:18001"
                   - "127.0.0.1:19180:18002"
@@ -1431,7 +1417,6 @@ API DEPENDENCIES
             18181,
             18182,
             18183,
-            1,
             &[],
             None,
         )

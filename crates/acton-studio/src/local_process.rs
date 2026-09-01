@@ -35,8 +35,6 @@ const FIRST_FULL_TON_V2_PORT: u16 = 18080;
 const FIRST_FULL_TON_V3_PORT: u16 = 18081;
 const FIRST_FULL_TON_ADMIN_PORT: u16 = 18082;
 const FIRST_FULL_TON_CONFIG_PORT: u16 = 18083;
-const DEFAULT_FULL_TON_VALIDATORS: u16 = 1;
-const MAX_FULL_TON_VALIDATORS: u16 = 7;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -1151,7 +1149,6 @@ fn resolve_request(
             api_v3_port,
             admin_port,
             config_port,
-            validators,
             mut imported_accounts,
         } => {
             validate_requested_port(api_v2_port)?;
@@ -1167,15 +1164,6 @@ fn resolve_request(
             excluded_ports.push(admin_port);
             let config_port =
                 select_port(FIRST_FULL_TON_CONFIG_PORT, config_port, &excluded_ports)?;
-            let validators = validators.unwrap_or(DEFAULT_FULL_TON_VALIDATORS);
-            if !(1..=MAX_FULL_TON_VALIDATORS).contains(&validators) {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_validators_invalid",
-                    message: format!(
-                        "Validator count must be between 1 and {MAX_FULL_TON_VALIDATORS}"
-                    ),
-                });
-            }
             for account in &mut imported_accounts {
                 account.shard_account_boc_hex = None;
             }
@@ -1184,50 +1172,11 @@ fn resolve_request(
                 api_v3_port,
                 admin_port,
                 config_port,
-                validators,
                 imported_accounts,
             }
         }
     };
     Ok((name, config))
-}
-
-#[cfg(test)]
-mod request_validation_tests {
-    use expect_test::expect;
-
-    use super::{EnvironmentRuntimeError, resolve_request};
-    use crate::{CreateEnvironmentConfig, CreateEnvironmentRequest};
-
-    #[test]
-    fn full_ton_network_rejects_eight_validators() {
-        let result = resolve_request(
-            CreateEnvironmentRequest {
-                name: "Full localnet".to_owned(),
-                config: CreateEnvironmentConfig::FullTonNetwork {
-                    api_v2_port: None,
-                    api_v3_port: None,
-                    admin_port: None,
-                    config_port: None,
-                    validators: Some(8),
-                    imported_accounts: Vec::new(),
-                },
-            },
-            &[],
-        );
-        let actual = match result {
-            Err(EnvironmentRuntimeError::InvalidRequest { code, message }) => {
-                format!("{code}\n{message}")
-            }
-            Err(error) => format!("unexpected error\n{error}"),
-            Ok(_) => "unexpected success".to_owned(),
-        };
-
-        expect![[r"
-            environment_validators_invalid
-            Validator count must be between 1 and 7"]]
-        .assert_eq(&actual);
-    }
 }
 
 fn validate_requested_port(port: Option<u16>) -> Result<(), EnvironmentRuntimeError> {
@@ -1453,7 +1402,6 @@ impl EnvironmentDriver {
                 api_v3_port,
                 admin_port,
                 config_port,
-                validators,
                 imported_accounts,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
@@ -1463,7 +1411,6 @@ impl EnvironmentDriver {
                 *api_v3_port,
                 *admin_port,
                 *config_port,
-                *validators,
                 imported_accounts,
                 resolved_imported_accounts,
             )

@@ -49,7 +49,6 @@ impl TestEnvironmentRuntime {
                 api_v3_port: 18_081,
                 admin_port: 18_082,
                 config_port: 18_083,
-                validators: 1,
                 imported_accounts: Vec::new(),
             },
             EnvironmentEndpoints {

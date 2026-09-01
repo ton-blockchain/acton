@@ -67,7 +67,6 @@ pub enum CreateEnvironmentConfig {
         api_v3_port: Option<u16>,
         admin_port: Option<u16>,
         config_port: Option<u16>,
-        validators: Option<u16>,
         #[serde(default)]
         imported_accounts: Vec<FullTonAccountImport>,
     },
@@ -187,7 +186,6 @@ pub enum EnvironmentConfig {
         api_v3_port: u16,
         admin_port: u16,
         config_port: u16,
-        validators: u16,
         imported_accounts: Vec<FullTonAccountImport>,
     },
     RemoteTonNetwork {

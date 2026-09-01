@@ -6,8 +6,6 @@ services:
       - --state-dir
       - /var/lib/localton
       - --ton-http-api
-      - --validators
-      - "__LOCALTON_VALIDATORS__"
 __LOCALTON_IMPORTED_ACCOUNTS__
     stop_grace_period: 60s
     restart: unless-stopped

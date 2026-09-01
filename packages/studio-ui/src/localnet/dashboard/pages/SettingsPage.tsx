@@ -39,8 +39,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const {environment} = useLocalnetRuntime()
   const localnetConfig =
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
-  const fullNetworkConfig =
-    environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const runtimeAvailable = environment?.status === "running"
   const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
   const hasMining = runtimeAvailable && supports(environment, "mining")
@@ -326,14 +324,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
                 value={formatForkState(environment)}
               />
             </>
-          ) : undefined}
-
-          {fullNetworkConfig ? (
-            <SettingsValueRow
-              label="Validators"
-              description="Validator nodes configured for this network"
-              value={<NumberValue value={fullNetworkConfig.validators ?? 1} />}
-            />
           ) : undefined}
 
           {hasControlApi ? (

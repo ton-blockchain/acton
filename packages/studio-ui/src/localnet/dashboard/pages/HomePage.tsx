@@ -461,9 +461,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                           <DataTableHeaderCell columnWidth="13%">Local blocks</DataTableHeaderCell>
                         </>
                       )}
-                      {fullNetworkConfig ? (
-                        <DataTableHeaderCell columnWidth="20%">Validators</DataTableHeaderCell>
-                      ) : showUptime ? (
+                      {showUptime ? (
                         <DataTableHeaderCell columnWidth={hasFork ? "12%" : "20%"}>
                           Uptime
                         </DataTableHeaderCell>
@@ -513,10 +511,10 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                                 <Tooltip
                                   content={
                                     fullNetworkConfig
-                                      ? "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+                                      ? "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
                                       : nodeInfo?.fork_network
                                         ? "Uses the Acton emulator and starts from a TON network snapshot, supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
-                                        : "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                                        : "Uses the Acton emulator, starts quickly, uses little disk space, and supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
                                   }
                                 >
                                   <button
@@ -553,9 +551,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                             <DataTableCell>{localBlockCount ?? "—"}</DataTableCell>
                           </>
                         )}
-                        {fullNetworkConfig ? (
-                          <DataTableCell>{fullNetworkConfig.validators}</DataTableCell>
-                        ) : showUptime ? (
+                        {showUptime ? (
                           <DataTableCell>
                             <Duration value={nodeInfo?.uptime_seconds} />
                           </DataTableCell>

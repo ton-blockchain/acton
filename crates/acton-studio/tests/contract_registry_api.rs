@@ -252,7 +252,6 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
             api_v3_port: 18081,
             admin_port: 18082,
             config_port: 18083,
-            validators: 1,
             imported_accounts: Vec::new(),
         },
         EnvironmentEndpoints {
