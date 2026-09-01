@@ -690,6 +690,10 @@ mod tests {
             .expect("in-memory CellDb flag must be present");
 
         assert_eq!(args[position + 1], "--initial-sync-delay");
-        assert!(!args.iter().any(|argument| argument == "--celldb-preload-all"));
+        assert!(
+            !args
+                .iter()
+                .any(|argument| argument == "--celldb-preload-all")
+        );
     }
 }

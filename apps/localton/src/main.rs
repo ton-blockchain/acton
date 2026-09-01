@@ -1,5 +1,6 @@
 mod binaries;
 mod bootstrap;
+mod cache;
 mod cli;
 mod http;
 mod join;

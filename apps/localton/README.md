@@ -255,6 +255,13 @@ The bootstrap instance collects host telemetry pushed by joined Localton instanc
 and combines it with its own TON reads. Collection is best effort: an unavailable
 dashboard does not stop a joined node or its validator-engine process.
 
+The dashboard maps globally routable advertised IPv4 addresses to countries with
+the offline [DB-IP Country Lite](https://db-ip.com/db/lite.php) database. Localton
+downloads the pinned database once into `<localton-cache>/geoip/`; individual node
+addresses are never sent to DB-IP or a map provider. Private and loopback addresses
+remain labeled as private network locations. If the database cannot be downloaded,
+the rest of the observability API and dashboard remain available.
+
 Open the bootstrap dashboard at `http://127.0.0.1:18007`. Its API is available at:
 
 ```text

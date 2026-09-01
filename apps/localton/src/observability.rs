@@ -261,8 +261,29 @@ pub struct NodeView {
     pub sync_lag_blocks: Option<u32>,
     pub current_validator: Option<bool>,
     pub next_validator: Option<bool>,
+    /// Approximate placement derived locally from the node's advertised address.
+    pub location: NodeLocation,
     #[serde(flatten)]
     pub telemetry: NodeTelemetry,
+}
+
+/// Country-level placement derived from an offline IP allocation database.
+///
+/// IP geolocation cannot identify a physical host location. The dashboard uses
+/// this value only for a coarse network distribution view.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum NodeLocation {
+    /// Country-level result for a globally routable address.
+    Country {
+        /// ISO 3166-1 alpha-2 country code.
+        country_code: String,
+        country: String,
+    },
+    /// Loopback, private, link-local, carrier-grade NAT, or reserved address.
+    Private,
+    /// A public address for which the local database has no usable record.
+    Unavailable,
 }
 
 /// Synchronization classification derived from node and network head samples.
@@ -614,6 +635,7 @@ impl ObservationStore {
                 sync_lag_blocks,
                 current_validator: current_membership,
                 next_validator: next_membership,
+                location: NodeLocation::Unavailable,
                 telemetry: telemetry.clone(),
             });
         }

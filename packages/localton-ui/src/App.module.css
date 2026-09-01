@@ -166,6 +166,15 @@
   font-size: var(--acton-font-size-sm);
 }
 
+.mapLoading {
+  display: grid;
+  min-height: 20rem;
+  place-items: center;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface-raised);
+}
+
 .observerEndpoint {
   display: grid;
   gap: 0.15rem;

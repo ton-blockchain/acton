@@ -63,6 +63,15 @@ export interface InitialSyncProgress {
   readonly state_download: StateDownloadProgress | null
 }
 
+export type NodeLocation =
+  | {
+      readonly kind: "country"
+      readonly country_code: string
+      readonly country: string
+    }
+  | {readonly kind: "private"}
+  | {readonly kind: "unavailable"}
+
 export interface NodeView {
   readonly observer_id: string
   readonly generated_at: number
@@ -102,6 +111,7 @@ export interface NodeView {
   readonly participate_in_elections: boolean
   readonly current_validator: boolean | null
   readonly next_validator: boolean | null
+  readonly location: NodeLocation
   readonly validator_public_key: string | null
   readonly validator_public_keys: readonly string[]
   readonly validator_adnl: string | null

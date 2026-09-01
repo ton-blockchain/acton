@@ -6,8 +6,6 @@
 //! atomically only after every step succeeds.
 
 use std::{
-    env,
-    ffi::OsString,
     fs::{self, File},
     io::{self, Read},
     path::{Path, PathBuf},
@@ -23,14 +21,12 @@ use tokio::io::AsyncWriteExt;
 use tracing::info;
 use zip::ZipArchive;
 
-use crate::storage::TON_RELEASE;
+use crate::{cache, storage::TON_RELEASE};
 
 use super::{
     REQUIRED_BINARIES,
     release::{current_asset, platform_id},
 };
-
-const CACHE_DIR_ENV: &str = "LOCALTON_CACHE_DIR";
 
 /// Resolves the pinned release from the shared cache or installs it once.
 ///
@@ -41,7 +37,7 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     let asset = current_asset()?;
     let platform = platform_id();
 
-    let release_dir = global_cache_root()?.join("ton").join(TON_RELEASE);
+    let release_dir = cache::root()?.join("ton").join(TON_RELEASE);
     let install_dir = release_dir.join(&platform);
 
     // The common case must not create or lock anything after the first install.
@@ -116,52 +112,6 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
 
     install_result?;
     Ok(install_dir)
-}
-
-fn global_cache_root() -> Result<PathBuf> {
-    cache_root_from(
-        env::var_os(CACHE_DIR_ENV),
-        env::var_os("HOME"),
-        env::var_os("XDG_CACHE_HOME"),
-    )
-}
-
-fn cache_root_from(
-    override_dir: Option<OsString>,
-    home_dir: Option<OsString>,
-    xdg_cache_dir: Option<OsString>,
-) -> Result<PathBuf> {
-    if let Some(path) = non_empty_path(override_dir) {
-        return Ok(path);
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let _ = xdg_cache_dir;
-        let home = non_empty_path(home_dir)
-            .context("HOME is not set; set LOCALTON_CACHE_DIR for the TON binary cache")?;
-        Ok(home.join("Library/Caches/localton"))
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(path) = non_empty_path(xdg_cache_dir) {
-            return Ok(path.join("localton"));
-        }
-        let home = non_empty_path(home_dir)
-            .context("HOME is not set; set LOCALTON_CACHE_DIR for the TON binary cache")?;
-        Ok(home.join(".cache/localton"))
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    {
-        let _ = (home_dir, xdg_cache_dir);
-        bail!("set LOCALTON_CACHE_DIR for the TON binary cache")
-    }
-}
-
-fn non_empty_path(value: Option<OsString>) -> Option<PathBuf> {
-    value.filter(|value| !value.is_empty()).map(PathBuf::from)
 }
 
 async fn acquire_install_lock(path: &Path) -> Result<File> {
@@ -344,39 +294,6 @@ fn extract_zip(archive_path: &Path, destination: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn explicit_cache_directory_has_highest_priority() {
-        let root = cache_root_from(
-            Some(OsString::from("/custom/localton-cache")),
-            Some(OsString::from("/users/test")),
-            Some(OsString::from("/xdg-cache")),
-        )
-        .unwrap();
-
-        assert_eq!(root, PathBuf::from("/custom/localton-cache"));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn macos_cache_uses_library_caches() {
-        let root = cache_root_from(None, Some(OsString::from("/users/test")), None).unwrap();
-
-        assert_eq!(root, PathBuf::from("/users/test/Library/Caches/localton"));
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn linux_cache_prefers_xdg_cache_home() {
-        let root = cache_root_from(
-            None,
-            Some(OsString::from("/users/test")),
-            Some(OsString::from("/xdg-cache")),
-        )
-        .unwrap();
-
-        assert_eq!(root, PathBuf::from("/xdg-cache/localton"));
-    }
 
     #[test]
     fn complete_installation_requires_matching_marker_and_resources() {

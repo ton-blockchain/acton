@@ -43,8 +43,10 @@ use super::{
     server,
 };
 
+mod geoip;
 mod network;
 
+use geoip::GeoIpResolver;
 use network::NodeHeadSample;
 
 const MAX_TELEMETRY_BODY_BYTES: usize = 256 * 1024;
@@ -54,12 +56,14 @@ static UI_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/../../packages/localton-ui/dist/.embedded");
 
 type SharedStore = Arc<RwLock<ObservationStore>>;
+type SharedGeoIp = Arc<RwLock<Option<GeoIpResolver>>>;
 
 #[derive(Clone)]
 struct ObservabilityState {
     store: SharedStore,
     network: watch::Receiver<Option<VerifiedNetworkState>>,
     local_node_is_network_source: bool,
+    geoip: SharedGeoIp,
 }
 
 /// HTTP listener and background tasks that share one observation shutdown signal.
@@ -121,11 +125,13 @@ pub(super) async fn start(
     let (network_updates, network_snapshot) = watch::channel(None);
     let (node_updates, node_snapshot) = watch::channel(None);
     let local_node_is_network_source = settings.node.role == NodeRole::Genesis;
+    let geoip = Arc::new(RwLock::new(None));
 
     let state = ObservabilityState {
         store: Arc::clone(&store),
         network: network_snapshot,
         local_node_is_network_source,
+        geoip: Arc::clone(&geoip),
     };
 
     let api = Router::new()
@@ -180,7 +186,12 @@ pub(super) async fn start(
         local_node_is_network_source.then(|| node_updates.clone()),
         shutdown.clone(),
     ));
-    let mut tasks = vec![publisher, network_reader];
+    let geoip_loader = tokio::spawn(async move {
+        if let Ok(resolver) = GeoIpResolver::load().await {
+            *geoip.write().await = Some(resolver);
+        }
+    });
+    let mut tasks = vec![publisher, network_reader, geoip_loader];
     if !local_node_is_network_source {
         tasks.push(tokio::spawn(network::node_collection_loop(
             layout,
@@ -207,11 +218,21 @@ async fn openapi_handler() -> Json<utoipa::openapi::OpenApi> {
 )]
 async fn network_handler(State(state): State<ObservabilityState>) -> Json<NetworkView> {
     let network = state.network.borrow().clone();
-    Json(state.store.write().await.aggregate(
+    let mut view = state.store.write().await.aggregate(
         unix_time(),
         network.as_ref(),
         state.local_node_is_network_source,
-    ))
+    );
+
+    let geoip = state.geoip.read().await;
+    for node in &mut view.nodes {
+        node.location = geoip.as_ref().map_or_else(
+            || geoip::location_without_database(&node.telemetry.public_ip),
+            |geoip| geoip.locate(&node.telemetry.public_ip),
+        );
+    }
+
+    Json(view)
 }
 
 #[utoipa::path(
