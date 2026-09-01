@@ -900,7 +900,7 @@ const NODE_ROLE_PRESENTATION: Record<
   validator: {
     letter: "V",
     label: "Validator",
-    description: "Validator mode and validator key management are enabled",
+    description: "Participates in the current validator set",
   },
   liteserver: {
     letter: "L",
@@ -985,9 +985,11 @@ function NodesTable({nodes, now}: {readonly nodes: readonly NodeView[]; readonly
                 </DataTableCell>
                 <DataTableCell>
                   <div className="role-list" aria-label={`${node.name} roles`}>
-                    {node.roles.map(role => (
-                      <NodeRoleBadge role={role} key={role} />
-                    ))}
+                    {node.roles
+                      .filter(role => role !== "validator" || node.active_validator)
+                      .map(role => (
+                        <NodeRoleBadge role={role} key={role} />
+                      ))}
                   </div>
                 </DataTableCell>
                 <DataTableCell align="right">
