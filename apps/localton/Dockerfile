@@ -5,7 +5,7 @@ ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
 ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
 
-FROM rust:${RUST_VERSION}-bookworm AS localton-builder
+FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
 WORKDIR /src
 
 COPY Cargo.toml Cargo.lock ./
@@ -26,10 +26,10 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
     && install -Dm755 target/release/xtask /out/xtask
 
 # Development target: reuse the native TON and indexer layers from the published
-# image and replace only the localton binary built from this checkout.
+# image and replace only the localton launcher built from this checkout.
 FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
 USER root
-COPY --from=localton-builder --chmod=0755 /out/localton /usr/local/bin/localton
+COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
 COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
 RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
@@ -183,8 +183,8 @@ ENV CCACHE_COMPRESS=true
 ENV CCACHE_MAXSIZE=4G
 ENV USERVER_FEATURE_STACK_USAGE_MONITOR=0
 
-COPY --from=localton-builder /out/localton /usr/local/bin/localton
-COPY --from=localton-builder /out/xtask /usr/local/bin/xtask
+COPY --from=launcher-builder /out/localton /usr/local/bin/localton
+COPY --from=launcher-builder /out/xtask /usr/local/bin/xtask
 
 RUN --mount=type=cache,id=ton-http-api-v2-ccache,target=/tmp/http-api-build/tools/ton-http-api-v2/ccache \
     xtask build-ton-http-api-v2 \
@@ -361,7 +361,7 @@ RUN apt-get update \
     && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan \
     && install -d -m 0755 /usr/share/doc/localton
 
-COPY --from=localton-builder /out/localton /usr/local/bin/localton
+COPY --from=launcher-builder /out/localton /usr/local/bin/localton
 COPY --from=ton-binaries /opt/ton /opt/ton
 COPY --from=http-api-builder /opt/ton-http-api-v2 /opt/ton-http-api-v2
 COPY --from=ton-indexer-builder \
