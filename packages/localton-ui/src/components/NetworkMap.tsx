@@ -27,16 +27,10 @@ function NetworkMap({nodes}: NetworkMapProps) {
     }))
   const privateNodes = nodes.filter(node => node.location.kind === "private")
   const unavailableNodes = nodes.filter(node => node.location.kind === "unavailable")
-  const locatedNodes = countries.reduce((total, country) => total + country.nodes.length, 0)
 
   return (
-    <section className={styles.container} aria-labelledby="node-locations-title">
+    <section className={styles.container} aria-label="Node locations by public IP">
       <div className={styles.mapPanel}>
-        <div className={styles.heading}>
-          <h3 id="node-locations-title">Node locations by public IP</h3>
-          <span>{locatedNodes.toLocaleString()} located</span>
-        </div>
-
         <div className={styles.map}>
           <WorldMap
             data={mapData}
@@ -79,7 +73,6 @@ function NetworkMap({nodes}: NetworkMapProps) {
           <ul className={styles.locationList}>
             {countries.map(country => (
               <li key={country.code} className={styles.locationRow}>
-                <span className={styles.locationMarker} data-kind="country" aria-hidden="true" />
                 <span className={styles.locationText}>
                   <strong>{country.country}</strong>
                   <span>{country.nodes.map(node => node.name).join(", ")}</span>
@@ -91,7 +84,6 @@ function NetworkMap({nodes}: NetworkMapProps) {
             ))}
             {privateNodes.length > 0 ? (
               <li className={styles.locationRow}>
-                <span className={styles.locationMarker} data-kind="private" aria-hidden="true" />
                 <span className={styles.locationText}>
                   <strong>Private network</strong>
                   <span>{privateNodes.map(node => node.name).join(", ")}</span>
@@ -101,11 +93,6 @@ function NetworkMap({nodes}: NetworkMapProps) {
             ) : null}
             {unavailableNodes.length > 0 ? (
               <li className={styles.locationRow}>
-                <span
-                  className={styles.locationMarker}
-                  data-kind="unavailable"
-                  aria-hidden="true"
-                />
                 <span className={styles.locationText}>
                   <strong>Location unavailable</strong>
                   <span>{unavailableNodes.map(node => node.name).join(", ")}</span>

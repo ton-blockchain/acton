@@ -1,3 +1,4 @@
+import {lazy, Suspense, useState} from "react"
 import {
   ByteSize,
   DataTable,
@@ -8,7 +9,9 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  Disclosure,
   Duration,
+  InlineLoader,
   Percentage,
   TechnicalValue,
   Tooltip,
@@ -17,6 +20,8 @@ import {
 import type {InitialSyncProgress, NodeView} from "../types"
 import {StatusPill} from "./StatusPill"
 import styles from "./NodesSection.module.css"
+
+const NetworkMap = lazy(() => import("./NetworkMap"))
 
 interface NodesSectionProps {
   readonly nodes: readonly NodeView[]
@@ -63,12 +68,38 @@ const NODE_ROLE_PRESENTATION: Record<
 
 /** Owns node synchronization, role, production, and observer columns for the network view */
 export function NodesSection({nodes, now}: NodesSectionProps) {
+  const [locationsOpen, setLocationsOpen] = useState(false)
+  const locatedNodes = nodes.filter(node => node.location.kind === "country").length
+
   return (
     <section id="nodes" className={styles.sectionStack} aria-labelledby="nodes-title">
       <div className={styles.sectionHeading}>
         <h2 id="nodes-title">Nodes and synchronization</h2>
       </div>
       <NodesTable nodes={nodes} now={now} />
+      <Disclosure
+        className={styles.locationDisclosure}
+        label={
+          <span className={styles.locationDisclosureLabel}>
+            <span>Node locations by public IP</span>
+            <span>{locatedNodes.toLocaleString()} located</span>
+          </span>
+        }
+        contentClassName={styles.locationDisclosureContent}
+        onToggle={event => setLocationsOpen(event.currentTarget.open)}
+      >
+        {locationsOpen ? (
+          <Suspense
+            fallback={
+              <div className={styles.mapLoading}>
+                <InlineLoader message="Loading node locations" />
+              </div>
+            }
+          >
+            <NetworkMap nodes={nodes} />
+          </Suspense>
+        ) : null}
+      </Disclosure>
     </section>
   )
 }

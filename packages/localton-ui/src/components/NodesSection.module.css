@@ -20,6 +20,37 @@
   letter-spacing: -0.012em;
 }
 
+.locationDisclosure {
+  border: 0;
+}
+
+.locationDisclosure > summary:hover {
+  background: transparent;
+}
+
+.locationDisclosureContent {
+  padding: 0.85rem 0 0;
+}
+
+.locationDisclosureLabel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.locationDisclosureLabel > span:last-child {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
+.mapLoading {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+}
+
 .nodesTable th:nth-child(1) {
   width: 10%;
 }

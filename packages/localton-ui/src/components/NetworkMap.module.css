@@ -12,28 +12,6 @@
   padding: 1rem 1.25rem 0.8rem;
 }
 
-.heading {
-  display: flex;
-  min-height: 1.75rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.heading h3 {
-  margin: 0;
-  font-size: var(--acton-font-size-sm);
-  font-weight: var(--acton-font-weight-semibold);
-  letter-spacing: -0.008em;
-}
-
-.heading > span {
-  flex: 0 0 auto;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  font-variant-numeric: tabular-nums;
-}
-
 .map {
   display: grid;
   min-height: 17rem;
@@ -101,7 +79,7 @@
 .locationRow {
   display: grid;
   min-height: 3.7rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
   padding: 0.7rem 0.9rem;
@@ -110,22 +88,6 @@
 
 .locationRow:last-child {
   border-bottom: 0;
-}
-
-.locationMarker {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: var(--acton-color-text-subtle);
-}
-
-.locationMarker[data-kind="country"] {
-  background: var(--acton-color-accent);
-}
-
-.locationMarker[data-kind="private"] {
-  border: 1px solid var(--acton-color-border-strong);
-  background: transparent;
 }
 
 .locationText {

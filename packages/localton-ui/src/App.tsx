@@ -1,4 +1,4 @@
-import {lazy, Suspense, useEffect, useRef, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {
   Activity,
   Boxes,
@@ -34,8 +34,6 @@ import styles from "./App.module.css"
 import type {NetworkView, NodeView, ShardHead} from "./types"
 
 const POLL_INTERVAL_MS = 2000
-const NetworkMap = lazy(() => import("./components/NetworkMap"))
-
 export function App() {
   const [network, setNetwork] = useState<NetworkView>()
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
@@ -171,15 +169,6 @@ export function App() {
                   <span>Waiting for TON network data</span>
                 </div>
               )}
-              <Suspense
-                fallback={
-                  <div className={styles.mapLoading}>
-                    <InlineLoader message="Loading node locations" />
-                  </div>
-                }
-              >
-                <NetworkMap nodes={network.nodes} />
-              </Suspense>
             </section>
 
             <ElectionSection election={network.election} now={now} />
