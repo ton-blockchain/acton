@@ -180,6 +180,7 @@ export interface V3ActionBase<TType extends string, TDetails> {
   readonly end_lt: string
   readonly end_utime: number
   readonly finality: string
+  readonly parent_gasless_action?: string | null
   readonly start_lt: string
   readonly start_utime: number
   readonly success: boolean | null
@@ -207,6 +208,17 @@ export interface V3ActionDetailsContractDeploy {
   readonly source?: V3ActionAddress
   readonly destination?: V3ActionAddress
   readonly value?: V3ActionString
+}
+
+export interface V3ActionDetailsChangeWalletKey {
+  readonly source?: V3ActionAddress
+  readonly destination: V3ActionAddress
+}
+
+export interface V3ActionDetailsGaslessRequest {
+  readonly source: V3ActionAddress
+  readonly destination: V3ActionAddress
+  readonly value: V3ActionString
 }
 
 export interface V3ActionDetailsTonTransfer {
@@ -1045,6 +1057,8 @@ export type V3Action =
   | V3ActionBase<"cocoon_grant_refund", V3ActionDetailsCocoonGrantRefund>
   | V3ActionBase<"cocoon_client_increase_stake", V3ActionDetailsCocoonClientIncreaseStake>
   | V3ActionBase<"cocoon_client_withdraw", V3ActionDetailsCocoonClientWithdraw>
+  | V3ActionBase<"change_wallet_key", V3ActionDetailsChangeWalletKey>
+  | V3ActionBase<"gasless_request", V3ActionDetailsGaslessRequest>
 
 export interface V3TransactionsResponse {
   readonly address_book: Record<string, V3AddressBookRow>
