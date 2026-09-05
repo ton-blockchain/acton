@@ -2,6 +2,7 @@ import {expect, mock, test} from "bun:test"
 import {beginCell} from "@ton/core"
 
 import {buildToncoinBlockDownloadUrl, TonClient} from "../src/api/client"
+import {getHistoryActionLabel} from "../src/components/AccountDetails"
 
 const mockFetch = (
   implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
@@ -754,6 +755,79 @@ test("account action metadata skips master lookup when the symbol is present", a
         ],
       }
     `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("account actions keep gasless markers and label the actions they produced", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = mockFetch(async () =>
+    Response.json({
+      actions: [
+        {
+          action_id: "gasless-request",
+          type: "gasless_request",
+          success: true,
+          details: {source: "0:relayer", destination: "0:wallet", value: "25000000"},
+          parent_gasless_action: "outer-gasless-request",
+        },
+        {
+          action_id: "change-wallet-key",
+          type: "change_wallet_key",
+          success: true,
+          details: {source: null, destination: "0:wallet"},
+          parent_gasless_action: "gasless-request",
+        },
+        {
+          action_id: "relayed-jetton-transfer",
+          type: "jetton_transfer",
+          success: true,
+          details: {},
+          parent_gasless_action: "gasless-request",
+        },
+        {
+          action_id: "relayed-dns-purchase",
+          type: "dns_purchase",
+          success: true,
+          details: {},
+          parent_gasless_action: "gasless-request",
+        },
+        {
+          action_id: "plain-jetton-transfer",
+          type: "jetton_transfer",
+          success: true,
+          details: {},
+        },
+      ],
+      address_book: {},
+      metadata: {},
+    }),
+  )
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const response = await client.getAccountActions("EQAddress")
+
+    expect(
+      response.actions.map(action => ({
+        type: action.type,
+        parent: action.parent_gasless_action ?? null,
+        label: getHistoryActionLabel(action, false),
+      })),
+    ).toEqual([
+      // A relayed relay stays "Gasless request" instead of "Gasless gasless request".
+      {type: "gasless_request", parent: "outer-gasless-request", label: "Gasless request"},
+      {type: "change_wallet_key", parent: "gasless-request", label: "Gasless change wallet key"},
+      {type: "jetton_transfer", parent: "gasless-request", label: "Gasless token transfer"},
+      // Labels that start with their own capitals keep them.
+      {type: "dns_purchase", parent: "gasless-request", label: "Gasless DNS purchase"},
+      {type: "jetton_transfer", parent: null, label: "Token transfer"},
+    ])
   } finally {
     globalThis.fetch = originalFetch
   }

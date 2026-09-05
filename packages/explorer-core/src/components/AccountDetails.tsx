@@ -60,6 +60,7 @@ import {
   FileCode2,
   Filter,
   Flame,
+  Fuel,
   Gavel,
   Globe2,
   History,
@@ -2266,6 +2267,7 @@ const ACTION_TYPE_LABELS = {
   auction_outbid: "Auction outbid",
   call_contract: "Called contract",
   change_dns: "Change DNS",
+  change_wallet_key: "Change wallet key",
   cocoon_client_change_secret_hash: "Change secret hash",
   cocoon_client_increase_stake: "Increase stake",
   cocoon_client_register: "Register client",
@@ -2297,6 +2299,7 @@ const ACTION_TYPE_LABELS = {
   evaa_supply: "EVAA supply",
   evaa_withdraw: "EVAA withdraw",
   extra_currency_transfer: "Extra currency transfer",
+  gasless_request: "Gasless request",
   jetton_burn: "Burn token",
   jetton_mint: "Mint token",
   jetton_swap: "Swap tokens",
@@ -2352,6 +2355,7 @@ const ACTION_TYPE_ICONS = {
   auction_outbid: Gavel,
   call_contract: Code2,
   change_dns: Globe2,
+  change_wallet_key: KeyRound,
   cocoon_client_change_secret_hash: KeyRound,
   cocoon_client_increase_stake: Pickaxe,
   cocoon_client_register: ServerCog,
@@ -2383,6 +2387,7 @@ const ACTION_TYPE_ICONS = {
   evaa_supply: Landmark,
   evaa_withdraw: Landmark,
   extra_currency_transfer: WalletCards,
+  gasless_request: Fuel,
   jetton_burn: Flame,
   jetton_mint: BadgePlus,
   jetton_swap: RefreshCw,
@@ -2519,12 +2524,35 @@ function buildHistoryActionRows(
   }))
 }
 
-function getHistoryActionLabel(action: V3Action, isIncoming: boolean): string {
+export function getHistoryActionLabel(action: V3Action, isIncoming: boolean): string {
+  const label = getHistoryActionBaseLabel(action, isIncoming)
+
+  // A `gasless_request` marker is itself relayable, so never read "Gasless gasless request".
+  if (action.type === "gasless_request" || !isNonEmptyString(action.parent_gasless_action)) {
+    return label
+  }
+
+  return `Gasless ${uncapitalizeLabel(label)}`
+}
+
+function getHistoryActionBaseLabel(action: V3Action, isIncoming: boolean): string {
   if (action.type === "ton_transfer") {
     return isIncoming ? "Received GRAM" : "Send GRAM"
   }
 
   return ACTION_TYPE_LABELS[action.type] ?? "Unsupported action"
+}
+
+// Base labels are sentence case, so they lowercase cleanly behind a prefix - unless the first
+// word carries its own capitals ("DNS purchase", "LayerZero send"), which stay untouched.
+function uncapitalizeLabel(label: string): string {
+  const [firstWord = ""] = label.split(" ")
+  const rest = firstWord.slice(1)
+  if (rest !== rest.toLowerCase()) {
+    return label
+  }
+
+  return `${label.charAt(0).toLowerCase()}${label.slice(1)}`
 }
 
 function getHistoryActionIcon(action: V3Action, info: HistoryActionInfo): LucideIcon {
@@ -2570,7 +2598,9 @@ function collectActionMessageNameAddresses(actions: readonly V3Action[]): string
 
     switch (action.type) {
       case "call_contract":
+      case "change_wallet_key":
       case "contract_deploy":
+      case "gasless_request":
         addHistoryAddress(addresses, action.details.source)
         addHistoryAddress(addresses, action.details.destination)
         break
@@ -3453,6 +3483,23 @@ function getHistoryActionDisplay(
         context.ownerAddress,
         () => EMPTY_VALUE_LINES,
         "Cocoon",
+      )
+    case "change_wallet_key":
+      return sourceDestinationAction(
+        action.details.source ?? null,
+        action.details.destination,
+        context.ownerAddress,
+        () => EMPTY_VALUE_LINES,
+        "Wallet",
+      )
+    case "gasless_request":
+      return sourceDestinationAction(
+        action.details.source,
+        action.details.destination,
+        context.ownerAddress,
+        isIncoming =>
+          valueLines(tonValueLine(action.details.value, isIncoming ? "positive" : "negative")),
+        "Relayer",
       )
     default:
       return unsupportedActionDisplay(action)

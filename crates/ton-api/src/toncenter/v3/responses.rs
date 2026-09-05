@@ -607,6 +607,8 @@ pub struct Action {
     pub end_lt: String,
     pub end_utime: u32,
     pub finality: String,
+    #[serde(default)]
+    pub parent_gasless_action: Option<String>,
     pub start_lt: String,
     pub start_utime: u32,
     #[serde(default)]
